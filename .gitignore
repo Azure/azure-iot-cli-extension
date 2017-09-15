@@ -270,10 +270,6 @@ paket-files/
 # CodeRush
 .cr/
 
-# Python Tools for Visual Studio (PTVS)
-__pycache__/
-*.pyc
-
 # Cake - Uncomment if you are using it
 # tools/**
 # !tools/packages.config
@@ -286,3 +282,43 @@ __pycache__/
 *.btm.cs
 *.odx.cs
 *.xsd.cs
+
+# Python
+__pycache__/
+*.pyc
+
+# Virtual environment
+env/
+env27/
+env36/
+.python-version
+
+# PTVS analysis
+.ptvs/
+
+# Build results
+obj/
+dist/
+MANIFEST
+packaged_releases/windows/out
+
+# Result of running python setup.py install/pip install -e
+RECORD.txt
+build/
+*.egg-info/
+
+.idea
+src/build
+*.iml
+/doc/_build
+/doc/sphinx/_build
+/.vs/config/applicationhost.config
+.vscode/settings.json
+.vscode/.ropeproject/
+.vscode/tags
+.vscode/cSpell.json
+.project
+.pydevproject
+
+# Code coverage
+.coverage
