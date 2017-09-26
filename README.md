@@ -4,6 +4,8 @@
 
 This project provides new and exciting IoT commands and capabilities that do not exist in the vanilla Azure CLI. Functionality is provided as an Az CLI extension package.
 
+Prebuilt package distributed on [Pypi](https://pypi.python.org/pypi/azure-cli-iot-ext)
+
 # Features
 
 - New device message send (device-to-cloud) supporting **amqp, mqtt and http** protocols
@@ -28,7 +30,7 @@ For more information on C++ dependencies refer to the [Python IoT SDK project](h
 
 Now you can leverage the Az CLI add extension capability. You will need to point the --source parameter to the IoT extension wheel package, either locally or a target URI. 
 
-To build the wheel locally, run `python setup.py bdist_wheel` where the current directory is the extension root.
+To build the wheel locally, ensure you have the `wheel` package installed i.e. `pip install wheel`. Then run `python setup.py bdist_wheel` where the current directory is the extension root.
 
 An official Pypi distribution will be released soon.
 
