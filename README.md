@@ -22,13 +22,15 @@ This extension depends on Az CLI and will supplement existing IoT commands. **Ev
 
 First follow the installation instructions on [GitHub](https://github.com/Azure/azure-cli) or [Microsoft Docs](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest) to setup Python and the Azure CLI in your environment.
 
-Next depending on your platform install required C++ libraries.
+Next depending on your OS environment you will need to install required C++ and Python shared libraries. These requirements come from the Azure [Python IoT SDK](https://github.com/Azure/azure-iot-sdk-python).
 - For Windows, install the Visual [C++ VS 15 redistributable](https://www.microsoft.com/en-us/download/details.aspx?id=48145)
-- For Linux, make sure you have at least libboost1.58 installed
+- For Linux (Ubuntu) ensure you have the following components installed
+    - libboost1.54-all-dev
+    - libpython3.4
 
-For more information on C++ dependencies refer to the [Python IoT SDK project](https://github.com/Azure/azure-iot-sdk-python/blob/master/doc/python-devbox-setup.md#install-the-python-modules-using-pypi-wheels-from-pypi) which is a provider for this extension.
+For more information on these dependencies refer to the [Python IoT SDK](https://github.com/Azure/azure-iot-sdk-python/blob/master/doc/python-devbox-setup.md#install-the-python-modules-using-pypi-wheels-from-pypi) project which is the major provider for this extension.
 
-Now you can leverage the Az CLI add extension capability. You will need to point the --source parameter of the add command to the IoT extension wheel package, either locally or a target URI. 
+Now that your environment has fulfilled prereqs you can leverage the Az CLI **extension add** capability. You will need to point the --source parameter of the add command to the IoT extension wheel package, either locally or a target URI. 
 
 The easiest way to install is use the official [Pypi](https://pypi.python.org/pypi/azure-cli-iot-ext) distributed package, but you can also create a package locally.
 
