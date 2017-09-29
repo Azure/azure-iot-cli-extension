@@ -24,9 +24,10 @@ First follow the installation instructions on [GitHub](https://github.com/Azure/
 
 Next depending on your OS environment you will need to install required C++ and Python shared libraries. These requirements come from the Azure [Python IoT SDK](https://github.com/Azure/azure-iot-sdk-python).
 - For Windows, install the Visual [C++ VS 15 redistributable](https://www.microsoft.com/en-us/download/details.aspx?id=48145)
-- For Linux (Ubuntu) ensure you have the following components installed
+- For Linux (Ubuntu 14/16) ensure you have the following components installed
     - libboost1.54-all-dev
-    - libpython3.4
+    - libpython2.7 (for Python 2.7) or libpython3.4 (for Python 3.4+)
+    - libcurl4-openssl-dev
 
 For more information on these dependencies refer to the [Python IoT SDK](https://github.com/Azure/azure-iot-sdk-python/blob/master/doc/python-devbox-setup.md#install-the-python-modules-using-pypi-wheels-from-pypi) project which is the major provider for this extension.
 
