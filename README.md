@@ -20,30 +20,47 @@ Checkout the prebuilt package distributed on [Pypi](https://pypi.python.org/pypi
 
 This extension depends on Az CLI and will supplement existing IoT commands. **Even** if you have Az CLI installed make sure it is up to date and **supports** the `az extension` feature!
 
+### Azure CLI
+
 First follow the installation instructions on [GitHub](https://github.com/Azure/azure-cli) or [Microsoft Docs](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest) to setup Python and the Azure CLI in your environment.
 
+### OS environment dependencies
+
 Next depending on your OS environment you will need to install required C++ and Python shared libraries. These requirements come from the Azure [Python IoT SDK](https://github.com/Azure/azure-iot-sdk-python).
-- For Windows, install the Visual [C++ VS 15 redistributable](https://www.microsoft.com/en-us/download/details.aspx?id=48145)
-- For Linux (Ubuntu 14/16) ensure you have the following components installed
-    - libboost1.54-all-dev
-    - libpython2.7 (for Python 2.7) or libpython3.4 (for Python 3.4+)
+
+#### Windows
+- Install the Visual [C++ VS 15 redistributable](https://www.microsoft.com/en-us/download/details.aspx?id=48145)
+
+#### Linux
+- The IoT SDK should work for Ubuntu Trusty and Xenial. 
+- Ensure you have the following dependencies installed.
+    - libboost1.54-all-dev ([trusty universe](https://packages.ubuntu.com/search?keywords=libboost1.54-all-dev&searchon=names&suite=all&section=all))
+    - libpython2.7 for Python 2.7 or libpython3.4 for Python 3.4+ ([trusty](https://packages.ubuntu.com/search?suite=all&section=all&arch=any&keywords=libpython3.4&searchon=names))
     - libcurl4-openssl-dev
+
+    **Notes**: 
+        
+    It is recommended to use package managers like apt-get or aptitude to install dependencies. 
+    
+    Read [this resource](https://digimaun.github.io/cloudsauce/2017/09/25/ubuntu-xenial-leveraging-trusty-packages/) to learn how to use trusty packages in xenial, with a specific example using libboost1.54-all-dev.
+    
 
 For more information on these dependencies refer to the [Python IoT SDK](https://github.com/Azure/azure-iot-sdk-python/blob/master/doc/python-devbox-setup.md#install-the-python-modules-using-pypi-wheels-from-pypi) project which is the major provider for this extension.
 
-Now that your environment has fulfilled prereqs you can leverage the Az CLI **extension add** capability. You will need to point the --source parameter of the add command to the IoT extension wheel package, either locally or a target URI. 
-
-The easiest way to install is use the official [Pypi](https://pypi.python.org/pypi/azure-cli-iot-ext) distributed package, but you can also create a package locally.
-
-To build the wheel locally, ensure you have the `wheel` package installed i.e. `pip install wheel`. Then run `python setup.py bdist_wheel` where the current directory is the extension root.
+### Add extension to Az CLI 
+Now that your environment has fulfilled prereqs you can leverage the Az CLI **extension add** capability. You will need to point the **--source** parameter of the add command to the IoT extension wheel package, either locally or a target URI.
 
 ```
 az extension add --source <filepath.whl OR uri for .whl>
 ```
 
-The command will download and install any additional Python dependencies required and may take a couple minutes to complete.
+The easiest way to add the extension is to use the official [Pypi](https://pypi.python.org/pypi/azure-cli-iot-ext) distributed package, but you can also create a package locally from source.
 
-After the extension add command finishes, the `az iot <subcommand>` collection should have new and overriden commands available for use.
+To build the wheel locally, ensure you have the `wheel` package installed i.e. `pip install wheel`. Then run `python setup.py bdist_wheel` where the current directory is the extension root.
+
+The az extension add command will download and install any additional Python dependencies required and may take a couple minutes to complete.
+
+After the command finishes, the `az iot <subcommand>` collection should have new and overriden commands available for use.
 
 
 # Command Guide
