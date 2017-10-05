@@ -1,4 +1,4 @@
 {
-    "azext.minCliVersion": "2.0.15+dev",
-    "version": "0.1.1"
+    "azext.minCliCoreVersion": "2.0.16",
+    "version": "0.1.2"
 }
