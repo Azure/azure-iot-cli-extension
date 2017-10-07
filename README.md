@@ -37,6 +37,7 @@ Next depending on your OS environment you will need to install required C++ and 
     - libboost1.54-all-dev ([trusty universe](https://packages.ubuntu.com/search?keywords=libboost1.54-all-dev&searchon=names&suite=all&section=all))
     - libpython2.7 for Python 2.7 or libpython3.4 for Python 3.4+ ([trusty](https://packages.ubuntu.com/search?suite=all&section=all&arch=any&keywords=libpython3.4&searchon=names))
     - libcurl4-openssl-dev
+    - Example [Xenial](https://aka.ms/azure-iotsdk-bootstrap-xenial) and [Trusty](https://aka.ms/azure-iotsdk-bootstrap-trusty) IoT SDK dependency installation scripts
 
     **Notes**: 
         
@@ -120,7 +121,7 @@ Update the following environment variables prior to running integration tests.
 
 - Device feedback has a variable event trigger time.
 - Device feedback may have issues with Py3 installations.
-- iot device message send will take user_id as input but will be inserted.
+- The command 'iot device message send' will take user_id as input but will insert the value
 in the message property bag rather than message meta data (until SDK updates).
 - Chatty provider function output may still leak to std out.
 
