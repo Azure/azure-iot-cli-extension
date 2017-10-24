@@ -2,6 +2,11 @@
 
 Release History
 ===============
+0.1.2
++++++++++++++++
+* Updated extension metadata with tweaked Az CLI names.
+* Device simulate supports receive count of infinity and message count of 0.
+
 0.1.1
 +++++++++++++++
 * Collection of new commands most of which use IoT SDK as the provider
