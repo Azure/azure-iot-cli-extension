@@ -136,10 +136,10 @@ def iot_hub_message_send(client, device_id, hub_name, message_id=str(uuid.uuid4(
 
 def iot_simulate_device(client, device_id, hub_name, settle='complete', protocol='amqp', data="Ping from Azure CLI",
                         message_count=5, message_interval=1, receive_count=None, file_path=None):
-    if message_count < 1:
-        raise CLIError("message_count must be > 0!")
+    if message_count < 0:
+        raise CLIError("message-count must be at least 0!")
     if message_interval < 1:
-        raise CLIError("message_interval must be > 0!")
+        raise CLIError("message-interval must be > 0!")
 
     try:
         protocol = _iot_sdk_device_process_protocol(protocol)
@@ -161,8 +161,12 @@ def iot_simulate_device(client, device_id, hub_name, settle='complete', protocol
             time.sleep(message_interval)
 
         if receive_count:
-            while sim_client.received() < receive_count:
-                time.sleep(1)
+            if receive_count == -1:
+                while True:
+                    time.sleep(1)
+            else:
+                while sim_client.received() < receive_count:
+                    time.sleep(1)
 
     except IoTHubClientError as e:
         raise CLIError("Unexpected client error %s" % e)

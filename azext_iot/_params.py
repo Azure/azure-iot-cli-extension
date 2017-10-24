@@ -47,8 +47,9 @@ register_cli_argument('iot device simulate', 'protocol',
 register_cli_argument('iot device simulate', 'settle',
                       help='Indicate how the received messages should be settled.',
                       arg_group="simulation", **enum_choice_list(SettleType))
-register_cli_argument('iot device simulate', 'receive_count', options_list=('--receive_count, -rc'),
-                      arg_group="simulation", help="Number of messages to receive as device.", type=int)
+register_cli_argument('iot device simulate', 'receive_count', options_list=('--receive-count, -rc'),
+                      arg_group="simulation", help="Number of messages to receive as device. Use -1 for infinity.",
+                      type=int)
 register_cli_argument('iot device simulate', 'message_count', options_list=('--message-count, -mc'),
                       arg_group="simulation", help="Number of messages to send as device.", type=int)
 register_cli_argument('iot device simulate', 'message_interval', options_list=('--message-interval, -mi'),
