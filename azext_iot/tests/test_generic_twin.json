@@ -1,0 +1,29 @@
+{
+  "authenticationType": "sas",
+  "capabilities": {
+    "iotEdge": true
+  },
+  "cloudToDeviceMessageCount": 0,
+  "connectionState": "Disconnected",
+  "deviceId": "mydevice",
+  "etag": "abcd",
+  "properties": {
+    "desired": {
+      "awesome": 9001,
+      "special": {
+        "prop": "value1"
+      }
+    }
+  },
+  "status": "enabled",
+  "tags": {
+    "location": {
+      "region": "US"
+    }
+  },
+  "version": 10,
+  "x509Thumbprint": {
+    "primaryThumbprint": null,
+    "secondaryThumbprint": null
+  }
+}

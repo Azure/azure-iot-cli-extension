@@ -3,6 +3,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+# This style of testing is deprecated and will be replaced
+
 try:
     from unittest.mock import MagicMock
     from unittest.mock import patch
@@ -59,23 +61,6 @@ class SimulationTests(unittest.TestCase):
             with open(os.devnull, "w") as f, contextlib.redirect_stdout(f):
                 subject.iot_simulate_device(MagicMock(), device_name, hub_name,
                                             'complete', protocol, 'sim data test with {}'.format(protocol), 2)
-
-
-class TwinTests(unittest.TestCase):
-    @patch('azext_iot.custom.iot_hub_show_connection_string')
-    def test_twin_show(self, hub):
-        hub.return_value = {'connectionString': hub_cs}
-        result = subject.iot_twin_show(MagicMock(), device_name, hub_name)
-        # Asserts result can be serialized
-        json.dumps(result)
-
-    @patch('azext_iot.custom.iot_hub_show_connection_string')
-    def test_twin_update(self, hub):
-        hub.return_value = {'connectionString': hub_cs}
-        guid = str(uuid.uuid4())
-        update_json = '{\"properties\":{\"desired\":{\"Awesome\":"%s"}}}' % guid
-        result = subject.iot_twin_update(MagicMock(), device_name, hub_name, update_json)
-        self.assertEqual(result['properties']['desired']['Awesome'], guid)
 
 
 if __name__ == '__main__':

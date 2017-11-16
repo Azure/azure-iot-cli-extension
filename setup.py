@@ -8,7 +8,7 @@
 from codecs import open
 from setuptools import setup, find_packages
 
-VERSION = "0.1.2"
+VERSION = "0.2.4"
 
 CLASSIFIERS = [
     'Development Status :: 4 - Beta',
@@ -25,19 +25,14 @@ CLASSIFIERS = [
 ]
 
 DEPENDENCIES = [
-    'azure-iothub-device-client',
-    'azure-iothub-service-client',
-    'six',
-    'azure-mgmt-iothub==0.2.2',
-    'azure-cli-iot==0.1.11',
-    'azure-cli-core'
+    'msrestazure>=0.4.7'
 ]
 
 setup(
     name='azure-cli-iot-ext',
     version=VERSION,
     description='Azure IoT CLI Extension',
-    long_description='Az CLI extension module focused on IoT commands and functionality.',
+    long_description='Az CLI extension package focused on IoT commands and functionality.',
     license='MIT',
     author='Microsoft',
     author_email='iotupx@microsoft.com',

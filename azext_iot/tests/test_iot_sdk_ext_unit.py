@@ -2,6 +2,9 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
+# pylint: disable=W0703
+
+# This style of testing is deprecated and will be replaced in a future release
 
 try:
     from unittest.mock import MagicMock
@@ -21,7 +24,6 @@ from azext_iot.iot_sdk.utility import Default_Msg_Callbacks
 from azext_iot.iot_sdk.device_manager import (DeviceManager, IoTHubMessage, IoTHubMessageDispositionResult,
                                               IoTHubClientConfirmationResult)
 from azure.cli.core.util import CLIError
-from iothub_service_client import IoTHubError
 from iothub_client import IoTHubClientError
 
 
@@ -31,91 +33,44 @@ hub_name = 'hub'
 connstring = 'HostName=abcd;SharedAccessKeyName=name;SharedAccessKey=value'
 
 
-class TwinTests(unittest.TestCase):
-    @patch('azext_iot.custom.IoTHubDeviceTwin')
-    @patch('azext_iot.custom.iot_hub_show_connection_string')
-    def test_twin_show(self, mock_hub, mock_twin):
-        mock_twin.return_value.get_twin.return_value = json
-        result = subject.iot_twin_show(MagicMock(), device_name, hub_name)
-        self.assertIsNot(result, None)
-        mock_twin.return_value.get_twin.assert_called_with(device_name)
-        self.assertIs(mock_twin.return_value.get_twin.call_count, 1)
-
-    @patch('azext_iot.custom.IoTHubDeviceTwin')
-    @patch('azext_iot.custom.iot_hub_show_connection_string')
-    def test_twin_show_with_error(self, mock_hub, mock_twin):
-        mock_twin.return_value.get_twin.side_effect = IoTHubError()
-        with self.assertRaises(CLIError):
-            subject.iot_twin_show(MagicMock(), device_name, hub_name)
-
-    @patch('azext_iot.custom.IoTHubDeviceTwin')
-    @patch('azext_iot.custom.iot_hub_show_connection_string')
-    def test_twin_update(self, mock_hub, mock_twin):
-        mock_twin.return_value.update_twin.return_value = json
-        result = subject.iot_twin_update(MagicMock(), device_name, hub_name, json)
-        self.assertIsNot(result, None)
-        mock_twin.return_value.update_twin.assert_called_with(device_name, json)
-        self.assertIs(mock_twin.return_value.update_twin.call_count, 1)
-
-    @patch('azext_iot.custom.IoTHubDeviceTwin')
-    @patch('azext_iot.custom.iot_hub_show_connection_string')
-    def test_twin_update_invalidjson_error(self, mock_hub, mock_twin):
-        with self.assertRaises(CLIError):
-            subject.iot_twin_update(MagicMock(), device_name, hub_name, json + '}{')
-
-    @patch('azext_iot.custom.IoTHubDeviceTwin')
-    @patch('azext_iot.custom.iot_hub_show_connection_string')
-    def test_twin_update_with_error(self, mock_hub, mock_twin):
-        e = IoTHubError('errors')
-        mock_twin.return_value.update_twin.side_effect = e
-        with self.assertRaises(CLIError):
-            subject.iot_twin_update(MagicMock(), device_name, hub_name, json)
-
-
-class DeviceMethodTests(unittest.TestCase):
-    @patch('azext_iot.custom.IoTHubDeviceMethod')
-    @patch('azext_iot.custom.iot_hub_show_connection_string')
-    def test_device_method(self, mock_hub, mock_devicemethod):
-        mock_devicemethod.return_value.invoke.return_value = MagicMock(status=200, payload='awesome')
-        response = subject.iot_device_method(MagicMock(), device_name, hub_name, 'method', json, 60)
-        self.assertIs(response['status'], 200)
-        self.assertIsNotNone(response['payload'])
-        mock_devicemethod.return_value.invoke.assert_called_with(device_name, 'method', json, 60)
-        self.assertIs(mock_devicemethod.return_value.invoke.call_count, 1)
-
-    @patch('azext_iot.custom.IoTHubDeviceMethod')
-    @patch('azext_iot.custom.iot_hub_show_connection_string')
-    def test_device_method_error(self, mock_hub, mock_devicemethod):
-        e = IoTHubError('errors')
-        mock_devicemethod.return_value.invoke.side_effect = e
-        with self.assertRaises(CLIError):
-            subject.iot_device_method(MagicMock(), device_name, hub_name, 'method', json)
+mock_target = {}
+mock_target['cs'] = connstring
+mock_target['hub'] = 'hub'
+mock_target['primarykey'] = 'abcde'
+mock_target['policy'] = 'iothubowner'
 
 
 class HubMessageTests(unittest.TestCase):
-    @patch('azext_iot.custom.IoTHubMessaging')
-    @patch('azext_iot.custom.iot_hub_show_connection_string')
-    def test_hub_send(self, mock_hub, mock_hubmsg):
-        subject.iot_hub_message_send(MagicMock(), device_name, hub_name,
-                                     str(uuid.uuid4()), str(uuid.uuid4()))
-        self.assertIs(mock_hubmsg.return_value.open.call_count, 1)
-        self.assertIs(mock_hubmsg.return_value.send_async.call_count, 1)
-        self.assertIs(mock_hubmsg.return_value.close.call_count, 1)
-
-    @patch('azext_iot.custom.IoTHubMessaging')
-    @patch('azext_iot.custom.iot_hub_show_connection_string')
-    def test_hub_send_error(self, mock_hub, mock_hubmsg):
-        e = IoTHubError('errors')
-        mock_hubmsg.return_value.send_async.side_effect = e
-        with self.assertRaises(CLIError):
+    @patch('azext_iot.custom.get_iot_hub_connection_string')
+    def test_hub_send(self, mock_hub):
+        mock_hub.return_value = mock_target
+        client = MagicMock()
+        with patch.dict("sys.modules", iothub_service_client=client):
             subject.iot_hub_message_send(MagicMock(), device_name, hub_name,
                                          str(uuid.uuid4()), str(uuid.uuid4()))
+            self.assertIs(client.IoTHubMessaging.return_value.open.call_count, 1)
+            self.assertIs(client.IoTHubMessaging.return_value.send_async.call_count, 1)
+            self.assertIs(client.IoTHubMessaging.return_value.close.call_count, 1)
+
+    @patch('azext_iot.custom.get_iot_hub_connection_string')
+    def test_hub_send_error(self, mock_hub):
+        e = ValueError('errors')
+        mock_hub.return_value = mock_target
+        client = MagicMock(name='iothub_service_client')
+        client.IoTHubMessaging.return_value.open.side_effect = e
+        client.IoTHubError = ValueError
+        with patch.dict("sys.modules", **{
+                'iothub_service_client': client
+                }):
+            with self.assertRaises(CLIError):
+                subject.iot_hub_message_send(MagicMock(), device_name, hub_name,
+                                             str(uuid.uuid4()), str(uuid.uuid4()))
 
 
 class DeviceMessageTests(unittest.TestCase):
     @patch('azext_iot.iot_sdk.device_manager.DeviceManager.keep_alive')
     @patch('azext_iot.iot_sdk.device_manager.IoTHubClient')
-    @patch('azext_iot.custom._get_single_device_connection_string')
+    @patch('azext_iot.custom._build_device_connection_string')
     def test_device_msg(self, mock_hub, mock_deviceclient, keepalive):
         txt_protocol = 'http'
         mock_hub.return_value = connstring
@@ -128,7 +83,7 @@ class DeviceMessageTests(unittest.TestCase):
     @patch('azext_iot.iot_sdk.device_manager.DeviceManager.keep_alive')
     @patch('azext_iot.iot_sdk.device_manager.DeviceManager.get_errors')
     @patch('azext_iot.iot_sdk.device_manager.IoTHubClient')
-    @patch('azext_iot.custom._get_single_device_connection_string')
+    @patch('azext_iot.custom._build_device_connection_string')
     def test_device_msg_runtime_error(self, mock_hub, mock_deviceclient, gerrors, keepalive):
         txt_protocol = 'amqp'
         mock_hub.return_value = connstring
@@ -141,7 +96,7 @@ class DeviceMessageTests(unittest.TestCase):
 
     @patch('azext_iot.iot_sdk.device_manager.DeviceManager.send_event')
     @patch('azext_iot.iot_sdk.device_manager.IoTHubClient')
-    @patch('azext_iot.custom._get_single_device_connection_string')
+    @patch('azext_iot.custom._build_device_connection_string')
     def test_device_msg_sdk_error(self, mock_hub, mock_deviceclient, mock_send):
         txt_protocol = 'mqtt'
         mock_hub.return_value = connstring
@@ -152,15 +107,12 @@ class DeviceMessageTests(unittest.TestCase):
             protocol = subject._iot_sdk_device_process_protocol(txt_protocol)
             mock_deviceclient.assert_called_with(connstring, protocol)
 
-    @patch('azext_iot.iot_sdk.device_manager.DeviceManager.send_event')
     @patch('azext_iot.iot_sdk.device_manager.IoTHubClient')
-    @patch('azext_iot.custom._get_single_device_connection_string')
-    def test_device_msg_invalid_protocol_error(self, mock_hub, mock_deviceclient, mock_send):
+    @patch('azext_iot.custom._build_device_connection_string')
+    def test_device_msg_invalid_protocol_error(self, mock_hub, mock_deviceclient):
         txt_protocol = 'protocol'
         mock_hub.return_value = connstring
-        e = IoTHubClientError('errors')
-        mock_send.side_effect = e
-        with self.assertRaises(CLIError):
+        with self.assertRaises(ValueError):
             subject.iot_device_send_message_ext(MagicMock(), device_name, hub_name, txt_protocol)
             protocol = subject._iot_sdk_device_process_protocol(txt_protocol)
             mock_deviceclient.assert_called_with(connstring, protocol)
@@ -170,7 +122,7 @@ class SimulationTests(unittest.TestCase):
     @patch('azext_iot.iot_sdk.device_manager.DeviceManager.received')
     @patch('azext_iot.iot_sdk.device_manager.DeviceManager.keep_alive')
     @patch('azext_iot.iot_sdk.device_manager.IoTHubClient')
-    @patch('azext_iot.custom._get_single_device_connection_string')
+    @patch('azext_iot.custom._build_device_connection_string')
     def test_device_sim(self, mock_hub, mock_deviceclient, keepalive, received):
         txt_protocol = 'amqp'
         txt_settle = 'complete'
@@ -192,7 +144,7 @@ class SimulationTests(unittest.TestCase):
 
     @patch('azext_iot.iot_sdk.device_manager.DeviceManager.send_event')
     @patch('azext_iot.iot_sdk.device_manager.IoTHubClient')
-    @patch('azext_iot.custom._get_single_device_connection_string')
+    @patch('azext_iot.custom._build_device_connection_string')
     def test_device_sim_error(self, mock_hub, mock_deviceclient, mock_send):
         txt_protocol = 'amqp'
         txt_settle = 'reject'
@@ -208,34 +160,33 @@ class SimulationTests(unittest.TestCase):
                                             'data', expected_msgs, 1, receive_count)
 
 
+@patch('azext_iot.custom.get_iot_hub_connection_string')
+@patch('azext_iot.custom.SasTokenAuthentication.generate_sas_token')
 class SasTokenTests(unittest.TestCase):
-    @patch('azext_iot.custom.iot_hub_policy_get')
-    @patch('azext_iot.custom.SasTokenAuthentication.generate_sas_token')
     def test_generate_token(self, mock_sas_provider, mock_ihpg):
         # Format from the actual SasTokenAuthentication.generate_sas_token
         mock_sas = (
-            'sr={0}.azure-devices.net%252fdevices%252f{1}&'
+            'SharedAccessSignature sr={0}.azure-devices.net%252fdevices%252f{1}&'
             'sig=52u8jNpJyHr8USSNSTiA1MWlUFVu0xdWA76XGyzMjVi'
             '%3D&se={2}&skn={3}'
             )
         mock_sas = mock_sas.format(hub_name, device_name, '3600', 'policy')
-        mock_sas_provider.return_value = 'SharedAccessSignature ' + mock_sas
+        mock_sas_provider.return_value = mock_sas
         result = subject.iot_get_sas_token(MagicMock(), device_name, hub_name, 'policy', 3600, None)
         self.assertIsNotNone(result)
-        self.assertEqual(result['SharedAccessSignature'], mock_sas)
+        self.assertEqual(result, mock_sas)
 
 
+@patch('azext_iot.iot_sdk.device_manager.IoTHubClient')
 class DeviceManagerCallbackTests(unittest.TestCase):
-    @patch('azext_iot.iot_sdk.device_manager.IoTHubClient')
     def test_upload_file_to_blob_result_callback(self, mock_deviceclient):
         device = DeviceManager('cs')
         try:
             with open(os.devnull, "w") as f, contextlib.redirect_stdout(f):
                 device.upload_file_to_blob_result_callback('success', 'context')
-        except Exception as e:   # pylint: disable=W0703
-            self.fail('upload_file_to_blob_result_callback exception: {}'.format(e))
+        except Exception as e:
+            self.fail('test_upload_file_to_blob_result_callback exception: {}'.format(e))
 
-    @patch('azext_iot.iot_sdk.device_manager.IoTHubClient')
     def test_receive_message_callback(self, mock_deviceclient):
         device = DeviceManager('cs')
         try:
@@ -246,31 +197,26 @@ class DeviceManagerCallbackTests(unittest.TestCase):
                 device.receive_message_callback(msg, 'context')
                 self.assertIs(result, IoTHubMessageDispositionResult.ABANDONED)
                 self.assertIs(device.received(), 2)
-        except Exception as e:   # pylint: disable=W0703
-            self.fail('receive_message_callback exception: {}'.format(e))
+        except Exception as e:
+            self.fail('test_receive_message_callback exception: {}'.format(e))
 
-    @patch('azext_iot.iot_sdk.device_manager.IoTHubClient')
     def test_send_event_result_callback(self, mock_deviceclient):
         device = DeviceManager('cs')
         try:
             with open(os.devnull, "w") as f, contextlib.redirect_stdout(f):
                 msg = IoTHubMessage(bytearray('data', 'utf8'))
                 device.send_event_result_callback(msg, IoTHubClientConfirmationResult.OK, 0)
-                self.assertFalse(device.keep_alive())
-        except Exception as e:   # pylint: disable=W0703
-            self.fail('send_event_result_callback exception: {}'.format(e))
+                self.assertFalse(device.keep_alive('msg'))
+        except Exception as e:
+            self.fail('test_send_event_result_callback exception: {}'.format(e))
 
-    @patch('azext_iot.iot_sdk.device_manager.IoTHubClient')
     def test_error_send_event_result_callback(self, mock_deviceclient):
         device = DeviceManager('cs')
-        try:
-            with open(os.devnull, "w") as f, contextlib.redirect_stdout(f):
-                msg = IoTHubMessage(bytearray('data', 'utf8'))
-                device.send_event_result_callback(msg, IoTHubClientConfirmationResult.ERROR, 0)
-                self.assertFalse(device.keep_alive())
-                self.assertIsNotNone(device.get_errors())
-        except Exception as e:   # pylint: disable=W0703
-            self.fail('send_event_result_callback exception: {}'.format(e))
+        with open(os.devnull, "w") as f, contextlib.redirect_stdout(f):
+            msg = IoTHubMessage(bytearray('data', 'utf8'))
+            device.send_event_result_callback(msg, IoTHubClientConfirmationResult.ERROR, 0)
+            self.assertFalse(device.keep_alive('msg'))
+            self.assertIsNotNone(device.get_errors('msg'))
 
 
 class UtilityCallbackTests(unittest.TestCase):
@@ -280,7 +226,7 @@ class UtilityCallbackTests(unittest.TestCase):
                 fake_records = [{'key0': 'value0'}, {'key1': 'value1'}]
                 dmc = Default_Msg_Callbacks()
                 dmc.feedback_received_callback(0, 1234, 4321, fake_records)
-        except Exception as e:   # pylint: disable=W0703
+        except Exception as e:
             self.fail('test_hub_default_callback exception: {}'.format(e))
 
 

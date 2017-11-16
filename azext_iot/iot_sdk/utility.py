@@ -1,12 +1,14 @@
-# Copyright (c) Microsoft. All rights reserved.
-# Licensed under the MIT license. See LICENSE file in the project root for
-# full license information.
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See License.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
 # pylint: disable=no-self-use,unused-argument
 
 import os
 import sys
 import contextlib
 import functools
+import ast
 import six
 
 six.print_ = functools.partial(six.print_, flush=True)
@@ -23,6 +25,25 @@ def block_stdout():
     finally:
         os.dup2(orig_stdout_fno, 1)
         devnull.close()
+
+
+def parse_entity(iothub_device):
+    device = {}
+    attributes = [attr for attr in dir(iothub_device) if not attr.startswith('__')]
+    for a in attributes:
+        device[a] = str(getattr(iothub_device, a, None))
+    return device
+
+
+def evaluate_literal(literal, expected):
+    # Safe evaluation
+    try:
+        result = ast.literal_eval(literal)
+        if not isinstance(result, expected):
+            return None
+        return result
+    except Exception:
+        return None
 
 
 class Default_Msg_Callbacks(object):
