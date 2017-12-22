@@ -8,7 +8,7 @@
 from codecs import open
 from setuptools import setup, find_packages
 
-VERSION = "0.2.4"
+VERSION = "0.3.0"
 
 CLASSIFIERS = [
     'Development Status :: 4 - Beta',
@@ -25,14 +25,15 @@ CLASSIFIERS = [
 ]
 
 DEPENDENCIES = [
-    'msrestazure>=0.4.7'
+    'msrestazure',
+    'paho-mqtt'
 ]
 
 setup(
     name='azure-cli-iot-ext',
     version=VERSION,
     description='Azure IoT CLI Extension',
-    long_description='Az CLI extension package focused on IoT commands and functionality.',
+    long_description='Az CLI extension focused on IoT data-plane commands and functionality.',
     license='MIT',
     author='Microsoft',
     author_email='iotupx@microsoft.com',

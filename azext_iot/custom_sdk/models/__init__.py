@@ -5,9 +5,9 @@
 # regenerated.
 # --------------------------------------------------------------------------
 
-from .device_twin_api import DeviceTwinAPI
-from .version import VERSION
+from .error_details import ErrorDetails, ErrorDetailsException
 
-__all__ = ['DeviceTwinAPI']
-
-__version__ = VERSION
+__all__ = [
+    'ErrorDetails',
+    'ErrorDetailsException',
+]

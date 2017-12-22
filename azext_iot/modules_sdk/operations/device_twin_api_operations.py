@@ -148,7 +148,6 @@ class DeviceTwinApiOperations(object):
 
         deserialized = None
 
-        'DeviceTwinInfo'
         if response.status_code == 200:
             deserialized = self._deserialize('object', response)
 

@@ -1,0 +1,16 @@
+{
+  "properties": {
+    "desired": {
+      "awesome": 9001,
+      "temperature": {
+        "min": 10,
+        "max": 100
+      }
+    }
+  },
+  "tags": {
+    "location": {
+      "region": "US"
+    }
+  }
+}

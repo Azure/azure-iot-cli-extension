@@ -278,3 +278,77 @@ class ModuleApiOperations(object):
             return client_raw_response
 
         return deserialized
+
+    # Merged from newer spec
+    def invoke_device_module_method(
+            self, deviceid, moduleid, direct_method_request, custom_headers=None, raw=False, **operation_config):
+        """Invoke a direct method on a device module.
+
+        Invoke a direct method on a device. See
+        https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-direct-methods
+        for more information.
+
+        :param deviceid:
+        :type deviceid: str
+        :param moduleid:
+        :type moduleid: str
+        :param direct_method_request:
+        :type direct_method_request: :class:`CloudToDeviceMethod
+        <iothubclient.models.CloudToDeviceMethod>`
+        :param dict custom_headers: headers that will be added to the request
+        :param bool raw: returns the direct response alongside the
+        deserialized response
+        :param operation_config: :ref:`Operation configuration
+        overrides<msrest:optionsforoperations>`.
+        :return: :class:`CloudToDeviceMethodResult
+        <iothubclient.models.CloudToDeviceMethodResult>` or
+        :class:`ClientRawResponse<msrest.pipeline.ClientRawResponse>` if
+        raw=true
+        :rtype: :class:`CloudToDeviceMethodResult
+        <iothubclient.models.CloudToDeviceMethodResult>` or
+        :class:`ClientRawResponse<msrest.pipeline.ClientRawResponse>`
+        :raises: :class:`CloudError<msrestazure.azure_exceptions.CloudError>`
+        """
+        # Construct URL
+        url = '/twins/{id}/modules/{mid}/methods'
+        path_format_arguments = {
+            'id': self._serialize.url("id", deviceid, 'str'),
+            'mid': self._serialize.url("mid", moduleid, 'str')
+        }
+        url = self._client.format_url(url, **path_format_arguments)
+
+        # Construct parameters
+        query_parameters = {}
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+
+        # Construct headers
+        header_parameters = {}
+        header_parameters['Content-Type'] = 'application/json; charset=utf-8'
+        if self.config.generate_client_request_id:
+            header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
+        if custom_headers:
+            header_parameters.update(custom_headers)
+        if self.config.accept_language is not None:
+            header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
+
+        # Construct body
+        body_content = self._serialize.body(direct_method_request, 'CloudToDeviceMethod')
+
+        # Construct and send request
+        request = self._client.post(url, query_parameters)
+        response = self._client.send(
+            request, header_parameters, body_content, **operation_config)
+
+        if response.status_code not in [200]:
+            raise models.ErrorDetailsException(self._deserialize, response)
+
+        deserialized = None
+
+        if response.status_code == 200:
+            deserialized = self._deserialize('CloudToDeviceMethodResult', response)
+
+        if raw:
+            client_raw_response = ClientRawResponse(deserialized, response)
+            return client_raw_response
+
+        return deserialized

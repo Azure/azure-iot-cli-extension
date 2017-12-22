@@ -21,6 +21,8 @@ from .configuration_version import ConfigurationVersion
 from .x509_thumbprint_info import X509ThumbprintInfo
 from .device_twin_info import DeviceTwinInfo
 from .error_details import ErrorDetails, ErrorDetailsException
+from .cloud_to_device_method import CloudToDeviceMethod
+from .cloud_to_device_method_result import CloudToDeviceMethodResult
 from .iot_hub_client_enums import (
     DeviceStatus,
     Nullable1,
@@ -51,4 +53,6 @@ __all__ = [
     'ConfigurationType',
     'ConfigurationStatus',
     'AuthenticationType',
+    'CloudToDeviceMethod',
+    'CloudToDeviceMethodResult'
 ]

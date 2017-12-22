@@ -1,22 +1,18 @@
 from enum import Enum
-from azure.cli.core.util import CLIError
+from knack.util import CLIError
 
 
 class SdkType(Enum):
     device_query_sdk = 0
     modules_sdk = 1
     device_twin_sdk = 2
+    device_msg_sdk = 3
+    custom_sdk = 4
 
 
 class DeviceStatusType(Enum):
     disabled = "disabled"
     enabled = "enabled"
-
-
-class ProtocolType(Enum):
-    http = 'http'
-    amqp = 'amqp'
-    mqtt = 'mqtt'
 
 
 class SettleType(Enum):
@@ -31,10 +27,15 @@ class DeviceAuthType(Enum):
     x509_ca = 'x509_ca'
 
 
+class KeyType(Enum):
+    primary = 'primary'
+    secondary = 'secondary'
+
+
 CONN_STR_TEMPLATE = 'HostName={};SharedAccessKeyName={};SharedAccessKey={}'
 
 
-def get_iot_hub_connection_string(client, hub_name, resource_group_name, policy_name='iothubowner'):
+def get_iot_hub_connection_string(client, hub_name, resource_group_name, policy_name='iothubowner', key_type='primary'):
     target_hub = None
     policy = None
 
@@ -70,9 +71,13 @@ def get_iot_hub_connection_string(client, hub_name, resource_group_name, policy_
         )
 
     result = {}
-    result['cs'] = CONN_STR_TEMPLATE.format(target_hub.properties.host_name, policy.key_name, policy.primary_key)
+    result['cs'] = CONN_STR_TEMPLATE.format(target_hub.properties.host_name, policy.key_name,
+                                            policy.primary_key if key_type == 'primary' else policy.secondary_key)
     result['hub'] = target_hub.properties.host_name
     result['policy'] = policy_name
     result['primarykey'] = policy.primary_key
     result['secondarykey'] = policy.secondary_key
+    result['subscription'] = client.config.subscription_id
+    result['resourcegroup'] = target_hub.resourcegroup
+
     return result

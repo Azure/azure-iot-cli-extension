@@ -5,6 +5,7 @@
 # regenerated.
 # --------------------------------------------------------------------------
 
+from .error_details import ErrorDetails, ErrorDetailsException
 from .query_specification import QuerySpecification
 from .query_result import QueryResult
 from .query_result_with_continuation import QueryResultWithContinuation
@@ -30,6 +31,8 @@ from .device_identities_api_enums import (
 )
 
 __all__ = [
+    'ErrorDetails',
+    'ErrorDetailsException',
     'QuerySpecification',
     'QueryResult',
     'QueryResultWithContinuation',
@@ -38,7 +41,6 @@ __all__ = [
     'SymmetricKey',
     'X509Thumbprint',
     'AuthenticationMechanism',
-    'Device',
     'VariantValueDateTime',
     'Metadata',
     'DeviceTwinProperties',

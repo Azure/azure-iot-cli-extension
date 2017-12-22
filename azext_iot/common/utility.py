@@ -2,16 +2,11 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-# pylint: disable=no-self-use,unused-argument
 
 import os
 import sys
 import contextlib
-import functools
 import ast
-import six
-
-six.print_ = functools.partial(six.print_, flush=True)
 
 
 # This is to prevent IoT SDK C output, but is not intrusive due to context
@@ -46,23 +41,10 @@ def evaluate_literal(literal, expected):
         return None
 
 
-class Default_Msg_Callbacks(object):
-    def open_complete_callback(self, context):
-        return
-
-    def send_complete_callback(self, context, messaging_result):
-        return
-
-    def feedback_received_callback(self, context, batch_user_id, batch_lock_token, feedback_records):
-        six.print_('_Feedback batch received_')
-        six.print_('{:<30}: {}'.format('UserId', batch_user_id))
-        six.print_('{:<30}: {}'.format('LockToken', batch_lock_token))
-        six.print_('{:<30}: {}'.format('Records', len(feedback_records)))
-        six.print_()
-        self.output_feedback_details(feedback_records)
-
-    def output_feedback_details(self, result):
-        for record in result:
-            for k in sorted(record.keys()):
-                six.print_('{:<30}: {}'.format(str(k), str(record[k])))
-            six.print_()
+def validate_key_value_pairs(string):
+    ''' Validates key-value pairs in the following format: a=b;c=d '''
+    result = None
+    if string:
+        kv_list = [x for x in string.split(';') if '=' in x]     # key-value pairs
+        result = dict(x.split('=', 1) for x in kv_list)
+    return result

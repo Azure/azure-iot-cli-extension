@@ -2,6 +2,15 @@
 
 Release History
 ===============
+0.3.0
++++++++++++++++
+* Knack based Extension conversion
+* Removed C IoT SDK dependencies (Python wrappers of)
+* Added numerous IoT data-plane functionality
+* Updated extension metadata
+* Moved to internal SAS generate method
+* Miscellaneous tweaks and improvements
+
 0.2.4
 +++++++++++++++
 * Build device connection string internally vs iot command module

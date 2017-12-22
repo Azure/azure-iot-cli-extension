@@ -1,59 +1,66 @@
-from azure.cli.core.commands import cli_command
-from azure.cli.core.commands.arm import cli_generic_update_command
+from azure.cli.core.commands import CliCommandType
 from azext_iot._factory import iot_hub_service_factory as factory
+from azext_iot import iotext_custom
 
+def load_command_table(self, _):
+    with self.command_group('iot hub') as g:
+        g.custom_command('query', 'iot_query')
+        g.custom_command('invoke-device-method', 'iot_device_method')
+        g.custom_command('invoke-module-method', 'iot_device_module_method')
+        g.custom_command('generate-sas-token', 'iot_get_sas_token')
+        g.custom_command('apply-configuration', 'iot_device_configuration_apply')
 
-custom_path = 'azext_iot.custom#{0}'
+        g.custom_command('show-connection-string', 'iot_get_hub_connection_string')
 
-# Query
-cli_command(__name__, 'iot query', custom_path.format('iot_query'), factory)
+    with self.command_group('iot hub device-identity') as g:
+        g.custom_command('create', 'iot_device_create')
+        g.custom_command('show', 'iot_device_show')
+        g.custom_command('list', 'iot_device_list')
+        g.custom_command('delete', 'iot_device_delete')
+        g.generic_update_command('update', getter_name='iot_device_show',
+                                 setter_name='iot_device_update', command_type=iotext_custom)
 
-# Simulation
-cli_command(__name__, 'iot device simulate', custom_path.format('iot_simulate_device'), factory)
+        g.custom_command('show-connection-string', 'iot_get_device_connection_string')
+        g.custom_command('import', 'iot_device_import')
+        g.custom_command('export', 'iot_device_export')
 
-# Messaging
-cli_command(__name__, 'iot hub message send', custom_path.format('iot_hub_message_send'), factory)
-cli_command(__name__, 'iot device message send', custom_path.format('iot_device_send_message_ext'), factory)
+    with self.command_group('iot hub module-identity') as g:
+        g.custom_command('create', 'iot_device_module_create')
+        g.custom_command('show', 'iot_device_module_show')
+        g.custom_command('list', 'iot_device_module_list')
+        g.custom_command('delete', 'iot_device_module_delete')
+        g.generic_update_command('update', getter_name='iot_device_module_show',
+                                 setter_name='iot_device_module_update', command_type=iotext_custom)
 
-# Utility
-cli_command(__name__, 'iot sas', custom_path.format('iot_get_sas_token'), factory)
+        g.custom_command('show-connection-string', 'iot_get_module_connection_string')
 
-# Module Ops
-cli_command(__name__, 'iot device module show', custom_path.format('iot_device_module_show'), factory)
-cli_command(__name__, 'iot device module create', custom_path.format('iot_device_module_create'), factory)
-cli_command(__name__, 'iot device module list', custom_path.format('iot_device_module_list'), factory)
-cli_command(__name__, 'iot device module delete', custom_path.format('iot_device_module_delete'), factory)
-cli_generic_update_command(__name__, 'iot device module update', custom_path.format(
-    'iot_device_module_show'), custom_path.format('iot_device_module_update'), factory)
+    with self.command_group('iot hub module-twin') as g:
+        g.custom_command('show', 'iot_device_module_twin_show')
+        g.custom_command('replace', 'iot_device_module_twin_replace')
+        g.generic_update_command('update', getter_name='iot_device_module_twin_show',
+                                 setter_name='iot_device_module_twin_update', command_type=iotext_custom)
 
-# Module Twin Ops
-cli_command(__name__, 'iot device module twin show', custom_path.format('iot_device_module_twin_show'), factory)
-cli_generic_update_command(__name__, 'iot device module twin update', custom_path.format(
-    'iot_device_module_twin_show'), custom_path.format('iot_device_module_twin_update'), factory)
-cli_command(__name__, 'iot device module twin replace', custom_path.format('iot_device_module_twin_replace'), factory)
+    with self.command_group('iot hub device-twin') as g:
+        g.custom_command('show', 'iot_device_twin_show')
+        g.custom_command('replace', 'iot_device_twin_replace')
+        g.generic_update_command('update', getter_name='iot_device_twin_show',
+                                 setter_name='iot_device_twin_update', command_type=iotext_custom)
 
-# Configuration Ops
-cli_command(__name__, 'iot configuration apply', custom_path.format('iot_device_configuration_apply'), factory)
+    with self.command_group('iot edge deployment') as g:
+        g.custom_command('create', 'iot_device_configuration_create')
+        g.custom_command('show', 'iot_device_configuration_show')
+        g.custom_command('list', 'iot_device_configuration_list')
+        g.custom_command('delete', 'iot_device_configuration_delete')
+        g.generic_update_command('update', getter_name='iot_device_configuration_show',
+                                 setter_name='iot_device_configuration_update', command_type=iotext_custom)
 
-cli_command(__name__, 'iot configuration create', custom_path.format('iot_device_configuration_create'), factory)
-cli_command(__name__, 'iot configuration show', custom_path.format('iot_device_configuration_show'), factory)
-cli_command(__name__, 'iot configuration list', custom_path.format('iot_device_configuration_list'), factory)
-cli_command(__name__, 'iot configuration delete', custom_path.format('iot_device_configuration_delete'), factory)
-cli_generic_update_command(__name__, 'iot configuration update', custom_path.format(
-    'iot_device_configuration_show'), custom_path.format('iot_device_configuration_update'), factory)
+    with self.command_group('iot device') as g:
+        g.custom_command('send-d2c-message', 'iot_device_send_message')
+        g.custom_command('simulate', 'iot_simulate_device')
+        g.custom_command('upload-file', 'iot_device_upload_file')
 
-# Device Ops
-cli_command(__name__, 'iot device create', custom_path.format('iot_device_create'), factory)
-cli_command(__name__, 'iot device list', custom_path.format('iot_device_list'), factory)
-cli_command(__name__, 'iot device show', custom_path.format('iot_device_show'), factory)
-cli_command(__name__, 'iot device delete', custom_path.format('iot_device_delete'), factory)
-cli_generic_update_command(__name__, 'iot device update', custom_path.format(
-    'iot_device_show'), custom_path.format('iot_device_update'), factory)
-
-# Method Invoke
-cli_command(__name__, 'iot device method invoke', custom_path.format('iot_device_method'), factory)
-
-# Device Twin Ops
-cli_command(__name__, 'iot device twin show', custom_path.format('iot_device_twin_show'), factory)
-cli_generic_update_command(__name__, 'iot device twin update', custom_path.format(
-    'iot_device_twin_show'), custom_path.format('iot_device_twin_update'), factory)
+    with self.command_group('iot device c2d-message') as g:
+        g.custom_command('complete', 'iot_c2d_message_complete')
+        g.custom_command('abandon', 'iot_c2d_message_abandon')
+        g.custom_command('reject', 'iot_c2d_message_reject')
+        g.custom_command('receive', 'iot_c2d_message_receive')
