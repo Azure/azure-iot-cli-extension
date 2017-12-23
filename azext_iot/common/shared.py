@@ -8,6 +8,7 @@ class SdkType(Enum):
     device_twin_sdk = 2
     device_msg_sdk = 3
     custom_sdk = 4
+    dps_sdk = 5
 
 
 class DeviceStatusType(Enum):
@@ -73,11 +74,52 @@ def get_iot_hub_connection_string(client, hub_name, resource_group_name, policy_
     result = {}
     result['cs'] = CONN_STR_TEMPLATE.format(target_hub.properties.host_name, policy.key_name,
                                             policy.primary_key if key_type == 'primary' else policy.secondary_key)
-    result['hub'] = target_hub.properties.host_name
+    result['resource'] = target_hub.properties.host_name
     result['policy'] = policy_name
     result['primarykey'] = policy.primary_key
     result['secondarykey'] = policy.secondary_key
     result['subscription'] = client.config.subscription_id
-    result['resourcegroup'] = target_hub.resourcegroup
 
+    return result
+
+def get_iot_dps_connection_string(
+    client, dps_name, resource_group_name, policy_name='provisioningserviceowner', key_type='primary'):
+    target_dps = None
+    policy = None
+
+    def _find_iot_dps_from_list(all_dps, dps_name):
+        if all_dps:
+            return next((dps for dps in all_dps if dps_name.lower() == dps.name.lower()), None)
+        return None
+
+    try:
+        target_dps = client.iot_dps_resource.get(dps_name, resource_group_name)
+    except Exception:
+        pass
+
+    if target_dps is None:
+        raise CLIError(
+            'No IoT Provisioning Service found with name {} in current subscription.'.format(dps_name))
+
+    try:
+        policy = client.iot_dps_resource.list_keys_for_key_name(dps_name, policy_name, resource_group_name)
+    except Exception:
+        pass
+
+    if policy is None:
+        raise CLIError(
+            'No keys found for policy {} of IoT Provisioning Service {}.'.format(policy_name, dps_name)
+        )
+
+    result = {}
+    result['cs'] = CONN_STR_TEMPLATE.format(
+        target_dps.properties.service_operations_host_name, 
+        policy.key_name,
+        policy.primary_key if key_type == 'primary' else policy.secondary_key)
+    result['resource'] = target_dps.properties.service_operations_host_name
+    result['policy'] = policy_name
+    result['primarykey'] = policy.primary_key
+    result['secondarykey'] = policy.secondary_key
+    result['subscription'] = client.config.subscription_id
+    
     return result

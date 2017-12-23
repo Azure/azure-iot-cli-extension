@@ -12,6 +12,31 @@ helps['iot'] = """
                    Augmented with the IoT Extension.
 """
 
+helps['iot dps device-enrollment'] = """
+    type: group
+    short-sumary: Manage Azure Provisioning Service Enrollments
+"""
+
+helps['iot dps device-enrollment show'] = """
+    type: command
+    short-sumary: Manage Azure Provisioning Service Enrollments
+"""
+
+helps['iot dps device-enrollment list'] = """
+    type: command
+    short-sumary: Manage Azure Provisioning Service Enrollments
+"""
+
+helps['iot dps device-enrollment-group'] = """
+    type: group
+    short-sumary: Manage Azure Provisioning Service Enrollments Groups
+"""
+
+helps['iot dps device-enrollment-group show'] = """
+    type: command
+    short-sumary: Manage Azure Provisioning Service Enrollments Groups
+"""
+
 helps['iot hub'] = """
     type: group
     short-summary: Manage entities in your Azure IoT Hub.

@@ -12,7 +12,7 @@ from knack.log import get_logger
 from knack.util import CLIError
 from azure.cli.core.util import read_file_content
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
-from azext_iot.common.shared import DeviceAuthType, SdkType, get_iot_hub_connection_string
+from azext_iot.common.shared import DeviceAuthType, SdkType, get_iot_hub_connection_string, get_iot_dps_connection_string
 from azext_iot.common.utility import validate_key_value_pairs, evaluate_literal
 from azext_iot._factory import _bind_sdk
 
@@ -27,6 +27,32 @@ from azext_iot.modules_sdk.models.device_module import DeviceModule
 
 logger = get_logger(__name__)
 
+# DPS enrollments
+API_VERSION = '2017-11-15'
+def iot_dps_device_enrollment_get(client, enrollment_id, dps_name, resource_group_name):
+    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
+    try:
+        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
+        return m_sdk.device_enrollment.get(enrollment_id, API_VERSION)
+    except errors.ErrorDetailsException as e:
+        raise CLIError(e)
+
+def iot_dps_device_enrollment_list(client, dps_name, resource_group_name):
+    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
+    try:
+        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
+        query = ''
+        m_sdk.device_enrollment.query(query)
+    except errors.ErrorDetailsException as e:
+        raise CLIError(e)
+
+def iot_dps_device_enrollment_group_get(client, enrollment_id, dps_name, resource_group_name):
+    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
+    try:
+        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
+        return m_sdk.device_enrollment_group.get(enrollment_id, API_VERSION)
+    except errors.ErrorDetailsException as e:
+        raise CLIError(e)
 
 # Query
 
