@@ -27,8 +27,20 @@ from azext_iot.modules_sdk.models.device_module import DeviceModule
 
 logger = get_logger(__name__)
 
-# DPS enrollments
+# DPS Enrollments
+
 API_VERSION = '2017-11-15'
+def iot_dps_device_enrollment_list(client, dps_name, resource_group_name):
+    from azext_iot.dps_sdk.models.query_specification import QuerySpecification
+    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
+    try:
+        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
+        query_command = "SELECT *"
+        query = QuerySpecification(query_command)
+        return m_sdk.device_enrollment.query(query, API_VERSION)
+    except errors.ErrorDetailsException as e:
+        raise CLIError(e)
+
 def iot_dps_device_enrollment_get(client, enrollment_id, dps_name, resource_group_name):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
@@ -37,12 +49,57 @@ def iot_dps_device_enrollment_get(client, enrollment_id, dps_name, resource_grou
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
 
-def iot_dps_device_enrollment_list(client, dps_name, resource_group_name):
+def iot_dps_device_enrollment_create(client, 
+                                     enrollment_id, 
+                                     attestation_type,
+                                     dps_name, 
+                                     resource_group_name,
+                                     endorsement_key = None,
+                                     certificate_path = None):
+    from azext_iot.dps_sdk.models.individual_enrollment import IndividualEnrollment
+    from azext_iot.dps_sdk.models.attestation_mechanism import AttestationMechanism
+    from azext_iot.dps_sdk.models.tpm_attestation import TpmAttestation
+    from azext_iot.dps_sdk.models.x509_attestation import X509Attestation
+    from azext_iot.dps_sdk.models.x509_certificates import X509Certificates
+    from azext_iot.dps_sdk.models.x509_certificate_with_info import X509CertificateWithInfo
+    from ._utils import open_certificate
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
-        query = ''
-        m_sdk.device_enrollment.query(query)
+        
+        if attestation_type == 'tpm':
+            tpm = TpmAttestation(endorsement_key)
+            attestation = AttestationMechanism(attestation_type, tpm)
+        if attestation_type == 'x509':
+            client_certificate_content = open_certificate(certificate_path)
+            client_certificate_with_info = X509CertificateWithInfo(client_certificate_content)
+            client_certificate = X509Certificates(client_certificate_with_info)
+            x509 = X509Attestation(client_certificate)
+            attestation = AttestationMechanism(attestation_type, x509)
+        
+        enrollment = IndividualEnrollment(enrollment_id, attestation)
+        return m_sdk.device_enrollment.create_or_update(enrollment_id, enrollment, API_VERSION)
+    except errors.ErrorDetailsException as e:
+        raise CLIError(e)
+
+def iot_dps_device_enrollment_delete(client, enrollment_id, dps_name, resource_group_name):
+    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
+    try:
+        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
+        return m_sdk.device_enrollment.delete(enrollment_id, API_VERSION)
+    except errors.ErrorDetailsException as e:
+        raise CLIError(e)
+
+# DPS Enrollments Group
+
+def iot_dps_device_enrollment_group_list(client, dps_name, resource_group_name):
+    from azext_iot.dps_sdk.models.query_specification import QuerySpecification
+    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
+    try:
+        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
+        query_command = "SELECT *"
+        query = QuerySpecification(query_command)
+        return m_sdk.device_enrollment_group.query(query, API_VERSION)
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
 
@@ -51,6 +108,14 @@ def iot_dps_device_enrollment_group_get(client, enrollment_id, dps_name, resourc
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
         return m_sdk.device_enrollment_group.get(enrollment_id, API_VERSION)
+    except errors.ErrorDetailsException as e:
+        raise CLIError(e)
+
+def iot_dps_device_enrollment_group_delete(client, enrollment_id, dps_name, resource_group_name):
+    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
+    try:
+        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
+        return m_sdk.device_enrollment_group.delete(enrollment_id, API_VERSION)
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
 
