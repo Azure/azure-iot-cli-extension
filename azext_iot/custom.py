@@ -89,8 +89,7 @@ def iot_dps_device_enrollment_create(client,
             x509 = X509Attestation(client_certificate)
             attestation = AttestationMechanism(attestation_type, None, x509)
         
-        #todo: how to accept twin content
-        initial_twin = InitialTwin(TwinCollection(), InitialTwinProperties(TwinCollection()))
+        initial_twin = _get_initial_twin(initial_twin_tags, initial_twin_properties)
         enrollment = IndividualEnrollment(enrollment_id, 
                                           attestation, 
                                           device_id, 
@@ -102,6 +101,15 @@ def iot_dps_device_enrollment_create(client,
         return m_sdk.device_enrollment.create_or_update(enrollment_id, enrollment, API_VERSION)
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
+
+def _get_initial_twin(initial_twin_tags = None, initial_twin_properties = None):
+    if not initial_twin_tags == None:
+        initial_twin_tags = json.loads(initial_twin_tags)
+    if not initial_twin_properties == None:
+        initial_twin_properties = json.loads(initial_twin_properties)
+    initial_twin = InitialTwin(TwinCollection(initial_twin_tags), 
+                               InitialTwinProperties(TwinCollection(initial_twin_properties)))
+    return initial_twin
 
 def iot_dps_device_enrollment_update(client, 
                                      enrollment_id, 
@@ -132,8 +140,7 @@ def iot_dps_device_enrollment_update(client,
             x509 = X509Attestation(client_certificate)
             attestation = AttestationMechanism(attestation_type, None, x509)
         
-        #todo: how to accept twin content
-        initial_twin = InitialTwin(TwinCollection(), InitialTwinProperties(TwinCollection()))
+        initial_twin = _get_initial_twin(initial_twin_tags, initial_twin_properties)
         enrollment = IndividualEnrollment(enrollment_id, 
                                           attestation, 
                                           device_id, 
@@ -194,8 +201,7 @@ def iot_dps_device_enrollment_group_create(client,
         x509 = X509Attestation(None, signing_certificate)
         attestation = AttestationMechanism("x509", None, x509)
         
-        #todo: how to accept twin content
-        initial_twin = InitialTwin(TwinCollection(), InitialTwinProperties(TwinCollection()))
+        initial_twin = _get_initial_twin(initial_twin_tags, initial_twin_properties)
         group_enrollment = EnrollmentGroup(enrollment_id, 
                                      attestation, 
                                      iot_hub_host_name, 
@@ -226,8 +232,7 @@ def iot_dps_device_enrollment_group_update(client,
         x509 = X509Attestation(None, signing_certificate)
         attestation = AttestationMechanism("x509", None, x509)
         
-        #todo: how to accept twin content
-        initial_twin = InitialTwin(TwinCollection(), InitialTwinProperties(TwinCollection()))
+        initial_twin = _get_initial_twin(initial_twin_tags, initial_twin_properties)
         group_enrollment = EnrollmentGroup(enrollment_id, 
                                      attestation, 
                                      iot_hub_host_name, 
@@ -237,7 +242,7 @@ def iot_dps_device_enrollment_group_update(client,
         return m_sdk.device_enrollment_group.create_or_update(enrollment_id, group_enrollment, API_VERSION, etag)
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
-        
+
 def iot_dps_device_enrollment_group_delete(client, enrollment_id, dps_name, resource_group_name):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:

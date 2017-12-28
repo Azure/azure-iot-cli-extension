@@ -115,5 +115,9 @@ def load_arguments(self, _):
                    help="""Map of labels to be applied to target configuration.
                            Use the following format:'{\"key0\":\"value0\", \"key1\":\"value1\"}'""")
 
+    with self.argument_context('iot dps device-enrollment') as c:
+        c.argument('provisioning-status', type=str, 
+                   help='allow enabled or disabled')
+
     with self.argument_context('iot dps device-enrollment-group') as c:
         c.argument('enrollment-id', type=str)
