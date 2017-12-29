@@ -359,7 +359,7 @@ helps['iot dps enrollment create'] = """
       text: >
         az iot dps enrollment create -g MyResourceGroup --dps-name MyDps --enrollment-id MyEnrollment --attestation-type x509
         --certificate-path /certificates/Certificate.pem --provisioning-status disabled --iot-hub-host-name MyHub.azure-devices.net
-        --initial-twin-properties {\\"location\\":{\\"region\\":\\"US\\"}} --device-id MyDevice
+        --initial-twin-properties "{'location':{'region':'US'}}" --device-id MyDevice
     - name: Create an enrollment 'MyEnrollment' with attestation type 'tpm' in the Azure IoT provisioning service 'MyDps'
             in the resource group 'MyResourceGroup' 
       text: >
@@ -418,7 +418,7 @@ helps['iot dps enrollment-group create'] = """
       text: >
         az iot dps enrollment-group create -g MyResourceGroup --dps-name MyDps --enrollment-id MyEnrollment 
         --certificate-path /certificates/Certificate.pem --provisioning-status enabled --iot-hub-host-name MyHub.azure-devices.net
-        --initial-twin-tags {\\"location\\":{\\"region\\":\\"US\\"}}
+        --initial-twin-tags "{'location':{'region':'US'}}"
 """
 
 helps['iot dps enrollment-group update'] = """

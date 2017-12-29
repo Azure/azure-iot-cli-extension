@@ -81,16 +81,15 @@ def iot_dps_device_enrollment_create(client,
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
-        
-        if attestation_type == AttestationType.tpm: 
+        if attestation_type == AttestationType.tpm.value: 
         #todo: 'Bad Request'. Details: Endorsement key is invalid, or does not match the Enrollment
             if endorsement_key == None:
                 raise CLIError('endorsement_key cannot be None')
             tpm = TpmAttestation(endorsement_key)
-            attestation = AttestationMechanism(AttestationType.tpm, tpm)
-        if attestation_type == AttestationType.x509:
+            attestation = AttestationMechanism(AttestationType.tpm.value, tpm)
+        if attestation_type == AttestationType.x509.value:
             attestation = _get_attestation_with_x509_client_cert(certificate_path)
-        
+         
         initial_twin = _get_initial_twin(initial_twin_tags, initial_twin_properties)
         enrollment = IndividualEnrollment(enrollment_id, 
                                           attestation, 
@@ -122,16 +121,28 @@ def iot_dps_device_enrollment_update(client,
         enrollment_record = m_sdk.device_enrollment.get(enrollment_id, API_VERSION)
         attestation_type =  enrollment_record.attestation.type
         
-        if attestation_type == AttestationType.tpm: 
+        if attestation_type == AttestationType.tpm.value: 
         #todo: 'Bad Request'. Details: Endorsement key is invalid, or does not match the Enrollment
             if endorsement_key == None:
-                raise CLIError('endorsement_key cannot be None')
+                endorsement_key = enrollment_record.attestation.tpm.endorsement_key
             tpm = TpmAttestation(endorsement_key)
-            attestation = AttestationMechanism(AttestationType.tpm, tpm)
-        if attestation_type == AttestationType.x509:
+            attestation = AttestationMechanism(AttestationType.tpm.value, tpm)
+        if attestation_type == AttestationType.x509.value:
             attestation = _get_attestation_with_x509_client_cert(certificate_path)
         
-        initial_twin = _get_initial_twin(initial_twin_tags, initial_twin_properties)
+        if iot_hub_host_name == None:
+            iot_hub_host_name = enrollment_record.iot_hub_host_name
+        if initial_twin_tags == None:
+            initial_twin_tags = enrollment_record.initial_twin.tags.additional_properties
+        if initial_twin_properties == None:
+            initial_twin_properties = enrollment_record.initial_twin.properties.desired.additional_properties 
+            print(initial_twin_properties)
+        if device_id == None:
+            device_id = enrollment_record.device_id
+        if provisioning_status == None:
+            provisioning_status = enrollment_record.provisioning_status
+
+        initial_twin = _get_initial_twin(initial_twin_tags, initial_twin_properties)   
         enrollment = IndividualEnrollment(enrollment_id, 
                                           attestation, 
                                           device_id, 
@@ -203,7 +214,7 @@ def iot_dps_device_enrollment_group_update(client,
                                      dps_name, 
                                      resource_group_name,
                                      etag,
-                                     certificate_path = None,
+                                     certificate_path,
                                      iot_hub_host_name = None,
                                      initial_twin_tags = None,
                                      initial_twin_properties = None,
@@ -212,7 +223,17 @@ def iot_dps_device_enrollment_group_update(client,
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
       
-        attestation = _get_attestation_with_x509_signing_cert(certificate_path)       
+        attestation = _get_attestation_with_x509_signing_cert(certificate_path)   
+
+        if iot_hub_host_name == None:
+            iot_hub_host_name = enrollment_record.iot_hub_host_name
+        if initial_twin_tags == None:
+            initial_twin_tags = enrollment_record.initial_twin.tags.additional_properties
+        if initial_twin_properties == None:
+            initial_twin_properties = enrollment_record.initial_twin.properties.desired.additional_properties 
+        if provisioning_status == None:
+            provisioning_status = enrollment_record.provisioning_status
+
         initial_twin = _get_initial_twin(initial_twin_tags, initial_twin_properties)       
         group_enrollment = EnrollmentGroup(enrollment_id, 
                                      attestation, 
@@ -234,10 +255,11 @@ def iot_dps_device_enrollment_group_delete(client, enrollment_id, dps_name, reso
         raise CLIError(e)
 
 def _get_initial_twin(initial_twin_tags = None, initial_twin_properties = None):
+    import ast
     if not initial_twin_tags == None:
-        initial_twin_tags = json.loads(initial_twin_tags)
+        initial_twin_tags = ast.literal_eval(str(initial_twin_tags))
     if not initial_twin_properties == None:
-        initial_twin_properties = json.loads(initial_twin_properties)
+        initial_twin_properties = ast.literal_eval(str(initial_twin_properties))
     initial_twin = InitialTwin(TwinCollection(initial_twin_tags), 
                                InitialTwinProperties(TwinCollection(initial_twin_properties)))
     return initial_twin
@@ -254,14 +276,14 @@ def _get_attestation_with_x509_client_cert(certificate_path):
         raise CLIError('certificate_path can not be None')
     certificate = _get_x509_certificate(certificate_path)
     x509Attestation = X509Attestation(certificate)
-    attestation = AttestationMechanism(AttestationType.x509, None, x509Attestation)
+    attestation = AttestationMechanism(AttestationType.x509.value, None, x509Attestation)
 
     return attestation
 
 def _get_attestation_with_x509_signing_cert(certificate_path):
     certificate = _get_x509_certificate(certificate_path)
     x509Attestation = X509Attestation(None, certificate)
-    attestation = AttestationMechanism(AttestationType.x509, None, x509Attestation)
+    attestation = AttestationMechanism(AttestationType.x509.value, None, x509Attestation)
 
     return attestation
 
