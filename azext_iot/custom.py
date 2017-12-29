@@ -225,6 +225,7 @@ def iot_dps_device_enrollment_group_update(client,
       
         attestation = _get_attestation_with_x509_signing_cert(certificate_path)   
 
+        enrollment_record = m_sdk.device_enrollment_group.get(enrollment_id, API_VERSION)
         if iot_hub_host_name == None:
             iot_hub_host_name = enrollment_record.iot_hub_host_name
         if initial_twin_tags == None:
