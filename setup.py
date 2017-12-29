@@ -26,7 +26,7 @@ CLASSIFIERS = [
 
 DEPENDENCIES = [
     'msrestazure',
-    'paho-mqtt'
+    'paho-mqtt==1.3.1'
 ]
 
 setup(
