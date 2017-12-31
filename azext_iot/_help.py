@@ -25,6 +25,26 @@ helps['iot hub device-identity'] = """
 helps['iot hub device-identity create'] = """
     type: command
     short-summary: Create a device in an IoT Hub.
+    examples:
+    - name: Create an edge enabled IoT device with default authorization (shared private key).
+      text: >
+        az iot hub device-identity create -n myhub -d mydevice -ee
+    - name: Create an IoT device with self-signed certificate authorization,
+            generate a cert valid for 10 days then use its thumbprint.
+      text: >
+        az iot hub device-identity create -n myhub -d mydevice -am x509_thumbprint --valid-days 10
+    - name: Create an IoT device with self-signed certificate authorization,
+            generate a cert of default expiration (365 days) and output to target directory.
+      text: >
+        az iot hub device-identity create -n myhub -d mydevice -am x509_thumbprint --output-dir /path/to/output
+    - name: Create an IoT device with self-signed certificate authorization and
+            explicitly provide primary and secondary thumbprints.
+      text: >
+        az iot hub device-identity create -n myhub -d mydevice -am x509_thumbprint
+        -ptp mythumbprint1 -stp mythumbprint2
+    - name: Create an IoT device with root CA authorization with disabled status and reason
+      text: >
+        az iot hub device-identity create -n myhub -d mydevice -am x509_ca --status disabled --status-reason 'for reasons'
 """
 
 helps['iot hub device-identity show'] = """

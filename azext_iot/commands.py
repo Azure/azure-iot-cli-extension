@@ -1,6 +1,6 @@
 from azure.cli.core.commands import CliCommandType
-from azext_iot._factory import iot_hub_service_factory as factory
 from azext_iot import iotext_custom
+
 
 def load_command_table(self, _):
     with self.command_group('iot hub') as g:

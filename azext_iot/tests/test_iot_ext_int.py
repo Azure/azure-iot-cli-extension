@@ -11,15 +11,23 @@ from azure.cli.testsdk import ResourceGroupPreparer, ScenarioTest, LiveScenarioT
 from azure.cli.core.util import read_file_content
 
 
+# Set these to the proper IoT Hub and Resource Group for Integration Tests.
+hub = os.environ.get('azext_iot_testhub')
+rg = os.environ.get('azext_iot_testrg')
+
+if not any([hub, rg]):
+    raise ValueError('Set azext_iot_testhub and azext_iot_testrg to run integration tests.')
+
+
 device_id_1 = 'test-device-1'
 device_id_2 = 'test-device-2'
 device_id_3 = 'test-device-3'
+device_id_4 = 'test-device-4'
 module_id_1 = 'test-module-1'
 module_id_2 = 'test-module-2'
 config_id_1 = 'test-config-1'
 config_id_2 = 'test-config-2'
-hub = 'TestHub'
-rg = 'IoT'
+
 device_id_pattern = r'^test\-device\-\d$'
 module_id_pattern = r'^test\-module\-\d$'
 config_id_pattern = r'^test\-config\-\d$'
@@ -42,10 +50,11 @@ class TestHub(LiveScenarioTest):
 
     def test_hub_query(self):
         self.cmd('iot hub query --hub-name {} -q "{}"'.format(hub, "select * from devices"),
-                 checks=[self.check('length([*])', 3),
+                 checks=[self.check('length([*])', 4),
                          self.check_pattern('[0].deviceId', device_id_pattern),
                          self.check_pattern('[1].deviceId', device_id_pattern),
-                         self.check_pattern('[2].deviceId', device_id_pattern)])
+                         self.check_pattern('[2].deviceId', device_id_pattern),
+                         self.check_pattern('[3].deviceId', device_id_pattern)])
 
     # Combined with unit test in Base CLI
     def test_sas_token(self):
@@ -88,6 +97,21 @@ class TestDevice(LiveScenarioTest):
                              'authentication.x509Thumbprint.primaryThumbprint', primary_thumbprint),
                          self.check('authentication.x509Thumbprint.secondaryThumbprint', secondary_thumbprint)])
 
+        self.cmd('''iot hub device-identity create --device-id {} --hub-name {}
+                    --auth-method x509_thumbprint --valid-days {}'''
+                 .format(device_id_4, hub, 10),
+                 checks=[self.check('deviceId', device_id_4),
+                         self.check('status', 'enabled'),
+                         self.check('statusReason', None),
+                         self.check('capabilities.iotEdge', False),
+                         self.check('connectionState', 'Disconnected'),
+                         self.check(
+                             'authentication.symmetricKey.primaryKey', None),
+                         self.check(
+                             'authentication.symmetricKey.secondaryKey', None),
+                         self.exists('authentication.x509Thumbprint.primaryThumbprint'),
+                         self.check('authentication.x509Thumbprint.secondaryThumbprint', None)])
+
         statusReason = "Test Status Reason"
         self.cmd('''iot hub device-identity create --device-id {} --hub-name {}
                     --auth-method x509_ca --status disabled --status-reason "{}"'''
@@ -117,10 +141,11 @@ class TestDevice(LiveScenarioTest):
 
     def test_device_list(self):
         self.cmd('iot hub device-identity list --hub-name {}'.format(hub),
-                 checks=[self.check('length([*])', 3),
+                 checks=[self.check('length([*])', 4),
                          self.check_pattern('[0].deviceId', device_id_pattern),
                          self.check_pattern('[1].deviceId', device_id_pattern),
-                         self.check_pattern('[2].deviceId', device_id_pattern)])
+                         self.check_pattern('[2].deviceId', device_id_pattern),
+                         self.check_pattern('[3].deviceId', device_id_pattern)])
 
         # Until API is fixed
         # self.cmd('iot hub device-identity list --hub-name {} -ee'.format(hub),
@@ -382,3 +407,4 @@ class TestCleanUp(LiveScenarioTest):
         self.cmd('iot hub device-identity delete -d {} -n {}'.format(device_id_1, hub), checks=self.is_empty())
         self.cmd('iot hub device-identity delete --device-id {} --hub-name {}'.format(device_id_2, hub), checks=self.is_empty())
         self.cmd('iot hub device-identity delete -d {} -n {}'.format(device_id_3, hub), checks=self.is_empty())
+        self.cmd('iot hub device-identity delete -d {} -n {}'.format(device_id_4, hub), checks=self.is_empty())

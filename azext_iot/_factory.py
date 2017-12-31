@@ -19,8 +19,8 @@ def _bind_sdk(target, sdk_type, device_id=None):
     from azext_iot.device_msg_sdk.iot_hub_device_client import IotHubDeviceClient
     from azext_iot.custom_sdk.custom_api import CustomClient
 
-    sas_uri = target['hub']
-    endpoint = "https://{}".format(target['hub'])
+    sas_uri = target['entity']
+    endpoint = "https://{}".format(sas_uri)
     if device_id:
         sas_uri = '{}/devices/{}'.format(sas_uri, device_id)
     subscription_id = target.get('subscription', None)
