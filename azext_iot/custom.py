@@ -133,10 +133,9 @@ def iot_dps_device_enrollment_update(client,
         if iot_hub_host_name == None:
             iot_hub_host_name = enrollment_record.iot_hub_host_name
         if initial_twin_tags == None:
-            initial_twin_tags = enrollment_record.initial_twin.tags.additional_properties
+            initial_twin_tags = _get_initial_twin_tags(enrollment_record)
         if initial_twin_properties == None:
-            initial_twin_properties = enrollment_record.initial_twin.properties.desired.additional_properties 
-            print(initial_twin_properties)
+            initial_twin_properties = _get_initial_twin_properties(enrollment_record)
         if device_id == None:
             device_id = enrollment_record.device_id
         if provisioning_status == None:
@@ -224,14 +223,14 @@ def iot_dps_device_enrollment_group_update(client,
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
       
         attestation = _get_attestation_with_x509_signing_cert(certificate_path)   
-
         enrollment_record = m_sdk.device_enrollment_group.get(enrollment_id, API_VERSION)
+ 
         if iot_hub_host_name == None:
             iot_hub_host_name = enrollment_record.iot_hub_host_name
         if initial_twin_tags == None:
-            initial_twin_tags = enrollment_record.initial_twin.tags.additional_properties
+            initial_twin_tags = _get_initial_twin_tags(enrollment_record)
         if initial_twin_properties == None:
-            initial_twin_properties = enrollment_record.initial_twin.properties.desired.additional_properties 
+            initial_twin_properties = _get_initial_twin_properties(enrollment_record) 
         if provisioning_status == None:
             provisioning_status = enrollment_record.provisioning_status
 
@@ -252,6 +251,31 @@ def iot_dps_device_enrollment_group_delete(client, enrollment_id, dps_name, reso
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
         return m_sdk.device_enrollment_group.delete(enrollment_id, API_VERSION)
+    except errors.ErrorDetailsException as e:
+        raise CLIError(e)
+
+# DPS Registration
+def iot_dps_registration_list(client, dps_name, resource_group_name, enrollment_id):
+    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
+    try:
+        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
+        return m_sdk.registration_status.query_registration_state(enrollment_id, API_VERSION)
+    except errors.ErrorDetailsException as e:
+        raise CLIError(e)
+
+def iot_dps_registration_get(client, dps_name, resource_group_name, registration_id):
+    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
+    try:
+        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
+        return m_sdk.registration_status.get_registration_state(registration_id, API_VERSION)
+    except errors.ErrorDetailsException as e:
+        raise CLIError(e)
+
+def iot_dps_registration_delete(client, dps_name, resource_group_name, registration_id):
+    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
+    try:
+        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
+        return m_sdk.registration_status.delete_registration_state(registration_id, API_VERSION)
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
 
@@ -287,6 +311,17 @@ def _get_attestation_with_x509_signing_cert(certificate_path):
     attestation = AttestationMechanism(AttestationType.x509.value, None, x509Attestation)
 
     return attestation
+
+def _get_initial_twin_tags(enrollment_record):
+    if not enrollment_record.initial_twin == None:
+                if not enrollment_record.initial_twin.tags == None:
+                    return enrollment_record.initial_twin.tags.additional_properties
+
+def _get_initial_twin_properties(enrollment_record):
+    if not enrollment_record.initial_twin == None:
+        if not enrollment_record.initial_twin.properties == None:
+            if not enrollment_record.initial_twin.properties.desired == None:
+                return enrollment_record.initial_twin.properties.desired.additional_properties
 
 # Query
 

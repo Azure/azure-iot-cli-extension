@@ -331,22 +331,22 @@ helps['iot dps'] = """
 
 helps['iot dps enrollment'] = """
     type: group
-    short-summary: Manage Azure Provisioning Service Enrollments
+    short-summary: Manage Azure IoT Hub Device Provisioning Service enrollments
 """
 
 helps['iot dps enrollment list'] = """
     type: command
-    short-summary: List device enrollments in an Azure provisioning service 
+    short-summary: List device enrollments in an Azure IoT Hub device provisioning service 
 """
 
 helps['iot dps enrollment show'] = """
     type: command
-    short-summary: Get the details of an Azure Provisioning Service device enrollment
+    short-summary: Get the details of an Azure IoT Hub Device Provisioning Service device enrollment
 """
 
 helps['iot dps enrollment create'] = """
     type: command
-    short-summary: Create an Azure Provisioning Service device enrollment
+    short-summary: Create an Azure IoT Hub Device Provisioning Service device enrollment
     examples:
     - name: Create an enrollment 'MyEnrollment' with attestation type 'x509' in the Azure IoT provisioning service 'MyDps'
             in the resource group 'MyResourceGroup'
@@ -369,7 +369,7 @@ helps['iot dps enrollment create'] = """
 
 helps['iot dps enrollment update'] = """
     type: command
-    short-summary: Update an Azure Provisioning Service device enrollment
+    short-summary: Update an Azure IoT Hub Device Provisioning Service device enrollment
     examples:
     - name: Update enrollment 'MyEnrollment' with a new x509 certificate in the Azure IoT provisioning service 'MyDps'
             in the resource group 'MyResourceGroup' 
@@ -385,27 +385,27 @@ helps['iot dps enrollment update'] = """
 
 helps['iot dps enrollment delete'] = """
     type: command
-    short-summary: Delete an Azure Provisioning Service device enrollment
+    short-summary: Delete an Azure IoT Hub Device Provisioning Service enrollment
 """
 
 helps['iot dps enrollment-group'] = """
     type: group
-    short-summary: Manage Azure Provisioning Service Enrollments Group
+    short-summary: Manage Azure IoT Hub Device Provisioning Service enrollments groups
 """
 
 helps['iot dps enrollment-group list'] = """
     type: command
-    short-summary: List device enrollments in an Azure provisioning service group
+    short-summary: List enrollments in an Azure IoT Hub device provisioning service
 """
 
 helps['iot dps enrollment-group show'] = """
     type: command
-    short-summary: Get the details of an Azure Provisioning Service device enrollment group
+    short-summary: Get the details of an Azure IoT Hub Device Provisioning Service enrollment group
 """
 
 helps['iot dps enrollment-group create'] = """
     type: command
-    short-summary: Create an Azure Provisioning Service device enrollment group
+    short-summary: Create an Azure IoT Hub Device Provisioning Service enrollment group
     examples:
     - name: Create an enrollment group 'MyEnrollment' in the Azure IoT provisioning service 'MyDps' in the resource group
             'MyResourceGroup'
@@ -423,7 +423,7 @@ helps['iot dps enrollment-group create'] = """
 
 helps['iot dps enrollment-group update'] = """
     type: command
-    short-summary: Update an Azure Provisioning Service device enrollment group
+    short-summary: Update an Azure IoT Hub Device Provisioning Service enrollment group
     examples:
     - name: Update enrollment group 'MyEnrollment' in the Azure IoT provisioning service 'MyDps' in the resource group
             'MyResourceGroup'
@@ -434,5 +434,25 @@ helps['iot dps enrollment-group update'] = """
 
 helps['iot dps enrollment-group delete'] = """
     type: command
-    short-summary: Delete an Azure Provisioning Service device enrollment group
+    short-summary: Delete an Azure IoT Hub Device Provisioning Service enrollment group
+"""
+
+helps['iot dps registration'] = """
+    type: group
+    short-summary: Manage Azure IoT Hub Device Provisioning Service registrations
+"""
+
+helps['iot dps registration list'] = """
+    type: command
+    short-summary: List registration state of devices in an Azure IoT Hub Device Provisioning Service enrollment group
+"""
+
+helps['iot dps registration show'] = """
+    type: command
+    short-summary: Get the device registration state in an Azure IoT Hub device provisioning service 
+"""
+
+helps['iot dps registration delete'] = """
+    type: command
+    short-summary: Delete a device registration in an Azure IoT Hub device provisioning service
 """

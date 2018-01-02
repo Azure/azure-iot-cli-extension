@@ -21,14 +21,19 @@ class IoTDpsTest(ScenarioTest):
         cert_file = "testcert.cer"
         max_int = 9223372036854775807
         _create_test_cert(cert_file, self.create_random_name(prefix='TESTCERT', length=24), 3, random.randint(0, max_int))
-
+        
         enrollment_id = self.create_random_name('enrollment-for-test', length=48)
         attestation_type = "x509"
         provisioning_status = "enabled"
         provisioning_status_new = "disabled"
         device_id = self.create_random_name('device-id-for-test', length=48)
+
+        endorsement_key = 'AToAAQALAAMAsgAgg3GXZ0SEs/gakMyNRqXXJP1S124GUgtk8qHaGzMUaaoABgCAAEMAEAgAAAAAAAEAibym9HQP9vxCGF5dVc1QQsAGe021aUGJ'
+                          'zNol1/gycBx3jFsTpwmWbISRwnFvflWd0w2Mc44FAAZNaJOAAxwZvG8GvyLlHh6fGKdh+mSBL4iLH2bZ4Ry22cB3CJVjXmdGoz9Y/j3/NwLndBxQ'
+                          'C+baNvzvyVQZ4/A2YL7vzIIj2ik4y+ve9ir7U0GbNdnxskqK1KFIITVVtkTIYyyFTIR0BySjPrRIDj7r7Mh5uF9HBppGKQCBoVSVV8dI91lNazmS'
+                          'dpGWyqCkO7iM4VvUMv2HT/ym53aYlUrau+Qq87Tu+uQipWYgRdF11KDfcpMHqqzBQQ1NpOJVhrsTrhyJzO7KNw=='
         
-        # Enrollment
+        # Enrollment (x509)
         etag = self.cmd('iot dps enrollment create --enrollment-id {} --attestation-type {} -g {} --dps-name {}  -p {}'
                         ' --provisioning-status {} --device-id {}'
                         .format(enrollment_id, attestation_type, group_name, dps_name, cert_file, provisioning_status, device_id),
@@ -47,8 +52,38 @@ class IoTDpsTest(ScenarioTest):
             checks=[self.check('[0].registrationId', enrollment_id)
         ])
 
-        self.cmd('iot dps enrollment update -g {} --dps-name {} --enrollment-id {} --provisioning_status {}'
-                 .format(group_name, dps_name, enrollment_id, provisioning_status),
+        self.cmd('iot dps enrollment update -g {} --dps-name {} --enrollment-id {} --provisioning_status {} --etag {}'
+                 .format(group_name, dps_name, enrollment_id, provisioning_status, etag),
+                 checks=[self.check('attestation.type', attestation_type),
+                         self.check('registrationId', enrollment_id),
+                         self.check('provisioningStatus', provisioning_status_new),
+                         self.check('deviceId', device_id)
+        ])
+
+        self.cmd('iot dps enrollment delete -g {} --dps-name {} --enrollment-id {}'.format(group_name, dps_name, enrollment_id))
+
+        # Enrollment (tpm)
+        attestation_type = "tpm"
+        etag = self.cmd('iot dps enrollment create --enrollment-id {} --attestation-type {} -g {} --dps-name {}  --endorsement-key {}'
+                        ' --provisioning-status {} --device-id {}'
+                        .format(enrollment_id, attestation_type, group_name, dps_name, endorsement_key, provisioning_status, device_id),
+                        checks=[self.check('attestation.type', attestation_type),
+                                self.check('registrationId', enrollment_id),
+                                self.check('provisioningStatus', provisioning_status),
+                                self.check('deviceId', device_id)
+        ]).get_output_in_json()['etag']
+
+        self.cmd('iot dps enrollment list -g {} --dps-name {}'.format(group_name, dps_name),
+            checks=[self.check('length[*]', 1),
+                    self.check('[0].registrationId', enrollment_id)
+        ])
+
+        self.cmd('iot dps enrollment show -g {} --dps-name {} --enrollment-id {}'.format(group_name, dps_name, enrollment_id),
+            checks=[self.check('[0].registrationId', enrollment_id)
+        ])
+
+        self.cmd('iot dps enrollment update -g {} --dps-name {} --enrollment-id {} --provisioning_status {} --etag {}'
+                 .format(group_name, dps_name, enrollment_id, provisioning_status, etag),
                  checks=[self.check('attestation.type', attestation_type),
                          self.check('registrationId', enrollment_id),
                          self.check('provisioningStatus', provisioning_status_new),
@@ -58,28 +93,29 @@ class IoTDpsTest(ScenarioTest):
         self.cmd('iot dps enrollment delete -g {} --dps-name {} --enrollment-id {}'.format(group_name, dps_name, enrollment_id))
 
         # Enrollment Group
-        etag = self.cmd('iot dps enrollment create --enrollment-id {} --attestation-type {} -g {} --dps-name {}  -p {} --provisioning-status {}'
-            .format(enrollment_id, attestation_type, group_name, dps_name, cert_file, provisioning_status),
-            checks=[self.check('attestation.type', attestation_type),
-                    self.check('registrationId', enrollment_id),
+        etag = self.cmd('iot dps enrollment-group create --enrollment-id {} -g {} --dps-name {}  -p {} --provisioning-status {}'
+            .format(enrollment_id, group_name, dps_name, cert_file, provisioning_status),
+            checks=[self.check('registrationId', enrollment_id),
                     self.check('provisioningStatus', provisioning_status)
         ]).get_output_in_json()['etag']
 
-        self.cmd(''.format(),
-            checks=[
+        self.cmd('iot dps enrollment-group list -g {} --dps-name {}'.format(group_name, dps_name),
+            checks=[self.check('length[*]', 1),
+                    self.check('[0].registrationId', enrollment_id)
         ])
 
-        self.cmd(''.format(),
-            checks=[
+        self.cmd('iot dps enrollment-group show -g {} --dps-name {} --enrollment-id {}'.format(group_name, dps_name, enrollment_id),
+            checks=[self.check('[0].registrationId', enrollment_id)
         ])
 
-        self.cmd(''.format(),
-            checks=[
+        self.cmd('iot dps enrollment-group update -g {} --dps-name {} --enrollment-id {} --provisioning_status {} --etag {}'
+                 .format(group_name, dps_name, enrollment_id, provisioning_status, etag),
+                 checks=[self.check('attestation.type', attestation_type),
+                         self.check('registrationId', enrollment_id),
+                         self.check('provisioningStatus', provisioning_status_new)
         ])
 
-        self.cmd(''.format(),
-            checks=[
-        ])
+        self.cmd('iot dps enrollment-group delete -g {} --dps-name {} --enrollment-id {}'.format(group_name, dps_name, enrollment_id))
 
         # Tear down the provisioning service
         self._delete_test_dps(dps_name, group_name)

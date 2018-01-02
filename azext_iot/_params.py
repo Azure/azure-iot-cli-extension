@@ -128,7 +128,7 @@ def load_arguments(self, _):
                    help='Enable or disable enrollment entry')
 
     with self.argument_context('iot dps enrollment') as c:
-        c.argument('enrollment_id', help='ID of enrollment')
+        c.argument('enrollment_id', help='ID of device enrollment record')
         c.argument('device_id', help='IoT Hub Device ID')
         
     with self.argument_context('iot dps enrollment create') as c:
@@ -139,7 +139,7 @@ def load_arguments(self, _):
                    help='TPM endorsement key for a TPM device. When choosing tpm as attestation type, endorsement key is required.')
 
     with self.argument_context('iot dps enrollment update') as c:
-        c.argument('certificate_path', options_list=['--certificate-path', '-p'], 
+        c.argument('certificate_path', options_list=['--certificate-path', '-p'],
                    help='The path to the file containing the certificate. When update enrollment using x509 as attestation mechanism,' 
                    ' certificate path is required.')
         c.argument('endorsement_key', options_list=['--endorsement-key', '-k'], 
@@ -149,4 +149,10 @@ def load_arguments(self, _):
         c.argument('enrollment_id', help='ID of enrollment group')
         c.argument('certificate_path', options_list=['--certificate-path', '-p'],
                    help='The path to the file containing the certificate.')
+
+    with self.argument_context('iot dps registration') as c:
+        c.argument('registration_id', help='ID of device registration')
+
+    with self.argument_context('iot dps registration list') as c:
+        c.argument('enrollment_id', help='ID of enrollment group')
         

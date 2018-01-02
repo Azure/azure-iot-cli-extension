@@ -79,3 +79,8 @@ def load_command_table(self, _):
         g.custom_command('show', 'iot_dps_device_enrollment_group_get')
         g.custom_command('update', 'iot_dps_device_enrollment_group_update')
         g.custom_command('delete', 'iot_dps_device_enrollment_group_delete')
+
+    with self.command_group('iot dps registration', client_factory=iot_service_provisioning_factory) as g:
+        g.custom_command('list', 'iot_dps_registration_list')
+        g.custom_command('show', 'iot_dps_registration_get')
+        g.custom_command('delete', 'iot_dps_registration_delete')
