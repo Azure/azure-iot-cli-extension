@@ -12,8 +12,8 @@ class SdkType(Enum):
 
 
 class DeviceStatusType(Enum):
-    disabled = "disabled"
-    enabled = "enabled"
+    disabled = 'disabled'
+    enabled = 'enabled'
 
 
 class SettleType(Enum):
@@ -82,11 +82,12 @@ def get_iot_hub_connection_string(client, hub_name, resource_group_name, policy_
     result = {}
     result['cs'] = CONN_STR_TEMPLATE.format(target_hub.properties.host_name, policy.key_name,
                                             policy.primary_key if key_type == 'primary' else policy.secondary_key)
-    result['resource'] = target_hub.properties.host_name
+    result['entity'] = target_hub.properties.host_name
     result['policy'] = policy_name
     result['primarykey'] = policy.primary_key
     result['secondarykey'] = policy.secondary_key
     result['subscription'] = client.config.subscription_id
+    result['resourcegroup'] = target_hub.resourcegroup
 
     return result
 
@@ -124,7 +125,7 @@ def get_iot_dps_connection_string(
         target_dps.properties.service_operations_host_name, 
         policy.key_name,
         policy.primary_key if key_type == 'primary' else policy.secondary_key)
-    result['resource'] = target_dps.properties.service_operations_host_name
+    result['entity'] = target_dps.properties.service_operations_host_name
     result['policy'] = policy_name
     result['primarykey'] = policy.primary_key
     result['secondarykey'] = policy.secondary_key

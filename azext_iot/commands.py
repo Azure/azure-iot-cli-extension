@@ -3,6 +3,7 @@ from azext_iot._factory import iot_hub_service_factory
 from azext_iot._factory import iot_service_provisioning_factory
 from azext_iot import iotext_custom
 
+
 def load_command_table(self, _):
     with self.command_group('iot hub', client_factory=iot_hub_service_factory) as g:
         g.custom_command('query', 'iot_query')

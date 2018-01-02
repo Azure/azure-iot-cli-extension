@@ -61,10 +61,14 @@ def load_arguments(self, _):
                    help='Set device status upon creation.')
         c.argument('status_reason', options_list=['--status-reason', '-star'],
                    help='Description for device status.')
-        c.argument('primary_thumbprint', options_list=['--primary-thumbprint', '-ptp'],
-                   help='Self-signed certificate thumbprint to use for primary key.')
-        c.argument('secondary_thumbprint', options_list=['--secondary-thumbprint', '-stp'],
-                   help='Self-signed certificate thumbprint to use for secondary key.')
+        c.argument('primary_thumbprint', arg_group='X.509', options_list=['--primary-thumbprint', '-ptp'],
+                   help='Explicit self-signed certificate thumbprint to use for primary key.')
+        c.argument('secondary_thumbprint', arg_group='X.509', options_list=['--secondary-thumbprint', '-stp'],
+                   help='Explicit self-signed certificate thumbprint to use for secondary key.')
+        c.argument('valid_days', arg_group='X.509', options_list=['--valid-days', '-vd'], type=int,
+                   help='Generate self-signed cert and use its thumbprint. Valid for specified number of days. Default: 365.')
+        c.argument('output_dir', arg_group='X.509', options_list=['--output-dir', '-od'],
+                   help='Generate self-signed cert and use its thumbprint. Output to specified target directory')
 
     with self.argument_context('iot hub device-identity export') as c:
         c.argument('blob_container_uri',

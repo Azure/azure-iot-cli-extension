@@ -18,6 +18,7 @@ from azext_iot.common.shared import (DeviceAuthType,
                                      get_iot_hub_connection_string, 
                                      get_iot_dps_connection_string)
 from azext_iot.common.utility import validate_key_value_pairs, evaluate_literal
+from azext_iot.common.certops import open_certificate
 from azext_iot._factory import _bind_sdk
 
 from azext_iot.modules_sdk.models.device_capabilities import DeviceCapabilities
@@ -87,7 +88,7 @@ def iot_device_show(client, device_id, hub_name, resource_group_name=None):
     m_sdk, errors = _bind_sdk(target, SdkType.modules_sdk)
     try:
         device = m_sdk.device_api.get_device(device_id)
-        device['hub'] = target.get('hub')
+        device['hub'] = target.get('entity')
         return device
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
@@ -107,7 +108,15 @@ def iot_device_list(client, hub_name, top=10, edge_enabled=False, resource_group
 def iot_device_create(client, device_id, hub_name, edge_enabled=False,
                       auth_method='shared_private_key', primary_thumbprint=None,
                       secondary_thumbprint=None, status='enabled', status_reason=None,
-                      resource_group_name=None):
+                      valid_days=None, output_dir=None, resource_group_name=None):
+
+    if any([valid_days, output_dir]):
+        valid_days = 365 if not valid_days else valid_days
+        if output_dir and not exists(output_dir):
+            raise CLIError('certificate output directory of "{}" does not exist.')
+        cert = _create_self_signed_cert(device_id, valid_days, output_dir)
+        primary_thumbprint = cert['thumbprint']
+
     target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
     m_sdk, errors = _bind_sdk(target, SdkType.modules_sdk)
     try:
@@ -133,9 +142,8 @@ def _assemble_auth(auth_method, pk, sk):
         auth = AuthenticationMechanism(
             symmetric_key=SymmetricKey(pk, sk), type='sas')
     elif auth_method == DeviceAuthType.x509_thumbprint.name or auth_method == 'selfSigned':
-        if not any([pk, sk]):
-            raise ValueError(
-                'primary + secondary Thumbprint required with selfSigned auth')
+        if not pk:
+            raise ValueError('primary thumbprint required with selfSigned auth')
         auth = AuthenticationMechanism(x509_thumbprint=X509Thumbprint(
             pk, sk), type='selfSigned')
     elif auth_method == DeviceAuthType.x509_ca.name or auth_method == 'certificateAuthority':
@@ -144,6 +152,11 @@ def _assemble_auth(auth_method, pk, sk):
         raise ValueError(
             'Authorization method {} invalid.'.format(auth_method))
     return auth
+
+
+def _create_self_signed_cert(subject, valid_days, output_path=None):
+    from azext_iot.common.certops import create_self_signed_certificate
+    return create_self_signed_certificate(subject, valid_days, output_path)
 
 
 def iot_device_update(client, device_id, hub_name, parameters, resource_group_name=None):
@@ -263,7 +276,9 @@ def iot_device_module_show(client, device_id, hub_name, module_id, resource_grou
     target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
     m_sdk, errors = _bind_sdk(target, SdkType.modules_sdk)
     try:
-        return m_sdk.module_api.get_module(device_id, module_id)
+        module = m_sdk.module_api.get_module(device_id, module_id)
+        module['hub'] = target.get('entity')
+        return module
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
 
@@ -569,7 +584,7 @@ def iot_get_sas_token(client, hub_name, device_id=None, policy_name='iothubowner
 def _iot_build_sas_token(client, hub_name, device_id=None, policy_name='iothubowner',
                          key_type='primary', duration=3600, resource_group_name=None):
     target = get_iot_hub_connection_string(client, hub_name, resource_group_name, policy_name)
-    uri = '{0}/devices/{1}'.format(target['hub'], device_id) if device_id else target['hub']
+    uri = '{0}/devices/{1}'.format(target['entity'], device_id) if device_id else target['entity']
     return SasTokenAuthentication(uri, target['policy'],
                                   target['primarykey'] if key_type == 'primary' else target['secondarykey'],
                                   time() + duration)
@@ -616,10 +631,7 @@ def iot_get_device_connection_string(client, hub_name, device_id, key_type='prim
 def iot_get_module_connection_string(client, hub_name, device_id, module_id, key_type='primary',
                                      resource_group_name=None):
     result = {}
-    # Unfortunate shortcut since the Module definition does not contain a hub property
-    device = iot_device_show(client, device_id, hub_name, resource_group_name)
     module = iot_device_module_show(client, device_id, hub_name, module_id, resource_group_name)
-    module['hub'] = device['hub']
     result['cs'] = _build_device_or_module_connection_string(None, key_type, module)
     return result
 
@@ -647,38 +659,17 @@ def _iot_device_send_message(target, device_id, data, properties=None, msg_count
     if properties:
         properties = validate_key_value_pairs(properties)
 
-    sas = SasTokenAuthentication(target['hub'], target['policy'], target['primarykey'], time() + 360).generate_sas_token()
+    sas = SasTokenAuthentication(target['entity'], target['policy'], target['primarykey'], time() + 360).generate_sas_token()
     cwd = os.path.dirname(os.path.abspath(__file__))
     cert_path = os.path.join(cwd, 'digicert.pem')
-    auth = {'username': '{}/{}/api-version=2016-11-14'.format(target['hub'], device_id), 'password': sas}
+    auth = {'username': '{}/{}/api-version=2016-11-14'.format(target['entity'], device_id), 'password': sas}
     tls = {'ca_certs': cert_path, 'tls_version': ssl.PROTOCOL_SSLv23}
     topic = 'devices/{}/messages/events/{}'.format(device_id, urlencode(properties) if properties else '')
     for _ in range(msg_count):
         msgs.append({'topic': topic, 'payload': data})
     try:
-        publish.multiple(msgs, client_id=device_id, hostname=target['hub'], auth=auth, port=8883, protocol=mqtt.MQTTv311, tls=tls)
-        return
-    except Exception as x:
-        raise CLIError(x)
-
-
-def iot_c2d_message_receive_mqtt(client, device_id, hub_name, resource_group_name=None):
-    import paho.mqtt.subscribe as subscribe
-    from paho.mqtt import client as mqtt
-    import ssl
-    import os
-
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
-    sas = SasTokenAuthentication(target['hub'], target['policy'], target['primarykey'], time() + 360).generate_sas_token()
-    cwd = os.path.dirname(os.path.abspath(__file__))
-    cert_path = os.path.join(cwd, 'digicert.pem')
-    auth = {'username': '{}/{}/api-version=2016-11-14'.format(target['hub'], device_id), 'password': sas}
-    tls = {'ca_certs': cert_path, 'tls_version': ssl.PROTOCOL_SSLv23}
-
-    try:
-        msg = subscribe.simple("devices/{}/messages/devicebound/#".format(device_id),
-                               client_id=device_id, hostname=target['hub'], auth=auth, port=8883, protocol=mqtt.MQTTv311, tls=tls)
-        six.print_(msg)
+        publish.multiple(msgs, client_id=device_id, hostname=target['entity'],
+                         auth=auth, port=8883, protocol=mqtt.MQTTv311, tls=tls)
         return
     except Exception as x:
         raise CLIError(x)
@@ -1069,19 +1060,8 @@ def _get_initial_twin(initial_twin_tags = None, initial_twin_properties = None):
                                InitialTwinProperties(TwinCollection(initial_twin_properties)))
     return initial_twin
 
-def _open_certificate(certificate_path):
-    certificate = ""
-    if certificate_path.endswith('.pem') or certificate_path.endswith('.cer'):
-        with open(certificate_path, "rb") as cert_file:
-            certificate = cert_file.read()
-            try:
-                certificate = certificate.decode("utf-8")
-            except UnicodeError:
-                certificate = base64.b64encode(certificate).decode("utf-8")
-    return certificate
-
 def _get_x509_certificate(certificate_path):
-    certificate_content = _open_certificate(certificate_path)
+    certificate_content = open_certificate(certificate_path)
     certificate_with_info = X509CertificateWithInfo(certificate_content)
     x509certificate = X509Certificates(certificate_with_info)
     

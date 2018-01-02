@@ -25,8 +25,8 @@ def _bind_sdk(target, sdk_type, device_id=None):
     from azext_iot.custom_sdk.custom_api import CustomClient
     from azext_iot.dps_sdk.device_provisioning_service_service_runtime_client import DeviceProvisioningServiceServiceRuntimeClient
 
-    sas_uri = target['resource']
-    endpoint = "https://{}".format(target['resource'])
+    sas_uri = target['entity']
+    endpoint = "https://{}".format(sas_uri)
     if device_id:
         sas_uri = '{}/devices/{}'.format(sas_uri, device_id)
     subscription_id = target.get('subscription', None)

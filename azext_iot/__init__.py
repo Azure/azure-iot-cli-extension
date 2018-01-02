@@ -4,14 +4,14 @@
 # --------------------------------------------------------------------------------------------
 
 from azure.cli.core import AzCommandsLoader
-from azext_iot._factory import iot_hub_service_factory as factory
+from azext_iot._factory import iot_hub_service_factory
 from azure.cli.core.commands import CliCommandType
 import azext_iot._help  # pylint: disable=unused-import
 
 
 iotext_custom = CliCommandType(
     operations_tmpl='azext_iot.custom#{}',
-    client_factory=factory
+    client_factory=iot_hub_service_factory
 )
 
 
