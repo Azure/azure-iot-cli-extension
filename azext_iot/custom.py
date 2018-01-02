@@ -40,288 +40,7 @@ from azext_iot.dps_sdk.models.twin_collection import TwinCollection
 from azext_iot.dps_sdk.models.initial_twin_properties import InitialTwinProperties
 from azext_iot.dps_sdk.models.enrollment_group import EnrollmentGroup
 
-from azext_iot._utils import open_certificate
-
 logger = get_logger(__name__)
-
-# DPS Enrollments
-
-API_VERSION = '2017-11-15'
-def iot_dps_device_enrollment_list(client, dps_name, resource_group_name):
-    from azext_iot.dps_sdk.models.query_specification import QuerySpecification
-    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
-    try:
-        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
-        query_command = "SELECT *"
-        query = QuerySpecification(query_command)
-        return m_sdk.device_enrollment.query(query, API_VERSION)
-    except errors.ErrorDetailsException as e:
-        raise CLIError(e)
-
-def iot_dps_device_enrollment_get(client, enrollment_id, dps_name, resource_group_name):
-    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
-    try:
-        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
-        return m_sdk.device_enrollment.get(enrollment_id, API_VERSION)
-    except errors.ErrorDetailsException as e:
-        raise CLIError(e)
-
-def iot_dps_device_enrollment_create(client, 
-                                     enrollment_id, 
-                                     attestation_type,
-                                     dps_name, 
-                                     resource_group_name,
-                                     endorsement_key = None,
-                                     certificate_path = None,
-                                     device_id = None,
-                                     iot_hub_host_name = None,
-                                     initial_twin_tags = None,
-                                     initial_twin_properties = None,
-                                     provisioning_status = None):
-    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
-    try:
-        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
-        if attestation_type == AttestationType.tpm.value: 
-        #todo: 'Bad Request'. Details: Endorsement key is invalid, or does not match the Enrollment
-            if endorsement_key == None:
-                raise CLIError('endorsement_key cannot be None')
-            tpm = TpmAttestation(endorsement_key)
-            attestation = AttestationMechanism(AttestationType.tpm.value, tpm)
-        if attestation_type == AttestationType.x509.value:
-            attestation = _get_attestation_with_x509_client_cert(certificate_path)
-         
-        initial_twin = _get_initial_twin(initial_twin_tags, initial_twin_properties)
-        enrollment = IndividualEnrollment(enrollment_id, 
-                                          attestation, 
-                                          device_id, 
-                                          None, 
-                                          iot_hub_host_name, 
-                                          initial_twin,
-                                          None,
-                                          provisioning_status)
-        return m_sdk.device_enrollment.create_or_update(enrollment_id, enrollment, API_VERSION)
-    except errors.ErrorDetailsException as e:
-        raise CLIError(e)
-
-def iot_dps_device_enrollment_update(client, 
-                                     enrollment_id, 
-                                     dps_name, 
-                                     resource_group_name,
-                                     etag,
-                                     endorsement_key = None,
-                                     certificate_path = None,
-                                     device_id = None,
-                                     iot_hub_host_name = None,
-                                     initial_twin_tags = None,
-                                     initial_twin_properties = None,
-                                     provisioning_status = None):
-    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
-    try:
-        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
-        enrollment_record = m_sdk.device_enrollment.get(enrollment_id, API_VERSION)
-        attestation_type =  enrollment_record.attestation.type
-        
-        if attestation_type == AttestationType.tpm.value: 
-        #todo: 'Bad Request'. Details: Endorsement key is invalid, or does not match the Enrollment
-            if endorsement_key == None:
-                endorsement_key = enrollment_record.attestation.tpm.endorsement_key
-            tpm = TpmAttestation(endorsement_key)
-            attestation = AttestationMechanism(AttestationType.tpm.value, tpm)
-        if attestation_type == AttestationType.x509.value:
-            attestation = _get_attestation_with_x509_client_cert(certificate_path)
-        
-        if iot_hub_host_name == None:
-            iot_hub_host_name = enrollment_record.iot_hub_host_name
-        if initial_twin_tags == None:
-            initial_twin_tags = _get_initial_twin_tags(enrollment_record)
-        if initial_twin_properties == None:
-            initial_twin_properties = _get_initial_twin_properties(enrollment_record)
-        if device_id == None:
-            device_id = enrollment_record.device_id
-        if provisioning_status == None:
-            provisioning_status = enrollment_record.provisioning_status
-
-        initial_twin = _get_initial_twin(initial_twin_tags, initial_twin_properties)   
-        enrollment = IndividualEnrollment(enrollment_id, 
-                                          attestation, 
-                                          device_id, 
-                                          None, 
-                                          iot_hub_host_name, 
-                                          initial_twin,
-                                          None,
-                                          provisioning_status)
-        return m_sdk.device_enrollment.create_or_update(enrollment_id, enrollment, API_VERSION, etag)
-    except errors.ErrorDetailsException as e:
-        raise CLIError(e)
-
-def iot_dps_device_enrollment_delete(client, enrollment_id, dps_name, resource_group_name):
-    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
-    try:
-        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
-        return m_sdk.device_enrollment.delete(enrollment_id, API_VERSION)
-    except errors.ErrorDetailsException as e:
-        raise CLIError(e)
-
-# DPS Enrollments Group
-
-def iot_dps_device_enrollment_group_list(client, dps_name, resource_group_name):
-    from azext_iot.dps_sdk.models.query_specification import QuerySpecification
-    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
-    try:
-        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
-        query_command = "SELECT *"
-        query = QuerySpecification(query_command)
-        return m_sdk.device_enrollment_group.query(query, API_VERSION)
-    except errors.ErrorDetailsException as e:
-        raise CLIError(e)
-
-def iot_dps_device_enrollment_group_get(client, enrollment_id, dps_name, resource_group_name):
-    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
-    try:
-        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
-        return m_sdk.device_enrollment_group.get(enrollment_id, API_VERSION)
-    except errors.ErrorDetailsException as e:
-        raise CLIError(e)
-
-def iot_dps_device_enrollment_group_create(client, 
-                                     enrollment_id, 
-                                     dps_name, 
-                                     resource_group_name,
-                                     certificate_path,
-                                     iot_hub_host_name = None,
-                                     initial_twin_tags = None,
-                                     initial_twin_properties = None,
-                                     provisioning_status = None):
-    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
-    try:
-        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
-        
-        attestation = _get_attestation_with_x509_signing_cert(certificate_path)          
-        initial_twin = _get_initial_twin(initial_twin_tags, initial_twin_properties)       
-        group_enrollment = EnrollmentGroup(enrollment_id, 
-                                     attestation, 
-                                     iot_hub_host_name, 
-                                     initial_twin,
-                                     None,
-                                     provisioning_status)
-        return m_sdk.device_enrollment_group.create_or_update(enrollment_id, group_enrollment, API_VERSION)
-    except errors.ErrorDetailsException as e:
-        raise CLIError(e)
-
-def iot_dps_device_enrollment_group_update(client, 
-                                     enrollment_id, 
-                                     dps_name, 
-                                     resource_group_name,
-                                     etag,
-                                     certificate_path,
-                                     iot_hub_host_name = None,
-                                     initial_twin_tags = None,
-                                     initial_twin_properties = None,
-                                     provisioning_status = None):
-    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
-    try:
-        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
-      
-        attestation = _get_attestation_with_x509_signing_cert(certificate_path)   
-        enrollment_record = m_sdk.device_enrollment_group.get(enrollment_id, API_VERSION)
- 
-        if iot_hub_host_name == None:
-            iot_hub_host_name = enrollment_record.iot_hub_host_name
-        if initial_twin_tags == None:
-            initial_twin_tags = _get_initial_twin_tags(enrollment_record)
-        if initial_twin_properties == None:
-            initial_twin_properties = _get_initial_twin_properties(enrollment_record) 
-        if provisioning_status == None:
-            provisioning_status = enrollment_record.provisioning_status
-
-        initial_twin = _get_initial_twin(initial_twin_tags, initial_twin_properties)       
-        group_enrollment = EnrollmentGroup(enrollment_id, 
-                                     attestation, 
-                                     iot_hub_host_name, 
-                                     initial_twin,
-                                     None,
-                                     provisioning_status)
-        
-        return m_sdk.device_enrollment_group.create_or_update(enrollment_id, group_enrollment, API_VERSION, etag)
-    except errors.ErrorDetailsException as e:
-        raise CLIError(e)
-
-def iot_dps_device_enrollment_group_delete(client, enrollment_id, dps_name, resource_group_name):
-    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
-    try:
-        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
-        return m_sdk.device_enrollment_group.delete(enrollment_id, API_VERSION)
-    except errors.ErrorDetailsException as e:
-        raise CLIError(e)
-
-# DPS Registration
-def iot_dps_registration_list(client, dps_name, resource_group_name, enrollment_id):
-    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
-    try:
-        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
-        return m_sdk.registration_status.query_registration_state(enrollment_id, API_VERSION)
-    except errors.ErrorDetailsException as e:
-        raise CLIError(e)
-
-def iot_dps_registration_get(client, dps_name, resource_group_name, registration_id):
-    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
-    try:
-        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
-        return m_sdk.registration_status.get_registration_state(registration_id, API_VERSION)
-    except errors.ErrorDetailsException as e:
-        raise CLIError(e)
-
-def iot_dps_registration_delete(client, dps_name, resource_group_name, registration_id):
-    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
-    try:
-        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
-        return m_sdk.registration_status.delete_registration_state(registration_id, API_VERSION)
-    except errors.ErrorDetailsException as e:
-        raise CLIError(e)
-
-def _get_initial_twin(initial_twin_tags = None, initial_twin_properties = None):
-    import ast
-    if not initial_twin_tags == None:
-        initial_twin_tags = ast.literal_eval(str(initial_twin_tags))
-    if not initial_twin_properties == None:
-        initial_twin_properties = ast.literal_eval(str(initial_twin_properties))
-    initial_twin = InitialTwin(TwinCollection(initial_twin_tags), 
-                               InitialTwinProperties(TwinCollection(initial_twin_properties)))
-    return initial_twin
-
-def _get_x509_certificate(certificate_path):
-    certificate_content = open_certificate(certificate_path)
-    certificate_with_info = X509CertificateWithInfo(certificate_content)
-    x509certificate = X509Certificates(certificate_with_info)
-    
-    return x509certificate
-
-def _get_attestation_with_x509_client_cert(certificate_path):
-    if certificate_path == None:
-        raise CLIError('certificate_path can not be None')
-    certificate = _get_x509_certificate(certificate_path)
-    x509Attestation = X509Attestation(certificate)
-    attestation = AttestationMechanism(AttestationType.x509.value, None, x509Attestation)
-
-    return attestation
-
-def _get_attestation_with_x509_signing_cert(certificate_path):
-    certificate = _get_x509_certificate(certificate_path)
-    x509Attestation = X509Attestation(None, certificate)
-    attestation = AttestationMechanism(AttestationType.x509.value, None, x509Attestation)
-
-    return attestation
-
-def _get_initial_twin_tags(enrollment_record):
-    if not enrollment_record.initial_twin == None:
-                if not enrollment_record.initial_twin.tags == None:
-                    return enrollment_record.initial_twin.tags.additional_properties
-
-def _get_initial_twin_properties(enrollment_record):
-    if not enrollment_record.initial_twin == None:
-        if not enrollment_record.initial_twin.properties == None:
-            if not enrollment_record.initial_twin.properties.desired == None:
-                return enrollment_record.initial_twin.properties.desired.additional_properties
 
 # Query
 
@@ -1104,3 +823,293 @@ def iot_device_upload_file(client, device_id, hub_name, file_path, content_type,
         custom_sdk.post_file_notification(device_id, container['correlationId'])
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
+
+# DPS Enrollments
+
+API_VERSION = '2017-11-15'
+def iot_dps_device_enrollment_list(client, dps_name, resource_group_name):
+    from azext_iot.dps_sdk.models.query_specification import QuerySpecification
+    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
+    try:
+        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
+        query_command = "SELECT *"
+        query = QuerySpecification(query_command)
+        return m_sdk.device_enrollment.query(query, API_VERSION)
+    except errors.ErrorDetailsException as e:
+        raise CLIError(e)
+
+def iot_dps_device_enrollment_get(client, enrollment_id, dps_name, resource_group_name):
+    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
+    try:
+        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
+        return m_sdk.device_enrollment.get(enrollment_id, API_VERSION)
+    except errors.ErrorDetailsException as e:
+        raise CLIError(e)
+
+def iot_dps_device_enrollment_create(client, 
+                                     enrollment_id, 
+                                     attestation_type,
+                                     dps_name, 
+                                     resource_group_name,
+                                     endorsement_key = None,
+                                     certificate_path = None,
+                                     device_id = None,
+                                     iot_hub_host_name = None,
+                                     initial_twin_tags = None,
+                                     initial_twin_properties = None,
+                                     provisioning_status = None):
+    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
+    try:
+        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
+        if attestation_type == AttestationType.tpm.value: 
+        #todo: 'Bad Request'. Details: Endorsement key is invalid, or does not match the Enrollment
+            if endorsement_key == None:
+                raise CLIError('endorsement_key cannot be None')
+            tpm = TpmAttestation(endorsement_key)
+            attestation = AttestationMechanism(AttestationType.tpm.value, tpm)
+        if attestation_type == AttestationType.x509.value:
+            attestation = _get_attestation_with_x509_client_cert(certificate_path)
+         
+        initial_twin = _get_initial_twin(initial_twin_tags, initial_twin_properties)
+        enrollment = IndividualEnrollment(enrollment_id, 
+                                          attestation, 
+                                          device_id, 
+                                          None, 
+                                          iot_hub_host_name, 
+                                          initial_twin,
+                                          None,
+                                          provisioning_status)
+        return m_sdk.device_enrollment.create_or_update(enrollment_id, enrollment, API_VERSION)
+    except errors.ErrorDetailsException as e:
+        raise CLIError(e)
+
+def iot_dps_device_enrollment_update(client, 
+                                     enrollment_id, 
+                                     dps_name, 
+                                     resource_group_name,
+                                     etag,
+                                     endorsement_key = None,
+                                     certificate_path = None,
+                                     device_id = None,
+                                     iot_hub_host_name = None,
+                                     initial_twin_tags = None,
+                                     initial_twin_properties = None,
+                                     provisioning_status = None):
+    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
+    try:
+        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
+        enrollment_record = m_sdk.device_enrollment.get(enrollment_id, API_VERSION)
+        attestation_type =  enrollment_record.attestation.type
+        
+        if attestation_type == AttestationType.tpm.value: 
+        #todo: 'Bad Request'. Details: Endorsement key is invalid, or does not match the Enrollment
+            if endorsement_key == None:
+                endorsement_key = enrollment_record.attestation.tpm.endorsement_key
+            tpm = TpmAttestation(endorsement_key)
+            attestation = AttestationMechanism(AttestationType.tpm.value, tpm)
+        if attestation_type == AttestationType.x509.value:
+            attestation = _get_attestation_with_x509_client_cert(certificate_path)
+        
+        if iot_hub_host_name == None:
+            iot_hub_host_name = enrollment_record.iot_hub_host_name
+        if initial_twin_tags == None:
+            initial_twin_tags = _get_initial_twin_tags(enrollment_record)
+        if initial_twin_properties == None:
+            initial_twin_properties = _get_initial_twin_properties(enrollment_record)
+        if device_id == None:
+            device_id = enrollment_record.device_id
+        if provisioning_status == None:
+            provisioning_status = enrollment_record.provisioning_status
+
+        initial_twin = _get_initial_twin(initial_twin_tags, initial_twin_properties)   
+        enrollment = IndividualEnrollment(enrollment_id, 
+                                          attestation, 
+                                          device_id, 
+                                          None, 
+                                          iot_hub_host_name, 
+                                          initial_twin,
+                                          None,
+                                          provisioning_status)
+        return m_sdk.device_enrollment.create_or_update(enrollment_id, enrollment, API_VERSION, etag)
+    except errors.ErrorDetailsException as e:
+        raise CLIError(e)
+
+def iot_dps_device_enrollment_delete(client, enrollment_id, dps_name, resource_group_name):
+    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
+    try:
+        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
+        return m_sdk.device_enrollment.delete(enrollment_id, API_VERSION)
+    except errors.ErrorDetailsException as e:
+        raise CLIError(e)
+
+# DPS Enrollments Group
+
+def iot_dps_device_enrollment_group_list(client, dps_name, resource_group_name):
+    from azext_iot.dps_sdk.models.query_specification import QuerySpecification
+    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
+    try:
+        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
+        query_command = "SELECT *"
+        query = QuerySpecification(query_command)
+        return m_sdk.device_enrollment_group.query(query, API_VERSION)
+    except errors.ErrorDetailsException as e:
+        raise CLIError(e)
+
+def iot_dps_device_enrollment_group_get(client, enrollment_id, dps_name, resource_group_name):
+    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
+    try:
+        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
+        return m_sdk.device_enrollment_group.get(enrollment_id, API_VERSION)
+    except errors.ErrorDetailsException as e:
+        raise CLIError(e)
+
+def iot_dps_device_enrollment_group_create(client, 
+                                     enrollment_id, 
+                                     dps_name, 
+                                     resource_group_name,
+                                     certificate_path,
+                                     iot_hub_host_name = None,
+                                     initial_twin_tags = None,
+                                     initial_twin_properties = None,
+                                     provisioning_status = None):
+    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
+    try:
+        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
+        
+        attestation = _get_attestation_with_x509_signing_cert(certificate_path)          
+        initial_twin = _get_initial_twin(initial_twin_tags, initial_twin_properties)       
+        group_enrollment = EnrollmentGroup(enrollment_id, 
+                                     attestation, 
+                                     iot_hub_host_name, 
+                                     initial_twin,
+                                     None,
+                                     provisioning_status)
+        return m_sdk.device_enrollment_group.create_or_update(enrollment_id, group_enrollment, API_VERSION)
+    except errors.ErrorDetailsException as e:
+        raise CLIError(e)
+
+def iot_dps_device_enrollment_group_update(client, 
+                                     enrollment_id, 
+                                     dps_name, 
+                                     resource_group_name,
+                                     etag,
+                                     certificate_path,
+                                     iot_hub_host_name = None,
+                                     initial_twin_tags = None,
+                                     initial_twin_properties = None,
+                                     provisioning_status = None):
+    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
+    try:
+        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
+      
+        attestation = _get_attestation_with_x509_signing_cert(certificate_path)   
+        enrollment_record = m_sdk.device_enrollment_group.get(enrollment_id, API_VERSION)
+ 
+        if iot_hub_host_name == None:
+            iot_hub_host_name = enrollment_record.iot_hub_host_name
+        if initial_twin_tags == None:
+            initial_twin_tags = _get_initial_twin_tags(enrollment_record)
+        if initial_twin_properties == None:
+            initial_twin_properties = _get_initial_twin_properties(enrollment_record) 
+        if provisioning_status == None:
+            provisioning_status = enrollment_record.provisioning_status
+
+        initial_twin = _get_initial_twin(initial_twin_tags, initial_twin_properties)       
+        group_enrollment = EnrollmentGroup(enrollment_id, 
+                                     attestation, 
+                                     iot_hub_host_name, 
+                                     initial_twin,
+                                     None,
+                                     provisioning_status)
+        
+        return m_sdk.device_enrollment_group.create_or_update(enrollment_id, group_enrollment, API_VERSION, etag)
+    except errors.ErrorDetailsException as e:
+        raise CLIError(e)
+
+def iot_dps_device_enrollment_group_delete(client, enrollment_id, dps_name, resource_group_name):
+    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
+    try:
+        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
+        return m_sdk.device_enrollment_group.delete(enrollment_id, API_VERSION)
+    except errors.ErrorDetailsException as e:
+        raise CLIError(e)
+
+# DPS Registration
+def iot_dps_registration_list(client, dps_name, resource_group_name, enrollment_id):
+    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
+    try:
+        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
+        return m_sdk.registration_status.query_registration_state(enrollment_id, API_VERSION)
+    except errors.ErrorDetailsException as e:
+        raise CLIError(e)
+
+def iot_dps_registration_get(client, dps_name, resource_group_name, registration_id):
+    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
+    try:
+        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
+        return m_sdk.registration_status.get_registration_state(registration_id, API_VERSION)
+    except errors.ErrorDetailsException as e:
+        raise CLIError(e)
+
+def iot_dps_registration_delete(client, dps_name, resource_group_name, registration_id):
+    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
+    try:
+        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
+        return m_sdk.registration_status.delete_registration_state(registration_id, API_VERSION)
+    except errors.ErrorDetailsException as e:
+        raise CLIError(e)
+
+def _get_initial_twin(initial_twin_tags = None, initial_twin_properties = None):
+    import ast
+    if not initial_twin_tags == None:
+        initial_twin_tags = ast.literal_eval(str(initial_twin_tags))
+    if not initial_twin_properties == None:
+        initial_twin_properties = ast.literal_eval(str(initial_twin_properties))
+    initial_twin = InitialTwin(TwinCollection(initial_twin_tags), 
+                               InitialTwinProperties(TwinCollection(initial_twin_properties)))
+    return initial_twin
+
+def _open_certificate(certificate_path):
+    certificate = ""
+    if certificate_path.endswith('.pem') or certificate_path.endswith('.cer'):
+        with open(certificate_path, "rb") as cert_file:
+            certificate = cert_file.read()
+            try:
+                certificate = certificate.decode("utf-8")
+            except UnicodeError:
+                certificate = base64.b64encode(certificate).decode("utf-8")
+    return certificate
+
+def _get_x509_certificate(certificate_path):
+    certificate_content = _open_certificate(certificate_path)
+    certificate_with_info = X509CertificateWithInfo(certificate_content)
+    x509certificate = X509Certificates(certificate_with_info)
+    
+    return x509certificate
+
+def _get_attestation_with_x509_client_cert(certificate_path):
+    if certificate_path == None:
+        raise CLIError('certificate_path can not be None')
+    certificate = _get_x509_certificate(certificate_path)
+    x509Attestation = X509Attestation(certificate)
+    attestation = AttestationMechanism(AttestationType.x509.value, None, x509Attestation)
+
+    return attestation
+
+def _get_attestation_with_x509_signing_cert(certificate_path):
+    certificate = _get_x509_certificate(certificate_path)
+    x509Attestation = X509Attestation(None, certificate)
+    attestation = AttestationMechanism(AttestationType.x509.value, None, x509Attestation)
+
+    return attestation
+
+def _get_initial_twin_tags(enrollment_record):
+    if not enrollment_record.initial_twin == None:
+                if not enrollment_record.initial_twin.tags == None:
+                    return enrollment_record.initial_twin.tags.additional_properties
+
+def _get_initial_twin_properties(enrollment_record):
+    if not enrollment_record.initial_twin == None:
+        if not enrollment_record.initial_twin.properties == None:
+            if not enrollment_record.initial_twin.properties.desired == None:
+                return enrollment_record.initial_twin.properties.desired.additional_properties
