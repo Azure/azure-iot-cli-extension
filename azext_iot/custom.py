@@ -1,3 +1,4 @@
+# coding=utf-8
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
@@ -408,7 +409,7 @@ def iot_device_configuration_update(client, config_id, hub_name, parameters, res
 
 def _handle_device_configuration_update_params(parameters):
     content = parameters['content']
-    if isinstance(content, six.text_type):
+    if isinstance(content, six.string_types):
         if exists(content):
             content = str(read_file_content(content))
         content = json.loads(content)

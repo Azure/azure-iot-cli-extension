@@ -1,3 +1,4 @@
+# coding=utf-8
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
@@ -14,6 +15,10 @@ from azure.cli.core.util import read_file_content
 # Set these to the proper IoT Hub and Resource Group for Integration Tests.
 hub = os.environ.get('azext_iot_testhub')
 rg = os.environ.get('azext_iot_testrg')
+
+# Set this environment variable to your empty blob container sas uri to test device export and enable file upload test.
+# For file upload, you will need to have configured your IoT Hub before running.
+test_storage = os.environ.get('azext_iot_teststorageuri')
 
 if not any([hub, rg]):
     raise ValueError('Set azext_iot_testhub and azext_iot_testrg to run integration tests.')
@@ -260,9 +265,9 @@ class TestModules(LiveScenarioTest):
     def test_module_list(self):
         self.cmd('iot hub module-identity list -d {} -n {}'.format(device_id_2, hub),
                  checks=[
-                    self.check('length([*])', 4),
-                    self.exists("[?moduleId=='$edgeAgent']"),
-                    self.exists("[?moduleId=='$edgeHub']")])
+                     self.check('length([*])', 4),
+                     self.exists("[?moduleId=='$edgeAgent']"),
+                     self.exists("[?moduleId=='$edgeHub']")])
 
     def test_module_show(self):
         self.cmd('iot hub module-identity show -d {} -n {} -m {}'.format(device_id_2, hub, module_id_1),
@@ -316,11 +321,13 @@ class TestModules(LiveScenarioTest):
                          self.check('tags.location.region', 'US')])
 
 
+content_path = os.path.join(cwd, 'test_config_content.json')
+
+
 class TestEdgeDeployment(LiveScenarioTest):
     def test_edge_deployment_create_and_show(self):
         priority = random.randint(1, 10)
         condition = 'tags.building=9 and tags.environment=\'test\''
-        content_path = os.path.join(cwd, 'test_config_content.json')
         labels = '{"key0":"value0", "key1":"value1"}'
         self.cmd("iot edge deployment create -c {} -n {} -pri {} -tc \"{}\" -lab '{}' -k '{}'"
                  .format(config_id_1, hub, priority, condition, labels, content_path),
@@ -352,6 +359,7 @@ class TestEdgeDeployment(LiveScenarioTest):
         priority = random.randint(1, 10)
         condition = "tags.building=43 and tags.environment='dev'"
         labels = '{"key":"super_value"}'
+
         self.cmd('iot edge deployment update -c {} -n {} --set priority={} targetCondition="{}" labels=\'{}\''
                  .format(config_id_1, hub, priority, condition, labels),
                  checks=[
@@ -389,6 +397,23 @@ class TestMessaging(LiveScenarioTest):
     def test_device_simulate(self):
         self.cmd("iot device simulate -d {} -n {} --data '{}' -rs 'complete'".format(device_id_1, hub, 'IoT Ext Test'),
                  checks=self.is_empty())
+
+
+@pytest.mark.skipif(not test_storage, reason="empty azext_iot_teststorageuri env var")
+class TestStorage(LiveScenarioTest):
+    def test_upload_file(self):
+        self.cmd('iot device upload-file -d {} -n {} -fp "{}" -ct {}'.format(device_id_1, hub, content_path, 'application/json'),
+                 checks=self.is_empty())
+
+    def test_export_device(self):
+        self.cmd('iot hub device-identity export -n {} -bcu "{}"'.format(hub, test_storage),
+                 checks=[
+                     self.check('additionalProperties.outputBlobContainerUri', test_storage),
+                     self.check('failureReason', None),
+                     self.check('type', 'export'),
+                     self.exists('jobId')
+                 ])
+
 
 
 @pytest.mark.second_to_last

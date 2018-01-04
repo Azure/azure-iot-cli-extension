@@ -1,3 +1,4 @@
+# coding=utf-8
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
@@ -545,7 +546,7 @@ class TestConfigCreate():
     @pytest.mark.parametrize("req", [
         (generate_device_config()),
         (generate_device_config(True)),
-        (generate_device_config(condition="tags.building=43 and tags.environment='test'", priority=5)),
+        (generate_device_config(condition="tags.building=43 and tags.environment='test'", priority=5)),
         (generate_device_config(labels='{"special":"value"}')),
     ])
     def test_config_create(self, serviceclient, req):
@@ -599,7 +600,7 @@ class TestConfigUpdate():
 
     @pytest.mark.parametrize("req", [
         (generate_device_config()),
-        (generate_device_config(condition="tags.building=9 and tags.environment='Dev'", priority=1000)),
+        (generate_device_config(condition="tags.building=9 and tags.environment='Dev'", priority=1000)),
         (generate_device_config(labels=evaluate_literal('{"special":"value"}', dict))),
     ])
     def test_config_update(self, serviceclient, req):
@@ -684,7 +685,8 @@ class TestConfigList():
         url = args[0][0].url
         assert json.dumps(result)
         assert len(result) == serviceclient.expected_size
-        assert '{}/configurations?top={}&'.format(mock_target['entity'], top) in url
+        assert '{}/configurations?'.format(mock_target['entity']) in url
+        assert 'top={}'.format(top) in url
 
     @pytest.mark.parametrize("top", [-1, 0])
     def test_config_list_invalid_args(self, serviceclient, top):
