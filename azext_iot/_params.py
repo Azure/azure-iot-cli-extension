@@ -11,11 +11,10 @@ from azure.cli.core.commands.parameters import (
     get_three_state_flag
 )
 from azext_iot.common.shared import (
-    DeviceStatusType,
+    EntityStatusType,
     SettleType,
     DeviceAuthType,
     KeyType,
-    ProvisioningStatus,
     AttestationType
 )
 
@@ -57,7 +56,7 @@ def load_arguments(self, _):
     with self.argument_context('iot hub device-identity') as c:
         c.argument('edge_enabled', options_list=['--edge-enabled', '-ee'], arg_type=get_three_state_flag(),
                    help='Flag indicating edge enablement.')
-        c.argument('status', options_list=['--status', '-sta'], arg_type=get_enum_type(DeviceStatusType),
+        c.argument('status', options_list=['--status', '-sta'], arg_type=get_enum_type(EntityStatusType),
                    help='Set device status upon creation.')
         c.argument('status_reason', options_list=['--status-reason', '-star'],
                    help='Description for device status.')
@@ -128,7 +127,7 @@ def load_arguments(self, _):
         c.argument('initial_twin_tags', options_list=['--initial-twin-tags', '--tags'],
                    help='Initial twin tags')
         c.argument('iot_hub_host_name', help='Host name of target IoT Hub')
-        c.argument('provisioning_status', arg_type=get_enum_type(ProvisioningStatus),
+        c.argument('provisioning_status', arg_type=get_enum_type(EntityStatusType),
                    help='Enable or disable enrollment entry')
 
     with self.argument_context('iot dps enrollment') as c:

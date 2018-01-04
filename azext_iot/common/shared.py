@@ -11,7 +11,7 @@ class SdkType(Enum):
     dps_sdk = 5
 
 
-class DeviceStatusType(Enum):
+class EntityStatusType(Enum):
     disabled = 'disabled'
     enabled = 'enabled'
 
@@ -32,10 +32,6 @@ class KeyType(Enum):
     primary = 'primary'
     secondary = 'secondary'
 
-
-class ProvisioningStatus(Enum):
-    disabled = 'disabled'
-    enabled = 'enabled'
 
 class AttestationType(Enum):
     tpm = 'tpm'
