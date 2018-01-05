@@ -55,7 +55,7 @@ Now follow the local package installation method.
 
 Your subscription details are used to manipulate target resources.
 
-You can login interactively, pass in account credentials or use a service principal with a certificate.
+You can login interactively, pass in account credentials or use a service principal with password/certificate options.
 
 [Azure CLI login details](https://docs.microsoft.com/en-us/cli/azure/authenticate-azure-cli?view=azure-cli-latest)
 
