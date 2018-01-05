@@ -1,130 +1,123 @@
-# Microsoft Azure IoT CLI Extension for Windows and Linux
+# Microsoft Azure IoT Extension for Azure CLI 2.0
 
 ![Python](https://img.shields.io/pypi/pyversions/azure-cli.svg?maxAge=2592000)
 
-This project provides new and exciting IoT commands and capabilities that do not exist in the vanilla Azure CLI. Functionality is provided as an Az CLI extension package.
+This project provides new and exciting IoT commands and capabilities focused around IoT data-plane. Functionality is provided as an Azure CLI extension package for seamless integration.
 
-Checkout the prebuilt package distributed on [Pypi](https://pypi.python.org/pypi/azure-cli-iot-ext).
+## Features
 
-# Features
+The extension will augment vanilla Azure CLI IoT by adding to or modifying the existing command space. The following categories of capability are provided:
 
-- New device message send (device-to-cloud) supporting **amqp, mqtt and http** protocols
-- Hub message send (cloud-to-device)
-- Device twin operations
-- Invoke device method
-- Device simulation
-- Generate SAS token
+- IoT Hub
+- IoT Edge
+- IoT Device Provisioning Service _(coming soon)_
 
+## Installation
 
-# Installation
+The extension is designed to be plug and play with Azure CLI. **Even** if you have Azure CLI installed make sure it is up to date.
 
-This extension depends on Az CLI and will supplement existing IoT commands. **Even** if you have Az CLI installed make sure it is up to date and **supports** the `az extension` feature!
+### Step 0: Install/Update Azure CLI
 
-### Azure CLI
+At a minimum your CLI core version must be `2.0.22` (use `az --version`) which support `az extension` commands and uses the `knack` command parser!
 
-First follow the installation instructions on [GitHub](https://github.com/Azure/azure-cli) or [Microsoft Docs](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest) to setup Python and the Azure CLI in your environment.
+Follow the installation instructions on [GitHub](https://github.com/Azure/azure-cli) or [Microsoft Docs](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest) to setup Azure CLI in your environment.
 
-### OS environment dependencies
+### Step 1: Install the extension
 
-Next depending on your OS environment you will need to install required C++ and Python shared libraries. These requirements come from the Azure [Python IoT SDK](https://github.com/Azure/azure-iot-sdk-python).
+Now that you have a compatible Azure CLI installed you can add the IoT extension.
+When installing an extension any additional Python dependencies required will be downloaded and installed.
 
-#### Windows
-- Install the Visual [C++ VS 15 redistributable](https://www.microsoft.com/en-us/download/details.aspx?id=48145)
+The are multiple options for installation. In prefered order:
 
-#### Linux
-- The IoT SDK should work for Ubuntu Trusty and Xenial. 
-- Ensure you have the following dependencies installed.
-    - libboost1.54-all-dev ([trusty universe](https://packages.ubuntu.com/search?keywords=libboost1.54-all-dev&searchon=names&suite=all&section=all))
-    - libpython2.7 for Python 2.7 or libpython3.4 for Python 3.4+ ([trusty](https://packages.ubuntu.com/search?suite=all&section=all&arch=any&keywords=libpython3.4&searchon=names))
-    - libcurl4-openssl-dev
-    - Example [Xenial](https://aka.ms/azure-iotsdk-bootstrap-xenial) and [Trusty](https://aka.ms/azure-iotsdk-bootstrap-trusty) IoT SDK dependency installation scripts
+#### 1.a) Index method
 
-    **Notes**: 
-        
-    It is recommended to use package managers like apt-get or aptitude to install dependencies. 
-    
-    Read [this resource](https://digimaun.github.io/cloudsauce/2017/09/25/ubuntu-xenial-leveraging-trusty-packages/) to learn how to use trusty packages in xenial, with a specific example using libboost1.54-all-dev.
-    
+Install the extension from official Microsoft Azure CLI Extension Index
 
-For more information on these dependencies refer to the [Python IoT SDK](https://github.com/Azure/azure-iot-sdk-python/blob/master/doc/python-devbox-setup.md#install-the-python-modules-using-pypi-wheels-from-pypi) project which is the major provider for this extension.
+`az extension add --name azure-cli-iot-ext`
 
-### Add extension to Az CLI 
-Now that your environment has fulfilled prereqs you can leverage the Az CLI **extension add** capability. You will need to point the **--source** parameter of the add command to the IoT extension wheel package, either locally or a target URI.
+#### 1.b) URL or local package installation method
 
-```
-az extension add --source <filepath.whl OR uri for .whl>
-```
+Go to this projects release tab in GitHub which contains past releases. Run the extension add command using the `--source` parameter.
 
-The easiest way to add the extension is to use the official [Pypi](https://pypi.python.org/pypi/azure-cli-iot-ext) distributed package, but you can also create a package locally from source.
+The arguement for the source parameter is either the URL download path (the extension package ends with '.whl') of your chosen release or the local path to the extension where you downloaded the release package.
+
+`az extension add --source <local file path to release.whl OR  url for release.whl>`
+
+#### 1.c) Package from source method
+
+You can create a wheel package locally from source.
 
 To build the wheel locally, ensure you have the `wheel` package installed i.e. `pip install wheel`. Then run `python setup.py bdist_wheel` where the current directory is the extension root.
 
-The az extension add command will download and install any additional Python dependencies required and may take a couple minutes to complete.
+Now follow the local package installation method.
 
-After the command finishes, the `az iot <subcommand>` collection should have new and overriden commands available for use.
+### Step 2: Log In (if you haven't already)
 
+Your subscription details are used to manipulate target resources.
 
-# Command Guide
+You can login interactively, pass in account credentials or use a service principal with a certificate.
 
-This is the current set of new commands. There is an assortment of parameters for each command! Make sure you add --help for detailed help information on either commands or parameters.
+[Azure CLI login details](https://docs.microsoft.com/en-us/cli/azure/authenticate-azure-cli?view=azure-cli-latest)
 
-```python
-az iot device twin show
-az iot device twin update
-az iot device message send
-az iot hub message send
-az iot device simulate
-az iot device method
-az iot device sas
-```
+### Step 3: Have Fun
+
+If you have any suggestions or find bugs, please let us know.
+
+## Command Guide
+
+[TBD]
 
 ## Developer setup
 
-Extension development depends on a local Az CLI dev environment. First follow the [instructions](https://github.com/Azure/azure-cli/blob/master/doc/configuring_your_machine.md) for preparing your machine.
+Extension development depends on a local Az CLI dev environment. First follow these [instructions](https://github.com/Azure/azure-cli/blob/master/doc/configuring_your_machine.md) for preparing your machine.
 
-Next install the required C++ dependencies outlined in the user installation instructions.
+Next update your `AZURE_EXTENSION_DIR` environment variable to a target extension deployment directory. This overrides the standard extension directory.
 
-Then update your `AZURE_EXTENSION_DIR` environment variable to a target extension deployment directory.
+Example `export AZURE_EXTENSION_DIR=~/.azure/devcliextensions/`
 
-Example `export AZURE_EXTENSION_DIR=~/.azure/devcliextensions`
+Run the following command to setup and install all dependencies in the extension deployment directory.
 
-When you are ready to try extension changes in Az CLI
-
-`pip install -U --target <extension deployment directory>/<extension name> <iot extension root>`
+`pip install -U --target <extension deployment directory>/azure_cli_iot_ext <iot extension code root>`
 
 Repeat the above command as needed.
 
+At this point, assuming the setup is good the extension should be loaded and you should see the extension command space. Use `az --debug` and `az extension list` for debugging this step.
 
-[Reference](https://github.com/Azure/azure-cli/tree/master/doc/extensions) docs for Az CLI Extension development
+Helpful [Reference](https://github.com/Azure/azure-cli/tree/master/doc/extensions) docs for Az CLI Extension development
 
 ### Running Tests
 
-Current testing patterns leverage [unittest](https://docs.python.org/3.6/library/unittest.html) and [coverage](https://coverage.readthedocs.io/en/coverage-4.4.1/).
+Update the `PYTHONPATH` environment variable with both the extension dev deployment directory and root for the extension source code.
 
-Ensure you have **activated** your Python virtual environment for Az CLI.
+Example `export PYTHONPATH=~/.azure/devcliextensions/:~/source/azure_cli_iot_ext/`
+
+Current testing patterns make heavy use of [pytest](https://docs.pytest.org/en/latest/) and [unittest](https://docs.python.org/3.6/library/unittest.html).
+
+We also make use of the `pytest-mock` and `pytest-ordering` plugins for pytest.
+
+After obtaining the above packages, ensure you have **activated** your Python virtual environment and your extension deployment directory is prepared.
 
 **Unit tests:**
 
-`python <extension root>/azext_iot/tests/test_iot_sdk_ext_unit.py`
+`pytest <extension root>/azext_iot/tests/test_iot_ext_unit.py`
 
-**Integration tests:** 
+**Integration tests:**
 
-Update the following environment variables prior to running integration tests.
+Currently integration tests leverage Azure CLI live scenario tests. Update the following environment variables prior to running integration tests.
 
-`iot_ext_hub_connstring`, `iot_ext_hub_name`, `iot_ext_device_connstring`, `iot_ext_device_name`
+`AZURE_TEST_RUN_LIVE` # Set to 'True' to hit live endpoints.
 
-`python <extension root>/azext_iot/tests/test_iot_sdk_ext_int.py`
+`azext_iot_testrg` # Target resource group for tests.
 
+`azext_iot_testhub` # Target IoT Hub for respective category of tests.
 
+Now you can run:
+
+`pytest <extension root>/azext_iot/tests/test_iot_ext_int.py`
 
 ## Known Issues
 
-- Device feedback has a variable event trigger time.
-- Device feedback may have issues with Py3 installations.
-- The command 'iot device message send' will take user_id as input but will insert the value
-in the message property bag rather than message meta data (until SDK updates).
-- Chatty provider function output may still leak to std out.
-
+- Device Export does not currently support IoT Edge device capability
 
 ## Contributing
 
