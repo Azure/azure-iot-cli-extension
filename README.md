@@ -33,7 +33,7 @@ In all cases, make sure the IoT extension is version **0.3.1** or greater.
 
 #### Installation methods in prefered order
 
-#### 1.a) ~~Index method~~ [The Index method will be available soon. Please use another method for now.]
+#### 1.a) Index method
 
 Install the extension from the official Microsoft Azure CLI Extension Index
 
@@ -76,7 +76,7 @@ You can login interactively, pass in account credentials or use a service princi
 
 If you have any suggestions or find bugs, please let us know.
 
-To remove the extension at any time, you can use `az extension remove --name 'azure_cli_iot_ext'`.
+To remove the extension at any time, you can use `az extension remove --name azure-cli-iot-ext`.
 
 ## Command Guide
 
