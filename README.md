@@ -18,7 +18,7 @@ The extension is designed to be plug and play with Azure CLI. **Even** if you ha
 
 ### Step 0: Install/Update Azure CLI
 
-At a minimum your CLI core version must be `2.0.22` (use `az --version`) which support `az extension` commands and uses the `knack` command parser!
+At a minimum your CLI core version must be `2.0.24` or above. Use `az --version` to validate. This version supports `az extension` commands and introduces the `knack` command framework.
 
 Follow the installation instructions on [GitHub](https://github.com/Azure/azure-cli) or [Microsoft Docs](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest) to setup Azure CLI in your environment.
 
@@ -27,21 +27,34 @@ Follow the installation instructions on [GitHub](https://github.com/Azure/azure-
 Now that you have a compatible Azure CLI installed you can add the IoT extension.
 When installing an extension any additional Python dependencies required will be downloaded and installed.
 
-The are multiple options for installation. In prefered order:
+There are multiple options for installation. After following one, you can use `az extension list` to validate currently installed extensions or `az extension show --name 'azure_cli_iot_ext'` to see details about this one.
 
-#### 1.a) Index method
+In all cases, make sure the IoT extension is version **0.3.1** or greater.
 
-Install the extension from official Microsoft Azure CLI Extension Index
+#### Installation methods in prefered order
+
+#### 1.a) ~~Index method~~ [The Index method will be available soon. Please use another method for now.]
+
+Install the extension from the official Microsoft Azure CLI Extension Index
 
 `az extension add --name azure-cli-iot-ext`
+
+##### Index Tips
+
+- You can use `az extension list-available` to see all available extensions on the index
+- It is possible to update an extension in place using `az extension update --name <extension name>`
 
 #### 1.b) URL or local package installation method
 
 Go to this projects release tab in GitHub which contains past releases. Run the extension add command using the `--source` parameter.
 
-The arguement for the source parameter is either the URL download path (the extension package ends with '.whl') of your chosen release or the local path to the extension where you downloaded the release package.
+The argument for the source parameter is either the URL download path (the extension package ends with '.whl') of your chosen release or the local path to the extension where you downloaded the release package.
 
 `az extension add --source <local file path to release.whl OR  url for release.whl>`
+
+For example to install version 0.3.1
+
+`az extension add --source 'https://github.com/Azure/azure-iot-cli-extension/releases/download/v0.3.1/azure_cli_iot_ext-0.3.1-py2.py3-none-any.whl'`
 
 #### 1.c) Package from source method
 
@@ -53,19 +66,23 @@ Now follow the local package installation method.
 
 ### Step 2: Log In (if you haven't already)
 
-Your subscription details are used to manipulate target resources.
+Your subscription details are used to interact with target resources.
 
 You can login interactively, pass in account credentials or use a service principal with password/certificate options.
 
-[Azure CLI login details](https://docs.microsoft.com/en-us/cli/azure/authenticate-azure-cli?view=azure-cli-latest)
+[More details](https://docs.microsoft.com/en-us/cli/azure/authenticate-azure-cli?view=azure-cli-latest) about Azure CLI authentication.
 
 ### Step 3: Have Fun
 
 If you have any suggestions or find bugs, please let us know.
 
+To remove the extension at any time, you can use `az extension remove --name 'azure_cli_iot_ext'`.
+
 ## Command Guide
 
-[TBD]
+Many commands require the default policy to exist on the target resource which is being manipulated. For example IoT Hub based commands commonly look for the 'iothubowner' policy. This behavior will change in a future update.
+
+[Command docs TBD]
 
 ## Developer setup
 
