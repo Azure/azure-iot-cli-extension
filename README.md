@@ -27,7 +27,7 @@ Follow the installation instructions on [GitHub](https://github.com/Azure/azure-
 Now that you have a compatible Azure CLI installed you can add the IoT extension.
 When installing an extension any additional Python dependencies required will be downloaded and installed.
 
-There are multiple options for installation. After following one, you can use `az extension list` to validate currently installed extensions or `az extension show --name 'azure_cli_iot_ext'` to see details about this one.
+There are multiple options for installation. After following one, you can use `az extension list` to validate currently installed extensions or `az extension show --name azure-cli-iot-ext` to see details about this one.
 
 In all cases, make sure the IoT extension is version **0.3.1** or greater.
 
