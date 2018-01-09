@@ -14,9 +14,10 @@ from azext_iot.common.certops import create_self_signed_certificate
 # Set these to the proper IoT DPS and Resource Group for Integration Tests.
 dps = os.environ.get('azext_iot_testdps')
 rg = os.environ.get('azext_iot_testrg')
+hub = os.environ.get('azext_iot_testhub')
 
-if not any([dps, rg]):
-    raise ValueError('Set azext_iot_testhub and azext_iot_testrg to run integration tests.')
+if not any([dps, rg, hub]):
+    raise ValueError('Set azext_iot_testhub, azext_iot_testdps and azext_iot_testrg to run integration tests.')
 
 cert_name = 'test'
 cert_path = cert_name + '-cert.pem'
@@ -42,13 +43,16 @@ class IoTDpsTest(LiveScenarioTest):
         device_id = self.create_random_name('device-id-for-test', length=48)
         attestation_type = AttestationType.tpm.value
         initial_twin = "\"{'key':'value'}\""
+        hub_host_name = '{}.azure-devices.net'.format(hub)
+
         etag = self.cmd('iot dps enrollment create --enrollment-id {} --attestation-type {} -g {} --dps-name {}  --endorsement-key {}'
-                        ' --provisioning-status {} --device-id {} --initial-twin-tags {} --initial-twin-properties {}'
-                        .format(enrollment_id, attestation_type, rg, dps, endorsement_key, self.provisioning_status, device_id, initial_twin, initial_twin),
+                        ' --provisioning-status {} --device-id {} --initial-twin-tags {} --initial-twin-properties {} --iot-hub-host-name {}'
+                        .format(enrollment_id, attestation_type, rg, dps, endorsement_key, self.provisioning_status, device_id, initial_twin, initial_twin, hub_host_name),
                         checks=[self.check('attestation.type', attestation_type),
                                 self.check('registrationId', enrollment_id),
                                 self.check('provisioningStatus', self.provisioning_status),
                                 self.check('deviceId', device_id),
+                                self.check('iotHubHostName', hub_host_name), 
                                 self.check('initialTwin.tags.additionalProperties', {'key': 'value'}),
                                 self.check('initialTwin.properties.desired.additionalProperties', {'key': 'value'})
         ]).get_output_in_json()['etag']
@@ -68,6 +72,7 @@ class IoTDpsTest(LiveScenarioTest):
                          self.check('registrationId', enrollment_id),
                          self.check('provisioningStatus', self.provisioning_status_new),
                          self.check('deviceId', device_id),
+                         self.check('iotHubHostName', hub_host_name), 
                          self.exists('initialTwin.tags.additionalProperties'),
                          self.exists('initialTwin.properties.desired.additionalProperties')
         ])
@@ -79,13 +84,16 @@ class IoTDpsTest(LiveScenarioTest):
         attestation_type = AttestationType.x509.value
         device_id = self.create_random_name('device-id-for-test', length=48)
         initial_twin = "\"{'key':'value'}\""
+        hub_host_name = '{}.azure-devices.net'.format(hub)
+
         etag = self.cmd('iot dps enrollment create --enrollment-id {} --attestation-type {} -g {} --dps-name {}  -p {}'
-                        ' --provisioning-status {} --device-id {} --initial-twin-tags {} --initial-twin-properties {}'
-                        .format(enrollment_id, attestation_type, rg, dps, cert_path, self.provisioning_status, device_id, initial_twin, initial_twin),
+                        ' --provisioning-status {} --device-id {} --initial-twin-tags {} --initial-twin-properties {} --iot-hub-host-name {}'
+                        .format(enrollment_id, attestation_type, rg, dps, cert_path, self.provisioning_status, device_id, initial_twin, initial_twin, hub_host_name),
                         checks=[self.check('attestation.type', attestation_type),
                                 self.check('registrationId', enrollment_id),
                                 self.check('provisioningStatus', self.provisioning_status),
                                 self.check('deviceId', device_id),
+                                self.check('iotHubHostName', hub_host_name), 
                                 self.check('initialTwin.tags.additionalProperties', {'key': 'value'}),
                                 self.check('initialTwin.properties.desired.additionalProperties', {'key': 'value'})
         ]).get_output_in_json()['etag']
@@ -105,6 +113,7 @@ class IoTDpsTest(LiveScenarioTest):
                          self.check('registrationId', enrollment_id),
                          self.check('provisioningStatus', self.provisioning_status_new),
                          self.check('deviceId', device_id),
+                         self.check('iotHubHostName', hub_host_name), 
                          self.exists('initialTwin.tags.additionalProperties'),
                          self.exists('initialTwin.properties.desired.additionalProperties')
         ])

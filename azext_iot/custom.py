@@ -854,7 +854,7 @@ def iot_dps_device_enrollment_create(client,
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
         
         if attestation_type == AttestationType.tpm.value: 
-            if endorsement_key == None:
+            if not endorsement_key:
                 raise CLIError('Endorsement key is requried')
             tpm = TpmAttestation(endorsement_key)
             attestation = AttestationMechanism(AttestationType.tpm.value, tpm)
@@ -892,31 +892,32 @@ def iot_dps_device_enrollment_update(client,
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
            
         enrollment_record = m_sdk.device_enrollment.get(enrollment_id, API_VERSION)
-        #if not etag == enrollment_record.etag:
-            #raise LookupError("enrollment etag not found.")
+        if not etag == enrollment_record['etag'].replace('"', ''):
+            raise LookupError("enrollment etag not found.")
 
-        attestation_type = enrollment_record.attestation.type
+        attestation_type = enrollment_record['attestation']['type']
         
         if attestation_type == AttestationType.tpm.value:
-            if not certificate_path == None:
+            if certificate_path:
                 raise CLIError('Cannot update certificate while enrollment is using tpm attestation mechanism')
-            if not endorsement_key == None:
-                enrollment_record.attestation.tpm.endorsement_key = endorsement_key
+            if endorsement_key:
+                enrollment_record['attestation']['tpm']['endorsement_key'] = endorsement_key
         else:
-            if not endorsement_key == None:
+            if endorsement_key:
                 raise CLIError('Cannot update endorsement key while enrollment is using x509 attestation mechanism')
-            enrollment_record.attestation = _get_attestation_with_x509_client_cert(certificate_path)
+            enrollment_record['attestation'] = _get_attestation_with_x509_client_cert(certificate_path)
 
-        enrollment_record.initial_twin = _get_updated_inital_twin(enrollment_record, 
+        enrollment_record['initialTwin'] = _get_updated_inital_twin(enrollment_record, 
                                                                   initial_twin_tags, 
                                                                   initial_twin_properties)
-        if not iot_hub_host_name == None:
-            enrollment_record.iot_hub_host_name = iot_hub_host_name
-        if not device_id == None:
-            enrollment_record.device_id = device_id
-        if not provisioning_status == None:
-            enrollment_record.provisioning_status = provisioning_status
-        enrollment_record.registration_state = None 
+
+        if iot_hub_host_name:
+            enrollment_record['iotHubHostName'] = iot_hub_host_name
+        if device_id:
+            enrollment_record['deviceId'] = device_id
+        if provisioning_status:
+            enrollment_record['provisioningStatus'] = provisioning_status
+        enrollment_record['registrationState'] = None 
         
         return m_sdk.device_enrollment.create_or_update(enrollment_id, enrollment_record, API_VERSION, etag)
     except errors.ErrorDetailsException as e:
@@ -992,18 +993,19 @@ def iot_dps_device_enrollment_group_update(client,
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
         
         enrollment_record = m_sdk.device_enrollment_group.get(enrollment_id, API_VERSION)
-        if not etag == enrollment_record.etag:
+        if not etag == enrollment_record['etag'].replace('"', ''):
             raise LookupError("enrollment etag not found.")
-        if not iot_hub_host_name == None:
-            enrollment_record.iot_hub_host_name = iot_hub_host_name
-        if not provisioning_status == None:
-            enrollment_record.provisioning_status = provisioning_status
+
+        if iot_hub_host_name:
+            enrollment_record['iotHubHostName'] = iot_hub_host_name
+        if provisioning_status:
+            enrollment_record['provisioningStatus'] = provisioning_status
  
-        enrollment_record.initial_twin = _get_updated_inital_twin(enrollment_record, 
+        enrollment_record['initialTwin'] = _get_updated_inital_twin(enrollment_record, 
                                                                   initial_twin_tags, 
                                                                   initial_twin_properties)
         
-        enrollment_record.attestation = _get_attestation_with_x509_signing_cert(certificate_path)
+        enrollment_record['attestation'] = _get_attestation_with_x509_signing_cert(certificate_path)
         
         return m_sdk.device_enrollment_group.create_or_update(enrollment_id, enrollment_record, API_VERSION, etag)
     except errors.ErrorDetailsException as e:
@@ -1044,26 +1046,24 @@ def iot_dps_registration_delete(client, dps_name, resource_group_name, registrat
 
 def _get_initial_twin(initial_twin_tags = None, initial_twin_properties = None):
     import ast
-    if initial_twin_tags == None and initial_twin_properties == None:
+    if not initial_twin_tags and not initial_twin_properties:
         return None
-    print(initial_twin_tags)
-    print(initial_twin_properties)
-    if not initial_twin_tags == None:
-        initial_twin_tags = ast.literal_eval(str(initial_twin_tags))
-    if not initial_twin_properties == None:
-        initial_twin_properties = ast.literal_eval(str(initial_twin_properties))
+    if initial_twin_tags:
+        initial_twin_tags = evaluate_literal(str(initial_twin_tags), dict)
+    if initial_twin_properties:
+        initial_twin_properties = evaluate_literal(str(initial_twin_properties), dict)
     return InitialTwin(TwinCollection(initial_twin_tags), 
                        InitialTwinProperties(TwinCollection(initial_twin_properties)))
 
 def _get_updated_inital_twin(enrollment_record, initial_twin_tags = None, initial_twin_properties = None):
-    if initial_twin_tags == None:
-        initial_twin_tags = _get_initial_twin_tags(enrollment_record)
-    if initial_twin_properties == None:
-        initial_twin_properties = _get_initial_twin_properties(enrollment_record)       
+    if not initial_twin_tags:
+        initial_twin_tags = enrollment_record['initialTwin']['tags']
+    if not initial_twin_properties:
+        initial_twin_properties = enrollment_record['initialTwin']['properties']['desired']    
     return _get_initial_twin(initial_twin_tags, initial_twin_properties) 
 
 def _get_x509_certificate(certificate_path):
-    if certificate_path == None:
+    if not certificate_path:
         raise CLIError('Certificate path is requried')
 
     certificate_content = open_certificate(certificate_path)
@@ -1073,7 +1073,7 @@ def _get_x509_certificate(certificate_path):
     return x509certificate
 
 def _get_attestation_with_x509_client_cert(certificate_path):
-    if (certificate_path) == None:
+    if not certificate_path:
         #return AttestationMechanism(AttestationType.x509.value, None, X509Attestation(None))
         raise CLIError('Certificate path is required')
     certificate = _get_x509_certificate(certificate_path)
@@ -1083,21 +1083,10 @@ def _get_attestation_with_x509_client_cert(certificate_path):
     return attestation
 
 def _get_attestation_with_x509_signing_cert(certificate_path):
-    if (certificate_path) == None:
+    if not certificate_path:
         raise CLIError('Certificate path is required')
     certificate = _get_x509_certificate(certificate_path)
     x509Attestation = X509Attestation(None, certificate)
     attestation = AttestationMechanism(AttestationType.x509.value, None, x509Attestation)
 
     return attestation
-
-def _get_initial_twin_tags(enrollment_record):
-    if not enrollment_record.initial_twin == None:
-                if not enrollment_record.initial_twin.tags == None:
-                    return enrollment_record.initial_twin.tags.additional_properties
-
-def _get_initial_twin_properties(enrollment_record):
-    if not enrollment_record.initial_twin == None:
-        if not enrollment_record.initial_twin.properties == None:
-            if not enrollment_record.initial_twin.properties.desired == None:
-                return enrollment_record.initial_twin.properties.desired.additional_properties

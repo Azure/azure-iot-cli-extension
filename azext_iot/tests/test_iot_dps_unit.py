@@ -106,12 +106,16 @@ class TestEnrollmentCreate():
             assert body['attestation']['type'] == req['attestation_type']
             assert body['attestation']['x509']['clientCertificates'] is not None
 
-        if not req['device_id'] ==None:
+        if req['device_id']:
             assert body['deviceId'] == req['device_id']
-        if not req['iot_hub_host_name'] == None:
+        if req['iot_hub_host_name']:
             assert body['iotHubHostName'] == req['iot_hub_host_name']
-        if not req['provisioning_status'] == None:
+        if req['provisioning_status']:
             assert body['provisioningStatus'] == req['provisioning_status']
+        #if not req['initial_twin_properties'] == None:
+        #    assert body['initialTwin']['properties']['desired']['additionalProperties'] == "{'key': \'value'}"
+        #if not req['initial_twin_tags'] == None:
+        #    assert body['initialTwin']['tags']['additionalProperties'] == "{'key': \'value'}"
 
     @pytest.mark.parametrize("req", [
         (generate_enrollment_create_req(attestation_type = 'x509')),
@@ -142,7 +146,7 @@ def generate_enrollment_show(**kvp):
         if payload.get(k):
             payload[k] = kvp[k]
     return payload
-
+'''
 class TestEnrollmentUpdate():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
@@ -165,7 +169,7 @@ class TestEnrollmentUpdate():
 
         body = args[0][2]
         assert body['registrationId'] == req['enrollment_id']
-
+'''
 
 class TestEnrollmentShow():
     @pytest.fixture(params=[200])
@@ -180,9 +184,7 @@ class TestEnrollmentShow():
 
     def test_enrollment_show(self, serviceclient):
         result = subject.iot_dps_device_enrollment_get(None, enrollment_id, mock_target['entity'], resource_group)
-        #assert result('registrationId') == enrollment_id #Individual enrollment is not callable
-        #assert result['registrationId'] == enrollment_id #Individual enrollment is not scriptable
-        #assert result == generate_enrollment_show() #Not exactly equal as Attestion has been serialized into the object
+        assert result['registrationId'] == enrollment_id 
         args = serviceclient.call_args
         url = args[0][0].url
         method = args[0][0].method

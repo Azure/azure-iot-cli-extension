@@ -81,7 +81,7 @@ class DeviceEnrollmentOperations(object):
         deserialized = None
 
         if response.status_code == 200:
-            deserialized = self._deserialize('IndividualEnrollment', response)
+            deserialized = self._deserialize('object', response)
 
         if raw:
             client_raw_response = ClientRawResponse(deserialized, response)
@@ -139,6 +139,7 @@ class DeviceEnrollmentOperations(object):
         # Construct body
         body_content = self._serialize.body(enrollment, 'IndividualEnrollment')
 
+        #print(body_content)
         # Construct and send request
         request = self._client.put(url, query_parameters)
         response = self._client.send(

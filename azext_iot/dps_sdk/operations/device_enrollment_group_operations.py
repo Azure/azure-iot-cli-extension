@@ -83,7 +83,7 @@ class DeviceEnrollmentGroupOperations(object):
         deserialized = None
 
         if response.status_code == 200:
-            deserialized = self._deserialize('EnrollmentGroup', response)
+            deserialized = self._deserialize('object', response)
 
         if raw:
             client_raw_response = ClientRawResponse(deserialized, response)
