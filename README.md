@@ -82,7 +82,7 @@ To remove the extension at any time, you can use `az extension remove --name azu
 
 Many commands require the default policy to exist on the target resource which is being manipulated. For example IoT Hub based commands commonly look for the 'iothubowner' policy. This behavior will change in a future update.
 
-[Command docs TBD]
+[Command Wiki](https://github.com/Azure/azure-iot-cli-extension/wiki/Commands)
 
 ## Developer setup
 
