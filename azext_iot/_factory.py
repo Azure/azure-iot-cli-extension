@@ -61,6 +61,6 @@ def _get_sdk_exception_type(sdk_type):
         SdkType.device_twin_sdk: import_module('azext_iot.device_twin_sdk.models.error_details'),
         SdkType.device_msg_sdk: import_module('azext_iot.device_msg_sdk.models.error_details'),
         SdkType.custom_sdk: import_module('azext_iot.custom_sdk.models.error_details'),
-        SdkType.dps_sdk: import_module('azext_iot.custom_sdk.models.error_details') #dps doesn't have error_details model
+        SdkType.dps_sdk: import_module('azext_iot.dps_sdk.models.error_details') 
     }
     return exception_library.get(sdk_type, None)

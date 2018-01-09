@@ -76,9 +76,7 @@ class DeviceEnrollmentOperations(object):
         response = self._client.send(request, header_parameters, **operation_config)
 
         if response.status_code not in [200]:
-            exp = CloudError(response)
-            exp.request_id = response.headers.get('x-ms-request-id')
-            raise exp
+            raise models.error_details.ErrorDetailsException(self._deserialize, response)
 
         deserialized = None
 
@@ -147,9 +145,7 @@ class DeviceEnrollmentOperations(object):
             request, header_parameters, body_content, **operation_config)
 
         if response.status_code not in [200]:
-            exp = CloudError(response)
-            exp.request_id = response.headers.get('x-ms-request-id')
-            raise exp
+            raise models.error_details.ErrorDetailsException(self._deserialize, response)
 
         deserialized = None
 
@@ -209,9 +205,7 @@ class DeviceEnrollmentOperations(object):
         response = self._client.send(request, header_parameters, **operation_config)
 
         if response.status_code not in [204]:
-            exp = CloudError(response)
-            exp.request_id = response.headers.get('x-ms-request-id')
-            raise exp
+            raise models.error_details.ErrorDetailsException(self._deserialize, response)
 
         if raw:
             client_raw_response = ClientRawResponse(None, response)
@@ -325,9 +319,7 @@ class DeviceEnrollmentOperations(object):
             request, header_parameters, body_content, **operation_config)
 
         if response.status_code not in [200]:
-            exp = CloudError(response)
-            exp.request_id = response.headers.get('x-ms-request-id')
-            raise exp
+            raise models.error_details.ErrorDetailsException(self._deserialize, response)
 
         deserialized = None
         header_dict = {}

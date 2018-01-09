@@ -61,7 +61,7 @@ class IoTDpsTest(LiveScenarioTest):
         self.cmd('iot dps enrollment show -g {} --dps-name {} --enrollment-id {}'.format(rg, dps, enrollment_id),
             checks=[self.check('registrationId', enrollment_id)
         ])
-
+        
         self.cmd('iot dps enrollment update -g {} --dps-name {} --enrollment-id {} --provisioning-status {} --etag {}'
                  .format(rg, dps, enrollment_id, self.provisioning_status_new, etag),
                  checks=[self.check('attestation.type', attestation_type),

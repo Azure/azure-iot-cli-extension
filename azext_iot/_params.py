@@ -121,10 +121,10 @@ def load_arguments(self, _):
                            Use the following format:'{\"key0\":\"value0\", \"key1\":\"value1\"}'""")
 
     with self.argument_context('iot dps') as c:
-        c.argument('dps_name', help='Name of the Azure provisioning service')
-        c.argument('initial_twin_properties', options_list=['--initial-twin-properties', '--properties'],
+        c.argument('dps_name', help='Name of the Azure IoT Hub device provisioning service')
+        c.argument('initial_twin_properties', options_list=['--initial-twin-properties', '-props'],
                    help='Initial twin properties')
-        c.argument('initial_twin_tags', options_list=['--initial-twin-tags', '--tags'],
+        c.argument('initial_twin_tags', options_list=['--initial-twin-tags', '-tags'],
                    help='Initial twin tags')
         c.argument('iot_hub_host_name', help='Host name of target IoT Hub')
         c.argument('provisioning_status', arg_type=get_enum_type(EntityStatusType),
@@ -143,7 +143,7 @@ def load_arguments(self, _):
 
     with self.argument_context('iot dps enrollment update') as c:
         c.argument('certificate_path', options_list=['--certificate-path', '-p'],
-                   help='The path to the file containing the certificate. When update enrollment using x509 as attestation mechanism,' 
+                   help='The path to the file containing the certificate. When updating enrollment with x509 attestation mechanism,' 
                    ' certificate path is required.')
         c.argument('endorsement_key', options_list=['--endorsement-key', '-k'], 
                    help='TPM endorsement key for a TPM device.')

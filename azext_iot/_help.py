@@ -415,7 +415,7 @@ helps['iot dps enrollment-group'] = """
 
 helps['iot dps enrollment-group list'] = """
     type: command
-    short-summary: List enrollments in an Azure IoT Hub device provisioning service
+    short-summary: List enrollment groups in an Azure IoT Hub device provisioning service
 """
 
 helps['iot dps enrollment-group show'] = """
@@ -445,11 +445,11 @@ helps['iot dps enrollment-group update'] = """
     type: command
     short-summary: Update an Azure IoT Hub Device Provisioning Service enrollment group
     examples:
-    - name: Update enrollment group 'MyEnrollment' in the Azure IoT provisioning service 'MyDps' in the resource group
-            'MyResourceGroup'
+    - name: Update enrollment group 'MyEnrollment' with a new certificate in the Azure IoT provisioning service 'MyDps' in the resource 
+            group 'MyResourceGroup' and update its initial twin tags
       text: >
         az iot dps enrollment-group update -g MyResourceGroup --dps-name MyDps --enrollment-id MyEnrollment
-        --certificate-path /certificates/NewCertificate.pem --etag AAAAAAAAAAA=
+        --certificate-path /certificates/NewCertificate.pem --initial-twin-tags "{'location':{'region':'US2'}}" --etag AAAAAAAAAAA= 
 """
 
 helps['iot dps enrollment-group delete'] = """
