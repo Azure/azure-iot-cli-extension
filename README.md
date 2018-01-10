@@ -2,11 +2,11 @@
 
 ![Python](https://img.shields.io/pypi/pyversions/azure-cli.svg?maxAge=2592000)
 
-This project provides new and exciting IoT commands and capabilities focused around IoT data-plane. Functionality is provided as an Azure CLI extension package for seamless integration.
+This project provides new and exciting IoT commands and capabilities focused around the IoT Hub and IoT Device Provisioning services. Functionality is provided as an Azure CLI extension package for seamless integration with existing command line functionality.
 
 ## Features
 
-The extension will augment vanilla Azure CLI IoT by adding to or modifying the existing command space. The following categories of capability are provided:
+The extension augments the vanilla Azure CLI IoT by adding to or modifying the existing command space. The extension includes capabilities in the following categories:
 
 - IoT Hub
 - IoT Edge
@@ -14,7 +14,7 @@ The extension will augment vanilla Azure CLI IoT by adding to or modifying the e
 
 ## Installation
 
-The extension is designed to be plug and play with Azure CLI. **Even** if you have Azure CLI installed make sure it is up to date.
+The extension is designed to be plug-and-play with Azure CLI. **Even** if you have Azure CLI installed make sure it is up to date.
 
 ### Step 0: Install/Update Azure CLI
 
@@ -25,13 +25,13 @@ Follow the installation instructions on [GitHub](https://github.com/Azure/azure-
 ### Step 1: Install the extension
 
 Now that you have a compatible Azure CLI installed you can add the IoT extension.
-When installing an extension any additional Python dependencies required will be downloaded and installed.
+When you install an extension, any additional Python dependencies required are automatically downloaded and installed.
 
-There are multiple options for installation. After following one, you can use `az extension list` to validate currently installed extensions or `az extension show --name azure-cli-iot-ext` to see details about this one.
+There are multiple options for installation. After installing the extension, you can use `az extension list` to validate the currently installed extensions or `az extension show --name azure-cli-iot-ext` to see details about the IoT extension.
 
 In all cases, make sure the IoT extension is version **0.3.2** or greater.
 
-#### Installation methods in prefered order
+#### Installation methods in preferred order
 
 #### 1.a) Index method
 
@@ -46,13 +46,13 @@ Install the extension from the official Microsoft Azure CLI Extension Index
 
 #### 1.b) URL or local package installation method
 
-Go to this projects release tab in GitHub which contains past releases. Run the extension add command using the `--source` parameter.
+Navigate to this project's release tab in GitHub to see the list of releases. Run the extension add command using the `--source` parameter.
 
-The argument for the source parameter is either the URL download path (the extension package ends with '.whl') of your chosen release or the local path to the extension where you downloaded the release package.
+The argument for the source parameter is either the URL download path (the extension package ends with '.whl') of your chosen release, or the local path to the extension where you downloaded the release package.
 
 `az extension add --source <local file path to release.whl OR  url for release.whl>`
 
-For example to install version 0.3.2
+For example, to install version 0.3.2
 
 `az extension add --source 'https://github.com/Azure/azure-iot-cli-extension/releases/download/v0.3.2/azure_cli_iot_ext-0.3.2-py2.py3-none-any.whl'`
 
@@ -68,7 +68,7 @@ Now follow the local package installation method.
 
 Your subscription details are used to interact with target resources.
 
-You can login interactively, pass in account credentials or use a service principal with password/certificate options.
+You can login interactively, pass in account credentials, or use a service principal with password/certificate options.
 
 [More details](https://docs.microsoft.com/en-us/cli/azure/authenticate-azure-cli?view=azure-cli-latest) about Azure CLI authentication.
 
@@ -80,15 +80,15 @@ To remove the extension at any time, you can use `az extension remove --name azu
 
 ## Command Guide
 
-Many commands require the default policy to exist on the target resource which is being manipulated. For example IoT Hub based commands commonly look for the 'iothubowner' policy. This behavior will change in a future update.
+Many commands require the default policy to exist on the target resource which is being manipulated. For example IoT Hub based commands commonly look for the **iothubowner** policy. This behavior will change in a future update.
 
 [Command Wiki](https://github.com/Azure/azure-iot-cli-extension/wiki/Commands)
 
 ## Developer setup
 
-Extension development depends on a local Az CLI dev environment. First follow these [instructions](https://github.com/Azure/azure-cli/blob/master/doc/configuring_your_machine.md) for preparing your machine.
+Extension development depends on a local Azure CLI dev environment. First, follow these [instructions](https://github.com/Azure/azure-cli/blob/master/doc/configuring_your_machine.md) to prepare your machine.
 
-Next update your `AZURE_EXTENSION_DIR` environment variable to a target extension deployment directory. This overrides the standard extension directory.
+Next, update your `AZURE_EXTENSION_DIR` environment variable to a target extension deployment directory. This overrides the standard extension directory.
 
 Example `export AZURE_EXTENSION_DIR=~/.azure/devcliextensions/`
 
