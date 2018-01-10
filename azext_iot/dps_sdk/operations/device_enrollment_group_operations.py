@@ -76,9 +76,7 @@ class DeviceEnrollmentGroupOperations(object):
         response = self._client.send(request, header_parameters, **operation_config)
 
         if response.status_code not in [200]:
-            exp = CloudError(response)
-            exp.request_id = response.headers.get('x-ms-request-id')
-            raise exp
+            raise models.error_details.ErrorDetailsException(self._deserialize, response)
 
         deserialized = None
 
@@ -139,7 +137,7 @@ class DeviceEnrollmentGroupOperations(object):
             header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
 
         # Construct body
-        body_content = self._serialize.body(enrollment_group, 'EnrollmentGroup')
+        body_content = self._serialize.body(enrollment_group, 'object')
 
         # Construct and send request
         request = self._client.put(url, query_parameters)
@@ -147,14 +145,12 @@ class DeviceEnrollmentGroupOperations(object):
             request, header_parameters, body_content, **operation_config)
 
         if response.status_code not in [200]:
-            exp = CloudError(response)
-            exp.request_id = response.headers.get('x-ms-request-id')
-            raise exp
+            raise models.error_details.ErrorDetailsException(self._deserialize, response)
 
         deserialized = None
 
         if response.status_code == 200:
-            deserialized = self._deserialize('EnrollmentGroup', response)
+            deserialized = self._deserialize('object', response)
 
         if raw:
             client_raw_response = ClientRawResponse(deserialized, response)
@@ -209,9 +205,7 @@ class DeviceEnrollmentGroupOperations(object):
         response = self._client.send(request, header_parameters, **operation_config)
 
         if response.status_code not in [204]:
-            exp = CloudError(response)
-            exp.request_id = response.headers.get('x-ms-request-id')
-            raise exp
+            raise models.error_details.ErrorDetailsException(self._deserialize, response)
 
         if raw:
             client_raw_response = ClientRawResponse(None, response)
@@ -263,15 +257,13 @@ class DeviceEnrollmentGroupOperations(object):
             request, header_parameters, body_content, **operation_config)
 
         if response.status_code not in [200]:
-            exp = CloudError(response)
-            exp.request_id = response.headers.get('x-ms-request-id')
-            raise exp
+            raise models.error_details.ErrorDetailsException(self._deserialize, response)
 
         deserialized = None
         header_dict = {}
 
         if response.status_code == 200:
-            deserialized = self._deserialize('[EnrollmentGroup]', response)
+            deserialized = self._deserialize('[object]', response)
             header_dict = {
                 'x-ms-continuation': 'str',
                 'x-ms-max-item-count': 'int',
