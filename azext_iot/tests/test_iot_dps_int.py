@@ -11,7 +11,7 @@ from azure.cli.testsdk import LiveScenarioTest, ResourceGroupPreparer, ResourceG
 from azext_iot.common.shared import EntityStatusType, AttestationType
 from azext_iot.common.certops import create_self_signed_certificate
 
-# Set these to the proper IoT DPS and Resource Group for Integration Tests.
+# Set these to the proper IoT Hub DPS, IoT Hub and Resource Group for Integration Tests.
 dps = os.environ.get('azext_iot_testdps')
 rg = os.environ.get('azext_iot_testrg')
 hub = os.environ.get('azext_iot_testhub')
@@ -28,7 +28,7 @@ class IoTDpsTest(LiveScenarioTest):
     provisioning_status_new = EntityStatusType.disabled.value
     
     def __init__(self, test_method):
-        super(IoTDpsTest, self).__init__('test_dps_enrollment_x509_lifecycle')
+        super(IoTDpsTest, self).__init__('test_dps_enrollment_tpm_lifecycle')
         output_dir = os.getcwd()
         create_self_signed_certificate(cert_name, 200, output_dir, True)
 
@@ -120,7 +120,6 @@ class IoTDpsTest(LiveScenarioTest):
         
         self.cmd('iot dps enrollment delete -g {} --dps-name {} --enrollment-id {}'.format(rg, dps, enrollment_id))    
 
-    # Enrollment Group
     def test_dps_enrollment_group_lifecycle(self):
         enrollment_id = self.create_random_name('enrollment-for-test', length=48)
         etag = self.cmd('iot dps enrollment-group create --enrollment-id {} -g {} --dps-name {}  -p {} --provisioning-status {}'

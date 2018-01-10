@@ -425,7 +425,7 @@ class TestGroupEnrollmentDelete():
 
 
 def generate_registration_state_show(): 
-    payload = {'registrationId': registration_id, 'state': 'active'}
+    payload = {'registrationId': registration_id, 'status': 'assigned', 'etag': 'AAAA=', 'assignedHub': 'myHub', 'deviceId': 'myDevice'}
     return payload
 
 class TestRegistrationShow():
@@ -501,3 +501,65 @@ class TestRegistrationDelete():
     def test_registration_delete_error(self, serviceclient_generic_error):
         with pytest.raises(CLIError):
             subject.iot_dps_registration_delete(None, registration_id, mock_target['entity'], resource_group)
+
+
+dps_suffix = "azure-devices.net"
+
+class TestGetDpsConnString():
+    @pytest.mark.parametrize("dpscount, targetdps, policy_name, rg_name, exp_success, why", [
+        (5, 'dps1', 'provisioningserviceowner', 'myrg', True, None),
+        (5, 'dps2', 'custompolicy', 'myrg', True, None),
+        (1, 'dps3', 'provisioningserviceowner', 'myrg', False, 'policy'),
+        (1, 'dps4', 'provisioningserviceowner', 'myrg', False, 'dps')
+    ])
+    def test_get_dps_conn_string(self, mocker, dpscount, targetdps, policy_name, rg_name, exp_success, why):
+        def _build_dps(dps, name, rg=None):
+            dps.name = name
+            dps.properties.service_operations_host_name = "{}.{}".format(name, dps_suffix)
+            dps.resourcegroup = rg
+            client.config.subscription_id = mock_target['subscription']
+            return dps
+
+        def _build_policy(policy, name):
+            policy.key_name = name
+            policy.primary_key = mock_target['primarykey']
+            policy.secondary_key = mock_target['secondarykey']
+            return policy
+
+        client = mocker.MagicMock(name='dpsclient')
+
+        dps_list = []
+        for i in range(0, dpscount):
+            dps_list.append(_build_dps(mocker.MagicMock(), "dps{}".format(i), rg_name))
+        client.list_by_subscription.return_value = dps_list
+       
+        if why == "dps":
+            client.iot_dps_resource.get.side_effect = ValueError
+        else:
+            client.iot_dps_resource.get.return_value = _build_dps(mocker.MagicMock(), targetdps, rg_name)
+
+        if why == "policy":
+            client.iot_dps_resource.list_keys_for_key_name.side_effect = ValueError
+        else:
+            client.iot_dps_resource.list_keys_for_key_name.return_value = _build_policy(mocker.MagicMock(), policy_name)
+
+        from azext_iot.common.shared import get_iot_dps_connection_string
+
+        if exp_success:
+            result = get_iot_dps_connection_string(client, targetdps, rg_name, policy_name)
+            expecting_dps = "{}.{}".format(targetdps, dps_suffix)
+            assert result['entity'] == expecting_dps
+            assert result['policy'] == policy_name
+            assert result['subscription'] == mock_target['subscription']
+            assert result['cs'] == "HostName={};SharedAccessKeyName={};SharedAccessKey={}".format(
+                expecting_dps,
+                policy_name,
+                mock_target['primarykey'])
+           
+            client.iot_dps_resource.get.assert_called_with(targetdps, rg_name)
+            client.iot_dps_resource.list_keys_for_key_name.assert_called_with(targetdps, policy_name, rg_name)
+
+        else:
+            with pytest.raises(CLIError):
+                get_iot_dps_connection_string(client, targetdps, rg_name, policy_name)
+
