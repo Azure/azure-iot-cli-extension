@@ -29,7 +29,7 @@ When installing an extension any additional Python dependencies required will be
 
 There are multiple options for installation. After following one, you can use `az extension list` to validate currently installed extensions or `az extension show --name azure-cli-iot-ext` to see details about this one.
 
-In all cases, make sure the IoT extension is version **0.3.1** or greater.
+In all cases, make sure the IoT extension is version **0.3.2** or greater.
 
 #### Installation methods in prefered order
 
@@ -52,9 +52,9 @@ The argument for the source parameter is either the URL download path (the exten
 
 `az extension add --source <local file path to release.whl OR  url for release.whl>`
 
-For example to install version 0.3.1
+For example to install version 0.3.2
 
-`az extension add --source 'https://github.com/Azure/azure-iot-cli-extension/releases/download/v0.3.1/azure_cli_iot_ext-0.3.1-py2.py3-none-any.whl'`
+`az extension add --source 'https://github.com/Azure/azure-iot-cli-extension/releases/download/v0.3.2/azure_cli_iot_ext-0.3.2-py2.py3-none-any.whl'`
 
 #### 1.c) Package from source method
 

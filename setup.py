@@ -8,7 +8,7 @@
 from codecs import open
 from setuptools import setup, find_packages
 
-VERSION = "0.3.1"
+VERSION = "0.3.2"
 
 CLASSIFIERS = [
     'Development Status :: 4 - Beta',
@@ -40,6 +40,6 @@ setup(
     url='https://github.com/azure/azure-iot-cli-extension',
     classifiers=CLASSIFIERS,
     packages=find_packages(),
-    package_data={'azext_iot': ['azext_metadata.json']},
+    package_data={'azext_iot': ['azext_metadata.json', 'digicert.pem']},
     install_requires=DEPENDENCIES
 )
