@@ -159,10 +159,11 @@ class TestEnrollmentUpdate():
         service_client.return_value = response
         return service_client
 
-    @pytest.mark.parametrize("req", [
-        (generate_enrollment_show(attestation = {'type': 'x509'})),
+    @pytest.mark.parametrize("result", [
+        ([generate_enrollment_show(attestation = {'type': 'x509'}),generate_enrollment_group_show(attestation = {'type': 'x509'})]),
     ])
-    def test_enrollment_update(self, serviceclient, req):       
+    def test_enrollment_group_update(self, serviceclient, result):    
+        serviceclient.return_value.text = json.dumps(result)     
         subject.iot_dps_device_enrollment_update(None, enrollment_id, mock_target['entity'], resource_group, 'AAAA==', None, 'newCertPath') 
  
         args = serviceclient.call_args_list[1]
@@ -171,7 +172,6 @@ class TestEnrollmentUpdate():
         assert args[0][0].method == 'PUT'
 
         body = args[0][2]
-        assert body['registrationId'] == req['enrollment_id']
 '''
 
 class TestEnrollmentShow():
@@ -309,7 +309,7 @@ class TestEnrollmentGroupCreate():
     @pytest.mark.parametrize("req", [
         (generate_enrollment_group_create_req(certificate_path = 'myCert'))
     ])       
-    def test_group_enrollment_show_error(self, serviceclient_generic_error, req):
+    def test_enrollment_group_show_error(self, serviceclient_generic_error, req):
         with pytest.raises(CLIError):
             subject.iot_dps_device_enrollment_group_create(None, req['enrollment_id'],  
                                                            req['dps_name'], req['rg'], req['certificate_path'],
@@ -325,7 +325,7 @@ def generate_enrollment_group_show(**kvp):
     return payload
 
 '''
-class TestEnrollmentUpdate():
+class TestEnrollmentGroupUpdate():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
@@ -334,11 +334,12 @@ class TestEnrollmentUpdate():
         service_client.return_value = response
         return service_client
 
-    @pytest.mark.parametrize("req", [
-        (generate_enrollment_show(attestation = {'type': 'x509'})),
+    @pytest.mark.parametrize("result", [
+        ([generate_enrollment_group_show(attestation = {'type': 'x509'}),generate_enrollment_group_show(attestation = {'type': 'x509'})]),
     ])
-    def test_enrollment_update(self, serviceclient, req):       
-        subject.iot_dps_device_enrollment_update(None, enrollment_id, mock_target['entity'], resource_group, 'AAAA==', None, 'newCertPath') 
+    def test_enrollment_group_update(self, serviceclient, result):    
+        serviceclient.return_value.text = json.dumps(result)   
+        subject.iot_dps_device_enrollment_group_update(None, enrollment_id, mock_target['entity'], resource_group, 'AAAA==', 'newCertPath') 
  
         args = serviceclient.call_args_list[1]
         url = args[0][0].url
@@ -346,10 +347,9 @@ class TestEnrollmentUpdate():
         assert args[0][0].method == 'PUT'
 
         body = args[0][2]
-        assert body['registrationId'] == req['enrollment_id']
 '''
 
-class TestGroupEnrollmentShow():
+class TestEnrollmentGroupShow():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
@@ -360,7 +360,7 @@ class TestGroupEnrollmentShow():
         service_client.return_value = response
         return service_client
 
-    def test_group_enrollment_show(self, serviceclient):
+    def test_enrollment_group_show(self, serviceclient):
         result = subject.iot_dps_device_enrollment_group_get(None, enrollment_id, mock_target['entity'], resource_group)
         assert json.dumps(result)
         assert result['enrollmentGroupId'] == enrollment_id 
@@ -371,12 +371,12 @@ class TestGroupEnrollmentShow():
         assert method == 'GET'
 
 
-    def test_group_enrollment_show_error(self, serviceclient_generic_error):
+    def test_enrollment_group_show_error(self, serviceclient_generic_error):
         with pytest.raises(CLIError):
             subject.iot_dps_device_enrollment_group_get(None, enrollment_id, mock_target['entity'], resource_group)
 
 
-class TestGroupEnrollmentList():
+class TestEnrollmentGroupList():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
@@ -402,7 +402,7 @@ class TestGroupEnrollmentList():
             subject.iot_dps_device_enrollment_group_list(None, mock_target['entity'], resource_group)
 
 
-class TestGroupEnrollmentDelete():
+class TestEnrollmentGroupDelete():
     @pytest.fixture(params=[204])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
@@ -412,7 +412,7 @@ class TestGroupEnrollmentDelete():
         service_client.return_value = response
         return service_client
 
-    def test_group_enrollment_delete(self, serviceclient):
+    def test_enrollment_group_delete(self, serviceclient):
         result = subject.iot_dps_device_enrollment_group_delete(None, enrollment_id, mock_target['entity'], resource_group)
         args = serviceclient.call_args
         url = args[0][0].url
@@ -420,7 +420,7 @@ class TestGroupEnrollmentDelete():
         assert "{}/enrollmentGroups/{}?".format(mock_target['entity'], enrollment_id) in url
         assert method == 'DELETE'
 
-    def test_group_enrollment_delete_error(self, serviceclient_generic_error):
+    def test_enrollment_group_delete_error(self, serviceclient_generic_error):
         with pytest.raises(CLIError):
             subject.iot_dps_device_enrollment_group_delete(None, enrollment_id, mock_target['entity'], resource_group)
 
