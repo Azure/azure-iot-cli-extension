@@ -82,10 +82,10 @@ class TestEnrollmentCreate():
     @pytest.mark.parametrize("req", [
         (generate_enrollment_create_req(attestation_type = 'tpm', endorsement_key = 'mykey')),
         (generate_enrollment_create_req(attestation_type = 'tpm', endorsement_key = 'mykey', device_id = '1', iot_hub_host_name = 'myHub', provisioning_status = 'disabled')),
-        (generate_enrollment_create_req(attestation_type = 'tpm', endorsement_key = 'mykey', provisioning_status = 'enabled', initial_twin_tags = "\"{'key':'value'}\"")),
+        (generate_enrollment_create_req(attestation_type = 'tpm', endorsement_key = 'mykey', provisioning_status = 'enabled', initial_twin_tags = {'key': 'value'})),
         (generate_enrollment_create_req(attestation_type = 'x509', certificate_path = 'myCert')),
         (generate_enrollment_create_req(attestation_type = 'x509', certificate_path = 'myCert', device_id = '1', iot_hub_host_name = 'myHub', provisioning_status = 'disabled')),
-        (generate_enrollment_create_req(attestation_type = 'x509', certificate_path = 'myCert', provisioning_status = 'enabled', initial_twin_properties = "\"{'key':'value'}\""))
+        (generate_enrollment_create_req(attestation_type = 'x509', certificate_path = 'myCert', provisioning_status = 'enabled', initial_twin_properties = {'key': 'value'}))
     ])
     def test_enrollment_create(self, serviceclient, req):       
         subject.iot_dps_device_enrollment_create(None, req['enrollment_id'], req['attestation_type'],
@@ -113,10 +113,10 @@ class TestEnrollmentCreate():
             assert body['iotHubHostName'] == req['iot_hub_host_name']
         if req['provisioning_status']:
             assert body['provisioningStatus'] == req['provisioning_status']
-        #if not req['initial_twin_properties'] == None:
-            #assert body['initialTwin']['properties']['desired'] == "{'key': \'value'}"
-        #if not req['initial_twin_tags'] == None:
-            #assert body['initialTwin']['tags'] == "{'key': \'value'}"
+        if not req['initial_twin_properties'] == None:
+            assert body['initialTwin']['properties']['desired'] == req['initial_twin_properties']
+        if not req['initial_twin_tags'] == None:
+            assert body['initialTwin']['tags'] == req['initial_twin_tags']
 
     @pytest.mark.parametrize("req", [
         (generate_enrollment_create_req(attestation_type = 'x509')),
@@ -148,6 +148,7 @@ def generate_enrollment_show(**kvp):
             payload[k] = kvp[k]
     return payload
 
+
 '''
 class TestEnrollmentUpdate():
     @pytest.fixture(params=[200])
@@ -162,7 +163,7 @@ class TestEnrollmentUpdate():
         (generate_enrollment_show(attestation = {'type': 'x509'})),
     ])
     def test_enrollment_update(self, serviceclient, req):       
-        subject.iot_dps_device_enrollment_update(None, enrollment_id, mock_target['entity'], resource_group, 'AAAA==', None, 'newCertPath') #Cannot serialize into Individual Enrollment
+        subject.iot_dps_device_enrollment_update(None, enrollment_id, mock_target['entity'], resource_group, 'AAAA==', None, 'newCertPath') 
  
         args = serviceclient.call_args_list[1]
         url = args[0][0].url
@@ -272,7 +273,7 @@ class TestEnrollmentGroupCreate():
     @pytest.mark.parametrize("req", [
         (generate_enrollment_group_create_req(certificate_path = 'myCert')),
         (generate_enrollment_group_create_req(certificate_path = 'myCert', iot_hub_host_name = 'myHub', provisioning_status = 'disabled')),
-        (generate_enrollment_group_create_req(certificate_path = 'myCert', provisioning_status = 'enabled', initial_twin_properties = "\"{'key':'value'}\""))
+        (generate_enrollment_group_create_req(certificate_path = 'myCert', provisioning_status = 'enabled', initial_twin_properties = {'key': 'value'}))
     ])
     def test_enrollment_group_create(self, serviceclient, req):       
         subject.iot_dps_device_enrollment_group_create(None, req['enrollment_id'], 
@@ -293,10 +294,10 @@ class TestEnrollmentGroupCreate():
             assert body['iotHubHostName'] == req['iot_hub_host_name']
         if req['provisioning_status']:
             assert body['provisioningStatus'] == req['provisioning_status']
-        #if not req['initial_twin_properties'] == None:
-            #assert body['initialTwin']['properties']['desired'] == "{'key': \'value'}"
-        #if not req['initial_twin_tags'] == None:
-            #assert body['initialTwin']['tags'] == "{'key': \'value'}"
+        if not req['initial_twin_properties'] == None:
+            assert body['initialTwin']['properties']['desired'] == req['initial_twin_properties']
+        if not req['initial_twin_tags'] == None:
+            assert body['initialTwin']['tags'] == req['initial_twin_tags']
 
     @pytest.mark.parametrize("req", [
         (generate_enrollment_group_create_req())
@@ -337,7 +338,7 @@ class TestEnrollmentUpdate():
         (generate_enrollment_show(attestation = {'type': 'x509'})),
     ])
     def test_enrollment_update(self, serviceclient, req):       
-        subject.iot_dps_device_enrollment_update(None, enrollment_id, mock_target['entity'], resource_group, 'AAAA==', None, 'newCertPath') #Cannot serialize into Individual Enrollment
+        subject.iot_dps_device_enrollment_update(None, enrollment_id, mock_target['entity'], resource_group, 'AAAA==', None, 'newCertPath') 
  
         args = serviceclient.call_args_list[1]
         url = args[0][0].url
