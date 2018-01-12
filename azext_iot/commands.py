@@ -1,3 +1,9 @@
+# coding=utf-8
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See License.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+
 from azure.cli.core.commands import CliCommandType
 from azext_iot._factory import iot_hub_service_factory 
 from azext_iot._factory import iot_service_provisioning_factory
