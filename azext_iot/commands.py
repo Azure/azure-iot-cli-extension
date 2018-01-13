@@ -64,6 +64,7 @@ def load_command_table(self, _):
     with self.command_group('iot device') as g:
         g.custom_command('send-d2c-message', 'iot_device_send_message')
         g.custom_command('simulate', 'iot_simulate_device')
+        g.custom_command('upload-file', 'iot_device_upload_file')
 
     with self.command_group('iot device c2d-message') as g:
         g.custom_command('complete', 'iot_c2d_message_complete')

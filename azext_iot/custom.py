@@ -791,7 +791,9 @@ def iot_device_upload_file(client, device_id, hub_name, file_path, content_type,
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
 
+
 # DPS Enrollments
+
 def iot_dps_device_enrollment_list(client, dps_name, resource_group_name, top=None):
     from azext_iot.dps_sdk.models.query_specification import QuerySpecification
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)    
@@ -812,6 +814,7 @@ def iot_dps_device_enrollment_get(client, enrollment_id, dps_name, resource_grou
         return m_sdk.device_enrollment.get(enrollment_id)
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
+
 
 def iot_dps_device_enrollment_create(client, 
                                      enrollment_id, 
@@ -850,6 +853,7 @@ def iot_dps_device_enrollment_create(client,
         return m_sdk.device_enrollment.create_or_update(enrollment_id, enrollment)
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
+
 
 def iot_dps_device_enrollment_update(client, 
                                      enrollment_id, 
@@ -901,6 +905,7 @@ def iot_dps_device_enrollment_update(client,
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
 
+
 def iot_dps_device_enrollment_delete(client, enrollment_id, dps_name, resource_group_name):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
@@ -908,6 +913,7 @@ def iot_dps_device_enrollment_delete(client, enrollment_id, dps_name, resource_g
         return m_sdk.device_enrollment.delete(enrollment_id)
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
+
 
 # DPS Enrollments Group
 
@@ -931,6 +937,7 @@ def iot_dps_device_enrollment_group_get(client, enrollment_id, dps_name, resourc
         return m_sdk.device_enrollment_group.get(enrollment_id)
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
+
 
 def iot_dps_device_enrollment_group_create(client, 
                                      enrollment_id, 
@@ -957,6 +964,7 @@ def iot_dps_device_enrollment_group_create(client,
         return m_sdk.device_enrollment_group.create_or_update(enrollment_id, group_enrollment)
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
+
 
 def iot_dps_device_enrollment_group_update(client, 
                                      enrollment_id, 
@@ -994,6 +1002,7 @@ def iot_dps_device_enrollment_group_update(client,
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
 
+
 def iot_dps_device_enrollment_group_delete(client, enrollment_id, dps_name, resource_group_name):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
@@ -1003,6 +1012,7 @@ def iot_dps_device_enrollment_group_delete(client, enrollment_id, dps_name, reso
         raise CLIError(e)
 
 # DPS Registration
+
 def iot_dps_registration_list(client, dps_name, resource_group_name, enrollment_id):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
@@ -1010,6 +1020,7 @@ def iot_dps_registration_list(client, dps_name, resource_group_name, enrollment_
         return m_sdk.registration_status.query_registration_state(enrollment_id)
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
+
 
 def iot_dps_registration_get(client, dps_name, resource_group_name, registration_id):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
@@ -1019,6 +1030,7 @@ def iot_dps_registration_get(client, dps_name, resource_group_name, registration
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
 
+
 def iot_dps_registration_delete(client, dps_name, resource_group_name, registration_id):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
@@ -1026,6 +1038,7 @@ def iot_dps_registration_delete(client, dps_name, resource_group_name, registrat
         return m_sdk.registration_status.delete_registration_state(registration_id)
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
+
 
 def _get_initial_twin(initial_twin_tags = None, initial_twin_properties = None):
     if not initial_twin_tags and not initial_twin_properties:
@@ -1037,12 +1050,14 @@ def _get_initial_twin(initial_twin_tags = None, initial_twin_properties = None):
     return InitialTwin(TwinCollection(initial_twin_tags), 
                        InitialTwinProperties(TwinCollection(initial_twin_properties)))
 
+
 def _get_updated_inital_twin(enrollment_record, initial_twin_tags = None, initial_twin_properties = None):
     if not initial_twin_tags:
         initial_twin_tags = enrollment_record['initialTwin']['tags']
     if not initial_twin_properties:
         initial_twin_properties = enrollment_record['initialTwin']['properties']['desired']    
     return _get_initial_twin(initial_twin_tags, initial_twin_properties) 
+
 
 def _get_x509_certificate(certificate_path):
     if not certificate_path:
@@ -1054,6 +1069,7 @@ def _get_x509_certificate(certificate_path):
     
     return x509certificate
 
+
 def _get_attestation_with_x509_client_cert(certificate_path):
     if not certificate_path:
         raise CLIError('Certificate path is required')
@@ -1063,6 +1079,7 @@ def _get_attestation_with_x509_client_cert(certificate_path):
 
     return attestation
 
+
 def _get_attestation_with_x509_signing_cert(certificate_path):
     if not certificate_path:
         raise CLIError('Certificate path is required')
@@ -1071,6 +1088,7 @@ def _get_attestation_with_x509_signing_cert(certificate_path):
     attestation = AttestationMechanism(AttestationType.x509.value, None, x509Attestation)
 
     return attestation
+
 
 def _execute_query(client, query, query_method, errors, top=None):
     payload = []
@@ -1082,8 +1100,6 @@ def _execute_query(client, query, query_method, errors, top=None):
             raise CLIError('top must be > 0')
 
     try:
-
-
         if top:
             headers['x-ms-max-item-count'] = str(top)
         result, token = query_method(query, headers)
