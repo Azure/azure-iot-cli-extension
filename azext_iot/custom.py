@@ -48,36 +48,11 @@ logger = get_logger(__name__)
 
 def iot_query(client, hub_name, query_command, top=None, resource_group_name=None):
     from azext_iot.device_query_sdk.models.query_specification import QuerySpecification
-
-    payload = []
-    headers = {}
     target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
-
-    # Consider top == 0
-    if top is not None:
-        if top <= 0:
-            raise CLIError('top must be > 0')
-
     q_sdk, errors = _bind_sdk(target, SdkType.device_query_sdk)
     try:
         query = QuerySpecification(query_command)
-        if top:
-            headers['x-ms-max-item-count'] = str(top)
-        result, token = q_sdk.device_api.query_devices(query, headers)
-        payload.extend(result)
-        while token:
-            # In case requested count is > service max page size
-            if top:
-                pl = len(payload)
-                if pl < top:
-                    page = top - pl
-                    headers['x-ms-max-item-count'] = str(page)
-                else:
-                    break
-            headers['x-ms-continuation'] = token
-            result, token = q_sdk.device_api.query_devices(query, headers)
-            payload.extend(result)
-        return payload[:top] if top else payload
+        return _execute_query(client, query, q_sdk.device_api.query_devices, errors, top)
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
 
@@ -817,24 +792,24 @@ def iot_device_upload_file(client, device_id, hub_name, file_path, content_type,
         raise CLIError(e)
 
 # DPS Enrollments
-
-API_VERSION = '2017-11-15'
-def iot_dps_device_enrollment_list(client, dps_name, resource_group_name):
+def iot_dps_device_enrollment_list(client, dps_name, resource_group_name, top=None):
     from azext_iot.dps_sdk.models.query_specification import QuerySpecification
-    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
-    try:
-        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
+    target = get_iot_dps_connection_string(client, dps_name, resource_group_name)    
+    try: 
+        m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk) 
+
         query_command = "SELECT *"
-        query = QuerySpecification(query_command)
-        return m_sdk.device_enrollment.query(query, API_VERSION)
+        query = QuerySpecification(query_command)     
+        return _execute_query(client, query, m_sdk.device_enrollment.query, errors, top)
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
+
 
 def iot_dps_device_enrollment_get(client, enrollment_id, dps_name, resource_group_name):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
-        return m_sdk.device_enrollment.get(enrollment_id, API_VERSION)
+        return m_sdk.device_enrollment.get(enrollment_id)
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
 
@@ -872,7 +847,7 @@ def iot_dps_device_enrollment_create(client,
                                           None,
                                           provisioning_status)
         
-        return m_sdk.device_enrollment.create_or_update(enrollment_id, enrollment, API_VERSION)
+        return m_sdk.device_enrollment.create_or_update(enrollment_id, enrollment)
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
 
@@ -892,9 +867,11 @@ def iot_dps_device_enrollment_update(client,
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
            
-        enrollment_record = m_sdk.device_enrollment.get(enrollment_id, API_VERSION)
-        if not etag == enrollment_record['etag'].replace('"', ''):
-            raise LookupError("enrollment etag not found.")
+        enrollment_record = m_sdk.device_enrollment.get(enrollment_id)
+        if not 'etag' in enrollment_record:
+            raise LookupError("enrollment etag not found.") 
+        if etag != enrollment_record['etag'].replace('"', ''):
+            raise LookupError("enrollment etag doesn't match.")
 
         attestation_type = enrollment_record['attestation']['type']
         
@@ -920,7 +897,7 @@ def iot_dps_device_enrollment_update(client,
             enrollment_record['provisioningStatus'] = provisioning_status
         enrollment_record['registrationState'] = None 
         
-        return m_sdk.device_enrollment.create_or_update(enrollment_id, enrollment_record, API_VERSION, etag)
+        return m_sdk.device_enrollment.create_or_update(enrollment_id, enrollment_record, etag)
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
 
@@ -928,28 +905,30 @@ def iot_dps_device_enrollment_delete(client, enrollment_id, dps_name, resource_g
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
-        return m_sdk.device_enrollment.delete(enrollment_id, API_VERSION)
+        return m_sdk.device_enrollment.delete(enrollment_id)
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
 
 # DPS Enrollments Group
 
-def iot_dps_device_enrollment_group_list(client, dps_name, resource_group_name):
+def iot_dps_device_enrollment_group_list(client, dps_name, resource_group_name, top=None):
     from azext_iot.dps_sdk.models.query_specification import QuerySpecification
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
+        
         query_command = "SELECT *"
-        query = QuerySpecification(query_command)
-        return m_sdk.device_enrollment_group.query(query, API_VERSION)
+        query = QuerySpecification(query_command) 
+        return _execute_query(client, query, m_sdk.device_enrollment_group.query, errors, top)    
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
+
 
 def iot_dps_device_enrollment_group_get(client, enrollment_id, dps_name, resource_group_name):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
-        return m_sdk.device_enrollment_group.get(enrollment_id, API_VERSION)
+        return m_sdk.device_enrollment_group.get(enrollment_id)
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
 
@@ -975,7 +954,7 @@ def iot_dps_device_enrollment_group_create(client,
                                      None,
                                      provisioning_status)
         
-        return m_sdk.device_enrollment_group.create_or_update(enrollment_id, group_enrollment, API_VERSION)
+        return m_sdk.device_enrollment_group.create_or_update(enrollment_id, group_enrollment)
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
 
@@ -993,9 +972,12 @@ def iot_dps_device_enrollment_group_update(client,
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
         
-        enrollment_record = m_sdk.device_enrollment_group.get(enrollment_id, API_VERSION)
-        if not etag == enrollment_record['etag'].replace('"', ''):
-            raise LookupError("enrollment etag not found.")
+        enrollment_record = m_sdk.device_enrollment_group.get(enrollment_id)
+        if not 'etag' in enrollment_record:
+            raise LookupError("enrollment etag not found.") 
+        if etag != enrollment_record['etag'].replace('"', ''):
+            raise LookupError("enrollment etag doesn't match.")
+
 
         if iot_hub_host_name:
             enrollment_record['iotHubHostName'] = iot_hub_host_name
@@ -1008,7 +990,7 @@ def iot_dps_device_enrollment_group_update(client,
         
         enrollment_record['attestation'] = _get_attestation_with_x509_signing_cert(certificate_path)
         
-        return m_sdk.device_enrollment_group.create_or_update(enrollment_id, enrollment_record, API_VERSION, etag)
+        return m_sdk.device_enrollment_group.create_or_update(enrollment_id, enrollment_record, etag)
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
 
@@ -1016,7 +998,7 @@ def iot_dps_device_enrollment_group_delete(client, enrollment_id, dps_name, reso
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
-        return m_sdk.device_enrollment_group.delete(enrollment_id, API_VERSION)
+        return m_sdk.device_enrollment_group.delete(enrollment_id)
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
 
@@ -1025,7 +1007,7 @@ def iot_dps_registration_list(client, dps_name, resource_group_name, enrollment_
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
-        return m_sdk.registration_status.query_registration_state(enrollment_id, API_VERSION)
+        return m_sdk.registration_status.query_registration_state(enrollment_id)
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
 
@@ -1033,7 +1015,7 @@ def iot_dps_registration_get(client, dps_name, resource_group_name, registration
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
-        return m_sdk.registration_status.get_registration_state(registration_id, API_VERSION)
+        return m_sdk.registration_status.get_registration_state(registration_id)
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
 
@@ -1041,12 +1023,11 @@ def iot_dps_registration_delete(client, dps_name, resource_group_name, registrat
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
-        return m_sdk.registration_status.delete_registration_state(registration_id, API_VERSION)
+        return m_sdk.registration_status.delete_registration_state(registration_id)
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
 
 def _get_initial_twin(initial_twin_tags = None, initial_twin_properties = None):
-    import ast
     if not initial_twin_tags and not initial_twin_properties:
         return None
     if initial_twin_tags:
@@ -1075,7 +1056,6 @@ def _get_x509_certificate(certificate_path):
 
 def _get_attestation_with_x509_client_cert(certificate_path):
     if not certificate_path:
-        #return AttestationMechanism(AttestationType.x509.value, None, X509Attestation(None))
         raise CLIError('Certificate path is required')
     certificate = _get_x509_certificate(certificate_path)
     x509Attestation = X509Attestation(certificate)
@@ -1091,3 +1071,35 @@ def _get_attestation_with_x509_signing_cert(certificate_path):
     attestation = AttestationMechanism(AttestationType.x509.value, None, x509Attestation)
 
     return attestation
+
+def _execute_query(client, query, query_method, errors, top=None):
+    payload = []
+    headers = {}
+
+    # Consider top == 0
+    if top is not None:
+        if top <= 0:
+            raise CLIError('top must be > 0')
+
+    try:
+
+
+        if top:
+            headers['x-ms-max-item-count'] = str(top)
+        result, token = query_method(query, headers)
+        payload.extend(result)
+        while token:
+            # In case requested count is > service max page size
+            if top:
+                pl = len(payload)
+                if pl < top:
+                    page = top - pl
+                    headers['x-ms-max-item-count'] = str(page)
+                else:
+                    break
+            headers['x-ms-continuation'] = token
+            result, token = query_method(query, headers)
+            payload.extend(result)
+        return payload[:top] if top else payload
+    except errors.ErrorDetailsException as e:
+        raise CLIError(e) 

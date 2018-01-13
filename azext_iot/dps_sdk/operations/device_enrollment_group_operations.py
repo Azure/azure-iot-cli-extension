@@ -11,7 +11,6 @@ from msrestazure.azure_exceptions import CloudError
 
 from .. import models
 
-
 class DeviceEnrollmentGroupOperations(object):
     """DeviceEnrollmentGroupOperations operations.
 
@@ -30,15 +29,14 @@ class DeviceEnrollmentGroupOperations(object):
         self._deserialize = deserializer
 
         self.config = config
+        self.api_version = "2017-11-15"
 
     def get(
-            self, id, api_version, custom_headers=None, raw=False, **operation_config):
+            self, id, custom_headers=None, raw=False, **operation_config):
         """Get a device enrollment group.
 
         :param id: Enrollment group ID.
         :type id: str
-        :param api_version:
-        :type api_version: str
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
          deserialized response
@@ -59,7 +57,7 @@ class DeviceEnrollmentGroupOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("api_version", api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("api_version", self.api_version, 'str')
 
         # Construct headers
         header_parameters = {}
@@ -90,7 +88,7 @@ class DeviceEnrollmentGroupOperations(object):
         return deserialized
 
     def create_or_update(
-            self, id, enrollment_group, api_version, if_match=None, custom_headers=None, raw=False, **operation_config):
+            self, id, enrollment_group, if_match=None, custom_headers=None, raw=False, **operation_config):
         """Create or update a device enrollment group.
 
         :param id: Enrollment group ID.
@@ -98,8 +96,6 @@ class DeviceEnrollmentGroupOperations(object):
         :param enrollment_group: The device enrollment group.
         :type enrollment_group:
          ~microsoft.azure.management.provisioningservices.models.EnrollmentGroup
-        :param api_version:
-        :type api_version: str
         :param if_match: The ETag of the enrollment record.
         :type if_match: str
         :param dict custom_headers: headers that will be added to the request
@@ -122,7 +118,7 @@ class DeviceEnrollmentGroupOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("api_version", api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("api_version", self.api_version, 'str')
 
         # Construct headers
         header_parameters = {}
@@ -159,13 +155,11 @@ class DeviceEnrollmentGroupOperations(object):
         return deserialized
 
     def delete(
-            self, id, api_version, if_match=None, custom_headers=None, raw=False, **operation_config):
+            self, id, if_match=None, custom_headers=None, raw=False, **operation_config):
         """Delete a device enrollment group.
 
         :param id: Enrollment group ID.
         :type id: str
-        :param api_version:
-        :type api_version: str
         :param if_match: The ETag of the enrollment group record.
         :type if_match: str
         :param dict custom_headers: headers that will be added to the request
@@ -186,7 +180,7 @@ class DeviceEnrollmentGroupOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("api_version", api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("api_version", self.api_version, 'str')
 
         # Construct headers
         header_parameters = {}
@@ -212,14 +206,12 @@ class DeviceEnrollmentGroupOperations(object):
             return client_raw_response
 
     def query(
-            self, query_specification, api_version, custom_headers=None, raw=False, **operation_config):
+            self, query_specification, custom_headers=None, raw=False, **operation_config):
         """Query the device enrollment groups.
 
         :param query_specification: The query specification.
         :type query_specification:
          ~microsoft.azure.management.provisioningservices.models.QuerySpecification
-        :param api_version:
-        :type api_version: str
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
          deserialized response
@@ -236,7 +228,7 @@ class DeviceEnrollmentGroupOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("api_version", api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("api_version", self.api_version, 'str')
 
         # Construct headers
         header_parameters = {}
@@ -275,4 +267,7 @@ class DeviceEnrollmentGroupOperations(object):
             client_raw_response.add_headers(header_dict)
             return client_raw_response
 
-        return deserialized
+        # Added Custom
+        continuation = response.headers.get('x-ms-continuation')
+
+        return deserialized, continuation

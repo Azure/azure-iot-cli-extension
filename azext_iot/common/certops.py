@@ -39,7 +39,7 @@ def create_self_signed_certificate(subject, valid_days, cert_output_dir, cert_on
     return {
         'certificate': cert_dump,
         'privateKey': key_dump,
-        'thumbprint': thumbprint,
+        'thumbprint': thumbprint
     }
 
 def open_certificate(certificate_path):
@@ -48,7 +48,7 @@ def open_certificate(certificate_path):
         with open(certificate_path, "rb") as cert_file:
             certificate = cert_file.read()
             try:
-                certificate = certificate.decode("utf-8").rstrip("\r\n")
+                certificate = certificate.decode("utf-8")
             except UnicodeError:
                 certificate = base64.b64encode(certificate).decode("utf-8")
     return certificate

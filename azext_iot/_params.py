@@ -128,7 +128,8 @@ def load_arguments(self, _):
         c.argument('initial_twin_tags', options_list=['--initial-twin-tags', '-tags'],
                    help='Initial twin tags')
         c.argument('iot_hub_host_name', help='Host name of target IoT Hub')
-        c.argument('provisioning_status', arg_type=get_enum_type(EntityStatusType),
+        c.argument('provisioning_status', options_list=['--provisioning-status', '-ps'],
+                  arg_type=get_enum_type(EntityStatusType),
                    help='Enable or disable enrollment entry')
 
     with self.argument_context('iot dps enrollment') as c:
@@ -136,22 +137,23 @@ def load_arguments(self, _):
         c.argument('device_id', help='IoT Hub Device ID')
         
     with self.argument_context('iot dps enrollment create') as c:
-        c.argument('attestation_type', arg_type=get_enum_type(AttestationType), help='Attestation Mechanism')
-        c.argument('certificate_path', options_list=['--certificate-path', '-p'], 
+        c.argument('attestation_type', options_list=['--attestation-type', '-at'],
+                   arg_type=get_enum_type(AttestationType), help='Attestation Mechanism')
+        c.argument('certificate_path', options_list=['--certificate-path', '-cp'], 
                    help='The path to the file containing the certificate. When choosing x509 as attestation type, certificate path is required.')
-        c.argument('endorsement_key', options_list=['--endorsement-key', '-k'], 
+        c.argument('endorsement_key', options_list=['--endorsement-key', '-ek'], 
                    help='TPM endorsement key for a TPM device. When choosing tpm as attestation type, endorsement key is required.')
 
     with self.argument_context('iot dps enrollment update') as c:
-        c.argument('certificate_path', options_list=['--certificate-path', '-p'],
+        c.argument('certificate_path', options_list=['--certificate-path', '-cp'],
                    help='The path to the file containing the certificate. When updating enrollment with x509 attestation mechanism,' 
                    ' certificate path is required.')
-        c.argument('endorsement_key', options_list=['--endorsement-key', '-k'], 
+        c.argument('endorsement_key', options_list=['--endorsement-key', '-ek'], 
                    help='TPM endorsement key for a TPM device.')
 
     with self.argument_context('iot dps enrollment-group') as c:
         c.argument('enrollment_id', help='ID of enrollment group')
-        c.argument('certificate_path', options_list=['--certificate-path', '-p'],
+        c.argument('certificate_path', options_list=['--certificate-path', '-cp'],
                    help='The path to the file containing the certificate.')
 
     with self.argument_context('iot dps registration') as c:

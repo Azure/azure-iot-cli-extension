@@ -207,20 +207,64 @@ class TestEnrollmentList():
         response = mocker.MagicMock(name='response')
         del response._attribute_map
         response.status_code = request.param
-        result = []
-        result.append(generate_enrollment_show())
-        response.text = json.dumps(result)
         service_client.return_value = response
         return service_client
 
-    def test_enrollment_list(self, serviceclient):
-        result = subject.iot_dps_device_enrollment_list(None, mock_target['entity'], resource_group)
-        args = serviceclient.call_args
+    @pytest.mark.parametrize("servresult, servtotal, top", [
+        ([generate_enrollment_show()], 6, 3),
+        ([generate_enrollment_show(), generate_enrollment_show()], 5, 2),
+        ([generate_enrollment_show(), generate_enrollment_show()], 6, None),
+        ([generate_enrollment_show() for i in range(0, 12)], 100, 51),
+        ([generate_enrollment_show()], 1, 100)
+    ])
+    def test_enrollment_list(self, serviceclient, servresult, servtotal, top):
+        serviceclient.return_value.text = json.dumps(servresult)
+        pagesize = len(servresult)
+        continuation = []
+
+        for i in range(int(servtotal/pagesize)):
+            continuation.append({'x-ms-continuation': 'abcd'})
+        if servtotal % pagesize != 0:
+            continuation.append({'x-ms-continuation': 'abcd'})
+        continuation[-1] = None
+
+        serviceclient.return_value.headers.get.side_effect = continuation
+
+        result = subject.iot_dps_device_enrollment_list(None, mock_target['entity'], resource_group, top)
+        
+        if top and top < servtotal:
+            targetcount = top
+        else:
+            targetcount = servtotal
+
+        assert len(result) == targetcount
+
+        if pagesize >= targetcount:
+            assert serviceclient.call_count == 1
+        else:
+            if targetcount % pagesize == 0:
+                assert serviceclient.call_count == int(targetcount/pagesize)
+            else:
+                assert serviceclient.call_count == int(targetcount/pagesize) + 1
+
+        args = serviceclient.call_args_list[0]
+        headers = args[0][1]
         url = args[0][0].url
         method = args[0][0].method
         assert "{}/enrollments/query?".format(mock_target['entity']) in url
         assert method == 'POST'
 
+        if top:
+            targetcount = top
+            if pagesize < top:
+                for i in range(1, len(serviceclient.call_args_list)):
+                    headers = serviceclient.call_args_list[i][0][1]
+                    targetcount = targetcount - pagesize
+                    assert headers['x-ms-max-item-count'] == str(targetcount)
+            else:
+                assert headers['x-ms-max-item-count'] == str(targetcount)
+        else:
+            assert not headers.get('x-ms-max-item-count')
     def test_enrollment_list_error(self, serviceclient_generic_error):
         with pytest.raises(CLIError):
             subject.iot_dps_device_enrollment_list(None, mock_target['entity'], resource_group)
@@ -376,28 +420,62 @@ class TestEnrollmentGroupShow():
             subject.iot_dps_device_enrollment_group_get(None, enrollment_id, mock_target['entity'], resource_group)
 
 
-class TestEnrollmentGroupList():
-    @pytest.fixture(params=[200])
-    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
-        service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        del response._attribute_map
-        response.status_code = request.param
-        result = []
-        result.append(generate_enrollment_group_show())
-        response.text = json.dumps(result)
-        service_client.return_value = response
-        return service_client
+    @pytest.mark.parametrize("servresult, servtotal, top", [
+        ([generate_enrollment_group_show()], 6, 3),
+        ([generate_enrollment_group_show(), generate_enrollment_show()], 5, 2),
+        ([generate_enrollment_group_show(), generate_enrollment_show()], 6, None),
+        ([generate_enrollment_group_show() for i in range(0, 12)], 100, 51),
+        ([generate_enrollment_group_show()], 1, 100)
+    ])
+    def test_enrollment_group_list(self, serviceclient, servresult, servtotal, top):
+        serviceclient.return_value.text = json.dumps(servresult)
+        pagesize = len(servresult)
+        continuation = []
 
-    def test_enrollment_list(self, serviceclient):
-        result = subject.iot_dps_device_enrollment_group_list(None, mock_target['entity'], resource_group)
-        args = serviceclient.call_args
+        for i in range(int(servtotal/pagesize)):
+            continuation.append({'x-ms-continuation': 'abcd'})
+        if servtotal % pagesize != 0:
+            continuation.append({'x-ms-continuation': 'abcd'})
+        continuation[-1] = None
+
+        serviceclient.return_value.headers.get.side_effect = continuation
+
+        result = subject.iot_dps_device_enrollment_group_list(None, mock_target['entity'], resource_group, top)
+        
+        if top and top < servtotal:
+            targetcount = top
+        else:
+            targetcount = servtotal
+
+        assert len(result) == targetcount
+
+        if pagesize >= targetcount:
+            assert serviceclient.call_count == 1
+        else:
+            if targetcount % pagesize == 0:
+                assert serviceclient.call_count == int(targetcount/pagesize)
+            else:
+                assert serviceclient.call_count == int(targetcount/pagesize) + 1
+
+        args = serviceclient.call_args_list[0]
+        headers = args[0][1]
         url = args[0][0].url
         method = args[0][0].method
         assert "{}/enrollmentGroups/query?".format(mock_target['entity']) in url
         assert method == 'POST'
 
-    def test_enrollment_list_error(self, serviceclient_generic_error):
+        if top:
+            targetcount = top
+            if pagesize < top:
+                for i in range(1, len(serviceclient.call_args_list)):
+                    headers = serviceclient.call_args_list[i][0][1]
+                    targetcount = targetcount - pagesize
+                    assert headers['x-ms-max-item-count'] == str(targetcount)
+            else:
+                assert headers['x-ms-max-item-count'] == str(targetcount)
+        else:
+            assert not headers.get('x-ms-max-item-count')
+    def test_enrollment_group_list_error(self, serviceclient_generic_error):
         with pytest.raises(CLIError):
             subject.iot_dps_device_enrollment_group_list(None, mock_target['entity'], resource_group)
 

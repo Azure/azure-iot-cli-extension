@@ -30,15 +30,14 @@ class RegistrationStatusOperations(object):
         self._deserialize = deserializer
 
         self.config = config
+        self.api_version = "2017-11-15"
 
     def get_registration_state(
-            self, id, api_version, custom_headers=None, raw=False, **operation_config):
+            self, id, custom_headers=None, raw=False, **operation_config):
         """Gets the device registration state.
 
         :param id: Registration ID.
         :type id: str
-        :param api_version:
-        :type api_version: str
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
          deserialized response
@@ -59,7 +58,7 @@ class RegistrationStatusOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("api_version", api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("api_version", self.api_version, 'str')
 
         # Construct headers
         header_parameters = {}
@@ -90,13 +89,11 @@ class RegistrationStatusOperations(object):
         return deserialized
 
     def delete_registration_state(
-            self, id, api_version, if_match=None, custom_headers=None, raw=False, **operation_config):
+            self, id, if_match=None, custom_headers=None, raw=False, **operation_config):
         """Deletes the device registration.
 
         :param id: Registration ID.
         :type id: str
-        :param api_version:
-        :type api_version: str
         :param if_match: The ETag of the registration status record.
         :type if_match: str
         :param dict custom_headers: headers that will be added to the request
@@ -117,7 +114,7 @@ class RegistrationStatusOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("api_version", api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("api_version", self.api_version, 'str')
 
         # Construct headers
         header_parameters = {}
@@ -143,13 +140,11 @@ class RegistrationStatusOperations(object):
             return client_raw_response
 
     def query_registration_state(
-            self, id, api_version, custom_headers=None, raw=False, **operation_config):
+            self, id, custom_headers=None, raw=False, **operation_config):
         """Gets the registration state of devices in this enrollmentGroup.
 
         :param id: Enrollment group ID.
         :type id: str
-        :param api_version:
-        :type api_version: str
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
          deserialized response
@@ -170,7 +165,7 @@ class RegistrationStatusOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("api_version", api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("api_version", self.api_version, 'str')
 
         # Construct headers
         header_parameters = {}
