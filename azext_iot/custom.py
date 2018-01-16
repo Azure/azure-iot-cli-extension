@@ -1040,22 +1040,31 @@ def iot_dps_registration_delete(client, dps_name, resource_group_name, registrat
         raise CLIError(e)
 
 
-def _get_initial_twin(initial_twin_tags = None, initial_twin_properties = None):
-    if not initial_twin_tags and not initial_twin_properties:
-        return None
-    if initial_twin_tags:
+def _get_initial_twin(initial_twin_tags = None, initial_twin_properties = None):   
+    if initial_twin_tags == "":
+        initial_twin_tags = None
+    elif initial_twin_tags:
         initial_twin_tags = evaluate_literal(str(initial_twin_tags), dict)
-    if initial_twin_properties:
+
+    if initial_twin_properties == "":
+        initial_twin_properties = None
+    elif initial_twin_properties:
         initial_twin_properties = evaluate_literal(str(initial_twin_properties), dict)
+        
     return InitialTwin(TwinCollection(initial_twin_tags), 
                        InitialTwinProperties(TwinCollection(initial_twin_properties)))
 
 
 def _get_updated_inital_twin(enrollment_record, initial_twin_tags = None, initial_twin_properties = None):
-    if not initial_twin_tags:
-        initial_twin_tags = enrollment_record['initialTwin']['tags']
-    if not initial_twin_properties:
-        initial_twin_properties = enrollment_record['initialTwin']['properties']['desired']    
+    if initial_twin_properties != "" and not initial_twin_tags:
+        if 'initialTwin' in enrollment_record:
+            if 'tags' in enrollment_record['initialTwin']:
+                initial_twin_tags = enrollment_record['initialTwin']['tags']
+    if initial_twin_properties != "" and not initial_twin_properties:
+        if 'initialTwin' in enrollment_record:
+             if 'properties' in enrollment_record['initialTwin']:
+                 if 'desired' in enrollment_record['initialTwin']['properties']:
+                    initial_twin_properties = enrollment_record['initialTwin']['properties']['desired']
     return _get_initial_twin(initial_twin_tags, initial_twin_properties) 
 
 
