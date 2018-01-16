@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from azure.cli.core.commands import CliCommandType
-from azext_iot._factory import iot_service_provisioning_factory
+from azext_iot._factory import iot_service_provisioning_factory as dps_factory
 from azext_iot import iotext_custom
 
 
@@ -45,7 +45,8 @@ def load_command_table(self, _):
         g.custom_command('show', 'iot_device_module_twin_show')
         g.custom_command('replace', 'iot_device_module_twin_replace')
         g.generic_update_command('update', getter_name='iot_device_module_twin_show',
-                                 setter_name='iot_device_module_twin_update', command_type=iotext_custom)
+                                 setter_name='iot_device_module_twin_update',
+                                 command_type=iotext_custom)
 
     with self.command_group('iot hub device-twin') as g:
         g.custom_command('show', 'iot_device_twin_show')
@@ -59,7 +60,8 @@ def load_command_table(self, _):
         g.custom_command('list', 'iot_device_configuration_list')
         g.custom_command('delete', 'iot_device_configuration_delete')
         g.generic_update_command('update', getter_name='iot_device_configuration_show',
-                                 setter_name='iot_device_configuration_update', command_type=iotext_custom)
+                                 setter_name='iot_device_configuration_update',
+                                 command_type=iotext_custom)
 
     with self.command_group('iot device') as g:
         g.custom_command('send-d2c-message', 'iot_device_send_message')
@@ -72,21 +74,21 @@ def load_command_table(self, _):
         g.custom_command('reject', 'iot_c2d_message_reject')
         g.custom_command('receive', 'iot_c2d_message_receive')
 
-    with self.command_group('iot dps enrollment', client_factory=iot_service_provisioning_factory) as g:
+    with self.command_group('iot dps enrollment', client_factory=dps_factory) as g:
         g.custom_command('create', 'iot_dps_device_enrollment_create')
         g.custom_command('list', 'iot_dps_device_enrollment_list')
         g.custom_command('show', 'iot_dps_device_enrollment_get')
         g.custom_command('update', 'iot_dps_device_enrollment_update')
         g.custom_command('delete', 'iot_dps_device_enrollment_delete')
 
-    with self.command_group('iot dps enrollment-group', client_factory=iot_service_provisioning_factory) as g:
+    with self.command_group('iot dps enrollment-group', client_factory=dps_factory) as g:
         g.custom_command('create', 'iot_dps_device_enrollment_group_create')
         g.custom_command('list', 'iot_dps_device_enrollment_group_list')
         g.custom_command('show', 'iot_dps_device_enrollment_group_get')
         g.custom_command('update', 'iot_dps_device_enrollment_group_update')
         g.custom_command('delete', 'iot_dps_device_enrollment_group_delete')
 
-    with self.command_group('iot dps registration', client_factory=iot_service_provisioning_factory) as g:
+    with self.command_group('iot dps registration', client_factory=dps_factory) as g:
         g.custom_command('list', 'iot_dps_registration_list')
         g.custom_command('show', 'iot_dps_registration_get')
         g.custom_command('delete', 'iot_dps_registration_delete')
