@@ -12,10 +12,11 @@ from azure.cli.core.commands.parameters import (
     get_three_state_flag
 )
 from azext_iot.common.shared import (
-    DeviceStatusType,
+    EntityStatusType,
     SettleType,
     DeviceAuthType,
-    KeyType
+    KeyType,
+    AttestationType
 )
 
 hub_name_type = CLIArgumentType(
@@ -56,7 +57,7 @@ def load_arguments(self, _):
     with self.argument_context('iot hub device-identity') as c:
         c.argument('edge_enabled', options_list=['--edge-enabled', '-ee'], arg_type=get_three_state_flag(),
                    help='Flag indicating edge enablement.')
-        c.argument('status', options_list=['--status', '-sta'], arg_type=get_enum_type(DeviceStatusType),
+        c.argument('status', options_list=['--status', '-sta'], arg_type=get_enum_type(EntityStatusType),
                    help='Set device status upon creation.')
         c.argument('status_reason', options_list=['--status-reason', '-star'],
                    help='Description for device status.')
@@ -119,3 +120,46 @@ def load_arguments(self, _):
         c.argument('labels', options_list=['--labels', '-lab'],
                    help="""Map of labels to be applied to target configuration.
                            Use the following format:'{\"key0\":\"value0\", \"key1\":\"value1\"}'""")
+
+    with self.argument_context('iot dps') as c:
+        c.argument('dps_name', help='Name of the Azure IoT Hub device provisioning service')
+        c.argument('initial_twin_properties', options_list=['--initial-twin-properties', '-props'],
+                   help='Initial twin properties')
+        c.argument('initial_twin_tags', options_list=['--initial-twin-tags', '-tags'],
+                   help='Initial twin tags')
+        c.argument('iot_hub_host_name', help='Host name of target IoT Hub')
+        c.argument('provisioning_status', options_list=['--provisioning-status', '-ps'],
+                   arg_type=get_enum_type(EntityStatusType),
+                   help='Enable or disable enrollment entry')
+
+    with self.argument_context('iot dps enrollment') as c:
+        c.argument('enrollment_id', help='ID of device enrollment record')
+        c.argument('device_id', help='IoT Hub Device ID')
+        
+    with self.argument_context('iot dps enrollment create') as c:
+        c.argument('attestation_type', options_list=['--attestation-type', '-at'],
+                   arg_type=get_enum_type(AttestationType), help='Attestation Mechanism')
+        c.argument('certificate_path', options_list=['--certificate-path', '-cp'],
+                   help='The path to the file containing the certificate. '
+                   'When choosing x509 as attestation type, certificate path is required.')
+        c.argument('endorsement_key', options_list=['--endorsement-key', '-ek'],
+                   help='TPM endorsement key for a TPM device. '
+                   ' When choosing tpm as attestation type, endorsement key is required.')
+
+    with self.argument_context('iot dps enrollment update') as c:
+        c.argument('certificate_path', options_list=['--certificate-path', '-cp'],
+                   help='The path to the file containing the certificate. '
+                   'When updating enrollment with x509 attestation mechanism, certificate path is required.')
+        c.argument('endorsement_key', options_list=['--endorsement-key', '-ek'],
+                   help='TPM endorsement key for a TPM device.')
+
+    with self.argument_context('iot dps enrollment-group') as c:
+        c.argument('enrollment_id', help='ID of enrollment group')
+        c.argument('certificate_path', options_list=['--certificate-path', '-cp'],
+                   help='The path to the file containing the certificate.')
+
+    with self.argument_context('iot dps registration') as c:
+        c.argument('registration_id', help='ID of device registration')
+
+    with self.argument_context('iot dps registration list') as c:
+        c.argument('enrollment_id', help='ID of enrollment group')

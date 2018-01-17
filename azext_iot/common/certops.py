@@ -9,7 +9,7 @@ import base64
 from OpenSSL import crypto
 
 
-def create_self_signed_certificate(subject, valid_days, cert_output_dir):
+def create_self_signed_certificate(subject, valid_days, cert_output_dir, cert_only=False):
     # create a key pair
     key = crypto.PKey()
     key.generate_key(crypto.TYPE_RSA, 2048)
@@ -32,14 +32,15 @@ def create_self_signed_certificate(subject, valid_days, cert_output_dir):
         key_file = subject + '-key.pem'
 
         open(join(cert_output_dir, cert_file), "wt").write(cert_dump)
-        open(join(cert_output_dir, key_file), "wt").write(key_dump)
+
+        if not cert_only:
+            open(join(cert_output_dir, key_file), "wt").write(key_dump)
 
     return {
         'certificate': cert_dump,
         'privateKey': key_dump,
         'thumbprint': thumbprint
     }
-
 
 def open_certificate(certificate_path):
     certificate = ""
