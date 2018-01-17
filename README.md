@@ -60,7 +60,7 @@ For example, to install version 0.3.2
 
 You can create a wheel package locally from source.
 
-To build the wheel locally, ensure you have the `wheel` package installed i.e. `pip install wheel`. Then run `python setup.py bdist_wheel` where the current directory is the extension root.
+To build the wheel locally, ensure you have the `wheel` package installed i.e. `pip install wheel`. Then run `python setup.py bdist_wheel` where the current directory is the extension root. Wheel package would be generated in `dist` folder
 
 Now follow the local package installation method.
 
@@ -116,7 +116,8 @@ After obtaining the above packages, ensure you have **activated** your Python vi
 
 **Unit tests:**
 
-`pytest <extension root>/azext_iot/tests/test_iot_ext_unit.py`
+`pytest <extension root>/azext_iot/tests/test_iot_ext_unit.py`  
+`pytest <extension root>/azext_iot/tests/test_iot_dps_unit.py`_(coming soon)_
 
 **Integration tests:**
 
@@ -131,6 +132,12 @@ Currently integration tests leverage Azure CLI live scenario tests. Update the f
 Now you can run:
 
 `pytest <extension root>/azext_iot/tests/test_iot_ext_int.py`
+
+`azext_iot_testdps` # Target IoT Hub DPS for respective category of tests.
+
+Now you can run:
+
+`pytest <extension root>/azext_iot/tests/test_iot_dps_int.py`_(coming soon)_
 
 ## Known Issues
 
