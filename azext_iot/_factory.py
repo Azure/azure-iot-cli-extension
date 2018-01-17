@@ -13,6 +13,11 @@ def iot_hub_service_factory(cli_ctx, *_):
     from azure.mgmt.iothub.iot_hub_client import IotHubClient
     return get_mgmt_service_client(cli_ctx, IotHubClient).iot_hub_resource
 
+def iot_service_provisioning_factory(cli_ctx, *_):
+    from azure.cli.core.commands.client_factory import get_mgmt_service_client
+    from azure.mgmt.iothubprovisioningservices.iot_dps_client import IotDpsClient
+    return get_mgmt_service_client(cli_ctx, IotDpsClient)
+
 
 def _bind_sdk(target, sdk_type, device_id=None):
     from azext_iot.device_query_sdk.device_identities_api import DeviceIdentitiesAPI
@@ -20,6 +25,7 @@ def _bind_sdk(target, sdk_type, device_id=None):
     from azext_iot.modules_sdk.iot_hub_client import IotHubClient
     from azext_iot.device_msg_sdk.iot_hub_device_client import IotHubDeviceClient
     from azext_iot.custom_sdk.custom_api import CustomClient
+    from azext_iot.dps_sdk import DeviceProvisioningServiceServiceRuntimeClient
 
     sas_uri = target['entity']
     endpoint = "https://{}".format(sas_uri)
@@ -41,6 +47,10 @@ def _bind_sdk(target, sdk_type, device_id=None):
     elif sdk_type is SdkType.custom_sdk:
         return (CustomClient(SasTokenAuthentication(sas_uri, target['policy'], target['primarykey']), endpoint),
                 _get_sdk_exception_type(sdk_type))
+    elif sdk_type is SdkType.dps_sdk:
+        return (DeviceProvisioningServiceServiceRuntimeClient(
+                    SasTokenAuthentication(sas_uri, target['policy'], target['primarykey']), endpoint),
+                _get_sdk_exception_type(sdk_type)) 
 
     return None
 
@@ -52,6 +62,7 @@ def _get_sdk_exception_type(sdk_type):
         SdkType.modules_sdk: import_module('azext_iot.modules_sdk.models.error_details'),
         SdkType.device_twin_sdk: import_module('azext_iot.device_twin_sdk.models.error_details'),
         SdkType.device_msg_sdk: import_module('azext_iot.device_msg_sdk.models.error_details'),
-        SdkType.custom_sdk: import_module('azext_iot.custom_sdk.models.error_details')
+        SdkType.custom_sdk: import_module('azext_iot.custom_sdk.models.error_details'),
+        SdkType.dps_sdk: import_module('azext_iot.dps_sdk.models.error_details') 
     }
     return exception_library.get(sdk_type, None)
