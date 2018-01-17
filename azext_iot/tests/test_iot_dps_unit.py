@@ -1,3 +1,4 @@
+# coding=utf-8
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
@@ -461,7 +462,19 @@ class TestEnrollmentGroupShow():
 
     def test_enrollment_group_show_error(self, serviceclient_generic_error):
         with pytest.raises(CLIError):
-            subject.iot_dps_device_enrollment_group_get(None, enrollment_id, mock_target['entity'], resource_group)
+            subject.iot_dps_device_enrollment_group_get(None, enrollment_id,
+                                                        mock_target['entity'], resource_group)
+
+
+class TestEnrollmentGroupList():
+    @pytest.fixture(params=[200])
+    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        response = mocker.MagicMock(name='response')
+        del response._attribute_map
+        response.status_code = request.param
+        service_client.return_value = response
+        return service_client
 
     @pytest.mark.parametrize("servresult, servtotal, top", [
         ([generate_enrollment_group_show()], 6, 3),
