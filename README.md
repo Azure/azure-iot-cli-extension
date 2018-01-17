@@ -133,11 +133,13 @@ Now you can run:
 
 `pytest <extension root>/azext_iot/tests/test_iot_ext_int.py`
 
+Update the following environment variables prior to running DPS integration tests _(coming soon)_.
+
 `azext_iot_testdps` # Target IoT Hub DPS for respective category of tests.
 
 Now you can run:
 
-`pytest <extension root>/azext_iot/tests/test_iot_dps_int.py`_(coming soon)_
+`pytest <extension root>/azext_iot/tests/test_iot_dps_int.py`
 
 ## Known Issues
 
