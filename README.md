@@ -86,7 +86,9 @@ To remove the extension at any time, you can use `az extension remove --name azu
 
 **Tip#1** Many commands require the default policy to exist on the target resource which is being manipulated. For example IoT Hub based commands commonly look for the **iothubowner** policy. _This behavior will change in a future update_.
 
-**Tip#2** For command parameters that take JSON, for example the `az iot hub device-twin update` command's `--set` parameter, JSON input is different between CMD/Powershell and Bash like shells. Please read the [Wiki Tips page](https://github.com/Azure/azure-iot-cli-extension/wiki/Tips) for more detail.
+**Tip#2** For command parameters that take JSON, for example the `az iot hub device-twin update` command's `--set` parameter, JSON input is different between CMD/Powershell and Bash like shells.
+
+Please read the [Tips Wiki page](https://github.com/Azure/azure-iot-cli-extension/wiki/Tips) for more detail and to maximize the functionality and enjoyment out of the IoT extension.
 
 ## Developer setup
 
