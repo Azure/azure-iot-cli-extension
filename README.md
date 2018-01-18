@@ -10,7 +10,7 @@ The extension augments the vanilla Azure CLI IoT by adding to or modifying the e
 
 - IoT Hub
 - IoT Edge
-- IoT Device Provisioning Service _(coming soon)_
+- IoT Device Provisioning Service (DPS)
 
 ## Installation
 
@@ -80,9 +80,13 @@ To remove the extension at any time, you can use `az extension remove --name azu
 
 ## Command Guide
 
-Many commands require the default policy to exist on the target resource which is being manipulated. For example IoT Hub based commands commonly look for the **iothubowner** policy. This behavior will change in a future update.
-
 [Command Wiki](https://github.com/Azure/azure-iot-cli-extension/wiki/Commands)
+
+#### Tips for success
+
+**Tip#1** Many commands require the default policy to exist on the target resource which is being manipulated. For example IoT Hub based commands commonly look for the **iothubowner** policy. _This behavior will change in a future update_.
+
+**Tip#2** For command parameters that take JSON, for example the `az iot hub device-twin update` command's `--set` parameter, JSON input is different between CMD/Powershell and Bash like shells. Please read the [Wiki Tips page](https://github.com/Azure/azure-iot-cli-extension/wiki/Tips) for more detail.
 
 ## Developer setup
 
@@ -108,20 +112,23 @@ Update the `PYTHONPATH` environment variable with both the extension dev deploym
 
 Example `export PYTHONPATH=~/.azure/devcliextensions/:~/source/azure_cli_iot_ext/`
 
-Current testing patterns make heavy use of [pytest](https://docs.pytest.org/en/latest/) and [unittest](https://docs.python.org/3.6/library/unittest.html).
+Current testing patterns make use of [pytest](https://docs.pytest.org/en/latest/) and [unittest](https://docs.python.org/3.6/library/unittest.html). We also use `pytest-mock` and `pytest-ordering` plugins for pytest so make sure you `pip install` these dependencies beforehand.
 
-We also make use of the `pytest-mock` and `pytest-ordering` plugins for pytest.
+After obtaining the above, ensure you have **activated** your Python virtual environment and your extension deployment directory is prepared.
 
-After obtaining the above packages, ensure you have **activated** your Python virtual environment and your extension deployment directory is prepared.
+#### Unit tests
 
-**Unit tests:**
+_Hub:_  
+`pytest <extension root>/azext_iot/tests/test_iot_ext_unit.py`
 
-`pytest <extension root>/azext_iot/tests/test_iot_ext_unit.py`  
-`pytest <extension root>/azext_iot/tests/test_iot_dps_unit.py`_(coming soon)_
+_DPS:_  
+`pytest <extension root>/azext_iot/tests/test_iot_dps_unit.py`
 
-**Integration tests:**
+#### Integration tests
 
 Currently integration tests leverage Azure CLI live scenario tests. Update the following environment variables prior to running integration tests.
+
+These variables are **shared** between Hub and DPS integration tests:
 
 `AZURE_TEST_RUN_LIVE` # Set to 'True' to hit live endpoints.
 
@@ -129,15 +136,17 @@ Currently integration tests leverage Azure CLI live scenario tests. Update the f
 
 `azext_iot_testhub` # Target IoT Hub for respective category of tests.
 
-Now you can run:
+Now you can run **Hub** integration tests:
 
 `pytest <extension root>/azext_iot/tests/test_iot_ext_int.py`
 
-Update the following environment variables prior to running DPS integration tests _(coming soon)_.
+_Optionally_ set `azext_iot_teststorageuri` to your empty blob container sas uri to test device export and enable file upload test. For file upload, you will need to have configured your IoT Hub before running.
+
+For **DPS** update the following environment variable prior to running.
 
 `azext_iot_testdps` # Target IoT Hub DPS for respective category of tests.
 
-Now you can run:
+Now you can run **DPS** integration tests:
 
 `pytest <extension root>/azext_iot/tests/test_iot_dps_int.py`
 
