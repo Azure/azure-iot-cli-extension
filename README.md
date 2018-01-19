@@ -2,7 +2,7 @@
 
 ![Python](https://img.shields.io/pypi/pyversions/azure-cli.svg?maxAge=2592000)
 
-This project provides new and exciting IoT commands and capabilities focused around the IoT Hub and IoT Device Provisioning services. Functionality is provided as an Azure CLI extension package for seamless integration with existing command line functionality.
+This project provides new and exciting IoT commands and capabilities focused around the IoT Hub and IoT Device Provisioning services. Functionality is provided as an Azure CLI extension package for seamless integration with existing command-line functionality.
 
 ## Features
 
@@ -86,7 +86,7 @@ To remove the extension at any time, you can use `az extension remove --name azu
 
 **Tip#1** Many commands require the default policy to exist on the target resource which is being manipulated. For example IoT Hub based commands commonly look for the **iothubowner** policy. _This behavior will change in a future update_.
 
-**Tip#2** For command parameters that take JSON, for example the `az iot hub device-twin update` command's `--set` parameter, JSON input is different between CMD/Powershell and Bash like shells.
+**Tip#2** For command parameters that take JSON, for example the `az iot hub device-twin update` command's `--set` parameter, JSON input is different between CMD/PowerShell and Bash-like shells.
 
 Please read the [Tips Wiki page](https://github.com/Azure/azure-iot-cli-extension/wiki/Tips) for more detail and to maximize the functionality and enjoyment out of the IoT extension.
 
