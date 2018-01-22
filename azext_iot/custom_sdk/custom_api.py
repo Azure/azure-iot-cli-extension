@@ -5,6 +5,8 @@
 # --------------------------------------------------------------------------------------------
 
 import uuid
+import requests
+
 from msrest.service_client import ServiceClient
 from msrest import Serializer, Deserializer
 from msrest.pipeline import ClientRawResponse
@@ -145,8 +147,7 @@ class CustomClient(object):
 
     def upload_file_to_container(
             self, storage_endpoint, content, content_type, raw=False, **operation_config):
-        import requests
-
+        
         # Construct headers
         header_parameters = {}
         header_parameters['Content-Type'] = content_type
