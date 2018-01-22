@@ -12,6 +12,7 @@ shared: Define shared data types(enums); hub and dps connection string functions
 from enum import Enum
 from knack.util import CLIError
 
+
 # pylint: disable=too-few-public-methods
 class SdkType(Enum):
     """
@@ -24,6 +25,7 @@ class SdkType(Enum):
     custom_sdk = 4
     dps_sdk = 5
 
+
 # pylint: disable=too-few-public-methods
 class EntityStatusType(Enum):
     """
@@ -31,6 +33,7 @@ class EntityStatusType(Enum):
     """
     disabled = 'disabled'
     enabled = 'enabled'
+
 
 # pylint: disable=too-few-public-methods
 class SettleType(Enum):
@@ -41,6 +44,7 @@ class SettleType(Enum):
     abandon = 'abandon'
     reject = 'reject'
 
+
 # pylint: disable=too-few-public-methods
 class DeviceAuthType(Enum):
     """
@@ -50,6 +54,7 @@ class DeviceAuthType(Enum):
     x509_thumbprint = 'x509_thumbprint'
     x509_ca = 'x509_ca'
 
+
 # pylint: disable=too-few-public-methods
 class KeyType(Enum):
     """
@@ -57,6 +62,7 @@ class KeyType(Enum):
     """
     primary = 'primary'
     secondary = 'secondary'
+
 
 # pylint: disable=too-few-public-methods
 class AttestationType(Enum):
@@ -67,6 +73,7 @@ class AttestationType(Enum):
     x509 = 'x509'
 
 CONN_STR_TEMPLATE = 'HostName={};SharedAccessKeyName={};SharedAccessKey={}'
+
 
 # pylint: disable=broad-except
 def get_iot_hub_connection_string(
@@ -136,6 +143,7 @@ def get_iot_hub_connection_string(
     result['resourcegroup'] = target_hub.resourcegroup
 
     return result
+
 
 # pylint: disable=broad-except
 def get_iot_dps_connection_string(
