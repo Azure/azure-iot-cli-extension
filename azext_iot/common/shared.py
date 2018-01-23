@@ -94,6 +94,10 @@ def get_iot_hub_connection_string(
 
     Returns:
         (dict): of connection string elements.
+
+    Raises:
+        CLIError: on input validation failure.
+
     """
 
     target_hub = None
@@ -165,6 +169,9 @@ def get_iot_dps_connection_string(
 
     Returns:
         (dict): of connection string elements.
+
+    Raises:
+        CLIError: on input validation failure.
     """
     target_dps = None
     policy = None
