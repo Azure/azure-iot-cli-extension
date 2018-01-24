@@ -38,7 +38,7 @@ class EntityStatusType(Enum):
 # pylint: disable=too-few-public-methods
 class SettleType(Enum):
     """
-    Settlement state of C2D message. 
+    Settlement state of C2D message.
     """
     complete = 'complete'
     abandon = 'abandon'
