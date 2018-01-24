@@ -76,10 +76,10 @@ helps['iot hub device-identity update'] = """
         --set capabilities.iotEdge=true
     - name: Disable device status
       text: >
-        az iot hub device-identity update -d [Devie ID] -n [IoTHub Name] --set status=disabled
+        az iot hub device-identity update -d [Device ID] -n [IoTHub Name] --set status=disabled
     - name: In one command
       text: >
-        az iot hub device-identity update -d [Devie ID] -n [IoTHub Name] 
+        az iot hub device-identity update -d [Device ID] -n [IoTHub Name] 
         --set status=disabled capabilities.iotEdge=true
 """
 
