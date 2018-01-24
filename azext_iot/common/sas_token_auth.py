@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 """
-sas_token_auth: Module containing Shared Access Signiture token class.
+sas_token_auth: Module containing Shared Access Signature token class.
 
 """
 
