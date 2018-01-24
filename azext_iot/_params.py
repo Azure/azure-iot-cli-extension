@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 """
-CLI parameter definations.
+CLI parameter definitions.
 """
 
 from knack.arguments import CLIArgumentType
