@@ -4,7 +4,14 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+"""
+custom_api: API configuration and API client classes.
+
+"""
+
 import uuid
+import requests
+
 from msrest.service_client import ServiceClient
 from msrest import Serializer, Deserializer
 from msrest.pipeline import ClientRawResponse
@@ -14,14 +21,17 @@ from .version import VERSION
 
 
 class CustomAPIConfiguration(AzureConfiguration):
-    """Configuration for CustomClient
-    Note that all parameters used to create this instance are saved as instance
+    """
+    Configuration for CustomClient.
+
+    Note: all parameters used to create this instance are saved as instance
     attributes.
 
-    :param credentials: Credentials needed for the client to connect to Azure.
-    :type credentials: :mod:`A msrestazure Credentials
-     object<msrestazure.azure_active_directory>`
-    :param str base_url: Service URL
+    Args:
+        credentials (msrestazure.azure_active_directory): Credentials needed for
+            the client to connect to Azure. `A msrestazure Credentials
+            object<msrestazure.azure_active_directory>`
+        base_url (str): Service URL
     """
 
     def __init__(
@@ -31,13 +41,27 @@ class CustomAPIConfiguration(AzureConfiguration):
             base_url = 'https://<fully-qualified IoT hub domain name>'
 
         super(CustomAPIConfiguration, self).__init__(base_url)
-        
+
         self.add_user_agent('iotextension/{}'.format(VERSION))
 
         self.credentials = credentials
 
 
 class CustomClient(object):
+    """
+    Custom Client used for uploading of device files.
+
+    Args:
+        credentials (msrestazure.azure_active_directory): Credentials needed for
+            the client to connect to Azure. `A msrestazure Credentials
+            object<msrestazure.azure_active_directory>`
+        base_url (str): Service URL
+
+    Attributes:
+        config (CustomAPIConfiguration): configuration object for this client.
+        api_version (str): api version this client adhears to.
+
+    """
     def __init__(
             self, credentials, base_url=None):
 
@@ -49,8 +73,30 @@ class CustomClient(object):
         self._serialize = Serializer()
         self._deserialize = Deserializer()
 
+
+    # pylint: disable=too-many-locals
     def build_device_file_container(
             self, deviceid, blob_name, custom_headers=None, raw=False, **operation_config):
+        """
+        Create a device file container in Azure Blob Storage.
+
+        Args:
+            deviceid (): ID of device to associate to blob storage.
+            blob_name (): name of blob to create
+            custom_headers (): any custom headers to add to the request.
+            raw (bool): should function return the 'raw' service client response.
+            operation_config (service_client.configuration): See details here:
+                https://github.com/Azure/msrest-for-python/blob/master/msrest/configuration.py
+
+        Returns:
+            deserialized (object): deserialized generic response object.
+            or
+            client_raw_response (ClientRawResponse): wrapper of raw response object.
+
+        Raises:
+            ErrorDetailsException: when http response is not 200 or 201.
+
+        """
 
         # Construct URL
         url = '/devices/{id}/files'
@@ -61,7 +107,9 @@ class CustomClient(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+        query_parameters['api-version'] = (
+            self._serialize.query("self.api_version", self.api_version, 'str')
+        )
 
         # Construct headers
         header_parameters = {}
@@ -71,7 +119,11 @@ class CustomClient(object):
         if custom_headers:
             header_parameters.update(custom_headers)
         if self.config.accept_language is not None:
-            header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
+            header_parameters['accept-language'] = (
+                self._serialize.header(
+                    "self.config.accept_language",
+                    self.config.accept_language, 'str')
+            )
 
         blob_payload = {'blobName': blob_name}
         # Construct body
@@ -96,8 +148,29 @@ class CustomClient(object):
 
         return deserialized
 
+
+    # pylint: disable=too-many-locals
     def post_file_notification(
             self, deviceid, correlation_id, custom_headers=None, raw=False, **operation_config):
+        """
+        Posts notification to device file notifications collection.
+
+        Args:
+            deviceid (str): ID of the device to post the notification to.
+            correlation_id (str): the coorelation id from a build_device_file_container response.
+            custom_headers (dict): dict of custom header values.
+            raw (bool): return the result as a ClientRawResponse.
+            operation_config (): any msrest.service_client configuration overrides.
+
+        Returns:
+            deserialized (): deserialized generic response object.
+            or
+            client_raw_response (ClientRawResponse): wrapper of raw response object.
+
+        Raises:
+            ErrorDetailsException: when http response is not 200, 201 or 204.
+
+        """
 
         # Construct URL
         url = '/devices/{id}/files/notifications'
@@ -108,7 +181,9 @@ class CustomClient(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+        query_parameters['api-version'] = (
+            self._serialize.query("self.api_version", self.api_version, 'str')
+        )
 
         # Construct headers
         header_parameters = {}
@@ -118,7 +193,11 @@ class CustomClient(object):
         if custom_headers:
             header_parameters.update(custom_headers)
         if self.config.accept_language is not None:
-            header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
+            header_parameters['accept-language'] = (
+                self._serialize.header(
+                    "self.config.accept_language",
+                    self.config.accept_language, 'str')
+            )
 
         notify_payload = {'correlationId': correlation_id}
         # Construct body
@@ -143,10 +222,27 @@ class CustomClient(object):
 
         return deserialized
 
+
     def upload_file_to_container(
             self, storage_endpoint, content, content_type, raw=False, **operation_config):
-        import requests
+        """
+        Uploads a file to the specified Azure storage endpoint.
 
+        Args:
+            storage_endpoint (str): target url of container to post file to.
+            content (object): the content to post to the storage endpoint
+            content_type (dict): the IANA Media Type of the content.
+            raw (bool): return the result as a ClientRawResponse.
+            operation_config (): any msrest.service_client configuration overrides.
+
+        Raises:
+            ErrorDetailsException: when http response is not 200 or 201.
+
+        ToDo:
+            either implement or remove 'raw' as it is currently unused.
+            either implement or remove 'operation_config' as it is currently unused.
+
+        """
         # Construct headers
         header_parameters = {}
         header_parameters['Content-Type'] = content_type

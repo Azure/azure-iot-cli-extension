@@ -4,12 +4,29 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+"""
+certops: Functions for working with certificates.
+"""
+
 from os.path import exists, join
 import base64
 from OpenSSL import crypto
 
 
 def create_self_signed_certificate(subject, valid_days, cert_output_dir, cert_only=False):
+    """
+    Function used to create a self-signed certificate
+
+    Args:
+        subject (str): Certificate common name; host name or wildcard.
+        valid_days (int): number of days certificate is valid for; used to calculate
+            certificate expiry.
+        cert_putput_dir (str): string value of output directory.
+        cert_only (bool): generate certificate only; no private key or thumbprint.
+
+    Returns:
+        result (dict): dict with certificate value, private key and thumbprint.
+    """
     # create a key pair
     key = crypto.PKey()
     key.generate_key(crypto.TYPE_RSA, 2048)
@@ -36,13 +53,25 @@ def create_self_signed_certificate(subject, valid_days, cert_output_dir, cert_on
         if not cert_only:
             open(join(cert_output_dir, key_file), "wt").write(key_dump)
 
-    return {
+    result = {
         'certificate': cert_dump,
         'privateKey': key_dump,
         'thumbprint': thumbprint
     }
 
+    return result
+
 def open_certificate(certificate_path):
+    """
+    Opens certificate file (as read binary) from the file system and
+    retruns the value read.
+
+    Args:
+        certificate_path (str): the path the the certificate file.
+
+    Returns:
+        certificate (str): returns utf-8 encoded value from certificate file.
+    """
     certificate = ""
     if certificate_path.endswith('.pem') or certificate_path.endswith('.cer'):
         with open(certificate_path, "rb") as cert_file:
