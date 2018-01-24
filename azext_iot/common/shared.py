@@ -38,7 +38,7 @@ class EntityStatusType(Enum):
 # pylint: disable=too-few-public-methods
 class SettleType(Enum):
     """
-    Result type of operation.
+    Settlement state of C2D message. 
     """
     complete = 'complete'
     abandon = 'abandon'
@@ -58,7 +58,7 @@ class DeviceAuthType(Enum):
 # pylint: disable=too-few-public-methods
 class KeyType(Enum):
     """
-    Shared private key
+    Shared private key.
     """
     primary = 'primary'
     secondary = 'secondary'
@@ -67,7 +67,7 @@ class KeyType(Enum):
 # pylint: disable=too-few-public-methods
 class AttestationType(Enum):
     """
-    Type of atestation (TMP or certificate based)
+    Type of atestation (TMP or certificate based).
     """
     tpm = 'tpm'
     x509 = 'x509'
