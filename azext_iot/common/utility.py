@@ -13,6 +13,7 @@ import os
 import sys
 import contextlib
 import ast
+import json
 
 
 @contextlib.contextmanager
@@ -84,3 +85,19 @@ def validate_key_value_pairs(string):
         kv_list = [x for x in string.split(';') if '=' in x]     # key-value pairs
         result = dict(x.split('=', 1) for x in kv_list)
     return result
+
+
+def shell_safe_json_parse(json_or_dict_string, preserve_order=False):
+    """ Allows the passing of JSON or Python dictionary strings. This is needed because certain
+    JSON strings in CMD shell are not received in main's argv. This allows the user to specify
+    the alternative notation, which does not have this problem (but is technically not JSON). """
+    try:
+        if not preserve_order:
+            return json.loads(json_or_dict_string)
+        from collections import OrderedDict
+        return json.loads(json_or_dict_string, object_pairs_hook=OrderedDict)
+    except ValueError as json_ex:
+        try:
+            return ast.literal_eval(json_or_dict_string)
+        except Exception:
+            raise json_ex

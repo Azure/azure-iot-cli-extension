@@ -125,8 +125,12 @@ helps['iot hub device-twin update'] = """
     examples:
     - name: Add nested tags to device twin.
       text: >
-        az iot hub device-twin update --device-id [Device ID] --hub-name [IoTHub Name] 
+        az iot hub device-twin update --device-id [Device ID] --hub-name [IoTHub Name]
         --set tags='{"location":{"region":"US"}}'
+    - name: Remove the 'region' property from parent 'location' property
+      text: >
+        az iot hub device-twin update --device-id [Device ID] --hub-name [IoTHub Name]
+        --set tags.location.region='null'
 """
 
 helps['iot hub device-twin replace'] = """
@@ -173,7 +177,7 @@ helps['iot hub module-identity update'] = """
     - name: Regenerate module symmetric authentication keys
       text: >
         az iot hub module-identity update -m [Module Name] -d [Device ID] -n [IoTHub Name] 
-        --set authentication.symmetricKey.primaryKey="[Key Value]" 
+        --set authentication.symmetricKey.primaryKey="[Key Value]"
         authentication.symmetricKey.secondaryKey="[key value]"
 """
 
@@ -202,6 +206,10 @@ helps['iot hub module-twin update'] = """
       text: >
         az iot hub module-twin update -d [Device ID] -n [IoTHub Name] -m [Module Name] --set
         properties.desired='{"conditions":{"temperature":{"warning":70, "critical":100}}}'
+    - name: Remove 'critical' property from parent 'temperature'
+      text: >
+        az iot hub module-twin update -d mydevice -n myhub -m mymod --set
+        properties.desired.condition.temperature.critical='null'
 """
 
 helps['iot hub module-twin replace'] = """

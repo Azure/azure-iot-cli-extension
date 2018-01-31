@@ -5,7 +5,6 @@
 # --------------------------------------------------------------------------------------------
 # pylint: disable=no-self-use,no-member,line-too-long,too-few-public-methods,no-name-in-module,C0103,R0913
 
-import json
 from os.path import exists, basename
 from time import time, sleep
 import six
@@ -13,12 +12,12 @@ from knack.log import get_logger
 from knack.util import CLIError
 from azure.cli.core.util import read_file_content
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
-from azext_iot.common.shared import (DeviceAuthType, 
-                                     SdkType, 
+from azext_iot.common.shared import (DeviceAuthType,
+                                     SdkType,
                                      AttestationType,
-                                     get_iot_hub_connection_string, 
+                                     get_iot_hub_connection_string,
                                      get_iot_dps_connection_string)
-from azext_iot.common.utility import validate_key_value_pairs, evaluate_literal
+from azext_iot.common.utility import shell_safe_json_parse, validate_key_value_pairs, evaluate_literal
 from azext_iot.common.certops import open_certificate
 from azext_iot._factory import _bind_sdk
 
@@ -75,7 +74,7 @@ def iot_device_list(client, hub_name, top=10, edge_enabled=False, resource_group
     if top <= 0:
         raise CLIError('top must be > 0')
 
-    query = 'SELECT * FROM devices where capabilities.iotEdge = true' if edge_enabled else 'SELECT * from devices'
+    query = 'select * from devices where capabilities.iotEdge = true' if edge_enabled else 'select * from devices'
     result = iot_query(client, hub_name, query, top, resource_group_name)
     if not result:
         logger.info('No registered devices found on hub "%s".', hub_name)
@@ -307,7 +306,7 @@ def iot_device_module_twin_replace(client, device_id, hub_name, module_id, targe
     try:
         if exists(target_json):
             target_json = str(read_file_content(target_json))
-        target_json = json.loads(target_json)
+        target_json = shell_safe_json_parse(target_json)
         module = m_sdk.device_twin_api.get_module_twin(device_id, module_id)
         etag = module.get('etag', None)
         if etag:
@@ -329,7 +328,7 @@ def iot_device_configuration_apply(client, device_id, hub_name, content, resourc
     try:
         if exists(content):
             content = str(read_file_content(content))
-        content = json.loads(content)
+        content = shell_safe_json_parse(content)
         test_root = content.get('content', None)
         if test_root:
             content = test_root
@@ -351,7 +350,7 @@ def iot_device_configuration_create(client, config_id, hub_name, content, target
     try:
         if exists(content):
             content = str(read_file_content(content))
-        content = json.loads(content)
+        content = shell_safe_json_parse(content)
         content = content.get('content', None)
         if not content:
             raise CLIError("content json must include 'content' property.")
@@ -403,7 +402,7 @@ def _handle_device_configuration_update_params(parameters):
     if isinstance(content, six.string_types):
         if exists(content):
             content = str(read_file_content(content))
-        content = json.loads(content)
+        content = shell_safe_json_parse(content)
     parameters['content'] = content
     labels = parameters.get('labels', None)
     if labels:
@@ -486,7 +485,7 @@ def iot_device_twin_replace(client, device_id, hub_name, target_json, resource_g
     try:
         if exists(target_json):
             target_json = str(read_file_content(target_json))
-        target_json = json.loads(target_json)
+        target_json = shell_safe_json_parse(target_json)
         device = dt_sdk.get_device_twin(device_id)
         etag = device.get('etag', None)
         if etag:
@@ -502,7 +501,7 @@ def iot_device_twin_replace(client, device_id, hub_name, target_json, resource_g
 
 # Device Method Invoke
 
-def iot_device_method(client, device_id, hub_name, method_name, method_payload, timeout=60, resource_group_name=None):
+def iot_device_method(client, device_id, hub_name, method_name, method_payload="{}", timeout=60, resource_group_name=None):
     from azext_iot.device_twin_sdk.models.cloud_to_device_method import CloudToDeviceMethod
 
     target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
@@ -514,9 +513,11 @@ def iot_device_method(client, device_id, hub_name, method_name, method_payload, 
     dt_sdk, errors = _bind_sdk(target, SdkType.device_twin_sdk)
 
     try:
-        if exists(method_payload):
-            method_payload = str(read_file_content(method_payload))
-        method_payload = json.loads(method_payload)
+        if method_payload:
+            if exists(method_payload):
+                method_payload = str(read_file_content(method_payload))
+            method_payload = shell_safe_json_parse(method_payload)
+
         method = CloudToDeviceMethod(method_name, method_payload, timeout, timeout)
         return dt_sdk.invoke_device_method(device_id, method)
     except ValueError as j:
@@ -527,7 +528,7 @@ def iot_device_method(client, device_id, hub_name, method_name, method_payload, 
 
 # Device Module Method Invoke
 
-def iot_device_module_method(client, device_id, hub_name, module_id, method_name, method_payload,
+def iot_device_module_method(client, device_id, hub_name, module_id, method_name, method_payload="{}",
                              timeout=60, resource_group_name=None):
     from azext_iot.modules_sdk.models.cloud_to_device_method import CloudToDeviceMethod
 
@@ -539,9 +540,11 @@ def iot_device_module_method(client, device_id, hub_name, module_id, method_name
 
     m_sdk, errors = _bind_sdk(target, SdkType.modules_sdk)
     try:
-        if exists(method_payload):
-            method_payload = str(read_file_content(method_payload))
-        method_payload = json.loads(method_payload)
+        if method_payload:
+            if exists(method_payload):
+                method_payload = str(read_file_content(method_payload))
+            method_payload = shell_safe_json_parse(method_payload)
+
         method = CloudToDeviceMethod(method_name, method_payload, timeout, timeout)
         return m_sdk.module_api.invoke_device_module_method(device_id, module_id, method)
     except ValueError as j:
