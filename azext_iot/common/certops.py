@@ -80,4 +80,4 @@ def open_certificate(certificate_path):
                 certificate = certificate.decode("utf-8")
             except UnicodeError:
                 certificate = base64.b64encode(certificate).decode("utf-8")
-    return certificate
+    return certificate.rstrip()  # Remove trailing white space from the certificate content

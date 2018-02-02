@@ -27,6 +27,7 @@ hub_name_type = CLIArgumentType(
     completer=get_resource_name_completion_list('Microsoft.Devices/IotHubs'),
     help='IoT Hub name.')
 
+
 # pylint: disable=too-many-statements
 def load_arguments(self, _):
     """
@@ -142,7 +143,7 @@ def load_arguments(self, _):
                          help='Weight of configuration in case of competing rules (highest wins).')
         context.argument('labels', options_list=['--labels', '-lab'],
                          help="""Map of labels to be applied to target configuration.
-                                Use the following format:'{\"key0\":\"value0\", 
+                                Use the following format:'{\"key0\":\"value0\",
                                 \"key1\":\"value1\"}'""")
 
     with self.argument_context('iot dps') as context:
@@ -164,25 +165,58 @@ def load_arguments(self, _):
     with self.argument_context('iot dps enrollment create') as context:
         context.argument('attestation_type', options_list=['--attestation-type', '-at'],
                          arg_type=get_enum_type(AttestationType), help='Attestation Mechanism')
-        context.argument('certificate_path', options_list=['--certificate-path', '-cp'],
-                         help='The path to the file containing the certificate. '
-                         'When choosing x509 as attestation type, certificate path is required.')
+        context.argument('certificate_path',
+                         options_list=['--certificate-path', '-cp'],
+                         help='The path to the file containing the primary certificate. '
+                         'When choosing x509 as attestation type, '
+                         'one of the certificate path is required.')
+        context.argument('secondary_certificate_path',
+                         options_list=['--secondary-certificate-path', '-scp'],
+                         help='The path to the file containing the secondary certificate. '
+                         'When choosing x509 as attestation type, '
+                         'one of the certificate path is required.')
         context.argument('endorsement_key', options_list=['--endorsement-key', '-ek'],
                          help='TPM endorsement key for a TPM device. '
-                         ' When choosing tpm as attestation type, endorsement key is required.')
+                         'When choosing tpm as attestation type, endorsement key is required.')
 
     with self.argument_context('iot dps enrollment update') as context:
-        context.argument('certificate_path', options_list=['--certificate-path', '-cp'],
-                         help='The path to the file containing the certificate. '
-                         'When updating enrollment with x509 attestation mechanism, '
-                         'certificate path is required.')
+        context.argument('certificate_path',
+                         options_list=['--certificate-path', '-cp'],
+                         help='The path to the file containing the primary certificate.')
+        context.argument('secondary_certificate_path',
+                         options_list=['--secondary-certificate-path', '-scp'],
+                         help='The path to the file containing the secondary certificate.')
+        context.argument('remove_certificate',
+                         options_list=['--remove-certificate', '-rc'],
+                         help='Remove current primary certificate',
+                         arg_type=get_three_state_flag())
+        context.argument('remove_secondary_certificate',
+                         options_list=['--remove-secondary-certificate', '-rsc'],
+                         help='Remove current secondary certificate',
+                         arg_type=get_three_state_flag())
         context.argument('endorsement_key', options_list=['--endorsement-key', '-ek'],
                          help='TPM endorsement key for a TPM device.')
 
     with self.argument_context('iot dps enrollment-group') as context:
         context.argument('enrollment_id', help='ID of enrollment group')
-        context.argument('certificate_path', options_list=['--certificate-path', '-cp'],
-                         help='The path to the file containing the certificate.')
+        context.argument('certificate_path',
+                         options_list=['--certificate-path', '-cp'],
+                         help='The path to the file containing the primary certificate. '
+                         'One of the certificate path is required.')
+        context.argument('secondary_certificate_path',
+                         options_list=['--secondary-certificate-path', '-scp'],
+                         help='The path to the file containing the secondary certificate. '
+                         'One of the certificate path is required.')
+
+    with self.argument_context('iot dps enrollment-group update') as context:
+        context.argument('remove_certificate',
+                         options_list=['--remove-certificate', '-rc'],
+                         help='Remove current primary certificate',
+                         arg_type=get_three_state_flag())
+        context.argument('remove_secondary_certificate',
+                         options_list=['--remove-secondary-certificate', '-rsc'],
+                         help='Remove current secondary certificate',
+                         arg_type=get_three_state_flag())
 
     with self.argument_context('iot dps registration') as context:
         context.argument('registration_id', help='ID of device registration')

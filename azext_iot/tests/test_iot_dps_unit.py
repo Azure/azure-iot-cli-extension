@@ -13,7 +13,6 @@ from knack.util import CLIError
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azure.cli.core.util import read_file_content
 
-device_id = 'mydevice'
 enrollment_id = 'myenrollment'
 resource_group = 'myrg'
 registration_id = 'myregistration'
@@ -41,7 +40,9 @@ def fixture_ghcs(mocker):
 
 @pytest.fixture()
 def fixture_sas(mocker):
-    r = SasTokenAuthentication(mock_target['entity'], mock_target['policy'], mock_target['primarykey'])
+    r = SasTokenAuthentication(mock_target['entity'],
+                               mock_target['policy'],
+                               mock_target['primarykey'])
     sas = mocker.patch(path_sas)
     sas.return_value = r
 
@@ -56,16 +57,18 @@ def serviceclient_generic_error(mocker, fixture_ghcs, fixture_sas, request):
 
 
 def generate_enrollment_create_req(attestation_type=None, endorsement_key=None, certificate_path=None,
-                                   device_id=None, iot_hub_host_name=None, initial_twin_tags=None,
+                                   secondary_certificate_path=None, device_Id=None,
+                                   iot_hub_host_name=None, initial_twin_tags=None,
                                    initial_twin_properties=None, provisioning_status=None):
-    return {'client': None, 
+    return {'client': None,
             'enrollment_id': enrollment_id,
-            'rg': resource_group, 
-            'dps_name': mock_target['entity'], 
+            'rg': resource_group,
+            'dps_name': mock_target['entity'],
             'attestation_type': attestation_type,
-            'endorsement_key': endorsement_key, 
+            'endorsement_key': endorsement_key,
             'certificate_path': certificate_path,
-            'device_id': device_id,
+            'secondary_certificate_path': secondary_certificate_path,
+            'device_id': device_Id,
             'iot_hub_host_name': iot_hub_host_name,
             'initial_twin_tags': initial_twin_tags,
             'initial_twin_properties': initial_twin_properties,
@@ -82,22 +85,44 @@ class TestEnrollmentCreate():
         return service_client
 
     @pytest.mark.parametrize("req", [
-        (generate_enrollment_create_req(attestation_type='tpm', endorsement_key='mykey')),
-        (generate_enrollment_create_req(attestation_type='tpm', endorsement_key='mykey', device_id='1',
-                                        iot_hub_host_name='myHub', provisioning_status='disabled')),
-        (generate_enrollment_create_req(attestation_type='tpm', endorsement_key='mykey', provisioning_status='enabled',
+        (generate_enrollment_create_req(attestation_type='tpm',
+                                        endorsement_key='mykey')),
+        (generate_enrollment_create_req(attestation_type='tpm',
+                                        endorsement_key='mykey',
+                                        device_Id='1',
+                                        iot_hub_host_name='myHub',
+                                        provisioning_status='disabled')),
+        (generate_enrollment_create_req(attestation_type='tpm',
+                                        endorsement_key='mykey',
+                                        provisioning_status='enabled',
                                         initial_twin_tags={'key': 'value'})),
-        (generate_enrollment_create_req(attestation_type='x509', certificate_path='myCert')),
-        (generate_enrollment_create_req(attestation_type='x509', certificate_path='myCert', device_id='1',
-                                        iot_hub_host_name='myHub', provisioning_status='disabled')),
-        (generate_enrollment_create_req(attestation_type='x509', certificate_path='myCert', provisioning_status='enabled', 
+        (generate_enrollment_create_req(attestation_type='x509',
+                                        certificate_path='myCert')),
+        (generate_enrollment_create_req(attestation_type='x509',
+                                        secondary_certificate_path='myCert2')),
+        (generate_enrollment_create_req(attestation_type='x509',
+                                        certificate_path='myCert',
+                                        device_Id='1',
+                                        iot_hub_host_name='myHub',
+                                        provisioning_status='disabled')),
+        (generate_enrollment_create_req(attestation_type='x509',
+                                        certificate_path='myCert',
+                                        provisioning_status='enabled',
                                         initial_twin_properties={'key': 'value'}))
     ])
     def test_enrollment_create(self, serviceclient, req):
-        subject.iot_dps_device_enrollment_create(None, req['enrollment_id'], req['attestation_type'],
-                                                 req['dps_name'], req['rg'], req['endorsement_key'], req['certificate_path'],
-                                                 req['device_id'], req['iot_hub_host_name'], req['initial_twin_tags'],
-                                                 req['initial_twin_properties'], req['provisioning_status'])
+        subject.iot_dps_device_enrollment_create(None,
+                                                 req['enrollment_id'],
+                                                 req['attestation_type'],
+                                                 req['dps_name'], req['rg'],
+                                                 req['endorsement_key'],
+                                                 req['certificate_path'],
+                                                 req['secondary_certificate_path'],
+                                                 req['device_id'],
+                                                 req['iot_hub_host_name'],
+                                                 req['initial_twin_tags'],
+                                                 req['initial_twin_properties'],
+                                                 req['provisioning_status'])
         args = serviceclient.call_args
         url = args[0][0].url
         assert "{}/enrollments/{}?".format(mock_target['entity'], enrollment_id) in url
@@ -111,6 +136,10 @@ class TestEnrollmentCreate():
         else:
             assert body['attestation']['type'] == req['attestation_type']
             assert body['attestation']['x509']['clientCertificates'] is not None
+            if req['certificate_path']:
+                assert body['attestation']['x509']['clientCertificates']['primary'] is not None
+            if req['secondary_certificate_path']:
+                assert body['attestation']['x509']['clientCertificates']['secondary'] is not None
 
         if req['device_id']:
             assert body['deviceId'] == req['device_id']
@@ -321,12 +350,14 @@ class TestEnrollmentDelete():
 
 def generate_enrollment_group_create_req(certificate_path=None, iot_hub_host_name=None,
                                          initial_twin_tags=None,
+                                         secondary_certificate_path=None,
                                          initial_twin_properties=None, provisioning_status=None):
     return {'client': None,
             'enrollment_id': enrollment_id,
             'rg': resource_group,
             'dps_name': mock_target['entity'],
             'certificate_path': certificate_path,
+            'secondary_certificate_path': secondary_certificate_path,
             'iot_hub_host_name': iot_hub_host_name,
             'initial_twin_tags': initial_twin_tags,
             'initial_twin_properties': initial_twin_properties,
@@ -344,6 +375,7 @@ class TestEnrollmentGroupCreate():
 
     @pytest.mark.parametrize("req", [
         (generate_enrollment_group_create_req(certificate_path='myCert')),
+        (generate_enrollment_group_create_req(secondary_certificate_path='myCert2')),
         (generate_enrollment_group_create_req(certificate_path='myCert', iot_hub_host_name='myHub',
                                               provisioning_status='disabled')),
         (generate_enrollment_group_create_req(certificate_path='myCert',
@@ -351,9 +383,12 @@ class TestEnrollmentGroupCreate():
                                               initial_twin_properties={'key': 'value'}))
     ])
     def test_enrollment_group_create(self, serviceclient, req):
-        subject.iot_dps_device_enrollment_group_create(None, req['enrollment_id'],
-                                                       req['dps_name'], req['rg'],
+        subject.iot_dps_device_enrollment_group_create(None,
+                                                       req['enrollment_id'],
+                                                       req['dps_name'],
+                                                       req['rg'],
                                                        req['certificate_path'],
+                                                       req['secondary_certificate_path'],
                                                        req['iot_hub_host_name'],
                                                        req['initial_twin_tags'],
                                                        req['initial_twin_properties'],
@@ -366,7 +401,10 @@ class TestEnrollmentGroupCreate():
         body = args[0][2]
         assert body['enrollmentGroupId'] == req['enrollment_id']
         assert body['attestation']['type'] == 'x509'
-        assert body['attestation']['x509']['signingCertificates'] is not None
+        if req['certificate_path']:
+            assert body['attestation']['x509']['signingCertificates']['primary'] is not None
+        if req['secondary_certificate_path']:
+            assert body['attestation']['x509']['signingCertificates']['secondary'] is not None
 
         if req['iot_hub_host_name']:
             assert body['iotHubHostName'] == req['iot_hub_host_name']
