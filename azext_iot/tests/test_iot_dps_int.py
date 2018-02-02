@@ -8,7 +8,7 @@
 import random
 import os
 from OpenSSL import crypto
-from azure.cli.testsdk import LiveScenarioTest, ResourceGroupPreparer, ResourceGroupPreparer
+from azure.cli.testsdk import LiveScenarioTest
 from azext_iot.common.shared import EntityStatusType, AttestationType
 from azext_iot.common.certops import create_self_signed_certificate
 

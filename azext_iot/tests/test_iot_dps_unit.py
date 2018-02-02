@@ -56,10 +56,11 @@ def serviceclient_generic_error(mocker, fixture_ghcs, fixture_sas, request):
     return service_client
 
 
-def generate_enrollment_create_req(attestation_type=None, endorsement_key=None, certificate_path=None,
-                                   secondary_certificate_path=None, device_Id=None,
-                                   iot_hub_host_name=None, initial_twin_tags=None,
-                                   initial_twin_properties=None, provisioning_status=None):
+def generate_enrollment_create_req(attestation_type=None, endorsement_key=None,
+                                   certificate_path=None, secondary_certificate_path=None,
+                                   device_Id=None, iot_hub_host_name=None,
+                                   initial_twin_tags=None, initial_twin_properties=None,
+                                   provisioning_status=None):
     return {'client': None,
             'enrollment_id': enrollment_id,
             'rg': resource_group,

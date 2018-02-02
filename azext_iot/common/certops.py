@@ -61,6 +61,7 @@ def create_self_signed_certificate(subject, valid_days, cert_output_dir, cert_on
 
     return result
 
+
 def open_certificate(certificate_path):
     """
     Opens certificate file (as read binary) from the file system and

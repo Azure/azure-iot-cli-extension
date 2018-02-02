@@ -277,9 +277,9 @@ class TestDeviceList():
         assert '{}/devices/query?'.format(mock_target['entity']) in url
 
         if edge:
-            assert body['query'] == 'SELECT * FROM devices where capabilities.iotEdge = true'
+            assert body['query'] == 'select * from devices where capabilities.iotEdge = true'
         else:
-            assert body['query'] == 'SELECT * from devices'
+            assert body['query'] == 'select * from devices'
 
         assert method == 'POST'
 
@@ -1084,8 +1084,9 @@ class TestDeviceMethodInvoke():
         service_client.return_value = response
         return service_client
 
-    def test_device_method(self, serviceclient):
-        payload = '{"key":"value"}'
+    @pytest.mark.parametrize("methodbody", ['{"key":"value"}', None])
+    def test_device_method(self, serviceclient, methodbody):
+        payload = methodbody
         device_method = 'mymethod'
         timeout = 100
         subject.iot_device_method(None, device_id, mock_target['entity'], device_method, payload, timeout)
@@ -1096,7 +1097,12 @@ class TestDeviceMethodInvoke():
 
         assert method == 'POST'
         assert body['methodName'] == device_method
-        assert body['payload'] == json.loads(payload)
+
+        if methodbody:
+            assert body['payload'] == json.loads(payload)
+        else:
+            assert body.get('payload') is None
+
         assert body['responseTimeoutInSeconds'] == timeout
         assert body['connectTimeoutInSeconds'] == timeout
         assert '{}/twins/{}/methods?'.format(mock_target['entity'], device_id, module_id) in url
@@ -1130,8 +1136,9 @@ class TestDeviceModuleMethodInvoke():
         service_client.return_value = response
         return service_client
 
-    def test_device_module_method(self, serviceclient):
-        payload = '{"key":"value"}'
+    @pytest.mark.parametrize("methodbody", ['{"key":"value"}', None])
+    def test_device_module_method(self, serviceclient, methodbody):
+        payload = methodbody
         module_method = 'mymethod'
         timeout = 100
         subject.iot_device_module_method(None, device_id, mock_target['entity'], module_id, module_method, payload, timeout)
@@ -1142,7 +1149,12 @@ class TestDeviceModuleMethodInvoke():
 
         assert method == 'POST'
         assert body['methodName'] == module_method
-        assert body['payload'] == json.loads(payload)
+
+        if methodbody:
+            assert body['payload'] == json.loads(payload)
+        else:
+            assert body.get('payload') is None
+
         assert body['responseTimeoutInSeconds'] == timeout
         assert body['connectTimeoutInSeconds'] == timeout
         assert '{}/twins/{}/modules/{}/methods?'.format(mock_target['entity'], device_id, module_id) in url

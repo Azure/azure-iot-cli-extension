@@ -127,6 +127,10 @@ helps['iot hub device-twin update'] = """
       text: >
         az iot hub device-twin update --device-id [Device ID] --hub-name [IoTHub Name]
         --set tags='{"location":{"region":"US"}}'
+    - name: Remove the 'region' property from parent 'location' property
+      text: >
+        az iot hub device-twin update --device-id [Device ID] --hub-name [IoTHub Name]
+        --set tags.location.region='null'
 """
 
 helps['iot hub device-twin replace'] = """
@@ -202,6 +206,10 @@ helps['iot hub module-twin update'] = """
       text: >
         az iot hub module-twin update -d [Device ID] -n [IoTHub Name] -m [Module Name] --set
         properties.desired='{"conditions":{"temperature":{"warning":70, "critical":100}}}'
+    - name: Remove 'critical' property from parent 'temperature'
+      text: >
+        az iot hub module-twin update -d mydevice -n myhub -m mymod --set
+        properties.desired.condition.temperature.critical='null'
 """
 
 helps['iot hub module-twin replace'] = """
