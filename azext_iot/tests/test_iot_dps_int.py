@@ -5,7 +5,6 @@
 # --------------------------------------------------------------------------------------------
 # pylint: disable=too-many-statements
 
-import random
 import os
 from OpenSSL import crypto
 from azure.cli.testsdk import LiveScenarioTest

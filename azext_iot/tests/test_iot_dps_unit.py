@@ -6,7 +6,6 @@
 
 import pytest
 import json
-import os
 from azext_iot import custom as subject
 from azext_iot.common.utility import evaluate_literal
 from knack.util import CLIError
