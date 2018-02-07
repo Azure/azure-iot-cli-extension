@@ -5,10 +5,9 @@
 # --------------------------------------------------------------------------------------------
 # pylint: disable=too-many-statements
 
-import random
 import os
 from OpenSSL import crypto
-from azure.cli.testsdk import LiveScenarioTest, ResourceGroupPreparer, ResourceGroupPreparer
+from azure.cli.testsdk import LiveScenarioTest
 from azext_iot.common.shared import EntityStatusType, AttestationType
 from azext_iot.common.certops import create_self_signed_certificate
 
@@ -36,7 +35,6 @@ class IoTDpsTest(LiveScenarioTest):
         create_self_signed_certificate(cert_name, 200, output_dir, True)
 
     def __del__(self):
-        import os.path
         if os.path.exists(cert_path):
             os.remove(cert_path)
 
@@ -48,118 +46,133 @@ class IoTDpsTest(LiveScenarioTest):
         initial_twin = "\"{'key':'value'}\""
         hub_host_name = '{}.azure-devices.net'.format(hub)
 
-        etag = self.cmd('iot dps enrollment create --enrollment-id {} --attestation-type {} -g {} --dps-name {}'
-                        ' --endorsement-key {} --provisioning-status {} --device-id {} --initial-twin-tags {}'
+        etag = self.cmd('iot dps enrollment create --enrollment-id {} --attestation-type {}'
+                        ' -g {} --dps-name {} --endorsement-key {}'
+                        ' --provisioning-status {} --device-id {} --initial-twin-tags {}'
                         ' --initial-twin-properties {} --iot-hub-host-name {}'
-                        .format(enrollment_id, attestation_type, rg, dps, endorsement_key, self.provisioning_status, device_id,
+                        .format(enrollment_id, attestation_type, rg, dps, endorsement_key,
+                                self.provisioning_status, device_id,
                                 initial_twin, initial_twin, hub_host_name),
                         checks=[
-                                self.check('attestation.type', attestation_type),
-                                self.check('registrationId', enrollment_id),
-                                self.check('provisioningStatus', self.provisioning_status),
-                                self.check('deviceId', device_id),
-                                self.check('iotHubHostName', hub_host_name), 
-                                self.check('initialTwin.tags', {'key': 'value'}),
-                                self.check('initialTwin.properties.desired', {'key': 'value'})
-                                ]).get_output_in_json()['etag']
-              
+                            self.check('attestation.type', attestation_type),
+                            self.check('registrationId', enrollment_id),
+                            self.check('provisioningStatus', self.provisioning_status),
+                            self.check('deviceId', device_id),
+                            self.check('iotHubHostName', hub_host_name),
+                            self.check('initialTwin.tags', {'key': 'value'}),
+                            self.check('initialTwin.properties.desired', {'key': 'value'})
+                            ]).get_output_in_json()['etag']
+
         self.cmd('iot dps enrollment list -g {} --dps-name {}'.format(rg, dps), checks=[
-                self.check('length(@)', 1),
-                self.check('[0].registrationId', enrollment_id)
+            self.check('length(@)', 1),
+            self.check('[0].registrationId', enrollment_id)
         ])
 
-        self.cmd('iot dps enrollment show -g {} --dps-name {} --enrollment-id {}'.format(rg, dps, enrollment_id), checks=[
-                self.check('registrationId', enrollment_id)
-        ])
-        
-        self.cmd('iot dps enrollment update -g {} --dps-name {} --enrollment-id {} --provisioning-status {} --etag {}'
+        self.cmd('iot dps enrollment show -g {} --dps-name {} --enrollment-id {}'
+                 .format(rg, dps, enrollment_id),
+                 checks=[self.check('registrationId', enrollment_id)])
+
+        self.cmd('iot dps enrollment update -g {} --dps-name {} --enrollment-id {}'
+                 ' --provisioning-status {} --etag {}'
                  .format(rg, dps, enrollment_id, self.provisioning_status_new, etag),
                  checks=[
-                        self.check('attestation.type', attestation_type),
-                        self.check('registrationId', enrollment_id),
-                        self.check('provisioningStatus', self.provisioning_status_new),
-                        self.check('deviceId', device_id),
-                        self.check('iotHubHostName', hub_host_name),
-                        self.exists('initialTwin.tags'),
-                        self.exists('initialTwin.properties.desired')
-                        ])
-        
-        self.cmd('iot dps enrollment delete -g {} --dps-name {} --enrollment-id {}'.format(rg, dps, enrollment_id))
+                     self.check('attestation.type', attestation_type),
+                     self.check('registrationId', enrollment_id),
+                     self.check('provisioningStatus', self.provisioning_status_new),
+                     self.check('deviceId', device_id),
+                     self.check('iotHubHostName', hub_host_name),
+                     self.exists('initialTwin.tags'),
+                     self.exists('initialTwin.properties.desired')
+                     ])
+
+        self.cmd('iot dps enrollment delete -g {} --dps-name {} --enrollment-id {}'
+                 .format(rg, dps, enrollment_id))
 
     def test_dps_enrollment_x509_lifecycle(self):
-        enrollment_id = self.create_random_name('enrollment-for-test', length=48)   
+        enrollment_id = self.create_random_name('enrollment-for-test', length=48)
         attestation_type = AttestationType.x509.value
         device_id = self.create_random_name('device-id-for-test', length=48)
         initial_twin = "\"{'key':'value'}\""
         hub_host_name = '{}.azure-devices.net'.format(hub)
 
-        etag = self.cmd('iot dps enrollment create --enrollment-id {} --attestation-type {} -g {} --dps-name {}  -p {}'
-                        ' --provisioning-status {} --device-id {} --initial-twin-tags {} --initial-twin-properties {}'
+        etag = self.cmd('iot dps enrollment create --enrollment-id {} --attestation-type {}'
+                        ' -g {} --dps-name {} -cp {} -scp {}'
+                        ' --provisioning-status {} --device-id {}'
+                        ' --initial-twin-tags {} --initial-twin-properties {}'
                         ' --iot-hub-host-name {}'
-                        .format(enrollment_id, attestation_type, rg, dps, cert_path, self.provisioning_status, device_id,
+                        .format(enrollment_id, attestation_type, rg, dps, cert_path,
+                                cert_path, self.provisioning_status, device_id,
                                 initial_twin, initial_twin, hub_host_name),
                         checks=[
-                                self.check('attestation.type', attestation_type),
-                                self.check('registrationId', enrollment_id),
-                                self.check('provisioningStatus', self.provisioning_status),
-                                self.check('deviceId', device_id),
-                                self.check('iotHubHostName', hub_host_name), 
-                                self.check('initialTwin.tags', {'key': 'value'}),
-                                self.check('initialTwin.properties.desired', {'key': 'value'})
-                                ]).get_output_in_json()['etag']
-              
+                            self.check('attestation.type', attestation_type),
+                            self.check('registrationId', enrollment_id),
+                            self.check('provisioningStatus', self.provisioning_status),
+                            self.check('deviceId', device_id),
+                            self.check('iotHubHostName', hub_host_name),
+                            self.check('initialTwin.tags', {'key': 'value'}),
+                            self.check('initialTwin.properties.desired', {'key': 'value'})
+                            ]).get_output_in_json()['etag']
+
         self.cmd('iot dps enrollment list -g {} --dps-name {}'.format(rg, dps),
                  checks=[
-                        self.check('length(@)', 1),
-                        self.check('[0].registrationId', enrollment_id)
-                        ])
+                     self.check('length(@)', 1),
+                     self.check('[0].registrationId', enrollment_id)
+                     ])
 
-        self.cmd('iot dps enrollment show -g {} --dps-name {} --enrollment-id {}'.format(rg, dps, enrollment_id),
-                 checks=[
-                         self.check('registrationId', enrollment_id)
-                        ])
+        self.cmd('iot dps enrollment show -g {} --dps-name {} --enrollment-id {}'
+                 .format(rg, dps, enrollment_id),
+                 checks=[self.check('registrationId', enrollment_id)])
 
-        self.cmd('iot dps enrollment update -g {} --dps-name {} --enrollment-id {} --provisioning-status {} --etag {} -p {}'
-                 .format(rg, dps, enrollment_id, self.provisioning_status_new, etag, cert_path),
+        self.cmd('iot dps enrollment update -g {} --dps-name {} --enrollment-id {}'
+                 ' --provisioning-status {} --etag {} -rc'
+                 .format(rg, dps, enrollment_id, self.provisioning_status_new, etag),
                  checks=[
-                         self.check('attestation.type', attestation_type),
-                         self.check('registrationId', enrollment_id),
-                         self.check('provisioningStatus', self.provisioning_status_new),
-                         self.check('deviceId', device_id),
-                         self.check('iotHubHostName', hub_host_name), 
-                         self.exists('initialTwin.tags'),
-                         self.exists('initialTwin.properties.desired')
-                        ])
-        
-        self.cmd('iot dps enrollment delete -g {} --dps-name {} --enrollment-id {}'.format(rg, dps, enrollment_id))    
+                     self.check('attestation.type', attestation_type),
+                     self.check('registrationId', enrollment_id),
+                     self.check('provisioningStatus', self.provisioning_status_new),
+                     self.check('deviceId', device_id),
+                     self.check('iotHubHostName', hub_host_name),
+                     self.exists('initialTwin.tags'),
+                     self.exists('initialTwin.properties.desired'),
+                     self.check('attestation.type.x509.clientCertificates.primary', None)
+                     ])
+
+        self.cmd('iot dps enrollment delete -g {} --dps-name {} --enrollment-id {}'
+                 .format(rg, dps, enrollment_id))
 
     def test_dps_enrollment_group_lifecycle(self):
         enrollment_id = self.create_random_name('enrollment-for-test', length=48)
-        etag = self.cmd('iot dps enrollment-group create --enrollment-id {} -g {} --dps-name {}  -p {} --provisioning-status {}'
-                        .format(enrollment_id, rg, dps, cert_path, self.provisioning_status),
-                        checks=[self.check('enrollmentGroupId', enrollment_id),
-                                self.check('provisioningStatus', self.provisioning_status)
-                                ]).get_output_in_json()['etag']
+        etag = self.cmd('iot dps enrollment-group create --enrollment-id {} -g {} --dps-name {}'
+                        ' -cp {} -scp {} --provisioning-status {}'
+                        .format(enrollment_id, rg, dps, cert_path, cert_path,
+                                self.provisioning_status),
+                        checks=[
+                            self.check('enrollmentGroupId', enrollment_id),
+                            self.check('provisioningStatus', self.provisioning_status)
+                            ]).get_output_in_json()['etag']
 
         self.cmd('iot dps enrollment-group list -g {} --dps-name {}'.format(rg, dps), checks=[
-                self.check('length(@)', 1),
-                self.check('[0].enrollmentGroupId', enrollment_id)]
-        )
+            self.check('length(@)', 1),
+            self.check('[0].enrollmentGroupId', enrollment_id)
+            ])
 
-        self.cmd('iot dps enrollment-group show -g {} --dps-name {} --enrollment-id {}'.format(rg, dps, enrollment_id), checks=[
-                self.check('enrollmentGroupId', enrollment_id)
-        ])
+        self.cmd('iot dps enrollment-group show -g {} --dps-name {} --enrollment-id {}'
+                 .format(rg, dps, enrollment_id),
+                 checks=[self.check('enrollmentGroupId', enrollment_id)])
 
-        self.cmd('iot dps enrollment-group update -g {} --dps-name {} --enrollment-id {} --provisioning-status {} -p {} --etag {}'
-                 .format(rg, dps, enrollment_id, self.provisioning_status_new, cert_path, etag), 
+        self.cmd('iot dps enrollment-group update -g {} --dps-name {} --enrollment-id {}'
+                 ' --provisioning-status {} -rsc --etag {}'
+                 .format(rg, dps, enrollment_id, self.provisioning_status_new, etag),
                  checks=[
-                        self.check('attestation.type', AttestationType.x509.value),
-                        self.check('enrollmentGroupId', enrollment_id),
-                        self.check('provisioningStatus', self.provisioning_status_new)
-                        ])
+                     self.check('attestation.type', AttestationType.x509.value),
+                     self.check('enrollmentGroupId', enrollment_id),
+                     self.check('provisioningStatus', self.provisioning_status_new),
+                     self.check('attestation.type.x509.clientCertificates.secondary', None)
+                     ])
 
-        self.cmd('iot dps registration list -g {} --dps-name {} --enrollment-id {}'.format(rg, dps, enrollment_id), checks=[
-                self.check('length(@)', 0)
-        ])
+        self.cmd('iot dps registration list -g {} --dps-name {} --enrollment-id {}'
+                 .format(rg, dps, enrollment_id),
+                 checks=[self.check('length(@)', 0)])
 
-        self.cmd('iot dps enrollment-group delete -g {} --dps-name {} --enrollment-id {}'.format(rg, dps, enrollment_id))
+        self.cmd('iot dps enrollment-group delete -g {} --dps-name {} --enrollment-id {}'
+                 .format(rg, dps, enrollment_id))

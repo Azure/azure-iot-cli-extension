@@ -61,6 +61,7 @@ def create_self_signed_certificate(subject, valid_days, cert_output_dir, cert_on
 
     return result
 
+
 def open_certificate(certificate_path):
     """
     Opens certificate file (as read binary) from the file system and
@@ -80,4 +81,4 @@ def open_certificate(certificate_path):
                 certificate = certificate.decode("utf-8")
             except UnicodeError:
                 certificate = base64.b64encode(certificate).decode("utf-8")
-    return certificate
+    return certificate.rstrip()  # Remove trailing white space from the certificate content
