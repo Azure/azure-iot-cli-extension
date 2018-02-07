@@ -334,7 +334,7 @@ helps['iot edge deployment create'] = """
     - name: Create deployment with condition where a device is in 'building 9' and
             the environment is 'test'.
       text: >
-        az iot edge deployment create -c myconfig -n myhub --content ../mycontent.json
+        az iot edge deployment create -c [configuration] -n [IoTHub Name] --content ../mycontent.json
         -lab '{"key0":"value0", "key1":"value1"}'
         --target-condition "tags.building=9 and tags.environment='test'" --priority 3
 """
