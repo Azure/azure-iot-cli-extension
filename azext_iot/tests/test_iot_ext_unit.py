@@ -7,7 +7,7 @@
 import pytest
 import json
 import os
-from azext_iot import custom as subject
+from azext_iot.operations import hub as subject
 from azext_iot.common.utility import evaluate_literal
 from knack.util import CLIError
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
@@ -29,7 +29,7 @@ mock_target['subscription'] = "5952cff8-bcd1-4235-9554-af2c0348bf23"
 
 # Patch Paths #
 path_service_client = 'msrest.service_client.ServiceClient.send'
-path_ghcs = 'azext_iot.custom.get_iot_hub_connection_string'
+path_ghcs = 'azext_iot.operations.hub.get_iot_hub_connection_string'
 path_sas = 'azext_iot._factory.SasTokenAuthentication'
 
 

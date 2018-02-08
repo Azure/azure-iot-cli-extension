@@ -186,6 +186,7 @@ _pkginfo.txt
 
 # Ignore Visual Studio and Pytest cache
 *.[Cc]ache
+*.pytest_cache
 
 # Others
 ClientBin/

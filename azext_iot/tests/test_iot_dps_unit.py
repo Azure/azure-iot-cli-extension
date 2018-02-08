@@ -6,7 +6,7 @@
 
 import pytest
 import json
-from azext_iot import custom as subject
+from azext_iot.operations import dps as subject
 from azext_iot.common.utility import evaluate_literal
 from knack.util import CLIError
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
@@ -27,7 +27,7 @@ mock_target['subscription'] = "5952cff8-bcd1-4235-9554-af2c0348bf23"
 
 # Patch Paths #
 path_service_client = 'msrest.service_client.ServiceClient.send'
-path_ghcs = 'azext_iot.custom.get_iot_dps_connection_string'
+path_ghcs = 'azext_iot.operations.dps.get_iot_dps_connection_string'
 path_sas = 'azext_iot._factory.SasTokenAuthentication'
 
 
@@ -439,7 +439,9 @@ class TestEnrollmentGroupCreate():
 
 
 def generate_enrollment_group_show(**kvp):
-    payload = {'attestation': {'x509': {'clientCertificates': None, 'signingCertificates': None}, 'type': 'x509'},
+    payload = {'attestation': {'x509':
+                               {'clientCertificates': {'primary': None, 'secondary': None},
+                                'signingCertificates': {'primary': None, 'secondary': None}}, 'type': 'x509'},
                'enrollmentGroupId': enrollment_id, 'etag': 'AAAA==',
                'provisioningStatus': 'disabled', 'iotHubHostName': 'myHub'}
     for k in kvp:
@@ -448,32 +450,50 @@ def generate_enrollment_group_show(**kvp):
     return payload
 
 
-'''
+def build_mock_response(mocker, status_code=200, payload=None):
+    response = mocker.MagicMock(name='response')
+    response.status_code = status_code
+    response.text = json.dumps(payload)
+    del response._attribute_map
+    return response
+
+
+# TODO: Expand as needed
 class TestEnrollmentGroupUpdate():
-    @pytest.fixture(params=[200])
+    @pytest.fixture(params=[(200, generate_enrollment_group_show(), 200)])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        response.status_code = request.param
-        service_client.return_value = response
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0], request.param[1]),
+            build_mock_response(mocker, request.param[2])
+        ]
+        service_client.side_effect = test_side_effect
         return service_client
 
-    @pytest.mark.parametrize("result", [
-        ([generate_enrollment_group_show(attestation = {'type': 'x509'}),
-         generate_enrollment_group_show(attestation = {'type': 'x509'})]),
+    # TODO: Add more user updatable parameters
+    @pytest.mark.parametrize("req", [
+        (generate_enrollment_group_create_req(certificate_path='newCertPath', secondary_certificate_path='someOtherCertPath')),
     ])
-    def test_enrollment_group_update(self, serviceclient, result):
-        serviceclient.return_value.text = json.dumps(result)
-        subject.iot_dps_device_enrollment_group_update(None, enrollment_id, mock_target['entity'], resource_group, 'AAAA==',
-                                                       'newCertPath')
+    def test_enrollment_group_update(self, serviceclient, req):
+        update_cert_path = req.get('certificate_path')
+        update_cert_secondary_path = req.get('secondary_certificate_path')
 
+        subject.iot_dps_device_enrollment_group_update(None, enrollment_id, mock_target['entity'], resource_group, 'AAAA==',
+                                                       update_cert_path, update_cert_secondary_path)
+        # Index 1 is the update args
         args = serviceclient.call_args_list[1]
         url = args[0][0].url
-        assert "{}/enrollments/{}?".format(mock_target['entity'], enrollment_id) in url
+
+        assert "{}/enrollmentGroups/{}?".format(mock_target['entity'], enrollment_id) in url
         assert args[0][0].method == 'PUT'
 
         body = args[0][2]
-'''
+
+        # TODO: Assert other props
+        if update_cert_path:
+            assert body['attestation']['x509']['signingCertificates']['primary']['certificate'] is not None
+        if update_cert_secondary_path:
+            assert body['attestation']['x509']['signingCertificates']['secondary']['certificate'] is not None
 
 
 class TestEnrollmentGroupShow():
