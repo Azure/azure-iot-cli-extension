@@ -11,6 +11,7 @@ Factory functions for IoT Hub and Device Provisioning Service.
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import SdkType
 
+
 # pylint: disable=invalid-name
 def iot_hub_service_factory(cli_ctx, *_):
     """
@@ -91,8 +92,8 @@ def _bind_sdk(target, sdk_type, device_id=None):
             IotHubDeviceClient(
                 SasTokenAuthentication(sas_uri, target['policy'], target['primarykey']),
                 subscription_id,
-                base_url=endpoint)
-            , _get_sdk_exception_type(sdk_type)
+                base_url=endpoint),
+            _get_sdk_exception_type(sdk_type)
             )
 
     elif sdk_type is SdkType.custom_sdk:

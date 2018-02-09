@@ -72,6 +72,7 @@ class AttestationType(Enum):
     tpm = 'tpm'
     x509 = 'x509'
 
+
 CONN_STR_TEMPLATE = 'HostName={};SharedAccessKeyName={};SharedAccessKey={}'
 
 
