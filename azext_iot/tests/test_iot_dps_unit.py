@@ -7,14 +7,13 @@
 import pytest
 import json
 from azext_iot.operations import dps as subject
-from azext_iot.common.utility import evaluate_literal
 from knack.util import CLIError
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
-from azure.cli.core.util import read_file_content
 
 enrollment_id = 'myenrollment'
 resource_group = 'myrg'
 registration_id = 'myregistration'
+etag = 'AAAA=='
 
 mock_target = {}
 mock_target['cs'] = 'HostName=mydps;SharedAccessKeyName=name;SharedAccessKey=value'
@@ -185,8 +184,17 @@ class TestEnrollmentCreate():
 
 def generate_enrollment_show(**kvp):
     payload = {'attestation':
-               {'x509': {'clientCertificates': None, 'signingCertificates': None}, 'tpm': None, 'type': 'x509'},
-               'registrationId': enrollment_id, 'etag': 'AAAA==',
+               {'x509': {'clientCertificates': {'primary':
+                         {'info':
+                          {'issuerName': 'test', 'notAfterUtc': '2037-01-01T00:00:00Z',
+                           'notBeforeUtc': '2017-01-01T00:00:00Z',
+                           'serialNumber': '1A2B3C4D5E',
+                           'sha1Thumbprint': '109F2ED9D3FC92C88C1DE2203488B93D6B3F05F5',
+                           'sha256Thumbprint': 'F7D272B400C88FAC2A12A990F14DD2E881CA1F',
+                           'subjectName': 'test',
+                           'version': '3'}}, 'secondary': None},
+                         }, 'tpm': None, 'type': 'x509'},
+               'registrationId': enrollment_id, 'etag': etag,
                'provisioningStatus': 'disabled', 'iotHubHostName': 'myHub',
                'deviceId': 'myDevice'}
     for k in kvp:
@@ -195,32 +203,101 @@ def generate_enrollment_show(**kvp):
     return payload
 
 
-'''
+def build_mock_response(mocker, status_code=200, payload=None):
+    response = mocker.MagicMock(name='response')
+    response.status_code = status_code
+    response.text = json.dumps(payload)
+    del response._attribute_map
+    return response
+
+
+def generate_enrollment_update_req(certificate_path=None, iot_hub_host_name=None,
+                                   initial_twin_tags=None,
+                                   secondary_certificate_path=None,
+                                   remove_certificate_path=None,
+                                   remove_secondary_certificate_path=None,
+                                   initial_twin_properties=None, provisioning_status=None,
+                                   device_id=None):
+    return {'client': None,
+            'enrollment_id': enrollment_id,
+            'rg': resource_group,
+            'dps_name': mock_target['entity'],
+            'certificate_path': certificate_path,
+            'secondary_certificate_path': secondary_certificate_path,
+            'remove_certificate_path': remove_certificate_path,
+            'remove_secondary_certificate_path': remove_secondary_certificate_path,
+            'iot_hub_host_name': iot_hub_host_name,
+            'initial_twin_tags': initial_twin_tags,
+            'initial_twin_properties': initial_twin_properties,
+            'provisioning_status': provisioning_status,
+            'device_id': device_id}
+
+
 class TestEnrollmentUpdate():
-    @pytest.fixture(params=[200])
+    @pytest.fixture(params=[(200, generate_enrollment_show(), 200)])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        response.status_code = request.param
-        service_client.return_value = response
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0], request.param[1]),
+            build_mock_response(mocker, request.param[2])
+        ]
+        service_client.side_effect = test_side_effect
         return service_client
 
-    @pytest.mark.parametrize("result", [
-        ([generate_enrollment_show(attestation = {'type': 'x509'}),
-          generate_enrollment_group_show(attestation = {'type': 'x509'})]),
+    @pytest.mark.parametrize("req", [
+        (generate_enrollment_update_req(secondary_certificate_path='someOtherCertPath')),
+        (generate_enrollment_update_req(certificate_path='newCertPath', secondary_certificate_path='someOtherCertPath')),
+        (generate_enrollment_update_req(remove_certificate_path='true')),
+        (generate_enrollment_update_req(iot_hub_host_name='someOtherHubName',
+                                        initial_twin_tags={'newKey': 'newValue'},
+                                        initial_twin_properties={'newKey': 'newValue'},
+                                        provisioning_status='enabled',
+                                        device_id='newId'))
     ])
-    def test_enrollment_group_update(self, serviceclient, result):
-        serviceclient.return_value.text = json.dumps(result)
-        subject.iot_dps_device_enrollment_update(None, enrollment_id, mock_target['entity'], resource_group, 'AAAA==', None,
-                                                 'newCertPath')
-
+    def test_enrollment_group_update(self, serviceclient, req):
+        subject.iot_dps_device_enrollment_update(None,
+                                                 req['enrollment_id'],
+                                                 req['dps_name'],
+                                                 req['rg'],
+                                                 etag,
+                                                 None,
+                                                 req['certificate_path'],
+                                                 req['secondary_certificate_path'],
+                                                 req['remove_certificate_path'],
+                                                 req['remove_secondary_certificate_path'],
+                                                 req['device_id'],
+                                                 req['iot_hub_host_name'],
+                                                 req['initial_twin_tags'],
+                                                 req['initial_twin_properties'],
+                                                 req['provisioning_status'])
+        # Index 1 is the update args
         args = serviceclient.call_args_list[1]
         url = args[0][0].url
+
         assert "{}/enrollments/{}?".format(mock_target['entity'], enrollment_id) in url
         assert args[0][0].method == 'PUT'
 
         body = args[0][2]
-'''
+
+        if not req['certificate_path']:
+            if req['remove_certificate_path']:
+                assert body['attestation']['x509']['clientCertificates']['primary'] is None
+            else:
+                assert body['attestation']['x509']['clientCertificates']['primary']['info'] is not None
+        if req['certificate_path']:
+            assert body['attestation']['x509']['clientCertificates']['primary']['certificate'] is not None
+        if req['secondary_certificate_path']:
+            assert body['attestation']['x509']['clientCertificates']['secondary']['certificate'] is not None
+        if req['iot_hub_host_name']:
+            assert body['iotHubHostName'] == req['iot_hub_host_name']
+        if req['provisioning_status']:
+            assert body['provisioningStatus'] == req['provisioning_status']
+        if req['initial_twin_properties']:
+            assert body['initialTwin']['properties']['desired'] == req['initial_twin_properties']
+        if req['initial_twin_tags']:
+            assert body['initialTwin']['tags'] == req['initial_twin_tags']
+        if req['device_id']:
+            assert body['deviceId'] == req['device_id']
 
 
 class TestEnrollmentShow():
@@ -440,9 +517,17 @@ class TestEnrollmentGroupCreate():
 
 def generate_enrollment_group_show(**kvp):
     payload = {'attestation': {'x509':
-                               {'clientCertificates': {'primary': None, 'secondary': None},
-                                'signingCertificates': {'primary': None, 'secondary': None}}, 'type': 'x509'},
-               'enrollmentGroupId': enrollment_id, 'etag': 'AAAA==',
+                               {'signingCertificates': {'primary':
+                                {'info':
+                                 {'issuerName': 'test', 'notAfterUtc': '2037-01-01T00:00:00Z',
+                                  'notBeforeUtc': '2017-01-01T00:00:00Z',
+                                  'serialNumber': '1A2B3C4D5E',
+                                  'sha1Thumbprint': '109F2ED9D3FC92C88C1DE2203488B93D6B3F05F5',
+                                  'sha256Thumbprint': 'F7D272B400C88FAC2A12A990F14DD2E881CA1F',
+                                  'subjectName': 'test',
+                                  'version': '3'}}, 'secondary': None},
+                                }, 'type': 'x509'},
+               'enrollmentGroupId': enrollment_id, 'etag': etag,
                'provisioningStatus': 'disabled', 'iotHubHostName': 'myHub'}
     for k in kvp:
         if payload.get(k):
@@ -450,15 +535,26 @@ def generate_enrollment_group_show(**kvp):
     return payload
 
 
-def build_mock_response(mocker, status_code=200, payload=None):
-    response = mocker.MagicMock(name='response')
-    response.status_code = status_code
-    response.text = json.dumps(payload)
-    del response._attribute_map
-    return response
+def generate_enrollment_group_update_req(certificate_path=None, iot_hub_host_name=None,
+                                         initial_twin_tags=None,
+                                         secondary_certificate_path=None,
+                                         remove_certificate_path=None,
+                                         remove_secondary_certificate_path=None,
+                                         initial_twin_properties=None, provisioning_status=None):
+    return {'client': None,
+            'enrollment_id': enrollment_id,
+            'rg': resource_group,
+            'dps_name': mock_target['entity'],
+            'certificate_path': certificate_path,
+            'secondary_certificate_path': secondary_certificate_path,
+            'remove_certificate_path': remove_certificate_path,
+            'remove_secondary_certificate_path': remove_secondary_certificate_path,
+            'iot_hub_host_name': iot_hub_host_name,
+            'initial_twin_tags': initial_twin_tags,
+            'initial_twin_properties': initial_twin_properties,
+            'provisioning_status': provisioning_status}
 
 
-# TODO: Expand as needed
 class TestEnrollmentGroupUpdate():
     @pytest.fixture(params=[(200, generate_enrollment_group_show(), 200)])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
@@ -470,16 +566,29 @@ class TestEnrollmentGroupUpdate():
         service_client.side_effect = test_side_effect
         return service_client
 
-    # TODO: Add more user updatable parameters
     @pytest.mark.parametrize("req", [
-        (generate_enrollment_group_create_req(certificate_path='newCertPath', secondary_certificate_path='someOtherCertPath')),
+        (generate_enrollment_group_update_req(secondary_certificate_path='someOtherCertPath')),
+        (generate_enrollment_group_update_req(certificate_path='newCertPath', secondary_certificate_path='someOtherCertPath')),
+        (generate_enrollment_group_update_req(remove_certificate_path='true')),
+        (generate_enrollment_group_update_req(iot_hub_host_name='someOtherHubName',
+                                              initial_twin_tags={'newKey': 'newValue'},
+                                              initial_twin_properties={'newKey': 'newValue'},
+                                              provisioning_status='enabled')),
     ])
     def test_enrollment_group_update(self, serviceclient, req):
-        update_cert_path = req.get('certificate_path')
-        update_cert_secondary_path = req.get('secondary_certificate_path')
-
-        subject.iot_dps_device_enrollment_group_update(None, enrollment_id, mock_target['entity'], resource_group, 'AAAA==',
-                                                       update_cert_path, update_cert_secondary_path)
+        subject.iot_dps_device_enrollment_group_update(None,
+                                                       req['enrollment_id'],
+                                                       req['dps_name'],
+                                                       req['rg'],
+                                                       etag,
+                                                       req['certificate_path'],
+                                                       req['secondary_certificate_path'],
+                                                       req['remove_certificate_path'],
+                                                       req['remove_secondary_certificate_path'],
+                                                       req['iot_hub_host_name'],
+                                                       req['initial_twin_tags'],
+                                                       req['initial_twin_properties'],
+                                                       req['provisioning_status'])
         # Index 1 is the update args
         args = serviceclient.call_args_list[1]
         url = args[0][0].url
@@ -489,11 +598,23 @@ class TestEnrollmentGroupUpdate():
 
         body = args[0][2]
 
-        # TODO: Assert other props
-        if update_cert_path:
+        if not req['certificate_path']:
+            if req['remove_certificate_path']:
+                assert body['attestation']['x509']['signingCertificates']['primary'] is None
+            else:
+                assert body['attestation']['x509']['signingCertificates']['primary']['info'] is not None
+        if req['certificate_path']:
             assert body['attestation']['x509']['signingCertificates']['primary']['certificate'] is not None
-        if update_cert_secondary_path:
+        if req['secondary_certificate_path']:
             assert body['attestation']['x509']['signingCertificates']['secondary']['certificate'] is not None
+        if req['iot_hub_host_name']:
+            assert body['iotHubHostName'] == req['iot_hub_host_name']
+        if req['provisioning_status']:
+            assert body['provisioningStatus'] == req['provisioning_status']
+        if req['initial_twin_properties']:
+            assert body['initialTwin']['properties']['desired'] == req['initial_twin_properties']
+        if req['initial_twin_tags']:
+            assert body['initialTwin']['tags'] == req['initial_twin_tags']
 
 
 class TestEnrollmentGroupShow():
