@@ -732,24 +732,37 @@ class TestConfigDelete():
             subject.iot_device_configuration_delete(None, config_id, mock_target['entity'])
 
 
+def build_mock_response(mocker, status_code=200, payload=None, headers=None):
+    response = mocker.MagicMock(name='response')
+    response.status_code = status_code
+    response.text = json.dumps(payload)
+    if headers:
+        response.headers = headers
+    del response._attribute_map
+    return response
+
+
 class TestConfigApply():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        response.status_code = request.param
-        service_client.return_value = response
+        service_client.side_effect = [build_mock_response(mocker),
+                                      build_mock_response(mocker, payload=[], headers={'x-ms-continuation': None})]
         return service_client
 
     @pytest.mark.parametrize("req", [
         (generate_device_config())
     ])
     def test_config_apply(self, serviceclient, req):
-        subject.iot_device_configuration_apply(None, device_id, mock_target['entity'], req['content'])
-        args = serviceclient.call_args
+        result = subject.iot_device_configuration_apply(None, device_id, mock_target['entity'], req['content'])
+        args = serviceclient.call_args_list[0]
         body = args[0][2]
         payload = json.loads(req['content'])
         assert body['moduleContent'] == payload['content']['moduleContent']
+        mod_list_args = serviceclient.call_args_list[1]
+        mod_list_body = mod_list_args[0][2]
+        assert mod_list_body['query'] == "select * from devices.modules where devices.deviceId = '{}'".format(device_id)
+        assert result is not None
 
     @pytest.mark.parametrize('req, arg', [
         (generate_device_config(), 'mangle'),

@@ -324,7 +324,8 @@ def iot_device_configuration_apply(client, device_id, hub_name, content, resourc
         if not module_content:
             raise CLIError("content json must include 'moduleContent' property.")
         content = ConfigurationContent(module_content=module_content)
-        return m_sdk.device_api.apply_configuration_content_on_device(device_id, content)
+        m_sdk.device_api.apply_configuration_content_on_device(device_id, content)
+        return iot_device_module_list(client, device_id, hub_name, 1000)
     except ValueError as j:
         raise CLIError('improperly formatted json: {}'.format(j))
     except errors.ErrorDetailsException as e:

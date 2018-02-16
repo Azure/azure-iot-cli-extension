@@ -225,11 +225,11 @@ class TestIoTHub(LiveScenarioTest):
 
         content_path = os.path.join(CWD, 'test_config_content.json')
         self.cmd("iot hub apply-configuration -d {} -n {} -g {} -k '{}'"
-                 .format(edge_device_ids[1], LIVE_HUB, LIVE_RG, content_path))
+                 .format(edge_device_ids[1], LIVE_HUB, LIVE_RG, content_path), checks=[self.check('length([*])', 3)])
 
         self.kwargs['generic_content'] = read_file_content(content_path)
         self.cmd("iot hub apply-configuration -d {} -n {} -g {} --content '{}'"
-                 .format(edge_device_ids[1], LIVE_HUB, LIVE_RG, '{generic_content}'))
+                 .format(edge_device_ids[1], LIVE_HUB, LIVE_RG, '{generic_content}'), self.check('length([*])', 3))
 
         sym_conn_str_pattern = r'^HostName={}\.azure-devices\.net;DeviceId={};SharedAccessKey='.format(
             LIVE_HUB, edge_device_ids[0])
