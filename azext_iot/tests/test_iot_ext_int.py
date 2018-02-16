@@ -32,6 +32,9 @@ SECONDARY_THUMBPRINT = '14963E8F3BA5B3984110B3C1CA8E8B8988599087'
 
 
 class TestIoTHub(LiveScenarioTest):
+    def setUp(self):
+        self._entity_names = None
+
     def _create_entity_names(self, devices=0, edge_devices=0, modules=0, configs=0):
         result = {}
         if devices:
@@ -58,9 +61,14 @@ class TestIoTHub(LiveScenarioTest):
                 config_ids.append(self.create_random_name(prefix='test-config-', length=32))
             result['config_ids'] = config_ids
 
+        self._entity_names = result
         return result
 
-    def _remove_entities(self, names):
+    def _remove_entities(self, names=None):
+        if not names:
+            names = self._entity_names
+            self._entity_names = None
+
         device_ids = names.get('device_ids')
         if device_ids:
             for i in device_ids:
@@ -78,6 +86,10 @@ class TestIoTHub(LiveScenarioTest):
             for i in config_ids:
                 self.cmd('iot edge deployment delete -c {} -n {} -g {}'
                          .format(i, LIVE_HUB, LIVE_RG), checks=self.is_empty())
+
+    def tearDown(self):
+        if self._entity_names:
+            self._remove_entities()
 
     def test_hub(self):
         hub_policy = "iothubowner"
@@ -215,8 +227,9 @@ class TestIoTHub(LiveScenarioTest):
         self.cmd("iot hub apply-configuration -d {} -n {} -g {} -k '{}'"
                  .format(edge_device_ids[1], LIVE_HUB, LIVE_RG, content_path))
 
+        self.kwargs['generic_content'] = read_file_content(content_path)
         self.cmd("iot hub apply-configuration -d {} -n {} -g {} --content '{}'"
-                 .format(edge_device_ids[1], LIVE_HUB, LIVE_RG, read_file_content(content_path)))
+                 .format(edge_device_ids[1], LIVE_HUB, LIVE_RG, '{generic_content}'))
 
         sym_conn_str_pattern = r'^HostName={}\.azure-devices\.net;DeviceId={};SharedAccessKey='.format(
             LIVE_HUB, edge_device_ids[0])
@@ -246,9 +259,8 @@ class TestIoTHub(LiveScenarioTest):
         self.cmd('iot hub generate-sas-token -n {} -g {} -d {} -kt "secondary"'.format(LIVE_HUB, LIVE_RG, edge_device_ids[1]),
                  checks=[self.exists('sas')])
 
-        self._remove_entities(names)
-
     def test_hub_device_twins(self):
+        self.kwargs['generic_dict'] = {'key': 'value'}
         device_count = 2
 
         names = self._create_entity_names(devices=device_count)
@@ -265,7 +277,7 @@ class TestIoTHub(LiveScenarioTest):
                          self.exists('properties.reported')])
 
         result = self.cmd('iot hub device-twin update -d {} -n {} -g {} --set properties.desired.special={}'
-                          .format(device_ids[0], LIVE_HUB, LIVE_RG, '\'{"key":"value"}\'')).get_output_in_json()
+                          .format(device_ids[0], LIVE_HUB, LIVE_RG, '"{generic_dict}"')).get_output_in_json()
         assert result['deviceId'] == device_ids[0]
         assert result['properties']['desired']['special']['key'] == 'value'
 
@@ -283,15 +295,14 @@ class TestIoTHub(LiveScenarioTest):
                          self.check('properties.desired.temperature.max', 100),
                          self.check('tags.location.region', 'US')])
 
+        self.kwargs['twin_payload'] = read_file_content(content_path)
         self.cmd("iot hub device-twin replace -d {} -n {} -g {} -j '{}'"
-                 .format(device_ids[1], LIVE_HUB, LIVE_RG, read_file_content(content_path)),
+                 .format(device_ids[1], LIVE_HUB, LIVE_RG, '{twin_payload}'),
                  checks=[self.check('deviceId', device_ids[1]),
                          self.check('properties.desired.awesome', 9001),
                          self.check('properties.desired.temperature.min', 10),
                          self.check('properties.desired.temperature.max', 100),
                          self.check('tags.location.region', 'US')])
-
-        self._remove_entities(names)
 
     def test_hub_modules(self):
         edge_device_count = 1
@@ -369,9 +380,8 @@ class TestIoTHub(LiveScenarioTest):
             self.cmd('iot hub module-identity delete -d {} -n {} -g {} --module-id {}'
                      .format(edge_device_ids[0], LIVE_HUB, LIVE_RG, i), checks=self.is_empty())
 
-        self._remove_entities(names)
-
     def test_hub_module_twins(self):
+        self.kwargs['generic_dict'] = {'key': 'value'}
         edge_device_count = 1
         module_count = 1
 
@@ -398,7 +408,7 @@ class TestIoTHub(LiveScenarioTest):
                          self.exists('properties.reported')])
 
         self.cmd('iot hub module-twin update -d {} -n {} -g {} -m {} --set properties.desired.special={}'
-                 .format(edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0], '\'{"key":"value"}\''),
+                 .format(edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0], '"{generic_dict}"'),
                  checks=[self.check('deviceId', edge_device_ids[0]),
                          self.check('moduleId', module_ids[0]),
                          self.check('properties.desired.special.key', 'value')])
@@ -413,8 +423,9 @@ class TestIoTHub(LiveScenarioTest):
                          self.check('properties.desired.temperature.max', 100),
                          self.check('tags.location.region', 'US')])
 
+        self.kwargs['twin_payload'] = read_file_content(content_path)
         self.cmd("iot hub module-twin replace -d {} -n {} -g {} -m {} -j '{}'"
-                 .format(edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0], read_file_content(content_path)),
+                 .format(edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0], '{twin_payload}'),
                  checks=[self.check('deviceId', edge_device_ids[0]),
                          self.check('moduleId', module_ids[0]),
                          self.check('properties.desired.awesome', 9001),
@@ -426,36 +437,34 @@ class TestIoTHub(LiveScenarioTest):
             self.cmd('iot hub module-identity delete -d {} -n {} -g {} --module-id {}'
                      .format(edge_device_ids[0], LIVE_HUB, LIVE_RG, i), checks=self.is_empty())
 
-        self._remove_entities(names)
-
     def test_edge_deployments(self):
+        self.kwargs['generic_dict'] = {'key': 'value'}
         config_count = 2
-
         names = self._create_entity_names(configs=config_count)
         config_ids = names['config_ids']
 
         content_path = os.path.join(CWD, 'test_config_content.json')
         priority = random.randint(1, 10)
         condition = 'tags.building=9 and tags.environment=\'test\''
-        labels = '{"key0":"value0", "key1":"value1"}'
-        self.cmd("iot edge deployment create -c {} -n {} -g {} -pri {} -tc \"{}\" -lab '{}' -k '{}'"
-                 .format(config_ids[0], LIVE_HUB, LIVE_RG, priority, condition, labels, content_path),
+        self.cmd("iot edge deployment create -c {} -n {} -g {} -pri {} -tc \"{}\" -lab {} -k '{}'"
+                 .format(config_ids[0], LIVE_HUB, LIVE_RG, priority, condition, '"{generic_dict}"', content_path),
                  checks=[
                      self.check('id', config_ids[0]),
                      self.check('priority', priority),
                      self.check('targetCondition', condition),
                      self.check('contentType', 'assignments'),
-                     self.check('labels', {"key0": "value0", "key1": "value1"})])
+                     self.check('labels', self.kwargs['generic_dict'])])
 
+        self.kwargs['deployment_payload'] = read_file_content(content_path)
         self.cmd("""iot edge deployment create --config-id {} --hub-name {} --resource-group {} --priority {}
-                    --target-condition \"{}\" --labels '{}' --content '{}'"""
-                 .format(config_ids[1], LIVE_HUB, LIVE_RG, priority, condition, labels, read_file_content(content_path)),
+                    --target-condition \"{}\" --labels {} --content '{}'"""
+                 .format(config_ids[1], LIVE_HUB, LIVE_RG, priority, condition, '"{generic_dict}"', '{deployment_payload}'),
                  checks=[
                      self.check('id', config_ids[1]),
                      self.check('priority', priority),
                      self.check('targetCondition', condition),
                      self.check('contentType', 'assignments'),
-                     self.check('labels', {"key0": "value0", "key1": "value1"})])
+                     self.check('labels', self.kwargs['generic_dict'])])
 
         self.cmd('iot edge deployment show -c {} -n {} -g {}'.format(config_ids[0], LIVE_HUB, LIVE_RG),
                  checks=[
@@ -463,26 +472,23 @@ class TestIoTHub(LiveScenarioTest):
                      self.check('priority', priority),
                      self.check('targetCondition', condition),
                      self.check('contentType', 'assignments'),
-                     self.check('labels', {"key0": "value0", "key1": "value1"})])
+                     self.check('labels', self.kwargs['generic_dict'])])
 
         priority = random.randint(1, 10)
         condition = "tags.building=43 and tags.environment='dev'"
-        labels = '{"key":"super_value"}'
-
-        self.cmd('iot edge deployment update -c {} -n {} -g {} --set priority={} targetCondition="{}" labels=\'{}\''
-                 .format(config_ids[0], LIVE_HUB, LIVE_RG, priority, condition, labels),
+        self.kwargs['generic_dict_updated'] = {'key': 'super_value'}
+        self.cmd('iot edge deployment update -c {} -n {} -g {} --set priority={} targetCondition="{}" labels={}'
+                 .format(config_ids[0], LIVE_HUB, LIVE_RG, priority, condition, '"{generic_dict_updated}"'),
                  checks=[
                      self.check('id', config_ids[0]),
                      self.check('priority', priority),
                      self.check('targetCondition', condition),
-                     self.check('labels', {"key": "super_value"})])
+                     self.check('labels', self.kwargs['generic_dict_updated'])])
 
         self.cmd("iot edge deployment list -n {} -g {}".format(LIVE_HUB, LIVE_RG),
                  checks=[self.check('length([*])', 2),
                          self.exists("[?id=='{}']".format(config_ids[0])),
                          self.exists("[?id=='{}']".format(config_ids[1]))])
-
-        self._remove_entities(names)
 
     def test_device_messaging(self):
         device_count = 1
@@ -515,8 +521,6 @@ class TestIoTHub(LiveScenarioTest):
         self.cmd('iot device send-d2c-message -d {} -n {} -g {} -props "MessageId=12345;CorrelationId=54321"'
                  .format(device_ids[0], LIVE_HUB, LIVE_RG), checks=self.is_empty())
 
-        self._remove_entities(names)
-
     @pytest.mark.skipif(not LIVE_STORAGE, reason="empty azext_iot_teststorageuri env var")
     def test_storage(self):
         device_count = 1
@@ -539,4 +543,3 @@ class TestIoTHub(LiveScenarioTest):
                      self.check('type', 'export'),
                      self.exists('jobId')
                  ])
-        self._remove_entities(names)

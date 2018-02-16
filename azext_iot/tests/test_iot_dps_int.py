@@ -6,7 +6,6 @@
 # pylint: disable=too-many-statements
 
 import os
-from OpenSSL import crypto
 from azure.cli.testsdk import LiveScenarioTest
 from azext_iot.common.shared import EntityStatusType, AttestationType
 from azext_iot.common.certops import create_self_signed_certificate
@@ -33,6 +32,7 @@ class IoTDpsTest(LiveScenarioTest):
         super(IoTDpsTest, self).__init__('test_dps_enrollment_tpm_lifecycle')
         output_dir = os.getcwd()
         create_self_signed_certificate(cert_name, 200, output_dir, True)
+        self.kwargs['generic_dict'] = {'key': 'value'}
 
     def __del__(self):
         if os.path.exists(cert_path):
@@ -40,10 +40,13 @@ class IoTDpsTest(LiveScenarioTest):
 
     def test_dps_enrollment_tpm_lifecycle(self):
         enrollment_id = self.create_random_name('enrollment-for-test', length=48)
-        endorsement_key = 'AToAAQALAAMAsgAgg3GXZ0SEs/gakMyNRqXXJP1S124GUgtk8qHaGzMUaaoABgCAAEMAEAgAAAAAAAEAibym9HQP9vxCGF5dVc1QQsAGe021aUGJzNol1/gycBx3jFsTpwmWbISRwnFvflWd0w2Mc44FAAZNaJOAAxwZvG8GvyLlHh6fGKdh+mSBL4iLH2bZ4Ry22cB3CJVjXmdGoz9Y/j3/NwLndBxQC+baNvzvyVQZ4/A2YL7vzIIj2ik4y+ve9ir7U0GbNdnxskqK1KFIITVVtkTIYyyFTIR0BySjPrRIDj7r7Mh5uF9HBppGKQCBoVSVV8dI91lNazmSdpGWyqCkO7iM4VvUMv2HT/ym53aYlUrau+Qq87Tu+uQipWYgRdF11KDfcpMHqqzBQQ1NpOJVhrsTrhyJzO7KNw=='
+        endorsement_key = ('AToAAQALAAMAsgAgg3GXZ0SEs/gakMyNRqXXJP1S124GUgtk8qHaGzMUaaoABgCAAEMAEAgAAAAAAAEAibym9HQP9vxCGF5dVc1Q'
+                           'QsAGe021aUGJzNol1/gycBx3jFsTpwmWbISRwnFvflWd0w2Mc44FAAZNaJOAAxwZvG8GvyLlHh6fGKdh+mSBL4iLH2bZ4Ry22cB3'
+                           'CJVjXmdGoz9Y/j3/NwLndBxQC+baNvzvyVQZ4/A2YL7vzIIj2ik4y+ve9ir7U0GbNdnxskqK1KFIITVVtkTIYyyFTIR0BySjPrRI'
+                           'Dj7r7Mh5uF9HBppGKQCBoVSVV8dI91lNazmSdpGWyqCkO7iM4VvUMv2HT/ym53aYlUrau+Qq87Tu+uQipWYgRdF11KDfcpMHqqzB'
+                           'QQ1NpOJVhrsTrhyJzO7KNw==')
         device_id = self.create_random_name('device-id-for-test', length=48)
         attestation_type = AttestationType.tpm.value
-        initial_twin = "\"{'key':'value'}\""
         hub_host_name = '{}.azure-devices.net'.format(hub)
 
         etag = self.cmd('iot dps enrollment create --enrollment-id {} --attestation-type {}'
@@ -52,15 +55,15 @@ class IoTDpsTest(LiveScenarioTest):
                         ' --initial-twin-properties {} --iot-hub-host-name {}'
                         .format(enrollment_id, attestation_type, rg, dps, endorsement_key,
                                 self.provisioning_status, device_id,
-                                initial_twin, initial_twin, hub_host_name),
+                                '"{generic_dict}"', '"{generic_dict}"', hub_host_name),
                         checks=[
                             self.check('attestation.type', attestation_type),
                             self.check('registrationId', enrollment_id),
                             self.check('provisioningStatus', self.provisioning_status),
                             self.check('deviceId', device_id),
                             self.check('iotHubHostName', hub_host_name),
-                            self.check('initialTwin.tags', {'key': 'value'}),
-                            self.check('initialTwin.properties.desired', {'key': 'value'})
+                            self.check('initialTwin.tags', self.kwargs['generic_dict']),
+                            self.check('initialTwin.properties.desired', self.kwargs['generic_dict'])
                             ]).get_output_in_json()['etag']
 
         self.cmd('iot dps enrollment list -g {} --dps-name {}'.format(rg, dps), checks=[
@@ -92,7 +95,6 @@ class IoTDpsTest(LiveScenarioTest):
         enrollment_id = self.create_random_name('enrollment-for-test', length=48)
         attestation_type = AttestationType.x509.value
         device_id = self.create_random_name('device-id-for-test', length=48)
-        initial_twin = "\"{'key':'value'}\""
         hub_host_name = '{}.azure-devices.net'.format(hub)
 
         etag = self.cmd('iot dps enrollment create --enrollment-id {} --attestation-type {}'
@@ -102,15 +104,15 @@ class IoTDpsTest(LiveScenarioTest):
                         ' --iot-hub-host-name {}'
                         .format(enrollment_id, attestation_type, rg, dps, cert_path,
                                 cert_path, self.provisioning_status, device_id,
-                                initial_twin, initial_twin, hub_host_name),
+                                '"{generic_dict}"', '"{generic_dict}"', hub_host_name),
                         checks=[
                             self.check('attestation.type', attestation_type),
                             self.check('registrationId', enrollment_id),
                             self.check('provisioningStatus', self.provisioning_status),
                             self.check('deviceId', device_id),
                             self.check('iotHubHostName', hub_host_name),
-                            self.check('initialTwin.tags', {'key': 'value'}),
-                            self.check('initialTwin.properties.desired', {'key': 'value'})
+                            self.check('initialTwin.tags', self.kwargs['generic_dict']),
+                            self.check('initialTwin.properties.desired', self.kwargs['generic_dict'])
                             ]).get_output_in_json()['etag']
 
         self.cmd('iot dps enrollment list -g {} --dps-name {}'.format(rg, dps),

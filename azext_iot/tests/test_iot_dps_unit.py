@@ -254,7 +254,7 @@ class TestEnrollmentUpdate():
                                         provisioning_status='enabled',
                                         device_id='newId'))
     ])
-    def test_enrollment_group_update(self, serviceclient, req):
+    def test_enrollment_update(self, serviceclient, req):
         subject.iot_dps_device_enrollment_update(None,
                                                  req['enrollment_id'],
                                                  req['dps_name'],
