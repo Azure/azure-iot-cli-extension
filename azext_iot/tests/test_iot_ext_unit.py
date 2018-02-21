@@ -1034,7 +1034,7 @@ class TestQuery():
         pagesize = len(servresult)
         continuation = []
 
-        for i in range(int(servtotal/pagesize)):
+        for i in range(int(servtotal / pagesize)):
             continuation.append({'x-ms-continuation': 'abcd'})
         if servtotal % pagesize != 0:
             continuation.append({'x-ms-continuation': 'abcd'})
@@ -1055,9 +1055,9 @@ class TestQuery():
             assert serviceclient.call_count == 1
         else:
             if targetcount % pagesize == 0:
-                assert serviceclient.call_count == int(targetcount/pagesize)
+                assert serviceclient.call_count == int(targetcount / pagesize)
             else:
-                assert serviceclient.call_count == int(targetcount/pagesize) + 1
+                assert serviceclient.call_count == int(targetcount / pagesize) + 1
 
         args = serviceclient.call_args_list[0]
         headers = args[0][1]

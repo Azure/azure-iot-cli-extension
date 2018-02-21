@@ -3,15 +3,15 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-# pylint: disable=no-self-use,no-member,line-too-long,too-few-public-methods,no-name-in-module,C0103,R0913
+# pylint: disable=no-self-use,no-member,line-too-long,too-few-public-methods,no-name-in-module
 
 from os.path import exists, basename
-from azext_iot._constants import EXTENSION_ROOT
 from time import time, sleep
-import six
 from knack.log import get_logger
 from knack.util import CLIError
 from azure.cli.core.util import read_file_content
+import six
+from azext_iot._constants import EXTENSION_ROOT
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import (DeviceAuthType,
                                      SdkType,
@@ -492,12 +492,13 @@ def iot_device_twin_replace(client, device_id, hub_name, target_json, resource_g
 
 def iot_device_method(client, device_id, hub_name, method_name, method_payload="{}", timeout=60, resource_group_name=None):
     from azext_iot.device_twin_sdk.models.cloud_to_device_method import CloudToDeviceMethod
+    from azext_iot._constants import METHOD_INVOKE_MAX_TIMEOUT_SEC, METHOD_INVOKE_MIN_TIMEOUT_SEC
 
     target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
-    if timeout > 300:
-        raise CLIError('timeout must not be over 300 seconds')
-    if timeout < 10:
-        raise CLIError('timeout must be at least 10 seconds')
+    if timeout > METHOD_INVOKE_MAX_TIMEOUT_SEC:
+        raise CLIError('timeout must not be over {} seconds'.format(METHOD_INVOKE_MAX_TIMEOUT_SEC))
+    if timeout < METHOD_INVOKE_MIN_TIMEOUT_SEC:
+        raise CLIError('timeout must be at least {} seconds'.format(METHOD_INVOKE_MIN_TIMEOUT_SEC))
 
     dt_sdk, errors = _bind_sdk(target, SdkType.device_twin_sdk)
 
@@ -520,12 +521,13 @@ def iot_device_method(client, device_id, hub_name, method_name, method_payload="
 def iot_device_module_method(client, device_id, hub_name, module_id, method_name, method_payload="{}",
                              timeout=60, resource_group_name=None):
     from azext_iot.modules_sdk.models.cloud_to_device_method import CloudToDeviceMethod
+    from azext_iot._constants import METHOD_INVOKE_MAX_TIMEOUT_SEC, METHOD_INVOKE_MIN_TIMEOUT_SEC
 
     target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
-    if timeout > 300:
-        raise CLIError('timeout must not be over 300 seconds')
-    if timeout < 10:
-        raise CLIError('timeout must be at least 10 seconds')
+    if timeout > METHOD_INVOKE_MAX_TIMEOUT_SEC:
+        raise CLIError('timeout must not be over {} seconds'.format(METHOD_INVOKE_MAX_TIMEOUT_SEC))
+    if timeout < METHOD_INVOKE_MIN_TIMEOUT_SEC:
+        raise CLIError('timeout must not be over {} seconds'.format(METHOD_INVOKE_MIN_TIMEOUT_SEC))
 
     m_sdk, errors = _bind_sdk(target, SdkType.modules_sdk)
     try:
@@ -576,8 +578,7 @@ def _build_device_or_module_connection_string(device, key_type='primary', module
             if key:
                 if module:
                     return template.format(module.get('hub'), module.get('deviceId'), module.get('moduleId'), key)
-                else:
-                    return template.format(device.get('hub'), device.get('deviceId'), key)
+                return template.format(device.get('hub'), device.get('deviceId'), key)
     raise CLIError('Unable to form target connection string')
 
 
@@ -706,6 +707,7 @@ def _iot_c2d_message_receive(target, device_id, lock_timeout=60):
                 'to': result.headers['iothub-to'],
                 'userId': result.headers['iothub-userid']
             }
+        return {}
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
 

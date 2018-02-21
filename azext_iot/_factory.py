@@ -66,51 +66,57 @@ def _bind_sdk(target, sdk_type, device_id=None):
     if sdk_type is SdkType.device_query_sdk:
         return (
             DeviceIdentitiesAPI(
-                SasTokenAuthentication(sas_uri, target['policy'], target['primarykey']),
+                SasTokenAuthentication(
+                    sas_uri, target['policy'], target['primarykey']),
                 endpoint),
             _get_sdk_exception_type(sdk_type)
-            )
+        )
 
     elif sdk_type is SdkType.device_twin_sdk:
         return (
             DeviceTwinAPI(
-                SasTokenAuthentication(sas_uri, target['policy'], target['primarykey']),
+                SasTokenAuthentication(
+                    sas_uri, target['policy'], target['primarykey']),
                 endpoint),
             _get_sdk_exception_type(sdk_type)
-            )
+        )
 
     elif sdk_type is SdkType.modules_sdk:
         return (
             IotHubClient(
-                SasTokenAuthentication(sas_uri, target['policy'], target['primarykey']),
+                SasTokenAuthentication(
+                    sas_uri, target['policy'], target['primarykey']),
                 subscription_id, endpoint),
             _get_sdk_exception_type(sdk_type)
-            )
+        )
 
     elif sdk_type is SdkType.device_msg_sdk:
         return (
             IotHubDeviceClient(
-                SasTokenAuthentication(sas_uri, target['policy'], target['primarykey']),
+                SasTokenAuthentication(
+                    sas_uri, target['policy'], target['primarykey']),
                 subscription_id,
                 base_url=endpoint),
             _get_sdk_exception_type(sdk_type)
-            )
+        )
 
     elif sdk_type is SdkType.custom_sdk:
         return (
             CustomClient(
-                SasTokenAuthentication(sas_uri, target['policy'], target['primarykey']),
+                SasTokenAuthentication(
+                    sas_uri, target['policy'], target['primarykey']),
                 endpoint),
             _get_sdk_exception_type(sdk_type)
-            )
+        )
 
     elif sdk_type is SdkType.dps_sdk:
         return (
             DeviceProvisioningServiceServiceRuntimeClient(
-                SasTokenAuthentication(sas_uri, target['policy'], target['primarykey']),
+                SasTokenAuthentication(
+                    sas_uri, target['policy'], target['primarykey']),
                 endpoint),
             _get_sdk_exception_type(sdk_type)
-            )
+        )
 
     return None
 

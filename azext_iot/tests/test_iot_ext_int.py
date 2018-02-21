@@ -344,13 +344,13 @@ class TestIoTHub(LiveScenarioTest):
 
         self.cmd('''iot hub module-identity update -d {} -n {} -g {} -m {}
                     --set authentication.symmetricKey.primaryKey="" authentication.symmetricKey.secondaryKey=""'''.format(
-                        edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0]),
-                 checks=[
-                     self.check('deviceId', edge_device_ids[0]),
-                     self.check('moduleId', module_ids[0]),
-                     self.check('managedBy', 'iotEdge'),
-                     self.exists('authentication.symmetricKey.primaryKey'),
-                     self.exists('authentication.symmetricKey.secondaryKey')])
+            edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0]),
+            checks=[
+                self.check('deviceId', edge_device_ids[0]),
+                self.check('moduleId', module_ids[0]),
+                self.check('managedBy', 'iotEdge'),
+                self.exists('authentication.symmetricKey.primaryKey'),
+                self.exists('authentication.symmetricKey.secondaryKey')])
 
         self.cmd('iot hub module-identity list -d {} -n {} -g {}'.format(edge_device_ids[0], LIVE_HUB, LIVE_RG),
                  checks=[self.check('length([*])', 4),
@@ -538,8 +538,8 @@ class TestIoTHub(LiveScenarioTest):
 
         self.cmd('iot hub device-identity export -n {} -bcu "{}"'.format(LIVE_HUB, LIVE_STORAGE),
                  checks=[
-                     self.check('additionalProperties.outputBlobContainerUri', LIVE_STORAGE),
+                     self.check(
+                         'additionalProperties.outputBlobContainerUri', LIVE_STORAGE),
                      self.check('failureReason', None),
                      self.check('type', 'export'),
-                     self.exists('jobId')
-                 ])
+                     self.exists('jobId')])
