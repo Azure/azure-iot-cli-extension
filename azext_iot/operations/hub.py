@@ -7,10 +7,10 @@
 
 from os.path import exists, basename
 from time import time, sleep
+import six
 from knack.log import get_logger
 from knack.util import CLIError
 from azure.cli.core.util import read_file_content
-import six
 from azext_iot._constants import EXTENSION_ROOT
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import (DeviceAuthType,

@@ -20,6 +20,7 @@ from . import models
 from .version import VERSION
 
 
+# pylint: disable=too-few-public-methods
 class CustomAPIConfiguration(AzureConfiguration):
     """
     Configuration for CustomClient.
