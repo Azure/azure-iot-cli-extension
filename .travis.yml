@@ -5,7 +5,7 @@ before_install:
   - chmod +x ./scripts/ci/test_source.sh
   - chmod +x ./scripts/ci/test_static.sh
 install:
-    - pip install pylint flake8 requests pytest pytest-mock -q
+    - pip install -r ./requirements -q
 jobs:
   include:
     - stage: verify
