@@ -3,7 +3,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-# pylint: disable=no-self-use,no-member,line-too-long,too-few-public-methods,no-name-in-module
+# pylint: disable=wrong-import-order
 
 from os.path import exists, basename
 from time import time, sleep
@@ -561,6 +561,7 @@ def _iot_build_sas_token(client, hub_name, device_id=None, policy_name='iothubow
                                   time() + duration)
 
 
+# pylint: disable=inconsistent-return-statements
 def _build_device_or_module_connection_string(device, key_type='primary', module=None):
     template = 'HostName={};DeviceId={};ModuleId={};{}' if module else 'HostName={};DeviceId={};{}'
     auth = module.get('authentication') if module else device.get('authentication')
