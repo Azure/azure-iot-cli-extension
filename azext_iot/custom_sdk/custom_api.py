@@ -20,6 +20,7 @@ from . import models
 from .version import VERSION
 
 
+# pylint: disable=too-few-public-methods
 class CustomAPIConfiguration(AzureConfiguration):
     """
     Configuration for CustomClient.
@@ -72,7 +73,6 @@ class CustomClient(object):
 
         self._serialize = Serializer()
         self._deserialize = Deserializer()
-
 
     # pylint: disable=too-many-locals
     def build_device_file_container(
@@ -148,7 +148,6 @@ class CustomClient(object):
 
         return deserialized
 
-
     # pylint: disable=too-many-locals
     def post_file_notification(
             self, deviceid, correlation_id, custom_headers=None, raw=False, **operation_config):
@@ -222,9 +221,8 @@ class CustomClient(object):
 
         return deserialized
 
-
     def upload_file_to_container(
-            self, storage_endpoint, content, content_type, raw=False, **operation_config):
+            self, storage_endpoint, content, content_type):
         """
         Uploads a file to the specified Azure storage endpoint.
 
@@ -237,10 +235,6 @@ class CustomClient(object):
 
         Raises:
             ErrorDetailsException: when http response is not 200 or 201.
-
-        ToDo:
-            either implement or remove 'raw' as it is currently unused.
-            either implement or remove 'operation_config' as it is currently unused.
 
         """
         # Construct headers

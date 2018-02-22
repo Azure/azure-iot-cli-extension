@@ -1,0 +1,5 @@
+pytest
+pytest-mock
+pytest-cov
+pylint
+flake8

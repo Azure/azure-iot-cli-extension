@@ -3,15 +3,24 @@ sudo: off
 language: python
 before_install:
   - chmod +x ./scripts/ci/test_source.sh
+  - chmod +x ./scripts/ci/test_static.sh
 install:
-    - pip install pylint flake8 requests pytest pytest-mock pytest-ordering -q
+    - pip install -r ./requirements -q
 jobs:
   include:
     - stage: verify
-      env: PURPOSE='SourceTests'
+      env: PURPOSE='SourceUnitTests'
       script: ./scripts/ci/test_source.sh
       python: 2.7
     - stage: verify
-      env: PURPOSE='SourceTests'
+      env: PURPOSE='SourceUnitTests'
       script: ./scripts/ci/test_source.sh
+      python: 3.6
+    - stage: verify
+      env: PURPOSE='SourceStaticTests'
+      script: ./scripts/ci/test_static.sh
+      python: 2.7
+    - stage: verify
+      env: PURPOSE='SourceStaticTests'
+      script: ./scripts/ci/test_static.sh
       python: 3.6

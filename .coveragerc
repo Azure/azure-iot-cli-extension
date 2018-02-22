@@ -1,0 +1,4 @@
+# .coveragerc to control coverage.py
+
+[run]
+omit = azext_iot/*_sdk/*, azext_iot/tests/*

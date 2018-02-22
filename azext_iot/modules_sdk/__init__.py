@@ -11,4 +11,3 @@ from .version import VERSION
 __all__ = ['IotHubClient']
 
 __version__ = VERSION
-

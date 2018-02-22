@@ -1,0 +1,8 @@
+[flake8]
+max-line-length = 130
+max-complexity = 10
+ignore =
+    E501,  # line too long, it is covered by pylint
+    E722,  # bare except, bad practice, to be removed in the future
+    F401,  # imported but unused, it is covered by pylint
+    C901   # code flow is too complex, to be removed in the future
