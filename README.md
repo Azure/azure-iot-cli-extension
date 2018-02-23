@@ -16,6 +16,8 @@ The extension augments the vanilla Azure CLI IoT by adding to or modifying the e
 
 The extension is designed to be plug-and-play with Azure CLI. **Even** if you have Azure CLI installed make sure it is up to date.
 
+:exclamation: For **installation troubleshooting** please go to the [respective docs section](docs/install-help.md) for help.
+
 ### Step 0: Install/Update Azure CLI
 
 At a minimum your CLI core version must be `2.0.24` or above. Use `az --version` to validate. This version supports `az extension` commands and introduces the `knack` command framework.
@@ -78,6 +80,8 @@ If you have any suggestions or find bugs, please let us know.
 
 To remove the extension at any time, you can use `az extension remove --name azure-cli-iot-ext`.
 
+:exclamation: For **installation troubleshooting** please go to the [respective docs section](docs/install-help.md) for help.
+
 ## Command Guide
 
 [Command Wiki](https://github.com/Azure/azure-iot-cli-extension/wiki/Commands)
@@ -114,7 +118,7 @@ Update the `PYTHONPATH` environment variable with both the extension dev deploym
 
 Example `export PYTHONPATH=~/.azure/devcliextensions/:~/source/azure_cli_iot_ext/`
 
-Current testing patterns make use of [pytest](https://docs.pytest.org/en/latest/) and [unittest](https://docs.python.org/3.6/library/unittest.html). We also use `pytest-mock` and `pytest-ordering` plugins for pytest so make sure you `pip install` these dependencies beforehand.
+Current testing patterns make use of [pytest](https://docs.pytest.org/en/latest/) and [unittest](https://docs.python.org/3.6/library/unittest.html). We also use `pytest-mock` and `pytest-cov` plugins for pytest so make sure you `pip install` these dependencies beforehand. You can leverage our `requirements` file at the root of this project to install from.
 
 After obtaining the above, ensure you have **activated** your Python virtual environment and your extension deployment directory is prepared.
 
@@ -151,6 +155,12 @@ For **DPS** update the following environment variable prior to running.
 Now you can run **DPS** integration tests:
 
 `pytest <extension root>/azext_iot/tests/test_iot_dps_int.py`
+
+#### All tests and coverage in one command
+
+At this point if your environment has been setup to execute all tests, you can leverage pytest discovery to run all tests and provide a coverage report.
+
+`pytest -v <extension root> --cov=azext_iot --cov-config <extension root>/.coveragerc`
 
 ## Known Issues
 
