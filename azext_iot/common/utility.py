@@ -14,6 +14,7 @@ import sys
 import contextlib
 import ast
 import json
+from threading import Thread, Event
 
 
 @contextlib.contextmanager
@@ -101,3 +102,53 @@ def shell_safe_json_parse(json_or_dict_string, preserve_order=False):
             return ast.literal_eval(json_or_dict_string)
         except Exception:
             raise json_ex
+
+
+def execute_onthread(**kwargs):
+    """
+    Experimental generic helper for executing methods without return values on a background thread
+
+    Args:
+        kwargs: Supported kwargs are 'interval' (int) to specify intervals between calls,
+                'method' (func) to specify method pointer for execution,
+                'args' (list) to specify method arguments,
+                'max_runs' (int) indicate an upper bound on number of executions,
+                'return_handle' (bool) indicates whether to return a Thread handle
+
+    Returns:
+        Event(): Object to set the event cancellation flag
+        or if 'return_handle'=True
+        Event(), Thread(): Event object to set the cancellation flag, Executing Thread object
+    """
+
+    interval = kwargs.get('interval')
+    method = kwargs.get('method')
+    args = kwargs.get('args')
+    max_runs = kwargs.get('max_runs')
+    handle = kwargs.get('return_handle')
+
+    if not interval:
+        interval = 2
+    if not method:
+        raise ValueError('kwarg "method" required for execution')
+    if not args:
+        args = []
+
+    cancellation_token = Event()
+
+    def method_wrap(max_runs=None):
+        runs = 0
+        while not cancellation_token.wait(interval):
+            if max_runs:
+                if runs >= max_runs:
+                    break
+            method(*args)
+            runs += 1
+
+    op = Thread(target=method_wrap, args=(max_runs,))
+    op.start()
+
+    if handle:
+        return cancellation_token, op
+
+    return cancellation_token

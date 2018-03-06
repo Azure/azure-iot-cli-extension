@@ -73,6 +73,15 @@ class AttestationType(Enum):
     x509 = 'x509'
 
 
+# pylint: disable=too-few-public-methods
+class ProtocolType(Enum):
+    """
+    Type of atestation (TMP or certificate based).
+    """
+    http = 'http'
+    mqtt = 'mqtt'
+
+
 CONN_STR_TEMPLATE = 'HostName={};SharedAccessKeyName={};SharedAccessKey={}'
 
 

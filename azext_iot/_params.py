@@ -20,7 +20,8 @@ from azext_iot.common.shared import (
     SettleType,
     DeviceAuthType,
     KeyType,
-    AttestationType
+    AttestationType,
+    ProtocolType
 )
 
 hub_name_type = CLIArgumentType(
@@ -122,11 +123,15 @@ def load_arguments(self, _):
                          'following format: a=b;c=d')
         context.argument('msg_count', options_list=['--msg-count', '-mc'], type=int,
                          help='# of MQTT messages to send to IoT Hub.')
-        context.argument('receive_count', options_list=['--receive-count', '-rc'], type=int,
-                         help='Number of c2d messages to receive and process. Use -1 for infinity.')
+        context.argument('msg_interval', options_list=['--msg-interval', '-mi'], type=int,
+                         help='Delay in seconds between device-to-cloud messages.')
         context.argument('receive_settle', options_list=['--receive-settle', '-rs'],
                          arg_type=get_enum_type(SettleType),
-                         help='Indicates how to settle received messages.')
+                         help='Indicates how to settle received cloud-to-device messages. '
+                         'Supported with HTTP only.')
+        context.argument('protocol_type', options_list=['--protocol', '-proto'],
+                         arg_type=get_enum_type(ProtocolType),
+                         help='Indicates device-to-cloud message protocol')
 
     with self.argument_context('iot device upload-file') as context:
         context.argument('file_path', options_list=['--file-path', '-fp'],

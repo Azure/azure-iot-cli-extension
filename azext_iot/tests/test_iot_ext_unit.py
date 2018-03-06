@@ -28,6 +28,7 @@ mock_target['subscription'] = "5952cff8-bcd1-4235-9554-af2c0348bf23"
 
 
 # Patch Paths #
+path_mqtt_client = 'azext_iot.operations._mqtt.mqtt.Client'
 path_service_client = 'msrest.service_client.ServiceClient.send'
 path_ghcs = 'azext_iot.operations.hub.get_iot_hub_connection_string'
 path_sas = 'azext_iot._factory.SasTokenAuthentication'
@@ -53,6 +54,13 @@ def serviceclient_generic_error(mocker, fixture_ghcs, fixture_sas, request):
     response.status_code = request.param
     service_client.return_value = response
     return service_client
+
+
+@pytest.fixture()
+def mqttclient_generic_error(mocker, fixture_ghcs, fixture_sas):
+    mqtt_client = mocker.patch(path_mqtt_client)
+    mqtt_client().connect.side_effect = Exception('something happened')
+    return mqtt_client
 
 
 def generate_device_create_req(ee=True, auth='shared_private_key', ptp='123',
@@ -1375,3 +1383,59 @@ class TestSasTokenAuth():
         assert 'se=1471940363' in token
         assert 'sr=iot-hub-for-test.azure-devices.net%252fdevices%252fiot-device-for-test' in token
         assert 'skn=iothubowner' in token
+
+# TODO: Implement c2d testing when API available
+
+
+class TestDeviceSimulate():
+    @pytest.fixture(params=[204])
+    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        response = mocker.MagicMock(name='response')
+        del response._attribute_map
+        response.status_code = request.param
+        response.text = ""
+        service_client.return_value = response
+        return service_client
+
+    @pytest.fixture()
+    def mqttclient(self, mocker, fixture_ghcs, fixture_sas):
+        client = mocker.patch(path_mqtt_client)
+        mock_conn = mocker.patch('azext_iot.operations._mqtt.mqtt_client_wrap.is_connected')
+        mock_conn.return_value = True
+        return client
+
+    @pytest.mark.parametrize("rs, mc, mi, protocol", [
+        ('complete', 1, 1, 'http'),
+        ('abandon', 2, 1, 'http'),
+        ('complete', 3, 1, 'mqtt'),
+    ])
+    def test_device_simulate(self, serviceclient, mqttclient, rs, mc, mi, protocol):
+        subject.iot_simulate_device(None, device_id, mock_target['entity'],
+                                    receive_settle=rs, msg_count=mc, msg_interval=mi, protocol_type=protocol)
+        if protocol == 'http':
+            args = serviceclient.call_args_list
+            result = [d2c_calls for calls in args for d2c_calls in calls if len(d2c_calls) > 0 and d2c_calls[0].method == 'POST']
+            assert len(result) == mc
+        if protocol == 'mqtt':
+            assert mc == mqttclient().publish.call_count
+            assert mqttclient().publish.call_args[0][0] == 'devices/{}/messages/events/'.format(device_id)
+            assert 1 == mqttclient().tls_set.call_count
+            assert 1 == mqttclient().username_pw_set.call_count
+
+    @pytest.mark.parametrize("rs, mc, mi, protocol, exception", [
+        ('reject', 4, 0, 'mqtt', CLIError),
+        ('complete', 0, 1, 'mqtt', CLIError)
+    ])
+    def test_device_simulate_invalid_args(self, serviceclient, rs, mc, mi, protocol, exception):
+        with pytest.raises(exception):
+            subject.iot_simulate_device(None, device_id, mock_target['entity'],
+                                        receive_settle=rs, msg_count=mc, msg_interval=mi, protocol_type=protocol)
+
+    def test_device_simulate_http_error(self, serviceclient_generic_error):
+        with pytest.raises(CLIError):
+            subject.iot_simulate_device(None, device_id, mock_target['entity'], protocol_type='http')
+
+    def test_device_simulate_mqtt_error(self, mqttclient_generic_error):
+        with pytest.raises(CLIError):
+            subject.iot_simulate_device(None, device_id, mock_target['entity'])

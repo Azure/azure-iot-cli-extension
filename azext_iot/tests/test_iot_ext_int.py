@@ -512,8 +512,14 @@ class TestIoTHub(LiveScenarioTest):
         self.cmd('iot device c2d-message abandon -d {} --hub-name {} -g {} --etag {}'
                  .format(device_ids[0], LIVE_HUB, LIVE_RG, etag), expect_failure=True)
 
-        self.cmd("iot device simulate -d {} -n {} -g {} --data '{}' -rs 'complete'"
-                 .format(device_ids[0], LIVE_HUB, LIVE_RG, 'IoT Ext Test'), checks=self.is_empty())
+        self.cmd("iot device simulate -d {} -n {} -g {} -mc {} -mi {} --data '{}' -rs 'complete'"
+                 .format(device_ids[0], LIVE_HUB, LIVE_RG, 2, 1, 'IoT Ext Test'), checks=self.is_empty())
+
+        self.cmd("iot device simulate -d {} -n {} -g {} -mc {} -mi {} --data '{}' -rs 'abandon' --protocol http"
+                 .format(device_ids[0], LIVE_HUB, LIVE_RG, 2, 1, 'IoT Ext Test'), checks=self.is_empty())
+
+        self.cmd("iot device simulate -d {} -n {} -g {} --data '{}' -rs 'reject'"
+                 .format(device_ids[0], LIVE_HUB, LIVE_RG, 'IoT Ext Test'), checks=self.is_empty(), expect_failure=True)
 
         self.cmd('iot device send-d2c-message -d {} -n {} -g {}'.format(device_ids[0], LIVE_HUB, LIVE_RG),
                  checks=self.is_empty())

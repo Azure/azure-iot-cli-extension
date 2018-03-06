@@ -335,9 +335,9 @@ class IotHubDevicesOperations(object):
 
     def receive_message(
             self, device_id, iot_hub_message_lock_timeout=None, custom_headers=None, raw=False, **operation_config):
-        """Receive a device-to-cloud message.
+        """Receive a cloud-to-device message.
 
-        Receive a device-to-cloud message.
+        Receive a cloud-to-device message.
 
         :param device_id: Device Id.
         :type device_id: str

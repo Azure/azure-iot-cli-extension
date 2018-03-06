@@ -646,6 +646,21 @@ def _iot_device_send_message(target, device_id, data, properties=None, msg_count
         raise CLIError(x)
 
 
+def iot_device_send_message_http(client, device_id, hub_name, data, msg_id=None,
+                                 corr_id=None, user_id=None, resource_group_name=None):
+    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+    return _iot_device_send_message_http(target, device_id, data, msg_id, corr_id, user_id)
+
+
+def _iot_device_send_message_http(target, device_id, data, msg_id=None,
+                                  corr_id=None, user_id=None):
+    msg_sdk, errors = _bind_sdk(target, SdkType.device_msg_sdk, device_id)
+    try:
+        return msg_sdk.iot_hub_devices.send_message(device_id, data, msg_id, corr_id, user_id)
+    except errors.ErrorDetailsException as e:
+        raise CLIError(e)
+
+
 def iot_c2d_message_complete(client, device_id, hub_name, etag, resource_group_name=None):
     target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
     return _iot_c2d_message_complete(target, device_id, etag)
@@ -714,33 +729,72 @@ def _iot_c2d_message_receive(target, device_id, lock_timeout=60):
 
 
 def iot_simulate_device(client, device_id, hub_name, receive_settle='complete',
-                        data='Ping from Az CLI IoT Extension', msg_count=2,
-                        receive_count=None, resource_group_name=None):
+                        data='Ping from Az CLI IoT Extension', msg_count=100,
+                        msg_interval=3, protocol_type='mqtt', resource_group_name=None):
+    import sys
+    import uuid
+    import datetime
+    import json
+    from azext_iot.operations._mqtt import mqtt_client_wrap
+    from azext_iot.common.utility import execute_onthread
+    from azext_iot._constants import MIN_SIM_MSG_INTERVAL, MIN_SIM_MSG_COUNT, SIM_RECEIVE_SLEEP_SEC
+
+    if protocol_type == 'mqtt':
+        if receive_settle != 'complete':
+            raise CLIError('mqtt protocol only supports settle type of "complete"')
+
+    if msg_interval < MIN_SIM_MSG_INTERVAL:
+        raise CLIError('msg interval must be at least {}'.format(MIN_SIM_MSG_INTERVAL))
+
+    if msg_count < MIN_SIM_MSG_COUNT:
+        raise CLIError('msg count must be at least {}'.format(MIN_SIM_MSG_COUNT))
+
     target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
-    sleep_interval = 3
-    if msg_count < 0:
-        raise CLIError("msg-count must be at least 0!")
-    _iot_device_send_message(target, device_id, data, None, msg_count)
+    token = None
 
-    if receive_count:
-        if receive_count < -1:
-            receive_count = 0
+    class generator():
+        def __init__(self):
+            self.calls = 0
 
-        if receive_count == -1:
-            while True:
-                _handle_c2d_msg(target, device_id, receive_settle)
-                sleep(sleep_interval)
+        def generate(self, jsonify=True):
+            self.calls += 1
+            payload = {'id': str(uuid.uuid4()), 'timestamp': str(datetime.datetime.utcnow()),
+                       'data': str(data + ' #{}'.format(self.calls))}
+            return json.dumps(payload) if jsonify else payload
+
+    def http_wrap(target, device_id, generator):
+        d = generator.generate(False)
+        _iot_device_send_message_http(target, device_id, d)
+        six.print_('.', end='', flush=True)
+        return
+
+    try:
+        if protocol_type == 'mqtt':
+            wrap = mqtt_client_wrap(target, device_id)
+            wrap.execute(generator(), publish_delay=msg_interval, msg_count=msg_count)
         else:
-            received = 0
-            while received < receive_count:
-                if _handle_c2d_msg(target, device_id, receive_settle):
-                    received += 1
-                sleep(sleep_interval)
+            six.print_('Sending and receiving events via https')
+            token, op = execute_onthread(method=http_wrap,
+                                         args=[target, device_id, generator()],
+                                         interval=msg_interval, max_runs=msg_count,
+                                         return_handle=True)
+            while True and op.is_alive():
+                _handle_c2d_msg(target, device_id, receive_settle)
+                sleep(SIM_RECEIVE_SLEEP_SEC)
+
+    except KeyboardInterrupt:
+        sys.exit()
+    except Exception as x:
+        raise CLIError(x)
+    finally:
+        if token:
+            token.set()
 
 
 def _handle_c2d_msg(target, device_id, receive_settle):
     result = _iot_c2d_message_receive(target, device_id)
     if result:
+        six.print_()
         six.print_('__Received C2D Message__')
         six.print_(result)
         if receive_settle == 'reject':
