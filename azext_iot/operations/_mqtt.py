@@ -18,7 +18,7 @@ connection_result = {0: "success", 1: "refused - incorrect protocol version", 2:
                      3: "refused - server unavailable", 4: "refused - bad username or password", 5: "refused - not authorized"}
 
 
-class mqtt_client_wrap():
+class mqtt_client_wrap(object):
 
     def __init__(self, target, device_id):
         self.target = target
