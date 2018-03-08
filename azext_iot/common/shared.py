@@ -76,7 +76,7 @@ class AttestationType(Enum):
 # pylint: disable=too-few-public-methods
 class ProtocolType(Enum):
     """
-    Type of atestation (TMP or certificate based).
+    Device message protocol.
     """
     http = 'http'
     mqtt = 'mqtt'

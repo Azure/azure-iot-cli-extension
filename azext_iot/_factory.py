@@ -30,7 +30,7 @@ def iot_hub_service_factory(cli_ctx, *_):
     return get_mgmt_service_client(cli_ctx, IotHubClient).iot_hub_resource
 
 
-# pylint: disable=invalid-name
+# pylint: disable=invalid-name,no-name-in-module
 def iot_service_provisioning_factory(cli_ctx, *_):
     """
     Factory for importing deps and getting service client resources.

@@ -752,6 +752,7 @@ def iot_simulate_device(client, device_id, hub_name, receive_settle='complete',
     target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
     token = None
 
+    # pylint: disable=too-few-public-methods
     class generator():
         def __init__(self):
             self.calls = 0
