@@ -8,7 +8,7 @@
 CLI parameter definitions.
 """
 
-from knack.arguments import CLIArgumentType
+from knack.arguments import CLIArgumentType, CaseInsensitiveList
 from azure.cli.core.commands.parameters import (
     resource_group_name_type,
     get_enum_type,
@@ -27,6 +27,13 @@ from azext_iot.common.shared import (
 hub_name_type = CLIArgumentType(
     completer=get_resource_name_completion_list('Microsoft.Devices/IotHubs'),
     help='IoT Hub name.')
+
+event_msg_prop_type = CLIArgumentType(
+    nargs='*',
+    choices=CaseInsensitiveList(['sys', 'app', 'anno', 'all']),
+    help='Indicate key message properties to output. '
+    'sys = system properties, app = application properties, anno = annotations'
+)
 
 
 # pylint: disable=too-many-statements
@@ -63,6 +70,23 @@ def load_arguments(self, _):
     with self.argument_context('iot hub') as context:
         context.argument('target_json', options_list=['--json', '-j'],
                          help='Json to replace existing twin with. Provide file path or raw json.')
+
+    with self.argument_context('iot hub monitor-events') as context:
+        context.argument('timeout', options_list=['--timeout', '-to'], type=int,
+                         help='Maximum seconds to maintain connection without receiving message. Use 0 for infinity. ')
+        context.argument('consumer_group', options_list=['--consumer-group', '-cg'],
+                         help='Specify the consumer group to use when connecting to event hub endpoint.')
+        context.argument('yes', options_list=['--yes', '-y'],
+                         arg_type=get_three_state_flag(),
+                         help='Flag indicating acceptance of dependency installation (if required). Default: false')
+        context.argument('repair', options_list=['--repair', '-r'],
+                         arg_type=get_three_state_flag(),
+                         help='Reinstall uamqp dependency compatible with extension version. Default: false')
+        context.argument('enqueued_time', options_list=['--enqueued-time', '-et'], type=int,
+                         help='Indicates the time that should be used as a starting point to read messages from the partitions. '
+                         'Units are milliseconds since unix epoch. '
+                         'If no time is indicated "now" is used.')
+        context.argument('properties', options_list=['--properties', '-props'], arg_type=event_msg_prop_type)
 
     with self.argument_context('iot hub device-identity') as context:
         context.argument('edge_enabled', options_list=['--edge-enabled', '-ee'],

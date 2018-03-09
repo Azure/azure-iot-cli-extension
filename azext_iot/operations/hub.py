@@ -14,9 +14,11 @@ from azure.cli.core.util import read_file_content
 from azext_iot._constants import EXTENSION_ROOT
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import (DeviceAuthType,
-                                     SdkType,
-                                     get_iot_hub_connection_string)
-from azext_iot.common.utility import shell_safe_json_parse, validate_key_value_pairs, evaluate_literal
+                                     SdkType)
+from azext_iot.common.azure import get_iot_hub_connection_string
+from azext_iot.common.utility import (shell_safe_json_parse,
+                                      validate_key_value_pairs, url_encode_dict,
+                                      evaluate_literal)
 from azext_iot._factory import _bind_sdk
 from azext_iot.operations.generic import execute_query
 
@@ -28,15 +30,19 @@ from azext_iot.modules_sdk.models.device import Device
 from azext_iot.modules_sdk.models.configuration_content import ConfigurationContent
 from azext_iot.modules_sdk.models.configuration import Configuration
 from azext_iot.modules_sdk.models.device_module import DeviceModule
+from azext_iot.assets.user_messages import ERROR_NO_HUB_OR_LOGIN_ON_INPUT
 
 logger = get_logger(__name__)
 
 
 # Query
 
-def iot_query(client, hub_name, query_command, top=None, resource_group_name=None):
+def iot_query(cmd, query_command, hub_name=None, top=None, resource_group_name=None, login=None):
+    if not any([hub_name, login]):
+        raise CLIError(ERROR_NO_HUB_OR_LOGIN_ON_INPUT)
+
     from azext_iot.device_query_sdk.models.query_specification import QuerySpecification
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     q_sdk, errors = _bind_sdk(target, SdkType.device_query_sdk)
     try:
         query = QuerySpecification(query_command)
@@ -63,16 +69,16 @@ def iot_device_list(client, hub_name, top=10, edge_enabled=False, resource_group
         raise CLIError('top must be > 0')
 
     query = 'select * from devices where capabilities.iotEdge = true' if edge_enabled else 'select * from devices'
-    result = iot_query(client, hub_name, query, top, resource_group_name)
+    result = iot_query(client, query, hub_name, top, resource_group_name)
     if not result:
         logger.info('No registered devices found on hub "%s".', hub_name)
     return result
 
 
-def iot_device_create(client, device_id, hub_name, edge_enabled=False,
+def iot_device_create(cmd, device_id, hub_name, edge_enabled=False,
                       auth_method='shared_private_key', primary_thumbprint=None,
                       secondary_thumbprint=None, status='enabled', status_reason=None,
-                      valid_days=None, output_dir=None, resource_group_name=None):
+                      valid_days=None, output_dir=None, resource_group_name=None, login=None):
 
     if any([valid_days, output_dir]):
         valid_days = 365 if not valid_days else valid_days
@@ -81,7 +87,7 @@ def iot_device_create(client, device_id, hub_name, edge_enabled=False,
         cert = _create_self_signed_cert(device_id, valid_days, output_dir)
         primary_thumbprint = cert['thumbprint']
 
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     m_sdk, errors = _bind_sdk(target, SdkType.modules_sdk)
     try:
         device = _assemble_device(
@@ -230,7 +236,7 @@ def iot_device_module_list(client, device_id, hub_name, top=10, resource_group_n
         raise CLIError('top must be > 0')
 
     query = "select * from devices.modules where devices.deviceId = '{}'".format(device_id)
-    result = iot_query(client, hub_name, query, top, resource_group_name)
+    result = iot_query(client, query, hub_name, top, resource_group_name)
     if not result:
         logger.info('No modules found on registered device "%s".', device_id)
     return result
@@ -446,7 +452,7 @@ def iot_device_configuration_delete(client, config_id, hub_name, resource_group_
 
 def iot_device_twin_show(client, device_id, hub_name, resource_group_name=None):
     query = "SELECT * FROM devices where devices.deviceId='{}'".format(device_id)
-    result = iot_query(client, hub_name, query, None, resource_group_name)
+    result = iot_query(client, query, hub_name, None, resource_group_name)
     if not result:
         raise CLIError('No registered device "{}" found.'.format(device_id))
     return result[0]
@@ -621,11 +627,6 @@ def _iot_device_send_message(target, device_id, data, properties=None, msg_count
     import ssl
     import os
 
-    try:
-        from urllib import urlencode
-    except ImportError:
-        from urllib.parse import urlencode
-
     msgs = []
     if properties:
         properties = validate_key_value_pairs(properties)
@@ -635,7 +636,7 @@ def _iot_device_send_message(target, device_id, data, properties=None, msg_count
     cert_path = os.path.join(cwd, 'digicert.pem')
     auth = {'username': '{}/{}/api-version=2016-11-14'.format(target['entity'], device_id), 'password': sas}
     tls = {'ca_certs': cert_path, 'tls_version': ssl.PROTOCOL_SSLv23}
-    topic = 'devices/{}/messages/events/{}'.format(device_id, urlencode(properties) if properties else '')
+    topic = 'devices/{}/messages/events/{}'.format(device_id, url_encode_dict(properties) if properties else '')
     for _ in range(msg_count):
         msgs.append({'topic': topic, 'payload': data})
     try:
@@ -728,7 +729,7 @@ def _iot_c2d_message_receive(target, device_id, lock_timeout=60):
         raise CLIError(e)
 
 
-def iot_simulate_device(client, device_id, hub_name, receive_settle='complete',
+def iot_simulate_device(cmd, device_id, hub_name, receive_settle='complete',
                         data='Ping from Az CLI IoT Extension', msg_count=100,
                         msg_interval=3, protocol_type='mqtt', resource_group_name=None):
     import sys
@@ -749,7 +750,7 @@ def iot_simulate_device(client, device_id, hub_name, receive_settle='complete',
     if msg_count < MIN_SIM_MSG_COUNT:
         raise CLIError('msg count must be at least {}'.format(MIN_SIM_MSG_COUNT))
 
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name)
     token = None
 
     # pylint: disable=too-few-public-methods
@@ -841,3 +842,65 @@ def iot_device_upload_file(client, device_id, hub_name, file_path, content_type,
         custom_sdk.post_file_notification(device_id, container['correlationId'])
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
+
+
+# pylint: disable=too-many-locals
+def iot_hub_monitor_events(cmd, hub_name, device_id=None, consumer_group='$Default', timeout=300,
+                           enqueued_time=None, resource_group_name=None, yes=False, properties=None, repair=False):
+    from azext_iot.common.utility import validate_min_python_version
+    validate_min_python_version(3, 5)
+
+    import importlib
+    import sys
+    from os import linesep
+    from datetime import datetime
+    from six.moves import input
+    from azext_iot.common.config import get_uamqp_ext_version, update_uamqp_ext_version
+    from azext_iot._constants import EVENT_LIB, VERSION
+    from azext_iot.common.utility import test_import
+    from azext_iot.common.pip import install
+
+    events3 = importlib.import_module('azext_iot.operations.events3._events')
+
+    config = cmd.cli_ctx.config
+
+    if not properties:
+        properties = []
+    properties = set((key.lower() for key in properties))
+
+    if timeout < 0:
+        raise CLIError('Monitoring timeout must be 0 (inf) or greater.')
+    timeout = (timeout * 1000)
+
+    if get_uamqp_ext_version(config) != EVENT_LIB[1] or repair or not test_import(EVENT_LIB[0]):
+        if not yes:
+            input_txt = ('Dependency update required for IoT extension version: {}. {}'
+                         'Updated dependency must be compatible with {} {}. '
+                         'Continue? (y/n) -> ').format(VERSION, linesep, EVENT_LIB[0], EVENT_LIB[1])
+            i = input(input_txt)
+            if i.lower() != 'y':
+                sys.exit('User has declined update...')
+
+        six.print_('Updating required dependency...')
+        if install(EVENT_LIB[0], compatible_version=EVENT_LIB[1]):
+            update_uamqp_ext_version(config, EVENT_LIB[1])
+            six.print_('Update appears to have worked. Executing command...')
+        else:
+            sys.exit('Failure updating {} {}. Aborting...'.format(EVENT_LIB[0], EVENT_LIB[1]))
+
+    def _calculate_millisec_since_unix_epoch_utc():
+        now = datetime.utcnow()
+        epoch = datetime.utcfromtimestamp(0)
+        return int(1000 * (now - epoch).total_seconds())
+
+    if not enqueued_time:
+        enqueued_time = _calculate_millisec_since_unix_epoch_utc()
+
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, include_events=True)
+
+    events3.executor(target,
+                     consumer_group=consumer_group,
+                     enqueued_time=enqueued_time,
+                     properties=properties,
+                     timeout=timeout,
+                     device_id=device_id)

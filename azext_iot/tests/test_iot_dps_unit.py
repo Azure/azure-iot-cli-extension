@@ -26,13 +26,13 @@ mock_target['subscription'] = "5952cff8-bcd1-4235-9554-af2c0348bf23"
 
 # Patch Paths #
 path_service_client = 'msrest.service_client.ServiceClient.send'
-path_ghcs = 'azext_iot.operations.dps.get_iot_dps_connection_string'
+path_gdcs = 'azext_iot.operations.dps.get_iot_dps_connection_string'
 path_sas = 'azext_iot._factory.SasTokenAuthentication'
 
 
 @pytest.fixture()
-def fixture_ghcs(mocker):
-    ghcs = mocker.patch(path_ghcs)
+def fixture_gdcs(mocker):
+    ghcs = mocker.patch(path_gdcs)
     ghcs.return_value = mock_target
 
 
@@ -46,7 +46,7 @@ def fixture_sas(mocker):
 
 
 @pytest.fixture(params=[400, 401, 500])
-def serviceclient_generic_error(mocker, fixture_ghcs, fixture_sas, request):
+def serviceclient_generic_error(mocker, fixture_gdcs, fixture_sas, request):
     service_client = mocker.patch(path_service_client)
     response = mocker.MagicMock(name='response')
     response.status_code = request.param
@@ -76,7 +76,7 @@ def generate_enrollment_create_req(attestation_type=None, endorsement_key=None,
 
 class TestEnrollmentCreate():
     @pytest.fixture(params=[200])
-    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
+    def serviceclient(self, mocker, fixture_gdcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
         response = mocker.MagicMock(name='response')
         response.status_code = request.param
@@ -235,7 +235,7 @@ def generate_enrollment_update_req(certificate_path=None, iot_hub_host_name=None
 
 class TestEnrollmentUpdate():
     @pytest.fixture(params=[(200, generate_enrollment_show(), 200)])
-    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
+    def serviceclient(self, mocker, fixture_gdcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
         test_side_effect = [
             build_mock_response(mocker, request.param[0], request.param[1]),
@@ -302,7 +302,7 @@ class TestEnrollmentUpdate():
 
 class TestEnrollmentShow():
     @pytest.fixture(params=[200])
-    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
+    def serviceclient(self, mocker, fixture_gdcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
         response = mocker.MagicMock(name='response')
         del response._attribute_map
@@ -330,7 +330,7 @@ class TestEnrollmentShow():
 
 class TestEnrollmentList():
     @pytest.fixture(params=[200])
-    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
+    def serviceclient(self, mocker, fixture_gdcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
         response = mocker.MagicMock(name='response')
         del response._attribute_map
@@ -402,7 +402,7 @@ class TestEnrollmentList():
 
 class TestEnrollmentDelete():
     @pytest.fixture(params=[204])
-    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
+    def serviceclient(self, mocker, fixture_gdcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
         response = mocker.MagicMock(name='response')
         del response._attribute_map
@@ -443,7 +443,7 @@ def generate_enrollment_group_create_req(certificate_path=None, iot_hub_host_nam
 
 class TestEnrollmentGroupCreate():
     @pytest.fixture(params=[200])
-    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
+    def serviceclient(self, mocker, fixture_gdcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
         response = mocker.MagicMock(name='response')
         response.status_code = request.param
@@ -557,7 +557,7 @@ def generate_enrollment_group_update_req(certificate_path=None, iot_hub_host_nam
 
 class TestEnrollmentGroupUpdate():
     @pytest.fixture(params=[(200, generate_enrollment_group_show(), 200)])
-    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
+    def serviceclient(self, mocker, fixture_gdcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
         test_side_effect = [
             build_mock_response(mocker, request.param[0], request.param[1]),
@@ -619,7 +619,7 @@ class TestEnrollmentGroupUpdate():
 
 class TestEnrollmentGroupShow():
     @pytest.fixture(params=[200])
-    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
+    def serviceclient(self, mocker, fixture_gdcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
         response = mocker.MagicMock(name='response')
         del response._attribute_map
@@ -647,7 +647,7 @@ class TestEnrollmentGroupShow():
 
 class TestEnrollmentGroupList():
     @pytest.fixture(params=[200])
-    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
+    def serviceclient(self, mocker, fixture_gdcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
         response = mocker.MagicMock(name='response')
         del response._attribute_map
@@ -721,7 +721,7 @@ class TestEnrollmentGroupList():
 
 class TestEnrollmentGroupDelete():
     @pytest.fixture(params=[204])
-    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
+    def serviceclient(self, mocker, fixture_gdcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
         response = mocker.MagicMock(name='response')
         del response._attribute_map
@@ -752,7 +752,7 @@ def generate_registration_state_show():
 
 class TestRegistrationShow():
     @pytest.fixture(params=[200])
-    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
+    def serviceclient(self, mocker, fixture_gdcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
         response = mocker.MagicMock(name='response')
         del response._attribute_map
@@ -780,7 +780,7 @@ class TestRegistrationShow():
 
 class TestRegistrationList():
     @pytest.fixture(params=[200])
-    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
+    def serviceclient(self, mocker, fixture_gdcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
         response = mocker.MagicMock(name='response')
         del response._attribute_map
@@ -808,7 +808,7 @@ class TestRegistrationList():
 
 class TestRegistrationDelete():
     @pytest.fixture(params=[204])
-    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
+    def serviceclient(self, mocker, fixture_gdcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
         response = mocker.MagicMock(name='response')
         del response._attribute_map
@@ -875,7 +875,7 @@ class TestGetDpsConnString():
             client.iot_dps_resource.list_keys_for_key_name.return_value = _build_policy(mocker.MagicMock(),
                                                                                         policy_name)
 
-        from azext_iot.common.shared import get_iot_dps_connection_string
+        from azext_iot.common.azure import get_iot_dps_connection_string
 
         if exp_success:
             result = get_iot_dps_connection_string(client, targetdps, rg_name, policy_name)

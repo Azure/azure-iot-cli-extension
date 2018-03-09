@@ -21,6 +21,29 @@ helps['iot hub'] = """
     short-summary: Manage entities in an Azure IoT Hub.
 """
 
+helps['iot hub monitor-events'] = """
+    type: command
+    short-summary: Monitor device telemetry & messages sent to an IoT Hub.
+    long-summary: EXPERIMENTAL requires Python 3.5+
+                  This command relies on and may install dependent Cython package (uamqp) upon first execution.
+    examples:
+    - name: Basic usage when filtering on no device
+      text: >
+        az iot hub monitor-events -n [IoTHub Name]
+    - name: Basic usage when filtering on target device
+      text: >
+        az iot hub monitor-events -n [IoTHub Name] -d [Device ID]
+    - name: Specify an Event Hub consumer group.
+      text: >
+        az iot hub monitor-events -n [IoTHub Name] -d [Device ID] -cg [Consumer Group Name]
+    - name: Receive message annotations (message headers)
+      text: >
+        az iot hub monitor-events -n [IoTHub Name] -d [Device ID] --properties anno
+    - name: Receive message annotations + system properties. Never time out.
+      text: >
+        az iot hub monitor-events -n [IoTHub Name] -d [Device ID] --properties anno sys --timeout 0
+"""
+
 helps['iot hub device-identity'] = """
     type: group
     short-summary: Manage IoT devices.
@@ -303,12 +326,35 @@ helps['iot device c2d-message reject'] = """
 
 helps['iot device send-d2c-message'] = """
     type: command
-    short-summary: Send an MQTT device-to-cloud message.
+    short-summary: Send an mqtt device-to-cloud message.
+    long-summary: Supports application and system properties to send with message.
+    examples:
+    - name: Basic usage
+      text: az iot device send-d2c-message -n [IotHub Name] -d [Device Id]
+    - name: Basic usage with custom data
+      text: az iot device send-d2c-message -n [IotHub Name] -d [Device Id] --data <message body>
+    - name: Send application properties
+      text: az iot device send-d2c-message -n [IotHub Name] -d [Device Id] -props 'key0=value0;key1=value1'
+    - name: Send system properties (Message Id and Correlation Id)
+      text: az iot device send-d2c-message -n [IotHub Name] -d [Device Id] -props '$.mid=<id>;$.cid=<id>'
 """
 
 helps['iot device simulate'] = """
     type: command
     short-summary: Simulate a device in an Azure IoT Hub.
+    long-summary: While the device simulation is running, the device will automatically receive
+                  and acknowledge cloud-to-device (c2d) messages. For mqtt simulation, all c2d messages will
+                  be acknowledged with completion. For http simulation c2d acknowledgement is based on user
+                  selection which can be complete, reject or abandon.
+    examples:
+    - name: Basic usage (mqtt).
+      text: az iot device simulate -n [IotHub Name] -d [Device Id]
+    - name: Basic usage (http).
+      text: az iot device simulate -n [IotHub Name] -d [Device Id] --protocol http
+    - name: Choose total message count and interval between messages.
+      text: az iot device simulate -n [IotHub Name] -d [Device Id] --msg-count 1000 --msg-interval 5
+    - name: Reject or abandon c2d messages (http only)
+      text: az iot device simulate -n [IotHub Name] -d [Device Id] -rs [reject|abandon]
 """
 
 helps['iot device upload-file'] = """

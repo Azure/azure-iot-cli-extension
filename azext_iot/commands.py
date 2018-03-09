@@ -17,11 +17,12 @@ def load_command_table(self, _):
     Load CLI commands
     """
     with self.command_group('iot hub', command_type=iothub_ops) as cmd_group:
-        cmd_group.command('query', 'iot_query')
+        cmd_group.command('query', 'iot_query', client_factory=None)
         cmd_group.command('invoke-device-method', 'iot_device_method')
         cmd_group.command('invoke-module-method', 'iot_device_module_method')
         cmd_group.command('generate-sas-token', 'iot_get_sas_token')
         cmd_group.command('apply-configuration', 'iot_device_configuration_apply')
+        # cmd_group.command('monitor-events', 'iot_hub_monitor_events')
 
         cmd_group.command('show-connection-string', 'iot_get_hub_connection_string')
 
@@ -69,7 +70,7 @@ def load_command_table(self, _):
 
     with self.command_group('iot device', command_type=iothub_ops) as cmd_group:
         cmd_group.command('send-d2c-message', 'iot_device_send_message')
-        cmd_group.command('simulate', 'iot_simulate_device')
+        cmd_group.command('simulate', 'iot_simulate_device', client_factory=None)
         cmd_group.command('upload-file', 'iot_device_upload_file')
 
     with self.command_group('iot device c2d-message', command_type=iothub_ops) as cmd_group:

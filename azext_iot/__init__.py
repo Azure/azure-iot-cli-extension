@@ -7,6 +7,7 @@
 from azure.cli.core import AzCommandsLoader
 from azure.cli.core.commands import CliCommandType
 from azext_iot._factory import iot_hub_service_factory, iot_service_provisioning_factory
+from azext_iot._constants import VERSION
 import azext_iot._help  # pylint: disable=unused-import
 
 
@@ -37,3 +38,5 @@ class IoTExtCommandsLoader(AzCommandsLoader):
 
 
 COMMAND_LOADER_CLS = IoTExtCommandsLoader
+
+__version__ = VERSION

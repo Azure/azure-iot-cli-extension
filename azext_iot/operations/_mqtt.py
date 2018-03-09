@@ -66,7 +66,7 @@ class mqtt_client_wrap(object):
                 if self.is_connected():
                     if msgs < msg_count:
                         msgs += 1
-                        self.client.publish(self.topic_publish, data.generate())
+                        self.client.publish(self.topic_publish, data.generate(True))
                     else:
                         break
                 sleep(publish_delay)

@@ -7,6 +7,8 @@
 import pytest
 import json
 import os
+from uuid import uuid4
+from azext_iot._constants import EVENT_LIB
 from azext_iot.operations import hub as subject
 from azext_iot.common.utility import evaluate_literal
 from knack.util import CLIError
@@ -18,26 +20,45 @@ device_id = 'mydevice'
 module_id = 'mymod'
 config_id = 'myconfig'
 
+hub_entity = 'myhub.azure-devices.net'
+
 mock_target = {}
-mock_target['cs'] = 'HostName=myhub;SharedAccessKeyName=name;SharedAccessKey=value'
-mock_target['entity'] = 'myhub'
+mock_target['entity'] = hub_entity
 mock_target['primarykey'] = 'rJx/6rJ6rmG4ak890+eW5MYGH+A0uzRvjGNjg3Ve8sfo='
 mock_target['secondarykey'] = 'aCd/6rJ6rmG4ak890+eW5MYGH+A0uzRvjGNjg3Ve8sfo='
 mock_target['policy'] = 'iothubowner'
 mock_target['subscription'] = "5952cff8-bcd1-4235-9554-af2c0348bf23"
 
+generic_cs_template = 'HostName={};SharedAccessKeyName={};SharedAccessKey={}'
+
+
+def generate_cs(hub=hub_entity, policy=mock_target['policy'], key=mock_target['primarykey']):
+    return generic_cs_template.format(hub, policy, key)
+
+
+mock_target['cs'] = generate_cs()
 
 # Patch Paths #
 path_mqtt_client = 'azext_iot.operations._mqtt.mqtt.Client'
 path_service_client = 'msrest.service_client.ServiceClient.send'
 path_ghcs = 'azext_iot.operations.hub.get_iot_hub_connection_string'
+path_iot_hub_service_factory = 'azext_iot.common.azure.iot_hub_service_factory'
 path_sas = 'azext_iot._factory.SasTokenAuthentication'
+
+
+@pytest.fixture()
+def fixture_cmd(mocker):
+    # Placeholder for later use
+    mocker.patch(path_iot_hub_service_factory)
+    cmd = mocker.MagicMock(name='cli cmd context')
+    return cmd
 
 
 @pytest.fixture()
 def fixture_ghcs(mocker):
     ghcs = mocker.patch(path_ghcs)
     ghcs.return_value = mock_target
+    return ghcs
 
 
 @pytest.fixture()
@@ -45,6 +66,7 @@ def fixture_sas(mocker):
     r = SasTokenAuthentication(mock_target['entity'], mock_target['policy'], mock_target['primarykey'])
     sas = mocker.patch(path_sas)
     sas.return_value = r
+    return sas
 
 
 @pytest.fixture(params=[400, 401, 500])
@@ -93,6 +115,7 @@ class TestDeviceCreate():
         subject.iot_device_create(None, req['device_id'], req['hub_name'],
                                   req['ee'], req['auth'], req['ptp'], req['stp'], req['status'],
                                   req['status_reason'], req['valid_days'], req['output_dir'])
+
         args = serviceclient.call_args
         url = args[0][0].url
         assert "{}/devices/{}?".format(mock_target['entity'], device_id) in url
@@ -140,7 +163,8 @@ class TestDeviceCreate():
 
 def generate_device_show(**kvp):
     payload = {'authentication': {'symmetricKey': {'primaryKey': '123', 'secondaryKey': '321'},
-               'type': 'sas'}, 'etag': 'abcd', 'capabilities': {'iotEdge': True}, 'deviceId': device_id, 'status': 'disabled'}
+                                  'type': 'sas'}, 'etag': 'abcd', 'capabilities': {'iotEdge': True},
+               'deviceId': device_id, 'status': 'disabled'}
     for k in kvp:
         if payload.get(k):
             payload[k] = kvp[k]
@@ -163,8 +187,8 @@ class TestDeviceUpdate():
                                               'type': 'selfSigned'})),
         (generate_device_show(authentication={'type': 'certificateAuthority'}))
     ])
-    def test_device_update(self, serviceclient, req):
-        subject.iot_device_update(None, req['deviceId'], mock_target['entity'], req)
+    def test_device_update(self, fixture_cmd, serviceclient, req):
+        subject.iot_device_update(fixture_cmd, req['deviceId'], mock_target['entity'], req)
         args = serviceclient.call_args
         assert "{}/devices/{}?".format(mock_target['entity'], device_id) in args[0][0].url
         assert args[0][0].method == 'PUT'
@@ -1050,7 +1074,7 @@ class TestQuery():
 
         serviceclient.return_value.headers.get.side_effect = continuation
 
-        result = subject.iot_query(None, mock_target['entity'], query, top)
+        result = subject.iot_query(None, hub_name=mock_target['entity'], query_command=query, top=top)
 
         if top and top < servtotal:
             targetcount = top
@@ -1203,15 +1227,19 @@ hub_suffix = "awesome-azure.net"
 
 
 class TestGetIoTHubConnString():
-    @pytest.mark.parametrize("hubcount, targethub, policy_name, rg_name, exp_success, why", [
-        (5, 'hub1', 'iothubowner', None, True, None),
-        (10, 'hub3', 'custompolicy', 'myrg', True, None),
-        (1, 'hub0', 'custompolicy', None, True, None),
-        (3, 'hub4', 'iothubowner', None, False, None),
-        (1, 'hub1', 'iothubowner', 'myrg', False, 'policy'),
-        (1, 'myhub', 'iothubowner', 'myrg', False, 'hub')
+    @pytest.mark.parametrize("hubcount, targethub, policy_name, rg_name, include_events, login, failure_reason", [
+        (5, 'hub1', 'iothubowner', None, False, None, None),
+        (0, 'hub1', 'iothubowner', None, False, True, None),
+        (1, 'hub0', 'iothubowner', None, True, None, None),
+        (10, 'hub3', 'custompolicy', 'myrg', False, None, None),
+        (1, 'hub0', 'custompolicy', None, False, None, None),
+        (3, 'hub4', 'iothubowner', None, False, None, 'subscription'),
+        (1, 'hub1', 'iothubowner', 'myrg', False, None, 'policy'),
+        (1, 'myhub', 'iothubowner', 'myrg', False, None, 'resource')
     ])
-    def test_get_hub_conn_string(self, mocker, hubcount, targethub, policy_name, rg_name, exp_success, why):
+    def test_get_hub_conn_string(self, mocker, hubcount, targethub, policy_name, rg_name, include_events, login, failure_reason):
+        from azext_iot.common.azure import get_iot_hub_connection_string
+
         def _build_hub(hub, name, rg=None):
             hub.name = name
             hub.properties.host_name = "{}.{}".format(name, hub_suffix)
@@ -1225,6 +1253,15 @@ class TestGetIoTHubConnString():
             policy.secondary_key = mock_target['secondarykey']
             return policy
 
+        def _build_event(hub):
+            hub.properties.event_hub_endpoints['events'].endpoint = ('sb://' + str(uuid4()))
+            hub.properties.event_hub_endpoints['events'].partition_count = '2'
+            hub.properties.event_hub_endpoints['events'].path = hub_entity
+            hub.properties.event_hub_endpoints['events'].partition_ids = ['0', '1']
+            return hub
+
+        cmd = mocker.MagicMock(name='cmd')
+        ihsf = mocker.patch(path_iot_hub_service_factory)
         client = mocker.MagicMock(name='hubclient')
 
         hub_list = []
@@ -1233,34 +1270,61 @@ class TestGetIoTHubConnString():
         client.list_by_subscription.return_value = hub_list
 
         if rg_name:
-            if why == "hub":
+            if failure_reason == "resource":
                 client.get.side_effect = ValueError
             else:
                 client.get.return_value = _build_hub(mocker.MagicMock(), targethub, rg_name)
 
-        if why == "policy":
+        if failure_reason == "policy":
             client.get_keys_for_key_name.side_effect = ValueError
         else:
             client.get_keys_for_key_name.return_value = _build_policy(mocker.MagicMock(), policy_name)
 
-        from azext_iot.common.shared import get_iot_hub_connection_string
+        if include_events:
+            _build_event(hub_list[0])
 
-        if exp_success:
-            result = get_iot_hub_connection_string(client, targethub, rg_name, policy_name)
-            expecting_hub = "{}.{}".format(targethub, hub_suffix)
-            assert result['entity'] == expecting_hub
-            assert result['policy'] == policy_name
-            assert result['resourcegroup'] == rg_name
-            assert result['subscription'] == mock_target['subscription']
-            assert result['cs'] == "HostName={};SharedAccessKeyName={};SharedAccessKey={}".format(
-                expecting_hub,
-                policy_name,
-                mock_target['primarykey'])
+        ihsf.return_value = client
 
-            if rg_name:
-                client.get.assert_called_with(rg_name, targethub)
-            client.get_keys_for_key_name.assert_called_with(rg_name, targethub, policy_name)
+        if not failure_reason:
+            if not login:
+                result = get_iot_hub_connection_string(cmd, targethub, rg_name, policy_name, include_events=include_events)
 
+                expecting_hub = "{}.{}".format(targethub, hub_suffix)
+                assert result['entity'] == expecting_hub
+                assert result['policy'] == policy_name
+                assert result['resourcegroup'] == rg_name
+                assert result['subscription'] == mock_target['subscription']
+                assert result['cs'] == generic_cs_template.format(
+                    expecting_hub,
+                    policy_name,
+                    mock_target['primarykey'])
+
+                if rg_name:
+                    client.get.assert_called_with(rg_name, targethub)
+                client.get_keys_for_key_name.assert_called_with(rg_name, targethub, policy_name)
+
+                if include_events:
+                    assert result['events']['endpoint']
+                    assert result['events']['partition_count']
+                    assert result['events']['path']
+                    assert result['events']['partition_ids']
+            else:
+                hub = str(uuid4())
+                policy = str(uuid4())
+                key = str(uuid4())
+                cs = generate_cs(hub, policy, key)
+
+                result = get_iot_hub_connection_string(cmd, targethub, rg_name, policy_name, login=cs)
+
+                assert result['entity'] == hub
+                assert result['policy'] == policy
+                assert result['primarykey'] == key
+                assert not result.get('resourcegroup')
+                assert not result.get('subscription')
+                assert result['cs'] == generic_cs_template.format(
+                    hub,
+                    policy,
+                    key)
         else:
             with pytest.raises(CLIError):
                 get_iot_hub_connection_string(client, targethub, rg_name, policy_name)
@@ -1384,8 +1448,6 @@ class TestSasTokenAuth():
         assert 'sr=iot-hub-for-test.azure-devices.net%252fdevices%252fiot-device-for-test' in token
         assert 'skn=iothubowner' in token
 
-# TODO: Implement c2d testing when API available
-
 
 class TestDeviceSimulate():
     @pytest.fixture(params=[204])
@@ -1439,3 +1501,94 @@ class TestDeviceSimulate():
     def test_device_simulate_mqtt_error(self, mqttclient_generic_error):
         with pytest.raises(CLIError):
             subject.iot_simulate_device(None, device_id, mock_target['entity'])
+
+
+@pytest.mark.skipif(True, reason='not ready')
+class TestMonitorEvents():
+    @pytest.fixture(params=[200])
+    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        response = mocker.MagicMock(name='response')
+        del response._attribute_map
+        response.status_code = request.param
+        service_client.return_value = response
+        existing_target = fixture_ghcs.return_value
+        existing_target['events'] = {}
+        existing_target['events']['partition_ids'] = []
+        return service_client
+
+    @pytest.fixture()
+    def uamqp_scenario(self, mocker, request):
+        get_uamqp = mocker.patch('azext_iot.common.config.get_uamqp_ext_version')
+        update_uamqp = mocker.patch('azext_iot.common.config.update_uamqp_ext_version')
+        installer = mocker.patch('azext_iot.common.pip.install')
+        installer.return_value = True
+        get_uamqp.return_value = EVENT_LIB[1]
+        test_import = mocker.patch('azext_iot.common.utility.test_import')
+        test_import.return_value = True
+        m_exit = mocker.patch('sys.exit')
+
+        return {'get_uamqp': get_uamqp, 'update_uamqp': update_uamqp,
+                'installer': installer, 'test_import': test_import, 'exit': m_exit}
+
+    @pytest.mark.parametrize("timeout, exception", [
+        (-1, CLIError),
+    ])
+    def test_monitor_events_invalid_args(self, fixture_cmd, serviceclient, timeout, exception):
+        with pytest.raises(exception):
+            subject.iot_hub_monitor_events(fixture_cmd, mock_target['entity'], device_id, timeout=timeout)
+
+    @pytest.mark.parametrize("pymajor, pyminor, exception", [
+        (3, 3, SystemExit),
+        (3, 4, SystemExit),
+        (2, 7, SystemExit)
+    ])
+    def test_monitor_events_invalid_python(self, fixture_cmd, serviceclient, mocker, pymajor, pyminor, exception):
+        version_mock = mocker.patch('azext_iot.common.utility.sys.version_info')
+        version_mock.major = pymajor
+        version_mock.minor = pyminor
+
+        with pytest.raises(exception):
+            subject.iot_hub_monitor_events(fixture_cmd, mock_target['entity'], device_id)
+
+    @pytest.mark.parametrize("case, extra_input, external_input", [
+        ('importerror', None, 'y'),
+        ('importerror', None, 'n'),
+        ('importerror', 'yes;', None),
+        ('compatibility', None, 'y'),
+        ('compatibility', None, 'n'),
+        ('compatibility', 'yes;', None),
+        ('repair', 'repair;', 'y'),
+        ('repair', 'repair;yes;', None),
+        ('repair', 'repair;', 'n')
+    ])
+    def test_monitor_events_uamqp_version(self, mocker, uamqp_scenario, fixture_cmd, serviceclient,
+                                          case, extra_input, external_input):
+        if case == 'importerror':
+            uamqp_scenario['test_import'].return_value = False
+        elif case == 'compatibility':
+            uamqp_scenario['get_uamqp'].return_value = '0.0.0'
+
+        from functools import partial
+        kwargs = {}
+        user_cancelled = True
+        if extra_input and 'yes;' in extra_input:
+            kwargs['yes'] = True
+            user_cancelled = False
+        if extra_input and 'repair;' in extra_input:
+            kwargs['repair'] = True
+        if external_input:
+            mocked_input = mocker.patch('six.moves.input')
+            mocked_input.return_value = external_input
+            if external_input.lower() == 'y':
+                user_cancelled = False
+
+        method = partial(subject.iot_hub_monitor_events, fixture_cmd, mock_target['entity'], **kwargs)
+        method()
+
+        if user_cancelled:
+            assert uamqp_scenario['exit'].call_args
+        else:
+            install_args = uamqp_scenario['installer'].call_args
+            assert install_args[0][0] == EVENT_LIB[0]
+            assert install_args[1]['compatible_version'] == EVENT_LIB[1]

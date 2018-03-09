@@ -318,8 +318,9 @@ class IotHubDevicesOperations(object):
         if self.config.accept_language is not None:
             header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
 
+        # Manually altered
         # Construct body
-        body_content = self._serialize.body(message, 'str')
+        body_content = self._serialize.body(message, 'object')
 
         # Construct and send request
         request = self._client.post(url, query_parameters)
