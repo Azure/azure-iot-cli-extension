@@ -24,6 +24,7 @@ from azext_iot.dps_sdk.models.initial_twin import InitialTwin
 from azext_iot.dps_sdk.models.twin_collection import TwinCollection
 from azext_iot.dps_sdk.models.initial_twin_properties import InitialTwinProperties
 from azext_iot.dps_sdk.models.enrollment_group import EnrollmentGroup
+from azext_iot.dps_sdk.models.x509_ca_references import X509CAReferences
 
 logger = get_logger(__name__)
 
@@ -193,6 +194,8 @@ def iot_dps_device_enrollment_group_create(client,
                                            resource_group_name,
                                            certificate_path=None,
                                            secondary_certificate_path=None,
+                                           certificate_name=None,
+                                           secondary_certificate_name=None,
                                            iot_hub_host_name=None,
                                            initial_twin_tags=None,
                                            initial_twin_properties=None,
@@ -201,8 +204,11 @@ def iot_dps_device_enrollment_group_create(client,
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
 
-        attestation = _get_attestation_with_x509_signing_cert(certificate_path,
-                                                              secondary_certificate_path)
+        attestation = _get_attestation_for_enrollment_group(certificate_path,
+                                                            secondary_certificate_path,
+                                                            certificate_name,
+                                                            secondary_certificate_name)
+
         initial_twin = _get_initial_twin(initial_twin_tags, initial_twin_properties)
         group_enrollment = EnrollmentGroup(enrollment_id,
                                            attestation,
@@ -223,6 +229,8 @@ def iot_dps_device_enrollment_group_update(client,
                                            etag,
                                            certificate_path=None,
                                            secondary_certificate_path=None,
+                                           certificate_name=None,
+                                           secondary_certificate_name=None,
                                            remove_certificate=None,
                                            remove_secondary_certificate=None,
                                            iot_hub_host_name=None,
@@ -250,11 +258,13 @@ def iot_dps_device_enrollment_group_update(client,
                                                                     initial_twin_tags,
                                                                     initial_twin_properties)
 
-        enrollment_record['attestation'] = _get_updated_attestation_with_x509_signing_cert(enrollment_record['attestation'],
-                                                                                           certificate_path,
-                                                                                           secondary_certificate_path,
-                                                                                           remove_certificate,
-                                                                                           remove_secondary_certificate)
+        enrollment_record['attestation'] = _get_updated_attestation_for_enrollment_group(enrollment_record['attestation'],
+                                                                                         certificate_path,
+                                                                                         secondary_certificate_path,
+                                                                                         certificate_name,
+                                                                                         secondary_certificate_name,
+                                                                                         remove_certificate,
+                                                                                         remove_secondary_certificate)
 
         return m_sdk.device_enrollment_group.create_or_update(enrollment_id, enrollment_record, etag)
     except errors.ErrorDetailsException as e:
@@ -370,9 +380,27 @@ def _get_updated_attestation_with_x509_client_cert(attestation,
     return attestation
 
 
-def _get_attestation_with_x509_signing_cert(primary_certificate_path, secondary_certificate_path):
+def _get_attestation_for_enrollment_group(primary_certificate_path,
+                                          secondary_certificate_path,
+                                          primary_certificate_name,
+                                          secondary_certificate_name):
     if not primary_certificate_path and not secondary_certificate_path:
-        raise CLIError('Please provide at least one certificate path')
+        if not primary_certificate_name and not secondary_certificate_name:
+            raise CLIError('Please provide at least one certificate')
+
+    if primary_certificate_path or secondary_certificate_path:
+        if primary_certificate_name or secondary_certificate_name:
+            raise CLIError('Please provide either certificate path or certficate name')
+        return _get_attestation_with_x509_signing_cert(primary_certificate_path, secondary_certificate_path)
+
+    if primary_certificate_name or secondary_certificate_name:
+        if primary_certificate_path or secondary_certificate_path:
+            raise CLIError('Please provide either certificate path or certficate name')
+        return _get_attestation_with_x509_ca_cert(primary_certificate_name, secondary_certificate_name)
+
+
+def _get_attestation_with_x509_signing_cert(primary_certificate_path,
+                                            secondary_certificate_path):
     certificate = _get_x509_certificate(primary_certificate_path, secondary_certificate_path)
     x509Attestation = X509Attestation(None, certificate)
     attestation = AttestationMechanism(AttestationType.x509.value, None, x509Attestation)
@@ -380,18 +408,103 @@ def _get_attestation_with_x509_signing_cert(primary_certificate_path, secondary_
     return attestation
 
 
+def _get_attestation_with_x509_ca_cert(primary_certificate_name,
+                                       secondary_certificate_name):
+    certificate = X509CAReferences(primary_certificate_name, secondary_certificate_name)
+    x509Attestation = X509Attestation(None, None, certificate)
+    attestation = AttestationMechanism(AttestationType.x509.value, None, x509Attestation)
+
+    return attestation
+
+
+def _get_updated_attestation_for_enrollment_group(attestation,
+                                                  primary_certificate_path,
+                                                  secondary_certificate_path,
+                                                  primary_certificate_name,
+                                                  secondary_certificate_name,
+                                                  remove_primary_certificate,
+                                                  remove_secondary_certificate):
+
+    if not primary_certificate_path and not secondary_certificate_path:
+        if not primary_certificate_name and not secondary_certificate_name:
+            if remove_primary_certificate and remove_secondary_certificate:
+                raise CLIError('Please provide at least one certificate')
+
+            if remove_primary_certificate:
+                if 'signingCertificates' in attestation['x509']:
+                    if ('secondary' not in attestation['x509']['signingCertificates'] or
+                            attestation['x509']['signingCertificates']['secondary'] is None):
+                        raise CLIError('Please provide at least one certificate while removing the only intermediate certificate')
+                if 'caReferences' in attestation['x509']:
+                    if ('secondary' not in attestation['x509']['caReferences'] or
+                            attestation['x509']['caReferences']['secondary'] is None):
+                        raise CLIError('Please provide at least one certificate while removing the only CA certificate')
+
+            if remove_secondary_certificate:
+                if 'signingCertificates' in attestation['x509']:
+                    if ('primary' not in attestation['x509']['signingCertificates'] or
+                            attestation['x509']['signingCertificates']['primary'] is None):
+                        raise CLIError('Please provide at least one certificate while removing the only intermediate certificate')
+                if 'caReferences' in attestation['x509']:
+                    if ('primary' not in attestation['x509']['caReferences'] or
+                            attestation['x509']['caReferences']['primary'] is None):
+                        raise CLIError('Please provide at least one certificate while removing the only CA certificate')
+            return attestation
+
+    if primary_certificate_path or secondary_certificate_path:
+        if primary_certificate_name or secondary_certificate_name:
+            raise CLIError('Please provide either certificate path or certficate name')
+        return _get_updated_attestation_with_x509_signing_cert(attestation,
+                                                               primary_certificate_path,
+                                                               secondary_certificate_path,
+                                                               remove_primary_certificate,
+                                                               remove_secondary_certificate)
+
+    if primary_certificate_name or secondary_certificate_name:
+        if primary_certificate_path or secondary_certificate_path:
+            raise CLIError('Please provide either certificate path or certficate name')
+        return _get_updated_attestation_with_x509_ca_cert(attestation,
+                                                          primary_certificate_name,
+                                                          secondary_certificate_name,
+                                                          remove_primary_certificate,
+                                                          remove_secondary_certificate)
+
+
 def _get_updated_attestation_with_x509_signing_cert(attestation,
                                                     primary_certificate_path,
                                                     secondary_certificate_path,
                                                     remove_primary_certificate,
                                                     remove_secondary_certificate):
-    if remove_primary_certificate:
-        attestation['x509']['signingCertificates']['primary'] = None
-    if remove_secondary_certificate:
-        attestation['x509']['signingCertificates']['secondary'] = None
-    if primary_certificate_path:
-        attestation['x509']['signingCertificates']['primary'] = _get_certificate_info(primary_certificate_path)
-    if secondary_certificate_path:
-        attestation['x509']['signingCertificates']['secondary'] = _get_certificate_info(secondary_certificate_path)
+    if 'signingCertificates' in attestation['x509']:
+        if remove_primary_certificate:
+            attestation['x509']['signingCertificates']['primary'] = None
+        if remove_secondary_certificate:
+            attestation['x509']['signingCertificates']['secondary'] = None
+        if primary_certificate_path:
+            attestation['x509']['signingCertificates']['primary'] = _get_certificate_info(primary_certificate_path)
+        if secondary_certificate_path:
+            attestation['x509']['signingCertificates']['secondary'] = _get_certificate_info(secondary_certificate_path)
 
-    return attestation
+        return attestation
+
+    return _get_attestation_with_x509_signing_cert(primary_certificate_path, secondary_certificate_path)
+
+
+def _get_updated_attestation_with_x509_ca_cert(attestation,
+                                               primary_certificate_name,
+                                               secondary_certificate_name,
+                                               remove_primary_certificate,
+                                               remove_secondary_certificate):
+    if 'caReferences' in attestation['x509']:
+        if remove_primary_certificate:
+            attestation['x509']['caReferences']['primary'] = None
+        if remove_secondary_certificate:
+            attestation['x509']['caReferences']['secondary'] = None
+        if primary_certificate_name:
+            attestation['x509']['caReferences']['primary'] = primary_certificate_name
+        if secondary_certificate_name:
+            attestation['x509']['caReferences']['secondary'] = secondary_certificate_name
+
+        return attestation
+
+    return _get_attestation_with_x509_ca_cert(primary_certificate_name, secondary_certificate_name)
