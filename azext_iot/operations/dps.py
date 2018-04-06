@@ -264,27 +264,11 @@ def iot_dps_device_enrollment_group_update(client,
                 if remove_certificate and remove_secondary_certificate:
                     raise CLIError('Please provide at least one certificate')
 
-                if remove_certificate:
-                    if 'signingCertificates' in enrollment_record['attestation']['x509']:
-                        if ('secondary' not in enrollment_record['attestation']['x509']['signingCertificates'] or
-                                not enrollment_record['attestation']['x509']['signingCertificates']['secondary']):
-                            raise CLIError('Please provide at least one certificate '
-                                           'while removing the only intermediate certificate')
-                    if 'caReferences' in enrollment_record['attestation']['x509']:
-                        if ('secondary' not in enrollment_record['attestation']['x509']['caReferences'] or
-                                not enrollment_record['attestation']['x509']['caReferences']['secondary']):
-                            raise CLIError('Please provide at least one certificate while removing the only CA certificate')
+                if not _can_remove_primary_certificate(remove_certificate, enrollment_record['attestation']):
+                    raise CLIError('Please provide at least one certificate while removing the only primary certificate')
 
-                if remove_secondary_certificate:
-                    if 'signingCertificates' in enrollment_record['attestation']['x509']:
-                        if ('primary' not in enrollment_record['attestation']['x509']['signingCertificates'] or
-                                not enrollment_record['attestation']['x509']['signingCertificates']['primary']):
-                            raise CLIError('Please provide at least one certificate '
-                                           'while removing the only intermediate certificate')
-                    if 'caReferences' in enrollment_record['attestation']['x509']:
-                        if ('primary' not in enrollment_record['attestation']['x509']['caReferences'] or
-                                not enrollment_record['attestation']['x509']['caReferences']['primary']):
-                            raise CLIError('Please provide at least one certificate while removing the only CA certificate')
+                if not _can_remove_secondary_certificate(remove_secondary_certificate, enrollment_record['attestation']):
+                    raise CLIError('Please provide at least one certificate while removing the only secondary certificate')
 
         if certificate_path or secondary_certificate_path:
             if certificate_name or secondary_certificate_name:
@@ -483,3 +467,31 @@ def _get_updated_attestation_with_x509_ca_cert(attestation,
         return attestation
 
     return _get_attestation_with_x509_ca_cert(primary_certificate_name, secondary_certificate_name)
+
+
+def _can_remove_primary_certificate(remove_certificate,
+                                    attestation):
+    if remove_certificate:
+        if 'signingCertificates' in attestation['x509']:
+            if ('secondary' not in attestation['x509']['signingCertificates'] or
+                    not attestation['x509']['signingCertificates']['secondary']):
+                return False
+        if 'caReferences' in attestation['x509']:
+            if ('secondary' not in attestation['x509']['caReferences'] or
+                    not attestation['x509']['caReferences']['secondary']):
+                return False
+    return True
+
+
+def _can_remove_secondary_certificate(remove_certificate,
+                                      attestation):
+    if remove_certificate:
+        if 'signingCertificates' in attestation['x509']:
+            if ('primary' not in attestation['x509']['signingCertificates'] or
+                    not attestation['x509']['signingCertificates']['primary']):
+                return False
+        if 'caReferences' in attestation['x509']:
+            if ('primary' not in attestation['x509']['caReferences'] or
+                    not attestation['x509']['caReferences']['primary']):
+                return False
+    return True
