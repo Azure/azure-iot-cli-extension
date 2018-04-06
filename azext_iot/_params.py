@@ -153,7 +153,8 @@ def load_arguments(self, _):
                          help='Initial twin properties')
         context.argument('initial_twin_tags', options_list=['--initial-twin-tags', '-tags'],
                          help='Initial twin tags')
-        context.argument('iot_hub_host_name', help='Host name of target IoT Hub')
+        context.argument('iot_hub_host_name', options_list=['--iot-hub-host-name', '-hn'],
+                         help='Host name of target IoT Hub')
         context.argument('provisioning_status', options_list=['--provisioning-status', '-ps'],
                          arg_type=get_enum_type(EntityStatusType),
                          help='Enable or disable enrollment entry')
@@ -204,11 +205,27 @@ def load_arguments(self, _):
         context.argument('certificate_path',
                          options_list=['--certificate-path', '-cp'],
                          help='The path to the file containing the primary certificate. '
-                         'One of the certificate path is required.')
+                         'If choose to use intermediate certificate, one of the certificate path is required.')
         context.argument('secondary_certificate_path',
                          options_list=['--secondary-certificate-path', '-scp'],
                          help='The path to the file containing the secondary certificate. '
-                         'One of the certificate path is required.')
+                         'If choose to use intermediate certificate, one of the certificate path is required.')
+        context.argument('certificate_name',
+                         options_list=['--certificate-name', '-cn'],
+                         help='The name of the primary CA certificate. '
+                         'If choose to use CA certificate, one of the certificate name is required.')
+        context.argument('secondary_certificate_name',
+                         options_list=['--secondary-certificate-name', '-scn'],
+                         help='The name of the secondary CA certificate. '
+                         'If choose to use CA certificate, one of the certificate name is required.')
+
+    with self.argument_context('iot dps enrollment-group update') as context:
+        context.argument('certificate_name',
+                         options_list=['--certificate-name', '-cn'],
+                         help='The name of the primary CA certificate.')
+        context.argument('secondary_certificate_name',
+                         options_list=['--secondary-certificate-name', '-scn'],
+                         help='The name of the secondary CA certificate.')
 
     with self.argument_context('iot dps registration') as context:
         context.argument('registration_id', help='ID of device registration')
