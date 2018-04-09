@@ -11,6 +11,7 @@ import pytest
 
 from azure.cli.testsdk import LiveScenarioTest
 from azure.cli.core.util import read_file_content
+from azext_iot.common.utility import validate_min_python_version, execute_onthread
 
 
 # Set these to the proper IoT Hub and Resource Group for Live Integration Tests.
@@ -526,6 +527,33 @@ class TestIoTHub(LiveScenarioTest):
 
         self.cmd('iot device send-d2c-message -d {} -n {} -g {} -props "MessageId=12345;CorrelationId=54321"'
                  .format(device_ids[0], LIVE_HUB, LIVE_RG), checks=self.is_empty())
+
+    # Skip test for now
+    # not validate_min_python_version(3, 5, exit_on_fail=False)
+    @pytest.mark.skipif(True, reason="minimum python version not satisfied")
+    def test_hub_monitor_event(self):
+        from azext_iot.operations.hub import iot_simulate_device
+        from azext_iot import iot_hub_service_factory
+        from azure.cli.testsdk import TestCli
+
+        cli_ctx = TestCli()
+        client = iot_hub_service_factory(cli_ctx)
+
+        device_count = 5
+
+        names = self._create_entity_names(devices=device_count)
+        device_ids = names['device_ids']
+
+        for i in range(device_count):
+            self.cmd('iot hub device-identity create -d {} -n {} -g {}'.format(device_ids[i], LIVE_HUB, LIVE_RG),
+                     checks=[self.check('deviceId', device_ids[i])])
+
+        for i in range(device_count):
+            execute_onthread(method=iot_simulate_device,
+                             args=[client, device_ids[i], LIVE_HUB, 'complete', 'Ping from test', 5, 1],
+                             max_runs=1)
+
+        self.cmd('iot hub monitor-events -n {} -g {} -to 10 -y -props all --debug'.format(LIVE_HUB, LIVE_RG), checks=None)
 
     @pytest.mark.skipif(not LIVE_STORAGE, reason="empty azext_iot_teststorageuri env var")
     def test_storage(self):

@@ -4,6 +4,7 @@ language: python
 before_install:
   - chmod +x ./scripts/ci/test_source.sh
   - chmod +x ./scripts/ci/test_static.sh
+  - chmod +x ./scripts/ci/test_static_py2.sh
 install:
     - pip install -r ./requirements -q
 jobs:
@@ -18,7 +19,7 @@ jobs:
       python: 3.6
     - stage: verify
       env: PURPOSE='SourceStaticTests'
-      script: ./scripts/ci/test_static.sh
+      script: ./scripts/ci/test_static_py2.sh
       python: 2.7
     - stage: verify
       env: PURPOSE='SourceStaticTests'

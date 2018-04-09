@@ -32,21 +32,21 @@ def block_stdout():
         devnull.close()
 
 
-def parse_entity(iothub_device):
+def parse_entity(entity):
     """
     Function creates a dict of device properties.
 
     Args:
-        iothub_device (object): object to extract attributes from.
+        entity (object): object to extract attributes from.
 
     Returns:
-        device (dict): a dictionary of properties from the function input.
+        result (dict): a dictionary of properties from the function input.
     """
-    device = {}
-    attributes = [attr for attr in dir(iothub_device) if not attr.startswith('__')]
+    result = {}
+    attributes = [attr for attr in dir(entity) if not attr.startswith('_')]
     for attribute in attributes:
-        device[attribute] = str(getattr(iothub_device, attribute, None))
-    return device
+        result[attribute] = getattr(entity, attribute, None)
+    return result
 
 
 # pylint: disable=broad-except
@@ -104,15 +104,51 @@ def shell_safe_json_parse(json_or_dict_string, preserve_order=False):
             raise json_ex
 
 
+def trim_from_start(s, substring):
+    """ Trims a substring from the target string (if it exists) returning the trimmed string.
+    Otherwise returns original target string. """
+    if s.startswith(substring):
+        s = s[len(substring):]
+    return s
+
+
+def validate_min_python_version(major, minor, error_msg=None, exit_on_fail=True):
+    """ If python version does not match AT LEAST requested values, will throw non 0 exit code."""
+    # TODO: Simplify
+    version = sys.version_info
+    result = False
+    if version.major > major:
+        return True
+    elif major == version.major:
+        result = (version.minor >= minor)
+
+    if not result:
+        if exit_on_fail:
+            msg = error_msg if error_msg else 'Python version {}.{} or higher required for this functionality.'.format(
+                major, minor)
+            sys.exit(msg)
+
+    return result
+
+
+def unicode_binary_map(target):
+    """ Convert binary keys of map to utf8 and retain the same values."""
+    # Assumes no iteritems()
+    result = {}
+    for k in target:
+        result[str(k, 'utf8')] = target[k]
+    return result
+
+
 def execute_onthread(**kwargs):
     """
     Experimental generic helper for executing methods without return values on a background thread
 
     Args:
-        kwargs: Supported kwargs are 'interval' (int) to specify intervals between calls,
-                'method' (func) to specify method pointer for execution,
-                'args' (list) to specify method arguments,
-                'max_runs' (int) indicate an upper bound on number of executions,
+        kwargs: Supported kwargs are 'interval' (int) to specify intervals between calls
+                'method' (func) to specify method pointer for execution
+                'args' (list) to specify method arguments
+                'max_runs' (int) indicate an upper bound on number of executions
                 'return_handle' (bool) indicates whether to return a Thread handle
 
     Returns:
@@ -123,7 +159,7 @@ def execute_onthread(**kwargs):
 
     interval = kwargs.get('interval')
     method = kwargs.get('method')
-    args = kwargs.get('args')
+    method_args = kwargs.get('args')
     max_runs = kwargs.get('max_runs')
     handle = kwargs.get('return_handle')
 
@@ -131,8 +167,8 @@ def execute_onthread(**kwargs):
         interval = 2
     if not method:
         raise ValueError('kwarg "method" required for execution')
-    if not args:
-        args = []
+    if not method_args:
+        method_args = []
 
     cancellation_token = Event()
 
@@ -142,7 +178,7 @@ def execute_onthread(**kwargs):
             if max_runs:
                 if runs >= max_runs:
                     break
-            method(*args)
+            method(*method_args)
             runs += 1
 
     op = Thread(target=method_wrap, args=(max_runs,))
@@ -152,3 +188,30 @@ def execute_onthread(**kwargs):
         return cancellation_token, op
 
     return cancellation_token
+
+
+def url_encode_dict(d):
+    try:
+        from urllib import urlencode
+    except ImportError:
+        from urllib.parse import urlencode
+
+    return urlencode(d)
+
+
+def url_encode_str(s):
+    try:
+        from urllib import quote_plus
+    except ImportError:
+        from urllib.parse import quote_plus
+
+    return quote_plus(s)
+
+
+def test_import(package):
+    import importlib
+    try:
+        importlib.import_module(package)
+    except ImportError:
+        return False
+    return True

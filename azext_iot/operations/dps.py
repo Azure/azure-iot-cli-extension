@@ -7,8 +7,8 @@
 from knack.log import get_logger
 from knack.util import CLIError
 from azext_iot.common.shared import (SdkType,
-                                     AttestationType,
-                                     get_iot_dps_connection_string)
+                                     AttestationType)
+from azext_iot.common.azure import get_iot_dps_connection_string
 from azext_iot.common.utility import evaluate_literal
 from azext_iot.common.certops import open_certificate
 from azext_iot.operations.generic import execute_query
