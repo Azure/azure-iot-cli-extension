@@ -234,19 +234,19 @@ def load_arguments(self, _):
         context.argument('certificate_path',
                          options_list=['--certificate-path', '-cp'],
                          help='The path to the file containing the primary certificate. '
-                         'If choose to use intermediate certificate, one of the certificate path is required.')
+                         'If attestation with an intermediate certificate is desired then a certificate path must be provided.')
         context.argument('secondary_certificate_path',
                          options_list=['--secondary-certificate-path', '-scp'],
                          help='The path to the file containing the secondary certificate. '
-                         'If choose to use intermediate certificate, one of the certificate path is required.')
-        context.argument('certificate_name',
-                         options_list=['--certificate-name', '-cn'],
-                         help='The name of the primary CA certificate. '
-                         'If choose to use CA certificate, one of the certificate name is required.')
-        context.argument('secondary_certificate_name',
-                         options_list=['--secondary-certificate-name', '-scn'],
-                         help='The name of the secondary CA certificate. '
-                         'If choose to use CA certificate, one of the certificate name is required.')
+                         'If attestation with an intermediate certificate is desired then a certificate path must be provided.')
+        context.argument('root_ca_name',
+                         options_list=['--root-ca-name', '--ca-name', '-cn'],
+                         help='The name of the primary root CA certificate. '
+                         'If attestation with a root CA certificate is desired then a root ca name must be provided.')
+        context.argument('secondary_root_ca_name',
+                         options_list=['--secondary-root-ca-name', '--secondary-ca-name', '-scn'],
+                         help='The name of the secondary root CA certificate. '
+                         'If attestation with a root CA certificate is desired then a root ca name must be provided.')
 
     with self.argument_context('iot dps enrollment-group update') as context:
         context.argument('certificate_name',
