@@ -446,13 +446,13 @@ helps['iot dps enrollment create'] = """
     - name: Create an enrollment '[Enrollment ID]' with attestation type 'x509' in the Azure
             IoT Device Provisioning Service '[DPS Name]' in the resource group
             '[Resource Group Name]' with provisioning status 'disabled', target IoT Hub
-            '[IoTHub Name].azure-devices.net', device id '[Device ID]' and initial twin
+            '[IoTHub Host Name]', device id '[Device ID]' and initial twin
             properties '{"location":{"region":"US"}}'.
       text: >
         az iot dps enrollment create -g [Resource Group Name] --dps-name [DPS Name]
         --enrollment-id [Enrollment ID] --attestation-type x509
         --certificate-path /certificates/Certificate.pem --provisioning-status disabled
-        --iot-hub-host-name [IoTHub Name].azure-devices.net
+        --iot-hub-host-name [IoTHub Host Name]
         --initial-twin-properties "{'location':{'region':'US'}}" --device-id [Device ID]
     - name: Create an enrollment 'MyEnrollment' with attestation type 'tpm' in the Azure IoT
             Device Provisioning Service '[DPS Name]' in the resource group '[Resource Group Name]'.
@@ -517,12 +517,12 @@ helps['iot dps enrollment-group create'] = """
         --enrollment-id [Enrollment ID] --secondary-certificate-name [Certificate Name]
     - name: Create an enrollment group '[Enrollment ID]' in the Azure IoT provisioning service
             'MyDps' in the resource group '[Resource Group Name]' with provisioning status
-            'enabled', target IoT Hub '[IoTHub Name].azure-devices.net' and initial twin
+            'enabled', target IoT Hub '[IoTHub Host Name]' and initial twin
             tags '{"location":{"region":"US"}} using an intermediate certificate as primary certificate'.
       text: >
         az iot dps enrollment-group create -g [Resource Group Name] --dps-name [DPS Name]
         --enrollment-id [Enrollment ID] --certificate-path /certificates/Certificate.pem
-        --provisioning-status enabled --iot-hub-host-name [IoTHub Name].azure-devices.net
+        --provisioning-status enabled --iot-hub-host-name [IoTHub Host Name]
         --initial-twin-tags "{'location':{'region':'US'}}"
 """
 
