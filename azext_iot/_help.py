@@ -505,14 +505,20 @@ helps['iot dps enrollment-group create'] = """
     short-summary: Create an enrollment group in an Azure IoT Hub Device Provisioning Service.
     examples:
     - name: Create an enrollment group '[Enrollment ID]' in the Azure IoT provisioning service
-            '[DPS Name]' in the resource group '[Resource Group Name]'.
+            '[DPS Name]' in the resource group '[Resource Group Name] using an intermediate certificate as primary certificate'.
       text: >
         az iot dps enrollment-group create -g [Resource Group Name] --dps-name [DPS Name]
         --enrollment-id [Enrollment ID] --certificate-path /certificates/Certificate.pem
     - name: Create an enrollment group '[Enrollment ID]' in the Azure IoT provisioning service
+            '[DPS Name]' in the resource group '[Resource Group Name] using a CA certificate [Certificate Name]
+            as secondary certificate'.
+      text: >
+        az iot dps enrollment-group create -g [Resource Group Name] --dps-name [DPS Name]
+        --enrollment-id [Enrollment ID] --secondary-certificate-name [Certificate Name]
+    - name: Create an enrollment group '[Enrollment ID]' in the Azure IoT provisioning service
             'MyDps' in the resource group '[Resource Group Name]' with provisioning status
             'enabled', target IoT Hub '[IoTHub Name].azure-devices.net' and initial twin
-            tags '{"location":{"region":"US"}}'.
+            tags '{"location":{"region":"US"}} using an intermediate certificate as primary certificate'.
       text: >
         az iot dps enrollment-group create -g [Resource Group Name] --dps-name [DPS Name]
         --enrollment-id [Enrollment ID] --certificate-path /certificates/Certificate.pem
@@ -524,13 +530,25 @@ helps['iot dps enrollment-group update'] = """
     type: command
     short-summary: Update an enrollment group in an Azure IoT Hub Device Provisioning Service.
     examples:
-    - name: Update enrollment group '[Enrollment ID]' with a new certificate in the
-            Azure IoT provisioning service '[DPS name]' in the resource group
-            'MyResourceGroup' and update its initial twin tags.
+    - name: Update enrollment group '[Enrollment ID]' in the Azure IoT provisioning service '[DPS name]'
+            in the resource group '[Resource Group Name]' with new initial twin tags.
+      text: >
+        az iot dps enrollment-group update -g [Resource Group Name] --dps-name [DPS Name]
+        --enrollment-id [Enrollment ID] --initial-twin-tags "{'location':{'region':'US2'}}" --etag AAAAAAAAAAA=
+    - name: Update enrollment group '[Enrollment ID]' in the Azure IoT provisioning service '[DPS name]'
+            in the resource group '[Resource Group Name]' with new primary intermediate certificate
+            and remove existing secondary intermediate certificate.
       text: >
         az iot dps enrollment-group update -g [Resource Group Name] --dps-name [DPS Name]
         --enrollment-id [Enrollment ID] --certificate-path /certificates/NewCertificate.pem
-        --initial-twin-tags "{'location':{'region':'US2'}}" --etag AAAAAAAAAAA=
+        --remove-secondary-certificate --etag AAAAAAAAAAA=
+    - name: Update enrollment group '[Enrollment ID]' in the Azure IoT provisioning service '[DPS name]'
+            in the resource group '[Resource Group Name]' with new secondary CA certificate
+            '[Certificate Name]' and remove existing primary CA certificate.
+      text: >
+        az iot dps enrollment-group update -g [Resource Group Name] --dps-name [DPS Name]
+        --enrollment-id [Enrollment ID] --secondary-certificate-name [Certificate Name]
+        --remove-certificate --etag AAAAAAAAAAA=
 """
 
 helps['iot dps enrollment-group delete'] = """

@@ -171,22 +171,40 @@ class IoTDpsTest(LiveScenarioTest):
                  .format(rg, dps, enrollment_id),
                  checks=[self.check('enrollmentGroupId', enrollment_id)])
 
-        self.cmd('iot dps enrollment-group update -g {} --dps-name {} --enrollment-id {}'
-                 ' --provisioning-status {} -rsc --etag {}'
-                 .format(rg, dps, enrollment_id, self.provisioning_status_new, etag),
-                 checks=[
-                     self.check('attestation.type',
-                                AttestationType.x509.value),
-                     self.check('enrollmentGroupId', enrollment_id),
-                     self.check('provisioningStatus',
-                                self.provisioning_status_new),
-                     self.check(
-                         'attestation.type.x509.clientCertificates.secondary', None)
-                 ])
+        etag = self.cmd('iot dps enrollment-group update -g {} --dps-name {} --enrollment-id {}'
+                        ' --provisioning-status {} -rsc --etag {}'
+                        .format(rg, dps, enrollment_id, self.provisioning_status_new, etag),
+                        checks=[
+                            self.check('attestation.type', AttestationType.x509.value),
+                            self.check('enrollmentGroupId', enrollment_id),
+                            self.check('provisioningStatus', self.provisioning_status_new),
+                            self.check('attestation.type.x509.clientCertificates.secondary', None)
+                        ]).get_output_in_json()['etag']
 
         self.cmd('iot dps registration list -g {} --dps-name {} --enrollment-id {}'
                  .format(rg, dps, enrollment_id),
                  checks=[self.check('length(@)', 0)])
 
+        cert_name = self.create_random_name('certificate-for-test', length=48)
+        cert_etag = self.cmd('iot dps certificate create -g {} --dps-name {} --name {} --p {}'
+                             .format(rg, dps, cert_name, cert_path),
+                             checks=[self.check('name', cert_name)]).get_output_in_json()['etag']
+
+        self.cmd('iot dps enrollment-group update -g {} --dps-name {} --enrollment-id {}'
+                 ' -cn {} --etag {}'
+                 .format(rg, dps, enrollment_id, cert_name, etag),
+                 checks=[
+                     self.check('attestation.type',
+                                AttestationType.x509.value),
+                     self.check('enrollmentGroupId', enrollment_id),
+                     self.check(
+                         'attestation.x509.caReferences.primary', cert_name),
+                     self.check(
+                         'attestation.x509.caReferences.secondary', None)
+                 ])
+
         self.cmd('iot dps enrollment-group delete -g {} --dps-name {} --enrollment-id {}'
                  .format(rg, dps, enrollment_id))
+
+        self.cmd('iot dps certificate delete -g {} --dps-name {} --name {} --etag {}'
+                 .format(rg, dps, cert_name, cert_etag))
