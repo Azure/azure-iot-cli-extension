@@ -217,7 +217,8 @@ def generate_enrollment_update_req(certificate_path=None, iot_hub_host_name=None
                                    remove_certificate_path=None,
                                    remove_secondary_certificate_path=None,
                                    initial_twin_properties=None, provisioning_status=None,
-                                   device_id=None):
+                                   device_id=None,
+                                   etag=None):
     return {'client': None,
             'enrollment_id': enrollment_id,
             'rg': resource_group,
@@ -230,7 +231,8 @@ def generate_enrollment_update_req(certificate_path=None, iot_hub_host_name=None
             'initial_twin_tags': initial_twin_tags,
             'initial_twin_properties': initial_twin_properties,
             'provisioning_status': provisioning_status,
-            'device_id': device_id}
+            'device_id': device_id,
+            'etag': etag}
 
 
 class TestEnrollmentUpdate():
@@ -245,7 +247,7 @@ class TestEnrollmentUpdate():
         return service_client
 
     @pytest.mark.parametrize("req", [
-        (generate_enrollment_update_req(secondary_certificate_path='someOtherCertPath')),
+        (generate_enrollment_update_req(etag=etag, secondary_certificate_path='someOtherCertPath')),
         (generate_enrollment_update_req(certificate_path='newCertPath', secondary_certificate_path='someOtherCertPath')),
         (generate_enrollment_update_req(remove_certificate_path='true')),
         (generate_enrollment_update_req(iot_hub_host_name='someOtherHubName',
@@ -259,7 +261,7 @@ class TestEnrollmentUpdate():
                                                  req['enrollment_id'],
                                                  req['dps_name'],
                                                  req['rg'],
-                                                 etag,
+                                                 req['etag'],
                                                  None,
                                                  req['certificate_path'],
                                                  req['secondary_certificate_path'],
@@ -425,16 +427,22 @@ class TestEnrollmentDelete():
                                                      mock_target['entity'], resource_group)
 
 
-def generate_enrollment_group_create_req(certificate_path=None, iot_hub_host_name=None,
+def generate_enrollment_group_create_req(iot_hub_host_name=None,
                                          initial_twin_tags=None,
+                                         certificate_path=None,
                                          secondary_certificate_path=None,
-                                         initial_twin_properties=None, provisioning_status=None):
+                                         root_ca_name=None,
+                                         secondary_root_ca_name=None,
+                                         initial_twin_properties=None,
+                                         provisioning_status=None):
     return {'client': None,
             'enrollment_id': enrollment_id,
             'rg': resource_group,
             'dps_name': mock_target['entity'],
             'certificate_path': certificate_path,
             'secondary_certificate_path': secondary_certificate_path,
+            'root_ca_name': root_ca_name,
+            'secondary_root_ca_name': secondary_root_ca_name,
             'iot_hub_host_name': iot_hub_host_name,
             'initial_twin_tags': initial_twin_tags,
             'initial_twin_properties': initial_twin_properties,
@@ -453,9 +461,12 @@ class TestEnrollmentGroupCreate():
     @pytest.mark.parametrize("req", [
         (generate_enrollment_group_create_req(certificate_path='myCert')),
         (generate_enrollment_group_create_req(secondary_certificate_path='myCert2')),
-        (generate_enrollment_group_create_req(certificate_path='myCert', iot_hub_host_name='myHub',
-                                              provisioning_status='disabled')),
+        (generate_enrollment_group_create_req(root_ca_name='myCert')),
+        (generate_enrollment_group_create_req(secondary_root_ca_name='myCert2')),
         (generate_enrollment_group_create_req(certificate_path='myCert',
+                                              iot_hub_host_name='myHub',
+                                              provisioning_status='disabled')),
+        (generate_enrollment_group_create_req(root_ca_name='myCert',
                                               provisioning_status='enabled',
                                               initial_twin_properties={'key': 'value'}))
     ])
@@ -466,6 +477,8 @@ class TestEnrollmentGroupCreate():
                                                        req['rg'],
                                                        req['certificate_path'],
                                                        req['secondary_certificate_path'],
+                                                       req['root_ca_name'],
+                                                       req['secondary_root_ca_name'],
                                                        req['iot_hub_host_name'],
                                                        req['initial_twin_tags'],
                                                        req['initial_twin_properties'],
@@ -482,6 +495,10 @@ class TestEnrollmentGroupCreate():
             assert body['attestation']['x509']['signingCertificates']['primary'] is not None
         if req['secondary_certificate_path']:
             assert body['attestation']['x509']['signingCertificates']['secondary'] is not None
+        if req['root_ca_name']:
+                assert body['attestation']['x509']['caReferences']['primary'] is not None
+        if req['secondary_root_ca_name']:
+            assert body['attestation']['x509']['caReferences']['secondary'] is not None
 
         if req['iot_hub_host_name']:
             assert body['iotHubHostName'] == req['iot_hub_host_name']
@@ -493,22 +510,43 @@ class TestEnrollmentGroupCreate():
             assert body['initialTwin']['tags'] == req['initial_twin_tags']
 
     @pytest.mark.parametrize("req", [
-        (generate_enrollment_group_create_req())
+        (generate_enrollment_group_create_req()),
+        (generate_enrollment_group_create_req(certificate_path='myCert',
+                                              root_ca_name='myCert')),
+        (generate_enrollment_group_create_req(secondary_certificate_path='myCert2',
+                                              root_ca_name='myCert',
+                                              secondary_root_ca_name='myCert2')),
+        (generate_enrollment_group_create_req(root_ca_name='myCert',
+                                              secondary_certificate_path='myCert2'))
     ])
     def test_enrollment_group_create_invalid_args(self, serviceclient, req):
         with pytest.raises(CLIError):
-            subject.iot_dps_device_enrollment_group_create(None, req['enrollment_id'],
-                                                           req['dps_name'], req['rg'],
-                                                           req['certificate_path'])
+            subject.iot_dps_device_enrollment_group_create(None,
+                                                           req['enrollment_id'],
+                                                           req['dps_name'],
+                                                           req['rg'],
+                                                           req['certificate_path'],
+                                                           req['secondary_certificate_path'],
+                                                           req['root_ca_name'],
+                                                           req['secondary_root_ca_name'],
+                                                           req['iot_hub_host_name'],
+                                                           req['initial_twin_tags'],
+                                                           req['initial_twin_properties'],
+                                                           req['provisioning_status'])
 
     @pytest.mark.parametrize("req", [
         (generate_enrollment_group_create_req(certificate_path='myCert'))
     ])
     def test_enrollment_group_show_error(self, serviceclient_generic_error, req):
         with pytest.raises(CLIError):
-            subject.iot_dps_device_enrollment_group_create(None, req['enrollment_id'],
-                                                           req['dps_name'], req['rg'],
+            subject.iot_dps_device_enrollment_group_create(None,
+                                                           req['enrollment_id'],
+                                                           req['dps_name'],
+                                                           req['rg'],
                                                            req['certificate_path'],
+                                                           req['secondary_certificate_path'],
+                                                           req['root_ca_name'],
+                                                           req['secondary_root_ca_name'],
                                                            req['iot_hub_host_name'],
                                                            req['initial_twin_tags'],
                                                            req['initial_twin_properties'],
@@ -535,24 +573,32 @@ def generate_enrollment_group_show(**kvp):
     return payload
 
 
-def generate_enrollment_group_update_req(certificate_path=None, iot_hub_host_name=None,
+def generate_enrollment_group_update_req(iot_hub_host_name=None,
                                          initial_twin_tags=None,
+                                         certificate_path=None,
                                          secondary_certificate_path=None,
-                                         remove_certificate_path=None,
-                                         remove_secondary_certificate_path=None,
-                                         initial_twin_properties=None, provisioning_status=None):
+                                         root_ca_name=None,
+                                         secondary_root_ca_name=None,
+                                         remove_certificate=None,
+                                         remove_secondary_certificate=None,
+                                         initial_twin_properties=None,
+                                         provisioning_status=None,
+                                         etag=None):
     return {'client': None,
             'enrollment_id': enrollment_id,
             'rg': resource_group,
             'dps_name': mock_target['entity'],
             'certificate_path': certificate_path,
             'secondary_certificate_path': secondary_certificate_path,
-            'remove_certificate_path': remove_certificate_path,
-            'remove_secondary_certificate_path': remove_secondary_certificate_path,
+            'root_ca_name': root_ca_name,
+            'secondary_root_ca_name': secondary_root_ca_name,
+            'remove_certificate': remove_certificate,
+            'remove_secondary_certificate': remove_secondary_certificate,
             'iot_hub_host_name': iot_hub_host_name,
             'initial_twin_tags': initial_twin_tags,
             'initial_twin_properties': initial_twin_properties,
-            'provisioning_status': provisioning_status}
+            'provisioning_status': provisioning_status,
+            'etag': etag}
 
 
 class TestEnrollmentGroupUpdate():
@@ -567,9 +613,11 @@ class TestEnrollmentGroupUpdate():
         return service_client
 
     @pytest.mark.parametrize("req", [
-        (generate_enrollment_group_update_req(secondary_certificate_path='someOtherCertPath')),
+        (generate_enrollment_group_update_req(etag=etag, secondary_certificate_path='someOtherCertPath')),
         (generate_enrollment_group_update_req(certificate_path='newCertPath', secondary_certificate_path='someOtherCertPath')),
-        (generate_enrollment_group_update_req(remove_certificate_path='true')),
+        (generate_enrollment_group_update_req(root_ca_name='someOtherCertName')),
+        (generate_enrollment_group_update_req(secondary_root_ca_name='someOtherCertName')),
+        (generate_enrollment_group_update_req(remove_certificate='true', root_ca_name='newCertName')),
         (generate_enrollment_group_update_req(iot_hub_host_name='someOtherHubName',
                                               initial_twin_tags={'newKey': 'newValue'},
                                               initial_twin_properties={'newKey': 'newValue'},
@@ -580,11 +628,13 @@ class TestEnrollmentGroupUpdate():
                                                        req['enrollment_id'],
                                                        req['dps_name'],
                                                        req['rg'],
-                                                       etag,
+                                                       req['etag'],
                                                        req['certificate_path'],
                                                        req['secondary_certificate_path'],
-                                                       req['remove_certificate_path'],
-                                                       req['remove_secondary_certificate_path'],
+                                                       req['root_ca_name'],
+                                                       req['secondary_root_ca_name'],
+                                                       req['remove_certificate'],
+                                                       req['remove_secondary_certificate'],
                                                        req['iot_hub_host_name'],
                                                        req['initial_twin_tags'],
                                                        req['initial_twin_properties'],
@@ -599,14 +649,19 @@ class TestEnrollmentGroupUpdate():
         body = args[0][2]
 
         if not req['certificate_path']:
-            if req['remove_certificate_path']:
-                assert body['attestation']['x509']['signingCertificates']['primary'] is None
-            else:
+            if not req['root_ca_name'] and not req['secondary_root_ca_name']:
                 assert body['attestation']['x509']['signingCertificates']['primary']['info'] is not None
+
         if req['certificate_path']:
             assert body['attestation']['x509']['signingCertificates']['primary']['certificate'] is not None
         if req['secondary_certificate_path']:
             assert body['attestation']['x509']['signingCertificates']['secondary']['certificate'] is not None
+
+        if req['root_ca_name']:
+            assert body['attestation']['x509']['caReferences']['primary'] is not None
+        if req['secondary_root_ca_name']:
+            assert body['attestation']['x509']['caReferences']['secondary'] is not None
+
         if req['iot_hub_host_name']:
             assert body['iotHubHostName'] == req['iot_hub_host_name']
         if req['provisioning_status']:
@@ -615,6 +670,36 @@ class TestEnrollmentGroupUpdate():
             assert body['initialTwin']['properties']['desired'] == req['initial_twin_properties']
         if req['initial_twin_tags']:
             assert body['initialTwin']['tags'] == req['initial_twin_tags']
+
+    @pytest.mark.parametrize("req", [
+        (generate_enrollment_group_update_req(certificate_path='myCert',
+                                              root_ca_name='myCert')),
+        (generate_enrollment_group_update_req(secondary_certificate_path='myCert2',
+                                              root_ca_name='myCert',
+                                              secondary_root_ca_name='myCert2')),
+        (generate_enrollment_group_update_req(root_ca_name='myCert',
+                                              secondary_certificate_path='myCert2')),
+        (generate_enrollment_group_update_req(remove_certificate='true',
+                                              remove_secondary_certificate='true')),
+        (generate_enrollment_group_update_req(remove_certificate='true'))
+    ])
+    def test_enrollment_group_update_invalid_args(self, serviceclient, req):
+        with pytest.raises(CLIError):
+            subject.iot_dps_device_enrollment_group_update(None,
+                                                           req['enrollment_id'],
+                                                           req['dps_name'],
+                                                           req['rg'],
+                                                           etag,
+                                                           req['certificate_path'],
+                                                           req['secondary_certificate_path'],
+                                                           req['root_ca_name'],
+                                                           req['secondary_root_ca_name'],
+                                                           req['remove_certificate'],
+                                                           req['remove_secondary_certificate'],
+                                                           req['iot_hub_host_name'],
+                                                           req['initial_twin_tags'],
+                                                           req['initial_twin_properties'],
+                                                           req['provisioning_status'])
 
 
 class TestEnrollmentGroupShow():
@@ -745,7 +830,7 @@ class TestEnrollmentGroupDelete():
 
 
 def generate_registration_state_show():
-    payload = {'registrationId': registration_id, 'status': 'assigned', 'etag': 'AAAA=', 'assignedHub': 'myHub',
+    payload = {'registrationId': registration_id, 'status': 'assigned', 'etag': etag, 'assignedHub': 'myHub',
                'deviceId': 'myDevice'}
     return payload
 
