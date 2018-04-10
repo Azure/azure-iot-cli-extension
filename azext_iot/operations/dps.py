@@ -115,8 +115,10 @@ def iot_dps_device_enrollment_update(client,
         enrollment_record = m_sdk.device_enrollment.get(enrollment_id)
 
         # Verify etag
-        if 'etag' in enrollment_record and etag != enrollment_record['etag'].replace('"', ''):
+        if etag and 'etag' in enrollment_record and etag != enrollment_record['etag'].replace('"', ''):
             raise LookupError("enrollment etag doesn't match.")
+        if not etag:
+            etag = enrollment_record['etag'].replace('"', '')
 
         # Verify and update attestation information
         attestation_type = enrollment_record['attestation']['type']
@@ -234,7 +236,7 @@ def iot_dps_device_enrollment_group_update(client,
                                            enrollment_id,
                                            dps_name,
                                            resource_group_name,
-                                           etag,
+                                           etag=None,
                                            certificate_path=None,
                                            secondary_certificate_path=None,
                                            root_ca_name=None,
@@ -249,12 +251,13 @@ def iot_dps_device_enrollment_group_update(client,
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
 
-        # Verify etag
         enrollment_record = m_sdk.device_enrollment_group.get(enrollment_id)
-        if 'etag' not in enrollment_record:
-            raise LookupError("enrollment etag not found.")
-        if etag != enrollment_record['etag'].replace('"', ''):
+
+        # Verify etag
+        if etag and 'etag' in enrollment_record and etag != enrollment_record['etag'].replace('"', ''):
             raise LookupError("enrollment etag doesn't match.")
+        if not etag:
+            etag = enrollment_record['etag'].replace('"', '')
 
         # Update enrollment information
         if not certificate_path and not secondary_certificate_path:

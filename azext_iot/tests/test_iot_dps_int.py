@@ -171,15 +171,15 @@ class IoTDpsTest(LiveScenarioTest):
                  .format(rg, dps, enrollment_id),
                  checks=[self.check('enrollmentGroupId', enrollment_id)])
 
-        etag = self.cmd('iot dps enrollment-group update -g {} --dps-name {} --enrollment-id {}'
-                        ' --provisioning-status {} -rsc --etag {}'
-                        .format(rg, dps, enrollment_id, self.provisioning_status_new, etag),
-                        checks=[
-                            self.check('attestation.type', AttestationType.x509.value),
-                            self.check('enrollmentGroupId', enrollment_id),
-                            self.check('provisioningStatus', self.provisioning_status_new),
-                            self.check('attestation.type.x509.clientCertificates.secondary', None)
-                        ]).get_output_in_json()['etag']
+        self.cmd('iot dps enrollment-group update -g {} --dps-name {} --enrollment-id {}'
+                 ' --provisioning-status {} -rsc --etag {}'
+                 .format(rg, dps, enrollment_id, self.provisioning_status_new, etag),
+                 checks=[
+                     self.check('attestation.type', AttestationType.x509.value),
+                     self.check('enrollmentGroupId', enrollment_id),
+                     self.check('provisioningStatus', self.provisioning_status_new),
+                     self.check('attestation.type.x509.clientCertificates.secondary', None)
+                 ])
 
         self.cmd('iot dps registration list -g {} --dps-name {} --enrollment-id {}'
                  .format(rg, dps, enrollment_id),
@@ -192,7 +192,7 @@ class IoTDpsTest(LiveScenarioTest):
 
         self.cmd('iot dps enrollment-group update -g {} --dps-name {} --enrollment-id {}'
                  ' -cn {} --etag {}'
-                 .format(rg, dps, enrollment_id, cert_name, etag),
+                 .format(rg, dps, enrollment_id, cert_name),
                  checks=[
                      self.check('attestation.type',
                                 AttestationType.x509.value),

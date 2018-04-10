@@ -217,7 +217,8 @@ def generate_enrollment_update_req(certificate_path=None, iot_hub_host_name=None
                                    remove_certificate_path=None,
                                    remove_secondary_certificate_path=None,
                                    initial_twin_properties=None, provisioning_status=None,
-                                   device_id=None):
+                                   device_id=None,
+                                   etag=None):
     return {'client': None,
             'enrollment_id': enrollment_id,
             'rg': resource_group,
@@ -230,7 +231,8 @@ def generate_enrollment_update_req(certificate_path=None, iot_hub_host_name=None
             'initial_twin_tags': initial_twin_tags,
             'initial_twin_properties': initial_twin_properties,
             'provisioning_status': provisioning_status,
-            'device_id': device_id}
+            'device_id': device_id,
+            'etag': etag}
 
 
 class TestEnrollmentUpdate():
@@ -245,7 +247,7 @@ class TestEnrollmentUpdate():
         return service_client
 
     @pytest.mark.parametrize("req", [
-        (generate_enrollment_update_req(secondary_certificate_path='someOtherCertPath')),
+        (generate_enrollment_update_req(etag=etag, secondary_certificate_path='someOtherCertPath')),
         (generate_enrollment_update_req(certificate_path='newCertPath', secondary_certificate_path='someOtherCertPath')),
         (generate_enrollment_update_req(remove_certificate_path='true')),
         (generate_enrollment_update_req(iot_hub_host_name='someOtherHubName',
@@ -259,7 +261,7 @@ class TestEnrollmentUpdate():
                                                  req['enrollment_id'],
                                                  req['dps_name'],
                                                  req['rg'],
-                                                 etag,
+                                                 req['etag'],
                                                  None,
                                                  req['certificate_path'],
                                                  req['secondary_certificate_path'],
@@ -579,7 +581,9 @@ def generate_enrollment_group_update_req(iot_hub_host_name=None,
                                          secondary_root_ca_name=None,
                                          remove_certificate=None,
                                          remove_secondary_certificate=None,
-                                         initial_twin_properties=None, provisioning_status=None):
+                                         initial_twin_properties=None,
+                                         provisioning_status=None,
+                                         etag=None):
     return {'client': None,
             'enrollment_id': enrollment_id,
             'rg': resource_group,
@@ -593,7 +597,8 @@ def generate_enrollment_group_update_req(iot_hub_host_name=None,
             'iot_hub_host_name': iot_hub_host_name,
             'initial_twin_tags': initial_twin_tags,
             'initial_twin_properties': initial_twin_properties,
-            'provisioning_status': provisioning_status}
+            'provisioning_status': provisioning_status,
+            'etag': etag}
 
 
 class TestEnrollmentGroupUpdate():
@@ -608,7 +613,7 @@ class TestEnrollmentGroupUpdate():
         return service_client
 
     @pytest.mark.parametrize("req", [
-        (generate_enrollment_group_update_req(secondary_certificate_path='someOtherCertPath')),
+        (generate_enrollment_group_update_req(etag=etag, secondary_certificate_path='someOtherCertPath')),
         (generate_enrollment_group_update_req(certificate_path='newCertPath', secondary_certificate_path='someOtherCertPath')),
         (generate_enrollment_group_update_req(root_ca_name='someOtherCertName')),
         (generate_enrollment_group_update_req(secondary_root_ca_name='someOtherCertName')),
@@ -623,7 +628,7 @@ class TestEnrollmentGroupUpdate():
                                                        req['enrollment_id'],
                                                        req['dps_name'],
                                                        req['rg'],
-                                                       etag,
+                                                       req['etag'],
                                                        req['certificate_path'],
                                                        req['secondary_certificate_path'],
                                                        req['root_ca_name'],
@@ -825,7 +830,7 @@ class TestEnrollmentGroupDelete():
 
 
 def generate_registration_state_show():
-    payload = {'registrationId': registration_id, 'status': 'assigned', 'etag': 'AAAA=', 'assignedHub': 'myHub',
+    payload = {'registrationId': registration_id, 'status': 'assigned', 'etag': etag, 'assignedHub': 'myHub',
                'deviceId': 'myDevice'}
     return payload
 
