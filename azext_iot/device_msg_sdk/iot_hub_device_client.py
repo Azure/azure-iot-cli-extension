@@ -49,10 +49,10 @@ class IotHubDeviceClientConfiguration(AzureConfiguration):
 
         if credentials is None:
             raise ValueError("Parameter 'credentials' must not be None.")
-        if subscription_id is None:
-            raise ValueError("Parameter 'subscription_id' must not be None.")
-        if not isinstance(subscription_id, str):
-            raise TypeError("Parameter 'subscription_id' must be str.")
+        # if subscription_id is None:
+        #     raise ValueError("Parameter 'subscription_id' must not be None.")
+        # if not isinstance(subscription_id, str):
+        #     raise TypeError("Parameter 'subscription_id' must be str.")
         if api_version is not None and not isinstance(api_version, str):
             raise TypeError("Optional parameter 'api_version' must be str.")
         if accept_language is not None and not isinstance(accept_language, str):

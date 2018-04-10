@@ -30,7 +30,6 @@ from azext_iot.modules_sdk.models.device import Device
 from azext_iot.modules_sdk.models.configuration_content import ConfigurationContent
 from azext_iot.modules_sdk.models.configuration import Configuration
 from azext_iot.modules_sdk.models.device_module import DeviceModule
-from azext_iot.assets.user_messages import ERROR_NO_HUB_OR_LOGIN_ON_INPUT
 
 logger = get_logger(__name__)
 
@@ -38,9 +37,6 @@ logger = get_logger(__name__)
 # Query
 
 def iot_query(cmd, query_command, hub_name=None, top=None, resource_group_name=None, login=None):
-    if not any([hub_name, login]):
-        raise CLIError(ERROR_NO_HUB_OR_LOGIN_ON_INPUT)
-
     from azext_iot.device_query_sdk.models.query_specification import QuerySpecification
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     q_sdk, errors = _bind_sdk(target, SdkType.device_query_sdk)
@@ -53,8 +49,12 @@ def iot_query(cmd, query_command, hub_name=None, top=None, resource_group_name=N
 
 # Device
 
-def iot_device_show(client, device_id, hub_name, resource_group_name=None):
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+def iot_device_show(cmd, device_id, hub_name=None, resource_group_name=None, login=None):
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
+    return _iot_device_show(target, device_id)
+
+
+def _iot_device_show(target, device_id):
     m_sdk, errors = _bind_sdk(target, SdkType.modules_sdk)
     try:
         device = m_sdk.device_api.get_device(device_id)
@@ -64,18 +64,18 @@ def iot_device_show(client, device_id, hub_name, resource_group_name=None):
         raise CLIError(e)
 
 
-def iot_device_list(client, hub_name, top=10, edge_enabled=False, resource_group_name=None):
+def iot_device_list(cmd, hub_name=None, top=10, edge_enabled=False, resource_group_name=None, login=None):
     if top <= 0:
         raise CLIError('top must be > 0')
 
     query = 'select * from devices where capabilities.iotEdge = true' if edge_enabled else 'select * from devices'
-    result = iot_query(client, query, hub_name, top, resource_group_name)
+    result = iot_query(cmd, query, hub_name, top, resource_group_name, login=login)
     if not result:
         logger.info('No registered devices found on hub "%s".', hub_name)
     return result
 
 
-def iot_device_create(cmd, device_id, hub_name, edge_enabled=False,
+def iot_device_create(cmd, device_id, hub_name=None, edge_enabled=False,
                       auth_method='shared_private_key', primary_thumbprint=None,
                       secondary_thumbprint=None, status='enabled', status_reason=None,
                       valid_days=None, output_dir=None, resource_group_name=None, login=None):
@@ -129,8 +129,8 @@ def _create_self_signed_cert(subject, valid_days, output_path=None):
     return create_self_signed_certificate(subject, valid_days, output_path)
 
 
-def iot_device_update(client, device_id, hub_name, parameters, resource_group_name=None):
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+def iot_device_update(cmd, device_id, parameters, hub_name=None, resource_group_name=None, login=None):
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     m_sdk, errors = _bind_sdk(target, SdkType.modules_sdk)
     try:
         updated_device = _handle_device_update_params(parameters)
@@ -158,8 +158,8 @@ def _handle_device_update_params(parameters):
     return _assemble_device(parameters['deviceId'], auth, edge, pk, sk, status, parameters.get('statusReason'))
 
 
-def iot_device_delete(client, device_id, hub_name, resource_group_name=None):
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+def iot_device_delete(cmd, device_id, hub_name=None, resource_group_name=None, login=None):
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     m_sdk, errors = _bind_sdk(target, SdkType.modules_sdk)
     try:
         device = m_sdk.device_api.get_device(device_id)
@@ -176,8 +176,8 @@ def iot_device_delete(client, device_id, hub_name, resource_group_name=None):
 
 # Module
 
-def iot_device_module_create(client, device_id, hub_name, module_id, resource_group_name=None):
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+def iot_device_module_create(cmd, device_id, module_id, hub_name=None, resource_group_name=None, login=None):
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     m_sdk, errors = _bind_sdk(target, SdkType.modules_sdk)
     try:
         # Current SPK auth only
@@ -194,8 +194,9 @@ def _assemble_module(device_id, module_id, auth_method, pk=None, sk=None):
     return module
 
 
-def iot_device_module_update(client, device_id, hub_name, module_id, parameters, resource_group_name=None):
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+def iot_device_module_update(cmd, device_id, module_id, parameters,
+                             hub_name=None, resource_group_name=None, login=None):
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     m_sdk, errors = _bind_sdk(target, SdkType.modules_sdk)
     try:
         updated_module = _handle_module_update_params(parameters)
@@ -231,19 +232,19 @@ def _parse_auth(parameters):
     return auth, pk, sk
 
 
-def iot_device_module_list(client, device_id, hub_name, top=10, resource_group_name=None):
+def iot_device_module_list(cmd, device_id, hub_name=None, top=10, resource_group_name=None, login=None):
     if top <= 0:
         raise CLIError('top must be > 0')
 
     query = "select * from devices.modules where devices.deviceId = '{}'".format(device_id)
-    result = iot_query(client, query, hub_name, top, resource_group_name)
+    result = iot_query(cmd, query, hub_name, top, resource_group_name, login=login)
     if not result:
         logger.info('No modules found on registered device "%s".', device_id)
     return result
 
 
-def iot_device_module_show(client, device_id, hub_name, module_id, resource_group_name=None):
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+def iot_device_module_show(cmd, device_id, module_id, hub_name=None, resource_group_name=None, login=None):
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     m_sdk, errors = _bind_sdk(target, SdkType.modules_sdk)
     try:
         module = m_sdk.module_api.get_module(device_id, module_id)
@@ -253,8 +254,8 @@ def iot_device_module_show(client, device_id, hub_name, module_id, resource_grou
         raise CLIError(e)
 
 
-def iot_device_module_delete(client, device_id, hub_name, module_id, resource_group_name=None):
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+def iot_device_module_delete(cmd, device_id, module_id, hub_name=None, resource_group_name=None, login=None):
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     m_sdk, errors = _bind_sdk(target, SdkType.modules_sdk)
     try:
         module = m_sdk.module_api.get_module(device_id, module_id)
@@ -271,8 +272,8 @@ def iot_device_module_delete(client, device_id, hub_name, module_id, resource_gr
 
 # Module Twin
 
-def iot_device_module_twin_show(client, device_id, hub_name, module_id, resource_group_name=None):
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+def iot_device_module_twin_show(cmd, device_id, module_id, hub_name=None, resource_group_name=None, login=None):
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     m_sdk, errors = _bind_sdk(target, SdkType.modules_sdk)
     try:
         return m_sdk.device_twin_api.get_module_twin(device_id, module_id)
@@ -280,8 +281,8 @@ def iot_device_module_twin_show(client, device_id, hub_name, module_id, resource
         raise CLIError(e)
 
 
-def iot_device_module_twin_update(client, device_id, hub_name, module_id, parameters, resource_group_name=None):
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+def iot_device_module_twin_update(cmd, device_id, module_id, parameters, hub_name=None, resource_group_name=None, login=None):
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     m_sdk, errors = _bind_sdk(target, SdkType.modules_sdk)
     try:
         etag = parameters.get('etag', None)
@@ -294,8 +295,8 @@ def iot_device_module_twin_update(client, device_id, hub_name, module_id, parame
         raise CLIError(e)
 
 
-def iot_device_module_twin_replace(client, device_id, hub_name, module_id, target_json, resource_group_name=None):
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+def iot_device_module_twin_replace(cmd, device_id, module_id, target_json, hub_name=None, resource_group_name=None, login=None):
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     m_sdk, errors = _bind_sdk(target, SdkType.modules_sdk)
     try:
         if exists(target_json):
@@ -316,8 +317,8 @@ def iot_device_module_twin_replace(client, device_id, hub_name, module_id, targe
 
 # Configuration
 
-def iot_device_configuration_apply(client, device_id, hub_name, content, resource_group_name=None):
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+def iot_device_configuration_apply(cmd, device_id, content, hub_name=None, resource_group_name=None, login=None):
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     m_sdk, errors = _bind_sdk(target, SdkType.modules_sdk)
     try:
         if exists(content):
@@ -331,16 +332,16 @@ def iot_device_configuration_apply(client, device_id, hub_name, content, resourc
             raise CLIError("content json must include 'moduleContent' property.")
         content = ConfigurationContent(module_content=module_content)
         m_sdk.device_api.apply_configuration_content_on_device(device_id, content)
-        return iot_device_module_list(client, device_id, hub_name, 1000)
+        return iot_device_module_list(cmd, device_id, hub_name=hub_name, top=1000, login=login)
     except ValueError as j:
         raise CLIError('improperly formatted json: {}'.format(j))
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
 
 
-def iot_device_configuration_create(client, config_id, hub_name, content, target_condition="", priority=0,
-                                    labels=None, resource_group_name=None):
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+def iot_device_configuration_create(cmd, config_id, content, hub_name=None, target_condition="", priority=0,
+                                    labels=None, resource_group_name=None, login=None):
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     m_sdk, errors = _bind_sdk(target, SdkType.modules_sdk)
     try:
         if exists(content):
@@ -368,8 +369,8 @@ def iot_device_configuration_create(client, config_id, hub_name, content, target
         raise CLIError(e)
 
 
-def iot_device_configuration_update(client, config_id, hub_name, parameters, resource_group_name=None):
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+def iot_device_configuration_update(cmd, config_id, parameters, hub_name=None, resource_group_name=None, login=None):
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     m_sdk, errors = _bind_sdk(target, SdkType.modules_sdk)
     try:
         parameters = _handle_device_configuration_update_params(parameters)
@@ -409,8 +410,8 @@ def _handle_device_configuration_update_params(parameters):
     return parameters
 
 
-def iot_device_configuration_show(client, config_id, hub_name, resource_group_name=None):
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+def iot_device_configuration_show(cmd, config_id, hub_name=None, resource_group_name=None, login=None):
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     m_sdk, errors = _bind_sdk(target, SdkType.modules_sdk)
     try:
         return m_sdk.configuration_api.get_configuration(config_id)
@@ -418,8 +419,8 @@ def iot_device_configuration_show(client, config_id, hub_name, resource_group_na
         raise CLIError(e)
 
 
-def iot_device_configuration_list(client, hub_name, top=5, resource_group_name=None):
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+def iot_device_configuration_list(cmd, hub_name=None, top=5, resource_group_name=None, login=None):
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     if top <= 0:
         raise CLIError('top must be > 0')
     m_sdk, errors = _bind_sdk(target, SdkType.modules_sdk)
@@ -432,8 +433,8 @@ def iot_device_configuration_list(client, hub_name, top=5, resource_group_name=N
         raise CLIError(e)
 
 
-def iot_device_configuration_delete(client, config_id, hub_name, resource_group_name=None):
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+def iot_device_configuration_delete(cmd, config_id, hub_name=None, resource_group_name=None, login=None):
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     m_sdk, errors = _bind_sdk(target, SdkType.modules_sdk)
     try:
         config = m_sdk.configuration_api.get_configuration(config_id)
@@ -450,16 +451,16 @@ def iot_device_configuration_delete(client, config_id, hub_name, resource_group_
 
 # Device Twin
 
-def iot_device_twin_show(client, device_id, hub_name, resource_group_name=None):
+def iot_device_twin_show(cmd, device_id, hub_name=None, resource_group_name=None, login=None):
     query = "SELECT * FROM devices where devices.deviceId='{}'".format(device_id)
-    result = iot_query(client, query, hub_name, None, resource_group_name)
+    result = iot_query(cmd, query, hub_name, None, resource_group_name, login=login)
     if not result:
         raise CLIError('No registered device "{}" found.'.format(device_id))
     return result[0]
 
 
-def iot_device_twin_update(client, device_id, hub_name, parameters, resource_group_name=None):
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+def iot_device_twin_update(cmd, device_id, parameters, hub_name=None, resource_group_name=None, login=None):
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     dt_sdk, errors = _bind_sdk(target, SdkType.device_twin_sdk)
 
     try:
@@ -473,8 +474,8 @@ def iot_device_twin_update(client, device_id, hub_name, parameters, resource_gro
         raise CLIError(e)
 
 
-def iot_device_twin_replace(client, device_id, hub_name, target_json, resource_group_name=None):
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+def iot_device_twin_replace(cmd, device_id, target_json, hub_name=None, resource_group_name=None, login=None):
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     dt_sdk, errors = _bind_sdk(target, SdkType.device_twin_sdk)
 
     try:
@@ -496,11 +497,12 @@ def iot_device_twin_replace(client, device_id, hub_name, target_json, resource_g
 
 # Device Method Invoke
 
-def iot_device_method(client, device_id, hub_name, method_name, method_payload="{}", timeout=60, resource_group_name=None):
+def iot_device_method(cmd, device_id, method_name, hub_name=None, method_payload="{}",
+                      timeout=60, resource_group_name=None, login=None):
     from azext_iot.device_twin_sdk.models.cloud_to_device_method import CloudToDeviceMethod
     from azext_iot._constants import METHOD_INVOKE_MAX_TIMEOUT_SEC, METHOD_INVOKE_MIN_TIMEOUT_SEC
 
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     if timeout > METHOD_INVOKE_MAX_TIMEOUT_SEC:
         raise CLIError('timeout must not be over {} seconds'.format(METHOD_INVOKE_MAX_TIMEOUT_SEC))
     if timeout < METHOD_INVOKE_MIN_TIMEOUT_SEC:
@@ -524,12 +526,12 @@ def iot_device_method(client, device_id, hub_name, method_name, method_payload="
 
 # Device Module Method Invoke
 
-def iot_device_module_method(client, device_id, hub_name, module_id, method_name, method_payload="{}",
-                             timeout=60, resource_group_name=None):
+def iot_device_module_method(cmd, device_id, module_id, method_name, hub_name=None, method_payload="{}",
+                             timeout=60, resource_group_name=None, login=None):
     from azext_iot.modules_sdk.models.cloud_to_device_method import CloudToDeviceMethod
     from azext_iot._constants import METHOD_INVOKE_MAX_TIMEOUT_SEC, METHOD_INVOKE_MIN_TIMEOUT_SEC
 
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     if timeout > METHOD_INVOKE_MAX_TIMEOUT_SEC:
         raise CLIError('timeout must not be over {} seconds'.format(METHOD_INVOKE_MAX_TIMEOUT_SEC))
     if timeout < METHOD_INVOKE_MIN_TIMEOUT_SEC:
@@ -552,19 +554,46 @@ def iot_device_module_method(client, device_id, hub_name, module_id, method_name
 
 # Utility
 
-def iot_get_sas_token(client, hub_name, device_id=None, policy_name='iothubowner',
-                      key_type='primary', duration=3600, resource_group_name=None):
-    return {'sas': _iot_build_sas_token(client, hub_name, device_id,
-                                        policy_name, key_type, duration, resource_group_name).generate_sas_token()}
+def iot_get_sas_token(cmd, hub_name=None, device_id=None, policy_name='iothubowner',
+                      key_type='primary', duration=3600, resource_group_name=None, login=None):
+    key_type = key_type.lower()
+    policy_name = policy_name.lower()
+
+    if login and policy_name != 'iothubowner':
+        raise CLIError('You are unable to change the sas policy with a hub connection string login.')
+    if login and key_type != 'primary' and not device_id:
+        raise CLIError('For non-device sas, you are unable to change the key type with a connection string login.')
+
+    return {'sas': _iot_build_sas_token(cmd, hub_name, device_id,
+                                        policy_name, key_type, duration, resource_group_name, login).generate_sas_token()}
 
 
-def _iot_build_sas_token(client, hub_name, device_id=None, policy_name='iothubowner',
-                         key_type='primary', duration=3600, resource_group_name=None):
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name, policy_name)
-    uri = '{0}/devices/{1}'.format(target['entity'], device_id) if device_id else target['entity']
-    return SasTokenAuthentication(uri, target['policy'],
-                                  target['primarykey'] if key_type == 'primary' else target['secondarykey'],
-                                  time() + duration)
+def _iot_build_sas_token(cmd, hub_name=None, device_id=None, policy_name='iothubowner',
+                         key_type='primary', duration=3600, resource_group_name=None, login=None):
+    from azext_iot.common.azure import parse_iot_device_connection_string
+
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, policy_name, login=login)
+    uri = None
+    policy = None
+    key = None
+    if device_id:
+        logger.info('Obtaining device "%s" details from registry, using IoT Hub policy "%s"', device_id, policy_name)
+        device = _iot_device_show(target, device_id)
+        device_cs = _build_device_or_module_connection_string(device=device, key_type=key_type)
+        uri = '{}/devices/{}'.format(target['entity'], device_id)
+        try:
+            parsed_device_cs = parse_iot_device_connection_string(device_cs)
+        except ValueError as e:
+            logger.debug(e)
+            raise CLIError('This device does not support SAS auth.')
+
+        key = parsed_device_cs['SharedAccessKey']
+    else:
+        uri = target['entity']
+        policy = target['policy']
+        key = target['primarykey'] if key_type == 'primary' else target['secondarykey']
+
+    return SasTokenAuthentication(uri, policy, key, time() + duration)
 
 
 # pylint: disable=inconsistent-return-statements
@@ -589,35 +618,37 @@ def _build_device_or_module_connection_string(device, key_type='primary', module
     raise CLIError('Unable to form target connection string')
 
 
-def iot_get_hub_connection_string(client, hub_name, policy_name='iothubowner', key_type='primary',
+def iot_get_hub_connection_string(cmd, hub_name, policy_name='iothubowner', key_type='primary',
                                   resource_group_name=None):
     result = {}
-    result['cs'] = get_iot_hub_connection_string(client, hub_name, resource_group_name,
+    result['cs'] = get_iot_hub_connection_string(cmd, hub_name, resource_group_name,
                                                  policy_name, key_type)['cs']
     return result
 
 
-def iot_get_device_connection_string(client, hub_name, device_id, key_type='primary',
-                                     resource_group_name=None):
+def iot_get_device_connection_string(cmd, device_id, hub_name=None, key_type='primary',
+                                     resource_group_name=None, login=None):
     result = {}
-    device = iot_device_show(client, device_id, hub_name, resource_group_name)
+    device = iot_device_show(cmd, device_id,
+                             hub_name=hub_name, resource_group_name=resource_group_name, login=login)
     result['cs'] = _build_device_or_module_connection_string(device, key_type)
     return result
 
 
-def iot_get_module_connection_string(client, hub_name, device_id, module_id, key_type='primary',
-                                     resource_group_name=None):
+def iot_get_module_connection_string(cmd, device_id, module_id, hub_name=None, key_type='primary',
+                                     resource_group_name=None, login=None):
     result = {}
-    module = iot_device_module_show(client, device_id, hub_name, module_id, resource_group_name)
+    module = iot_device_module_show(cmd, device_id, module_id,
+                                    resource_group_name=resource_group_name, hub_name=hub_name, login=login)
     result['cs'] = _build_device_or_module_connection_string(None, key_type, module)
     return result
 
 
 # Messaging
 
-def iot_device_send_message(client, device_id, hub_name, data='Ping from Az CLI IoT Extension',
-                            properties=None, msg_count=1, resource_group_name=None):
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+def iot_device_send_message(cmd, device_id, hub_name=None, data='Ping from Az CLI IoT Extension',
+                            properties=None, msg_count=1, resource_group_name=None, login=None):
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     return _iot_device_send_message(target, device_id, data, properties, msg_count)
 
 
@@ -647,9 +678,9 @@ def _iot_device_send_message(target, device_id, data, properties=None, msg_count
         raise CLIError(x)
 
 
-def iot_device_send_message_http(client, device_id, hub_name, data, msg_id=None,
-                                 corr_id=None, user_id=None, resource_group_name=None):
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+def iot_device_send_message_http(cmd, device_id, data, hub_name=None, msg_id=None,
+                                 corr_id=None, user_id=None, resource_group_name=None, login=None):
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     return _iot_device_send_message_http(target, device_id, data, msg_id, corr_id, user_id)
 
 
@@ -662,8 +693,8 @@ def _iot_device_send_message_http(target, device_id, data, msg_id=None,
         raise CLIError(e)
 
 
-def iot_c2d_message_complete(client, device_id, hub_name, etag, resource_group_name=None):
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+def iot_c2d_message_complete(cmd, device_id, etag, hub_name=None, resource_group_name=None, login=None):
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     return _iot_c2d_message_complete(target, device_id, etag)
 
 
@@ -675,8 +706,8 @@ def _iot_c2d_message_complete(target, device_id, etag):
         raise CLIError(e)
 
 
-def iot_c2d_message_reject(client, device_id, hub_name, etag, resource_group_name=None):
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+def iot_c2d_message_reject(cmd, device_id, etag, hub_name=None, resource_group_name=None, login=None):
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     return _iot_c2d_message_reject(target, device_id, etag)
 
 
@@ -688,8 +719,8 @@ def _iot_c2d_message_reject(target, device_id, etag):
         raise CLIError(e)
 
 
-def iot_c2d_message_abandon(client, device_id, hub_name, etag, resource_group_name=None):
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+def iot_c2d_message_abandon(cmd, device_id, etag, hub_name=None, resource_group_name=None, login=None):
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     return _iot_c2d_message_abandon(target, device_id, etag)
 
 
@@ -701,8 +732,8 @@ def _iot_c2d_message_abandon(target, device_id, etag):
         raise CLIError(e)
 
 
-def iot_c2d_message_receive(client, device_id, hub_name, lock_timeout=60, resource_group_name=None):
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+def iot_c2d_message_receive(cmd, device_id, hub_name=None, lock_timeout=60, resource_group_name=None, login=None):
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     return _iot_c2d_message_receive(target, device_id, lock_timeout)
 
 
@@ -729,9 +760,10 @@ def _iot_c2d_message_receive(target, device_id, lock_timeout=60):
         raise CLIError(e)
 
 
-def iot_simulate_device(cmd, device_id, hub_name, receive_settle='complete',
+# pylint: disable=too-many-locals
+def iot_simulate_device(cmd, device_id, hub_name=None, receive_settle='complete',
                         data='Ping from Az CLI IoT Extension', msg_count=100,
-                        msg_interval=3, protocol_type='mqtt', resource_group_name=None):
+                        msg_interval=3, protocol_type='mqtt', resource_group_name=None, login=None):
     import sys
     import uuid
     import datetime
@@ -750,7 +782,7 @@ def iot_simulate_device(cmd, device_id, hub_name, receive_settle='complete',
     if msg_count < MIN_SIM_MSG_COUNT:
         raise CLIError('msg count must be at least {}'.format(MIN_SIM_MSG_COUNT))
 
-    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name)
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     token = None
 
     # pylint: disable=too-few-public-methods
@@ -812,19 +844,23 @@ def _handle_c2d_msg(target, device_id, receive_settle):
     return False
 
 
-def iot_device_export(client, hub_name, blob_container_uri, include_keys=False, resource_group_name=None):
+def iot_device_export(cmd, hub_name, blob_container_uri, include_keys=False, resource_group_name=None):
+    from azext_iot._factory import iot_hub_service_factory
+    client = iot_hub_service_factory(cmd.cli_ctx)
     target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
     return client.export_devices(target['resourcegroup'], hub_name, blob_container_uri, not include_keys)
 
 
-def iot_device_import(client, hub_name, input_blob_container_uri, output_blob_container_uri, resource_group_name=None):
+def iot_device_import(cmd, hub_name, input_blob_container_uri, output_blob_container_uri, resource_group_name=None):
+    from azext_iot._factory import iot_hub_service_factory
+    client = iot_hub_service_factory(cmd.cli_ctx)
     target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
     return client.import_devices(target['resourcegroup'], hub_name,
                                  input_blob_container_uri, output_blob_container_uri)
 
 
-def iot_device_upload_file(client, device_id, hub_name, file_path, content_type, resource_group_name=None):
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+def iot_device_upload_file(cmd, device_id, file_path, content_type, hub_name=None, resource_group_name=None, login=None):
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     if not exists(file_path):
         raise CLIError('File path "{}" does not exist!'.format(file_path))
 

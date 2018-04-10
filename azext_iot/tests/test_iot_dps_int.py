@@ -15,7 +15,7 @@ dps = os.environ.get('azext_iot_testdps')
 rg = os.environ.get('azext_iot_testrg')
 hub = os.environ.get('azext_iot_testhub')
 
-if not any([dps, rg, hub]):
+if not all([dps, rg, hub]):
     raise ValueError('Set azext_iot_testhub, azext_iot_testdps '
                      'and azext_iot_testrg to run integration tests.')
 

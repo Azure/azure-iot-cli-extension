@@ -23,6 +23,7 @@ from azext_iot.common.shared import (
     AttestationType,
     ProtocolType
 )
+from azext_iot._validators import mode2_iot_login_handler
 
 hub_name_type = CLIArgumentType(
     completer=get_resource_name_completion_list('Microsoft.Devices/IotHubs'),
@@ -42,6 +43,11 @@ def load_arguments(self, _):
     Load CLI Args for Knack parser
     """
     with self.argument_context('iot') as context:
+        context.argument('login', options_list=['--login', '-l'],
+                         validator=mode2_iot_login_handler,
+                         help='This command supports an entity connection string with rights to perform action. '
+                         'Use to avoid session login via "az login". '
+                         'If both a login and entity name are provided the login takes priority.')
         context.argument('resource_group_name', arg_type=resource_group_name_type)
         context.argument('hub_name', options_list=['--hub-name', '-n'], arg_type=hub_name_type)
         context.argument('device_id', options_list=['--device-id', '-d'], help='Target Device.')
@@ -70,6 +76,8 @@ def load_arguments(self, _):
     with self.argument_context('iot hub') as context:
         context.argument('target_json', options_list=['--json', '-j'],
                          help='Json to replace existing twin with. Provide file path or raw json.')
+        context.argument('policy_name', options_list=['--policy-name', '-po'],
+                         help='Shared access policy with operation permissions for target IoT Hub entity.')
 
     with self.argument_context('iot hub monitor-events') as context:
         context.argument('timeout', options_list=['--timeout', '-to'], type=int,

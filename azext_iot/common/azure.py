@@ -10,18 +10,23 @@ from azext_iot.common.utility import trim_from_start
 from azext_iot._factory import iot_hub_service_factory
 
 
-def _parse_connection_string(cs, validate=None):
+def _parse_connection_string(cs, validate=None, cstring_type='entity'):
     decomposed = validate_key_value_pairs(cs)
     if validate:
         for k in validate:
             if not decomposed.get(k):
-                raise ValueError('connection string has missing property: {}'.format(k))
+                raise ValueError('{} connection string has missing property: {}'.format(cstring_type, k))
     return decomposed
 
 
 def parse_iot_hub_connection_string(cs):
     validate = ['HostName', 'SharedAccessKeyName', 'SharedAccessKey']
-    return _parse_connection_string(cs, validate)
+    return _parse_connection_string(cs, validate, 'IoT Hub')
+
+
+def parse_iot_device_connection_string(cs):
+    validate = ['HostName', 'DeviceId', 'SharedAccessKey']
+    return _parse_connection_string(cs, validate, 'Device')
 
 
 CONN_STR_TEMPLATE = 'HostName={};SharedAccessKeyName={};SharedAccessKey={}'
@@ -60,7 +65,11 @@ def get_iot_hub_connection_string(
     policy = None
 
     if login:
-        decomposed = parse_iot_hub_connection_string(login)
+        try:
+            decomposed = parse_iot_hub_connection_string(login)
+        except ValueError as e:
+            raise CLIError(e)
+
         result = {}
         result['cs'] = login
         result['policy'] = decomposed['SharedAccessKeyName']

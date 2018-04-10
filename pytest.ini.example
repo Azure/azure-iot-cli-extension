@@ -3,5 +3,6 @@ env =
     AZURE_TEST_RUN_LIVE=True
     azext_iot_testrg=
     azext_iot_testhub=
+    azext_iot_testhub_cs=
     azext_iot_testdps=
     azext_iot_teststorageuri=
