@@ -15,6 +15,7 @@ from .operations.module_api_operations import ModuleApiOperations
 from .operations.iot_dps_admin_operations import IotDpsAdminOperations
 from .operations.device_twin_api_operations import DeviceTwinApiOperations
 from . import models
+from azext_iot._constants import VERSION as extver
 
 
 class IotHubClientConfiguration(AzureConfiguration):
@@ -45,7 +46,7 @@ class IotHubClientConfiguration(AzureConfiguration):
         super(IotHubClientConfiguration, self).__init__(base_url)
 
         self.add_user_agent('iothubclient/{}'.format(VERSION))
-        self.add_user_agent('Azure-SDK-For-Python')
+        self.add_user_agent('MicrosoftAzure/IoTPlatformCliExtension/{}'.format(extver))
 
         self.credentials = credentials
         self.subscription_id = subscription_id

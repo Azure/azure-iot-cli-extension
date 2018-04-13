@@ -1,5 +1,7 @@
 import pytest
+from knack.util import CLIError
 from azext_iot.common.utility import validate_min_python_version
+from azext_iot._validators import mode2_iot_login_handler
 
 
 class TestMinPython():
@@ -27,3 +29,45 @@ class TestMinPython():
 
         with pytest.raises(exception):
             validate_min_python_version(pymajor, pyminor)
+
+
+class TestMode2Handler():
+    @pytest.mark.parametrize("hub_name, dps_name, login", [
+        ('myhub', '[]', None),
+        ('[]', 'mydps', None),
+        (None, None, 'mylogin'),
+        ('myhub', '[]', 'mylogin'),
+        ('[]', 'mydps', 'mylogin'),
+        ('[]', '[]', '[]'),
+        ('myhub', '[]', '[]'),
+        ('[]', 'mydps', '[]'),
+    ])
+    def test_mode2_login(self, mocker, hub_name, dps_name, login):
+        mock_cmd = mocker.MagicMock(name='mock cmd')
+        mock_cmd.name = 'iot '
+        mock_ns = mocker.MagicMock(name='mock ns')
+        if login != '[]':
+            mock_ns.login = login
+        if hub_name != '[]':
+            mock_ns.hub_name = hub_name
+        if dps_name != '[]':
+            mock_ns.dps_name = dps_name
+
+        mode2_iot_login_handler(mock_cmd, mock_ns)
+
+    @pytest.mark.parametrize("hub_name, dps_name, login", [
+        (None, None, None)
+    ])
+    def test_mode2_login_error(self, mocker, hub_name, dps_name, login):
+        mock_cmd = mocker.MagicMock(name='mock cmd')
+        mock_cmd.name = 'iot '
+        mock_ns = mocker.MagicMock(name='mock ns')
+        if login != '[]':
+            mock_ns.login = login
+        if hub_name != '[]':
+            mock_ns.hub_name = hub_name
+        if dps_name != '[]':
+            mock_ns.dps_name = dps_name
+
+        with pytest.raises(CLIError):
+            mode2_iot_login_handler(mock_cmd, mock_ns)

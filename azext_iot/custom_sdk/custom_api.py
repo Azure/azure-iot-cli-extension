@@ -18,6 +18,7 @@ from msrest.pipeline import ClientRawResponse
 from msrestazure import AzureConfiguration
 from . import models
 from .version import VERSION
+from azext_iot._constants import VERSION as extver
 
 
 # pylint: disable=too-few-public-methods
@@ -43,7 +44,8 @@ class CustomAPIConfiguration(AzureConfiguration):
 
         super(CustomAPIConfiguration, self).__init__(base_url)
 
-        self.add_user_agent('iotextension/{}'.format(VERSION))
+        self.add_user_agent('customclient/{}'.format(VERSION))
+        self.add_user_agent('MicrosoftAzure/IoTPlatformCliExtension/{}'.format(extver))
 
         self.credentials = credentials
 

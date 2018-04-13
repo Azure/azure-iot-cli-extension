@@ -6,14 +6,13 @@
 
 from azure.cli.core import AzCommandsLoader
 from azure.cli.core.commands import CliCommandType
-from azext_iot._factory import iot_hub_service_factory, iot_service_provisioning_factory
+from azext_iot._factory import iot_service_provisioning_factory
 from azext_iot._constants import VERSION
 import azext_iot._help  # pylint: disable=unused-import
 
 
 iothub_ops = CliCommandType(
-    operations_tmpl='azext_iot.operations.hub#{}',
-    client_factory=iot_hub_service_factory
+    operations_tmpl='azext_iot.operations.hub#{}'
 )
 
 iotdps_ops = CliCommandType(

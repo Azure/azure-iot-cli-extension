@@ -14,9 +14,9 @@ from hashlib import sha256
 from hmac import HMAC
 from time import time
 try:
-    from urllib import (urlencode, quote)
+    from urllib import (urlencode, quote_plus)
 except ImportError:
-    from urllib.parse import (urlencode, quote)  # pylint: disable=import-error
+    from urllib.parse import (urlencode, quote_plus)  # pylint: disable=import-error
 from msrest.authentication import Authentication
 
 
@@ -32,8 +32,7 @@ class SasTokenAuthentication(Authentication):
             be seconds since the epoch, in UTC. Default is an hour later from now.
     """
     def __init__(self, uri, shared_access_policy_name, shared_access_key, expiry=None):
-
-        self.uri = quote(uri.lower(), safe='').lower()
+        self.uri = uri
         self.policy = shared_access_policy_name
         self.key = shared_access_key
         if expiry is None:
@@ -59,16 +58,18 @@ class SasTokenAuthentication(Authentication):
         Returns:
             result (str): SAS token as string literal.
         """
-        encoded_uri = quote(self.uri, safe='').lower()
+        encoded_uri = quote_plus(self.uri)
         ttl = int(self.expiry)
         sign_key = '%s\n%d' % (encoded_uri, ttl)
         signature = b64encode(HMAC(b64decode(self.key), sign_key.encode('utf-8'), sha256).digest())
 
-        result = 'SharedAccessSignature ' + urlencode({
+        result = {
             'sr': self.uri,
             'sig': signature,
-            'se': str(ttl),
-            'skn': self.policy
-        })
+            'se': str(ttl)
+        }
 
-        return result
+        if self.policy:
+            result['skn'] = self.policy
+
+        return 'SharedAccessSignature ' + urlencode(result)

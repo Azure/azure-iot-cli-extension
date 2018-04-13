@@ -13,6 +13,7 @@ from msrestazure import AzureConfiguration
 from msrestazure.azure_exceptions import CloudError
 from . import models
 from .version import VERSION
+from azext_iot._constants import VERSION as extver
 
 
 class DeviceTwinAPIConfiguration(AzureConfiguration):
@@ -37,7 +38,7 @@ class DeviceTwinAPIConfiguration(AzureConfiguration):
         super(DeviceTwinAPIConfiguration, self).__init__(base_url)
 
         self.add_user_agent('devicetwinapi/{}'.format(VERSION))
-        self.add_user_agent('Azure-SDK-For-Python')
+        self.add_user_agent('MicrosoftAzure/IoTPlatformCliExtension/{}'.format(extver))
 
         self.credentials = credentials
 

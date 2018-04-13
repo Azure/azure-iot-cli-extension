@@ -260,7 +260,24 @@ helps['iot hub apply-configuration'] = """
 
 helps['iot hub generate-sas-token'] = """
     type: command
-    short-summary: Generate a SAS token for a target hub or device.
+    short-summary: Generate a SAS token for a target IoT Hub or device.
+    long-summary: For device SAS tokens, the policy parameter is used to
+                  access the the device registry only. Therefore the policy should have
+                  read access to the registry. For IoT Hub tokens the policy is part of the SAS.
+    examples:
+    - name: Generate an IoT Hub SAS token using the iothubowner policy and primary key.
+      text: >
+        az iot hub generate-sas-token -n [IoTHub Name]
+    - name: Generate an IoT Hub SAS token using the registryRead policy and secondary key.
+      text: >
+        az iot hub generate-sas-token -n [IoTHub Name] --policy registryRead --key-type secondary
+    - name: Generate a device SAS token using the iothubowner policy to access the [IoTHub Name] device registry.
+      text: >
+        az iot hub generate-sas-token -d [Device ID] -n [IoTHub Name]
+    - name: Generate a device SAS token using an IoT Hub connection string (with registry access)
+      text: >
+        az iot hub generate-sas-token -d [Device ID]
+        --login 'HostName=myhub.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey=12345'
 """
 
 helps['iot hub invoke-module-method'] = """
