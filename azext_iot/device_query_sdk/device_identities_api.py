@@ -11,6 +11,7 @@ from msrestazure import AzureConfiguration
 from .version import VERSION
 from .operations.device_api_operations import DeviceApiOperations
 from . import models
+from azext_iot._constants import VERSION as extver
 
 
 class DeviceIdentitiesAPIConfiguration(AzureConfiguration):
@@ -35,7 +36,7 @@ class DeviceIdentitiesAPIConfiguration(AzureConfiguration):
         super(DeviceIdentitiesAPIConfiguration, self).__init__(base_url)
 
         self.add_user_agent('deviceidentitiesapi/{}'.format(VERSION))
-        self.add_user_agent('Azure-SDK-For-Python')
+        self.add_user_agent('MicrosoftAzure/IoTPlatformCliExtension/{}'.format(extver))
 
         self.credentials = credentials
 

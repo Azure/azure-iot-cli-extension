@@ -13,6 +13,7 @@ from .operations.device_enrollment_operations import DeviceEnrollmentOperations
 from .operations.device_enrollment_group_operations import DeviceEnrollmentGroupOperations
 from .operations.registration_status_operations import RegistrationStatusOperations
 from . import models
+from azext_iot._constants import VERSION as extver
 
 
 class DeviceProvisioningServiceServiceRuntimeClientConfiguration(AzureConfiguration):
@@ -32,12 +33,12 @@ class DeviceProvisioningServiceServiceRuntimeClientConfiguration(AzureConfigurat
         if credentials is None:
             raise ValueError("Parameter 'credentials' must not be None.")
         if not base_url:
-            base_url = 'https://contoso.azure-devices-provisioning.net'
+            base_url = 'https://<fully-qualified IoT hub domain name>'
 
         super(DeviceProvisioningServiceServiceRuntimeClientConfiguration, self).__init__(base_url)
 
         self.add_user_agent('deviceprovisioningserviceserviceruntimeclient/{}'.format(VERSION))
-        self.add_user_agent('Azure-SDK-For-Python')
+        self.add_user_agent('MicrosoftAzure/IoTPlatformCliExtension/{}'.format(extver))
 
         self.credentials = credentials
 

@@ -114,7 +114,7 @@ class TestIoTHub(LiveScenarioTest):
         self.cmd('iot hub show-connection-string -n {} -g {} -kt {}'.format(LIVE_HUB, LIVE_RG, 'secondary'), checks=[
             self.check_pattern('cs', hub_conn_str_pattern)
         ])
-        self.cmd('iot hub show-connection-string -n {} -g {} -kt {} -po doesnotexist'.format(LIVE_HUB, LIVE_RG, 'secondary'),
+        self.cmd('iot hub show-connection-string -n {} -g {} -kt {} -pn doesnotexist'.format(LIVE_HUB, LIVE_RG, 'secondary'),
                  expect_failure=True)
 
         self.cmd('az iot hub generate-sas-token -n {} -g {}'.format(LIVE_HUB, LIVE_RG), checks=[
@@ -130,7 +130,7 @@ class TestIoTHub(LiveScenarioTest):
             self.exists('sas')
         ])
 
-        self.cmd('az iot hub generate-sas-token --login {} -po somepolicy'.format(LIVE_HUB_CS), expect_failure=True)
+        self.cmd('az iot hub generate-sas-token --login {} -pn somepolicy'.format(LIVE_HUB_CS), expect_failure=True)
 
         # With connection string
         # Error can't change key for a sas token with conn string
@@ -332,7 +332,7 @@ class TestIoTHub(LiveScenarioTest):
             self.exists('sas')
         ])
 
-        self.cmd('iot hub generate-sas-token -d {} --login {} -po "mypolicy"'.format(edge_device_ids[1], LIVE_HUB_CS),
+        self.cmd('iot hub generate-sas-token -d {} --login {} -pn "mypolicy"'.format(edge_device_ids[1], LIVE_HUB_CS),
                  expect_failure=True)
 
     def test_hub_device_twins(self):

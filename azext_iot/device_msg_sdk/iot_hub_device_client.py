@@ -16,6 +16,7 @@ from msrestazure import AzureConfiguration
 from .version import VERSION
 from .operations.iot_hub_devices_operations import IotHubDevicesOperations
 from . import models
+from azext_iot._constants import VERSION as extver
 
 
 class IotHubDeviceClientConfiguration(AzureConfiguration):
@@ -49,21 +50,17 @@ class IotHubDeviceClientConfiguration(AzureConfiguration):
 
         if credentials is None:
             raise ValueError("Parameter 'credentials' must not be None.")
-        # if subscription_id is None:
-        #     raise ValueError("Parameter 'subscription_id' must not be None.")
-        # if not isinstance(subscription_id, str):
-        #     raise TypeError("Parameter 'subscription_id' must be str.")
         if api_version is not None and not isinstance(api_version, str):
             raise TypeError("Optional parameter 'api_version' must be str.")
         if accept_language is not None and not isinstance(accept_language, str):
             raise TypeError("Optional parameter 'accept_language' must be str.")
         if not base_url:
-            base_url = 'https://example.azure-devices.net'
+            base_url = 'https://<fully-qualified IoT hub domain name>'
 
         super(IotHubDeviceClientConfiguration, self).__init__(base_url, filepath)
 
         self.add_user_agent('iothubdeviceclient/{}'.format(VERSION))
-        self.add_user_agent('Azure-SDK-For-Python')
+        self.add_user_agent('MicrosoftAzure/IoTPlatformCliExtension/{}'.format(extver))
 
         self.credentials = credentials
         self.subscription_id = subscription_id

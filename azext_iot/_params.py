@@ -47,7 +47,7 @@ def load_arguments(self, _):
                          validator=mode2_iot_login_handler,
                          help='This command supports an entity connection string with rights to perform action. '
                          'Use to avoid session login via "az login". '
-                         'If both a login and entity name are provided the login takes priority.')
+                         'If both an entity connection string and name are provided the connection string takes priority.')
         context.argument('resource_group_name', arg_type=resource_group_name_type)
         context.argument('hub_name', options_list=['--hub-name', '-n'], arg_type=hub_name_type)
         context.argument('device_id', options_list=['--device-id', '-d'], help='Target Device.')
@@ -55,7 +55,7 @@ def load_arguments(self, _):
         context.argument('key_type', options_list=['--key-type', '-kt'],
                          arg_type=get_enum_type(KeyType),
                          help='Shared access policy key type for auth.')
-        context.argument('policy_name', options_list=['--policy-name', '-po'],
+        context.argument('policy_name', options_list=['--policy-name', '-pn'],
                          help='Shared access policy to use for auth.')
         context.argument('duration', options_list=['--duration', '-du'],
                          help='Valid token duration in seconds.')
@@ -76,7 +76,7 @@ def load_arguments(self, _):
     with self.argument_context('iot hub') as context:
         context.argument('target_json', options_list=['--json', '-j'],
                          help='Json to replace existing twin with. Provide file path or raw json.')
-        context.argument('policy_name', options_list=['--policy-name', '-po'],
+        context.argument('policy_name', options_list=['--policy-name', '-pn'],
                          help='Shared access policy with operation permissions for target IoT Hub entity.')
 
     with self.argument_context('iot hub monitor-events') as context:
