@@ -593,7 +593,7 @@ def _iot_build_sas_token(cmd, hub_name=None, device_id=None, policy_name='iothub
         policy = target['policy']
         key = target['primarykey'] if key_type == 'primary' else target['secondarykey']
 
-    return SasTokenAuthentication(uri, policy, key, time() + duration)
+    return SasTokenAuthentication(uri, policy, key, time() + int(duration))
 
 
 # pylint: disable=inconsistent-return-statements
