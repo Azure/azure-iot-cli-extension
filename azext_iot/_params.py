@@ -237,8 +237,6 @@ def load_arguments(self, _):
 
     with self.argument_context('iot dps enrollment-group') as context:
         context.argument('enrollment_id', help='ID of enrollment group')
-
-    with self.argument_context('iot dps enrollment-group create') as context:
         context.argument('certificate_path',
                          options_list=['--certificate-path', '-cp'],
                          help='The path to the file containing the primary certificate. '
@@ -255,14 +253,6 @@ def load_arguments(self, _):
                          options_list=['--secondary-root-ca-name', '--secondary-ca-name', '-scn'],
                          help='The name of the secondary root CA certificate. '
                          'If attestation with a root CA certificate is desired then a root ca name must be provided.')
-
-    with self.argument_context('iot dps enrollment-group update') as context:
-        context.argument('certificate_name',
-                         options_list=['--certificate-name', '-cn'],
-                         help='The name of the primary CA certificate.')
-        context.argument('secondary_certificate_name',
-                         options_list=['--secondary-certificate-name', '-scn'],
-                         help='The name of the secondary CA certificate.')
 
     with self.argument_context('iot dps registration') as context:
         context.argument('registration_id', help='ID of device registration')
