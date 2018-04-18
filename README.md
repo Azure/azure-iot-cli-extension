@@ -104,7 +104,7 @@ Example `export AZURE_EXTENSION_DIR=~/.azure/devcliextensions/`
 
 Run the following command to setup and install all dependencies in the extension deployment directory.
 
-`pip install -U --target <extension deployment directory>/azure_cli_iot_ext <iot extension code root>`
+`pip install -U --target <extension deployment directory>/azure-cli-iot-ext <iot extension code root>`
 
 Repeat the above command as needed.
 
@@ -116,7 +116,7 @@ Helpful [Reference](https://github.com/Azure/azure-cli/tree/master/doc/extension
 
 Update the `PYTHONPATH` environment variable with both the extension dev deployment directory and root for the extension source code.
 
-Example `export PYTHONPATH=~/.azure/devcliextensions/:~/source/azure_cli_iot_ext/`
+Example `export PYTHONPATH=~/.azure/devcliextensions/azure-cli-iot-ext/:~/source/azure-cli-iot-ext/`
 
 Current testing patterns make use of [pytest](https://docs.pytest.org/en/latest/) and [unittest](https://docs.python.org/3.6/library/unittest.html). We also use `pytest-mock` and `pytest-cov` plugins for pytest so make sure you `pip install` these dependencies beforehand. You can leverage our `requirements` file at the root of this project to install from.
 
@@ -132,7 +132,7 @@ _DPS:_
 
 #### Integration tests
 
-Currently integration tests leverage Azure CLI live scenario tests. Update the following environment variables prior to running integration tests.
+Currently integration tests leverage Azure CLI live scenario tests. Update the following environment variables OR use an updated pytest.ini (copying and renaming pytest.ini.example) in the extension root directory prior to running integration tests.
 
 These variables are **shared** between Hub and DPS integration tests:
 
