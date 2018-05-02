@@ -125,6 +125,10 @@ class TestIoTHub(LiveScenarioTest):
             self.exists('sas')
         ])
 
+        self.cmd('az iot hub generate-sas-token -n {} -du {}'.format(LIVE_HUB, '1000'), checks=[
+            self.exists('sas')
+        ])
+
         # With connection string
         self.cmd('az iot hub generate-sas-token --login {}'.format(LIVE_HUB_CS), checks=[
             self.exists('sas')
@@ -316,6 +320,10 @@ class TestIoTHub(LiveScenarioTest):
         self.cmd('iot hub generate-sas-token -n {} -g {} -d {}'.format(LIVE_HUB, LIVE_RG, edge_device_ids[0]), checks=[
             self.exists('sas')
         ])
+
+        self.cmd('iot hub generate-sas-token -n {} -g {} -d {} -du {}'.format(LIVE_HUB,
+                                                                              LIVE_RG, edge_device_ids[0], '1000'),
+                 checks=[self.exists('sas')])
 
         # None SAS device auth
         self.cmd('iot hub generate-sas-token -n {} -g {} -d {}'.format(LIVE_HUB, LIVE_RG, device_ids[1]), expect_failure=True)
@@ -740,18 +748,16 @@ class TestIoTHub(LiveScenarioTest):
         self.cmd('iot device send-d2c-message -d {} --login {} -props "MessageId=12345;CorrelationId=54321"'
                  .format(device_ids[0], LIVE_HUB_CS), checks=self.is_empty())
 
-    # Skip test for now
-    # not validate_min_python_version(3, 5, exit_on_fail=False)
-    @pytest.mark.skipif(True, reason="minimum python version not satisfied")
-    def test_hub_monitor_event(self):
+    @pytest.mark.skipif(not validate_min_python_version(3, 5, exit_on_fail=False), reason="minimum python version not satisfied")
+    def test_hub_monitor_event_all(self):
         from azext_iot.operations.hub import iot_simulate_device
-        from azext_iot import iot_hub_service_factory
+        from azext_iot._factory import iot_hub_service_factory
         from azure.cli.testsdk import TestCli
 
         cli_ctx = TestCli()
         client = iot_hub_service_factory(cli_ctx)
 
-        device_count = 5
+        device_count = 10
 
         names = self._create_entity_names(devices=device_count)
         device_ids = names['device_ids']
@@ -765,7 +771,34 @@ class TestIoTHub(LiveScenarioTest):
                              args=[client, device_ids[i], LIVE_HUB, 'complete', 'Ping from test', 5, 1],
                              max_runs=1)
 
-        self.cmd('iot hub monitor-events -n {} -g {} -to 10 -y -props all --debug'.format(LIVE_HUB, LIVE_RG), checks=None)
+        self.cmd('iot hub monitor-events -n {} -g {} -to 10 -y -props sys anno app --debug'.format(
+            LIVE_HUB, LIVE_RG), checks=None)
+
+    @pytest.mark.skipif(not validate_min_python_version(3, 5, exit_on_fail=False), reason="minimum python version not satisfied")
+    def test_hub_monitor_event_device(self):
+        from azext_iot.operations.hub import iot_simulate_device
+        from azext_iot._factory import iot_hub_service_factory
+        from azure.cli.testsdk import TestCli
+
+        cli_ctx = TestCli()
+        client = iot_hub_service_factory(cli_ctx)
+
+        device_count = 2
+
+        names = self._create_entity_names(devices=device_count)
+        device_ids = names['device_ids']
+
+        for i in range(device_count):
+            self.cmd('iot hub device-identity create -d {} -n {} -g {}'.format(device_ids[i], LIVE_HUB, LIVE_RG),
+                     checks=[self.check('deviceId', device_ids[i])])
+
+        for i in range(device_count):
+            execute_onthread(method=iot_simulate_device,
+                             args=[client, device_ids[i], LIVE_HUB, 'complete', 'Ping from test', 5, 1, 'http'],
+                             max_runs=1)
+
+        self.cmd('iot hub monitor-events -n {} -to 10 -y -props all -d {} --debug'.format(
+            LIVE_HUB, device_ids[0]), checks=None)
 
     @pytest.mark.skipif(not LIVE_STORAGE, reason="empty azext_iot_teststorageuri env var")
     def test_storage(self):

@@ -22,7 +22,7 @@ def load_command_table(self, _):
         cmd_group.command('invoke-module-method', 'iot_device_module_method')
         cmd_group.command('generate-sas-token', 'iot_get_sas_token')
         cmd_group.command('apply-configuration', 'iot_device_configuration_apply')
-        # cmd_group.command('monitor-events', 'iot_hub_monitor_events')
+        cmd_group.command('monitor-events', 'iot_hub_monitor_events')
 
         cmd_group.command('show-connection-string', 'iot_get_hub_connection_string')
 
