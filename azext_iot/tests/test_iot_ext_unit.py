@@ -1540,7 +1540,6 @@ class TestDeviceSimulate():
             subject.iot_simulate_device(fixture_cmd, device_id, hub_name=mock_target['entity'])
 
 
-@pytest.mark.skipif(True, reason='not ready')
 class TestMonitorEvents():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):

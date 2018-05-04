@@ -10,12 +10,10 @@ import six
 from knack.log import get_logger
 from azext_iot._constants import VERSION
 
-
 logger = get_logger(__name__)
 
 
 def executor(target, consumer_group, enqueued_time, device_id=None, properties=None, timeout=0):
-
     coroutines = []
     partitions = target['events']['partition_ids']
 
@@ -24,7 +22,7 @@ def executor(target, consumer_group, enqueued_time, device_id=None, properties=N
         return
 
     # TODO: Shared connection having issues.
-    # conn = create_connection_async(target)
+    # conn = _create_async_connection(target)
     for p in partitions:
         coroutines.append(monitor_events(target, p,
                                          consumer_group=consumer_group,
@@ -34,6 +32,10 @@ def executor(target, consumer_group, enqueued_time, device_id=None, properties=N
                                          timeout=timeout))
 
     loop = asyncio.get_event_loop()
+    if loop.is_closed():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
     future = asyncio.gather(*coroutines, loop=loop, return_exceptions=True)
     result = None
     try:
@@ -50,7 +52,7 @@ def executor(target, consumer_group, enqueued_time, device_id=None, properties=N
         loop.run_forever()
     finally:
         # TODO: Shared connection having issues.
-        # close_task = loop.create_task(close_connection_async(conn))
+        # close_task = loop.create_task(_close_connection_async(conn))
         # loop.run_until_complete(close_task)
         loop.close()
         if result:
@@ -73,14 +75,14 @@ async def monitor_events(target, partition, consumer_group, enqueuedtimeutc,
 
     def _output_msg_kpi(msg):
         # TODO: Determine if amqp filters can support boolean operators for multiple conditions
-        if device_id and msg.message_annotations[b'iothub-connection-device-id'] != device_id:
+        if device_id and msg.annotations[b'iothub-connection-device-id'] != device_id:
             return
 
         event_source = {'event': {}}
-        event_source['event']['origin'] = msg.message_annotations.get(b'iothub-connection-device-id')
+        event_source['event']['origin'] = msg.annotations.get(b'iothub-connection-device-id')
         event_source['event']['payload'] = str(next(msg.get_data()), 'utf8')
         if 'anno' in properties or 'all' in properties:
-            event_source['event']['annotations'] = unicode_binary_map(msg.message_annotations)
+            event_source['event']['annotations'] = unicode_binary_map(msg.annotations)
         if 'sys' in properties or 'all' in properties:
             if not event_source['event'].get('properties'):
                 event_source['event']['properties'] = {}
@@ -88,10 +90,8 @@ async def monitor_events(target, partition, consumer_group, enqueuedtimeutc,
         if 'app' in properties or 'all' in properties:
             if not event_source['event'].get('properties'):
                 event_source['event']['properties'] = {}
-            app_prop = None
-            msg_handle = msg.get_message()
-            app_prop = msg_handle.application_properties.value.value
-            del msg_handle
+            app_prop = msg.application_properties if msg.application_properties else None
+
             if app_prop:
                 event_source['event']['properties']['application'] = app_prop
 
@@ -101,8 +101,7 @@ async def monitor_events(target, partition, consumer_group, enqueuedtimeutc,
     async_client = uamqp.ReceiveClientAsync(source, auth=_create_sas_auth(target), timeout=timeout, prefetch=0, debug=debug)
 
     try:
-        # await async_client.open_async(connection=connection)
-        # Callback method
+        # Alternative to async iterator: Callback method
         # await async_client.receive_messages_async(_output_msg_kpi)
         async for msg in async_client.receive_messages_iter_async():
             _output_msg_kpi(msg)
@@ -114,7 +113,7 @@ async def monitor_events(target, partition, consumer_group, enqueuedtimeutc,
             await async_client.close_async()
 
 
-def create_connection_async(target, debug=False):
+def _create_async_connection(target, debug=False):
     from uuid import uuid4
     from uamqp.async import ConnectionAsync
 
@@ -141,6 +140,6 @@ def _create_sas_auth(target):
     return sas_auth
 
 
-async def close_connection_async(connection):
+async def _close_connection_async(connection):
     if connection:
         await connection.destroy_async()

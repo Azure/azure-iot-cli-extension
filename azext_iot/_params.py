@@ -57,7 +57,7 @@ def load_arguments(self, _):
                          help='Shared access policy key type for auth.')
         context.argument('policy_name', options_list=['--policy-name', '-pn'],
                          help='Shared access policy to use for auth.')
-        context.argument('duration', options_list=['--duration', '-du'],
+        context.argument('duration', options_list=['--duration', '-du'], type=int,
                          help='Valid token duration in seconds.')
         context.argument('etag', options_list=['--etag', '-e'], help='Entity tag value.')
         context.argument('top', type=int, help='Maximum number of elements to return.')
@@ -86,7 +86,8 @@ def load_arguments(self, _):
                          help='Specify the consumer group to use when connecting to event hub endpoint.')
         context.argument('yes', options_list=['--yes', '-y'],
                          arg_type=get_three_state_flag(),
-                         help='Flag indicating acceptance of dependency installation (if required). Default: false')
+                         help='Skip user prompts. Indicates acceptance of dependency installation (if required). '
+                         'Used primarily for automation scenarios. Default: false')
         context.argument('repair', options_list=['--repair', '-r'],
                          arg_type=get_three_state_flag(),
                          help='Reinstall uamqp dependency compatible with extension version. Default: false')

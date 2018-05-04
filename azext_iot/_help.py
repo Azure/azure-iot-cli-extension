@@ -26,6 +26,7 @@ helps['iot hub monitor-events'] = """
     short-summary: Monitor device telemetry & messages sent to an IoT Hub.
     long-summary: EXPERIMENTAL requires Python 3.5+
                   This command relies on and may install dependent Cython package (uamqp) upon first execution.
+                  https://github.com/Azure/azure-uamqp-python
     examples:
     - name: Basic usage when filtering on no device
       text: >
@@ -42,6 +43,9 @@ helps['iot hub monitor-events'] = """
     - name: Receive message annotations + system properties. Never time out.
       text: >
         az iot hub monitor-events -n [IoTHub Name] -d [Device ID] --properties anno sys --timeout 0
+    - name: Receive all message attributes from all device messages
+      text: >
+        az iot hub monitor-events -n [IoTHub Name] -props all
 """
 
 helps['iot hub device-identity'] = """
@@ -397,7 +401,7 @@ helps['iot edge deployment create'] = """
     - name: Create deployment with condition where a device is in 'building 9' and
             the environment is 'test'.
       text: >
-        az iot edge deployment create -c [configuration] -n [IoTHub Name] --content ../mycontent.json
+        az iot edge deployment create -c [Configuration Name] -n [IoTHub Name] --content ../mycontent.json
         -lab '{"key0":"value0", "key1":"value1"}'
         --target-condition "tags.building=9 and tags.environment='test'" --priority 3
 """
@@ -420,7 +424,7 @@ helps['iot edge deployment update'] = """
     examples:
     - name: Alter the priority of a deployment configuration and update the targetCondition
       text: >
-        az iot edge deployment update -c [configuration] -n [IoTHub Name] --set priority=10
+        az iot edge deployment update -c [Configuration Name] -n [IoTHub Name] --set priority=10
         targetCondition="tags.building=43 and tags.environment='dev'"
 """
 
