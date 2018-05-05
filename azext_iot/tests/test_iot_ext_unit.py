@@ -10,7 +10,7 @@ import os
 from uuid import uuid4
 from azext_iot._constants import EVENT_LIB
 from azext_iot.operations import hub as subject
-from azext_iot.common.utility import evaluate_literal
+from azext_iot.common.utility import evaluate_literal, validate_min_python_version
 from knack.util import CLIError
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azure.cli.core.util import read_file_content
@@ -1464,7 +1464,7 @@ class TestSasTokenAuth():
         expiry = 1471940363
 
         # Action
-        sas_auth = SasTokenAuthentication(uri, policy_name, access_key, expiry)
+        sas_auth = SasTokenAuthentication(uri, None, access_key, expiry)
         token = sas_auth.generate_sas_token()
 
         # Assertion
@@ -1472,18 +1472,21 @@ class TestSasTokenAuth():
         assert 'sig=SIumZ1ACqqPJZ2okHDlW9MSYKykEpqsQY3z6FMOICd4%3D' in token
         assert 'se=1471940363' in token
         assert 'sr=iot-hub-for-test.azure-devices.net%2Fdevices%2Fiot-device-for-test' in token
-        assert 'skn=iothubowner' in token
+        assert 'skn=' not in token
 
         # Prepare parameters
         uri = 'iot-hub-for-test.azure-devices.net'
 
         # Action
-        sas_auth = SasTokenAuthentication(uri, None, access_key, expiry)
+        sas_auth = SasTokenAuthentication(uri, policy_name, access_key, expiry)
         token = sas_auth.generate_sas_token()
 
         # Assertion
-        assert ('SharedAccessSignature sr=iot-hub-for-test.azure-devices.net&'
-                'sig=770sPjjYxRYpNz8%2FhEN7XR5XU5KDGYGTinSP8YyeTXw%3D&se=1471940363') == token
+        assert 'SharedAccessSignature ' in token
+        assert 'sig=770sPjjYxRYpNz8%2FhEN7XR5XU5KDGYGTinSP8YyeTXw%3D' in token
+        assert 'se=1471940363' in token
+        assert 'sr=iot-hub-for-test.azure-devices.net' in token
+        assert 'skn=iothubowner' in token
 
 
 class TestDeviceSimulate():
@@ -1540,6 +1543,7 @@ class TestDeviceSimulate():
             subject.iot_simulate_device(fixture_cmd, device_id, hub_name=mock_target['entity'])
 
 
+@pytest.mark.skipif(not validate_min_python_version(3, 5, exit_on_fail=False), reason="minimum python version not satisfied")
 class TestMonitorEvents():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
