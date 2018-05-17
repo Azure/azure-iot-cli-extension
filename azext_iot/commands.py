@@ -78,6 +78,7 @@ def load_command_table(self, _):
         cmd_group.command('abandon', 'iot_c2d_message_abandon')
         cmd_group.command('reject', 'iot_c2d_message_reject')
         cmd_group.command('receive', 'iot_c2d_message_receive')
+        cmd_group.command('send', 'iot_c2d_message_send')
 
     with self.command_group('iot dps enrollment', command_type=iotdps_ops) as cmd_group:
         cmd_group.command('create', 'iot_dps_device_enrollment_create')

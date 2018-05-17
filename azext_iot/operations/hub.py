@@ -20,7 +20,7 @@ from azext_iot.common.utility import (shell_safe_json_parse,
                                       validate_key_value_pairs, url_encode_dict,
                                       evaluate_literal)
 from azext_iot._factory import _bind_sdk
-from azext_iot.operations.generic import execute_query
+from azext_iot.operations.generic import execute_query, _process_top
 
 from azext_iot.modules_sdk.models.device_capabilities import DeviceCapabilities
 from azext_iot.modules_sdk.models.authentication_mechanism import AuthenticationMechanism
@@ -37,6 +37,8 @@ logger = get_logger(__name__)
 # Query
 
 def iot_query(cmd, query_command, hub_name=None, top=None, resource_group_name=None, login=None):
+    top = _process_top(top)
+
     from azext_iot.device_query_sdk.models.query_specification import QuerySpecification
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     q_sdk, errors = _bind_sdk(target, SdkType.device_query_sdk)
@@ -64,9 +66,8 @@ def _iot_device_show(target, device_id):
         raise CLIError(e)
 
 
-def iot_device_list(cmd, hub_name=None, top=10, edge_enabled=False, resource_group_name=None, login=None):
-    if top <= 0:
-        raise CLIError('top must be > 0')
+def iot_device_list(cmd, hub_name=None, top=1000, edge_enabled=False, resource_group_name=None, login=None):
+    top = _process_top(top)
 
     query = 'select * from devices where capabilities.iotEdge = true' if edge_enabled else 'select * from devices'
     result = iot_query(cmd, query, hub_name, top, resource_group_name, login=login)
@@ -232,9 +233,8 @@ def _parse_auth(parameters):
     return auth, pk, sk
 
 
-def iot_device_module_list(cmd, device_id, hub_name=None, top=10, resource_group_name=None, login=None):
-    if top <= 0:
-        raise CLIError('top must be > 0')
+def iot_device_module_list(cmd, device_id, hub_name=None, top=1000, resource_group_name=None, login=None):
+    top = _process_top(top)
 
     query = "select * from devices.modules where devices.deviceId = '{}'".format(device_id)
     result = iot_query(cmd, query, hub_name, top, resource_group_name, login=login)
@@ -332,7 +332,7 @@ def iot_device_configuration_apply(cmd, device_id, content, hub_name=None, resou
             raise CLIError("content json must include 'moduleContent' property.")
         content = ConfigurationContent(module_content=module_content)
         m_sdk.device_api.apply_configuration_content_on_device(device_id, content)
-        return iot_device_module_list(cmd, device_id, hub_name=hub_name, top=1000, login=login)
+        return iot_device_module_list(cmd, device_id, hub_name=hub_name, top=-1, login=login)
     except ValueError as j:
         raise CLIError('improperly formatted json: {}'.format(j))
     except errors.ErrorDetailsException as e:
@@ -419,10 +419,10 @@ def iot_device_configuration_show(cmd, config_id, hub_name=None, resource_group_
         raise CLIError(e)
 
 
-def iot_device_configuration_list(cmd, hub_name=None, top=5, resource_group_name=None, login=None):
+def iot_device_configuration_list(cmd, hub_name=None, top=10, resource_group_name=None, login=None):
+    top = _process_top(top, upper_limit=10)
+
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
-    if top <= 0:
-        raise CLIError('top must be > 0')
     m_sdk, errors = _bind_sdk(target, SdkType.modules_sdk)
     try:
         result = m_sdk.configuration_api.get_configurations(top)
@@ -760,6 +760,34 @@ def _iot_c2d_message_receive(target, device_id, lock_timeout=60):
         raise CLIError(e)
 
 
+def iot_c2d_message_send(cmd, device_id, hub_name=None, data='Ping from Az CLI IoT Extension',
+                         properties=None, correlation_id=None, ack=None, yes=False, repair=False,
+                         resource_group_name=None, login=None):
+    from azext_iot.common.deps import ensure_uamqp
+    from azext_iot.common.utility import validate_min_python_version
+
+    validate_min_python_version(3, 4)
+
+    config = cmd.cli_ctx.config
+    ensure_uamqp(config, yes, repair)
+
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
+    return _iot_c2d_message_send(target=target, device_id=device_id, data=data, properties=properties,
+                                 correlation_id=correlation_id, ack=ack)
+
+
+def _iot_c2d_message_send(target, device_id, data, properties=None, correlation_id=None, ack=None):
+    import importlib
+
+    if properties:
+        properties = validate_key_value_pairs(properties)
+
+    events3 = importlib.import_module('azext_iot.operations.events3._events')
+    events3.send_c2d_message(target=target, device_id=device_id, data=data,
+                             properties=properties, correlation_id=correlation_id, ack=ack)
+    return
+
+
 # pylint: disable=too-many-locals
 def iot_simulate_device(cmd, device_id, hub_name=None, receive_settle='complete',
                         data='Ping from Az CLI IoT Extension', msg_count=100,
@@ -883,46 +911,25 @@ def iot_device_upload_file(cmd, device_id, file_path, content_type, hub_name=Non
 # pylint: disable=too-many-locals
 def iot_hub_monitor_events(cmd, hub_name, device_id=None, consumer_group='$Default', timeout=300,
                            enqueued_time=None, resource_group_name=None, yes=False, properties=None, repair=False):
-    from azext_iot.common.utility import validate_min_python_version
-    validate_min_python_version(3, 5)
-
     import importlib
-    import sys
-    from os import linesep
     from datetime import datetime
-    from six.moves import input
-    from azext_iot.common.config import get_uamqp_ext_version, update_uamqp_ext_version
-    from azext_iot._constants import EVENT_LIB, VERSION
-    from azext_iot.common.utility import test_import
-    from azext_iot.common.pip import install
+    from azext_iot.common.deps import ensure_uamqp
+    from azext_iot.common.utility import validate_min_python_version
 
-    events3 = importlib.import_module('azext_iot.operations.events3._events')
-
-    config = cmd.cli_ctx.config
-
-    if not properties:
-        properties = []
-    properties = set((key.lower() for key in properties))
+    validate_min_python_version(3, 5)
 
     if timeout < 0:
         raise CLIError('Monitoring timeout must be 0 (inf) or greater.')
     timeout = (timeout * 1000)
 
-    if get_uamqp_ext_version(config) != EVENT_LIB[1] or repair or not test_import(EVENT_LIB[0]):
-        if not yes:
-            input_txt = ('Dependency update required for IoT extension version: {}. {}'
-                         'Updated dependency must be compatible with {} {}. '
-                         'Continue? (y/n) -> ').format(VERSION, linesep, EVENT_LIB[0], EVENT_LIB[1])
-            i = input(input_txt)
-            if i.lower() != 'y':
-                sys.exit('User has declined update...')
+    config = cmd.cli_ctx.config
+    ensure_uamqp(config, yes, repair)
 
-        six.print_('Updating required dependency...')
-        if install(EVENT_LIB[0], compatible_version=EVENT_LIB[1]):
-            update_uamqp_ext_version(config, EVENT_LIB[1])
-            six.print_('Update appears to have worked. Executing command...')
-        else:
-            sys.exit('Failure updating {} {}. Aborting...'.format(EVENT_LIB[0], EVENT_LIB[1]))
+    events3 = importlib.import_module('azext_iot.operations.events3._events')
+
+    if not properties:
+        properties = []
+    properties = set((key.lower() for key in properties))
 
     def _calculate_millisec_since_unix_epoch_utc():
         now = datetime.utcnow()

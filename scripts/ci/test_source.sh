@@ -25,5 +25,7 @@ pytest -v azext_iot/tests/test_iot_ext_unit.py
 echo "Executing - DPS unit tests"
 pytest -v azext_iot/tests/test_iot_dps_unit.py
 
+echo "Executing - Utility unit tests"
+pytest -v azext_iot/tests/test_iot_utility_unit.py
 
 echo "Tests completed."

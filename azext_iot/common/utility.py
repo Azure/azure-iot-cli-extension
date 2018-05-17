@@ -114,7 +114,6 @@ def trim_from_start(s, substring):
 
 def validate_min_python_version(major, minor, error_msg=None, exit_on_fail=True):
     """ If python version does not match AT LEAST requested values, will throw non 0 exit code."""
-    # TODO: Simplify
     version = sys.version_info
     result = False
     if version.major > major:
@@ -199,13 +198,19 @@ def url_encode_dict(d):
     return urlencode(d)
 
 
-def url_encode_str(s):
+def url_encode_str(s, plus=False):
     try:
-        from urllib import quote_plus
+        if plus:
+            from urllib import quote_plus
+        else:
+            from urllib import quote
     except ImportError:
-        from urllib.parse import quote_plus
+        if plus:
+            from urllib.parse import quote_plus
+        else:
+            from urllib.parse import quote
 
-    return quote_plus(s)
+    return quote_plus(s) if plus else quote(s)
 
 
 def test_import(package):

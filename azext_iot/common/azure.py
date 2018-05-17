@@ -104,8 +104,11 @@ def get_iot_hub_connection_string(
             'No IoT Hub found with name {} in current subscription.'.format(hub_name))
 
     try:
-        policy = client.get_keys_for_key_name(
-            target_hub.resourcegroup, target_hub.name, policy_name)
+        addprops = getattr(target_hub, 'additional_properties', None)
+        resource_group_name = addprops.get('resourcegroup') if addprops else getattr(
+            target_hub, 'resourcegroup', None)
+
+        policy = client.get_keys_for_key_name(resource_group_name, target_hub.name, policy_name)
     except Exception:
         pass
 
@@ -123,7 +126,7 @@ def get_iot_hub_connection_string(
     result['primarykey'] = policy.primary_key
     result['secondarykey'] = policy.secondary_key
     result['subscription'] = client.config.subscription_id
-    result['resourcegroup'] = target_hub.resourcegroup
+    result['resourcegroup'] = resource_group_name
 
     if include_events:
         events = {}
