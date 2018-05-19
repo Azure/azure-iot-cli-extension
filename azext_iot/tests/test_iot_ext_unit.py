@@ -717,7 +717,7 @@ class TestConfigList():
         service_client.return_value = response
         return service_client
 
-    @pytest.mark.parametrize("top", [10, 1000])
+    @pytest.mark.parametrize("top", [1, 10])
     def test_config_list(self, serviceclient, top):
         result = subject.iot_device_configuration_list(fixture_cmd, hub_name=mock_target['entity'], top=top)
         args = serviceclient.call_args
@@ -727,7 +727,7 @@ class TestConfigList():
         assert '{}/configurations?'.format(mock_target['entity']) in url
         assert 'top={}'.format(top) in url
 
-    @pytest.mark.parametrize("top", [-2, 0])
+    @pytest.mark.parametrize("top", [-1, 0])
     def test_config_list_invalid_args(self, serviceclient, top):
         with pytest.raises(CLIError):
             subject.iot_device_configuration_list(fixture_cmd, hub_name=mock_target['entity'], top=top)
