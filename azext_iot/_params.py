@@ -150,7 +150,7 @@ def load_arguments(self, _):
     with self.argument_context('iot hub query') as context:
         context.argument('query_command', options_list=['--query-command', '-q'],
                          help='User query to be executed.')
-        context.argument('top', options_list=['--top', '-top'],
+        context.argument('top', options_list=['--top', '-top'], type=int,
                          help='Maximum number of elements to return. By default query has no cap.')
 
     with self.argument_context('iot device') as context:
@@ -198,6 +198,8 @@ def load_arguments(self, _):
                          help="""Map of labels to be applied to target configuration.
                                 Use the following format:'{\"key0\":\"value0\",
                                 \"key1\":\"value1\"}'""")
+        context.argument('top', options_list=['--top', '-top'], type=int,
+                         help='Maximum number of elements to return.')
 
     with self.argument_context('iot dps') as context:
         context.argument('dps_name', help='Name of the Azure IoT Hub device provisioning service')
