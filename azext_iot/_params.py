@@ -21,7 +21,8 @@ from azext_iot.common.shared import (
     DeviceAuthType,
     KeyType,
     AttestationType,
-    ProtocolType
+    ProtocolType,
+    AckType
 )
 from azext_iot._validators import mode2_iot_login_handler
 
@@ -60,7 +61,8 @@ def load_arguments(self, _):
         context.argument('duration', options_list=['--duration', '-du'], type=int,
                          help='Valid token duration in seconds.')
         context.argument('etag', options_list=['--etag', '-e'], help='Entity tag value.')
-        context.argument('top', type=int, help='Maximum number of elements to return.')
+        context.argument('top', type=int, options_list=['--top', '-top'],
+                         help='Maximum number of elements to return. Use -1 for unlimited.')
         context.argument('method_name', options_list=['--method-name', '-mn'],
                          help='Target method for invocation.')
         context.argument('method_payload', options_list=['--method-payload', '-mp'],
@@ -72,6 +74,13 @@ def load_arguments(self, _):
                          help='The authorization type an entity is to be created with.')
         context.argument('content', options_list=['--content', '-k'],
                          help='IoT Edge configuration content json. Provide file path or raw json.')
+        context.argument('yes', options_list=['--yes', '-y'],
+                         arg_type=get_three_state_flag(),
+                         help='Skip user prompts. Indicates acceptance of dependency installation (if required). '
+                         'Used primarily for automation scenarios. Default: false')
+        context.argument('repair', options_list=['--repair', '-r'],
+                         arg_type=get_three_state_flag(),
+                         help='Reinstall uamqp dependency compatible with extension version. Default: false')
 
     with self.argument_context('iot hub') as context:
         context.argument('target_json', options_list=['--json', '-j'],
@@ -84,13 +93,6 @@ def load_arguments(self, _):
                          help='Maximum seconds to maintain connection without receiving message. Use 0 for infinity. ')
         context.argument('consumer_group', options_list=['--consumer-group', '-cg'],
                          help='Specify the consumer group to use when connecting to event hub endpoint.')
-        context.argument('yes', options_list=['--yes', '-y'],
-                         arg_type=get_three_state_flag(),
-                         help='Skip user prompts. Indicates acceptance of dependency installation (if required). '
-                         'Used primarily for automation scenarios. Default: false')
-        context.argument('repair', options_list=['--repair', '-r'],
-                         arg_type=get_three_state_flag(),
-                         help='Reinstall uamqp dependency compatible with extension version. Default: false')
         context.argument('enqueued_time', options_list=['--enqueued-time', '-et'], type=int,
                          help='Indicates the time that should be used as a starting point to read messages from the partitions. '
                          'Units are milliseconds since unix epoch. '
@@ -148,6 +150,8 @@ def load_arguments(self, _):
     with self.argument_context('iot hub query') as context:
         context.argument('query_command', options_list=['--query-command', '-q'],
                          help='User query to be executed.')
+        context.argument('top', options_list=['--top', '-top'], type=int,
+                         help='Maximum number of elements to return. By default query has no cap.')
 
     with self.argument_context('iot device') as context:
         context.argument('data', options_list=['--data', '-da'], help='Message body.')
@@ -155,7 +159,7 @@ def load_arguments(self, _):
                          help='Message property bag in key-value pairs with the '
                          'following format: a=b;c=d')
         context.argument('msg_count', options_list=['--msg-count', '-mc'], type=int,
-                         help='# of MQTT messages to send to IoT Hub.')
+                         help='Number of device messages to send to IoT Hub.')
         context.argument('msg_interval', options_list=['--msg-interval', '-mi'], type=int,
                          help='Delay in seconds between device-to-cloud messages.')
         context.argument('receive_settle', options_list=['--receive-settle', '-rs'],
@@ -165,6 +169,17 @@ def load_arguments(self, _):
         context.argument('protocol_type', options_list=['--protocol', '-proto'],
                          arg_type=get_enum_type(ProtocolType),
                          help='Indicates device-to-cloud message protocol')
+
+    with self.argument_context('iot device c2d-message') as context:
+        context.argument('ack', options_list=['--ack', '-ack'], arg_type=get_enum_type(AckType),
+                         help='Request the delivery of per-message feedback regarding the final state of that message. '
+                         'The description of ack values is as follows. '
+                         'Positive: If the c2d message reaches the Completed state, IoT Hub generates a feedback message. '
+                         'Negative: If the c2d message reaches the Dead lettered state, IoT Hub generates a feedback message. '
+                         'Full: IoT Hub generates a feedback message in either case. '
+                         'By default, no ack is requested.')
+        context.argument('correlation_id', options_list=['--correlation-id', '-cid'],
+                         help='Correlation Id associated with message.')
 
     with self.argument_context('iot device upload-file') as context:
         context.argument('file_path', options_list=['--file-path', '-fp'],
@@ -183,6 +198,8 @@ def load_arguments(self, _):
                          help="""Map of labels to be applied to target configuration.
                                 Use the following format:'{\"key0\":\"value0\",
                                 \"key1\":\"value1\"}'""")
+        context.argument('top', options_list=['--top', '-top'], type=int,
+                         help='Maximum number of elements to return.')
 
     with self.argument_context('iot dps') as context:
         context.argument('dps_name', help='Name of the Azure IoT Hub device provisioning service')

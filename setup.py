@@ -34,7 +34,7 @@ CLASSIFIERS = [
 ]
 
 DEPENDENCIES = [
-    'msrestazure',
+    'msrestazure==0.4.29',
     'paho-mqtt==1.3.1',
     'pyyaml'
 ]

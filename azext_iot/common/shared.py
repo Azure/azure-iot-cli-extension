@@ -79,3 +79,13 @@ class ProtocolType(Enum):
     """
     http = 'http'
     mqtt = 'mqtt'
+
+
+# pylint: disable=too-few-public-methods
+class AckType(Enum):
+    """
+    Type of request for acknowledgement of c2d message.
+    """
+    positive = 'positive'
+    negative = 'negative'
+    full = 'full'

@@ -5,10 +5,21 @@
 # --------------------------------------------------------------------------------------------
 
 import asyncio
+from time import time
+from uuid import uuid4
 import sys
+
+import uamqp
+from uamqp.async import ConnectionAsync, SASTokenAsync
 import six
+import yaml
+
 from knack.log import get_logger
 from azext_iot._constants import VERSION
+from azext_iot.common.utility import url_encode_str
+from azext_iot.common.sas_token_auth import SasTokenAuthentication
+from azext_iot.common.utility import unicode_binary_map, parse_entity
+
 
 logger = get_logger(__name__)
 
@@ -63,10 +74,6 @@ def executor(target, consumer_group, enqueued_time, device_id=None, properties=N
 
 async def monitor_events(target, partition, consumer_group, enqueuedtimeutc,
                          properties, device_id=None, timeout=0, debug=False):
-    import uamqp
-    import yaml
-    from azext_iot.common.utility import unicode_binary_map, parse_entity
-
     source = uamqp.address.Source("amqps://{}/{}/ConsumerGroups/{}/Partitions/{}".format(
         target['events']['endpoint'], target['events']['path'], consumer_group, partition))
 
@@ -114,9 +121,6 @@ async def monitor_events(target, partition, consumer_group, enqueuedtimeutc,
 
 
 def _create_async_connection(target, debug=False):
-    from uuid import uuid4
-    from uamqp.async import ConnectionAsync
-
     def _create_properties():
         properties = {}
         properties["product"] = "az.cli.iot.extension"
@@ -133,8 +137,6 @@ def _create_async_connection(target, debug=False):
 
 
 def _create_sas_auth(target):
-    from uamqp.async import SASTokenAsync
-
     sas_uri = 'sb://{}/{}'.format(target['events']['endpoint'], target['events']['path'])
     sas_auth = SASTokenAsync.from_shared_access_key(sas_uri, target['policy'], target['primarykey'])
     return sas_auth
@@ -143,3 +145,41 @@ def _create_sas_auth(target):
 async def _close_connection_async(connection):
     if connection:
         await connection.destroy_async()
+
+
+def send_c2d_message(target, device_id, data, properties=None,
+                     correlation_id=None, ack=None):
+    app_props = {}
+    if properties:
+        app_props.update(properties)
+
+    app_props['iothub-ack'] = (ack if ack else 'none')
+
+    msg_props = uamqp.message.MessageProperties()
+    msg_props.to = '/devices/{}/messages/devicebound'.format(device_id)
+    msg_props.message_id = str(uuid4())
+
+    if correlation_id:
+        msg_props.correlation_id = correlation_id
+
+    msg_content = str.encode(data)
+
+    message = uamqp.Message(msg_content, properties=msg_props, application_properties=app_props)
+
+    operation = '/messages/devicebound'
+    endpoint = _build_iothub_amqp_endpoint_from_target(target)
+    endpoint = endpoint + operation
+    client = uamqp.SendClient('amqps://' + endpoint)
+    client.send_message(message)
+    client.close()
+
+
+def _build_iothub_amqp_endpoint_from_target(target):
+    hub_name = target['entity'].split('.')[0]
+    endpoint = "{}@sas.root.{}".format(target['policy'], hub_name)
+    endpoint = url_encode_str(endpoint)
+    sas_token = SasTokenAuthentication(target['entity'], target['policy'],
+                                       target['primarykey'], time() + 360).generate_sas_token()
+    endpoint = endpoint + ":{}@{}".format(url_encode_str(sas_token), target['entity'])
+
+    return endpoint

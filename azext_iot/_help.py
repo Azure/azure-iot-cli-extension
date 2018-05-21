@@ -345,6 +345,21 @@ helps['iot device c2d-message reject'] = """
     short-summary: Reject or deadletter a cloud-to-device message.
 """
 
+helps['iot device c2d-message send'] = """
+    type: command
+    short-summary: Send a cloud-to-device message.
+    long-summary: EXPERIMENTAL requires Python 3.4+
+                  This command relies on and may install dependent Cython package (uamqp) upon first execution.
+                  https://github.com/Azure/azure-uamqp-python
+    examples:
+    - name: Basic usage with default message body
+      text: >
+        az iot device c2d-message send -d [Device Id] -n [IoTHub Name]
+    - name: Send cloud-to-device message with custom data and properties.
+      text: >
+        az iot device c2d-message send -d [Device Id] -n [IoTHub Name] --data 'Hello World' -props 'key0=value0;key1=value1'
+"""
+
 helps['iot device send-d2c-message'] = """
     type: command
     short-summary: Send an mqtt device-to-cloud message.
