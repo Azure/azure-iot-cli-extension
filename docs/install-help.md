@@ -16,6 +16,6 @@ Make sure you install the right distribution of Azure CLI that is compatible wit
 
 For example using the recommended installation path of [Linux via apt](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli-apt?view=azure-cli-latest), validate that your `/etc/apt/sources.list.d/azure-cli.list` file has the proper distribution identifier.
 
-On the Ubuntu environment provided with the [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/install-win10) the sources list file will have an entry that will be tagged with 'xenial':
+On an Ubuntu 16.04 environment provided with the [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/install-win10) the sources list file should have an entry tagged with 'xenial':
 
 `deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ xenial main`
