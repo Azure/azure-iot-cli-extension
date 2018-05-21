@@ -960,7 +960,7 @@ class TestGetDpsConnString():
             client.iot_dps_resource.list_keys_for_key_name.return_value = _build_policy(mocker.MagicMock(),
                                                                                         policy_name)
 
-        from azext_iot.common.azure import get_iot_dps_connection_string
+        from azext_iot.common._azure import get_iot_dps_connection_string
 
         if exp_success:
             result = get_iot_dps_connection_string(client, targetdps, rg_name, policy_name)

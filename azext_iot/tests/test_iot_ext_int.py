@@ -8,6 +8,7 @@
 import os
 import random
 import pytest
+from uuid import uuid4
 
 from azure.cli.testsdk import LiveScenarioTest
 from azure.cli.core.util import read_file_content
@@ -25,7 +26,6 @@ LIVE_STORAGE = os.environ.get('azext_iot_teststorageuri')
 
 if not all([LIVE_HUB, LIVE_HUB_CS, LIVE_RG]):
     raise ValueError('Set azext_iot_testhub, azext_iot_testhub_cs and azext_iot_testrg to run IoT Hub integration tests.')
-
 
 CWD = os.path.dirname(os.path.abspath(__file__))
 
@@ -182,6 +182,9 @@ class TestIoTHub(LiveScenarioTest):
         self.cmd('iot hub query -q "{}" --login {}'.format("select * from devices", LIVE_HUB_CS),
                  checks=query_checks)
 
+        self.cmd('iot hub query -q "{}" --login {} --top -1'.format("select * from devices", LIVE_HUB_CS),
+                 checks=query_checks)
+
         self.cmd('''iot hub device-identity create --device-id {} --hub-name {} --resource-group {}
                     --auth-method x509_thumbprint --primary-thumbprint {} --secondary-thumbprint {}'''
                  .format(device_ids[0], LIVE_HUB, LIVE_RG, PRIMARY_THUMBPRINT, SECONDARY_THUMBPRINT),
@@ -251,6 +254,9 @@ class TestIoTHub(LiveScenarioTest):
                          self.exists('authentication.symmetricKey.secondaryKey')])
 
         self.cmd('iot hub device-identity list --hub-name {} --resource-group {}'.format(LIVE_HUB, LIVE_RG),
+                 checks=[self.check('length([*])', device_count + edge_device_count)])
+
+        self.cmd('iot hub device-identity list --hub-name {} --resource-group {} --top -1'.format(LIVE_HUB, LIVE_RG),
                  checks=[self.check('length([*])', device_count + edge_device_count)])
 
         self.cmd('iot hub device-identity list -n {} -g {} -ee'.format(LIVE_HUB, LIVE_RG),
@@ -473,6 +479,11 @@ class TestIoTHub(LiveScenarioTest):
                          self.exists("[?moduleId=='$edgeAgent']"),
                          self.exists("[?moduleId=='$edgeHub']")])
 
+        self.cmd('iot hub module-identity list -d {} -n {} -g {} --top -1'.format(edge_device_ids[0], LIVE_HUB, LIVE_RG),
+                 checks=[self.check('length([*])', 4),
+                         self.exists("[?moduleId=='$edgeAgent']"),
+                         self.exists("[?moduleId=='$edgeHub']")])
+
         # With connection string
         self.cmd('iot hub module-identity list -d {} --login {}'.format(edge_device_ids[0], LIVE_HUB_CS),
                  checks=[self.check('length([*])', 4),
@@ -677,11 +688,63 @@ class TestIoTHub(LiveScenarioTest):
                          self.exists("[?id=='{}']".format(config_ids[0])),
                          self.exists("[?id=='{}']".format(config_ids[1]))])
 
+        # Error top of -1 does not work with deployments
+        self.cmd("iot edge deployment list -n {} -g {} --top -1".format(LIVE_HUB, LIVE_RG), expect_failure=True)
+
+        # Error max top of 10 with deployments
+        self.cmd("iot edge deployment list -n {} -g {} --top 100".format(LIVE_HUB, LIVE_RG), expect_failure=True)
+
         # With connection string
         self.cmd("iot edge deployment list --login {}".format(LIVE_HUB_CS),
                  checks=[self.check('length([*])', 2),
                          self.exists("[?id=='{}']".format(config_ids[0])),
                          self.exists("[?id=='{}']".format(config_ids[1]))])
+
+    @pytest.mark.skipif(not validate_min_python_version(3, 4, exit_on_fail=False), reason="minimum python version not satisfied")
+    def test_uamqp_device_messaging(self):
+        device_count = 1
+
+        names = self._create_entity_names(devices=device_count)
+        device_ids = names['device_ids']
+
+        self.cmd('iot hub device-identity create -d {} -n {} -g {} -ee'.format(device_ids[0], LIVE_HUB, LIVE_RG),
+                 checks=[self.check('deviceId', device_ids[0])])
+
+        test_body = str(uuid4())
+        test_props = 'key0=value0;key1=value1'
+        test_cid = str(uuid4())
+
+        self.cmd('iot device c2d-message send -d {} --hub-name {} -g {} --data {} -cid {}'
+                 .format(device_ids[0], LIVE_HUB, LIVE_RG, test_body, test_cid), checks=self.is_empty())
+
+        result = self.cmd('iot device c2d-message receive -d {} --hub-name {} -g {}'.format(
+            device_ids[0], LIVE_HUB, LIVE_RG)).get_output_in_json()
+
+        assert result['data'] == test_body
+        assert result['correlationId'] == test_cid
+        assert result['ack'] == 'none'
+        etag = result['etag']
+
+        self.cmd('iot device c2d-message complete -d {} --hub-name {} -g {} --etag {}'.format(
+            device_ids[0], LIVE_HUB, LIVE_RG, etag), checks=self.is_empty())
+
+        test_body = str(uuid4())
+        test_cid = str(uuid4())
+
+        self.cmd('iot device c2d-message send -d {} --hub-name {} -g {} --data {} -props {} -cid {} -ack {} --login {}'
+                 .format(device_ids[0], LIVE_HUB, LIVE_RG, test_body,
+                         test_props, test_cid, 'positive', LIVE_HUB_CS), checks=self.is_empty())
+
+        result = self.cmd('iot device c2d-message receive -d {} --hub-name {} -g {}'.format(
+            device_ids[0], LIVE_HUB, LIVE_RG)).get_output_in_json()
+
+        assert result['data'] == test_body
+        assert result['correlationId'] == test_cid
+        assert result['ack'] == 'positive'
+        etag = result['etag']
+
+        self.cmd('iot device c2d-message reject -d {} --hub-name {} -g {} --etag {}'.format(
+            device_ids[0], LIVE_HUB, LIVE_RG, etag), checks=self.is_empty())
 
     def test_device_messaging(self):
         device_count = 1

@@ -5,16 +5,12 @@
 # --------------------------------------------------------------------------------------------
 
 from knack.util import CLIError
+from azext_iot.assets.user_messages import ERROR_PARAM_TOP_OUT_OF_BOUNDS
 
 
 def execute_query(query, query_method, errors, top=None):
     payload = []
     headers = {}
-
-    # Consider top == 0
-    if top is not None:
-        if top <= 0:
-            raise CLIError('top must be > 0')
 
     try:
         if top:
@@ -36,3 +32,14 @@ def execute_query(query, query_method, errors, top=None):
         return payload[:top] if top else payload
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
+
+
+def _process_top(top, upper_limit=None):
+    # Consider top == 0
+    if not top and top != 0:
+        return None
+    if top == -1 and not upper_limit:
+        return None
+    if top <= 0 or (upper_limit and top > upper_limit):
+        raise CLIError(ERROR_PARAM_TOP_OUT_OF_BOUNDS(upper_limit))
+    return int(top)
