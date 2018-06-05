@@ -4,6 +4,18 @@
 
 This project provides new and exciting IoT commands and capabilities focused around the IoT Hub and IoT Device Provisioning services. Functionality is provided as an Azure CLI extension package for seamless integration with existing command-line functionality.
 
+## :exclamation: Breaking Announcement :exclamation:
+
+Currently version 2.0.34 of Azure CLI is **NOT** compatible with the IoT extension. All parties are aware of this problem. A hotfix is planned to be issued to Azure CLI by 6/13.
+
+You will see an error that looks like this when running commands with multi-character short options:
+
+`command authoring error: multi-character short option '-props' is not allowed. Use a single character or convert to a long-option.`
+
+Until the hotfix, to mitigate use Az CLI 2.0.33 or below.
+
+_Status last updated 6/5 12:23 pm PST_
+
 ## Features
 
 The extension augments the vanilla Azure CLI IoT by adding to or modifying the existing command space. The extension includes capabilities in the following categories:
