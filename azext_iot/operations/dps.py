@@ -11,7 +11,7 @@ from azext_iot.common.shared import (SdkType,
 from azext_iot.common._azure import get_iot_dps_connection_string
 from azext_iot.common.utility import shell_safe_json_parse
 from azext_iot.common.certops import open_certificate
-from azext_iot.operations.generic import execute_query
+from azext_iot.operations.generic import _execute_query
 from azext_iot._factory import _bind_sdk
 
 from azext_iot.dps_sdk.models.individual_enrollment import IndividualEnrollment
@@ -39,7 +39,7 @@ def iot_dps_device_enrollment_list(client, dps_name, resource_group_name, top=No
 
         query_command = "SELECT *"
         query = QuerySpecification(query_command)
-        return execute_query(query, m_sdk.device_enrollment.query, errors, top)
+        return _execute_query(query, m_sdk.device_enrollment.query, top)
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
 
@@ -175,7 +175,7 @@ def iot_dps_device_enrollment_group_list(client, dps_name, resource_group_name, 
 
         query_command = "SELECT *"
         query = QuerySpecification(query_command)
-        return execute_query(query, m_sdk.device_enrollment_group.query, errors, top)
+        return _execute_query(query, m_sdk.device_enrollment_group.query, top)
     except errors.ErrorDetailsException as e:
         raise CLIError(e)
 

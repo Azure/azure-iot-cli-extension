@@ -23,6 +23,8 @@ class SdkType(Enum):
     device_msg_sdk = 3
     custom_sdk = 4
     dps_sdk = 5
+    device_sdk = 6
+    service_sdk = 7
 
 
 # pylint: disable=too-few-public-methods
@@ -89,3 +91,21 @@ class AckType(Enum):
     positive = 'positive'
     negative = 'negative'
     full = 'full'
+
+
+# pylint: disable=too-few-public-methods
+class QueryType(Enum):
+    """
+    Type of request for acknowledgement of c2d message.
+    """
+    twin = 'twin'
+    job = 'job'
+
+
+# pylint: disable=too-few-public-methods
+class MetricType(Enum):
+    """
+    Type of request for acknowledgement of c2d message.
+    """
+    system = 'system'
+    user = 'user'

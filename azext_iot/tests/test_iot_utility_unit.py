@@ -130,4 +130,4 @@ class TestEnsureUamqp():
         else:
             install_args = uamqp_scenario['installer'].call_args
             assert install_args[0][0] == EVENT_LIB[0]
-            assert install_args[1]['compatible_version'] == EVENT_LIB[1]
+            assert install_args[1]['exact_version'] == EVENT_LIB[1]

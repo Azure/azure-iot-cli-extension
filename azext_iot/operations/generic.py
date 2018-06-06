@@ -8,30 +8,27 @@ from knack.util import CLIError
 from azext_iot.assets.user_messages import ERROR_PARAM_TOP_OUT_OF_BOUNDS
 
 
-def execute_query(query, query_method, errors, top=None):
+def _execute_query(query, query_method, top=None):
     payload = []
     headers = {}
 
-    try:
+    if top:
+        headers['x-ms-max-item-count'] = str(top)
+    result, token = query_method(query, headers)
+    payload.extend(result)
+    while token:
+        # In case requested count is > service max page size
         if top:
-            headers['x-ms-max-item-count'] = str(top)
+            pl = len(payload)
+            if pl < top:
+                page = top - pl
+                headers['x-ms-max-item-count'] = str(page)
+            else:
+                break
+        headers['x-ms-continuation'] = token
         result, token = query_method(query, headers)
         payload.extend(result)
-        while token:
-            # In case requested count is > service max page size
-            if top:
-                pl = len(payload)
-                if pl < top:
-                    page = top - pl
-                    headers['x-ms-max-item-count'] = str(page)
-                else:
-                    break
-            headers['x-ms-continuation'] = token
-            result, token = query_method(query, headers)
-            payload.extend(result)
-        return payload[:top] if top else payload
-    except errors.ErrorDetailsException as e:
-        raise CLIError(e)
+    return payload[:top] if top else payload
 
 
 def _process_top(top, upper_limit=None):

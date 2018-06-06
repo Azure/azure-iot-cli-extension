@@ -6,7 +6,7 @@ before_install:
   - chmod +x ./scripts/ci/test_static.sh
   - chmod +x ./scripts/ci/test_static_py2.sh
 install:
-    - pip install -r ./requirements -q
+    - pip install -r ./dev_requirements -q
 jobs:
   include:
     - stage: verify

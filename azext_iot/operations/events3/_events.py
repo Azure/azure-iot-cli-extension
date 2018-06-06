@@ -32,10 +32,11 @@ def executor(target, consumer_group, enqueued_time, device_id=None, properties=N
         logger.debug('No Event Hub partitions found to listen on.')
         return
 
-    # TODO: Shared connection having issues.
+    # TODO: Create and use shared connection
     # conn = _create_async_connection(target)
     for p in partitions:
         coroutines.append(monitor_events(target, p,
+                                         connection=None,
                                          consumer_group=consumer_group,
                                          enqueuedtimeutc=enqueued_time,
                                          properties=properties,
@@ -62,17 +63,17 @@ def executor(target, consumer_group, enqueued_time, device_id=None, properties=N
         future.cancel()
         loop.run_forever()
     finally:
-        # TODO: Shared connection having issues.
+        # TODO: Close shared connection
         # close_task = loop.create_task(_close_connection_async(conn))
         # loop.run_until_complete(close_task)
         loop.close()
         if result:
             error = next(res for res in result if result)
             if error:
-                six.print_('Error: ', error)
+                logger.debug('Error: ', error)
 
 
-async def monitor_events(target, partition, consumer_group, enqueuedtimeutc,
+async def monitor_events(target, partition, connection, consumer_group, enqueuedtimeutc,
                          properties, device_id=None, timeout=0, debug=False):
     source = uamqp.address.Source("amqps://{}/{}/ConsumerGroups/{}/Partitions/{}".format(
         target['events']['endpoint'], target['events']['path'], consumer_group, partition))
@@ -86,26 +87,30 @@ async def monitor_events(target, partition, consumer_group, enqueuedtimeutc,
             return
 
         event_source = {'event': {}}
-        event_source['event']['origin'] = msg.annotations.get(b'iothub-connection-device-id')
+
+        event_source['event']['origin'] = str(msg.annotations.get(b'iothub-connection-device-id'), 'utf8')
         event_source['event']['payload'] = str(next(msg.get_data()), 'utf8')
         if 'anno' in properties or 'all' in properties:
             event_source['event']['annotations'] = unicode_binary_map(msg.annotations)
         if 'sys' in properties or 'all' in properties:
             if not event_source['event'].get('properties'):
                 event_source['event']['properties'] = {}
-            event_source['event']['properties']['system'] = parse_entity(msg.properties)
+            event_source['event']['properties']['system'] = unicode_binary_map(parse_entity(msg.properties))
         if 'app' in properties or 'all' in properties:
             if not event_source['event'].get('properties'):
                 event_source['event']['properties'] = {}
             app_prop = msg.application_properties if msg.application_properties else None
 
             if app_prop:
-                event_source['event']['properties']['application'] = app_prop
+                event_source['event']['properties']['application'] = unicode_binary_map(app_prop)
 
         six.print_(yaml.dump(event_source, default_flow_style=False), flush=True)
 
     exp_cancelled = False
     async_client = uamqp.ReceiveClientAsync(source, auth=_create_sas_auth(target), timeout=timeout, prefetch=0, debug=debug)
+
+    if connection:
+        await async_client.open_async(connection=connection)
 
     try:
         # Alternative to async iterator: Callback method

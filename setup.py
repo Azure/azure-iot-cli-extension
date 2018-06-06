@@ -36,6 +36,7 @@ CLASSIFIERS = [
 DEPENDENCIES = [
     'msrestazure==0.4.29',
     'paho-mqtt==1.3.1',
+    'jmespath==0.9.3',
     'pyyaml'
 ]
 

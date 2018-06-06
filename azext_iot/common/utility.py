@@ -72,6 +72,27 @@ def evaluate_literal(literal, expected):
         return None
 
 
+def verify_transform(subject, mapping):
+    """
+    Determines if a key from mapping exists in subject and if so
+    verifies that subject[k] is of type mapping[k]
+    """
+    import jmespath
+    for k in mapping.keys():
+        result = jmespath.search(k, subject)
+
+        if result is None:
+            raise AttributeError('The property "{}" is required'.format(k))
+        if not isinstance(result, mapping[k]):
+            supplemental_info = ''
+            if mapping[k] == dict:
+                wiki_link = 'https://github.com/Azure/azure-iot-cli-extension/wiki/Tips'
+                supplemental_info = 'Review inline JSON examples here --> {}'.format(wiki_link)
+
+            raise TypeError('The property "{}" must be of {} but is {}. Input: {}. {}'.format(
+                k, str(mapping[k]), str(type(result)), result, supplemental_info))
+
+
 def validate_key_value_pairs(string):
     """
     Funtion to validate key-value pairs in the format: a=b;c=d
@@ -131,11 +152,20 @@ def validate_min_python_version(major, minor, error_msg=None, exit_on_fail=True)
 
 
 def unicode_binary_map(target):
-    """ Convert binary keys of map to utf8 and retain the same values."""
+    """ Decode binary keys and values of map to unicode."""
     # Assumes no iteritems()
     result = {}
+
     for k in target:
-        result[str(k, 'utf8')] = target[k]
+        key = k
+        if isinstance(k, bytes):
+            key = str(k, 'utf8')
+
+        if isinstance(target[k], bytes):
+            result[key] = str(target[k], 'utf8')
+        else:
+            result[key] = target[k]
+
     return result
 
 
@@ -214,9 +244,27 @@ def url_encode_str(s, plus=False):
 
 
 def test_import(package):
+    """ Used to determine if a dependency is loading correctly """
     import importlib
     try:
         importlib.import_module(package)
     except ImportError:
         return False
     return True
+
+
+def unpack_msrest_error(e, clouderror=True):
+    """ Obtains full response text from an msrest error """
+    if clouderror:
+        try:
+            return json.loads(e.response.text)
+        except ValueError:
+            return e.response.text
+        except TypeError:
+            return e.response.text
+    return e
+
+
+def dict_transform_lower_case_key(d):
+    """ Converts a dictionary to an identical one with all lower case keys """
+    return {k.lower(): v for k, v in d.items()}

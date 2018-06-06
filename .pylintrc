@@ -11,10 +11,11 @@ disable=missing-docstring,locally-disabled,fixme,cyclic-import,too-many-argument
 
 [TYPECHECK]
 # For Azure CLI extensions, we ignore some import errors as they'll be available in the environment of the CLI
-ignored-modules=azure,azure.cli,azure.cli.core,azure.cli.core.extension,azure.cli.core.commands,knack,six,msrest,msrestazure,paho,OpenSSL,requests,uamqp,yaml
+ignored-modules=azure,azure.cli,azure.cli.core,azure.cli.core.extension,azure.cli.core.commands,knack,six,msrest,msrestazure,paho,OpenSSL,requests,uamqp,yaml,jmespath
 
 [FORMAT]
 max-line-length=130
+max-module-lines=1250
 
 [VARIABLES]
 # Tells whether we should check for unused import in __init__ files.

@@ -50,8 +50,19 @@ def serviceclient_generic_error(mocker, fixture_gdcs, fixture_sas, request):
     service_client = mocker.patch(path_service_client)
     response = mocker.MagicMock(name='response')
     response.status_code = request.param
+    del response._attribute_map
+    response.text = json.dumps({'error': 'something failed'})
+
     service_client.return_value = response
     return service_client
+
+
+def build_mock_response(mocker, status_code=200, payload=None):
+    response = mocker.MagicMock(name='response')
+    response.status_code = status_code
+    response.text = json.dumps(payload)
+    del response._attribute_map
+    return response
 
 
 def generate_enrollment_create_req(attestation_type=None, endorsement_key=None,
@@ -78,9 +89,7 @@ class TestEnrollmentCreate():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_gdcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        response.status_code = request.param
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker, request.param, {})
         return service_client
 
     @pytest.mark.parametrize("req", [
@@ -201,14 +210,6 @@ def generate_enrollment_show(**kvp):
         if payload.get(k):
             payload[k] = kvp[k]
     return payload
-
-
-def build_mock_response(mocker, status_code=200, payload=None):
-    response = mocker.MagicMock(name='response')
-    response.status_code = status_code
-    response.text = json.dumps(payload)
-    del response._attribute_map
-    return response
 
 
 def generate_enrollment_update_req(certificate_path=None, iot_hub_host_name=None,
@@ -453,9 +454,7 @@ class TestEnrollmentGroupCreate():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_gdcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        response.status_code = request.param
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker, request.param, {})
         return service_client
 
     @pytest.mark.parametrize("req", [

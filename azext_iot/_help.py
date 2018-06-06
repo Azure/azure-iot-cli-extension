@@ -13,7 +13,10 @@ from knack.help_files import helps
 helps['iot'] = """
     type: group
     short-summary: Manage Internet of Things (IoT) assets.
-                   Augmented with the IoT Extension.
+                   Augmented with the IoT extension.
+    long-summary: |
+                  Review the extension wiki tips to maximize usage
+                  https://github.com/Azure/azure-iot-cli-extension/wiki/Tips
 """
 
 helps['iot hub'] = """
@@ -24,7 +27,8 @@ helps['iot hub'] = """
 helps['iot hub monitor-events'] = """
     type: command
     short-summary: Monitor device telemetry & messages sent to an IoT Hub.
-    long-summary: EXPERIMENTAL requires Python 3.5+
+    long-summary: |
+                  EXPERIMENTAL requires Python 3.5+
                   This command relies on and may install dependent Cython package (uamqp) upon first execution.
                   https://github.com/Azure/azure-uamqp-python
     examples:
@@ -252,11 +256,12 @@ helps['iot hub module-twin replace'] = """
 
 helps['iot hub apply-configuration'] = """
     type: command
-    short-summary: Apply deployment manifest to a single device.
-    long-summary: Manifest content is json and must have root element of 'content' or 'moduleContent'
+    short-summary: Apply a deployment manifest to a single device.
+    long-summary: DEPRECATED. Use 'az iot edge set-modules' instead.
+                  Manifest content is json and must have root element of 'content' or 'moduleContent'
                   e.g. {"content":{...}} or {"moduleContent":{...}}
     examples:
-    - name: Test configuration while in development.
+    - name: Test modules while in development.
       text: >
         az iot hub apply-configuration --hub-name [IoTHub Name] --device-id [Device ID]
         --content ../mycontent.json
@@ -315,6 +320,81 @@ helps['iot hub show-connection-string'] = """
     short-summary: Show a target IoT Hub Connection String.
 """
 
+helps['iot hub configuration'] = """
+    type: group
+    short-summary: Manage IoT device configurations at scale
+"""
+
+helps['iot hub configuration create'] = """
+    type: command
+    short-summary: Create an IoT device configuration in the target IoT Hub.
+    long-summary: |
+                  The configuration content is json and must include a root object containing the "deviceContent" property.
+
+                  Alternatively "deviceContent" can be nested in a "content" property.
+                  E.g. {"deviceContent":{...}} or {"content":{"deviceContent":{...}}}
+
+                  Device configurations can be created with user provided metrics for on demand evaluation.
+                  User metrics are json and in the form of {"metrics":{"queries":{...}}}
+    examples:
+    - name: Create a device configuration that applies on condition where a device is in 'building 9' and
+            the environment is 'test'.
+      text: >
+        az iot configuration create -c [Config Name] -n [IoTHub Name] --content ../device_content.json
+        --target-condition "tags.building=9 and tags.environment='test'"
+    - name: Create a device configuration with labels and provide user metrics inline (bash syntax example)
+      text: >
+        az iot configuration create -c [Config Name] -n [IoTHub Name] --content ../device_content.json
+        --target-condition "tags.building=9" --labels '{"key0":"value0", "key1":"value1"}'
+        --metrics '{"metrics": {"queries": {"mymetrik": "select deviceId from devices where tags.location='US'"}}}'
+    - name: Create a device configuration with labels and provide user metrics inline (cmd syntax example)
+      text: >
+        az iot configuration create -c [Config Name] -n [IoTHub Name] --content ../device_content.json
+        --target-condition "tags.building=9" --labels "{\\"key0\\":\\"value0\\", \\"key1\\":\\"value1\\"}"
+        --metrics "{\\"metrics\\": {\\"queries\\": {\\"mymetrik\\":
+        \\"select deviceId from devices where tags.location='US'\\"}}}"
+"""
+
+helps['iot hub configuration show'] = """
+    type: command
+    short-summary: Get the details of an IoT device configuration.
+"""
+
+helps['iot hub configuration list'] = """
+    type: command
+    short-summary: List IoT device configurations in an IoT Hub.
+"""
+
+helps['iot hub configuration update'] = """
+    type: command
+    short-summary: Update an IoT device configuration with the specified properties.
+    long-summary: Use --set followed by property assignments for updating a configuration.
+                  Leverage properties returned from 'az iot hub configuration show'.
+    examples:
+    - name: Alter the priority of a device configuration and update its target condition
+      text: >
+        az iot hub configuration update -c [Configuration Name] -n [IoTHub Name] --set priority=10
+        targetCondition="tags.building=43 and tags.environment='dev'"
+"""
+
+helps['iot hub configuration delete'] = """
+    type: command
+    short-summary: Delete an IoT device configuration.
+"""
+
+helps['iot hub configuration show-metric'] = """
+    type: command
+    short-summary: Evaluate a target user or system metric defined in an IoT device configuration
+    examples:
+    - name: Evaluate the user defined 'warningLimit' metric
+      text: >
+        az iot hub configuration show-metric -m warningLimit -d [Configuration Name] -n [IoTHub Name]
+    - name: Evaluate the system 'appliedCount' metric
+      text: >
+        az iot hub configuration show-metric --metric-id appliedCount -d [Configuration Name] -n [IoTHub Name]
+        --metric-type system
+"""
+
 helps['iot device'] = """
     type: group
     short-summary: Leverage device-to-cloud and cloud-to-device messaging capabilities.
@@ -348,7 +428,8 @@ helps['iot device c2d-message reject'] = """
 helps['iot device c2d-message send'] = """
     type: command
     short-summary: Send a cloud-to-device message.
-    long-summary: EXPERIMENTAL requires Python 3.4+
+    long-summary: |
+                  EXPERIMENTAL requires Python 3.4+
                   This command relies on and may install dependent Cython package (uamqp) upon first execution.
                   https://github.com/Azure/azure-uamqp-python
     examples:
@@ -400,58 +481,90 @@ helps['iot device upload-file'] = """
 
 helps['iot edge'] = """
     type: group
-    short-summary: Deploy and manage IoT solutions on the Edge.
+    short-summary: Manage IoT solutions on the Edge.
+"""
+
+helps['iot edge set-modules'] = """
+    type: command
+    short-summary: Set modules on a single device.
+    long-summary: |
+                  The modules content is json and must include a root object containing the "modulesContent" property.
+
+                  Alternatively "modulesContent" can be nested in a "content" property.
+                  E.g. {"modulesContent":{...}} or {"content":{"modulesContent":{...}}}
+    examples:
+    - name: Test modules while in development by setting modules on a target device.
+      text: >
+        az iot edge set-modules --hub-name [IoTHub Name] --device-id [Device ID] --content ../modules_content.json
 """
 
 helps['iot edge deployment'] = """
     type: group
-    short-summary: Configure IoT Edge deployments.
+    short-summary: Manage IoT Edge deployments at scale.
 """
 
 helps['iot edge deployment create'] = """
     type: command
     short-summary: Create an IoT Edge deployment in the target IoT Hub.
-    long-summary: Configuration json must have root of 'content' like {"content":{...}}.
+    long-summary: |
+                  The deployment content is json and must include a root object containing the "modulesContent" property.
+
+                  Alternatively "modulesContent" can be nested in a "content" property.
+                  E.g. {"modulesContent":{...}} or {"content":{"modulesContent":{...}}}
     examples:
-    - name: Create deployment with condition where a device is in 'building 9' and
+    - name: Create a deployment with labels (bash syntax example) that applies for devices in 'building 9' and
             the environment is 'test'.
       text: >
-        az iot edge deployment create -c [Configuration Name] -n [IoTHub Name] --content ../mycontent.json
-        -lab '{"key0":"value0", "key1":"value1"}'
+        az iot edge deployment create -d [Deployment Name] -n [IoTHub Name] --content ../modules_content.json
+        --labels '{"key0":"value0", "key1":"value1"}'
         --target-condition "tags.building=9 and tags.environment='test'" --priority 3
+    - name: Create a deployment with labels (cmd syntax example) that applies for devices tagged with environment 'dev'.
+      text: >
+        az iot edge deployment create -d [Deployment Name] -n [IoTHub Name] --content ../modules_content.json
+        --labels "{\\"key\\":\\"value\\"}"
+        --target-condition "tags.environment='dev'"
 """
 
 helps['iot edge deployment show'] = """
     type: command
-    short-summary: Get the details of an IoT Edge configuration in an IoT Hub.
+    short-summary: Get the details of an IoT Edge deployment.
 """
 
 helps['iot edge deployment list'] = """
     type: command
-    short-summary: List IoT Edge configurations in an IoT Hub.
+    short-summary: List IoT Edge deployments in an IoT Hub.
 """
 
 helps['iot edge deployment update'] = """
     type: command
-    short-summary: Update an IoT Edge deployment configuration with the specified properties.
-    long-summary: Use --set followed by property assignments for updating a deployment configuration.
+    short-summary: Update an IoT Edge deployment with the specified properties.
+    long-summary: Use --set followed by property assignments for updating a deployment.
                   Leverage properties returned from 'az iot edge deployment show'.
     examples:
-    - name: Alter the priority of a deployment configuration and update the targetCondition
+    - name: Alter the labels and target condition of an existing edge deployment
       text: >
-        az iot edge deployment update -c [Configuration Name] -n [IoTHub Name] --set priority=10
-        targetCondition="tags.building=43 and tags.environment='dev'"
+        az iot edge deployment update -d [Deployment Name] -n [IoTHub Name]
+        --set labels='{"purpose":"dev", "owners":"IoTEngineering"}' targetCondition='tags.building=9'
 """
 
 helps['iot edge deployment delete'] = """
     type: command
-    short-summary: Delete an IoT Hub Edge deployment.
+    short-summary: Delete an IoT Edge deployment.
+"""
+
+helps['iot edge deployment show-metric'] = """
+    type: command
+    short-summary: Evaluate a target system metric defined in an IoT Edge deployment.
+    examples:
+    - name: Evaluate the 'appliedCount' system metric
+      text: >
+        az iot edge deployment show-metric -m appliedCount -d [Deployment Name] -n [IoTHub Name]
 """
 
 helps['iot dps'] = """
     type: group
-    short-summary: Manage entities in Azure IoT Hub Device Provisioning Service.
-                   Augmented with the IoT Extension.
+    short-summary: Manage entities in an Azure IoT Hub Device Provisioning Service.
+                   Augmented with the IoT extension.
 """
 
 helps['iot dps enrollment'] = """

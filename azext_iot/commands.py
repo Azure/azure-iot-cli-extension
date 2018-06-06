@@ -21,7 +21,8 @@ def load_command_table(self, _):
         cmd_group.command('invoke-device-method', 'iot_device_method')
         cmd_group.command('invoke-module-method', 'iot_device_module_method')
         cmd_group.command('generate-sas-token', 'iot_get_sas_token')
-        cmd_group.command('apply-configuration', 'iot_device_configuration_apply')
+        cmd_group.command('apply-configuration', 'iot_edge_set_modules',
+                          deprecate_info='az iot edge set-modules')
         cmd_group.command('monitor-events', 'iot_hub_monitor_events')
 
         cmd_group.command('show-connection-string', 'iot_get_hub_connection_string')
@@ -60,13 +61,26 @@ def load_command_table(self, _):
         cmd_group.generic_update_command('update', getter_name='iot_device_twin_show',
                                          setter_name='iot_device_twin_update')
 
+    with self.command_group('iot hub configuration', command_type=iothub_ops) as cmd_group:
+        cmd_group.command('show-metric', 'iot_hub_configuration_metric_show')
+        cmd_group.command('create', 'iot_hub_configuration_create')
+        cmd_group.command('show', 'iot_hub_configuration_show')
+        cmd_group.command('list', 'iot_hub_configuration_list')
+        cmd_group.command('delete', 'iot_hub_configuration_delete')
+        cmd_group.generic_update_command('update', getter_name='iot_hub_configuration_show',
+                                         setter_name='iot_hub_configuration_update')
+
+    with self.command_group('iot edge', command_type=iothub_ops) as cmd_group:
+        cmd_group.command('set-modules', 'iot_edge_set_modules')
+
     with self.command_group('iot edge deployment', command_type=iothub_ops) as cmd_group:
-        cmd_group.command('create', 'iot_device_configuration_create')
-        cmd_group.command('show', 'iot_device_configuration_show')
-        cmd_group.command('list', 'iot_device_configuration_list')
-        cmd_group.command('delete', 'iot_device_configuration_delete')
-        cmd_group.generic_update_command('update', getter_name='iot_device_configuration_show',
-                                         setter_name='iot_device_configuration_update')
+        cmd_group.command('show-metric', 'iot_edge_deployment_metric_show')
+        cmd_group.command('create', 'iot_edge_deployment_create')
+        cmd_group.command('show', 'iot_hub_configuration_show')
+        cmd_group.command('list', 'iot_edge_deployment_list')
+        cmd_group.command('delete', 'iot_hub_configuration_delete')
+        cmd_group.generic_update_command('update', getter_name='iot_hub_configuration_show',
+                                         setter_name='iot_hub_configuration_update')
 
     with self.command_group('iot device', command_type=iothub_ops) as cmd_group:
         cmd_group.command('send-d2c-message', 'iot_device_send_message')

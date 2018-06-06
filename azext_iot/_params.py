@@ -22,7 +22,8 @@ from azext_iot.common.shared import (
     KeyType,
     AttestationType,
     ProtocolType,
-    AckType
+    AckType,
+    MetricType
 )
 from azext_iot._validators import mode2_iot_login_handler
 
@@ -61,7 +62,7 @@ def load_arguments(self, _):
         context.argument('duration', options_list=['--duration', '-du'], type=int,
                          help='Valid token duration in seconds.')
         context.argument('etag', options_list=['--etag', '-e'], help='Entity tag value.')
-        context.argument('top', type=int, options_list=['--top', '-top'],
+        context.argument('top', type=int, options_list=['--top'],
                          help='Maximum number of elements to return. Use -1 for unlimited.')
         context.argument('method_name', options_list=['--method-name', '-mn'],
                          help='Target method for invocation.')
@@ -72,8 +73,10 @@ def load_arguments(self, _):
         context.argument('auth_method', options_list=['--auth-method', '-am'],
                          arg_type=get_enum_type(DeviceAuthType),
                          help='The authorization type an entity is to be created with.')
-        context.argument('content', options_list=['--content', '-k'],
-                         help='IoT Edge configuration content json. Provide file path or raw json.')
+        context.argument('metric_type', options_list=['--metric-type', '-mt'], arg_type=get_enum_type(MetricType),
+                         help='Indicates which metric collection should be used to lookup a metric.')
+        context.argument('metric_id', options_list=['--metric-id', '-m'],
+                         help='Target metric for evaluation.')
         context.argument('yes', options_list=['--yes', '-y'],
                          arg_type=get_three_state_flag(),
                          help='Skip user prompts. Indicates acceptance of dependency installation (if required). '
@@ -87,6 +90,20 @@ def load_arguments(self, _):
                          help='Json to replace existing twin with. Provide file path or raw json.')
         context.argument('policy_name', options_list=['--policy-name', '-pn'],
                          help='Shared access policy with operation permissions for target IoT Hub entity.')
+        context.argument('primary_thumbprint', arg_group='X.509',
+                         options_list=['--primary-thumbprint', '-ptp'],
+                         help='Explicit self-signed certificate thumbprint to use for primary key.')
+        context.argument('secondary_thumbprint', arg_group='X.509',
+                         options_list=['--secondary-thumbprint', '-stp'],
+                         help='Explicit self-signed certificate thumbprint to '
+                         'use for secondary key.')
+        context.argument('valid_days', arg_group='X.509', options_list=['--valid-days', '-vd'],
+                         type=int,
+                         help='Generate self-signed cert and use its thumbprint. Valid '
+                         'for specified number of days. Default: 365.')
+        context.argument('output_dir', arg_group='X.509', options_list=['--output-dir', '-od'],
+                         help='Generate self-signed cert and use its thumbprint. '
+                         'Output to specified target directory')
 
     with self.argument_context('iot hub monitor-events') as context:
         context.argument('timeout', options_list=['--timeout', '-to'], type=int,
@@ -108,20 +125,6 @@ def load_arguments(self, _):
                          help='Set device status upon creation.')
         context.argument('status_reason', options_list=['--status-reason', '-star'],
                          help='Description for device status.')
-        context.argument('primary_thumbprint', arg_group='X.509',
-                         options_list=['--primary-thumbprint', '-ptp'],
-                         help='Explicit self-signed certificate thumbprint to use for primary key.')
-        context.argument('secondary_thumbprint', arg_group='X.509',
-                         options_list=['--secondary-thumbprint', '-stp'],
-                         help='Explicit self-signed certificate thumbprint to '
-                         'use for secondary key.')
-        context.argument('valid_days', arg_group='X.509', options_list=['--valid-days', '-vd'],
-                         type=int,
-                         help='Generate self-signed cert and use its thumbprint. Valid '
-                         'for specified number of days. Default: 365.')
-        context.argument('output_dir', arg_group='X.509', options_list=['--output-dir', '-od'],
-                         help='Generate self-signed cert and use its thumbprint. '
-                         'Output to specified target directory')
 
     with self.argument_context('iot hub device-identity export') as context:
         context.argument('blob_container_uri',
@@ -150,7 +153,7 @@ def load_arguments(self, _):
     with self.argument_context('iot hub query') as context:
         context.argument('query_command', options_list=['--query-command', '-q'],
                          help='User query to be executed.')
-        context.argument('top', options_list=['--top', '-top'], type=int,
+        context.argument('top', options_list=['--top'], type=int,
                          help='Maximum number of elements to return. By default query has no cap.')
 
     with self.argument_context('iot device') as context:
@@ -180,6 +183,8 @@ def load_arguments(self, _):
                          'By default, no ack is requested.')
         context.argument('correlation_id', options_list=['--correlation-id', '-cid'],
                          help='Correlation Id associated with message.')
+        context.argument('lock_timeout', options_list=['--lock-timeout', '-lt'], type=int,
+                         help='Specifies the amount of time a message will be invisible to other receive calls.')
 
     with self.argument_context('iot device upload-file') as context:
         context.argument('file_path', options_list=['--file-path', '-fp'],
@@ -187,19 +192,44 @@ def load_arguments(self, _):
         context.argument('content_type', options_list=['--content-type', '-ct'],
                          help='MIME Type of file.')
 
-    with self.argument_context('iot edge') as context:
+    # Remove after deprecation
+    with self.argument_context('iot hub apply-configuration') as context:
+        context.argument('content', options_list=['--content', '-k'],
+                         help='Configuration content. Provide file path or raw json.')
+
+    with self.argument_context('iot hub configuration') as context:
         context.argument('config_id', options_list=['--config-id', '-c'],
-                         help='Target Configuration.')
-        context.argument('target_condition', options_list=['--target-condition', '-tc'],
-                         help='Target condition in which this Edge configuration applies to.')
+                         help='Target device configuration.')
+        context.argument('target_condition', options_list=['--target-condition', '-tc', '-t'],
+                         help='Target condition in which a device configuration applies to.')
         context.argument('priority', options_list=['--priority', '-pri'],
-                         help='Weight of configuration in case of competing rules (highest wins).')
+                         help='Weight of the device configuration in case of competing rules (highest wins).')
+        context.argument('content', options_list=['--content', '-k'],
+                         help='Device configuration content. Provide file path or raw json.')
+        context.argument('metrics', options_list=['--metrics', '-m'],
+                         help='Device configuration metric definitions. Provide file path or raw json.')
         context.argument('labels', options_list=['--labels', '-lab'],
-                         help="""Map of labels to be applied to target configuration.
-                                Use the following format:'{\"key0\":\"value0\",
-                                \"key1\":\"value1\"}'""")
-        context.argument('top', options_list=['--top', '-top'], type=int,
-                         help='Maximum number of elements to return.')
+                         help="Map of labels to be applied to target configuration. "
+                              "Format example: {\"key0\":\"value0\", \"key1\":\"value1\"}")
+        context.argument('top', options_list=['--top'], type=int,
+                         help='Maximum number of configurations to return.')
+
+    with self.argument_context('iot edge') as context:
+        context.argument('config_id', options_list=['--deployment-id', '-d', '--config-id', '-c'],
+                         help='Target deployment. --config-id/-c is deprecated for deployments. Use --deployment-id/-d instead.')
+        context.argument('target_condition', options_list=['--target-condition', '-tc', '-t'],
+                         help='Target condition in which an Edge deployment applies to.')
+        context.argument('priority', options_list=['--priority', '-pri'],
+                         help='Weight of deployment in case of competing rules (highest wins).')
+        context.argument('content', options_list=['--content', '-k'],
+                         help='IoT Edge deployment content. Provide file path or raw json.')
+        context.argument('metrics', options_list=['--metrics', '-m'],
+                         help='IoT Edge deployment metric definitions. Provide file path or raw json.')
+        context.argument('labels', options_list=['--labels', '-lab'],
+                         help="Map of labels to be applied to target deployment. "
+                              "Use the following format: '{\"key0\":\"value0\", \"key1\":\"value1\"}'")
+        context.argument('top', options_list=['--top'], type=int,
+                         help='Maximum number of deployments to return.')
 
     with self.argument_context('iot dps') as context:
         context.argument('dps_name', help='Name of the Azure IoT Hub device provisioning service')

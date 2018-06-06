@@ -1,0 +1,27 @@
+{
+    "id": "myconfig",
+    "content": {
+        "deviceContent": {
+            "properties.desired.settings0": {
+                "a": "b"
+            },
+            "properties.desired.settings1": {
+                "c": "d"
+            }
+        }
+    },
+    "contentType": "assignment",
+    "schemaVersion": "2.0",
+    "targetCondition": "tags.environment='test'",
+    "priority": 100,
+    "labels": {
+        "key0": "value0",
+        "key1": "value1"
+    },
+    "metrics": {
+        "queries": {
+            "mymetric0": "select deviceId from devices where properties.reported.lastDesiredStatus.code = 200",
+            "mymetric1": "select deviceId from devices where properties.reported.lastDesiredStatus.code = 201"
+        }
+    }
+}

@@ -3,15 +3,19 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
+# pylint: disable=W0613,W0621
 
 import pytest
 import json
+import copy
 import os
+import six
 from uuid import uuid4
+from random import randint
 from azext_iot.operations import hub as subject
 from azext_iot.common.utility import evaluate_literal, validate_min_python_version
-from knack.util import CLIError
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
+from knack.util import CLIError
 from azure.cli.core.util import read_file_content
 
 
@@ -44,6 +48,8 @@ path_ghcs = 'azext_iot.operations.hub.get_iot_hub_connection_string'
 path_iot_hub_service_factory = 'azext_iot.common._azure.iot_hub_service_factory'
 path_sas = 'azext_iot._factory.SasTokenAuthentication'
 
+# TODO generalize all fixtures across DPS/Hub unit tests
+
 
 @pytest.fixture()
 def fixture_cmd(mocker):
@@ -73,6 +79,21 @@ def serviceclient_generic_error(mocker, fixture_ghcs, fixture_sas, request):
     service_client = mocker.patch(path_service_client)
     response = mocker.MagicMock(name='response')
     response.status_code = request.param
+    del response._attribute_map
+    response.text = json.dumps({'error': 'something failed'})
+
+    service_client.return_value = response
+    return service_client
+
+
+@pytest.fixture(params=[{'etag': None}, {}])
+def serviceclient_generic_invalid_or_missing_etag(mocker, fixture_ghcs, fixture_sas, request):
+    service_client = mocker.patch(path_service_client)
+    response = mocker.MagicMock(name='response')
+    response.status_code = 200
+    del response._attribute_map
+    response.text = json.dumps(request.param)
+
     service_client.return_value = response
     return service_client
 
@@ -84,7 +105,17 @@ def mqttclient_generic_error(mocker, fixture_ghcs, fixture_sas):
     return mqtt_client
 
 
-def generate_device_create_req(ee=True, auth='shared_private_key', ptp='123',
+def build_mock_response(mocker, status_code=200, payload=None, headers=None):
+    response = mocker.MagicMock(name='response')
+    response.status_code = status_code
+    response.text = json.dumps(payload)
+    if headers:
+        response.headers = headers
+    del response._attribute_map
+    return response
+
+
+def generate_device_create_req(ee=False, auth='shared_private_key', ptp='123',
                                stp='321', status='enabled', status_reason=None,
                                valid_days=None, output_dir=None):
     return {'client': None, 'device_id': device_id,
@@ -97,13 +128,12 @@ class TestDeviceCreate():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        response.status_code = request.param
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker, request.param, {})
         return service_client
 
     @pytest.mark.parametrize("req", [
         (generate_device_create_req()),
+        (generate_device_create_req(ee=True)),
         (generate_device_create_req(auth='x509_ca')),
         (generate_device_create_req(auth='x509_thumbprint')),
         (generate_device_create_req(auth='x509_thumbprint', stp=None)),
@@ -111,7 +141,7 @@ class TestDeviceCreate():
         (generate_device_create_req(status='disabled', status_reason='reasons'))
     ])
     def test_device_create(self, serviceclient, req):
-        subject.iot_device_create(None, req['device_id'], req['hub_name'],
+        subject.iot_device_create(fixture_cmd, req['device_id'], req['hub_name'],
                                   req['ee'], req['auth'], req['ptp'], req['stp'], req['status'],
                                   req['status_reason'], req['valid_days'], req['output_dir'])
 
@@ -140,9 +170,11 @@ class TestDeviceCreate():
             if req['stp'] is None:
                 assert x509tp.get('secondaryThumbprint') is None
             else:
-                assert x509tp['secondaryThumbprint']
+                assert x509tp['secondaryThumbprint'] == req['stp']
 
     @pytest.mark.parametrize("req, exp", [
+        (generate_device_create_req(ee=True, auth='x509_thumbprint'), CLIError),
+        (generate_device_create_req(ee=True, auth='x509_ca'), CLIError),
         (generate_device_create_req(auth='doesnotexist'), ValueError),
         (generate_device_create_req(auth='x509_thumbprint', ptp=None, stp=''), ValueError)
     ])
@@ -174,9 +206,7 @@ class TestDeviceUpdate():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        response.status_code = request.param
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker, request.param, {})
         return service_client
 
     # Update does a GET/SHOW first
@@ -225,46 +255,42 @@ class TestDeviceUpdate():
 
 
 class TestDeviceDelete():
-    @pytest.fixture(params=[200])
+    @pytest.fixture(params=[(200, 204)])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        del response._attribute_map
-        response.status_code = request.param
-        service_client.return_value = response
+        etag = str(uuid4())
+        service_client.expected_etag = etag
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0], {'etag': etag}),
+            build_mock_response(mocker, request.param[1])
+        ]
+        service_client.side_effect = test_side_effect
         return service_client
 
-    @pytest.mark.parametrize("etag", [{'etag': 'abcd'}])
-    def test_device_delete(self, serviceclient, etag):
-        serviceclient.return_value.text = json.dumps(etag)
-        subject.iot_device_delete(None, device_id, mock_target['entity'])
+    def test_device_delete(self, serviceclient):
+        subject.iot_device_delete(fixture_cmd, device_id, mock_target['entity'])
         args = serviceclient.call_args
         url = args[0][0].url
         assert '{}/devices/{}?'.format(mock_target['entity'], device_id) in url
         assert args[0][0].method == 'DELETE'
         headers = args[0][1]
-        assert headers['If-Match'] == '"{}"'.format(etag['etag'])
+        assert headers['If-Match'] == '"{}"'.format(serviceclient.expected_etag)
 
-    @pytest.mark.parametrize("etag, exp", [({'etag': ''}, LookupError), ({}, LookupError)])
-    def test_device_delete_invalid_args(self, serviceclient, etag, exp):
-        serviceclient.return_value.text = json.dumps(etag)
-        with pytest.raises(exp):
-            subject.iot_device_delete(None, device_id, mock_target['entity'])
+    @pytest.mark.parametrize("exception", [LookupError])
+    def test_device_delete_invalid_args(self, serviceclient_generic_invalid_or_missing_etag, exception):
+        with pytest.raises(exception):
+            subject.iot_device_delete(fixture_cmd, device_id, mock_target['entity'])
 
     def test_device_delete_error(self, serviceclient_generic_error):
         with pytest.raises(CLIError):
-            subject.iot_device_delete(None, device_id, mock_target['entity'])
+            subject.iot_device_delete(fixture_cmd, device_id, mock_target['entity'])
 
 
 class TestDeviceShow():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        del response._attribute_map
-        response.status_code = request.param
-        response.text = json.dumps(generate_device_show())
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker, request.param, generate_device_show())
         return service_client
 
     def test_device_show(self, serviceclient):
@@ -330,8 +356,8 @@ class TestDeviceList():
             subject.iot_device_list(None, mock_target['entity'])
 
 
-def generate_module_create_req(mid=module_id, auth='shared_private_key', ptp='123', stp='321'):
-    r = generate_device_create_req(auth=auth, ptp=ptp, stp=stp)
+def generate_module_create_req(mid=module_id, auth='shared_private_key', ptp='123', stp='321', **kwargs):
+    r = generate_device_create_req(auth=auth, ptp=ptp, stp=stp, **kwargs)
     r['module_id'] = mid
     return r
 
@@ -340,19 +366,22 @@ class TestDeviceModuleCreate():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        response.status_code = request.param
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker, request.param, {})
         return service_client
 
     @pytest.mark.parametrize("req", [
         (generate_module_create_req(auth='shared_private_key')),
         (generate_module_create_req(auth='x509_ca')),
-        (generate_module_create_req(auth='x509_thumbprint'))
+        (generate_module_create_req(auth='x509_thumbprint')),
+        (generate_module_create_req(auth='x509_thumbprint', stp=None)),
+        (generate_module_create_req(auth='x509_thumbprint', ptp=None, stp=None, valid_days=30))
     ])
     def test_device_module_create(self, serviceclient, req):
         subject.iot_device_module_create(fixture_cmd, req['device_id'], hub_name=req['hub_name'],
-                                         module_id=req['module_id'])
+                                         module_id=req['module_id'], auth_method=req['auth'],
+                                         primary_thumbprint=req['ptp'], secondary_thumbprint=req['stp'],
+                                         valid_days=req.get('valid_days'))
+
         args = serviceclient.call_args
         assert "{}/devices/{}/modules/{}?".format(mock_target['entity'], device_id, module_id) in args[0][0].url
         assert args[0][0].method == 'PUT'
@@ -363,6 +392,18 @@ class TestDeviceModuleCreate():
 
         if req['auth'] == 'shared_private_key':
             assert body['authentication']['type'] == 'sas'
+        elif req['auth'] == 'x509_ca':
+            assert body['authentication']['type'] == 'certificateAuthority'
+            assert not body['authentication'].get('x509Thumbprint')
+            assert not body['authentication'].get('symmetricKey')
+        elif req['auth'] == 'x509_thumbprint':
+            assert body['authentication']['type'] == 'selfSigned'
+            x509tp = body['authentication']['x509Thumbprint']
+            assert x509tp['primaryThumbprint']
+            if req['stp'] is None:
+                assert x509tp.get('secondaryThumbprint') is None
+            else:
+                assert x509tp['secondaryThumbprint'] == req['stp']
 
     @pytest.mark.parametrize("req", [
         (generate_module_create_req())
@@ -382,9 +423,7 @@ class TestDeviceModuleUpdate():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        response.status_code = request.param
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker, request.param, {})
         return service_client
 
     # Update does a GET/SHOW first
@@ -438,18 +477,19 @@ class TestDeviceModuleUpdate():
 
 
 class TestDeviceModuleDelete():
-    @pytest.fixture(params=[200])
+    @pytest.fixture(params=[(200, 204)])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        response.status_code = request.param
-        del response._attribute_map
-        service_client.return_value = response
+        etag = str(uuid4())
+        service_client.expected_etag = etag
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0], {'etag': etag}),
+            build_mock_response(mocker, request.param[1])
+        ]
+        service_client.side_effect = test_side_effect
         return service_client
 
-    @pytest.mark.parametrize("etag", [{'etag': 'abcd'}])
-    def test_device_module_delete(self, serviceclient, etag):
-        serviceclient.return_value.text = json.dumps(etag)
+    def test_device_module_delete(self, serviceclient):
         subject.iot_device_module_delete(fixture_cmd, device_id, module_id=module_id, hub_name=mock_target['entity'])
         args = serviceclient.call_args
         url = args[0][0].url
@@ -458,12 +498,11 @@ class TestDeviceModuleDelete():
 
         assert 'devices/{}/modules/{}?'.format(device_id, module_id) in url
         assert method == 'DELETE'
-        assert headers['If-Match'] == '"{}"'.format(etag['etag'])
+        assert headers['If-Match'] == '"{}"'.format(serviceclient.expected_etag)
 
-    @pytest.mark.parametrize("etag, exp", [({'etag': ''}, LookupError), ({}, LookupError)])
-    def test_device_module_invalid_args(self, serviceclient, etag, exp):
-        serviceclient.return_value.text = json.dumps(etag)
-        with pytest.raises(exp):
+    @pytest.mark.parametrize("exception", [LookupError])
+    def test_device_module_invalid_args(self, serviceclient_generic_invalid_or_missing_etag, exception):
+        with pytest.raises(exception):
             subject.iot_device_module_delete(fixture_cmd, device_id, module_id=module_id, hub_name=mock_target['entity'])
 
     def test_device_module_delete_error(self, serviceclient_generic_error):
@@ -542,28 +581,59 @@ class TestDeviceModuleList():
 
 def change_dir():
     from inspect import getsourcefile
-    import os
     os.chdir(os.path.dirname(os.path.abspath(getsourcefile(lambda: 0))))
 
 
-def generate_device_config(file_handle=False, condition='', priority=2, labels='{"key1":"value1"}', etag='abcd'):
+def generate_device_config(condition="tags.building=43 and tags.environment='test'", priority=randint(0, 100), scenario='create',
+                           labels='{"key1":"value1"}', etag=str(uuid4()), content_type='modules', include_metrics=True,
+                           metrics_from_file=False, content_from_file=False, metrics_short_form=False,
+                           content_short_form=False, modules_schema='2.0', config_id=None):
     result = {}
     change_dir()
-    path = 'test_config_content.json'
 
-    if file_handle:
-        result['content'] = path
+    if include_metrics and content_type != 'modules':
+        if metrics_from_file:
+            result['metrics'] = 'test_config_device_metrics.json'
+        else:
+            result['metrics'] = {'metrics': {'queries': {
+                "mymetric": "SELECT deviceId from devices where properties.reported.lastDesiredStatus.code = 200"}}}
+            if metrics_short_form or scenario == 'update':
+                result['metrics'] = result['metrics']['metrics']
+            if scenario == 'create':
+                result['metrics'] = json.dumps(result['metrics'])
+    elif content_type == 'modules' and scenario == 'update':
+        result['metrics'] = {'queries': {}, 'results': {}}
+
+    content_path = 'test_config_modules_content.json' if content_type == 'modules' else 'test_config_device_content.json'
+    if content_from_file:
+        result['content'] = content_path
     else:
-        result['content'] = str(read_file_content(path))
+        result['content'] = json.loads(str(read_file_content(content_path)))
+        if content_type == 'modules':
+            content_key = 'moduleContent' if modules_schema == '1.0' else 'modulesContent'
+            payload = result['content']['content']['modulesContent']
+            del result['content']['content']['modulesContent']
+            result['content']['content'][content_key] = payload
+        else:
+            content_key = 'deviceContent'
+
+        if content_short_form or scenario == 'update':
+            result['content'] = result['content']['content']
+
+        if scenario == 'create':
+            result['content'] = json.dumps(result['content'])
 
     result['priority'] = priority
-    result['condition'] = condition
-    result['labels'] = labels
+    result['labels'] = labels if scenario == 'create' else json.loads(labels)
     result['etag'] = etag
-    result['id'] = config_id
-
-    # Update uses json params from get/show instead of cli params for create
+    result['id'] = str(uuid4()) if not config_id else config_id
     result['targetCondition'] = condition
+    result['content_type'] = content_type
+    result['schemaVersion'] = '2.0' if modules_schema == '2.0' else '1.0'
+    result['content_short_form'] = content_short_form
+    result['metrics_short_form'] = metrics_short_form
+    result['content_from_file'] = content_from_file
+    result['metrics_from_file'] = metrics_from_file
 
     return result
 
@@ -572,120 +642,170 @@ class TestConfigCreate():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        response.status_code = request.param
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker, request.param, {})
         return service_client
 
     @pytest.mark.parametrize("req", [
         (generate_device_config()),
-        (generate_device_config(True)),
-        (generate_device_config(condition="tags.building=43 and tags.environment='test'", priority=5)),
-        (generate_device_config(labels='{"special":"value"}')),
+        (generate_device_config(content_from_file=True)),
+        (generate_device_config(content_short_form=True)),
+        (generate_device_config(modules_schema='1.0')),
+        (generate_device_config(modules_schema='1.0', content_short_form=True)),
+        (generate_device_config(content_type='device')),
+        (generate_device_config(content_type='device', content_short_form=True)),
+        (generate_device_config(content_type='device', content_from_file=True)),
+        (generate_device_config(content_type='device', include_metrics=False)),
+        (generate_device_config(content_type='device', metrics_from_file=True)),
+        (generate_device_config(content_type='device', metrics_short_form=True))
     ])
     def test_config_create(self, serviceclient, req):
-        subject.iot_device_configuration_create(fixture_cmd, config_id=config_id, hub_name=mock_target['entity'],
-                                                content=req['content'], target_condition=req['condition'],
-                                                priority=req['priority'], labels=req['labels'])
+        if req['content_type'] == 'device':
+            subject.iot_hub_configuration_create(fixture_cmd, config_id=req['id'], hub_name=mock_target['entity'],
+                                                 content=req['content'], target_condition=req['targetCondition'],
+                                                 priority=req['priority'], labels=req['labels'], metrics=req.get('metrics'))
+        else:
+            subject.iot_edge_deployment_create(fixture_cmd, config_id=req['id'], hub_name=mock_target['entity'],
+                                               content=req['content'], target_condition=req['targetCondition'],
+                                               priority=req['priority'], labels=req['labels'])
         args = serviceclient.call_args
         url = args[0][0].url
         method = args[0][0].method
         body = args[0][2]
 
-        assert '{}/configurations/{}?'.format(mock_target['entity'], config_id) in url
+        assert '{}/configurations/{}?'.format(mock_target['entity'], req['id']) in url
         assert method == 'PUT'
-        assert body['id'] == config_id
+        assert body['id'] == req['id']
 
         if os.path.exists(req['content']):
-            req['content'] = str(read_file_content(req['content']))
+            js = json.loads(str(read_file_content(req['content'])))
+            req['content'] = str(json.dumps(js))
 
-        assert body['content'] == json.loads(req['content'])['content']
-        assert body['contentType'] == 'assignments'
-        assert body.get('targetCondition') == req.get('condition')
-        assert body.get('priority') == req.get('priority')
+        if req.get('metrics'):
+            if os.path.exists(req['metrics']):
+                js = json.loads(str(read_file_content(req['metrics'])))
+                req['metrics'] = json.dumps(js)
+
+        if req.get('content_short_form'):
+            if req['schemaVersion'] == '1.0' and req['content_type'] == 'modules':
+                assert body['content']['modulesContent'] == json.loads(req['content'])['moduleContent']
+            else:
+                assert body['content'] == json.loads(req['content'])
+        else:
+            if req['schemaVersion'] == '1.0' and req['content_type'] == 'modules':
+                assert body['content']['modulesContent'] == json.loads(req['content'])['content']['moduleContent']
+            else:
+                assert body['content'] == json.loads(req['content'])['content']
+
+        if req.get('metrics'):
+            if req.get('metrics_short_form') or req.get('metrics_from_file'):
+                assert body['metrics'] == json.loads(req['metrics'])
+            else:
+                assert body['metrics'] == json.loads(req['metrics'])['metrics']
+
+        assert body['contentType'] == 'assignment'
+        assert body['targetCondition'] == req.get('targetCondition')
+        assert body['priority'] == req['priority']
         assert body.get('labels') == evaluate_literal(req.get('labels'), dict)
 
     @pytest.mark.parametrize('req, arg', [
         (generate_device_config(), 'mangle'),
+        (generate_device_config(content_type='device'), 'mangle')
     ])
     def test_config_create_invalid_args(self, serviceclient, req, arg):
         with pytest.raises(CLIError):
             if arg == 'mangle':
-                req['content'] = req['content'].replace('"content":', '"config":')
-            subject.iot_device_configuration_create(fixture_cmd, config_id=config_id, hub_name=mock_target['entity'],
-                                                    content=req['content'], target_condition=req['condition'],
-                                                    priority=req['priority'], labels=req['labels'])
+                if req['content_type'] == 'device':
+                    req['content'] = req['content'].replace('"deviceContent":', '"deviceConfig":')
+                    subject.iot_hub_configuration_create(fixture_cmd, config_id=config_id, hub_name=mock_target['entity'],
+                                                         content=req['content'], target_condition=req['targetCondition'],
+                                                         priority=req['priority'], labels=req['labels'],
+                                                         metrics=req.get('metrics'))
+                else:
+                    req['content'] = req['content'].replace('"modulesContent":', '"moduleConfig":')
+                    subject.iot_edge_deployment_create(fixture_cmd, config_id=config_id, hub_name=mock_target['entity'],
+                                                       content=req['content'], target_condition=req['targetCondition'],
+                                                       priority=req['priority'], labels=req['labels'])
 
     @pytest.mark.parametrize("req", [
-        (generate_device_config())
+        (generate_device_config(content_type='device'))
     ])
     def test_config_create_error(self, serviceclient_generic_error, req):
         with pytest.raises(CLIError):
-            subject.iot_device_configuration_create(fixture_cmd, config_id=config_id, hub_name=mock_target['entity'],
-                                                    content=req['content'], target_condition=req['condition'],
-                                                    priority=req['priority'], labels=req['labels'])
+            subject.iot_hub_configuration_create(fixture_cmd, config_id=config_id, hub_name=mock_target['entity'],
+                                                 content=req['content'], target_condition=req['targetCondition'],
+                                                 priority=req['priority'], labels=req['labels'], metrics=req.get('metrics'))
 
 
 class TestConfigUpdate():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        response.status_code = request.param
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker, request.param, {})
         return service_client
 
     @pytest.mark.parametrize("req", [
-        (generate_device_config()),
-        (generate_device_config(condition="tags.building=9 and tags.environment='Dev'", priority=1000)),
-        (generate_device_config(labels=evaluate_literal('{"special":"value"}', dict))),
+        (generate_device_config(scenario='update')),
+        (generate_device_config(scenario='update', content_type='device', include_metrics=True))
     ])
     def test_config_update(self, serviceclient, req):
-        subject.iot_device_configuration_update(fixture_cmd, config_id=config_id,
-                                                hub_name=mock_target['entity'], parameters=req)
+        req_copy = copy.deepcopy(req)
+        subject.iot_hub_configuration_update(fixture_cmd, config_id=req['id'],
+                                             hub_name=mock_target['entity'], parameters=req_copy)
         args = serviceclient.call_args
         url = args[0][0].url
         method = args[0][0].method
         body = args[0][2]
 
-        assert '{}/configurations/{}?'.format(mock_target['entity'], config_id) in url
+        assert '{}/configurations/{}?'.format(mock_target['entity'], req['id']) in url
         assert method == 'PUT'
-        assert body['id'] == config_id
+        assert body['id'] == req['id']
 
         assert body['content'] == req['content']
-        assert body['contentType'] == 'assignments'
-        assert body.get('targetCondition') == req.get('targetCondition')
-        assert body.get('priority') == req.get('priority')
+
+        if req.get('metrics'):
+            assert body['metrics'] == req['metrics']
+
+        assert body['contentType'] == 'assignment'
+        assert body['targetCondition'] == req.get('targetCondition')
+        assert body['priority'] == req.get('priority')
         assert body.get('labels') == req.get('labels')
+
         headers = args[0][1]
         assert headers['If-Match'] == '"{}"'.format(req['etag'])
 
     @pytest.mark.parametrize("req", [
-        (generate_device_config(etag='')),
-        (generate_device_config())
+        (generate_device_config(scenario='update', etag=''))
+    ])
+    def test_config_update_invalid_args(self, serviceclient, req):
+        with pytest.raises(LookupError):
+            subject.iot_hub_configuration_update(fixture_cmd, config_id=config_id,
+                                                 hub_name=mock_target['entity'], parameters=req)
+
+    @pytest.mark.parametrize("req", [
+        (generate_device_config(scenario='update'))
     ])
     def test_config_update_error(self, serviceclient_generic_error, req):
         with pytest.raises(CLIError):
-            subject.iot_device_configuration_update(fixture_cmd, config_id=config_id,
-                                                    hub_name=mock_target['entity'], parameters=req)
+            subject.iot_hub_configuration_update(fixture_cmd, config_id=config_id,
+                                                 hub_name=mock_target['entity'], parameters=req)
 
 
 class TestConfigShow():
-    @pytest.fixture(params=[200])
+    @pytest.fixture(params=[(200, 'device'), (200, 'modules')])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        del response._attribute_map
-        response.status_code = request.param
-        response.text = json.dumps(generate_device_config())
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(
+            mocker, request.param[0],
+            generate_device_config(scenario='update', content_type=request.param[1], config_id=config_id)
+        )
+        service_client.test_meta = request.param[1]
         return service_client
 
     def test_config_show(self, serviceclient):
-        result = subject.iot_device_configuration_show(fixture_cmd, config_id=config_id, hub_name=mock_target['entity'])
+        result = subject.iot_hub_configuration_show(fixture_cmd, config_id=config_id, hub_name=mock_target['entity'])
 
         assert result['id'] == config_id
-        assert result == generate_device_config()
+        assert result == generate_device_config(scenario='update', content_type=serviceclient.test_meta, config_id=config_id)
         assert json.dumps(result)
 
         args = serviceclient.call_args
@@ -697,11 +817,11 @@ class TestConfigShow():
 
     def test_config_show_error(self, serviceclient_generic_error):
         with pytest.raises(CLIError):
-            subject.iot_device_configuration_show(fixture_cmd, config_id=config_id, hub_name=mock_target['entity'])
+            subject.iot_hub_configuration_show(fixture_cmd, config_id=config_id, hub_name=mock_target['entity'])
 
 
 class TestConfigList():
-    @pytest.fixture(params=[(200, 10), (200, 0)])
+    @pytest.fixture(params=[(200, 10)])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
         response = mocker.MagicMock(name='response')
@@ -710,7 +830,9 @@ class TestConfigList():
         result = []
         size = request.param[1]
         for _ in range(size):
-            result.append(json.loads(generate_device_config()['content']))
+            result.append(generate_device_config(scenario='update'))
+        for _ in range(size):
+            result.append(generate_device_config(content_type='device', scenario='update'))
         service_client.expected_size = size
         response.text = json.dumps(result)
         response.headers = {'x-ms-continuation': None}
@@ -719,38 +841,49 @@ class TestConfigList():
 
     @pytest.mark.parametrize("top", [1, 10])
     def test_config_list(self, serviceclient, top):
-        result = subject.iot_device_configuration_list(fixture_cmd, hub_name=mock_target['entity'], top=top)
+        result = subject.iot_hub_configuration_list(fixture_cmd, hub_name=mock_target['entity'], top=top)
         args = serviceclient.call_args
         url = args[0][0].url
         assert json.dumps(result)
-        assert len(result) == serviceclient.expected_size
+        assert len(result) == top
+        assert '{}/configurations?'.format(mock_target['entity']) in url
+        assert 'top={}'.format(top) in url
+
+    @pytest.mark.parametrize("top", [1, 10])
+    def test_deployment_list(self, serviceclient, top):
+        result = subject.iot_edge_deployment_list(fixture_cmd, hub_name=mock_target['entity'], top=top)
+        args = serviceclient.call_args
+        url = args[0][0].url
+        assert json.dumps(result)
+        assert len(result) == top
         assert '{}/configurations?'.format(mock_target['entity']) in url
         assert 'top={}'.format(top) in url
 
     @pytest.mark.parametrize("top", [-1, 0])
     def test_config_list_invalid_args(self, serviceclient, top):
         with pytest.raises(CLIError):
-            subject.iot_device_configuration_list(fixture_cmd, hub_name=mock_target['entity'], top=top)
+            subject.iot_hub_configuration_list(fixture_cmd, hub_name=mock_target['entity'], top=top)
 
     def test_config_list_error(self, serviceclient_generic_error):
         with pytest.raises(CLIError):
-            subject.iot_device_configuration_list(fixture_cmd, hub_name=mock_target['entity'])
+            subject.iot_hub_configuration_list(fixture_cmd, hub_name=mock_target['entity'])
 
 
 class TestConfigDelete():
-    @pytest.fixture(params=[200])
+    @pytest.fixture(params=[(200, 204)])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        response.status_code = request.param
-        del response._attribute_map
-        service_client.return_value = response
+        etag = str(uuid4())
+        service_client.expected_etag = etag
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0], {'etag': etag}),
+            build_mock_response(mocker, request.param[1])
+        ]
+        service_client.side_effect = test_side_effect
         return service_client
 
-    @pytest.mark.parametrize("etag", [{'etag': 'abcd'}])
-    def test_config_delete(self, serviceclient, etag):
-        serviceclient.return_value.text = json.dumps(etag)
-        subject.iot_device_configuration_delete(fixture_cmd, config_id=config_id, hub_name=mock_target['entity'])
+    def test_config_delete(self, serviceclient):
+        subject.iot_hub_configuration_delete(fixture_cmd, config_id=config_id, hub_name=mock_target['entity'])
         args = serviceclient.call_args
         url = args[0][0].url
         method = args[0][0].method
@@ -758,27 +891,91 @@ class TestConfigDelete():
 
         assert method == 'DELETE'
         assert '{}/configurations/{}?'.format(mock_target['entity'], config_id) in url
-        assert headers['If-Match'] == '"{}"'.format(etag['etag'])
+        assert headers['If-Match'] == '"{}"'.format(serviceclient.expected_etag)
 
-    @pytest.mark.parametrize("etag, exp", [({'etag': ''}, LookupError), ({}, LookupError)])
-    def test_config_delete_invalid_args(self, serviceclient, etag, exp):
-        serviceclient.return_value.text = json.dumps(etag)
-        with pytest.raises(exp):
-            subject.iot_device_configuration_delete(fixture_cmd, config_id=config_id, hub_name=mock_target['entity'])
+    @pytest.mark.parametrize("expected", [LookupError])
+    def test_config_delete_invalid_args(self, serviceclient_generic_invalid_or_missing_etag, expected):
+        with pytest.raises(expected):
+            subject.iot_hub_configuration_delete(fixture_cmd, config_id=config_id, hub_name=mock_target['entity'])
 
     def test_config_delete_error(self, serviceclient_generic_error):
         with pytest.raises(CLIError):
-            subject.iot_device_configuration_delete(fixture_cmd, config_id=config_id, hub_name=mock_target['entity'])
+            subject.iot_hub_configuration_delete(fixture_cmd, config_id=config_id, hub_name=mock_target['entity'])
 
 
-def build_mock_response(mocker, status_code=200, payload=None, headers=None):
-    response = mocker.MagicMock(name='response')
-    response.status_code = status_code
-    response.text = json.dumps(payload)
-    if headers:
-        response.headers = headers
-    del response._attribute_map
-    return response
+def generate_config_metrics(content_type='modules'):
+    change_dir()
+    path = None
+
+    if content_type == 'modules':
+        path = 'test_config_modules_show.json'
+
+    return json.loads(str(read_file_content(path)))
+
+
+class TestConfigMetricShow():
+    @pytest.fixture(params=[200])
+    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        service_client.side_effect = [build_mock_response(mocker, payload=generate_config_metrics()),
+                                      build_mock_response(mocker, payload=[], headers={'x-ms-continuation': None})]
+        return service_client
+
+    @pytest.mark.parametrize("metric_id, content_type, metric_type", [
+        ('appliedCount', 'modules', 'systemMetrics'),
+        ('reportedSuccessfulCount', 'modules', 'systemMetrics'),
+        ('mymetric', 'device', 'metrics'),
+        ('reportedFailedCount', 'device', 'systemMetrics')
+    ])
+    def test_config_metric_show(self, serviceclient, metric_id, content_type, metric_type):
+
+        if content_type == 'modules':
+            result = subject.iot_edge_deployment_metric_show(fixture_cmd, config_id=config_id,
+                                                             metric_id=metric_id, hub_name=mock_target['entity'])
+        else:
+            mt = 'user' if metric_type == 'metrics' else 'system'
+            result = subject.iot_hub_configuration_metric_show(fixture_cmd, config_id=config_id, metric_type=mt,
+                                                               metric_id=metric_id, hub_name=mock_target['entity'])
+
+        expected = generate_config_metrics()
+
+        assert result['metric'] == metric_id
+        assert result['query'] == expected[metric_type]['queries'][metric_id]
+
+        query_args = serviceclient.call_args_list[1]
+        query_body = query_args[0][2]
+
+        assert query_body['query'] == expected[metric_type]['queries'][metric_id]
+
+    @pytest.mark.parametrize("metric_id, content_type, metric_type", [
+        ('doesnotexist0', 'modules', 'systemMetrics'),
+        ('doesnotexist1', 'modules', 'metrics'),
+        ('doesnotexist2', 'device', 'metrics'),
+        ('doesnotexist3', 'device', 'systemMetrics')
+    ])
+    def test_config_metric_show_invalid_args(self, serviceclient, metric_id, content_type, metric_type):
+        with pytest.raises(CLIError):
+            if content_type == 'modules':
+                subject.iot_edge_deployment_metric_show(fixture_cmd, config_id=config_id,
+                                                        metric_id=metric_id, hub_name=mock_target['entity'])
+            else:
+                mt = 'user' if metric_type == 'metrics' else 'system'
+                subject.iot_hub_configuration_metric_show(fixture_cmd, config_id=config_id, metric_type=mt,
+                                                          metric_id=metric_id, hub_name=mock_target['entity'])
+
+    @pytest.mark.parametrize("metric_id, content_type, metric_type", [
+        ('doesnotexist0', 'modules', 'systemMetrics'),
+        ('doesnotexist1', 'device', 'metrics')
+    ])
+    def test_config_metric_show_error(self, serviceclient_generic_error, metric_id, content_type, metric_type):
+        with pytest.raises(CLIError):
+            if content_type == 'modules':
+                subject.iot_edge_deployment_metric_show(fixture_cmd, config_id=config_id,
+                                                        metric_id=metric_id, hub_name=mock_target['entity'])
+            else:
+                mt = 'user' if metric_type == 'metrics' else 'system'
+                subject.iot_hub_configuration_metric_show(fixture_cmd, config_id=config_id, metric_type=mt,
+                                                          metric_id=metric_id, hub_name=mock_target['entity'])
 
 
 class TestConfigApply():
@@ -790,37 +987,55 @@ class TestConfigApply():
         return service_client
 
     @pytest.mark.parametrize("req", [
-        (generate_device_config())
+        (generate_device_config()),
+        (generate_device_config(content_short_form=True)),
+        (generate_device_config(content_from_file=True))
     ])
     def test_config_apply(self, serviceclient, req):
-        result = subject.iot_device_configuration_apply(fixture_cmd, device_id,
-                                                        hub_name=mock_target['entity'], content=req['content'])
+        result = subject.iot_edge_set_modules(fixture_cmd, device_id,
+                                              hub_name=mock_target['entity'], content=req['content'])
         args = serviceclient.call_args_list[0]
         body = args[0][2]
-        payload = json.loads(req['content'])
-        assert body['moduleContent'] == payload['content']['moduleContent']
+
+        if os.path.exists(req['content']):
+            js = json.loads(str(read_file_content(req['content'])))
+            req['content'] = str(json.dumps(js))
+
+        if req.get('content_short_form'):
+            if req['schemaVersion'] == '1.0' and req['content_type'] == 'modules':
+                assert body['modulesContent'] == json.loads(req['content'])['moduleContent']
+            else:
+                assert body == json.loads(req['content'])
+        else:
+            if req['schemaVersion'] == '1.0' and req['content_type'] == 'modules':
+                assert body['modulesContent'] == json.loads(req['content'])['content']['moduleContent']
+            else:
+                assert body == json.loads(req['content'])['content']
+
         mod_list_args = serviceclient.call_args_list[1]
         mod_list_body = mod_list_args[0][2]
+
         assert mod_list_body['query'] == "select * from devices.modules where devices.deviceId = '{}'".format(device_id)
         assert result is not None
 
     @pytest.mark.parametrize('req, arg', [
         (generate_device_config(), 'mangle'),
+        (generate_device_config(content_type='device'), ''),
     ])
     def test_config_apply_invalid_args(self, serviceclient, req, arg):
         with pytest.raises(CLIError):
             if arg == 'mangle':
-                req['content'] = req['content'].replace('"moduleContent":', '"somethingelse":')
-            subject.iot_device_configuration_apply(fixture_cmd, device_id,
-                                                   hub_name=mock_target['entity'], content=req['content'])
+                req['content'] = req['content'].replace('"modulesContent":', '"somethingelse":')
+            subject.iot_edge_set_modules(fixture_cmd, device_id,
+                                         hub_name=mock_target['entity'], content=req['content'])
 
     @pytest.mark.parametrize("req", [
         (generate_device_config())
     ])
     def test_config_apply_error(self, serviceclient_generic_error, req):
         with pytest.raises(CLIError):
-            subject.iot_device_configuration_apply(fixture_cmd, device_id,
-                                                   hub_name=mock_target['entity'], content=req['content'])
+            subject.iot_edge_set_modules(fixture_cmd, device_id,
+                                         hub_name=mock_target['entity'], content=req['content'])
 
 
 def generate_device_twin_show(file_handle=False, **kvp):
@@ -852,7 +1067,7 @@ class TestDeviceTwinShow():
         args = serviceclient.call_args
         body = args[0][2]
         assert json.dumps(result)
-        assert body['query'] == "SELECT * FROM devices where devices.deviceId='{}'".format(device_id)
+        assert body['query'] == "select * from devices where devices.deviceId='{}'".format(device_id)
 
     def test_device_twin_show_error(self, serviceclient_generic_error):
         with pytest.raises(CLIError):
@@ -863,14 +1078,12 @@ class TestDeviceTwinUpdate():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        response.status_code = request.param
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker, request.param,
+                                                          payload=generate_device_twin_show())
         return service_client
 
     # Update does a GET/SHOW first
     @pytest.mark.parametrize("req", [
-        (generate_device_twin_show()),
         (generate_device_twin_show(properties={"desired": {"key": "value"}}))
     ])
     def test_device_twin_update(self, serviceclient, req):
@@ -881,14 +1094,15 @@ class TestDeviceTwinUpdate():
         assert 'twins/{}'.format(device_id) in args[0][0].url
 
     @pytest.mark.parametrize("req, exp", [
-        (generate_device_show(etag=None), LookupError)
+        (generate_device_twin_show(etag=None), LookupError)
     ])
     def test_device_twin_update_invalid_args(self, serviceclient, req, exp):
         with pytest.raises(exp):
             subject.iot_device_twin_update(fixture_cmd, req['deviceId'], hub_name=mock_target['entity'], parameters=req)
 
     @pytest.mark.parametrize("req", [
-        (generate_device_show())
+        (generate_device_twin_show()),
+        (generate_device_twin_show(tags=''))
     ])
     def test_device_twin_update_error(self, serviceclient_generic_error, req):
         with pytest.raises(CLIError):
@@ -910,7 +1124,7 @@ class TestDeviceTwinReplace():
     @pytest.mark.parametrize("req, isfile", [
         (generate_device_twin_show(moduleId=module_id), False),
         (generate_device_twin_show(moduleId=module_id, properties={"desired": {"key": "value"}}), False),
-        (generate_device_twin_show(True), True)
+        (generate_device_twin_show(file_handle=True), True)
     ])
     def test_device_twin_replace(self, serviceclient, req, isfile):
         if not isfile:
@@ -923,12 +1137,12 @@ class TestDeviceTwinReplace():
             assert body == json.loads(content)
         else:
             assert body == json.loads(req)
-        assert '{}/twins/{}?'.format(mock_target['entity'], device_id, module_id) in args[0][0].url
+        assert '{}/twins/{}?'.format(mock_target['entity'], device_id) in args[0][0].url
         assert args[0][0].method == 'PUT'
 
     @pytest.mark.parametrize("req, exp", [
-        (generate_device_twin_show(moduleId=module_id, etag=None), LookupError),
-        ({'invalid': 'payload'}, LookupError)
+        (generate_device_twin_show(etag=None), LookupError),
+        ({'invalid': 'payload'}, LookupError),
     ])
     def test_device_twin_replace_invalid_args(self, serviceclient, req, exp):
         with pytest.raises(exp):
@@ -949,11 +1163,8 @@ class TestDeviceModuleTwinShow():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        del response._attribute_map
-        response.status_code = request.param
-        response.text = json.dumps(generate_device_twin_show())
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker, request.param,
+                                                          payload=generate_device_twin_show())
         return service_client
 
     def test_device_module_twin_show(self, serviceclient):
@@ -972,14 +1183,12 @@ class TestDeviceModuleTwinUpdate():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        response.status_code = request.param
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker, request.param,
+                                                          payload=generate_device_twin_show(moduleId=module_id))
         return service_client
 
     # Update does a GET/SHOW first
     @pytest.mark.parametrize("req", [
-        (generate_device_twin_show(moduleId=module_id)),
         (generate_device_twin_show(moduleId=module_id, properties={"desired": {"key": "value"}}))
     ])
     def test_device_module_twin_update(self, serviceclient, req):
@@ -988,11 +1197,11 @@ class TestDeviceModuleTwinUpdate():
         args = serviceclient.call_args
         body = args[0][2]
         assert body == req
-        assert 'twins/{}'.format(req['deviceId']) in args[0][0].url
-        assert 'modules/{}?'.format(module_id) in args[0][0].url
+        assert 'twins/{}/modules/{}?'.format(req['deviceId'], module_id) in args[0][0].url
 
     @pytest.mark.parametrize("req, exp", [
-        (generate_device_twin_show(moduleId=module_id, etag=None), LookupError)
+        (generate_device_twin_show(moduleId=module_id, properties={"desired": {"key": "value"}}, etag=None), LookupError),
+        (generate_device_twin_show(moduleId=module_id), CLIError)
     ])
     def test_device_module_twin_update_invalid_args(self, serviceclient, req, exp):
         with pytest.raises(exp):
@@ -1012,18 +1221,15 @@ class TestDeviceModuleTwinReplace():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        response.status_code = request.param
-        del response._attribute_map
-        response.text = json.dumps(generate_device_twin_show(moduleId=module_id))
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker, request.param,
+                                                          payload=generate_device_twin_show(moduleId=module_id))
         return service_client
 
     # Replace does a GET/SHOW first
     @pytest.mark.parametrize("req, isfile", [
         (generate_device_twin_show(moduleId=module_id), False),
         (generate_device_twin_show(moduleId=module_id, properties={"desired": {"key": "value"}}), False),
-        (generate_device_twin_show(True), True)
+        (generate_device_twin_show(file_handle=True), True)
     ])
     def test_device_module_twin_replace(self, serviceclient, req, isfile):
         if not isfile:
@@ -1169,20 +1375,20 @@ class TestDeviceMethodInvoke():
 
         assert body['responseTimeoutInSeconds'] == timeout
         assert body['connectTimeoutInSeconds'] == timeout
-        assert '{}/twins/{}/methods?'.format(mock_target['entity'], device_id, module_id) in url
+        assert '{}/twins/{}/methods?'.format(mock_target['entity'], device_id) in url
 
-    @pytest.mark.parametrize("req, type, exp", [
+    @pytest.mark.parametrize("req, etype, exp", [
         ("badformat", 'payload', CLIError),
         ('{"key":"valu', 'payload', CLIError),
         (1000, 'timeout', CLIError),
         (5, 'timeout', CLIError),
     ])
-    def test_device_method_invalid_args(self, serviceclient, req, type, exp):
+    def test_device_method_invalid_args(self, serviceclient, req, etype, exp):
         with pytest.raises(exp):
-            if type == 'payload':
+            if etype == 'payload':
                 subject.iot_device_method(fixture_cmd, device_id=device_id, hub_name=mock_target['entity'],
                                           method_name='mymethod', method_payload=req)
-            if type == 'timeout':
+            if etype == 'timeout':
                 subject.iot_device_method(fixture_cmd, device_id=device_id, hub_name=mock_target['entity'],
                                           method_name='mymethod', method_payload='{"key":"value"}', timeout=req)
 
@@ -1227,18 +1433,18 @@ class TestDeviceModuleMethodInvoke():
         assert body['connectTimeoutInSeconds'] == timeout
         assert '{}/twins/{}/modules/{}/methods?'.format(mock_target['entity'], device_id, module_id) in url
 
-    @pytest.mark.parametrize("req, type, exp", [
+    @pytest.mark.parametrize("req, etype, exp", [
         ("doesnotexist", 'payload', CLIError),
         ('{"key":"valu', 'payload', CLIError),
         (1000, 'timeout', CLIError),
         (5, 'timeout', CLIError),
     ])
-    def test_device_module_method_invalid_args(self, serviceclient, req, type, exp):
+    def test_device_module_method_invalid_args(self, serviceclient, req, etype, exp):
         with pytest.raises(exp):
-            if type == 'payload':
+            if etype == 'payload':
                 subject.iot_device_module_method(fixture_cmd, device_id=device_id, module_id=module_id, method_name='mymethod',
                                                  hub_name=mock_target['entity'], method_payload=req)
-            if type == 'timeout':
+            if etype == 'timeout':
                 subject.iot_device_module_method(fixture_cmd, device_id=device_id, module_id=module_id, method_name='mymethod',
                                                  hub_name=mock_target['entity'], method_payload='{"key":"value"}', timeout=req)
 
@@ -1407,7 +1613,7 @@ class TestDeviceMessaging():
         headers = args[0][1]
 
         assert method == 'GET'
-        assert '{}/devices/{}/messages/devicebound?'.format(mock_target['entity'], device_id) in url
+        assert '{}/devices/{}/messages/deviceBound?'.format(mock_target['entity'], device_id) in url
         assert headers['IotHub-MessageLockTimeout'] == str(timeout)
 
         assert result['ack'] == sample_c2d_receive['iothub-ack']
@@ -1433,7 +1639,7 @@ class TestDeviceMessaging():
 
         assert result is None
         assert method == 'DELETE'
-        assert '{}/devices/{}/messages/devicebound/{}?'.format(mock_target['entity'], device_id, etag) in url
+        assert '{}/devices/{}/messages/deviceBound/{}?'.format(mock_target['entity'], device_id, etag) in url
 
     def test_c2d_reject(self, serviceclient):
         etag = "3k28zb44-0d00-4ddd-ade3-6110eb94c476"
@@ -1446,7 +1652,7 @@ class TestDeviceMessaging():
 
         assert result is None
         assert method == 'DELETE'
-        assert '{}/devices/{}/messages/devicebound/{}?'.format(mock_target['entity'], device_id, etag) in url
+        assert '{}/devices/{}/messages/deviceBound/{}?'.format(mock_target['entity'], device_id, etag) in url
         assert 'reject=' in url
 
     def test_c2d_abandon(self, serviceclient):
@@ -1460,7 +1666,7 @@ class TestDeviceMessaging():
 
         assert result is None
         assert method == 'POST'
-        assert '{}/devices/{}/messages/devicebound/{}/abandon?'.format(mock_target['entity'], device_id, etag) in url
+        assert '{}/devices/{}/messages/deviceBound/{}/abandon?'.format(mock_target['entity'], device_id, etag) in url
 
     def test_c2d_errors(self, serviceclient_generic_error):
         with pytest.raises(CLIError):
@@ -1524,6 +1730,7 @@ class TestDeviceSimulate():
 
     @pytest.mark.parametrize("rs, mc, mi, protocol", [
         ('complete', 1, 1, 'http'),
+        ('reject', 1, 1, 'http'),
         ('abandon', 2, 1, 'http'),
         ('complete', 3, 1, 'mqtt'),
     ])
@@ -1532,13 +1739,18 @@ class TestDeviceSimulate():
                                     receive_settle=rs, msg_count=mc, msg_interval=mi, protocol_type=protocol)
         if protocol == 'http':
             args = serviceclient.call_args_list
-            result = [d2c_calls for calls in args for d2c_calls in calls if len(d2c_calls) > 0 and d2c_calls[0].method == 'POST']
+            result = []
+            for call in args:
+                call = call[0]
+                if call[0].method == 'POST':
+                    result.append(call)
+
             assert len(result) == mc
         if protocol == 'mqtt':
             assert mc == mqttclient().publish.call_count
             assert mqttclient().publish.call_args[0][0] == 'devices/{}/messages/events/'.format(device_id)
-            assert 1 == mqttclient().tls_set.call_count
-            assert 1 == mqttclient().username_pw_set.call_count
+            assert mqttclient().tls_set.call_count == 1
+            assert mqttclient().username_pw_set.call_count == 1
 
     @pytest.mark.parametrize("rs, mc, mi, protocol, exception", [
         ('reject', 4, 0, 'mqtt', CLIError),

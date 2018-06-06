@@ -7,6 +7,7 @@
 
 import os
 import random
+import json
 import pytest
 from uuid import uuid4
 
@@ -92,10 +93,10 @@ class TestIoTHub(LiveScenarioTest):
             for i in config_ids:
                 if config_ids.index(i) == (len(config_ids) - 1):
                     # With connection string
-                    self.cmd('iot edge deployment delete -c {} --login {}'
+                    self.cmd('iot hub configuration delete -c {} --login {}'
                              .format(i, LIVE_HUB_CS), checks=self.is_empty())
                 else:
-                    self.cmd('iot edge deployment delete -c {} -n {} -g {}'
+                    self.cmd('iot hub configuration delete -c {} -n {} -g {}'
                              .format(i, LIVE_HUB, LIVE_RG), checks=self.is_empty())
 
     def tearDown(self):
@@ -174,6 +175,14 @@ class TestIoTHub(LiveScenarioTest):
         query_checks = [self.check('length([*])', edge_device_count)]
         for i in range(edge_device_count):
             query_checks.append(self.exists('[?deviceId==`{}`]'.format(edge_device_ids[i])))
+
+        # Not currently supported
+        self.cmd('iot hub device-identity create -d {} -n {} -g {} --auth-method x509_thumbprint -ee'.format(
+            'willnotwork', LIVE_HUB, LIVE_RG), expect_failure=True)
+
+        # Not currently supported
+        self.cmd('iot hub device-identity create -d {} -n {} -g {} --auth-method x509_ca -ee'.format(
+            'willnotwork', LIVE_HUB, LIVE_RG), expect_failure=True)
 
         self.cmd('iot hub query --hub-name {} -g {} -q "{}"'.format(LIVE_HUB, LIVE_RG, "select * from devices"),
                  checks=query_checks)
@@ -293,19 +302,6 @@ class TestIoTHub(LiveScenarioTest):
                          self.exists('authentication.symmetricKey.primaryKey'),
                          self.exists('authentication.symmetricKey.secondaryKey')])
 
-        content_path = os.path.join(CWD, 'test_config_content.json')
-        self.cmd("iot hub apply-configuration -d {} -n {} -g {} -k '{}'"
-                 .format(edge_device_ids[1], LIVE_HUB, LIVE_RG, content_path), checks=[self.check('length([*])', 3)])
-
-        # With connection string
-        content_path = os.path.join(CWD, 'test_config_content.json')
-        self.cmd("iot hub apply-configuration -d {} --login {} -k '{}'"
-                 .format(edge_device_ids[1], LIVE_HUB_CS, content_path), checks=[self.check('length([*])', 3)])
-
-        self.kwargs['generic_content'] = read_file_content(content_path)
-        self.cmd("iot hub apply-configuration -d {} -n {} -g {} --content '{}'"
-                 .format(edge_device_ids[1], LIVE_HUB, LIVE_RG, '{generic_content}'), self.check('length([*])', 3))
-
         sym_conn_str_pattern = r'^HostName={}\.azure-devices\.net;DeviceId={};SharedAccessKey='.format(
             LIVE_HUB, edge_device_ids[0])
         cer_conn_str_pattern = r'^HostName={}\.azure-devices\.net;DeviceId={};x509=true'.format(
@@ -349,8 +345,43 @@ class TestIoTHub(LiveScenarioTest):
         self.cmd('iot hub generate-sas-token -d {} --login {} -pn "mypolicy"'.format(edge_device_ids[1], LIVE_HUB_CS),
                  expect_failure=True)
 
+    def test_hub_apply_device_content(self):
+        edge_device_count = 2
+        names = self._create_entity_names(edge_devices=edge_device_count)
+        edge_device_ids = names['edge_device_ids']
+
+        for device_id in edge_device_ids:
+            self.cmd('iot hub device-identity create -d {} -n {} -g {} -ee'.format(device_id, LIVE_HUB, LIVE_RG))
+
+        content_path = os.path.join(CWD, 'test_config_modules_content.json')
+        content_path_v1 = os.path.join(CWD, 'test_config_modules_content_v1.json')
+
+        self.kwargs['generic_content'] = read_file_content(content_path)
+
+        self.cmd("iot hub apply-configuration -d {} -n {} -g {} -k '{}'"
+                 .format(edge_device_ids[0], LIVE_HUB, LIVE_RG, content_path), checks=[self.check('length([*])', 3)])
+
+        self.cmd("iot hub apply-configuration -d {} -n {} -g {} --content '{}'"
+                 .format(edge_device_ids[0], LIVE_HUB, LIVE_RG, '{generic_content}'), self.check('length([*])', 3))
+
+        # With connection string
+        self.cmd("iot hub apply-configuration -d {} --login {} -k '{}'"
+                 .format(edge_device_ids[0], LIVE_HUB_CS, content_path_v1), checks=[self.check('length([*])', 4)])
+
+        # iot edge set-modules replaces apply-configuration
+        self.cmd("iot edge set-modules -d {} -n {} -g {} -k '{}'"
+                 .format(edge_device_ids[1], LIVE_HUB, LIVE_RG, content_path), checks=[self.check('length([*])', 3)])
+
+        self.cmd("iot edge set-modules -d {} -n {} -g {} --content '{}'"
+                 .format(edge_device_ids[1], LIVE_HUB, LIVE_RG, '{generic_content}'), self.check('length([*])', 3))
+
+        # With connection string
+        self.cmd("iot edge set-modules -d {} --login {} -k '{}'"
+                 .format(edge_device_ids[1], LIVE_HUB_CS, content_path_v1), checks=[self.check('length([*])', 4)])
+
     def test_hub_device_twins(self):
         self.kwargs['generic_dict'] = {'key': 'value'}
+        self.kwargs['bad_format'] = "{'key: 'value'}"
         device_count = 2
 
         names = self._create_entity_names(devices=device_count)
@@ -389,6 +420,11 @@ class TestIoTHub(LiveScenarioTest):
         assert result['deviceId'] == device_ids[0]
         assert result['properties']['desired']['special']['key'] == 'value'
 
+        # Error case, test type enforcer
+        self.cmd('iot hub device-twin update -d {} -n {} -g {} --set tags={}'
+                 .format(device_ids[0], LIVE_HUB, LIVE_RG, '"{bad_format}"'),
+                 expect_failure=True)
+
         content_path = os.path.join(CWD, 'test_generic_replace.json')
         self.cmd("iot hub device-twin replace -d {} -n {} -g {} -j '{}'"
                  .format(device_ids[0], LIVE_HUB, LIVE_RG, content_path),
@@ -417,37 +453,80 @@ class TestIoTHub(LiveScenarioTest):
                          self.check('tags.location.region', 'US')])
 
     def test_hub_modules(self):
-        edge_device_count = 1
+        edge_device_count = 2
+        device_count = 1
         module_count = 2
 
-        names = self._create_entity_names(edge_devices=edge_device_count, modules=module_count)
+        names = self._create_entity_names(edge_devices=edge_device_count, devices=device_count, modules=module_count)
         edge_device_ids = names['edge_device_ids']
         module_ids = names['module_ids']
+        device_ids = names['device_ids']
 
-        self.cmd('iot hub device-identity create -d {} -n {} -g {} -ee'.format(edge_device_ids[0], LIVE_HUB, LIVE_RG),
-                 checks=[self.check('deviceId', edge_device_ids[0])])
+        for edge_device in edge_device_ids:
+            self.cmd('iot hub device-identity create -d {} -n {} -g {} -ee'.format(edge_device, LIVE_HUB, LIVE_RG),
+                     checks=[self.check('deviceId', edge_device)])
 
+        self.cmd('iot hub device-identity create -d {} -n {} -g {}'.format(device_ids[0], LIVE_HUB, LIVE_RG),
+                 checks=[self.check('deviceId', device_ids[0])])
+
+        # Symmetric Key
         # With connection string
-        self.cmd('iot hub module-identity create -d {} --login {} -m {}'
-                 .format(edge_device_ids[0], LIVE_HUB_CS, module_ids[0]),
-                 checks=[self.check('deviceId', edge_device_ids[0]),
-                         self.check('moduleId', module_ids[0]),
-                         self.check('managedBy', 'iotEdge'),
-                         self.exists('authentication.symmetricKey.primaryKey'),
-                         self.exists('authentication.symmetricKey.secondaryKey')])
-
         self.cmd('iot hub module-identity create --device-id {} --hub-name {} --resource-group {} --module-id {}'
                  .format(edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[1]),
                  checks=[self.check('deviceId', edge_device_ids[0]),
                          self.check('moduleId', module_ids[1]),
-                         self.check('managedBy', 'iotEdge'),
                          self.exists('authentication.symmetricKey.primaryKey'),
                          self.exists('authentication.symmetricKey.secondaryKey')])
 
-        # Uncomment after API change. Currently API let's you create modules on non-edge devices.
-        # self.cmd('iot hub module-identity create --device-id {} --hub-name {} --resource-group {} --module-id {}'
-        #          .format(self.device_ids[2], LIVE_HUB, LIVE_RG, module_ids[1]),
-        #          expect_failure=True)
+        self.cmd('iot hub module-identity create -d {} --login {} -m {}'
+                 .format(edge_device_ids[0], LIVE_HUB_CS, module_ids[0]),
+                 checks=[self.check('deviceId', edge_device_ids[0]),
+                         self.check('moduleId', module_ids[0]),
+                         self.exists('authentication.symmetricKey.primaryKey'),
+                         self.exists('authentication.symmetricKey.secondaryKey')])
+
+        # X509 Thumbprint
+        # With connection string
+        self.cmd('''iot hub module-identity create --module-id {} --device-id {} --login {}
+                    --auth-method x509_thumbprint --primary-thumbprint {} --secondary-thumbprint {}'''
+                 .format(module_ids[0], device_ids[0], LIVE_HUB_CS, PRIMARY_THUMBPRINT, SECONDARY_THUMBPRINT),
+                 checks=[self.check('deviceId', device_ids[0]),
+                         self.check('moduleId', module_ids[0]),
+                         self.check('connectionState', 'Disconnected'),
+                         self.check(
+                             'authentication.symmetricKey.primaryKey', None),
+                         self.check(
+                             'authentication.symmetricKey.secondaryKey', None),
+                         self.check(
+                             'authentication.x509Thumbprint.primaryThumbprint', PRIMARY_THUMBPRINT),
+                         self.check('authentication.x509Thumbprint.secondaryThumbprint', SECONDARY_THUMBPRINT)])
+
+        self.cmd('''iot hub module-identity create -m {} -d {} -n {} -g {} -am x509_thumbprint -vd {}'''
+                 .format(module_ids[1], device_ids[0], LIVE_HUB, LIVE_RG, 10),
+                 checks=[self.check('deviceId', device_ids[0]),
+                         self.check('moduleId', module_ids[1]),
+                         self.check('connectionState', 'Disconnected'),
+                         self.check(
+                             'authentication.symmetricKey.primaryKey', None),
+                         self.check(
+                             'authentication.symmetricKey.secondaryKey', None),
+                         self.exists('authentication.x509Thumbprint.primaryThumbprint'),
+                         self.check('authentication.x509Thumbprint.secondaryThumbprint', None)])
+
+        # X509 CA
+        # With connection string
+        self.cmd('''iot hub module-identity create --module-id {} --device-id {} --login {} --auth-method x509_ca'''
+                 .format(module_ids[0], edge_device_ids[1], LIVE_HUB_CS),
+                 checks=[self.check('deviceId', edge_device_ids[1]),
+                         self.check('moduleId', module_ids[0]),
+                         self.check('connectionState', 'Disconnected'),
+                         self.check(
+                             'authentication.symmetricKey.primaryKey', None),
+                         self.check(
+                             'authentication.symmetricKey.secondaryKey', None),
+                         self.check(
+                             'authentication.x509Thumbprint.primaryThumbprint', None),
+                         self.check('authentication.x509Thumbprint.secondaryThumbprint', None)])
 
         # Includes $edgeAgent && $edgeHub system modules
         result = self.cmd('iot hub query --hub-name {} -g {} -q "{}"'
@@ -460,7 +539,6 @@ class TestIoTHub(LiveScenarioTest):
                  edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0]),
                  checks=[self.check('deviceId', edge_device_ids[0]),
                          self.check('moduleId', module_ids[0]),
-                         self.check('managedBy', 'iotEdge'),
                          self.exists('authentication.symmetricKey.primaryKey'),
                          self.exists('authentication.symmetricKey.secondaryKey')])
 
@@ -470,7 +548,6 @@ class TestIoTHub(LiveScenarioTest):
                  edge_device_ids[0], LIVE_HUB_CS, module_ids[0]),
                  checks=[self.check('deviceId', edge_device_ids[0]),
                          self.check('moduleId', module_ids[0]),
-                         self.check('managedBy', 'iotEdge'),
                          self.exists('authentication.symmetricKey.primaryKey'),
                          self.exists('authentication.symmetricKey.secondaryKey')])
 
@@ -495,7 +572,6 @@ class TestIoTHub(LiveScenarioTest):
                  checks=[
                      self.check('deviceId', edge_device_ids[0]),
                      self.check('moduleId', module_ids[0]),
-                     self.check('managedBy', 'iotEdge'),
                      self.exists('authentication.symmetricKey.primaryKey'),
                      self.exists('authentication.symmetricKey.secondaryKey')])
 
@@ -505,7 +581,6 @@ class TestIoTHub(LiveScenarioTest):
                  checks=[
                      self.check('deviceId', edge_device_ids[0]),
                      self.check('moduleId', module_ids[0]),
-                     self.check('managedBy', 'iotEdge'),
                      self.exists('authentication.symmetricKey.primaryKey'),
                      self.exists('authentication.symmetricKey.secondaryKey')])
 
@@ -535,6 +610,7 @@ class TestIoTHub(LiveScenarioTest):
 
     def test_hub_module_twins(self):
         self.kwargs['generic_dict'] = {'key': 'value'}
+        self.kwargs['bad_format'] = "{'key: 'value'}"
         edge_device_count = 1
         module_count = 1
 
@@ -549,7 +625,6 @@ class TestIoTHub(LiveScenarioTest):
                  .format(edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0]),
                  checks=[self.check('deviceId', edge_device_ids[0]),
                          self.check('moduleId', module_ids[0]),
-                         self.check('managedBy', 'iotEdge'),
                          self.exists('authentication.symmetricKey.primaryKey'),
                          self.exists('authentication.symmetricKey.secondaryKey')])
 
@@ -580,6 +655,10 @@ class TestIoTHub(LiveScenarioTest):
                  checks=[self.check('deviceId', edge_device_ids[0]),
                          self.check('moduleId', module_ids[0]),
                          self.check('properties.desired.special.key', 'value')])
+
+        # Error case test type enforcer
+        self.cmd('iot hub module-twin update -d {} --login {} -m {} --set properties.desired={}'
+                 .format(edge_device_ids[0], LIVE_HUB_CS, module_ids[0], '"{bad_format}"'), expect_failure=True)
 
         content_path = os.path.join(CWD, 'test_generic_replace.json')
         self.cmd("iot hub module-twin replace -d {} -n {} -g {} -m {} -j '{}'"
@@ -615,58 +694,112 @@ class TestIoTHub(LiveScenarioTest):
             self.cmd('iot hub module-identity delete -d {} -n {} -g {} --module-id {}'
                      .format(edge_device_ids[0], LIVE_HUB, LIVE_RG, i), checks=self.is_empty())
 
-    def test_edge_deployments(self):
+    def test_device_configurations(self):
         self.kwargs['generic_dict'] = {'key': 'value'}
-        config_count = 2
+        self.kwargs['bad_format'] = "{'key: 'value'}"
+        config_count = 5
         names = self._create_entity_names(configs=config_count)
         config_ids = names['config_ids']
 
-        content_path = os.path.join(CWD, 'test_config_content.json')
+        content_path = os.path.join(CWD, 'test_config_device_content.json')
+        metrics_path = os.path.join(CWD, 'test_config_device_metrics.json')
+
+        self.kwargs['configuration_payload'] = read_file_content(content_path)
+        self.kwargs['metrics_payload'] = read_file_content(metrics_path)
+
         priority = random.randint(1, 10)
         condition = 'tags.building=9 and tags.environment=\'test\''
+        empty_metrics = {'queries': {}, 'results': {}}
 
         # With connection string
-        self.cmd("iot edge deployment create -c {} --login {} -pri {} -tc \"{}\" -lab {} -k '{}'"
+        self.cmd("iot hub configuration create -c {} --login {} -pri {} -tc \"{}\" -lab {} -k '{}'"
                  .format(config_ids[0], LIVE_HUB_CS, priority, condition, '"{generic_dict}"', content_path),
                  checks=[
                      self.check('id', config_ids[0]),
                      self.check('priority', priority),
                      self.check('targetCondition', condition),
-                     self.check('contentType', 'assignments'),
-                     self.check('labels', self.kwargs['generic_dict'])])
+                     self.check('labels', self.kwargs['generic_dict']),
+                     self.check('content.deviceContent', json.loads(
+                         self.kwargs['configuration_payload'])['content']['deviceContent']),
+                     self.check('metrics', empty_metrics)])
 
-        self.kwargs['deployment_payload'] = read_file_content(content_path)
-        self.cmd("""iot edge deployment create --config-id {} --hub-name {} --resource-group {} --priority {}
+        self.cmd("""iot hub configuration create --config-id {} --hub-name {} --resource-group {} --priority {}
                     --target-condition \"{}\" --labels {} --content '{}'"""
-                 .format(config_ids[1], LIVE_HUB, LIVE_RG, priority, condition, '"{generic_dict}"', '{deployment_payload}'),
+                 .format(config_ids[1], LIVE_HUB, LIVE_RG, priority, condition, '"{generic_dict}"', '{configuration_payload}'),
                  checks=[
                      self.check('id', config_ids[1]),
                      self.check('priority', priority),
                      self.check('targetCondition', condition),
-                     self.check('contentType', 'assignments'),
-                     self.check('labels', self.kwargs['generic_dict'])])
+                     self.check('labels', self.kwargs['generic_dict']),
+                     self.check('content.deviceContent', json.loads(
+                         self.kwargs['configuration_payload'])['content']['deviceContent']),
+                     self.check('metrics', empty_metrics)])
 
-        self.cmd('iot edge deployment show -c {} -n {} -g {}'.format(config_ids[0], LIVE_HUB, LIVE_RG),
+        # With connection string
+        self.cmd("iot hub configuration create -c {} --login {} -pri {} -tc \"{}\" -lab {} -k '{}' -m '{}'"
+                 .format(config_ids[2], LIVE_HUB_CS, priority, condition, '"{generic_dict}"', content_path, metrics_path),
+                 checks=[
+                     self.check('id', config_ids[2]),
+                     self.check('priority', priority),
+                     self.check('targetCondition', condition),
+                     self.check('labels', self.kwargs['generic_dict']),
+                     self.check('content.deviceContent', json.loads(
+                         self.kwargs['configuration_payload'])['content']['deviceContent']),
+                     self.check('metrics.queries', json.loads(self.kwargs['metrics_payload'])['queries'])])
+
+        self.cmd("""iot hub configuration create --config-id {} --hub-name {} --resource-group {} --priority {}
+                    --target-condition \"{}\" --labels {} --content '{}' --metrics '{}'"""
+                 .format(config_ids[3], LIVE_HUB, LIVE_RG, priority, condition, '"{generic_dict}"',
+                         '{configuration_payload}', '{metrics_payload}'),
+                 checks=[
+                     self.check('id', config_ids[3]),
+                     self.check('priority', priority),
+                     self.check('targetCondition', condition),
+                     self.check('labels', self.kwargs['generic_dict']),
+                     self.check('content.deviceContent', json.loads(
+                         self.kwargs['configuration_payload'])['content']['deviceContent']),
+                     self.check('metrics.queries', json.loads(self.kwargs['metrics_payload'])['queries'])])
+
+        self.cmd("""iot hub configuration create --config-id {} --hub-name {} --resource-group {} --priority {}
+                 --content '{}' """
+                 .format(config_ids[4], LIVE_HUB, LIVE_RG, priority, '{configuration_payload}'),
+                 checks=[
+                     self.check('id', config_ids[4]),
+                     self.check('priority', priority),
+                     self.check('targetCondition', ''),
+                     self.check('content.deviceContent', json.loads(
+                         self.kwargs['configuration_payload'])['content']['deviceContent'])])
+
+        # With connection string
+        self.cmd('iot hub configuration show -c {} --login {}'.format(config_ids[0], LIVE_HUB_CS),
                  checks=[
                      self.check('id', config_ids[0]),
                      self.check('priority', priority),
                      self.check('targetCondition', condition),
-                     self.check('contentType', 'assignments'),
-                     self.check('labels', self.kwargs['generic_dict'])])
+                     self.check('labels', self.kwargs['generic_dict']),
+                     self.check('metrics', empty_metrics)])
 
-        # With connection string
-        self.cmd('iot edge deployment show -c {} --login {}'.format(config_ids[1], LIVE_HUB_CS),
+        self.cmd('iot hub configuration show -c {} --login {}'.format(config_ids[3], LIVE_HUB_CS),
                  checks=[
-                     self.check('id', config_ids[1]),
+                     self.check('id', config_ids[3]),
                      self.check('priority', priority),
                      self.check('targetCondition', condition),
-                     self.check('contentType', 'assignments'),
-                     self.check('labels', self.kwargs['generic_dict'])])
+                     self.check('labels', self.kwargs['generic_dict']),
+                     self.check('metrics.queries', json.loads(self.kwargs['metrics_payload'])['queries'])])
+
+        self.cmd('iot hub configuration show --config-id {} --hub-name {} --resource-group {}'.format(config_ids[2],
+                                                                                                      LIVE_HUB, LIVE_RG),
+                 checks=[
+                     self.check('id', config_ids[2]),
+                     self.check('priority', priority),
+                     self.check('targetCondition', condition),
+                     self.check('labels', self.kwargs['generic_dict']),
+                     self.check('metrics.queries', json.loads(self.kwargs['metrics_payload'])['queries'])])
 
         priority = random.randint(1, 10)
         condition = "tags.building=43 and tags.environment='dev'"
         self.kwargs['generic_dict_updated'] = {'key': 'super_value'}
-        self.cmd('iot edge deployment update -c {} -n {} -g {} --set priority={} targetCondition="{}" labels={}'
+        self.cmd('iot hub configuration update -c {} -n {} -g {} --set priority={} targetCondition="{}" labels={}'
                  .format(config_ids[0], LIVE_HUB, LIVE_RG, priority, condition, '"{generic_dict_updated}"'),
                  checks=[
                      self.check('id', config_ids[0]),
@@ -675,7 +808,7 @@ class TestIoTHub(LiveScenarioTest):
                      self.check('labels', self.kwargs['generic_dict_updated'])])
 
         # With connection string
-        self.cmd('iot edge deployment update -c {} --login {} --set priority={} targetCondition="{}" labels={}'
+        self.cmd('iot hub configuration update -c {} --login {} --set priority={} targetCondition="{}" labels={}'
                  .format(config_ids[0], LIVE_HUB_CS, priority, condition, '"{generic_dict_updated}"'),
                  checks=[
                      self.check('id', config_ids[0]),
@@ -683,22 +816,194 @@ class TestIoTHub(LiveScenarioTest):
                      self.check('targetCondition', condition),
                      self.check('labels', self.kwargs['generic_dict_updated'])])
 
+        # Error via type enforcer
+        self.cmd('iot hub configuration update -c {} --login {} --set priority={} targetCondition="{}" labels={}'
+                 .format(config_ids[0], LIVE_HUB_CS, priority, condition, '"{bad_format}"'), expect_failure=True)
+
+        self.cmd('iot hub configuration update -c {} --login {} --set content={}'
+                 .format(config_ids[0], LIVE_HUB_CS, '"{bad_format}"'), expect_failure=True)
+
+        # Metrics
+        user_metric_name = 'mymetric'
+        system_metric_name = 'appliedCount'
+        config_output = self.cmd('iot hub configuration show --login {} --config-id {}'.format(
+            LIVE_HUB_CS, config_ids[2])).get_output_in_json()
+
+        self.cmd('iot hub configuration show-metric --metric-id {} --login {} --config-id {} --metric-type {}'
+                 .format(user_metric_name, LIVE_HUB_CS, config_ids[2], 'user'),
+                 checks=[
+                     self.check('metric', user_metric_name),
+                     self.check('query', config_output['metrics']['queries'][user_metric_name])
+                 ])
+
+        # With connection string
+        self.cmd('iot hub configuration show-metric -m {} --login {} -c {} --metric-type {}'
+                 .format('doesnotexist', LIVE_HUB_CS, config_ids[2], 'user'), expect_failure=True)
+
+        self.cmd('iot hub configuration show-metric -m {} --login {} -c {} --metric-type {}'
+                 .format(system_metric_name, LIVE_HUB_CS, config_ids[2], 'system'),
+                 checks=[
+                     self.check('metric', system_metric_name),
+                     self.check('query', config_output['systemMetrics']['queries'][system_metric_name])
+                 ])
+
+        config_list_check = [
+            self.check('length([*])', 5),
+            self.exists("[?id=='{}']".format(config_ids[0])),
+            self.exists("[?id=='{}']".format(config_ids[1])),
+            self.exists("[?id=='{}']".format(config_ids[2])),
+            self.exists("[?id=='{}']".format(config_ids[3])),
+            self.exists("[?id=='{}']".format(config_ids[4]))
+        ]
+
+        self.cmd("iot hub configuration list -n {} -g {}".format(LIVE_HUB, LIVE_RG),
+                 checks=config_list_check)
+
+        # With connection string
+        self.cmd("iot hub configuration list --login {}".format(LIVE_HUB_CS),
+                 checks=config_list_check)
+
+        # Error top of -1 does not work with configurations
+        self.cmd("iot hub configuration list -n {} -g {} --top -1".format(LIVE_HUB, LIVE_RG), expect_failure=True)
+
+        # Error max top of 20 with configurations
+        self.cmd("iot hub configuration list -n {} -g {} --top 100".format(LIVE_HUB, LIVE_RG), expect_failure=True)
+
+    def test_edge_deployments(self):
+        self.kwargs['generic_dict'] = {'key': 'value'}
+        config_count = 3
+        names = self._create_entity_names(configs=config_count)
+        config_ids = names['config_ids']
+
+        content_path = os.path.join(CWD, 'test_config_modules_content.json')
+        content_path_v1 = os.path.join(CWD, 'test_config_modules_content_v1.json')
+
+        self.kwargs['configuration_payload'] = read_file_content(content_path)
+        self.kwargs['configuration_payload_v1'] = read_file_content(content_path_v1)
+
+        priority = random.randint(1, 10)
+        condition = 'tags.building=9 and tags.environment=\'test\''
+
+        # With connection string
+        self.cmd("iot edge deployment create -d {} --login {} -pri {} -tc \"{}\" -lab {} -k '{}'"
+                 .format(config_ids[0], LIVE_HUB_CS, priority, condition, '"{generic_dict}"', content_path),
+                 checks=[
+                     self.check('id', config_ids[0]),
+                     self.check('priority', priority),
+                     self.check('targetCondition', condition),
+                     self.check('labels', self.kwargs['generic_dict']),
+                     self.check('content.modulesContent', json.loads(
+                         self.kwargs['configuration_payload'])['content']['modulesContent'])])
+
+        self.cmd("""iot edge deployment create --deployment-id {} --hub-name {} --resource-group {} --priority {}
+                    --target-condition \"{}\" --labels {} --content '{}'"""
+                 .format(config_ids[1], LIVE_HUB, LIVE_RG, priority, condition, '"{generic_dict}"', '{configuration_payload}'),
+                 checks=[
+                     self.check('id', config_ids[1]),
+                     self.check('priority', priority),
+                     self.check('targetCondition', condition),
+                     self.check('labels', self.kwargs['generic_dict']),
+                     self.check('content.modulesContent', json.loads(
+                         self.kwargs['configuration_payload'])['content']['modulesContent'])])
+
+        self.cmd("""iot edge deployment create --deployment-id {} --hub-name {} --resource-group {} --priority {}
+                    --target-condition \"{}\" --labels {} --content '{}'"""
+                 .format(config_ids[2], LIVE_HUB, LIVE_RG, priority, condition, '"{generic_dict}"', content_path_v1),
+                 checks=[
+                     self.check('id', config_ids[2]),
+                     self.check('priority', priority),
+                     self.check('targetCondition', condition),
+                     self.check('labels', self.kwargs['generic_dict']),
+                     self.check('content.modulesContent', json.loads(
+                         # moduleContent for v1
+                         self.kwargs['configuration_payload_v1'])['content']['moduleContent'])])
+
+        # With connection string
+        self.cmd('iot edge deployment show -d {} --login {}'.format(config_ids[1], LIVE_HUB_CS),
+                 checks=[
+                     self.check('id', config_ids[1]),
+                     self.check('priority', priority),
+                     self.check('targetCondition', condition),
+                     self.check('labels', self.kwargs['generic_dict'])])
+
+        self.cmd('iot edge deployment show --deployment-id {} --hub-name {} --resource-group {}'.format(config_ids[0],
+                                                                                                        LIVE_HUB, LIVE_RG),
+                 checks=[
+                     self.check('id', config_ids[0]),
+                     self.check('priority', priority),
+                     self.check('targetCondition', condition),
+                     self.check('labels', self.kwargs['generic_dict'])])
+
+        priority = random.randint(1, 10)
+        condition = "tags.building=43 and tags.environment='dev'"
+        self.kwargs['generic_dict_updated'] = {'key': 'super_value'}
+        self.cmd('iot edge deployment update -d {} -n {} -g {} --set priority={} targetCondition="{}" labels={}'
+                 .format(config_ids[0], LIVE_HUB, LIVE_RG, priority, condition, '"{generic_dict_updated}"'),
+                 checks=[
+                     self.check('id', config_ids[0]),
+                     self.check('priority', priority),
+                     self.check('targetCondition', condition),
+                     self.check('labels', self.kwargs['generic_dict_updated'])])
+
+        # With connection string
+        self.cmd('iot edge deployment update -d {} --login {} --set priority={} targetCondition="{}" labels={}'
+                 .format(config_ids[0], LIVE_HUB_CS, priority, condition, '"{generic_dict_updated}"'),
+                 checks=[
+                     self.check('id', config_ids[0]),
+                     self.check('priority', priority),
+                     self.check('targetCondition', condition),
+                     self.check('labels', self.kwargs['generic_dict_updated'])])
+
+        # Metrics
+        system_metric_name = 'appliedCount'
+        config_output = self.cmd('iot edge deployment show --login {} --config-id {}'.format(
+            LIVE_HUB_CS, config_ids[2])).get_output_in_json()
+
+        self.cmd('iot edge deployment show-metric --metric-id {} --config-id {} --hub-name {}'
+                 .format(system_metric_name, config_ids[2], LIVE_HUB),
+                 checks=[
+                     self.check('metric', system_metric_name),
+                     self.check('query', config_output['systemMetrics']['queries'][system_metric_name])
+                 ])
+
+        # With connection string
+        self.cmd('iot edge deployment show-metric -m {} --login {} -c {}'
+                 .format('doesnotexist', LIVE_HUB_CS, config_ids[2]), expect_failure=True)
+
+        self.cmd('iot edge deployment show-metric --metric-id {} --login {} --config-id {}'
+                 .format(system_metric_name, LIVE_HUB_CS, config_ids[2]),
+                 checks=[
+                     self.check('metric', system_metric_name),
+                     self.check('query', config_output['systemMetrics']['queries'][system_metric_name])
+                 ])
+
+        config_list_check = [
+            self.check('length([*])', 3),
+            self.exists("[?id=='{}']".format(config_ids[0])),
+            self.exists("[?id=='{}']".format(config_ids[1])),
+            self.exists("[?id=='{}']".format(config_ids[2]))
+        ]
+
         self.cmd("iot edge deployment list -n {} -g {}".format(LIVE_HUB, LIVE_RG),
-                 checks=[self.check('length([*])', 2),
-                         self.exists("[?id=='{}']".format(config_ids[0])),
-                         self.exists("[?id=='{}']".format(config_ids[1]))])
-
-        # Error top of -1 does not work with deployments
-        self.cmd("iot edge deployment list -n {} -g {} --top -1".format(LIVE_HUB, LIVE_RG), expect_failure=True)
-
-        # Error max top of 10 with deployments
-        self.cmd("iot edge deployment list -n {} -g {} --top 100".format(LIVE_HUB, LIVE_RG), expect_failure=True)
+                 checks=config_list_check)
 
         # With connection string
         self.cmd("iot edge deployment list --login {}".format(LIVE_HUB_CS),
-                 checks=[self.check('length([*])', 2),
-                         self.exists("[?id=='{}']".format(config_ids[0])),
-                         self.exists("[?id=='{}']".format(config_ids[1]))])
+                 checks=config_list_check)
+
+        # Explicit delete for edge deployment
+        self.cmd("iot edge deployment delete -d {} -n {} -g {}".format(
+            config_ids[1], LIVE_HUB, LIVE_RG))
+        del config_ids[1]
+        self.cmd("iot edge deployment delete -d {} --login {}".format(
+            config_ids[0], LIVE_HUB_CS))
+        del config_ids[0]
+
+        # Error top of -1 does not work with configurations
+        self.cmd("iot edge deployment list -n {} -g {} --top -1".format(LIVE_HUB, LIVE_RG), expect_failure=True)
+
+        # Error max top of 20 with configurations
+        self.cmd("iot edge deployment list -n {} -g {} --top 100".format(LIVE_HUB, LIVE_RG), expect_failure=True)
 
     @pytest.mark.skipif(not validate_min_python_version(3, 4, exit_on_fail=False), reason="minimum python version not satisfied")
     def test_uamqp_device_messaging(self):
@@ -867,7 +1172,7 @@ class TestIoTHub(LiveScenarioTest):
     def test_storage(self):
         device_count = 1
 
-        content_path = os.path.join(CWD, 'test_config_content.json')
+        content_path = os.path.join(CWD, 'test_config_modules_content_v1.json')
         names = self._create_entity_names(devices=device_count)
         device_ids = names['device_ids']
 

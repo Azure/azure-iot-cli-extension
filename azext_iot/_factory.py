@@ -50,10 +50,9 @@ def iot_service_provisioning_factory(cli_ctx, *_):
 
 # pylint: disable=too-many-return-statements
 def _bind_sdk(target, sdk_type, device_id=None):
-    from azext_iot.device_query_sdk.device_identities_api import DeviceIdentitiesAPI
-    from azext_iot.device_twin_sdk.device_twin_api import DeviceTwinAPI
-    from azext_iot.modules_sdk.iot_hub_client import IotHubClient
-    from azext_iot.device_msg_sdk.iot_hub_device_client import IotHubDeviceClient
+    from azext_iot.device_sdk.iot_hub_gateway_device_apis import IotHubGatewayDeviceAPIs
+    from azext_iot.service_sdk.iot_hub_gateway_service_apis import IotHubGatewayServiceAPIs
+
     from azext_iot.custom_sdk.custom_api import CustomClient
     from azext_iot.dps_sdk import DeviceProvisioningServiceServiceRuntimeClient
 
@@ -61,42 +60,22 @@ def _bind_sdk(target, sdk_type, device_id=None):
     endpoint = "https://{}".format(sas_uri)
     if device_id:
         sas_uri = '{}/devices/{}'.format(sas_uri, device_id)
-    subscription_id = target.get('subscription', None)
 
-    if sdk_type is SdkType.device_query_sdk:
+    if sdk_type is SdkType.device_sdk:
         return (
-            DeviceIdentitiesAPI(
+            IotHubGatewayDeviceAPIs(
                 SasTokenAuthentication(
                     sas_uri, target['policy'], target['primarykey']),
                 endpoint),
             _get_sdk_exception_type(sdk_type)
         )
 
-    elif sdk_type is SdkType.device_twin_sdk:
+    elif sdk_type is SdkType.service_sdk:
         return (
-            DeviceTwinAPI(
+            IotHubGatewayServiceAPIs(
                 SasTokenAuthentication(
                     sas_uri, target['policy'], target['primarykey']),
                 endpoint),
-            _get_sdk_exception_type(sdk_type)
-        )
-
-    elif sdk_type is SdkType.modules_sdk:
-        return (
-            IotHubClient(
-                SasTokenAuthentication(
-                    sas_uri, target['policy'], target['primarykey']),
-                subscription_id, endpoint),
-            _get_sdk_exception_type(sdk_type)
-        )
-
-    elif sdk_type is SdkType.device_msg_sdk:
-        return (
-            IotHubDeviceClient(
-                SasTokenAuthentication(
-                    sas_uri, target['policy'], target['primarykey']),
-                subscription_id,
-                base_url=endpoint),
             _get_sdk_exception_type(sdk_type)
         )
 
@@ -123,12 +102,11 @@ def _bind_sdk(target, sdk_type, device_id=None):
 
 def _get_sdk_exception_type(sdk_type):
     from importlib import import_module
+
     exception_library = {
-        SdkType.device_query_sdk: import_module('azext_iot.device_query_sdk.models.error_details'),
-        SdkType.modules_sdk: import_module('azext_iot.modules_sdk.models.error_details'),
-        SdkType.device_twin_sdk: import_module('azext_iot.device_twin_sdk.models.error_details'),
-        SdkType.device_msg_sdk: import_module('azext_iot.device_msg_sdk.models.error_details'),
         SdkType.custom_sdk: import_module('azext_iot.custom_sdk.models.error_details'),
+        SdkType.service_sdk: import_module('msrestazure.azure_exceptions'),
+        SdkType.device_sdk: import_module('msrestazure.azure_exceptions'),
         SdkType.dps_sdk: import_module('azext_iot.dps_sdk.models.error_details')
     }
     return exception_library.get(sdk_type, None)
