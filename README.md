@@ -1,4 +1,4 @@
-# Microsoft Azure IoT Extension for Azure CLI 2.0
+# Microsoft Azure IoT Extension for Azure CLI
 
 ![Python](https://img.shields.io/pypi/pyversions/azure-cli.svg?maxAge=2592000)
 
@@ -6,15 +6,13 @@ This project provides new and exciting IoT commands and capabilities focused aro
 
 ## :exclamation: Breaking Announcement :exclamation:
 
-Currently version 2.0.34 of Azure CLI is **NOT** compatible with the IoT extension. All parties are aware of this problem. A hotfix is planned to be issued to Azure CLI by 6/13.
+Versions 2.0.34 to 2.0.36 of Azure CLI are **NOT** compatible with the IoT extension.
 
 You will see an error that looks like this when running commands with multi-character short options:
 
 `command authoring error: multi-character short option '-props' is not allowed. Use a single character or convert to a long-option.`
 
-Until the hotfix, to mitigate use Az CLI 2.0.33 or below.
-
-_Status last updated 6/5 12:23 pm PST_
+We recommend skipping these version. Please look at the [compatibility](./README.md#compatibility) section below for up to date guidelines.
 
 ## Features
 
@@ -30,9 +28,16 @@ The extension is designed to be plug-and-play with Azure CLI. **Even** if you ha
 
 :exclamation: For **installation troubleshooting** please go to the [respective docs section](docs/install-help.md) for help.
 
+### Compatibility
+Before installation validate that your Azure CLI version is within the following criteria. Use `az --version` to validate.
+
+```python
+>= '2.0.24' and NOT in ['2.0.34', '2.0.35', '2.0.36']
+```
+
 ### Step 0: Install/Update Azure CLI
 
-At a minimum your CLI core version must be `2.0.24` or above. Use `az --version` to validate. This version supports `az extension` commands and introduces the `knack` command framework.
+At a minimum your CLI core version must be within the compatibility criteria defined above.
 
 Follow the installation instructions on [GitHub](https://github.com/Azure/azure-cli) or [Microsoft Docs](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest) to setup Azure CLI in your environment.
 
