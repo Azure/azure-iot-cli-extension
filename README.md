@@ -4,7 +4,20 @@
 
 This project provides new and exciting IoT commands and capabilities focused around the IoT Hub and IoT Device Provisioning services. Functionality is provided as an Azure CLI extension package for seamless integration with existing command-line functionality.
 
-## :exclamation: Breaking Announcement :exclamation:
+## :exclamation: Breaking Announcements :exclamation:
+
+**NEW** 6/21/18 -
+The Windows Installer for Azure CLI since version 2.0.34 has an issue with the packaged pip. This issue prevents the IoT extension from being installed. The problem is being worked on and we will provide guidance upon resolution.
+
+The error looks like this:
+
+```bash
+Command '['C:\Program Files (x86)\Microsoft SDKs\Azure\CLI2\python.exe', '-m', 'pip', 'install', '--target', 'C:\Users\myuser\.azure\cliextensions\azure-cli-iot-ext', 'C:\Users\myuser\AppData\Local\Temp\tmpkds3dj8q\azure_cli_iot_ext-0.4.5-py2.py3-none-any.whl', '-vv', '--disable-pip-version-check', '--no-cache-dir']' returned non-zero exit status 2.
+Pip failed
+```
+Look at this [issue thread](https://github.com/Azure/azure-iot-cli-extension/issues/33#issuecomment-399200521) for a workaround.
+
+___
 
 Versions 2.0.34 to 2.0.36 of Azure CLI are **NOT** compatible with the IoT extension.
 
