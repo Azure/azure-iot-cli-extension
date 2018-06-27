@@ -612,18 +612,30 @@ class TestIoTHub(LiveScenarioTest):
         self.kwargs['generic_dict'] = {'key': 'value'}
         self.kwargs['bad_format'] = "{'key: 'value'}"
         edge_device_count = 1
+        device_count = 1
         module_count = 1
 
-        names = self._create_entity_names(edge_devices=edge_device_count, modules=module_count)
+        names = self._create_entity_names(edge_devices=edge_device_count, modules=module_count, devices=device_count)
         edge_device_ids = names['edge_device_ids']
         module_ids = names['module_ids']
+        device_ids = names['device_ids']
 
         self.cmd('iot hub device-identity create -d {} -n {} -g {} -ee'.format(edge_device_ids[0], LIVE_HUB, LIVE_RG),
                  checks=[self.check('deviceId', edge_device_ids[0])])
 
+        self.cmd('iot hub device-identity create -d {} -n {} -g {}'.format(device_ids[0], LIVE_HUB, LIVE_RG),
+                 checks=[self.check('deviceId', device_ids[0])])
+
         self.cmd('iot hub module-identity create -d {} -n {} -g {} -m {}'
                  .format(edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0]),
                  checks=[self.check('deviceId', edge_device_ids[0]),
+                         self.check('moduleId', module_ids[0]),
+                         self.exists('authentication.symmetricKey.primaryKey'),
+                         self.exists('authentication.symmetricKey.secondaryKey')])
+
+        self.cmd('iot hub module-identity create -d {} -n {} -g {} -m {}'
+                 .format(device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0]),
+                 checks=[self.check('deviceId', device_ids[0]),
                          self.check('moduleId', module_ids[0]),
                          self.exists('authentication.symmetricKey.primaryKey'),
                          self.exists('authentication.symmetricKey.secondaryKey')])
@@ -658,6 +670,9 @@ class TestIoTHub(LiveScenarioTest):
 
         # Error case test type enforcer
         self.cmd('iot hub module-twin update -d {} --login {} -m {} --set properties.desired={}'
+                 .format(edge_device_ids[0], LIVE_HUB_CS, module_ids[0], '"{bad_format}"'), expect_failure=True)
+
+        self.cmd('iot hub module-twin update -d {} --login {} -m {} --set tags={}'
                  .format(edge_device_ids[0], LIVE_HUB_CS, module_ids[0], '"{bad_format}"'), expect_failure=True)
 
         content_path = os.path.join(CWD, 'test_generic_replace.json')

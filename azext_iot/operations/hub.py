@@ -305,6 +305,8 @@ def iot_device_module_twin_update(cmd, device_id, module_id, parameters, hub_nam
             headers = {}
             headers["If-Match"] = '"{}"'.format(etag)
             verify = {'properties.desired': dict}
+            if parameters.get('tags', None):
+                verify['tags'] = dict
             verify_transform(parameters, verify)
             return service_sdk.update_module_twin(device_id, module_id, parameters, custom_headers=headers)
         raise LookupError("module twin etag not found")
@@ -637,7 +639,7 @@ def iot_device_twin_update(cmd, device_id, parameters, hub_name=None, resource_g
             headers = {}
             headers["If-Match"] = '"{}"'.format(etag)
             verify = {'properties.desired': dict}
-            if parameters.get('tags'):
+            if parameters.get('tags', None):
                 verify['tags'] = dict
             verify_transform(parameters, verify)
             return service_sdk.update_twin(device_id, parameters, custom_headers=headers)

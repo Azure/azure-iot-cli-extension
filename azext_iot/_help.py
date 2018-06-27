@@ -176,40 +176,40 @@ helps['iot hub device-twin replace'] = """
 
 helps['iot hub module-identity'] = """
     type: group
-    short-summary: Manage IoT Edge modules.
+    short-summary: Manage IoT device modules.
 """
 
 helps['iot hub module-identity show-connection-string'] = """
     type: command
-    short-summary: Show a target IoT Edge module connection string.
+    short-summary: Show a target IoT device module connection string.
 """
 
 helps['iot hub module-identity create'] = """
     type: command
-    short-summary: Create a module on a target IoT Edge device in an IoT Hub.
+    short-summary: Create a module on a target IoT device in an IoT Hub.
 """
 
 helps['iot hub module-identity show'] = """
     type: command
-    short-summary: Get the details of an IoT Edge module.
+    short-summary: Get the details of an IoT device module in an IoT Hub.
 """
 
 helps['iot hub module-identity list'] = """
     type: command
-    short-summary: List modules of an IoT Edge device.
+    short-summary: List modules located on an IoT device in an IoT Hub.
 """
 
 helps['iot hub module-identity update'] = """
     type: command
-    short-summary: Update an IoT Hub Edge module.
+    short-summary: Update an IoT Hub device module.
     long-summary: Use --set followed by property assignments for updating a module.
                   Leverage properties returned from 'iot hub module-identity show'.
     examples:
     - name: Regenerate module symmetric authentication keys
       text: >
         az iot hub module-identity update -m [Module Name] -d [Device ID] -n [IoTHub Name]
-        --set authentication.symmetricKey.primaryKey="[Key Value]"
-        authentication.symmetricKey.secondaryKey="[key value]"
+        --set authentication.symmetricKey.primaryKey=""
+        authentication.symmetricKey.secondaryKey=""
 """
 
 helps['iot hub module-identity delete'] = """
@@ -219,12 +219,12 @@ helps['iot hub module-identity delete'] = """
 
 helps['iot hub module-twin'] = """
     type: group
-    short-summary: Manage IoT Edge module twin configuration.
+    short-summary: Manage IoT device module twin configuration.
 """
 
 helps['iot hub module-twin show'] = """
     type: command
-    short-summary: Get a module twin definition.
+    short-summary: Show a module twin definition.
 """
 
 helps['iot hub module-twin update'] = """
@@ -245,10 +245,10 @@ helps['iot hub module-twin update'] = """
 
 helps['iot hub module-twin replace'] = """
     type: command
-    short-summary: Replace module twin definition with target json.
+    short-summary: Replace a module twin definition with target json.
     long-summary: Input json directly or use a file path.
     examples:
-    - name: Replace module twin with file contents.
+    - name: Replace a module twin with file contents.
       text: >
         az iot hub module-twin replace -d [Device ID] -n [IoTHub Name]
         -m [Module Name] -j ../mymodtwin.json
@@ -482,18 +482,26 @@ helps['iot device upload-file'] = """
 helps['iot edge'] = """
     type: group
     short-summary: Manage IoT solutions on the Edge.
+    long-summmary: |
+                   Azure IoT Edge moves cloud analytics and custom business logic to devices so that your organization
+                   can focus on business insights instead of data management. Enable your solution to truly scale by
+                   configuring your IoT software, deploying it to devices via standard containers, and monitoring it
+                   all from the cloud.
+
+                   Read more about Azure IoT Edge here:
+                   https://docs.microsoft.com/en-us/azure/iot-edge/
 """
 
 helps['iot edge set-modules'] = """
     type: command
-    short-summary: Set modules on a single device.
+    short-summary: Set edge modules on a single device.
     long-summary: |
                   The modules content is json and must include a root object containing the "modulesContent" property.
 
                   Alternatively "modulesContent" can be nested in a "content" property.
                   E.g. {"modulesContent":{...}} or {"content":{"modulesContent":{...}}}
     examples:
-    - name: Test modules while in development by setting modules on a target device.
+    - name: Test edge modules while in development by setting modules on a target device.
       text: >
         az iot edge set-modules --hub-name [IoTHub Name] --device-id [Device ID] --content ../modules_content.json
 """
