@@ -1,8 +1,31 @@
-# Microsoft Azure IoT Extension for Azure CLI 2.0
+# Microsoft Azure IoT Extension for Azure CLI
 
 ![Python](https://img.shields.io/pypi/pyversions/azure-cli.svg?maxAge=2592000)
 
 This project provides new and exciting IoT commands and capabilities focused around the IoT Hub and IoT Device Provisioning services. Functionality is provided as an Azure CLI extension package for seamless integration with existing command-line functionality.
+
+## :exclamation: Breaking Announcements :exclamation:
+
+**NEW** 6/21/18 -
+The Windows Installer for Azure CLI since version 2.0.34 has an issue with the packaged pip. This issue prevents the IoT extension from being installed. The problem is being worked on and we will provide guidance upon resolution.
+
+The error looks like this:
+
+```bash
+Command '['C:\Program Files (x86)\Microsoft SDKs\Azure\CLI2\python.exe', '-m', 'pip', 'install', '--target', 'C:\Users\myuser\.azure\cliextensions\azure-cli-iot-ext', 'C:\Users\myuser\AppData\Local\Temp\tmpkds3dj8q\azure_cli_iot_ext-0.4.5-py2.py3-none-any.whl', '-vv', '--disable-pip-version-check', '--no-cache-dir']' returned non-zero exit status 2.
+Pip failed
+```
+Look at this [issue thread](https://github.com/Azure/azure-iot-cli-extension/issues/33#issuecomment-399200521) for a workaround.
+
+___
+
+Versions 2.0.34 to 2.0.36 of Azure CLI are **NOT** compatible with the IoT extension.
+
+You will see an error that looks like this when running commands with multi-character short options:
+
+`command authoring error: multi-character short option '-props' is not allowed. Use a single character or convert to a long-option.`
+
+We recommend skipping these version. Please look at the [compatibility](./README.md#compatibility) section below for up to date guidelines.
 
 ## Features
 
@@ -18,9 +41,16 @@ The extension is designed to be plug-and-play with Azure CLI. **Even** if you ha
 
 :exclamation: For **installation troubleshooting** please go to the [respective docs section](docs/install-help.md) for help.
 
+### Compatibility
+Before installation validate that your Azure CLI version is within the following criteria. Use `az --version` to validate.
+
+```python
+>= '2.0.24' and NOT in ['2.0.34', '2.0.35', '2.0.36']
+```
+
 ### Step 0: Install/Update Azure CLI
 
-At a minimum your CLI core version must be `2.0.24` or above. Use `az --version` to validate. This version supports `az extension` commands and introduces the `knack` command framework.
+At a minimum your CLI core version must be within the compatibility criteria defined above.
 
 Follow the installation instructions on [GitHub](https://github.com/Azure/azure-cli) or [Microsoft Docs](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest) to setup Azure CLI in your environment.
 
