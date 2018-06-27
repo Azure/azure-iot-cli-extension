@@ -1,0 +1,7 @@
+pytest
+pytest-mock
+pytest-cov
+pytest-env
+pylint
+flake8
+autopep8

@@ -12,6 +12,7 @@ from azext_iot._constants import EVENT_LIB, VERSION
 from azext_iot.common.utility import test_import
 from azext_iot.common.config import get_uamqp_ext_version, update_uamqp_ext_version
 from azext_iot.common.pip import install
+from azext_iot.common._homebrew_patch import HomebrewPipPatch
 
 
 def ensure_uamqp(config, yes=False, repair=False):
@@ -25,8 +26,9 @@ def ensure_uamqp(config, yes=False, repair=False):
                 sys.exit('User has declined update...')
 
         six.print_('Updating required dependency...')
-        if install(EVENT_LIB[0], compatible_version=EVENT_LIB[1]):
-            update_uamqp_ext_version(config, EVENT_LIB[1])
-            six.print_('Update appears to have worked. Executing command...')
-        else:
-            sys.exit('Failure updating {} {}. Aborting...'.format(EVENT_LIB[0], EVENT_LIB[1]))
+        with HomebrewPipPatch():
+            if install(EVENT_LIB[0], exact_version=EVENT_LIB[1]):
+                update_uamqp_ext_version(config, EVENT_LIB[1])
+                six.print_('Update appears to have worked. Executing command...')
+            else:
+                sys.exit('Failure updating {} {}. Aborting...'.format(EVENT_LIB[0], EVENT_LIB[1]))
