@@ -7,7 +7,9 @@ This project provides new and exciting IoT commands and capabilities focused aro
 ## :exclamation: Breaking Announcements :exclamation:
 
 **NEW** 6/21/18 -
-The Windows Installer for Azure CLI since version 2.0.34 has an issue with the packaged pip. This issue prevents the IoT extension from being installed. The problem is being worked on and we will provide guidance upon resolution.
+The Windows Installer for Azure CLI since version 2.0.34 has an issue with the packaged pip. This issue prevents the IoT extension from being installed. 
+
+To fix, upgrade using at least the 2.0.39 MSI.
 
 The error looks like this:
 
@@ -15,7 +17,7 @@ The error looks like this:
 Command '['C:\Program Files (x86)\Microsoft SDKs\Azure\CLI2\python.exe', '-m', 'pip', 'install', '--target', 'C:\Users\myuser\.azure\cliextensions\azure-cli-iot-ext', 'C:\Users\myuser\AppData\Local\Temp\tmpkds3dj8q\azure_cli_iot_ext-0.4.5-py2.py3-none-any.whl', '-vv', '--disable-pip-version-check', '--no-cache-dir']' returned non-zero exit status 2.
 Pip failed
 ```
-Look at this [issue thread](https://github.com/Azure/azure-iot-cli-extension/issues/33#issuecomment-399200521) for a workaround.
+Look at this [issue thread](https://github.com/Azure/azure-iot-cli-extension/issues/33#issuecomment-399200521) for an alternative workaround.
 
 ___
 
@@ -42,10 +44,14 @@ The extension is designed to be plug-and-play with Azure CLI. **Even** if you ha
 :exclamation: For **installation troubleshooting** please go to the [respective docs section](docs/install-help.md) for help.
 
 ### Compatibility
-Before installation validate that your Azure CLI version is within the following criteria. Use `az --version` to validate.
+Before installation validate that your Azure CLI version is within the following criteria. The criteria differs based on OS and method of installation. Use `az --version` to validate.
 
 ```python
->= '2.0.24' and NOT in ['2.0.34', '2.0.35', '2.0.36']
+# Windows MSI
+>= '2.0.24' and NOT between '2.0.34' - '2.0.38' inclusive
+
+# Windows PIP, Linux and macOS
+>= '2.0.24' and NOT between '2.0.34' - '2.0.36' inclusive
 ```
 
 ### Step 0: Install/Update Azure CLI
