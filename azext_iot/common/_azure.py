@@ -3,6 +3,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
+# pylint: disable=too-many-statements
 
 from knack.util import CLIError
 from azext_iot.common.utility import validate_key_value_pairs

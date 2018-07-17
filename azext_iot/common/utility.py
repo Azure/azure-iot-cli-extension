@@ -32,20 +32,25 @@ def block_stdout():
         devnull.close()
 
 
-def parse_entity(entity):
+def parse_entity(entity, filter_none=False):
     """
-    Function creates a dict of device properties.
+    Function creates a dict of object attributes.
 
     Args:
         entity (object): object to extract attributes from.
 
     Returns:
-        result (dict): a dictionary of properties from the function input.
+        result (dict): a dictionary of attributes from the function input.
     """
     result = {}
     attributes = [attr for attr in dir(entity) if not attr.startswith('_')]
     for attribute in attributes:
-        result[attribute] = getattr(entity, attribute, None)
+        value = getattr(entity, attribute, None)
+        if filter_none and not value:
+            continue
+        value_behavior = dir(value)
+        if '__call__' not in value_behavior:
+            result[attribute] = value
     return result
 
 
@@ -139,7 +144,7 @@ def validate_min_python_version(major, minor, error_msg=None, exit_on_fail=True)
     result = False
     if version.major > major:
         return True
-    elif major == version.major:
+    if major == version.major:
         result = (version.minor >= minor)
 
     if not result:

@@ -10,9 +10,9 @@ from uuid import uuid4
 import sys
 
 import uamqp
-from uamqp.async import ConnectionAsync, SASTokenAsync
 import six
 import yaml
+import json
 
 from knack.log import get_logger
 from azext_iot._constants import VERSION
@@ -23,25 +23,12 @@ from azext_iot.common.utility import unicode_binary_map, parse_entity
 
 logger = get_logger(__name__)
 
+DEBUG = True
+
 
 def executor(target, consumer_group, enqueued_time, device_id=None, properties=None, timeout=0):
     coroutines = []
-    partitions = target['events']['partition_ids']
-
-    if not partitions:
-        logger.debug('No Event Hub partitions found to listen on.')
-        return
-
-    # TODO: Create and use shared connection
-    # conn = _create_async_connection(target)
-    for p in partitions:
-        coroutines.append(monitor_events(target, p,
-                                         connection=None,
-                                         consumer_group=consumer_group,
-                                         enqueuedtimeutc=enqueued_time,
-                                         properties=properties,
-                                         device_id=device_id,
-                                         timeout=timeout))
+    coroutines.append(initiate_event_monitor(target, consumer_group, enqueued_time, device_id, properties, timeout))
 
     loop = asyncio.get_event_loop()
     if loop.is_closed():
@@ -50,6 +37,7 @@ def executor(target, consumer_group, enqueued_time, device_id=None, properties=N
 
     future = asyncio.gather(*coroutines, loop=loop, return_exceptions=True)
     result = None
+
     try:
         device_filter_txt = None
         if device_id:
@@ -63,39 +51,81 @@ def executor(target, consumer_group, enqueued_time, device_id=None, properties=N
         future.cancel()
         loop.run_forever()
     finally:
-        # TODO: Close shared connection
-        # close_task = loop.create_task(_close_connection_async(conn))
-        # loop.run_until_complete(close_task)
-        loop.close()
         if result:
             error = next(res for res in result if result)
             if error:
-                logger.debug('Error: ', error)
+                logger.error(error)
 
 
-async def monitor_events(target, partition, connection, consumer_group, enqueuedtimeutc,
-                         properties, device_id=None, timeout=0, debug=False):
-    source = uamqp.address.Source("amqps://{}/{}/ConsumerGroups/{}/Partitions/{}".format(
-        target['events']['endpoint'], target['events']['path'], consumer_group, partition))
+async def initiate_event_monitor(target, consumer_group, enqueued_time, device_id=None, properties=None, timeout=0):
+    def _get_conn_props():
+        properties = {}
+        properties["product"] = "az.cli.iot.extension"
+        properties["version"] = VERSION
+        properties["framework"] = "Python {}.{}.{}".format(*sys.version_info[0:3])
+        properties["platform"] = sys.platform
+        return properties
 
+    if not target.get('events'):
+        endpoint = _build_iothub_amqp_endpoint_from_target(target)
+        _, update = await evaluate_redirect(endpoint)
+        target['events'] = update['events']
+        auth = _build_auth_container(target)
+        meta_data = await query_meta_data(target['events']['address'], target['events']['path'], auth)
+        partition_count = meta_data[b'partition_count']
+        partition_ids = []
+        for i in range(int(partition_count)):
+            partition_ids.append(str(i))
+        target['events']['partition_ids'] = partition_ids
+
+    partitions = target['events']['partition_ids']
+
+    if not partitions:
+        logger.debug('No Event Hub partitions found to listen on.')
+        return
+
+    coroutines = []
+
+    auth = _build_auth_container(target)
+    async with uamqp.ConnectionAsync(target['events']['endpoint'], sasl=auth,
+                                     debug=DEBUG, container_id=str(uuid4()), properties=_get_conn_props()) as conn:
+        for p in partitions:
+            coroutines.append(monitor_events(endpoint=target['events']['endpoint'],
+                                             connection=conn,
+                                             path=target['events']['path'],
+                                             auth=auth,
+                                             partition=p,
+                                             consumer_group=consumer_group,
+                                             enqueuedtimeutc=enqueued_time,
+                                             properties=properties,
+                                             device_id=device_id,
+                                             timeout=timeout))
+        await asyncio.gather(*coroutines)
+
+
+async def monitor_events(endpoint, connection, path, auth, partition, consumer_group, enqueuedtimeutc,
+                         properties, device_id=None, timeout=0):
+    source = uamqp.address.Source('amqps://{}/{}/ConsumerGroups/{}/Partitions/{}'.format(endpoint, path,
+                                                                                         consumer_group, partition))
     source.set_filter(
         bytes('amqp.annotation.x-opt-enqueuedtimeutc > ' + str(enqueuedtimeutc), 'utf8'))
 
     def _output_msg_kpi(msg):
         # TODO: Determine if amqp filters can support boolean operators for multiple conditions
-        if device_id and msg.annotations[b'iothub-connection-device-id'] != device_id:
+        origin = str(msg.annotations.get(b'iothub-connection-device-id'), 'utf8')
+        if device_id and origin != device_id:
             return
 
         event_source = {'event': {}}
 
-        event_source['event']['origin'] = str(msg.annotations.get(b'iothub-connection-device-id'), 'utf8')
+        event_source['event']['origin'] = origin
         event_source['event']['payload'] = str(next(msg.get_data()), 'utf8')
         if 'anno' in properties or 'all' in properties:
             event_source['event']['annotations'] = unicode_binary_map(msg.annotations)
         if 'sys' in properties or 'all' in properties:
             if not event_source['event'].get('properties'):
                 event_source['event']['properties'] = {}
-            event_source['event']['properties']['system'] = unicode_binary_map(parse_entity(msg.properties))
+            event_source['event']['properties']['system'] = unicode_binary_map(parse_entity(msg.properties, True))
         if 'app' in properties or 'all' in properties:
             if not event_source['event'].get('properties'):
                 event_source['event']['properties'] = {}
@@ -107,49 +137,70 @@ async def monitor_events(target, partition, connection, consumer_group, enqueued
         six.print_(yaml.dump(event_source, default_flow_style=False), flush=True)
 
     exp_cancelled = False
-    async_client = uamqp.ReceiveClientAsync(source, auth=_create_sas_auth(target), timeout=timeout, prefetch=0, debug=debug)
-
-    if connection:
-        await async_client.open_async(connection=connection)
+    receive_client = uamqp.ReceiveClientAsync(source, auth=auth, timeout=timeout, prefetch=0, debug=DEBUG)
 
     try:
-        # Alternative to async iterator: Callback method
-        # await async_client.receive_messages_async(_output_msg_kpi)
-        async for msg in async_client.receive_messages_iter_async():
+        if connection:
+            await receive_client.open_async(connection=connection)
+
+        async for msg in receive_client.receive_messages_iter_async():
             _output_msg_kpi(msg)
+
     except asyncio.CancelledError:
         exp_cancelled = True
-        await async_client.close_async()
+        await receive_client.close_async()
+    except uamqp.errors.LinkDetach as ld:
+        if isinstance(ld.description, bytes):
+            ld.description = str(ld.description, 'utf8')
+        raise RuntimeError(ld.description)
     finally:
         if not exp_cancelled:
-            await async_client.close_async()
+            await receive_client.close_async()
 
 
-def _create_async_connection(target, debug=False):
-    def _create_properties():
-        properties = {}
-        properties["product"] = "az.cli.iot.extension"
-        properties["version"] = VERSION
-        properties["framework"] = "Python {}.{}.{}".format(*sys.version_info[0:3])
-        properties["platform"] = sys.platform
-        return properties
-
-    sas_auth = _create_sas_auth(target)
-
-    return ConnectionAsync(target['events']['endpoint'], sas_auth,
-                           container_id=str(uuid4()), properties=_create_properties(),
-                           debug=debug)
-
-
-def _create_sas_auth(target):
+def _build_auth_container(target):
     sas_uri = 'sb://{}/{}'.format(target['events']['endpoint'], target['events']['path'])
-    sas_auth = SASTokenAsync.from_shared_access_key(sas_uri, target['policy'], target['primarykey'])
-    return sas_auth
+    return uamqp.authentication.SASTokenAsync.from_shared_access_key(sas_uri, target['policy'], target['primarykey'])
 
 
-async def _close_connection_async(connection):
-    if connection:
-        await connection.destroy_async()
+async def evaluate_redirect(endpoint):
+    source = uamqp.address.Source('amqps://{}/messages/events/$management'.format(endpoint))
+    receive_client = uamqp.ReceiveClientAsync(source, timeout=30000, prefetch=1, debug=DEBUG)
+
+    try:
+        await receive_client.open_async()
+        await receive_client.receive_message_batch_async(max_batch_size=1)
+    except uamqp.errors.LinkRedirect as redirect:
+        redirect = unicode_binary_map(parse_entity(redirect))
+        result = {}
+        result['events'] = {}
+        result['events']['endpoint'] = redirect['hostname']
+        result['events']['path'] = redirect['address'].replace('amqps://', '').split('/')[1]
+        result['events']['address'] = redirect['address']
+        return redirect, result
+    finally:
+        await receive_client.close_async()
+
+
+async def query_meta_data(endpoint, path, auth):
+    source = uamqp.address.Source(endpoint)
+    receive_client = uamqp.ReceiveClientAsync(source, auth=auth, timeout=30000, debug=DEBUG)
+    try:
+        await receive_client.open_async()
+        message = uamqp.Message(application_properties={'name': path})
+
+        response = await receive_client.mgmt_request_async(
+            message,
+            b'READ',
+            op_type=b'com.microsoft:eventhub',
+            status_code_field=b'status-code',
+            description_fields=b'status-description',
+            timeout=30000
+        )
+        test = response.get_data()
+        return test
+    finally:
+        await receive_client.close_async()
 
 
 def send_c2d_message(target, device_id, data, properties=None,
@@ -162,7 +213,8 @@ def send_c2d_message(target, device_id, data, properties=None,
 
     msg_props = uamqp.message.MessageProperties()
     msg_props.to = '/devices/{}/messages/devicebound'.format(device_id)
-    msg_props.message_id = str(uuid4())
+    msg_id = str(uuid4())
+    msg_props.message_id = msg_id
 
     if correlation_id:
         msg_props.correlation_id = correlation_id
@@ -174,17 +226,59 @@ def send_c2d_message(target, device_id, data, properties=None,
     operation = '/messages/devicebound'
     endpoint = _build_iothub_amqp_endpoint_from_target(target)
     endpoint = endpoint + operation
-    client = uamqp.SendClient('amqps://' + endpoint)
-    client.send_message(message)
-    client.close()
+    client = uamqp.SendClient('amqps://' + endpoint, debug=DEBUG)
+    client.queue_message(message)
+    result = client.send_all_messages()
+    errors = [m for m in result if m == uamqp.constants.MessageState.SendFailed]
+    return msg_id, errors
 
 
-def _build_iothub_amqp_endpoint_from_target(target):
+def _build_iothub_amqp_endpoint_from_target(target, duration=360):
     hub_name = target['entity'].split('.')[0]
-    endpoint = "{}@sas.root.{}".format(target['policy'], hub_name)
-    endpoint = url_encode_str(endpoint)
+    user = "{}@sas.root.{}".format(target['policy'], hub_name)
     sas_token = SasTokenAuthentication(target['entity'], target['policy'],
-                                       target['primarykey'], time() + 360).generate_sas_token()
-    endpoint = endpoint + ":{}@{}".format(url_encode_str(sas_token), target['entity'])
+                                       target['primarykey'], time() + duration).generate_sas_token()
+    return url_encode_str(user) + ":{}@{}".format(url_encode_str(sas_token), target['entity'])
 
-    return endpoint
+
+def monitor_feedback(target, device_id, wait_on_id=None, token_duration=3600):
+
+    def handle_msg(msg):
+        payload = next(msg.get_data())
+        if isinstance(payload, bytes):
+            payload = str(payload, 'utf8')
+        # assume json [] based on spec
+        payload = json.loads(payload)
+        for p in payload:
+            if device_id and p.get('deviceId') and p['deviceId'].lower() != device_id.lower():
+                return None
+            six.print_(yaml.dump({'feedback': p}, default_flow_style=False), flush=True)
+            if wait_on_id:
+                msg_id = p['originalMessageId']
+                if msg_id == wait_on_id:
+                    return msg_id
+        return None
+
+    operation = '/messages/servicebound/feedback'
+    endpoint = _build_iothub_amqp_endpoint_from_target(target, duration=token_duration)
+    endpoint = endpoint + operation
+
+    device_filter_txt = None
+    if device_id:
+        device_filter_txt = ' filtering on device: {},'.format(device_id)
+
+    six.print_('Starting C2D feedback monitor,{} use ctrl-c to stop...'.format(device_filter_txt if device_filter_txt else ''))
+
+    try:
+        client = uamqp.ReceiveClient('amqps://' + endpoint, debug=DEBUG)
+        message_generator = client.receive_messages_iter()
+        for msg in message_generator:
+            match = handle_msg(msg)
+            if match:
+                logger.info('requested msg id has been matched...')
+                msg.accept()
+                return match
+    except uamqp.errors.AMQPConnectionError:
+        logger.debug('amqp connection has expired...')
+    finally:
+        client.close()

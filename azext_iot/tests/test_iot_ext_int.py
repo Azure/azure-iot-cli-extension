@@ -1051,20 +1051,42 @@ class TestIoTHub(LiveScenarioTest):
         test_body = str(uuid4())
         test_cid = str(uuid4())
 
-        self.cmd('iot device c2d-message send -d {} --hub-name {} -g {} --data {} -props {} -cid {} -ack {} --login {}'
-                 .format(device_ids[0], LIVE_HUB, LIVE_RG, test_body,
-                         test_props, test_cid, 'positive', LIVE_HUB_CS), checks=self.is_empty())
+        # With connection string
+        self.cmd('iot device c2d-message send -d {} --data {} -props {} -cid {} --ack {} --login {}'
+                 .format(device_ids[0], test_body, test_props, test_cid, 'positive', LIVE_HUB_CS), checks=self.is_empty())
 
-        result = self.cmd('iot device c2d-message receive -d {} --hub-name {} -g {}'.format(
-            device_ids[0], LIVE_HUB, LIVE_RG)).get_output_in_json()
+        result = self.cmd('iot device c2d-message receive -d {} --login {}'.format(
+            device_ids[0], LIVE_HUB_CS)).get_output_in_json()
 
         assert result['data'] == test_body
         assert result['correlationId'] == test_cid
         assert result['ack'] == 'positive'
         etag = result['etag']
 
-        self.cmd('iot device c2d-message reject -d {} --hub-name {} -g {} --etag {}'.format(
-            device_ids[0], LIVE_HUB, LIVE_RG, etag), checks=self.is_empty())
+        self.cmd('iot device c2d-message reject -d {} --etag {} --login {}'.format(
+            device_ids[0], etag, LIVE_HUB_CS), checks=self.is_empty())
+
+        # Test waiting for ack from c2d send
+        from azext_iot.operations.hub import iot_simulate_device
+        from azext_iot._factory import iot_hub_service_factory
+        from azure.cli.testsdk import TestCli
+
+        cli_ctx = TestCli()
+        client = iot_hub_service_factory(cli_ctx)
+
+        token, thread = execute_onthread(method=iot_simulate_device,
+                                         args=[client, device_ids[0], LIVE_HUB, 'complete',
+                                               'Ping from c2d ack wait test', 2, 5, 'http'],
+                                         max_runs=5,
+                                         return_handle=True)
+
+        self.cmd('iot device c2d-message send -d {} --ack {} --login {} --wait'.format(device_ids[0], 'full', LIVE_HUB_CS))
+        token.set()
+        thread.join()
+
+        # Error - invalid wait when no ack requested
+        self.cmd('iot device c2d-message send -d {} --login {} --wait'.format(
+            device_ids[0], LIVE_HUB_CS), expect_failure=True)
 
     def test_device_messaging(self):
         device_count = 1
@@ -1151,11 +1173,19 @@ class TestIoTHub(LiveScenarioTest):
 
         for i in range(device_count):
             execute_onthread(method=iot_simulate_device,
-                             args=[client, device_ids[i], LIVE_HUB, 'complete', 'Ping from test', 5, 1],
+                             args=[client, device_ids[i], LIVE_HUB, 'complete', 'Ping from event monitor test 1, part a', 5, 1],
                              max_runs=1)
 
-        self.cmd('iot hub monitor-events -n {} -g {} -to 10 -y -props sys anno app --debug'.format(
+        self.cmd('iot hub monitor-events -n {} -g {} -t 10 -y -p sys anno app'.format(
             LIVE_HUB, LIVE_RG), checks=None)
+
+        # With connection string
+        for i in range(device_count):
+            execute_onthread(method=iot_simulate_device,
+                             args=[client, device_ids[i], LIVE_HUB, 'complete', 'Ping from event monitor test 1, part b', 5, 1],
+                             max_runs=1)
+
+        self.cmd('iot hub monitor-events -t 10 -y -p all --login {}'.format(LIVE_HUB_CS), checks=None)
 
     @pytest.mark.skipif(not validate_min_python_version(3, 5, exit_on_fail=False), reason="minimum python version not satisfied")
     def test_hub_monitor_event_device(self):
@@ -1177,11 +1207,90 @@ class TestIoTHub(LiveScenarioTest):
 
         for i in range(device_count):
             execute_onthread(method=iot_simulate_device,
-                             args=[client, device_ids[i], LIVE_HUB, 'complete', 'Ping from test', 5, 1, 'http'],
+                             args=[client, device_ids[i], LIVE_HUB, 'complete',
+                                   'Ping from event monitor test 2, part a', 5, 1, 'http'],
                              max_runs=1)
 
-        self.cmd('iot hub monitor-events -n {} -to 10 -y -props all -d {} --debug'.format(
+        self.cmd('iot hub monitor-events -n {} -t 10 -y -p all -d {}'.format(
             LIVE_HUB, device_ids[0]), checks=None)
+
+        # With connection string
+        for i in range(device_count):
+            execute_onthread(method=iot_simulate_device,
+                             args=[client, device_ids[i], LIVE_HUB, 'complete', 'Ping from event monitor test 2, part b', 5, 1],
+                             max_runs=1)
+
+        self.cmd('iot hub monitor-events -t 10 -y -p sys anno app --device-id {} --login {}'.format(
+            device_ids[0], LIVE_HUB_CS), checks=None)
+
+    @pytest.mark.skipif(not validate_min_python_version(3, 4, exit_on_fail=False), reason="minimum python version not satisfied")
+    def test_hub_monitor_feedback(self):
+        device_count = 1
+
+        names = self._create_entity_names(devices=device_count)
+        device_ids = names['device_ids']
+
+        for i in range(device_count):
+            self.cmd('iot hub device-identity create -d {} -n {} -g {}'.format(device_ids[i], LIVE_HUB, LIVE_RG),
+                     checks=[self.check('deviceId', device_ids[i])])
+
+        ack = 'full'
+        self.cmd('iot device c2d-message send -d {} --hub-name {} -g {} --ack {}'
+                 .format(device_ids[0], LIVE_HUB, LIVE_RG, ack), checks=self.is_empty())
+
+        result = self.cmd('iot device c2d-message receive -d {} --hub-name {} -g {}'
+                          .format(device_ids[0], LIVE_HUB, LIVE_RG)).get_output_in_json()
+        msg_id = result['messageId']
+        etag = result['etag']
+        assert result['ack'] == ack
+
+        self.cmd('iot device c2d-message complete -d {} --hub-name {} -g {} -e {}'
+                 .format(device_ids[0], LIVE_HUB, LIVE_RG, etag))
+
+        self.cmd('iot hub monitor-feedback -n {} -g {} -w {}'.format(LIVE_HUB, LIVE_RG, msg_id))
+
+        # With connection string - filter on device
+        ack = 'positive'
+        self.cmd('iot device c2d-message send -d {} --login {} --ack {}'
+                 .format(device_ids[0], LIVE_HUB_CS, ack), checks=self.is_empty())
+
+        result = self.cmd('iot device c2d-message receive -d {} --login {}'
+                          .format(device_ids[0], LIVE_HUB_CS)).get_output_in_json()
+        msg_id = result['messageId']
+        etag = result['etag']
+        assert result['ack'] == ack
+
+        self.cmd('iot device c2d-message complete -d {} --login {} -e {}'
+                 .format(device_ids[0], LIVE_HUB_CS, etag))
+
+        self.cmd('iot hub monitor-feedback --login {} -w {} -d {}'.format(LIVE_HUB_CS, msg_id, device_ids[0]))
+
+        # With connection string - dead lettered case + unrelated ack
+        ack = 'negative'
+
+        # Create some noise
+        self.cmd('iot device c2d-message send -d {} --login {} --ack {}'
+                 .format(device_ids[0], LIVE_HUB_CS, ack), checks=self.is_empty())
+        result = self.cmd('iot device c2d-message receive -d {} --login {}'
+                          .format(device_ids[0], LIVE_HUB_CS)).get_output_in_json()
+        etag = result['etag']
+        self.cmd('iot device c2d-message reject -d {} --login {} -e {}'
+                 .format(device_ids[0], LIVE_HUB_CS, etag))
+
+        # Target message
+        self.cmd('iot device c2d-message send -d {} --login {} --ack {}'
+                 .format(device_ids[0], LIVE_HUB_CS, ack), checks=self.is_empty())
+
+        result = self.cmd('iot device c2d-message receive -d {} --login {}'
+                          .format(device_ids[0], LIVE_HUB_CS)).get_output_in_json()
+        msg_id = result['messageId']
+        etag = result['etag']
+        assert result['ack'] == ack
+
+        self.cmd('iot device c2d-message reject -d {} --login {} -e {}'
+                 .format(device_ids[0], LIVE_HUB_CS, etag))
+
+        self.cmd('iot hub monitor-feedback --login {} -w {}'.format(LIVE_HUB_CS, msg_id))
 
     @pytest.mark.skipif(not LIVE_STORAGE, reason="empty azext_iot_teststorageuri env var")
     def test_storage(self):

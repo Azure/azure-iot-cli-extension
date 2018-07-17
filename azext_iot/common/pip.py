@@ -30,4 +30,11 @@ def install(package, exact_version=None, compatible_version=None):
 
     cmd.append(cmd_suffix)
     logger.info(cmd)
-    return subprocess.call(cmd) == 0
+    try:
+        log_output = subprocess.check_output(cmd, stderr=subprocess.STDOUT, universal_newlines=True)
+        logger.debug(log_output)
+        return True
+    except subprocess.CalledProcessError as e:
+        logger.debug(e.output)
+        logger.debug(e)
+        return False
