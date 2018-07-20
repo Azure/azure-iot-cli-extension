@@ -32,13 +32,17 @@ helps['iot hub monitor-events'] = """
                   This command relies on and may install dependent Cython package (uamqp) upon first execution.
                   https://github.com/Azure/azure-uamqp-python
     examples:
-    - name: Basic usage when filtering on no device
+    - name: Basic usage
       text: >
         az iot hub monitor-events -n [IoTHub Name]
+    - name: Basic usage with an IoT Hub connection string
+      text: >
+        az iot hub monitor-events -n [IoTHub Name]
+        --login 'HostName=myhub.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey=12345'
     - name: Basic usage when filtering on target device
       text: >
         az iot hub monitor-events -n [IoTHub Name] -d [Device ID]
-    - name: Specify an Event Hub consumer group.
+    - name: Filter device and specify an Event Hub consumer group to bind to.
       text: >
         az iot hub monitor-events -n [IoTHub Name] -d [Device ID] -cg [Consumer Group Name]
     - name: Receive message annotations (message headers)
@@ -50,6 +54,29 @@ helps['iot hub monitor-events'] = """
     - name: Receive all message attributes from all device messages
       text: >
         az iot hub monitor-events -n [IoTHub Name] -props all
+"""
+
+helps['iot hub monitor-feedback'] = """
+    type: command
+    short-summary: Monitor feedback sent by devices to acknowledge cloud-to-device (C2D) messages.
+    long-summary: |
+                  EXPERIMENTAL requires Python 3.4+
+                  This command relies on and may install dependent Cython package (uamqp) upon first execution.
+                  https://github.com/Azure/azure-uamqp-python
+    examples:
+    - name: Basic usage
+      text: >
+        az iot hub monitor-feedback -n [IoTHub Name]
+    - name: Basic usage with an IoT Hub connection string
+      text: >
+        az iot hub monitor-feedback -n [IoTHub Name]
+        --login 'HostName=myhub.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey=12345'
+    - name: Basic usage when filtering on target device
+      text: >
+        az iot hub monitor-feedback -n [IoTHub Name] -d [Device ID]
+    - name: Exit feedback monitor upon receiving a message with specific id (uuid)
+      text: >
+        az iot hub monitor-feedback -n [IoTHub Name] -d [Device ID] -w [Message Id]
 """
 
 helps['iot hub device-identity'] = """
@@ -439,6 +466,9 @@ helps['iot device c2d-message send'] = """
     - name: Send cloud-to-device message with custom data and properties.
       text: >
         az iot device c2d-message send -d [Device Id] -n [IoTHub Name] --data 'Hello World' -props 'key0=value0;key1=value1'
+    - name: Send a C2D message and wait for device acknowledgement
+      text: >
+        az iot device c2d-message send -d [Device Id] -n [IoTHub Name] --wait
 """
 
 helps['iot device send-d2c-message'] = """

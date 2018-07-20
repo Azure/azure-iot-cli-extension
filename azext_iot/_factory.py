@@ -70,7 +70,7 @@ def _bind_sdk(target, sdk_type, device_id=None):
             _get_sdk_exception_type(sdk_type)
         )
 
-    elif sdk_type is SdkType.service_sdk:
+    if sdk_type is SdkType.service_sdk:
         return (
             IotHubGatewayServiceAPIs(
                 SasTokenAuthentication(
@@ -79,7 +79,7 @@ def _bind_sdk(target, sdk_type, device_id=None):
             _get_sdk_exception_type(sdk_type)
         )
 
-    elif sdk_type is SdkType.custom_sdk:
+    if sdk_type is SdkType.custom_sdk:
         return (
             CustomClient(
                 SasTokenAuthentication(
@@ -88,7 +88,7 @@ def _bind_sdk(target, sdk_type, device_id=None):
             _get_sdk_exception_type(sdk_type)
         )
 
-    elif sdk_type is SdkType.dps_sdk:
+    if sdk_type is SdkType.dps_sdk:
         return (
             DeviceProvisioningServiceServiceRuntimeClient(
                 SasTokenAuthentication(

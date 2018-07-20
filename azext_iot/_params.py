@@ -106,15 +106,19 @@ def load_arguments(self, _):
                          'Output to specified target directory')
 
     with self.argument_context('iot hub monitor-events') as context:
-        context.argument('timeout', options_list=['--timeout', '-to'], type=int,
+        context.argument('timeout', options_list=['--timeout', '-to', '-t'], type=int,
                          help='Maximum seconds to maintain connection without receiving message. Use 0 for infinity. ')
-        context.argument('consumer_group', options_list=['--consumer-group', '-cg'],
+        context.argument('consumer_group', options_list=['--consumer-group', '-cg', '-c'],
                          help='Specify the consumer group to use when connecting to event hub endpoint.')
-        context.argument('enqueued_time', options_list=['--enqueued-time', '-et'], type=int,
+        context.argument('enqueued_time', options_list=['--enqueued-time', '-et', '-e'], type=int,
                          help='Indicates the time that should be used as a starting point to read messages from the partitions. '
                          'Units are milliseconds since unix epoch. '
                          'If no time is indicated "now" is used.')
-        context.argument('properties', options_list=['--properties', '-props'], arg_type=event_msg_prop_type)
+        context.argument('properties', options_list=['--properties', '-props', '-p'], arg_type=event_msg_prop_type)
+
+    with self.argument_context('iot hub monitor-feedback') as context:
+        context.argument('wait_on_id', options_list=['--wait-on-msg', '-w'],
+                         help='Feedback monitor will block until a message with specific id (uuid) is received.')
 
     with self.argument_context('iot hub device-identity') as context:
         context.argument('edge_enabled', options_list=['--edge-enabled', '-ee'],
@@ -174,7 +178,7 @@ def load_arguments(self, _):
                          help='Indicates device-to-cloud message protocol')
 
     with self.argument_context('iot device c2d-message') as context:
-        context.argument('ack', options_list=['--ack', '-ack'], arg_type=get_enum_type(AckType),
+        context.argument('ack', options_list=['--ack'], arg_type=get_enum_type(AckType),
                          help='Request the delivery of per-message feedback regarding the final state of that message. '
                          'The description of ack values is as follows. '
                          'Positive: If the c2d message reaches the Completed state, IoT Hub generates a feedback message. '
@@ -185,6 +189,11 @@ def load_arguments(self, _):
                          help='Correlation Id associated with message.')
         context.argument('lock_timeout', options_list=['--lock-timeout', '-lt'], type=int,
                          help='Specifies the amount of time a message will be invisible to other receive calls.')
+
+    with self.argument_context('iot device c2d-message send') as context:
+        context.argument('wait_on_feedback', options_list=['--wait', '-w'],
+                         arg_type=get_three_state_flag(),
+                         help='If set the c2d send operation will block until device feedback has been received.')
 
     with self.argument_context('iot device upload-file') as context:
         context.argument('file_path', options_list=['--file-path', '-fp'],

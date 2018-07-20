@@ -37,7 +37,7 @@ DEPENDENCIES = [
     'msrestazure==0.4.29',
     'paho-mqtt==1.3.1',
     'jmespath==0.9.3',
-    'pyyaml'
+    'pyyaml==3.13'
 ]
 
 
@@ -49,7 +49,7 @@ setup(
     'Focused on providing data plane commands for Azure IoT Hub, IoT Edge and IoT Device Provisioning Service',
     license='MIT',
     author='Microsoft',
-    author_email='iotupx@microsoft.com',
+    author_email='iotupx@microsoft.com',  # +@digimaun
     url='https://github.com/azure/azure-iot-cli-extension',
     classifiers=CLASSIFIERS,
     packages=find_packages(),

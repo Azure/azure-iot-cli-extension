@@ -24,6 +24,7 @@ def load_command_table(self, _):
         cmd_group.command('apply-configuration', 'iot_edge_set_modules',
                           deprecate_info='az iot edge set-modules')
         cmd_group.command('monitor-events', 'iot_hub_monitor_events')
+        cmd_group.command('monitor-feedback', 'iot_hub_monitor_feedback')
 
         cmd_group.command('show-connection-string', 'iot_get_hub_connection_string')
 

@@ -2,6 +2,63 @@
 
 Release History
 ===============
+
+0.5.1
++++++++++++++++
+* New command: iot hub monitor-feedback
+* Event monitor now supports connection string based usage (via --login)
+* Improvements to amqp functionality
+* Increment extension target uamqp version to 0.1.1
+
+0.5.0
++++++++++++++++
+* New complete command group: hub configuration (supports IoT device configuration)
+* New command: edge set-modules (deprecates apply-configuration)
+* New commands: <edge deployment or device configuration> show-metric
+* Increment to service API version target
+* Increment uAMQP to v0.1.0rc1. Dependency install will use exact version (vs compatible)
+* Support Homebrew for out of band uAMQP install
+* Help Text content++
+* Misc tweaks and improvements
+
+0.4.5
++++++++++++++++
+* Introduces C2D message send for Python 3.4+.
+* Concurrently support 0.4.0 + 0.5.0 IoT mgmt SDK
+* Improved top parameter for list ops
+* Generalize uamqp dependency check (for operations that require it)
+
+0.4.4
++++++++++++++++
+* First release of monitor-events command. Currently supports Python 3.5+, with increased support in future updates.
+* Uses uamqp beta5 build as provider and therefore inherits its compatibility.
+* Help text improvements.
+* Generate sas token duration param will force int.
+
+0.4.3
++++++++++++++++
+* Mode 2 login support for most IoT Hub commands. Provide an IoT Hub connection string via --login/-l for commands that support it.
+* Added X509 root CA support for DPS enrollment groups
+* Reworked device simulator
+* Various fixes and tweaks.
+
+0.4.1
++++++++++++++++
+* Device Provisioning Service Individual + Group enrollments support secondary cert for identity attestation.
+* Encoding issue fixed for listing edge devices (with hub device-identity list -ee)
+* IoT Edge workflow improved. Edge device modules will be immediately returned after applying a single device configuration.
+* Major internal optimizations in package structure
+* Travis CI integration
+
+0.4.0
++++++++++++++++
+* Device Provisioning Service functionality added
+
+0.3.2
++++++++++++++++
+* Updated command names/path
+* First announced release
+
 0.3.0
 +++++++++++++++
 * Knack based Extension conversion

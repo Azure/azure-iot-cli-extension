@@ -114,15 +114,15 @@ def _assemble_auth(auth_method, pk, sk):
     from azext_iot.service_sdk.models.x509_thumbprint import X509Thumbprint
 
     auth = None
-    if auth_method == DeviceAuthType.shared_private_key.name or auth_method == 'sas':
+    if auth_method in [DeviceAuthType.shared_private_key.name, 'sas']:
         auth = AuthenticationMechanism(
             symmetric_key=SymmetricKey(pk, sk), type='sas')
-    elif auth_method == DeviceAuthType.x509_thumbprint.name or auth_method == 'selfSigned':
+    elif auth_method in [DeviceAuthType.x509_thumbprint.name, 'selfSigned']:
         if not pk:
             raise ValueError('primary thumbprint required with selfSigned auth')
         auth = AuthenticationMechanism(x509_thumbprint=X509Thumbprint(
             pk, sk), type='selfSigned')
-    elif auth_method == DeviceAuthType.x509_ca.name or auth_method == 'certificateAuthority':
+    elif auth_method in [DeviceAuthType.x509_ca.name, 'certificateAuthority']:
         auth = AuthenticationMechanism(type='certificateAuthority')
     else:
         raise ValueError(
@@ -789,7 +789,7 @@ def _build_device_or_module_connection_string(device, key_type='primary', module
                 key = 'SharedAccessKey={}'
                 key = key.format(auth['symmetricKey']['primaryKey'] if key_type == 'primary'
                                  else auth['symmetricKey']['secondaryKey'])
-            elif auth_type == 'certificateauthority' or auth_type == 'selfsigned':
+            elif auth_type in ['certificateauthority', 'selfsigned']:
                 key = 'x509=true'
             if key:
                 if module:
@@ -955,31 +955,39 @@ def _iot_c2d_message_receive(target, device_id, lock_timeout=60):
 
 
 def iot_c2d_message_send(cmd, device_id, hub_name=None, data='Ping from Az CLI IoT Extension',
-                         properties=None, correlation_id=None, ack=None, yes=False, repair=False,
-                         resource_group_name=None, login=None):
+                         properties=None, correlation_id=None, ack=None, wait_on_feedback=False,
+                         yes=False, repair=False, resource_group_name=None, login=None):
     from azext_iot.common.deps import ensure_uamqp
     from azext_iot.common.utility import validate_min_python_version
 
     validate_min_python_version(3, 4)
+
+    if wait_on_feedback and not ack:
+        raise CLIError('To wait on device feedback, ack must be "full", "negative" or "positive"')
 
     config = cmd.cli_ctx.config
     ensure_uamqp(config, yes, repair)
 
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     return _iot_c2d_message_send(target=target, device_id=device_id, data=data, properties=properties,
-                                 correlation_id=correlation_id, ack=ack)
+                                 correlation_id=correlation_id, ack=ack, wait=wait_on_feedback)
 
 
-def _iot_c2d_message_send(target, device_id, data, properties=None, correlation_id=None, ack=None):
+def _iot_c2d_message_send(target, device_id, data, properties=None,
+                          correlation_id=None, ack=None, wait=None):
     import importlib
 
     if properties:
         properties = validate_key_value_pairs(properties)
 
     events3 = importlib.import_module('azext_iot.operations.events3._events')
-    events3.send_c2d_message(target=target, device_id=device_id, data=data,
-                             properties=properties, correlation_id=correlation_id, ack=ack)
-    return
+    msg_id, errors = events3.send_c2d_message(target=target, device_id=device_id, data=data,
+                                              properties=properties, correlation_id=correlation_id, ack=ack)
+    if errors:
+        raise CLIError('Error: {}, use --debug for more details.'.format(errors))
+
+    if wait:
+        _iot_hub_monitor_feedback(target=target, device_id=device_id, wait_on_id=msg_id)
 
 
 # pylint: disable=too-many-locals
@@ -1022,7 +1030,6 @@ def iot_simulate_device(cmd, device_id, hub_name=None, receive_settle='complete'
         d = generator.generate(False)
         _iot_device_send_message_http(target, device_id, d)
         six.print_('.', end='', flush=True)
-        return
 
     try:
         if protocol_type == 'mqtt':
@@ -1103,8 +1110,9 @@ def iot_device_upload_file(cmd, device_id, file_path, content_type, hub_name=Non
 
 
 # pylint: disable=too-many-locals
-def iot_hub_monitor_events(cmd, hub_name, device_id=None, consumer_group='$Default', timeout=300,
-                           enqueued_time=None, resource_group_name=None, yes=False, properties=None, repair=False):
+def iot_hub_monitor_events(cmd, hub_name=None, device_id=None, consumer_group='$Default', timeout=300,
+                           enqueued_time=None, resource_group_name=None, yes=False, properties=None, repair=False,
+                           login=None):
     import importlib
     from datetime import datetime
     from azext_iot.common.deps import ensure_uamqp
@@ -1133,7 +1141,7 @@ def iot_hub_monitor_events(cmd, hub_name, device_id=None, consumer_group='$Defau
     if not enqueued_time:
         enqueued_time = _calculate_millisec_since_unix_epoch_utc()
 
-    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, include_events=True)
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, include_events=True, login=login)
 
     events3.executor(target,
                      consumer_group=consumer_group,
@@ -1141,3 +1149,25 @@ def iot_hub_monitor_events(cmd, hub_name, device_id=None, consumer_group='$Defau
                      properties=properties,
                      timeout=timeout,
                      device_id=device_id)
+
+
+def iot_hub_monitor_feedback(cmd, hub_name=None, device_id=None, yes=False,
+                             wait_on_id=None, repair=False, resource_group_name=None, login=None):
+    from azext_iot.common.deps import ensure_uamqp
+    from azext_iot.common.utility import validate_min_python_version
+
+    validate_min_python_version(3, 4)
+
+    config = cmd.cli_ctx.config
+    ensure_uamqp(config, yes, repair)
+
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
+
+    return _iot_hub_monitor_feedback(target=target, device_id=device_id, wait_on_id=wait_on_id)
+
+
+def _iot_hub_monitor_feedback(target, device_id, wait_on_id):
+    import importlib
+
+    events3 = importlib.import_module('azext_iot.operations.events3._events')
+    events3.monitor_feedback(target=target, device_id=device_id, wait_on_id=wait_on_id, token_duration=3600)
