@@ -32,7 +32,7 @@ class IoTDpsTest(LiveScenarioTest):
         super(IoTDpsTest, self).__init__('test_dps_enrollment_tpm_lifecycle')
         output_dir = os.getcwd()
         create_self_signed_certificate(cert_name, 200, output_dir, True)
-        self.kwargs['generic_dict'] = {'key': 'value'}
+        self.kwargs['generic_dict'] = {'count': None, 'key': 'value', 'metadata': None, 'version': None}
 
     def __del__(self):
         if os.path.exists(cert_path):
@@ -66,7 +66,10 @@ class IoTDpsTest(LiveScenarioTest):
                             self.check('initialTwin.tags',
                                        self.kwargs['generic_dict']),
                             self.check('initialTwin.properties.desired',
-                                       self.kwargs['generic_dict'])
+                                       self.kwargs['generic_dict']),
+                            self.exists('reprovisionPolicy'),
+                            self.check('reprovisionPolicy.migrateDeviceData', True),
+                            self.check('reprovisionPolicy.updateHubAssignment', True)
                         ]).get_output_in_json()['etag']
 
         self.cmd('iot dps enrollment list -g {} --dps-name {}'.format(rg, dps), checks=[
@@ -119,7 +122,10 @@ class IoTDpsTest(LiveScenarioTest):
                             self.check('initialTwin.tags',
                                        self.kwargs['generic_dict']),
                             self.check('initialTwin.properties.desired',
-                                       self.kwargs['generic_dict'])
+                                       self.kwargs['generic_dict']),
+                            self.exists('reprovisionPolicy'),
+                            self.check('reprovisionPolicy.migrateDeviceData', True),
+                            self.check('reprovisionPolicy.updateHubAssignment', True)
                         ]).get_output_in_json()['etag']
 
         self.cmd('iot dps enrollment list -g {} --dps-name {}'.format(rg, dps),
@@ -150,8 +156,70 @@ class IoTDpsTest(LiveScenarioTest):
         self.cmd('iot dps enrollment delete -g {} --dps-name {} --enrollment-id {}'
                  .format(rg, dps, enrollment_id))
 
+    def test_dps_enrollment_symmetrickey_lifecycle(self):
+        enrollment_id = self.create_random_name('enrollment-for-test', length=48)
+        attestation_type = AttestationType.symmetricKey.value
+        primary_key = 'x3XNu1HeSw93rmtDXduRUZjhqdGbcqR/zloWYiyPUzw='
+        secondary_key = 'PahMnOSBblv9CRn5B765iK35jTvnjDUjYP9hKBZa4Ug='
+        device_id = self.create_random_name('device-id-for-test', length=48)
+        hub_host_name = '{}.azure-devices.net'.format(hub)
+        reprovisionPolicy_reprovisionandresetdata = 'reprovisionandresetdata'
+
+        etag = self.cmd('iot dps enrollment create --enrollment-id {} --attestation-type {}'
+                        ' -g {} --dps-name {} -pk {} -sk {}'
+                        ' --provisioning-status {} --device-id {}'
+                        ' --initial-twin-tags {} --initial-twin-properties {}'
+                        ' --iot-hub-host-name {} -rp {}'
+                        .format(enrollment_id, attestation_type, rg, dps, primary_key,
+                                secondary_key, self.provisioning_status, device_id,
+                                '"{generic_dict}"', '"{generic_dict}"', hub_host_name,
+                                reprovisionPolicy_reprovisionandresetdata),
+                        checks=[
+                            self.check('attestation.type', attestation_type),
+                            self.check('registrationId', enrollment_id),
+                            self.check('provisioningStatus',
+                                       self.provisioning_status),
+                            self.check('deviceId', device_id),
+                            self.check('iotHubHostName', hub_host_name),
+                            self.check('initialTwin.tags',
+                                       self.kwargs['generic_dict']),
+                            self.check('initialTwin.properties.desired',
+                                       self.kwargs['generic_dict']),
+                            self.exists('reprovisionPolicy'),
+                            self.check('reprovisionPolicy.migrateDeviceData', False),
+                            self.check('reprovisionPolicy.updateHubAssignment', True)
+                        ]).get_output_in_json()['etag']
+
+        self.cmd('iot dps enrollment list -g {} --dps-name {}'.format(rg, dps),
+                 checks=[
+                     self.check('length(@)', 1),
+                     self.check('[0].registrationId', enrollment_id)])
+
+        self.cmd('iot dps enrollment show -g {} --dps-name {} --enrollment-id {}'
+                 .format(rg, dps, enrollment_id),
+                 checks=[self.check('registrationId', enrollment_id)])
+
+        self.cmd('iot dps enrollment update -g {} --dps-name {} --enrollment-id {}'
+                 ' --provisioning-status {} --etag {} -rc'
+                 .format(rg, dps, enrollment_id, self.provisioning_status_new, etag),
+                 checks=[
+                     self.check('attestation.type', attestation_type),
+                     self.check('registrationId', enrollment_id),
+                     self.check('provisioningStatus',
+                                self.provisioning_status_new),
+                     self.check('deviceId', device_id),
+                     self.check('iotHubHostName', hub_host_name),
+                     self.exists('initialTwin.tags'),
+                     self.exists('initialTwin.properties.desired'),
+                     self.check('attestation.symmetric_key.primary_key', primary_key)
+                 ])
+
+        self.cmd('iot dps enrollment delete -g {} --dps-name {} --enrollment-id {}'
+                 .format(rg, dps, enrollment_id))
+
     def test_dps_enrollment_group_lifecycle(self):
         enrollment_id = self.create_random_name('enrollment-for-test', length=48)
+        reprovisionPolicy_never = 'never'
         etag = self.cmd('iot dps enrollment-group create --enrollment-id {} -g {} --dps-name {}'
                         ' -cp {} -scp {} --provisioning-status {}'
                         .format(enrollment_id, rg, dps, cert_path, cert_path,
@@ -159,7 +227,10 @@ class IoTDpsTest(LiveScenarioTest):
                         checks=[
                             self.check('enrollmentGroupId', enrollment_id),
                             self.check('provisioningStatus',
-                                       self.provisioning_status)
+                                       self.provisioning_status),
+                            self.exists('reprovisionPolicy'),
+                            self.check('reprovisionPolicy.migrateDeviceData', True),
+                            self.check('reprovisionPolicy.updateHubAssignment', True)
                         ]).get_output_in_json()['etag']
 
         self.cmd('iot dps enrollment-group list -g {} --dps-name {}'.format(rg, dps), checks=[
@@ -172,13 +243,16 @@ class IoTDpsTest(LiveScenarioTest):
                  checks=[self.check('enrollmentGroupId', enrollment_id)])
 
         self.cmd('iot dps enrollment-group update -g {} --dps-name {} --enrollment-id {}'
-                 ' --provisioning-status {} -rsc --etag {}'
-                 .format(rg, dps, enrollment_id, self.provisioning_status_new, etag),
+                 ' --provisioning-status {} -rsc --etag {} -rp {}'
+                 .format(rg, dps, enrollment_id, self.provisioning_status_new, etag, reprovisionPolicy_never),
                  checks=[
                      self.check('attestation.type', AttestationType.x509.value),
                      self.check('enrollmentGroupId', enrollment_id),
                      self.check('provisioningStatus', self.provisioning_status_new),
-                     self.check('attestation.type.x509.clientCertificates.secondary', None)
+                     self.check('attestation.type.x509.clientCertificates.secondary', None),
+                     self.exists('reprovisionPolicy'),
+                     self.check('reprovisionPolicy.migrateDeviceData', False),
+                     self.check('reprovisionPolicy.updateHubAssignment', False)
                  ])
 
         self.cmd('iot dps registration list -g {} --dps-name {} --enrollment-id {}'

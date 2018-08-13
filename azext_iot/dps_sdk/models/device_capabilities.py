@@ -12,21 +12,21 @@
 from msrest.serialization import Model
 
 
-class X509CAReferences(Model):
-    """Primary and secondary CA references.
+class DeviceCapabilities(Model):
+    """Device capabilities.
 
-    :param primary:
-    :type primary: str
-    :param secondary:
-    :type secondary: str
+    :param iot_edge: IoT Edge capability
+    :type iot_edge: bool
     """
 
-    _attribute_map = {
-        'primary': {'key': 'primary', 'type': 'str'},
-        'secondary': {'key': 'secondary', 'type': 'str'},
+    _validation = {
+        'iot_edge': {'required': True},
     }
 
-    def __init__(self, primary=None, secondary=None):
-        super(X509CAReferences, self).__init__()
-        self.primary = primary
-        self.secondary = secondary
+    _attribute_map = {
+        'iot_edge': {'key': 'iotEdge', 'type': 'bool'},
+    }
+
+    def __init__(self, iot_edge):
+        super(DeviceCapabilities, self).__init__()
+        self.iot_edge = iot_edge

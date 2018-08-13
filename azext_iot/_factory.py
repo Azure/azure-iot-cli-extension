@@ -107,6 +107,6 @@ def _get_sdk_exception_type(sdk_type):
         SdkType.custom_sdk: import_module('azext_iot.custom_sdk.models.error_details'),
         SdkType.service_sdk: import_module('msrestazure.azure_exceptions'),
         SdkType.device_sdk: import_module('msrestazure.azure_exceptions'),
-        SdkType.dps_sdk: import_module('azext_iot.dps_sdk.models.error_details')
+        SdkType.dps_sdk: import_module('azext_iot.dps_sdk.models.provisioning_service_error_details')
     }
     return exception_library.get(sdk_type, None)

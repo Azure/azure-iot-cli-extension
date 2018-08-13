@@ -72,6 +72,7 @@ class AttestationType(Enum):
     """
     tpm = 'tpm'
     x509 = 'x509'
+    symmetricKey = 'symmetricKey'
 
 
 # pylint: disable=too-few-public-methods
@@ -109,3 +110,13 @@ class MetricType(Enum):
     """
     system = 'system'
     user = 'user'
+
+
+# pylint: disable=too-few-public-methods
+class ReprovisionType(Enum):
+    """
+    Type of re-provisioning for device data to different IoT Hub.
+    """
+    reprovisionandmigratedata = 'reprovisionandmigratedata'
+    reprovisionandresetdata = 'reprovisionandresetdata'
+    never = 'never'

@@ -23,7 +23,8 @@ from azext_iot.common.shared import (
     AttestationType,
     ProtocolType,
     AckType,
-    MetricType
+    MetricType,
+    ReprovisionType
 )
 from azext_iot._validators import mode2_iot_login_handler
 
@@ -270,6 +271,9 @@ def load_arguments(self, _):
     with self.argument_context('iot dps enrollment') as context:
         context.argument('enrollment_id', help='ID of device enrollment record')
         context.argument('device_id', help='IoT Hub Device ID')
+        context.argument('reprovision_policy', options_list=['--reprovision-policy', '-rp'],
+                         arg_type=get_enum_type(ReprovisionType),
+                         help='Device data to be handled on re-provision to different Iot Hub.')
 
     with self.argument_context('iot dps enrollment create') as context:
         context.argument('attestation_type', options_list=['--attestation-type', '--at'],
@@ -287,6 +291,10 @@ def load_arguments(self, _):
         context.argument('endorsement_key', options_list=['--endorsement-key', '--ek'],
                          help='TPM endorsement key for a TPM device. '
                          'When choosing tpm as attestation type, endorsement key is required.')
+        context.argument('primary_key', options_list=['--primary-key', '-pk'],
+                         help='The primary symmetric shared access key stored in base64 format. ')
+        context.argument('secondary_key', options_list=['--secondary-key', '-sk'],
+                         help='The secondary symmetric shared access key stored in base64 format. ')
 
     with self.argument_context('iot dps enrollment update') as context:
         context.argument('endorsement_key', options_list=['--endorsement-key', '--ek'],
@@ -310,6 +318,9 @@ def load_arguments(self, _):
                          options_list=['--secondary-root-ca-name', '--secondary-ca-name', '--scn'],
                          help='The name of the secondary root CA certificate. '
                          'If attestation with a root CA certificate is desired then a root ca name must be provided.')
+        context.argument('reprovision_policy', options_list=['--reprovision-policy', '-rp'],
+                         arg_type=get_enum_type(ReprovisionType),
+                         help='Device data to be handled on re-provision to different Iot Hub.')
 
     with self.argument_context('iot dps registration') as context:
         context.argument('registration_id', help='ID of device registration')

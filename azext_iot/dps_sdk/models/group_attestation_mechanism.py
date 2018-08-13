@@ -12,22 +12,15 @@
 from msrest.serialization import Model
 
 
-class AttestationMechanism(Model):
-    """Attestation mechanism for individual enrollments.
+class GroupAttestationMechanism(Model):
+    """Attestation mechanism for enrollment groups.
 
-    :param type: Attestation Type. Possible values include: 'none', 'tpm',
-     'x509', 'symmetricKey'
+    :param type: Attestation Type. Possible values include: 'none', 'x509'
     :type type: str or
      ~microsoft.azure.management.provisioningservices.models.enum
-    :param tpm: TPM attestation method.
-    :type tpm:
-     ~microsoft.azure.management.provisioningservices.models.TpmAttestation
     :param x509: X509 attestation method.
     :type x509:
      ~microsoft.azure.management.provisioningservices.models.X509Attestation
-    :param symmetric_key: Symmetric Key attestation method.
-    :type symmetric_key:
-     ~microsoft.azure.management.provisioningservices.models.SymmetricKeyAttestation
     """
 
     _validation = {
@@ -36,14 +29,10 @@ class AttestationMechanism(Model):
 
     _attribute_map = {
         'type': {'key': 'type', 'type': 'str'},
-        'tpm': {'key': 'tpm', 'type': 'TpmAttestation'},
         'x509': {'key': 'x509', 'type': 'X509Attestation'},
-        'symmetric_key': {'key': 'symmetricKey', 'type': 'SymmetricKeyAttestation'},
     }
 
-    def __init__(self, type, tpm=None, x509=None, symmetric_key=None):
-        super(AttestationMechanism, self).__init__()
+    def __init__(self, type, x509=None):
+        super(GroupAttestationMechanism, self).__init__()
         self.type = type
-        self.tpm = tpm
         self.x509 = x509
-        self.symmetric_key = symmetric_key

@@ -12,21 +12,21 @@
 from msrest.serialization import Model
 
 
-class X509CAReferences(Model):
-    """Primary and secondary CA references.
+class SymmetricKeyAttestation(Model):
+    """Attestation via SymmetricKey.
 
-    :param primary:
-    :type primary: str
-    :param secondary:
-    :type secondary: str
+    :param primary_key: Primary symmetric key.
+    :type primary_key: str
+    :param secondary_key: Secondary symmetric key.
+    :type secondary_key: str
     """
 
     _attribute_map = {
-        'primary': {'key': 'primary', 'type': 'str'},
-        'secondary': {'key': 'secondary', 'type': 'str'},
+        'primary_key': {'key': 'primaryKey', 'type': 'str'},
+        'secondary_key': {'key': 'secondaryKey', 'type': 'str'},
     }
 
-    def __init__(self, primary=None, secondary=None):
-        super(X509CAReferences, self).__init__()
-        self.primary = primary
-        self.secondary = secondary
+    def __init__(self, primary_key=None, secondary_key=None):
+        super(SymmetricKeyAttestation, self).__init__()
+        self.primary_key = primary_key
+        self.secondary_key = secondary_key
