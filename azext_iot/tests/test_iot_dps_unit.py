@@ -70,7 +70,8 @@ def generate_enrollment_create_req(attestation_type=None, endorsement_key=None,
                                    device_Id=None, iot_hub_host_name=None,
                                    initial_twin_tags=None, initial_twin_properties=None,
                                    provisioning_status=None, reprovision_policy=None,
-                                   primary_key=None, secondary_key=None):
+                                   primary_key=None, secondary_key=None, allocation_policy=None,
+                                   iot_hubs=None):
     return {'client': None,
             'enrollment_id': enrollment_id,
             'rg': resource_group,
@@ -86,7 +87,9 @@ def generate_enrollment_create_req(attestation_type=None, endorsement_key=None,
             'provisioning_status': provisioning_status,
             'reprovision_policy': reprovision_policy,
             'primary_key': primary_key,
-            'secondary_key': secondary_key}
+            'secondary_key': secondary_key,
+            'allocation_policy': allocation_policy,
+            'iot_hubs': iot_hubs}
 
 
 class TestEnrollmentCreate():
@@ -133,7 +136,24 @@ class TestEnrollmentCreate():
         (generate_enrollment_create_req(attestation_type='symmetricKey',
                                         primary_key='primarykey',
                                         secondary_key='secondarykey',
-                                        reprovision_policy='never'))
+                                        reprovision_policy='never')),
+        (generate_enrollment_create_req(attestation_type='symmetricKey',
+                                        primary_key='primarykey',
+                                        secondary_key='secondarykey',
+                                        reprovision_policy='never',
+                                        allocation_policy='static',
+                                        iot_hubs='hub1')),
+        (generate_enrollment_create_req(attestation_type='symmetricKey',
+                                        primary_key='primarykey',
+                                        secondary_key='secondarykey',
+                                        reprovision_policy='never',
+                                        allocation_policy='hashed',
+                                        iot_hubs='hub1 hub2')),
+        (generate_enrollment_create_req(attestation_type='symmetricKey',
+                                        primary_key='primarykey',
+                                        secondary_key='secondarykey',
+                                        reprovision_policy='never',
+                                        allocation_policy='geolatency'))
     ])
     def test_enrollment_create(self, serviceclient, req):
         subject.iot_dps_device_enrollment_create(None,
@@ -150,7 +170,9 @@ class TestEnrollmentCreate():
                                                  req['initial_twin_tags'],
                                                  req['initial_twin_properties'],
                                                  req['provisioning_status'],
-                                                 req['reprovision_policy'])
+                                                 req['reprovision_policy'],
+                                                 req['allocation_policy'],
+                                                 req['iot_hubs'])
         args = serviceclient.call_args
         url = args[0][0].url
         assert "{}/enrollments/{}?".format(mock_target['entity'], enrollment_id) in url
@@ -179,7 +201,8 @@ class TestEnrollmentCreate():
         if req['device_id']:
             assert body['deviceId'] == req['device_id']
         if req['iot_hub_host_name']:
-            assert body['iotHubHostName'] == req['iot_hub_host_name']
+            assert body['allocationPolicy'] == 'static'
+            assert body['iotHubs'] == req['iot_hub_host_name'].split()
         if req['provisioning_status']:
             assert body['provisioningStatus'] == req['provisioning_status']
         if req['initial_twin_properties']:
@@ -198,6 +221,10 @@ class TestEnrollmentCreate():
         if req['reprovision_policy'] == 'never':
             assert not body['reprovisionPolicy']['migrateDeviceData']
             assert not body['reprovisionPolicy']['updateHubAssignment']
+        if req['allocation_policy']:
+            assert body['allocationPolicy'] == req['allocation_policy']
+        if req['iot_hubs']:
+            assert body['iotHubs'] == req['iot_hubs'].split()
 
     @pytest.mark.parametrize("req", [
         (generate_enrollment_create_req(attestation_type='x509')),
@@ -207,7 +234,12 @@ class TestEnrollmentCreate():
         (generate_enrollment_create_req(attestation_type='symmetricKey')),
         (generate_enrollment_create_req(attestation_type='symmetricKey', certificate_path='myCert')),
         (generate_enrollment_create_req(attestation_type='symmetricKey', primary_key='primarykey')),
-        (generate_enrollment_create_req(reprovision_policy='invalid'))
+        (generate_enrollment_create_req(reprovision_policy='invalid')),
+        (generate_enrollment_create_req(allocation_policy='invalid')),
+        (generate_enrollment_create_req(allocation_policy='static')),
+        (generate_enrollment_create_req(allocation_policy='static', iot_hubs='hub1 hub2')),
+        (generate_enrollment_create_req(allocation_policy='static', iot_hub_host_name='hubname')),
+        (generate_enrollment_create_req(iot_hubs='hub1 hub2'))
     ])
     def test_enrollment_create_invalid_args(self, serviceclient, req):
         with pytest.raises(CLIError):
@@ -220,11 +252,13 @@ class TestEnrollmentCreate():
                                                      req['primary_key'],
                                                      None,
                                                      None,
+                                                     req['iot_hub_host_name'],
                                                      None,
                                                      None,
                                                      None,
-                                                     None,
-                                                     req['reprovision_policy'])
+                                                     req['reprovision_policy'],
+                                                     req['allocation_policy'],
+                                                     req['iot_hubs'])
 
     @pytest.mark.parametrize("req", [
         (generate_enrollment_create_req(attestation_type='tpm', endorsement_key='mykey'))
@@ -271,7 +305,8 @@ def generate_enrollment_update_req(certificate_path=None, iot_hub_host_name=None
                                    remove_secondary_certificate_path=None,
                                    initial_twin_properties=None, provisioning_status=None,
                                    device_id=None,
-                                   etag=None, reprovision_policy=None):
+                                   etag=None, reprovision_policy=None,
+                                   allocation_policy=None, iot_hubs=None):
     return {'client': None,
             'enrollment_id': enrollment_id,
             'rg': resource_group,
@@ -286,7 +321,9 @@ def generate_enrollment_update_req(certificate_path=None, iot_hub_host_name=None
             'provisioning_status': provisioning_status,
             'device_id': device_id,
             'etag': etag,
-            'reprovision_policy': reprovision_policy}
+            'reprovision_policy': reprovision_policy,
+            'allocation_policy': allocation_policy,
+            'iot_hubs': iot_hubs}
 
 
 class TestEnrollmentUpdate():
@@ -311,7 +348,10 @@ class TestEnrollmentUpdate():
                                         device_id='newId')),
         (generate_enrollment_update_req(reprovision_policy='reprovisionandmigratedata')),
         (generate_enrollment_update_req(reprovision_policy='reprovisionandresetdata')),
-        (generate_enrollment_update_req(reprovision_policy='never'))
+        (generate_enrollment_update_req(reprovision_policy='never')),
+        (generate_enrollment_update_req(allocation_policy='static', iot_hubs='hub1')),
+        (generate_enrollment_update_req(allocation_policy='hashed', iot_hubs='hub1 hub2')),
+        (generate_enrollment_update_req(allocation_policy='geolatency'))
     ])
     def test_enrollment_update(self, serviceclient, req):
         subject.iot_dps_device_enrollment_update(None,
@@ -331,7 +371,9 @@ class TestEnrollmentUpdate():
                                                  req['initial_twin_tags'],
                                                  req['initial_twin_properties'],
                                                  req['provisioning_status'],
-                                                 req['reprovision_policy'])
+                                                 req['reprovision_policy'],
+                                                 req['allocation_policy'],
+                                                 req['iot_hubs'])
         # Index 1 is the update args
         args = serviceclient.call_args_list[1]
         url = args[0][0].url
@@ -350,7 +392,8 @@ class TestEnrollmentUpdate():
         if req['secondary_certificate_path']:
             assert body['attestation']['x509']['clientCertificates']['secondary']['certificate'] is not None
         if req['iot_hub_host_name']:
-            assert body['iotHubHostName'] == req['iot_hub_host_name']
+            assert body['allocationPolicy'] == 'static'
+            assert body['iotHubs'] == req['iot_hub_host_name'].split()
         if req['provisioning_status']:
             assert body['provisioningStatus'] == req['provisioning_status']
         if req['initial_twin_properties']:
@@ -368,6 +411,10 @@ class TestEnrollmentUpdate():
         if req['reprovision_policy'] == 'never':
             assert not body['reprovisionPolicy']['migrateDeviceData']
             assert not body['reprovisionPolicy']['updateHubAssignment']
+        if req['allocation_policy']:
+            assert body['allocationPolicy'] == req['allocation_policy']
+        if req['iot_hubs']:
+            assert body['iotHubs'] == req['iot_hubs'].split()
 
 
 class TestEnrollmentShow():
@@ -503,7 +550,9 @@ def generate_enrollment_group_create_req(iot_hub_host_name=None,
                                          secondary_root_ca_name=None,
                                          initial_twin_properties=None,
                                          provisioning_status=None,
-                                         reprovision_policy=None):
+                                         reprovision_policy=None,
+                                         allocation_policy=None,
+                                         iot_hubs=None):
     return {'client': None,
             'enrollment_id': enrollment_id,
             'rg': resource_group,
@@ -516,7 +565,9 @@ def generate_enrollment_group_create_req(iot_hub_host_name=None,
             'initial_twin_tags': initial_twin_tags,
             'initial_twin_properties': initial_twin_properties,
             'provisioning_status': provisioning_status,
-            'reprovision_policy': reprovision_policy}
+            'reprovision_policy': reprovision_policy,
+            'allocation_policy': allocation_policy,
+            'iot_hubs': iot_hubs}
 
 
 class TestEnrollmentGroupCreate():
@@ -542,7 +593,15 @@ class TestEnrollmentGroupCreate():
         (generate_enrollment_group_create_req(certificate_path='myCert',
                                               reprovision_policy='reprovisionandresetdata')),
         (generate_enrollment_group_create_req(certificate_path='myCert',
-                                              reprovision_policy='never'))
+                                              reprovision_policy='never')),
+        (generate_enrollment_group_create_req(certificate_path='myCert',
+                                              allocation_policy='static',
+                                              iot_hubs='hub1')),
+        (generate_enrollment_group_create_req(certificate_path='myCert',
+                                              allocation_policy='hashed',
+                                              iot_hubs='hub1 hub2')),
+        (generate_enrollment_group_create_req(certificate_path='myCert',
+                                              allocation_policy='geolatency')),
     ])
     def test_enrollment_group_create(self, serviceclient, req):
         subject.iot_dps_device_enrollment_group_create(None,
@@ -557,7 +616,9 @@ class TestEnrollmentGroupCreate():
                                                        req['initial_twin_tags'],
                                                        req['initial_twin_properties'],
                                                        req['provisioning_status'],
-                                                       req['reprovision_policy'])
+                                                       req['reprovision_policy'],
+                                                       req['allocation_policy'],
+                                                       req['iot_hubs'])
         args = serviceclient.call_args
         url = args[0][0].url
         assert "{}/enrollmentGroups/{}?".format(mock_target['entity'], enrollment_id) in url
@@ -576,7 +637,8 @@ class TestEnrollmentGroupCreate():
             assert body['attestation']['x509']['caReferences']['secondary'] is not None
 
         if req['iot_hub_host_name']:
-            assert body['iotHubHostName'] == req['iot_hub_host_name']
+            assert body['allocationPolicy'] == 'static'
+            assert body['iotHubs'] == req['iot_hub_host_name'].split()
         if req['provisioning_status']:
             assert body['provisioningStatus'] == req['provisioning_status']
         if req['initial_twin_properties']:
@@ -595,6 +657,10 @@ class TestEnrollmentGroupCreate():
         if req['reprovision_policy'] == 'never':
             assert not body['reprovisionPolicy']['migrateDeviceData']
             assert not body['reprovisionPolicy']['updateHubAssignment']
+        if req['allocation_policy']:
+            assert body['allocationPolicy'] == req['allocation_policy']
+        if req['iot_hubs']:
+            assert body['iotHubs'] == req['iot_hubs'].split()
 
     @pytest.mark.parametrize("req", [
         (generate_enrollment_group_create_req()),
@@ -605,7 +671,11 @@ class TestEnrollmentGroupCreate():
                                               secondary_root_ca_name='myCert2')),
         (generate_enrollment_group_create_req(root_ca_name='myCert',
                                               secondary_certificate_path='myCert2')),
-        (generate_enrollment_group_create_req(reprovision_policy='invalid'))
+        (generate_enrollment_group_create_req(reprovision_policy='invalid')),
+        (generate_enrollment_group_create_req(allocation_policy='invalid')),
+        (generate_enrollment_group_create_req(allocation_policy='static', iot_hub_host_name='hub')),
+        (generate_enrollment_group_create_req(allocation_policy='static', iot_hubs='hub1 hub2')),
+        (generate_enrollment_group_create_req(iot_hubs='hub1 hub2'))
     ])
     def test_enrollment_group_create_invalid_args(self, serviceclient, req):
         with pytest.raises(CLIError):
@@ -621,7 +691,9 @@ class TestEnrollmentGroupCreate():
                                                            req['initial_twin_tags'],
                                                            req['initial_twin_properties'],
                                                            req['provisioning_status'],
-                                                           req['reprovision_policy'])
+                                                           req['reprovision_policy'],
+                                                           req['allocation_policy'],
+                                                           req['iot_hubs'])
 
     @pytest.mark.parametrize("req", [
         (generate_enrollment_group_create_req(certificate_path='myCert'))
@@ -673,7 +745,9 @@ def generate_enrollment_group_update_req(iot_hub_host_name=None,
                                          initial_twin_properties=None,
                                          provisioning_status=None,
                                          etag=None,
-                                         reprovision_policy=None):
+                                         reprovision_policy=None,
+                                         allocation_policy=None,
+                                         iot_hubs=None):
     return {'client': None,
             'enrollment_id': enrollment_id,
             'rg': resource_group,
@@ -689,7 +763,9 @@ def generate_enrollment_group_update_req(iot_hub_host_name=None,
             'initial_twin_properties': initial_twin_properties,
             'provisioning_status': provisioning_status,
             'etag': etag,
-            'reprovision_policy': reprovision_policy}
+            'reprovision_policy': reprovision_policy,
+            'allocation_policy': allocation_policy,
+            'iot_hubs': iot_hubs}
 
 
 class TestEnrollmentGroupUpdate():
@@ -716,6 +792,10 @@ class TestEnrollmentGroupUpdate():
         (generate_enrollment_group_update_req(reprovision_policy='reprovisionandmigratedata')),
         (generate_enrollment_group_update_req(reprovision_policy='reprovisionandresetdata')),
         (generate_enrollment_group_update_req(reprovision_policy='never')),
+        (generate_enrollment_group_update_req(allocation_policy='static', iot_hubs='hub1')),
+        (generate_enrollment_group_update_req(allocation_policy='hashed', iot_hubs='hub1 hub2')),
+        (generate_enrollment_group_update_req(allocation_policy='geolatency')),
+        (generate_enrollment_group_update_req(iot_hub_host_name='hub1'))
     ])
     def test_enrollment_group_update(self, serviceclient, req):
         subject.iot_dps_device_enrollment_group_update(None,
@@ -733,7 +813,9 @@ class TestEnrollmentGroupUpdate():
                                                        req['initial_twin_tags'],
                                                        req['initial_twin_properties'],
                                                        req['provisioning_status'],
-                                                       req['reprovision_policy'])
+                                                       req['reprovision_policy'],
+                                                       req['allocation_policy'],
+                                                       req['iot_hubs'])
         # Index 1 is the update args
         args = serviceclient.call_args_list[1]
         url = args[0][0].url
@@ -757,7 +839,8 @@ class TestEnrollmentGroupUpdate():
             assert body['attestation']['x509']['caReferences']['secondary'] is not None
 
         if req['iot_hub_host_name']:
-            assert body['iotHubHostName'] == req['iot_hub_host_name']
+            assert body['allocationPolicy'] == 'static'
+            assert body['iotHubs'] == req['iot_hub_host_name'].split()
         if req['provisioning_status']:
             assert body['provisioningStatus'] == req['provisioning_status']
         if req['initial_twin_properties']:
@@ -773,6 +856,10 @@ class TestEnrollmentGroupUpdate():
         if req['reprovision_policy'] == 'never':
             assert not body['reprovisionPolicy']['migrateDeviceData']
             assert not body['reprovisionPolicy']['updateHubAssignment']
+        if req['allocation_policy']:
+            assert body['allocationPolicy'] == req['allocation_policy']
+        if req['iot_hubs']:
+            assert body['iotHubs'] == req['iot_hubs'].split()
 
     @pytest.mark.parametrize("req", [
         (generate_enrollment_group_update_req(certificate_path='myCert',
@@ -785,7 +872,11 @@ class TestEnrollmentGroupUpdate():
         (generate_enrollment_group_update_req(remove_certificate='true',
                                               remove_secondary_certificate='true')),
         (generate_enrollment_group_update_req(remove_certificate='true')),
-        (generate_enrollment_group_update_req(reprovision_policy='invalid'))
+        (generate_enrollment_group_update_req(reprovision_policy='invalid')),
+        (generate_enrollment_group_update_req(allocation_policy='invalid')),
+        (generate_enrollment_group_update_req(allocation_policy='static', iot_hub_host_name='hub')),
+        (generate_enrollment_group_update_req(allocation_policy='static', iot_hubs='hub1 hub2')),
+        (generate_enrollment_group_update_req(iot_hubs='hub1 hub2'))
     ])
     def test_enrollment_group_update_invalid_args(self, serviceclient, req):
         with pytest.raises(CLIError):
@@ -804,7 +895,9 @@ class TestEnrollmentGroupUpdate():
                                                            req['initial_twin_tags'],
                                                            req['initial_twin_properties'],
                                                            req['provisioning_status'],
-                                                           req['reprovision_policy'])
+                                                           req['reprovision_policy'],
+                                                           req['allocation_policy'],
+                                                           req['iot_hubs'])
 
 
 class TestEnrollmentGroupShow():

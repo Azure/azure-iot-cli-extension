@@ -120,3 +120,13 @@ class ReprovisionType(Enum):
     reprovisionandmigratedata = 'reprovisionandmigratedata'
     reprovisionandresetdata = 'reprovisionandresetdata'
     never = 'never'
+
+
+# pylint: disable=too-few-public-methods
+class AllocationType(Enum):
+    """
+    Type of allocation for device assigned to the Hub.
+    """
+    hashed = 'hashed'
+    geolatency = 'geolatency'
+    static = 'static'

@@ -7,7 +7,7 @@
 
 import os
 from azure.cli.testsdk import LiveScenarioTest
-from azext_iot.common.shared import EntityStatusType, AttestationType
+from azext_iot.common.shared import EntityStatusType, AttestationType, AllocationType
 from azext_iot.common.certops import create_self_signed_certificate
 
 # Set these to the proper IoT Hub DPS, IoT Hub and Resource Group for Integration Tests.
@@ -52,17 +52,18 @@ class IoTDpsTest(LiveScenarioTest):
         etag = self.cmd('iot dps enrollment create --enrollment-id {} --attestation-type {}'
                         ' -g {} --dps-name {} --endorsement-key {}'
                         ' --provisioning-status {} --device-id {} --initial-twin-tags {}'
-                        ' --initial-twin-properties {} --iot-hub-host-name {}'
+                        ' --initial-twin-properties {} --allocation-policy {} --iot-hubs {}'
                         .format(enrollment_id, attestation_type, rg, dps, endorsement_key,
                                 self.provisioning_status, device_id,
-                                '"{generic_dict}"', '"{generic_dict}"', hub_host_name),
+                                '"{generic_dict}"', '"{generic_dict}"', AllocationType.static.value, hub_host_name),
                         checks=[
                             self.check('attestation.type', attestation_type),
                             self.check('registrationId', enrollment_id),
                             self.check('provisioningStatus',
                                        self.provisioning_status),
                             self.check('deviceId', device_id),
-                            self.check('iotHubHostName', hub_host_name),
+                            self.check('allocationPolicy', AllocationType.static.value),
+                            self.check('iotHubs', hub_host_name.split()),
                             self.check('initialTwin.tags',
                                        self.kwargs['generic_dict']),
                             self.check('initialTwin.properties.desired',
@@ -90,7 +91,8 @@ class IoTDpsTest(LiveScenarioTest):
                      self.check('provisioningStatus',
                                 self.provisioning_status_new),
                      self.check('deviceId', device_id),
-                     self.check('iotHubHostName', hub_host_name),
+                     self.check('allocationPolicy', AllocationType.static.value),
+                     self.check('iotHubs', hub_host_name.split()),
                      self.exists('initialTwin.tags'),
                      self.exists('initialTwin.properties.desired')
                  ])
@@ -108,17 +110,20 @@ class IoTDpsTest(LiveScenarioTest):
                         ' -g {} --dps-name {} -cp {} -scp {}'
                         ' --provisioning-status {} --device-id {}'
                         ' --initial-twin-tags {} --initial-twin-properties {}'
-                        ' --iot-hub-host-name {}'
+                        ' --allocation-policy {} --iot-hubs {}'
                         .format(enrollment_id, attestation_type, rg, dps, cert_path,
                                 cert_path, self.provisioning_status, device_id,
-                                '"{generic_dict}"', '"{generic_dict}"', hub_host_name),
+                                '"{generic_dict}"', '"{generic_dict}"',
+                                AllocationType.hashed.value,
+                                hub_host_name),
                         checks=[
                             self.check('attestation.type', attestation_type),
                             self.check('registrationId', enrollment_id),
                             self.check('provisioningStatus',
                                        self.provisioning_status),
                             self.check('deviceId', device_id),
-                            self.check('iotHubHostName', hub_host_name),
+                            self.check('allocationPolicy', AllocationType.hashed.value),
+                            self.check('iotHubs', hub_host_name.split()),
                             self.check('initialTwin.tags',
                                        self.kwargs['generic_dict']),
                             self.check('initialTwin.properties.desired',
@@ -146,7 +151,8 @@ class IoTDpsTest(LiveScenarioTest):
                      self.check('provisioningStatus',
                                 self.provisioning_status_new),
                      self.check('deviceId', device_id),
-                     self.check('iotHubHostName', hub_host_name),
+                     self.check('allocationPolicy', AllocationType.hashed.value),
+                     self.check('iotHubs', hub_host_name.split()),
                      self.exists('initialTwin.tags'),
                      self.exists('initialTwin.properties.desired'),
                      self.check(
@@ -162,17 +168,17 @@ class IoTDpsTest(LiveScenarioTest):
         primary_key = 'x3XNu1HeSw93rmtDXduRUZjhqdGbcqR/zloWYiyPUzw='
         secondary_key = 'PahMnOSBblv9CRn5B765iK35jTvnjDUjYP9hKBZa4Ug='
         device_id = self.create_random_name('device-id-for-test', length=48)
-        hub_host_name = '{}.azure-devices.net'.format(hub)
         reprovisionPolicy_reprovisionandresetdata = 'reprovisionandresetdata'
 
         etag = self.cmd('iot dps enrollment create --enrollment-id {} --attestation-type {}'
                         ' -g {} --dps-name {} -pk {} -sk {}'
                         ' --provisioning-status {} --device-id {}'
                         ' --initial-twin-tags {} --initial-twin-properties {}'
-                        ' --iot-hub-host-name {} -rp {}'
+                        ' --allocation-policy {} -rp {}'
                         .format(enrollment_id, attestation_type, rg, dps, primary_key,
                                 secondary_key, self.provisioning_status, device_id,
-                                '"{generic_dict}"', '"{generic_dict}"', hub_host_name,
+                                '"{generic_dict}"', '"{generic_dict}"',
+                                AllocationType.geolatency.value,
                                 reprovisionPolicy_reprovisionandresetdata),
                         checks=[
                             self.check('attestation.type', attestation_type),
@@ -180,7 +186,7 @@ class IoTDpsTest(LiveScenarioTest):
                             self.check('provisioningStatus',
                                        self.provisioning_status),
                             self.check('deviceId', device_id),
-                            self.check('iotHubHostName', hub_host_name),
+                            self.check('allocationPolicy', AllocationType.geolatency.value),
                             self.check('initialTwin.tags',
                                        self.kwargs['generic_dict']),
                             self.check('initialTwin.properties.desired',
@@ -208,7 +214,7 @@ class IoTDpsTest(LiveScenarioTest):
                      self.check('provisioningStatus',
                                 self.provisioning_status_new),
                      self.check('deviceId', device_id),
-                     self.check('iotHubHostName', hub_host_name),
+                     self.check('allocationPolicy', AllocationType.geolatency.value),
                      self.exists('initialTwin.tags'),
                      self.exists('initialTwin.properties.desired'),
                      self.check('attestation.symmetric_key.primary_key', primary_key)
@@ -220,15 +226,20 @@ class IoTDpsTest(LiveScenarioTest):
     def test_dps_enrollment_group_lifecycle(self):
         enrollment_id = self.create_random_name('enrollment-for-test', length=48)
         reprovisionPolicy_never = 'never'
+        hub_host_name = '{}.azure-devices.net'.format(hub)
         etag = self.cmd('iot dps enrollment-group create --enrollment-id {} -g {} --dps-name {}'
-                        ' -cp {} -scp {} --provisioning-status {}'
+                        ' -cp {} -scp {} --provisioning-status {} --allocation-policy {}'
+                        ' --iot-hubs {}'
                         .format(enrollment_id, rg, dps, cert_path, cert_path,
-                                self.provisioning_status),
+                                self.provisioning_status, AllocationType.geolatency.value,
+                                hub_host_name),
                         checks=[
                             self.check('enrollmentGroupId', enrollment_id),
                             self.check('provisioningStatus',
                                        self.provisioning_status),
                             self.exists('reprovisionPolicy'),
+                            self.check('allocationPolicy', AllocationType.geolatency.value),
+                            self.check('iotHubs', hub_host_name.split()),
                             self.check('reprovisionPolicy.migrateDeviceData', True),
                             self.check('reprovisionPolicy.updateHubAssignment', True)
                         ]).get_output_in_json()['etag']
@@ -243,14 +254,17 @@ class IoTDpsTest(LiveScenarioTest):
                  checks=[self.check('enrollmentGroupId', enrollment_id)])
 
         self.cmd('iot dps enrollment-group update -g {} --dps-name {} --enrollment-id {}'
-                 ' --provisioning-status {} -rsc --etag {} -rp {}'
-                 .format(rg, dps, enrollment_id, self.provisioning_status_new, etag, reprovisionPolicy_never),
+                 ' --provisioning-status {} -rsc --etag {} -rp {} --allocation-policy {}'
+                 .format(rg, dps, enrollment_id, self.provisioning_status_new, etag,
+                         reprovisionPolicy_never, AllocationType.hashed.value),
                  checks=[
                      self.check('attestation.type', AttestationType.x509.value),
                      self.check('enrollmentGroupId', enrollment_id),
                      self.check('provisioningStatus', self.provisioning_status_new),
                      self.check('attestation.type.x509.clientCertificates.secondary', None),
                      self.exists('reprovisionPolicy'),
+                     self.check('allocationPolicy', AllocationType.hashed.value),
+                     self.check('iotHubs', hub_host_name.split()),
                      self.check('reprovisionPolicy.migrateDeviceData', False),
                      self.check('reprovisionPolicy.updateHubAssignment', False)
                  ])

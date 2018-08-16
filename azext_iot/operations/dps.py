@@ -7,7 +7,8 @@ from knack.log import get_logger
 from knack.util import CLIError
 from azext_iot.common.shared import (SdkType,
                                      AttestationType,
-                                     ReprovisionType)
+                                     ReprovisionType,
+                                     AllocationType)
 from azext_iot.common._azure import get_iot_dps_connection_string
 from azext_iot.common.utility import shell_safe_json_parse
 from azext_iot.common.certops import open_certificate
@@ -54,6 +55,7 @@ def iot_dps_device_enrollment_get(client, enrollment_id, dps_name, resource_grou
         raise CLIError(e)
 
 
+# pylint: disable=too-many-locals
 def iot_dps_device_enrollment_create(client,
                                      enrollment_id,
                                      attestation_type,
@@ -69,7 +71,9 @@ def iot_dps_device_enrollment_create(client,
                                      initial_twin_tags=None,
                                      initial_twin_properties=None,
                                      provisioning_status=None,
-                                     reprovision_policy=None):
+                                     reprovision_policy=None,
+                                     allocation_policy=None,
+                                     iot_hubs=None):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
@@ -88,21 +92,32 @@ def iot_dps_device_enrollment_create(client,
                                                SymmetricKeyAttestation(primary_key, secondary_key))
         reprovision = _get_reprovision_policy(reprovision_policy)
         initial_twin = _get_initial_twin(initial_twin_tags, initial_twin_properties)
+        iot_hub_list = iot_hubs.split() if iot_hubs else iot_hubs
+        _validate_allocation_policy_for_enrollment(allocation_policy, iot_hub_host_name, iot_hub_list)
+        if iot_hub_host_name and allocation_policy is None:
+            allocation_policy = AllocationType.static.value
+            iot_hub_list = iot_hub_host_name.split()
+
         enrollment = IndividualEnrollment(enrollment_id,
                                           attestation,
                                           device_id,
                                           None,
                                           None,
-                                          iot_hub_host_name,
+                                          None,
                                           initial_twin,
                                           None,
                                           provisioning_status,
-                                          reprovision)
+                                          reprovision,
+                                          None,
+                                          None,
+                                          allocation_policy,
+                                          iot_hub_list)
         return m_sdk.device_enrollment.create_or_update(enrollment_id, enrollment)
     except errors.ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
 
+# pylint: disable=too-many-locals
 def iot_dps_device_enrollment_update(client,
                                      enrollment_id,
                                      dps_name,
@@ -120,7 +135,9 @@ def iot_dps_device_enrollment_update(client,
                                      initial_twin_tags=None,
                                      initial_twin_properties=None,
                                      provisioning_status=None,
-                                     reprovision_policy=None):
+                                     reprovision_policy=None,
+                                     allocation_policy=None,
+                                     iot_hubs=None):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
@@ -157,7 +174,9 @@ def iot_dps_device_enrollment_update(client,
                 enrollment_record.attestation.symmetric_key.secondary_key = secondary_key
         # Update enrollment information
         if iot_hub_host_name:
-            enrollment_record.iot_hub_host_name = iot_hub_host_name
+            enrollment_record.allocation_policy = AllocationType.static.value
+            enrollment_record.iot_hubs = iot_hub_host_name.split()
+            enrollment_record.iot_hub_host_name = None
         if device_id:
             enrollment_record.device_id = device_id
         if provisioning_status:
@@ -168,6 +187,12 @@ def iot_dps_device_enrollment_update(client,
         enrollment_record.initial_twin = _get_updated_inital_twin(enrollment_record,
                                                                   initial_twin_tags,
                                                                   initial_twin_properties)
+        iot_hub_list = iot_hubs.split() if iot_hubs else iot_hubs
+        _validate_allocation_policy_for_enrollment(allocation_policy, iot_hub_host_name, iot_hub_list)
+        if allocation_policy:
+            enrollment_record.allocation_policy = allocation_policy
+            enrollment_record.iot_hubs = iot_hub_list
+            enrollment_record.iot_hub_host_name = None
         return m_sdk.device_enrollment.create_or_update(enrollment_id, enrollment_record, etag)
     except errors.ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
@@ -218,7 +243,9 @@ def iot_dps_device_enrollment_group_create(client,
                                            initial_twin_tags=None,
                                            initial_twin_properties=None,
                                            provisioning_status=None,
-                                           reprovision_policy=None):
+                                           reprovision_policy=None,
+                                           allocation_policy=None,
+                                           iot_hubs=None):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
@@ -235,13 +262,22 @@ def iot_dps_device_enrollment_group_create(client,
             attestation = _get_attestation_with_x509_ca_cert(root_ca_name, secondary_root_ca_name)
         reprovision = _get_reprovision_policy(reprovision_policy)
         initial_twin = _get_initial_twin(initial_twin_tags, initial_twin_properties)
+        iot_hub_list = iot_hubs.split() if iot_hubs else iot_hubs
+        _validate_allocation_policy_for_enrollment(allocation_policy, iot_hub_host_name, iot_hub_list)
+        if iot_hub_host_name and allocation_policy is None:
+            allocation_policy = AllocationType.static.value
+            iot_hub_list = iot_hub_host_name.split()
         group_enrollment = EnrollmentGroup(enrollment_id,
                                            attestation,
-                                           iot_hub_host_name,
+                                           None,
                                            initial_twin,
                                            None,
                                            provisioning_status,
-                                           reprovision)
+                                           reprovision,
+                                           None,
+                                           None,
+                                           allocation_policy,
+                                           iot_hub_list)
         return m_sdk.device_enrollment_group.create_or_update(enrollment_id, group_enrollment)
     except errors.ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
@@ -262,7 +298,9 @@ def iot_dps_device_enrollment_group_update(client,
                                            initial_twin_tags=None,
                                            initial_twin_properties=None,
                                            provisioning_status=None,
-                                           reprovision_policy=None):
+                                           reprovision_policy=None,
+                                           allocation_policy=None,
+                                           iot_hubs=None):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
@@ -302,7 +340,9 @@ def iot_dps_device_enrollment_group_update(client,
                                                                                        remove_certificate,
                                                                                        remove_secondary_certificate)
         if iot_hub_host_name:
-            enrollment_record.iot_hub_host_name = iot_hub_host_name
+            enrollment_record.allocation_policy = AllocationType.static.value
+            enrollment_record.iot_hubs = iot_hub_host_name.split()
+            enrollment_record.iot_hub_host_name = None
         if provisioning_status:
             enrollment_record.provisioning_status = provisioning_status
         if reprovision_policy:
@@ -310,6 +350,12 @@ def iot_dps_device_enrollment_group_update(client,
         enrollment_record.initial_twin = _get_updated_inital_twin(enrollment_record,
                                                                   initial_twin_tags,
                                                                   initial_twin_properties)
+        iot_hub_list = iot_hubs.split() if iot_hubs else iot_hubs
+        _validate_allocation_policy_for_enrollment(allocation_policy, iot_hub_host_name, iot_hub_list)
+        if allocation_policy:
+            enrollment_record.allocation_policy = allocation_policy
+            enrollment_record.iot_hubs = iot_hub_list
+            enrollment_record.iot_hub_host_name = None
         return m_sdk.device_enrollment_group.create_or_update(enrollment_id, enrollment_record, etag)
     except errors.ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
@@ -537,3 +583,21 @@ def _validate_arguments_for_attestation_mechanism(attestation_type,
             raise CLIError('Cannot remove certificate while enrollment is using symmetric key attestation mechanism')
         if endorsement_key:
             raise CLIError('Cannot update endorsement key while enrollment is using symmetric key attestation mechanism')
+
+
+def _validate_allocation_policy_for_enrollment(allocation_policy,
+                                               iot_hub_host_name,
+                                               iot_hub_list):
+    if allocation_policy:
+        if iot_hub_host_name is not None:
+            raise CLIError('\'iot_hub_host_name\' is not required when allocation-policy is defined.')
+        if not any(allocation_policy == allocation.value for allocation in AllocationType):
+            raise CLIError('Please provide valid allocation policy.')
+        if allocation_policy == AllocationType.static.value:
+            if iot_hub_list is None:
+                raise CLIError('Please provide a hub to be assigned with device.')
+            if iot_hub_list and len(iot_hub_list) > 1:
+                raise CLIError('Only one hub is required in static allocation policy.')
+    else:
+        if iot_hub_list:
+            raise CLIError('Please provide allocation policy.')
