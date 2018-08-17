@@ -48,13 +48,14 @@ def executor(target, consumer_group, enqueued_time, device_id=None, properties=N
         result = loop.run_until_complete(future)
     except KeyboardInterrupt:
         six.print_('Stopping event monitor...')
-        future.cancel()
+        loop.call_soon_threadsafe(future.cancel)
         loop.run_forever()
     finally:
         if result:
             error = next(res for res in result if result)
             if error:
                 logger.error(error)
+                raise RuntimeError(error)
 
 
 async def initiate_event_monitor(target, consumer_group, enqueued_time, device_id=None, properties=None, timeout=0):

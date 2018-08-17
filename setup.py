@@ -33,11 +33,15 @@ CLASSIFIERS = [
     'License :: OSI Approved :: MIT License',
 ]
 
+# The following dependencies are needed by the IoT extension.
+# Most of these are leveraged from Az CLI Core.
+# 'msrestazure==0.4.29',
+# 'paho-mqtt==1.3.1',
+# 'jmespath==0.9.3',
+# 'pyyaml==3.13'
+
 DEPENDENCIES = [
-    'msrestazure==0.4.29',
-    'paho-mqtt==1.3.1',
-    'jmespath==0.9.3',
-    'pyyaml==3.13'
+    'paho-mqtt==1.3.1'
 ]
 
 
