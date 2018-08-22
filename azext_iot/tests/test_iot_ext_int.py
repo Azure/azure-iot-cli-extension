@@ -1069,9 +1069,9 @@ class TestIoTHub(LiveScenarioTest):
         # Test waiting for ack from c2d send
         from azext_iot.operations.hub import iot_simulate_device
         from azext_iot._factory import iot_hub_service_factory
-        from azure.cli.testsdk import TestCli
+        from azure.cli.core.mock import DummyCli
 
-        cli_ctx = TestCli()
+        cli_ctx = DummyCli()
         client = iot_hub_service_factory(cli_ctx)
 
         token, thread = execute_onthread(method=iot_simulate_device,
@@ -1080,12 +1080,12 @@ class TestIoTHub(LiveScenarioTest):
                                          max_runs=5,
                                          return_handle=True)
 
-        self.cmd('iot device c2d-message send -d {} --ack {} --login {} --wait'.format(device_ids[0], 'full', LIVE_HUB_CS))
+        self.cmd('iot device c2d-message send -d {} --ack {} --login {} --wait -y'.format(device_ids[0], 'full', LIVE_HUB_CS))
         token.set()
         thread.join()
 
         # Error - invalid wait when no ack requested
-        self.cmd('iot device c2d-message send -d {} --login {} --wait'.format(
+        self.cmd('iot device c2d-message send -d {} --login {} --wait -y'.format(
             device_ids[0], LIVE_HUB_CS), expect_failure=True)
 
     def test_device_messaging(self):
@@ -1155,14 +1155,16 @@ class TestIoTHub(LiveScenarioTest):
 
     @pytest.mark.skipif(not validate_min_python_version(3, 5, exit_on_fail=False), reason="minimum python version not satisfied")
     def test_hub_monitor_event_all(self):
-        from azext_iot.operations.hub import iot_simulate_device
+        from azext_iot.operations.hub import iot_simulate_device, iot_device_send_message
         from azext_iot._factory import iot_hub_service_factory
-        from azure.cli.testsdk import TestCli
+        from azure.cli.core.mock import DummyCli
 
-        cli_ctx = TestCli()
+        cli_ctx = DummyCli()
         client = iot_hub_service_factory(cli_ctx)
-
         device_count = 10
+
+        # Event monitor should throw runtime exception in case of error
+        self.cmd('iot hub monitor-events -t 10 -y -p all --login {}'.format(LIVE_HUB_CS + 'zzz'), expect_failure=True)
 
         names = self._create_entity_names(devices=device_count)
         device_ids = names['device_ids']
@@ -1187,13 +1189,22 @@ class TestIoTHub(LiveScenarioTest):
 
         self.cmd('iot hub monitor-events -t 10 -y -p all --login {}'.format(LIVE_HUB_CS), checks=None)
 
+        # Leverage app and system properties
+        execute_onthread(method=iot_device_send_message,
+                         args=[client, device_ids[0], LIVE_HUB,
+                               'Ping from event monitor test 1, part c',
+                               '$.mid=12345;key0=value0;key1=1', 5],
+                         max_runs=3)
+
+        self.cmd('iot hub monitor-events -t 10 -y -p all --login {}'.format(LIVE_HUB_CS), checks=None)
+
     @pytest.mark.skipif(not validate_min_python_version(3, 5, exit_on_fail=False), reason="minimum python version not satisfied")
     def test_hub_monitor_event_device(self):
         from azext_iot.operations.hub import iot_simulate_device
         from azext_iot._factory import iot_hub_service_factory
-        from azure.cli.testsdk import TestCli
+        from azure.cli.core.mock import DummyCli
 
-        cli_ctx = TestCli()
+        cli_ctx = DummyCli()
         client = iot_hub_service_factory(cli_ctx)
 
         device_count = 2
@@ -1235,7 +1246,7 @@ class TestIoTHub(LiveScenarioTest):
                      checks=[self.check('deviceId', device_ids[i])])
 
         ack = 'full'
-        self.cmd('iot device c2d-message send -d {} --hub-name {} -g {} --ack {}'
+        self.cmd('iot device c2d-message send -d {} --hub-name {} -g {} --ack {} -y'
                  .format(device_ids[0], LIVE_HUB, LIVE_RG, ack), checks=self.is_empty())
 
         result = self.cmd('iot device c2d-message receive -d {} --hub-name {} -g {}'
@@ -1247,11 +1258,11 @@ class TestIoTHub(LiveScenarioTest):
         self.cmd('iot device c2d-message complete -d {} --hub-name {} -g {} -e {}'
                  .format(device_ids[0], LIVE_HUB, LIVE_RG, etag))
 
-        self.cmd('iot hub monitor-feedback -n {} -g {} -w {}'.format(LIVE_HUB, LIVE_RG, msg_id))
+        self.cmd('iot hub monitor-feedback -n {} -g {} -w {} -y'.format(LIVE_HUB, LIVE_RG, msg_id))
 
         # With connection string - filter on device
         ack = 'positive'
-        self.cmd('iot device c2d-message send -d {} --login {} --ack {}'
+        self.cmd('iot device c2d-message send -d {} --login {} --ack {} -y'
                  .format(device_ids[0], LIVE_HUB_CS, ack), checks=self.is_empty())
 
         result = self.cmd('iot device c2d-message receive -d {} --login {}'
@@ -1263,13 +1274,13 @@ class TestIoTHub(LiveScenarioTest):
         self.cmd('iot device c2d-message complete -d {} --login {} -e {}'
                  .format(device_ids[0], LIVE_HUB_CS, etag))
 
-        self.cmd('iot hub monitor-feedback --login {} -w {} -d {}'.format(LIVE_HUB_CS, msg_id, device_ids[0]))
+        self.cmd('iot hub monitor-feedback --login {} -w {} -d {} -y'.format(LIVE_HUB_CS, msg_id, device_ids[0]))
 
         # With connection string - dead lettered case + unrelated ack
         ack = 'negative'
 
         # Create some noise
-        self.cmd('iot device c2d-message send -d {} --login {} --ack {}'
+        self.cmd('iot device c2d-message send -d {} --login {} --ack {} -y'
                  .format(device_ids[0], LIVE_HUB_CS, ack), checks=self.is_empty())
         result = self.cmd('iot device c2d-message receive -d {} --login {}'
                           .format(device_ids[0], LIVE_HUB_CS)).get_output_in_json()
@@ -1278,7 +1289,7 @@ class TestIoTHub(LiveScenarioTest):
                  .format(device_ids[0], LIVE_HUB_CS, etag))
 
         # Target message
-        self.cmd('iot device c2d-message send -d {} --login {} --ack {}'
+        self.cmd('iot device c2d-message send -d {} --login {} --ack {} -y'
                  .format(device_ids[0], LIVE_HUB_CS, ack), checks=self.is_empty())
 
         result = self.cmd('iot device c2d-message receive -d {} --login {}'
@@ -1290,7 +1301,7 @@ class TestIoTHub(LiveScenarioTest):
         self.cmd('iot device c2d-message reject -d {} --login {} -e {}'
                  .format(device_ids[0], LIVE_HUB_CS, etag))
 
-        self.cmd('iot hub monitor-feedback --login {} -w {}'.format(LIVE_HUB_CS, msg_id))
+        self.cmd('iot hub monitor-feedback --login {} -w {} -y'.format(LIVE_HUB_CS, msg_id))
 
     @pytest.mark.skipif(not LIVE_STORAGE, reason="empty azext_iot_teststorageuri env var")
     def test_storage(self):
@@ -1314,8 +1325,7 @@ class TestIoTHub(LiveScenarioTest):
 
         self.cmd('iot hub device-identity export -n {} -bcu "{}"'.format(LIVE_HUB, LIVE_STORAGE),
                  checks=[
-                     self.check(
-                         'additionalProperties.outputBlobContainerUri', LIVE_STORAGE),
+                     self.check('outputBlobContainerUri', LIVE_STORAGE),
                      self.check('failureReason', None),
                      self.check('type', 'export'),
                      self.exists('jobId')])

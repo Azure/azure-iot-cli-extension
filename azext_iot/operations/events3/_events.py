@@ -43,12 +43,19 @@ def executor(target, consumer_group, enqueued_time, device_id=None, properties=N
         if device_id:
             device_filter_txt = ' filtering on device: {},'.format(device_id)
 
+        def stop_and_suppress_eloop():
+            try:
+                loop.stop()
+            except Exception:  # pylint: disable=broad-except
+                pass
+
         six.print_('Starting event monitor,{} use ctrl-c to stop...'.format(device_filter_txt if device_filter_txt else ''))
-        future.add_done_callback(lambda future: loop.stop())
+        future.add_done_callback(lambda future: stop_and_suppress_eloop())
         result = loop.run_until_complete(future)
     except KeyboardInterrupt:
         six.print_('Stopping event monitor...')
-        loop.call_soon_threadsafe(future.cancel)
+        for t in asyncio.Task.all_tasks():
+            t.cancel()
         loop.run_forever()
     finally:
         if result:
