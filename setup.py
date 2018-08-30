@@ -40,6 +40,10 @@ CLASSIFIERS = [
 # 'jmespath==0.9.3',
 # 'pyyaml==3.13'
 
+# There is also a dependency for uamqp for amqp based commands
+# though that is installed out of band (managed by the extension)
+# for compatibility reasons.
+
 DEPENDENCIES = [
     'paho-mqtt==1.3.1'
 ]
