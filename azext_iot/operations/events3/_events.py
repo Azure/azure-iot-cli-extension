@@ -108,7 +108,7 @@ async def initiate_event_monitor(target, consumer_group, enqueued_time, device_i
                                              properties=properties,
                                              device_id=device_id,
                                              timeout=timeout))
-        await asyncio.gather(*coroutines)
+        await asyncio.gather(*coroutines, return_exceptions=True)
 
 
 async def monitor_events(endpoint, connection, path, auth, partition, consumer_group, enqueuedtimeutc,
@@ -154,7 +154,7 @@ async def monitor_events(endpoint, connection, path, auth, partition, consumer_g
         async for msg in receive_client.receive_messages_iter_async():
             _output_msg_kpi(msg)
 
-    except asyncio.CancelledError:
+    except (asyncio.CancelledError, KeyboardInterrupt):
         exp_cancelled = True
         await receive_client.close_async()
     except uamqp.errors.LinkDetach as ld:
@@ -164,6 +164,7 @@ async def monitor_events(endpoint, connection, path, auth, partition, consumer_g
     finally:
         if not exp_cancelled:
             await receive_client.close_async()
+        logger.info("Closed monitor on partition %s", partition)
 
 
 def _build_auth_container(target):

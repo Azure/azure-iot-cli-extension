@@ -12,18 +12,6 @@ The extension augments the vanilla Azure CLI IoT by adding to or modifying the e
 - IoT Edge
 - IoT Device Provisioning Service (DPS)
 
-## Quick Start
-
-Validate that your Azure CLI version is [compatible](#compatibility).
-
-**Add the extension**: `az extension add --name azure-cli-iot-ext`
-
-**List installed extensions**: `az extension list`
-
-**Update the extension**: `az extension update --name azure-cli-iot-ext`
-
-**Remove the extension**: `az extension remove --name azure-cli-iot-ext`
-
 ## Installation
 
 The extension is designed to be plug-and-play with Azure CLI. **Even** if you have Azure CLI installed make sure it is up to date.
@@ -31,23 +19,40 @@ The extension is designed to be plug-and-play with Azure CLI. **Even** if you ha
 :exclamation: For **installation troubleshooting** please go to the [respective docs section](docs/install-help.md) for help.
 
 ### Compatibility
-Before installation validate that your Azure CLI version is within the following criteria. The criteria differs based on OS and method of installation. Use `az --version` to validate.
+Before installation ensure that your Azure CLI version meets the following criteria. The criteria differs based on OS and method of installation. Use `az --version` to determine the CLI version.
 
-```python
-# Windows MSI
->= '2.0.24' and NOT between '2.0.34' - '2.0.38' inclusive
+In all cases your CLI needs to be at least `v2.0.24`.
 
-# Windows PIP, Linux and macOS
->= '2.0.24' and NOT between '2.0.34' - '2.0.36' inclusive
-```
+| CLI Install Method  | NOT compatible with |
+| ------------- | ------------- |
+| Windows via MSI  | v2.0.34 to v2.0.38  |
+| Windows via PIP, Linux or macOS  | v2.0.34 to v2.0.36  |
 
-### Step 0: Install/Update Azure CLI
 
-At a minimum your CLI core version must be within the compatibility criteria defined above.
+### Quick Guide
+
+Validate that your Azure CLI version is [compatible](#compatibility).
+
+**Common Az CLI extension operations**
+
+Add: `az extension add --name azure-cli-iot-ext`
+
+List: `az extension list`
+
+Update: `az extension update --name azure-cli-iot-ext`
+
+Remove: `az extension remove --name azure-cli-iot-ext`
+
+
+### Full Guide
+
+#### Step 0: Install/Update Azure CLI
+
+At a minimum your CLI core version must be within the [compatibility](#compatibility) criteria defined above.
 
 Follow the installation instructions on [GitHub](https://github.com/Azure/azure-cli) or [Microsoft Docs](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest) to setup Azure CLI in your environment.
 
-### Step 1: Install the extension
+#### Step 1: Install the extension
 
 Now that you have a compatible Azure CLI installed you can add the IoT extension.
 When you install an extension, any additional Python dependencies required are automatically downloaded and installed.
@@ -89,7 +94,7 @@ To build the wheel locally, ensure you have the Python `wheel` package installed
 
 Now follow the local package installation method.
 
-### Step 2: Log In (if you haven't already)
+#### Step 2: Log In (if you haven't already)
 
 Your subscription details are used to interact with target resources.
 
@@ -97,7 +102,7 @@ You can login interactively, pass in account credentials, or use a service princ
 
 [More details](https://docs.microsoft.com/en-us/cli/azure/authenticate-azure-cli?view=azure-cli-latest) about Azure CLI authentication.
 
-### Step 3: Have Fun
+#### Step 3: Have Fun
 
 If you have any suggestions or find bugs, please let us know.
 
@@ -107,15 +112,16 @@ To remove the extension at any time, you can use `az extension remove --name azu
 
 ## Command Guide
 
-[Command Wiki](https://github.com/Azure/azure-iot-cli-extension/wiki/Commands)
+The [Microsoft Docs](https://docs.microsoft.com/en-us/cli/azure/ext/azure-cli-iot-ext/iot?view=azure-cli-latest) extensions reference are updated per release.
 
 #### Tips for success
 
-**Tip#1** Many commands require the default policy to exist on the target resource which is being manipulated. For example IoT Hub based commands commonly look for the **iothubowner** policy. _This behavior will change in a future update_.
+* Many commands require the default policy to exist on the target resource which is being manipulated. For example IoT Hub based commands commonly look for the **iothubowner** policy. _This behavior will change in a future update_.
 
-**Tip#2** For command parameters that take JSON, for example the `az iot hub device-twin update` command's `--set` parameter, JSON input is different between CMD/PowerShell and Bash-like shells.
+* For command parameters that take JSON, for example the `az iot hub device-twin update` command's `--set` parameter, the JSON input format is different between CMD/PowerShell and Bash-like shells.
 
 Please read the [Tips Wiki page](https://github.com/Azure/azure-iot-cli-extension/wiki/Tips) for more detail and to maximize the functionality and enjoyment out of the IoT extension.
+
 
 ## Developer setup
 
@@ -185,9 +191,6 @@ At this point if your environment has been setup to execute all tests, you can l
 
 `pytest -v <extension root> --cov=azext_iot --cov-config <extension root>/.coveragerc`
 
-## Known Issues
-
-- Device Export does not currently support IoT Edge device capability
 
 ## Contributing
 
