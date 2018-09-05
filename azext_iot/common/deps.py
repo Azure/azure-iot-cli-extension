@@ -27,7 +27,8 @@ def ensure_uamqp(config, yes=False, repair=False):
 
         six.print_('Updating required dependency...')
         with HomebrewPipPatch():
-            if install(EVENT_LIB[0], exact_version=EVENT_LIB[1]):
+            # The version range defined in this custom_version parameter should be stable
+            if install(EVENT_LIB[0], custom_version='>={},<{}'.format(EVENT_LIB[1], EVENT_LIB[2])):
                 update_uamqp_ext_version(config, EVENT_LIB[1])
                 six.print_('Update appears to have worked. Executing command...')
             else:

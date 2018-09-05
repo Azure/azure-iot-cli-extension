@@ -14,7 +14,7 @@ from azext_iot._constants import EXTENSION_NAME
 logger = get_logger(__name__)
 
 
-def install(package, exact_version=None, compatible_version=None):
+def install(package, exact_version=None, compatible_version=None, custom_version=None):
     if not extension_exists(EXTENSION_NAME):
         raise RuntimeError('iot extension is misconfigured')
     ext_path = get_extension_path(EXTENSION_NAME)
@@ -25,6 +25,8 @@ def install(package, exact_version=None, compatible_version=None):
         cmd_suffix = '{}=={}'.format(package, exact_version)
     elif compatible_version:
         cmd_suffix = '{}~={}'.format(package, compatible_version)
+    elif custom_version:
+        cmd_suffix = '{}{}'.format(package, custom_version)
     else:
         cmd_suffix = package
 

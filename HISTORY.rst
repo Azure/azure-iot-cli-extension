@@ -3,6 +3,19 @@
 Release History
 ===============
 
+0.5.3
++++++++++++++++
+* uAMQP out of band install will use range rule >=1.0.1,<1.1 instead of exact version
+* Added initial scenario automation document with example script
+
+0.5.2
++++++++++++++++
+* Significant reduction in extension install time
+* Significant reduction in chance of deadlock on keyboard interrupt when using monitor-events (uamqp dependency incremented to v1.0.1)
+* Monitor-events will throw a runtime exception upon errors.
+* Catch empty sys.excepthook errors occasionally raised by underlying cancelled futures
+* Test improvements + CLI testsdk path change to azure.cli.core.mock.DummyCli
+
 0.5.1
 +++++++++++++++
 * New command: iot hub monitor-feedback
