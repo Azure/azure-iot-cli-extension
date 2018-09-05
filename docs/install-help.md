@@ -1,5 +1,3 @@
-# Microsoft Azure IoT Extension for Azure CLI 2.0
-
 ## Installation Troubleshooting
 
 **Problem**

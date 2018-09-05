@@ -122,6 +122,9 @@ The [Microsoft Docs](https://docs.microsoft.com/en-us/cli/azure/ext/azure-cli-io
 
 Please read the [Tips Wiki page](https://github.com/Azure/azure-iot-cli-extension/wiki/Tips) for more detail and to maximize the functionality and enjoyment out of the IoT extension.
 
+## Scenario Automation
+
+Jump start your Azure IoT automation experience by checking out [example automation scripts](docs/scenario-automation.md) using the IoT extension!
 
 ## Developer setup
 
