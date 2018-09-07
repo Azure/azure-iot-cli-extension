@@ -154,13 +154,18 @@ async def monitor_events(endpoint, connection, path, auth, partition, consumer_g
         async for msg in receive_client.receive_messages_iter_async():
             _output_msg_kpi(msg)
 
-    except (asyncio.CancelledError, KeyboardInterrupt):
+    except asyncio.CancelledError:
         exp_cancelled = True
         await receive_client.close_async()
     except uamqp.errors.LinkDetach as ld:
         if isinstance(ld.description, bytes):
             ld.description = str(ld.description, 'utf8')
         raise RuntimeError(ld.description)
+    except KeyboardInterrupt:
+        logger.info("Keyboard interrupt, closing monitor on partition %s", partition)
+        exp_cancelled = True
+        await receive_client.close_async()
+        raise
     finally:
         if not exp_cancelled:
             await receive_client.close_async()

@@ -6,6 +6,7 @@ Release History
 0.5.3
 +++++++++++++++
 * uAMQP out of band install will use range rule >=1.0.1,<1.1 instead of exact version
+* Reworked monitor-events keyboardinterrupt handling
 * Added initial scenario automation document with example script
 
 0.5.2
