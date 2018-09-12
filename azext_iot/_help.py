@@ -753,6 +753,12 @@ helps['iot dps enrollment-group create'] = """
         --enrollment-id [Enrollment ID] --certificate-path /certificates/Certificate.pem
         --provisioning-status enabled --iot-hub-host-name [IoTHub Host Name]
         --initial-twin-tags "{'location':{'region':'US'}}"
+    - name: Create an enrollment group '[Enrollment ID]' in the Azure IoT provisioning service
+            '[DPS Name]' in the resource group '[Resource Group Name] with attestation type 'symmetrickey'.
+      text: >
+        az iot dps enrollment-group create -g [Resource Group Name] --dps-name [DPS Name]
+        --enrollment-id [Enrollment ID] --primary-key [Primary Key] --secondary-key [Secondary Key] 
+
 """
 
 helps['iot dps enrollment-group update'] = """
@@ -778,6 +784,11 @@ helps['iot dps enrollment-group update'] = """
         az iot dps enrollment-group update -g [Resource Group Name] --dps-name [DPS Name]
         --enrollment-id [Enrollment ID] --secondary-certificate-name [Certificate Name]
         --remove-certificate --etag AAAAAAAAAAA=
+    - name: Update enrollment group '[Enrollment ID]' in the Azure IoT provisioning service '[DPS name]'
+            in the resource group '[Resource Group Name]' with new primary key.
+      text: >
+        az iot dps enrollment-group update -g [Resource Group Name] --dps-name [DPS Name]
+        --enrollment-id [Enrollment ID] --primary-key [New Primary Key] --etag AAAAAAAAAAA=
 """
 
 helps['iot dps enrollment-group delete'] = """

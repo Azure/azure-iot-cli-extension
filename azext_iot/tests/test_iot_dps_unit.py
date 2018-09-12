@@ -3,7 +3,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-import pdb
+
 import pytest
 import json
 from azext_iot.operations import dps as subject
@@ -124,6 +124,7 @@ class TestEnrollmentCreate():
                                         certificate_path='myCert',
                                         provisioning_status='enabled',
                                         initial_twin_properties={'key': 'value'})),
+        (generate_enrollment_create_req(attestation_type='symmetricKey')),
         (generate_enrollment_create_req(attestation_type='symmetricKey',
                                         primary_key='primarykey',
                                         secondary_key='secondarykey')),
@@ -231,9 +232,6 @@ class TestEnrollmentCreate():
         (generate_enrollment_create_req(attestation_type='x509', endorsement_key='myKey')),
         (generate_enrollment_create_req(attestation_type='tpm')),
         (generate_enrollment_create_req(attestation_type='tpm', certificate_path='myCert')),
-        (generate_enrollment_create_req(attestation_type='symmetricKey')),
-        (generate_enrollment_create_req(attestation_type='symmetricKey', certificate_path='myCert')),
-        (generate_enrollment_create_req(attestation_type='symmetricKey', primary_key='primarykey')),
         (generate_enrollment_create_req(reprovision_policy='invalid')),
         (generate_enrollment_create_req(allocation_policy='invalid')),
         (generate_enrollment_create_req(allocation_policy='static')),
@@ -548,6 +546,8 @@ def generate_enrollment_group_create_req(iot_hub_host_name=None,
                                          secondary_certificate_path=None,
                                          root_ca_name=None,
                                          secondary_root_ca_name=None,
+                                         primary_key=None,
+                                         secondary_key=None,
                                          initial_twin_properties=None,
                                          provisioning_status=None,
                                          reprovision_policy=None,
@@ -561,6 +561,8 @@ def generate_enrollment_group_create_req(iot_hub_host_name=None,
             'secondary_certificate_path': secondary_certificate_path,
             'root_ca_name': root_ca_name,
             'secondary_root_ca_name': secondary_root_ca_name,
+            'primary_key': primary_key,
+            'secondary_key': secondary_key,
             'iot_hub_host_name': iot_hub_host_name,
             'initial_twin_tags': initial_twin_tags,
             'initial_twin_properties': initial_twin_properties,
@@ -578,6 +580,8 @@ class TestEnrollmentGroupCreate():
         return service_client
 
     @pytest.mark.parametrize("req", [
+        (generate_enrollment_group_create_req(primary_key='primarykey',
+                                              secondary_key='secondarykey')),
         (generate_enrollment_group_create_req(certificate_path='myCert')),
         (generate_enrollment_group_create_req(secondary_certificate_path='myCert2')),
         (generate_enrollment_group_create_req(root_ca_name='myCert')),
@@ -612,6 +616,8 @@ class TestEnrollmentGroupCreate():
                                                        req['secondary_certificate_path'],
                                                        req['root_ca_name'],
                                                        req['secondary_root_ca_name'],
+                                                       req['primary_key'],
+                                                       req['secondary_key'],
                                                        req['iot_hub_host_name'],
                                                        req['initial_twin_tags'],
                                                        req['initial_twin_properties'],
@@ -626,15 +632,24 @@ class TestEnrollmentGroupCreate():
 
         body = args[0][2]
         assert body['enrollmentGroupId'] == req['enrollment_id']
-        assert body['attestation']['type'] == 'x509'
         if req['certificate_path']:
+            assert body['attestation']['type'] == 'x509'
             assert body['attestation']['x509']['signingCertificates']['primary'] is not None
         if req['secondary_certificate_path']:
+            assert body['attestation']['type'] == 'x509'
             assert body['attestation']['x509']['signingCertificates']['secondary'] is not None
         if req['root_ca_name']:
-                assert body['attestation']['x509']['caReferences']['primary'] is not None
+            assert body['attestation']['type'] == 'x509'
+            assert body['attestation']['x509']['caReferences']['primary'] is not None
         if req['secondary_root_ca_name']:
+            assert body['attestation']['type'] == 'x509'
             assert body['attestation']['x509']['caReferences']['secondary'] is not None
+
+        if not req['certificate_path'] and not req['secondary_certificate_path']:
+            if not req['root_ca_name'] and not req['secondary_root_ca_name']:
+                assert body['attestation']['type'] == 'symmetricKey'
+                assert body['attestation']['symmetricKey']['primaryKey'] is not None
+                assert body['attestation']['symmetricKey']['secondaryKey'] is not None
 
         if req['iot_hub_host_name']:
             assert body['allocationPolicy'] == 'static'
@@ -663,7 +678,6 @@ class TestEnrollmentGroupCreate():
             assert body['iotHubs'] == req['iot_hubs'].split()
 
     @pytest.mark.parametrize("req", [
-        (generate_enrollment_group_create_req()),
         (generate_enrollment_group_create_req(certificate_path='myCert',
                                               root_ca_name='myCert')),
         (generate_enrollment_group_create_req(secondary_certificate_path='myCert2',
@@ -687,6 +701,8 @@ class TestEnrollmentGroupCreate():
                                                            req['secondary_certificate_path'],
                                                            req['root_ca_name'],
                                                            req['secondary_root_ca_name'],
+                                                           req['primary_key'],
+                                                           req['secondary_key'],
                                                            req['iot_hub_host_name'],
                                                            req['initial_twin_tags'],
                                                            req['initial_twin_properties'],
@@ -708,6 +724,8 @@ class TestEnrollmentGroupCreate():
                                                            req['secondary_certificate_path'],
                                                            req['root_ca_name'],
                                                            req['secondary_root_ca_name'],
+                                                           req['primary_key'],
+                                                           req['secondary_key'],
                                                            req['iot_hub_host_name'],
                                                            req['initial_twin_tags'],
                                                            req['initial_twin_properties'],
@@ -742,6 +760,8 @@ def generate_enrollment_group_update_req(iot_hub_host_name=None,
                                          secondary_root_ca_name=None,
                                          remove_certificate=None,
                                          remove_secondary_certificate=None,
+                                         primary_key=None,
+                                         secondary_key=None,
                                          initial_twin_properties=None,
                                          provisioning_status=None,
                                          etag=None,
@@ -758,6 +778,8 @@ def generate_enrollment_group_update_req(iot_hub_host_name=None,
             'secondary_root_ca_name': secondary_root_ca_name,
             'remove_certificate': remove_certificate,
             'remove_secondary_certificate': remove_secondary_certificate,
+            'primary_key': primary_key,
+            'secondary_key': secondary_key,
             'iot_hub_host_name': iot_hub_host_name,
             'initial_twin_tags': initial_twin_tags,
             'initial_twin_properties': initial_twin_properties,
@@ -809,6 +831,8 @@ class TestEnrollmentGroupUpdate():
                                                        req['secondary_root_ca_name'],
                                                        req['remove_certificate'],
                                                        req['remove_secondary_certificate'],
+                                                       req['primary_key'],
+                                                       req['secondary_key'],
                                                        req['iot_hub_host_name'],
                                                        req['initial_twin_tags'],
                                                        req['initial_twin_properties'],
@@ -891,6 +915,8 @@ class TestEnrollmentGroupUpdate():
                                                            req['secondary_root_ca_name'],
                                                            req['remove_certificate'],
                                                            req['remove_secondary_certificate'],
+                                                           req['primary_key'],
+                                                           req['secondary_key'],
                                                            req['iot_hub_host_name'],
                                                            req['initial_twin_tags'],
                                                            req['initial_twin_properties'],

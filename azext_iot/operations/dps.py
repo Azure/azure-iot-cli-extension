@@ -3,7 +3,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-import pdb
+
 from knack.log import get_logger
 from knack.util import CLIError
 from azext_iot.common.shared import (SdkType,
@@ -85,8 +85,6 @@ def iot_dps_device_enrollment_create(client,
         if attestation_type == AttestationType.x509.value:
             attestation = _get_attestation_with_x509_client_cert(certificate_path, secondary_certificate_path)
         if attestation_type == AttestationType.symmetricKey.value:
-            if not primary_key or not secondary_key:
-                raise CLIError('Please provide both primary and secondary symmetric shared access key.')
             attestation = AttestationMechanism(AttestationType.symmetricKey.value,
                                                None,
                                                None,
@@ -237,6 +235,8 @@ def iot_dps_device_enrollment_group_create(client,
                                            secondary_certificate_path=None,
                                            root_ca_name=None,
                                            secondary_root_ca_name=None,
+                                           primary_key=None,
+                                           secondary_key=None,
                                            iot_hub_host_name=None,
                                            initial_twin_tags=None,
                                            initial_twin_properties=None,
@@ -249,7 +249,10 @@ def iot_dps_device_enrollment_group_create(client,
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
         if not certificate_path and not secondary_certificate_path:
             if not root_ca_name and not secondary_root_ca_name:
-                raise CLIError('Please provide at least one certificate')
+                attestation = AttestationMechanism(AttestationType.symmetricKey.value,
+                                                   None,
+                                                   None,
+                                                   SymmetricKeyAttestation(primary_key, secondary_key))
         if certificate_path or secondary_certificate_path:
             if root_ca_name or secondary_root_ca_name:
                 raise CLIError('Please provide either certificate path or certficate name')
@@ -290,6 +293,8 @@ def iot_dps_device_enrollment_group_update(client,
                                            secondary_root_ca_name=None,
                                            remove_certificate=None,
                                            remove_secondary_certificate=None,
+                                           primary_key=None,
+                                           secondary_key=None,
                                            iot_hub_host_name=None,
                                            initial_twin_tags=None,
                                            initial_twin_properties=None,
@@ -307,34 +312,42 @@ def iot_dps_device_enrollment_group_update(client,
         if not etag:
             etag = enrollment_record.etag.replace('"', '')
         # Update enrollment information
-        if not certificate_path and not secondary_certificate_path:
-            if not root_ca_name and not secondary_root_ca_name:
-                # Check if certificate can be safely removed while no new certificate has been provided
-                if remove_certificate and remove_secondary_certificate:
-                    raise CLIError('Please provide at least one certificate')
+        if enrollment_record.attestation.type == AttestationType.symmetricKey.value:
+            enrollment_record.attestation = m_sdk.device_enrollment_group.attestation_mechanism_method(enrollment_id)
+            if primary_key:
+                enrollment_record.attestation.symmetric_key.primary_key = primary_key
+            if secondary_key:
+                enrollment_record.attestation.symmetric_key.secondary_key = secondary_key
+        
+        if enrollment_record.attestation.type == AttestationType.x509.value:
+            if not certificate_path and not secondary_certificate_path:
+                if not root_ca_name and not secondary_root_ca_name:
+                    # Check if certificate can be safely removed while no new certificate has been provided
+                    if remove_certificate and remove_secondary_certificate:
+                        raise CLIError('Please provide at least one certificate')
 
-                if not _can_remove_primary_certificate(remove_certificate, enrollment_record.attestation):
-                    raise CLIError('Please provide at least one certificate while removing the only primary certificate')
+                    if not _can_remove_primary_certificate(remove_certificate, enrollment_record.attestation):
+                        raise CLIError('Please provide at least one certificate while removing the only primary certificate')
 
-                if not _can_remove_secondary_certificate(remove_secondary_certificate, enrollment_record.attestation):
-                    raise CLIError('Please provide at least one certificate while removing the only secondary certificate')
+                    if not _can_remove_secondary_certificate(remove_secondary_certificate, enrollment_record.attestation):
+                        raise CLIError('Please provide at least one certificate while removing the only secondary certificate')
 
-        if certificate_path or secondary_certificate_path:
-            if root_ca_name or secondary_root_ca_name:
-                raise CLIError('Please provide either certificate path or certficate name')
-            enrollment_record.attestation = _get_updated_attestation_with_x509_signing_cert(enrollment_record.attestation,
-                                                                                            certificate_path,
-                                                                                            secondary_certificate_path,
-                                                                                            remove_certificate,
-                                                                                            remove_secondary_certificate)
-        if root_ca_name or secondary_root_ca_name:
             if certificate_path or secondary_certificate_path:
-                raise CLIError('Please provide either certificate path or certficate name')
-            enrollment_record.attestation = _get_updated_attestation_with_x509_ca_cert(enrollment_record.attestation,
-                                                                                       root_ca_name,
-                                                                                       secondary_root_ca_name,
-                                                                                       remove_certificate,
-                                                                                       remove_secondary_certificate)
+                if root_ca_name or secondary_root_ca_name:
+                    raise CLIError('Please provide either certificate path or certficate name')
+                enrollment_record.attestation = _get_updated_attestation_with_x509_signing_cert(enrollment_record.attestation,
+                                                                                                certificate_path,
+                                                                                                secondary_certificate_path,
+                                                                                                remove_certificate,
+                                                                                                remove_secondary_certificate)
+            if root_ca_name or secondary_root_ca_name:
+                if certificate_path or secondary_certificate_path:
+                    raise CLIError('Please provide either certificate path or certficate name')
+                enrollment_record.attestation = _get_updated_attestation_with_x509_ca_cert(enrollment_record.attestation,
+                                                                                           root_ca_name,
+                                                                                           secondary_root_ca_name,
+                                                                                           remove_certificate,
+                                                                                           remove_secondary_certificate)
         if iot_hub_host_name:
             enrollment_record.allocation_policy = AllocationType.static.value
             enrollment_record.iot_hubs = iot_hub_host_name.split()

@@ -308,6 +308,10 @@ def load_arguments(self, _):
 
     with self.argument_context('iot dps enrollment-group') as context:
         context.argument('enrollment_id', help='ID of enrollment group')
+        context.argument('primary_key', options_list=['--primary-key', '--pk'],
+                         help='The primary symmetric shared access key stored in base64 format. ')
+        context.argument('secondary_key', options_list=['--secondary-key', '--sk'],
+                         help='The secondary symmetric shared access key stored in base64 format. ')
         context.argument('certificate_path',
                          options_list=['--certificate-path', '--cp'],
                          help='The path to the file containing the primary certificate. '
