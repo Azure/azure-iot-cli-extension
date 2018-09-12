@@ -3,7 +3,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-
+import pdb
 import pytest
 import json
 from azext_iot.operations import dps as subject
@@ -468,9 +468,9 @@ class TestEnrollmentList():
         continuation = []
 
         for i in range(int(servtotal / pagesize)):
-            continuation.append({'x-ms-continuation': 'abcd'})
+            continuation.append('abcd')
         if servtotal % pagesize != 0:
-            continuation.append({'x-ms-continuation': 'abcd'})
+            continuation.append('abcd')
         continuation[-1] = None
 
         serviceclient.return_value.headers.get.side_effect = continuation
@@ -950,9 +950,9 @@ class TestEnrollmentGroupList():
         continuation = []
 
         for i in range(int(servtotal / pagesize)):
-            continuation.append({'x-ms-continuation': 'abcd'})
+            continuation.append('abcd')
         if servtotal % pagesize != 0:
-            continuation.append({'x-ms-continuation': 'abcd'})
+            continuation.append('abcd')
         continuation[-1] = None
 
         serviceclient.return_value.headers.get.side_effect = continuation

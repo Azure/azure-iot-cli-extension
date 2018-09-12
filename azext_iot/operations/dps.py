@@ -3,6 +3,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
+import pdb
 from knack.log import get_logger
 from knack.util import CLIError
 from azext_iot.common.shared import (SdkType,
@@ -100,16 +101,13 @@ def iot_dps_device_enrollment_create(client,
 
         enrollment = IndividualEnrollment(enrollment_id,
                                           attestation,
+                                          None,
                                           device_id,
-                                          None,
-                                          None,
                                           None,
                                           initial_twin,
                                           None,
                                           provisioning_status,
                                           reprovision,
-                                          None,
-                                          None,
                                           allocation_policy,
                                           iot_hub_list)
         return m_sdk.device_enrollment.create_or_update(enrollment_id, enrollment)
@@ -216,8 +214,8 @@ def iot_dps_device_enrollment_group_list(client, dps_name, resource_group_name, 
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
 
         query_command = "SELECT *"
-        query = QuerySpecification(query_command)
-        return _execute_query(query, m_sdk.device_enrollment_group.query, top)
+        query1 = QuerySpecification(query_command)
+        return _execute_query(query1, m_sdk.device_enrollment_group.query, top)
     except errors.ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
@@ -274,8 +272,6 @@ def iot_dps_device_enrollment_group_create(client,
                                            None,
                                            provisioning_status,
                                            reprovision,
-                                           None,
-                                           None,
                                            allocation_policy,
                                            iot_hub_list)
         return m_sdk.device_enrollment_group.create_or_update(enrollment_id, group_enrollment)
