@@ -45,7 +45,7 @@ done
 for name in ${device_names[@]}
 do
     interval=$(((RANDOM % 5) + 1))
-    c="$sim_device$name -mi $interval"
+    c="$sim_device$name --mi $interval"
     (az $c &) > /dev/null
 done
 

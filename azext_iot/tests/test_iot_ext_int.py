@@ -112,10 +112,10 @@ class TestIoTHub(LiveScenarioTest):
         self.cmd('iot hub show-connection-string -n {} -g {}'.format(LIVE_HUB, LIVE_RG), checks=[
             self.check_pattern('cs', hub_conn_str_pattern)
         ])
-        self.cmd('iot hub show-connection-string -n {} -g {} -kt {}'.format(LIVE_HUB, LIVE_RG, 'secondary'), checks=[
+        self.cmd('iot hub show-connection-string -n {} -g {} --kt {}'.format(LIVE_HUB, LIVE_RG, 'secondary'), checks=[
             self.check_pattern('cs', hub_conn_str_pattern)
         ])
-        self.cmd('iot hub show-connection-string -n {} -g {} -kt {} -pn doesnotexist'.format(LIVE_HUB, LIVE_RG, 'secondary'),
+        self.cmd('iot hub show-connection-string -n {} -g {} --kt {} --pn doesnotexist'.format(LIVE_HUB, LIVE_RG, 'secondary'),
                  expect_failure=True)
 
         self.cmd('az iot hub generate-sas-token -n {} -g {}'.format(LIVE_HUB, LIVE_RG), checks=[
@@ -126,7 +126,7 @@ class TestIoTHub(LiveScenarioTest):
             self.exists('sas')
         ])
 
-        self.cmd('az iot hub generate-sas-token -n {} -du {}'.format(LIVE_HUB, '1000'), checks=[
+        self.cmd('az iot hub generate-sas-token -n {} --du {}'.format(LIVE_HUB, '1000'), checks=[
             self.exists('sas')
         ])
 
@@ -135,11 +135,11 @@ class TestIoTHub(LiveScenarioTest):
             self.exists('sas')
         ])
 
-        self.cmd('az iot hub generate-sas-token --login {} -pn somepolicy'.format(LIVE_HUB_CS), expect_failure=True)
+        self.cmd('az iot hub generate-sas-token --login {} --pn somepolicy'.format(LIVE_HUB_CS), expect_failure=True)
 
         # With connection string
         # Error can't change key for a sas token with conn string
-        self.cmd('az iot hub generate-sas-token --login {} -kt secondary'.format(LIVE_HUB_CS), expect_failure=True)
+        self.cmd('az iot hub generate-sas-token --login {} --kt secondary'.format(LIVE_HUB_CS), expect_failure=True)
 
         self.cmd('iot hub query --hub-name {} -q "{}"'.format(LIVE_HUB, "select * from devices"),
                  checks=[self.check('length([*])', 0)])
@@ -163,7 +163,7 @@ class TestIoTHub(LiveScenarioTest):
         edge_device_ids = names['edge_device_ids']
 
         for i in range(edge_device_count):
-            self.cmd('iot hub device-identity create -d {} -n {} -g {} -ee'.format(edge_device_ids[i], LIVE_HUB, LIVE_RG),
+            self.cmd('iot hub device-identity create -d {} -n {} -g {} --ee'.format(edge_device_ids[i], LIVE_HUB, LIVE_RG),
                      checks=[self.check('deviceId', edge_device_ids[i]),
                              self.check('status', 'enabled'),
                              self.check('statusReason', None),
@@ -177,11 +177,11 @@ class TestIoTHub(LiveScenarioTest):
             query_checks.append(self.exists('[?deviceId==`{}`]'.format(edge_device_ids[i])))
 
         # Not currently supported
-        self.cmd('iot hub device-identity create -d {} -n {} -g {} --auth-method x509_thumbprint -ee'.format(
+        self.cmd('iot hub device-identity create -d {} -n {} -g {} --auth-method x509_thumbprint --ee'.format(
             'willnotwork', LIVE_HUB, LIVE_RG), expect_failure=True)
 
         # Not currently supported
-        self.cmd('iot hub device-identity create -d {} -n {} -g {} --auth-method x509_ca -ee'.format(
+        self.cmd('iot hub device-identity create -d {} -n {} -g {} --auth-method x509_ca --ee'.format(
             'willnotwork', LIVE_HUB, LIVE_RG), expect_failure=True)
 
         self.cmd('iot hub query --hub-name {} -g {} -q "{}"'.format(LIVE_HUB, LIVE_RG, "select * from devices"),
@@ -268,11 +268,11 @@ class TestIoTHub(LiveScenarioTest):
         self.cmd('iot hub device-identity list --hub-name {} --resource-group {} --top -1'.format(LIVE_HUB, LIVE_RG),
                  checks=[self.check('length([*])', device_count + edge_device_count)])
 
-        self.cmd('iot hub device-identity list -n {} -g {} -ee'.format(LIVE_HUB, LIVE_RG),
+        self.cmd('iot hub device-identity list -n {} -g {} --ee'.format(LIVE_HUB, LIVE_RG),
                  checks=[self.check('length([*])', edge_device_count)])
 
         # With connection string
-        self.cmd('iot hub device-identity list -ee --login {}'.format(LIVE_HUB_CS),
+        self.cmd('iot hub device-identity list --ee --login {}'.format(LIVE_HUB_CS),
                  checks=[self.check('length([*])', edge_device_count)])
 
         self.cmd('iot hub device-identity update -d {} -n {} -g {} --set capabilities.iotEdge={}'
@@ -311,7 +311,7 @@ class TestIoTHub(LiveScenarioTest):
                  .format(edge_device_ids[0], LIVE_HUB, LIVE_RG),
                  checks=[self.check_pattern('cs', sym_conn_str_pattern)])
 
-        self.cmd('iot hub device-identity show-connection-string -d {} -n {} -g {} -kt {}'
+        self.cmd('iot hub device-identity show-connection-string -d {} -n {} -g {} --kt {}'
                  .format(edge_device_ids[0], LIVE_HUB, LIVE_RG, 'secondary'),
                  checks=[self.check_pattern('cs', sym_conn_str_pattern)])
 
@@ -323,14 +323,13 @@ class TestIoTHub(LiveScenarioTest):
             self.exists('sas')
         ])
 
-        self.cmd('iot hub generate-sas-token -n {} -g {} -d {} -du {}'.format(LIVE_HUB,
-                                                                              LIVE_RG, edge_device_ids[0], '1000'),
+        self.cmd('iot hub generate-sas-token -n {} -g {} -d {} --du {}'.format(LIVE_HUB, LIVE_RG, edge_device_ids[0], '1000'),
                  checks=[self.exists('sas')])
 
         # None SAS device auth
         self.cmd('iot hub generate-sas-token -n {} -g {} -d {}'.format(LIVE_HUB, LIVE_RG, device_ids[1]), expect_failure=True)
 
-        self.cmd('iot hub generate-sas-token -n {} -g {} -d {} -kt "secondary"'.format(LIVE_HUB, LIVE_RG, edge_device_ids[1]),
+        self.cmd('iot hub generate-sas-token -n {} -g {} -d {} --kt "secondary"'.format(LIVE_HUB, LIVE_RG, edge_device_ids[1]),
                  checks=[self.exists('sas')])
 
         # With connection string
@@ -338,11 +337,11 @@ class TestIoTHub(LiveScenarioTest):
             self.exists('sas')
         ])
 
-        self.cmd('iot hub generate-sas-token -d {} --login {} -kt "secondary"'.format(edge_device_ids[1], LIVE_HUB_CS), checks=[
+        self.cmd('iot hub generate-sas-token -d {} --login {} --kt "secondary"'.format(edge_device_ids[1], LIVE_HUB_CS), checks=[
             self.exists('sas')
         ])
 
-        self.cmd('iot hub generate-sas-token -d {} --login {} -pn "mypolicy"'.format(edge_device_ids[1], LIVE_HUB_CS),
+        self.cmd('iot hub generate-sas-token -d {} --login {} --pn "mypolicy"'.format(edge_device_ids[1], LIVE_HUB_CS),
                  expect_failure=True)
 
     def test_hub_apply_device_content(self):
@@ -351,7 +350,7 @@ class TestIoTHub(LiveScenarioTest):
         edge_device_ids = names['edge_device_ids']
 
         for device_id in edge_device_ids:
-            self.cmd('iot hub device-identity create -d {} -n {} -g {} -ee'.format(device_id, LIVE_HUB, LIVE_RG))
+            self.cmd('iot hub device-identity create -d {} -n {} -g {} --ee'.format(device_id, LIVE_HUB, LIVE_RG))
 
         content_path = os.path.join(CWD, 'test_config_modules_content.json')
         content_path_v1 = os.path.join(CWD, 'test_config_modules_content_v1.json')
@@ -463,7 +462,7 @@ class TestIoTHub(LiveScenarioTest):
         device_ids = names['device_ids']
 
         for edge_device in edge_device_ids:
-            self.cmd('iot hub device-identity create -d {} -n {} -g {} -ee'.format(edge_device, LIVE_HUB, LIVE_RG),
+            self.cmd('iot hub device-identity create -d {} -n {} -g {} --ee'.format(edge_device, LIVE_HUB, LIVE_RG),
                      checks=[self.check('deviceId', edge_device)])
 
         self.cmd('iot hub device-identity create -d {} -n {} -g {}'.format(device_ids[0], LIVE_HUB, LIVE_RG),
@@ -501,7 +500,7 @@ class TestIoTHub(LiveScenarioTest):
                              'authentication.x509Thumbprint.primaryThumbprint', PRIMARY_THUMBPRINT),
                          self.check('authentication.x509Thumbprint.secondaryThumbprint', SECONDARY_THUMBPRINT)])
 
-        self.cmd('''iot hub module-identity create -m {} -d {} -n {} -g {} -am x509_thumbprint -vd {}'''
+        self.cmd('''iot hub module-identity create -m {} -d {} -n {} -g {} --am x509_thumbprint --vd {}'''
                  .format(module_ids[1], device_ids[0], LIVE_HUB, LIVE_RG, 10),
                  checks=[self.check('deviceId', device_ids[0]),
                          self.check('moduleId', module_ids[1]),
@@ -595,7 +594,7 @@ class TestIoTHub(LiveScenarioTest):
                  .format(edge_device_ids[0], LIVE_HUB_CS, module_ids[0]),
                  checks=[self.check_pattern('cs', mod_sym_conn_str_pattern)])
 
-        self.cmd('iot hub module-identity show-connection-string -d {} -n {} -g {} -m {} -kt {}'
+        self.cmd('iot hub module-identity show-connection-string -d {} -n {} -g {} -m {} --kt {}'
                  .format(edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0], "secondary"),
                  checks=[self.check_pattern('cs', mod_sym_conn_str_pattern)])
 
@@ -620,7 +619,7 @@ class TestIoTHub(LiveScenarioTest):
         module_ids = names['module_ids']
         device_ids = names['device_ids']
 
-        self.cmd('iot hub device-identity create -d {} -n {} -g {} -ee'.format(edge_device_ids[0], LIVE_HUB, LIVE_RG),
+        self.cmd('iot hub device-identity create -d {} -n {} -g {} --ee'.format(edge_device_ids[0], LIVE_HUB, LIVE_RG),
                  checks=[self.check('deviceId', edge_device_ids[0])])
 
         self.cmd('iot hub device-identity create -d {} -n {} -g {}'.format(device_ids[0], LIVE_HUB, LIVE_RG),
@@ -727,7 +726,7 @@ class TestIoTHub(LiveScenarioTest):
         empty_metrics = {'queries': {}, 'results': {}}
 
         # With connection string
-        self.cmd("iot hub configuration create -c {} --login {} -pri {} -tc \"{}\" -lab {} -k '{}'"
+        self.cmd("iot hub configuration create -c {} --login {} --pri {} --tc \"{}\" --lab {} -k '{}'"
                  .format(config_ids[0], LIVE_HUB_CS, priority, condition, '"{generic_dict}"', content_path),
                  checks=[
                      self.check('id', config_ids[0]),
@@ -751,7 +750,7 @@ class TestIoTHub(LiveScenarioTest):
                      self.check('metrics', empty_metrics)])
 
         # With connection string
-        self.cmd("iot hub configuration create -c {} --login {} -pri {} -tc \"{}\" -lab {} -k '{}' -m '{}'"
+        self.cmd("iot hub configuration create -c {} --login {} --pri {} --tc \"{}\" --lab {} -k '{}' -m '{}'"
                  .format(config_ids[2], LIVE_HUB_CS, priority, condition, '"{generic_dict}"', content_path, metrics_path),
                  checks=[
                      self.check('id', config_ids[2]),
@@ -900,7 +899,7 @@ class TestIoTHub(LiveScenarioTest):
         condition = 'tags.building=9 and tags.environment=\'test\''
 
         # With connection string
-        self.cmd("iot edge deployment create -d {} --login {} -pri {} -tc \"{}\" -lab {} -k '{}'"
+        self.cmd("iot edge deployment create -d {} --login {} --pri {} --tc \"{}\" --lab {} -k '{}'"
                  .format(config_ids[0], LIVE_HUB_CS, priority, condition, '"{generic_dict}"', content_path),
                  checks=[
                      self.check('id', config_ids[0]),
@@ -1027,14 +1026,14 @@ class TestIoTHub(LiveScenarioTest):
         names = self._create_entity_names(devices=device_count)
         device_ids = names['device_ids']
 
-        self.cmd('iot hub device-identity create -d {} -n {} -g {} -ee'.format(device_ids[0], LIVE_HUB, LIVE_RG),
+        self.cmd('iot hub device-identity create -d {} -n {} -g {} --ee'.format(device_ids[0], LIVE_HUB, LIVE_RG),
                  checks=[self.check('deviceId', device_ids[0])])
 
         test_body = str(uuid4())
         test_props = 'key0=value0;key1=value1'
         test_cid = str(uuid4())
 
-        self.cmd('iot device c2d-message send -d {} --hub-name {} -g {} --data {} -cid {}'
+        self.cmd('iot device c2d-message send -d {} --hub-name {} -g {} --data {} --cid {}'
                  .format(device_ids[0], LIVE_HUB, LIVE_RG, test_body, test_cid), checks=self.is_empty())
 
         result = self.cmd('iot device c2d-message receive -d {} --hub-name {} -g {}'.format(
@@ -1052,7 +1051,7 @@ class TestIoTHub(LiveScenarioTest):
         test_cid = str(uuid4())
 
         # With connection string
-        self.cmd('iot device c2d-message send -d {} --data {} -props {} -cid {} --ack {} --login {}'
+        self.cmd('iot device c2d-message send -d {} --data {} --props {} --cid {} --ack {} --login {}'
                  .format(device_ids[0], test_body, test_props, test_cid, 'positive', LIVE_HUB_CS), checks=self.is_empty())
 
         result = self.cmd('iot device c2d-message receive -d {} --login {}'.format(
@@ -1094,7 +1093,7 @@ class TestIoTHub(LiveScenarioTest):
         names = self._create_entity_names(devices=device_count)
         device_ids = names['device_ids']
 
-        self.cmd('iot hub device-identity create -d {} -n {} -g {} -ee'.format(device_ids[0], LIVE_HUB, LIVE_RG),
+        self.cmd('iot hub device-identity create -d {} -n {} -g {} --ee'.format(device_ids[0], LIVE_HUB, LIVE_RG),
                  checks=[self.check('deviceId', device_ids[0])])
 
         self.cmd('iot device c2d-message receive -d {} --hub-name {} -g {}'
@@ -1126,31 +1125,31 @@ class TestIoTHub(LiveScenarioTest):
         self.cmd('iot device c2d-message abandon -d {} --login {} --etag {}'
                  .format(device_ids[0], LIVE_HUB_CS, etag), expect_failure=True)
 
-        self.cmd("iot device simulate -d {} -n {} -g {} -mc {} -mi {} --data '{}' -rs 'complete'"
+        self.cmd("iot device simulate -d {} -n {} -g {} --mc {} --mi {} --data '{}' --rs 'complete'"
                  .format(device_ids[0], LIVE_HUB, LIVE_RG, 2, 1, 'IoT Ext Test'), checks=self.is_empty())
 
         # With connection string
-        self.cmd("iot device simulate -d {} --login {} -mc {} -mi {} --data '{}' -rs 'complete'"
+        self.cmd("iot device simulate -d {} --login {} --mc {} --mi {} --data '{}' --rs 'complete'"
                  .format(device_ids[0], LIVE_HUB_CS, 2, 1, 'IoT Ext Test'), checks=self.is_empty())
 
-        self.cmd("iot device simulate -d {} -n {} -g {} -mc {} -mi {} --data '{}' -rs 'abandon' --protocol http"
+        self.cmd("iot device simulate -d {} -n {} -g {} --mc {} --mi {} --data '{}' --rs 'abandon' --protocol http"
                  .format(device_ids[0], LIVE_HUB, LIVE_RG, 2, 1, 'IoT Ext Test'), checks=self.is_empty())
 
         # With connection string
-        self.cmd("iot device simulate -d {} --login {} -mc {} -mi {} --data '{}' -rs 'abandon' --protocol http"
+        self.cmd("iot device simulate -d {} --login {} --mc {} --mi {} --data '{}' --rs 'abandon' --protocol http"
                  .format(device_ids[0], LIVE_HUB_CS, 2, 1, 'IoT Ext Test'), checks=self.is_empty())
 
-        self.cmd("iot device simulate -d {} -n {} -g {} --data '{}' -rs 'reject'"
+        self.cmd("iot device simulate -d {} -n {} -g {} --data '{}' --rs 'reject'"
                  .format(device_ids[0], LIVE_HUB, LIVE_RG, 'IoT Ext Test'), checks=self.is_empty(), expect_failure=True)
 
         self.cmd('iot device send-d2c-message -d {} -n {} -g {}'.format(device_ids[0], LIVE_HUB, LIVE_RG),
                  checks=self.is_empty())
 
-        self.cmd('iot device send-d2c-message -d {} -n {} -g {} -props "MessageId=12345;CorrelationId=54321"'
+        self.cmd('iot device send-d2c-message -d {} -n {} -g {} --props "MessageId=12345;CorrelationId=54321"'
                  .format(device_ids[0], LIVE_HUB, LIVE_RG), checks=self.is_empty())
 
         # With connection string
-        self.cmd('iot device send-d2c-message -d {} --login {} -props "MessageId=12345;CorrelationId=54321"'
+        self.cmd('iot device send-d2c-message -d {} --login {} --props "MessageId=12345;CorrelationId=54321"'
                  .format(device_ids[0], LIVE_HUB_CS), checks=self.is_empty())
 
     @pytest.mark.skipif(not validate_min_python_version(3, 5, exit_on_fail=False), reason="minimum python version not satisfied")
@@ -1311,19 +1310,19 @@ class TestIoTHub(LiveScenarioTest):
         names = self._create_entity_names(devices=device_count)
         device_ids = names['device_ids']
 
-        self.cmd('iot hub device-identity create -d {} -n {} -g {} -ee'.format(device_ids[0], LIVE_HUB, LIVE_RG),
+        self.cmd('iot hub device-identity create -d {} -n {} -g {} --ee'.format(device_ids[0], LIVE_HUB, LIVE_RG),
                  checks=[self.check('deviceId', device_ids[0])])
 
-        self.cmd('iot device upload-file -d {} -n {} -fp "{}" -ct {}'
+        self.cmd('iot device upload-file -d {} -n {} --fp "{}" --ct {}'
                  .format(device_ids[0], LIVE_HUB, content_path, 'application/json'),
                  checks=self.is_empty())
 
         # With connection string
-        self.cmd('iot device upload-file -d {} --login {} -fp "{}" -ct {}'
+        self.cmd('iot device upload-file -d {} --login {} --fp "{}" --ct {}'
                  .format(device_ids[0], LIVE_HUB_CS, content_path, 'application/json'),
                  checks=self.is_empty())
 
-        self.cmd('iot hub device-identity export -n {} -bcu "{}"'.format(LIVE_HUB, LIVE_STORAGE),
+        self.cmd('iot hub device-identity export -n {} --bcu "{}"'.format(LIVE_HUB, LIVE_STORAGE),
                  checks=[
                      self.check('outputBlobContainerUri', LIVE_STORAGE),
                      self.check('failureReason', None),
