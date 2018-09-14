@@ -18,7 +18,7 @@ MIN_SIM_MSG_COUNT = 1
 SIM_RECEIVE_SLEEP_SEC = 3
 
 # (Lib name, minimum version (including), maximum version (excluding))
-EVENT_LIB = ('uamqp', '1.0.1', '1.1')
+EVENT_LIB = ('uamqp', '1.0.3', '1.1')
 
 # Config Key's
 CONFIG_KEY_UAMQP_EXT_VERSION = 'uamqp_ext_version'
