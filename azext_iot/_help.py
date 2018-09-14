@@ -367,16 +367,16 @@ helps['iot hub configuration create'] = """
     - name: Create a device configuration that applies on condition where a device is in 'building 9' and
             the environment is 'test'.
       text: >
-        az iot configuration create -c [Config Name] -n [IoTHub Name] --content ../device_content.json
+        az iot hub configuration create -c [Config Name] -n [IoTHub Name] --content ../device_content.json
         --target-condition "tags.building=9 and tags.environment='test'"
     - name: Create a device configuration with labels and provide user metrics inline (bash syntax example)
       text: >
-        az iot configuration create -c [Config Name] -n [IoTHub Name] --content ../device_content.json
+        az iot hub configuration create -c [Config Name] -n [IoTHub Name] --content ../device_content.json
         --target-condition "tags.building=9" --labels '{"key0":"value0", "key1":"value1"}'
         --metrics '{"metrics": {"queries": {"mymetrik": "select deviceId from devices where tags.location='US'"}}}'
     - name: Create a device configuration with labels and provide user metrics inline (cmd syntax example)
       text: >
-        az iot configuration create -c [Config Name] -n [IoTHub Name] --content ../device_content.json
+        az iot hub configuration create -c [Config Name] -n [IoTHub Name] --content ../device_content.json
         --target-condition "tags.building=9" --labels "{\\"key0\\":\\"value0\\", \\"key1\\":\\"value1\\"}"
         --metrics "{\\"metrics\\": {\\"queries\\": {\\"mymetrik\\":
         \\"select deviceId from devices where tags.location='US'\\"}}}"
