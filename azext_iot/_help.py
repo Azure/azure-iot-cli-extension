@@ -44,7 +44,7 @@ helps['iot hub monitor-events'] = """
         az iot hub monitor-events -n [IoTHub Name] -d [Device ID]
     - name: Filter device and specify an Event Hub consumer group to bind to.
       text: >
-        az iot hub monitor-events -n [IoTHub Name] -d [Device ID] -cg [Consumer Group Name]
+        az iot hub monitor-events -n [IoTHub Name] -d [Device ID] --cg [Consumer Group Name]
     - name: Receive message annotations (message headers)
       text: >
         az iot hub monitor-events -n [IoTHub Name] -d [Device ID] --properties anno
@@ -53,7 +53,7 @@ helps['iot hub monitor-events'] = """
         az iot hub monitor-events -n [IoTHub Name] -d [Device ID] --properties anno sys --timeout 0
     - name: Receive all message attributes from all device messages
       text: >
-        az iot hub monitor-events -n [IoTHub Name] -props all
+        az iot hub monitor-events -n [IoTHub Name] --props all
 """
 
 helps['iot hub monitor-feedback'] = """
@@ -90,25 +90,25 @@ helps['iot hub device-identity create'] = """
     examples:
     - name: Create an edge enabled IoT device with default authorization (shared private key).
       text: >
-        az iot hub device-identity create -n [IoTHub Name] -d [Device ID] -ee
+        az iot hub device-identity create -n [IoTHub Name] -d [Device ID] --ee
     - name: Create an IoT device with self-signed certificate authorization,
             generate a cert valid for 10 days then use its thumbprint.
       text: >
         az iot hub device-identity create -n [IoTHub Name] -d [Device ID]
-        -am x509_thumbprint --valid-days 10
+        --am x509_thumbprint --valid-days 10
     - name: Create an IoT device with self-signed certificate authorization,
             generate a cert of default expiration (365 days) and output to target directory.
       text: >
-        az iot hub device-identity create -n [IoTHub Name] -d [Device ID] -am x509_thumbprint
+        az iot hub device-identity create -n [IoTHub Name] -d [Device ID] --am x509_thumbprint
         --output-dir /path/to/output
     - name: Create an IoT device with self-signed certificate authorization and
             explicitly provide primary and secondary thumbprints.
       text: >
-        az iot hub device-identity create -n [IoTHub Name] -d [Device ID] -am x509_thumbprint
-        -ptp [Thumbprint 1] -stp [Thumbprint 2]
+        az iot hub device-identity create -n [IoTHub Name] -d [Device ID] --am x509_thumbprint
+        --ptp [Thumbprint 1] --stp [Thumbprint 2]
     - name: Create an IoT device with root CA authorization with disabled status and reason
       text: >
-        az iot hub device-identity create -n [IoTHub Name] -d [Device ID] -am x509_ca
+        az iot hub device-identity create -n [IoTHub Name] -d [Device ID] --am x509_ca
         --status disabled --status-reason 'for reasons'
 """
 
@@ -367,16 +367,16 @@ helps['iot hub configuration create'] = """
     - name: Create a device configuration that applies on condition where a device is in 'building 9' and
             the environment is 'test'.
       text: >
-        az iot configuration create -c [Config Name] -n [IoTHub Name] --content ../device_content.json
+        az iot hub configuration create -c [Config Name] -n [IoTHub Name] --content ../device_content.json
         --target-condition "tags.building=9 and tags.environment='test'"
     - name: Create a device configuration with labels and provide user metrics inline (bash syntax example)
       text: >
-        az iot configuration create -c [Config Name] -n [IoTHub Name] --content ../device_content.json
+        az iot hub configuration create -c [Config Name] -n [IoTHub Name] --content ../device_content.json
         --target-condition "tags.building=9" --labels '{"key0":"value0", "key1":"value1"}'
         --metrics '{"metrics": {"queries": {"mymetrik": "select deviceId from devices where tags.location='US'"}}}'
     - name: Create a device configuration with labels and provide user metrics inline (cmd syntax example)
       text: >
-        az iot configuration create -c [Config Name] -n [IoTHub Name] --content ../device_content.json
+        az iot hub configuration create -c [Config Name] -n [IoTHub Name] --content ../device_content.json
         --target-condition "tags.building=9" --labels "{\\"key0\\":\\"value0\\", \\"key1\\":\\"value1\\"}"
         --metrics "{\\"metrics\\": {\\"queries\\": {\\"mymetrik\\":
         \\"select deviceId from devices where tags.location='US'\\"}}}"
@@ -465,7 +465,7 @@ helps['iot device c2d-message send'] = """
         az iot device c2d-message send -d [Device Id] -n [IoTHub Name]
     - name: Send cloud-to-device message with custom data and properties.
       text: >
-        az iot device c2d-message send -d [Device Id] -n [IoTHub Name] --data 'Hello World' -props 'key0=value0;key1=value1'
+        az iot device c2d-message send -d [Device Id] -n [IoTHub Name] --data 'Hello World' --props 'key0=value0;key1=value1'
     - name: Send a C2D message and wait for device acknowledgement
       text: >
         az iot device c2d-message send -d [Device Id] -n [IoTHub Name] --wait
@@ -481,9 +481,9 @@ helps['iot device send-d2c-message'] = """
     - name: Basic usage with custom data
       text: az iot device send-d2c-message -n [IotHub Name] -d [Device Id] --data <message body>
     - name: Send application properties
-      text: az iot device send-d2c-message -n [IotHub Name] -d [Device Id] -props 'key0=value0;key1=value1'
+      text: az iot device send-d2c-message -n [IotHub Name] -d [Device Id] --props 'key0=value0;key1=value1'
     - name: Send system properties (Message Id and Correlation Id)
-      text: az iot device send-d2c-message -n [IotHub Name] -d [Device Id] -props '$.mid=<id>;$.cid=<id>'
+      text: az iot device send-d2c-message -n [IotHub Name] -d [Device Id] --props '$.mid=<id>;$.cid=<id>'
 """
 
 helps['iot device simulate'] = """
@@ -501,7 +501,7 @@ helps['iot device simulate'] = """
     - name: Choose total message count and interval between messages.
       text: az iot device simulate -n [IotHub Name] -d [Device Id] --msg-count 1000 --msg-interval 5
     - name: Reject or abandon c2d messages (http only)
-      text: az iot device simulate -n [IotHub Name] -d [Device Id] -rs [reject|abandon]
+      text: az iot device simulate -n [IotHub Name] -d [Device Id] --rs [reject|abandon]
 """
 
 helps['iot device upload-file'] = """

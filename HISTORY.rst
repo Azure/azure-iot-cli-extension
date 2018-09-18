@@ -3,6 +3,10 @@
 Release History
 ===============
 
+0.5.4
++++++++++++++++
+* Replaced multi-character short options ('-props', for example) with long option prefixes '--' to satisfy Azure CLI CI linter requirements
+
 0.5.3
 +++++++++++++++
 * uAMQP out of band install will use range rule >=1.0.1,<1.1 instead of exact version
