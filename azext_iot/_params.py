@@ -173,7 +173,7 @@ def load_arguments(self, _):
                          arg_type=get_enum_type(SettleType),
                          help='Indicates how to settle received cloud-to-device messages. '
                          'Supported with HTTP only.')
-        context.argument('protocol_type', options_list=['--protocol', '-proto'],
+        context.argument('protocol_type', options_list=['--protocol', '--proto'],
                          arg_type=get_enum_type(ProtocolType),
                          help='Indicates device-to-cloud message protocol')
 
