@@ -268,13 +268,13 @@ def load_arguments(self, _):
                          options_list=['--remove-secondary-certificate', '--rsc'],
                          help='Remove current secondary certificate',
                          arg_type=get_three_state_flag())
-        context.argument('reprovision_policy', options_list=['--reprovision-policy', '-rp'],
+        context.argument('reprovision_policy', options_list=['--reprovision-policy', '--rp'],
                          arg_type=get_enum_type(ReprovisionType),
                          help='Device data to be handled on re-provision to different Iot Hub.')
-        context.argument('allocation_policy', options_list=['--allocation-policy', '-ap'],
+        context.argument('allocation_policy', options_list=['--allocation-policy', '--ap'],
                          arg_type=get_enum_type(AllocationType),
                          help='Type of allocation for device assigned to the Hub.')
-        context.argument('iot_hubs', options_list=['--iot-hubs', '-ih'],
+        context.argument('iot_hubs', options_list=['--iot-hubs', '--ih'],
                          help='Host name of target IoT Hub. Use space-separated list for multiple IoT Hubs.')
 
     with self.argument_context('iot dps enrollment') as context:
@@ -297,9 +297,9 @@ def load_arguments(self, _):
         context.argument('endorsement_key', options_list=['--endorsement-key', '--ek'],
                          help='TPM endorsement key for a TPM device. '
                          'When choosing tpm as attestation type, endorsement key is required.')
-        context.argument('primary_key', options_list=['--primary-key', '-pk'],
+        context.argument('primary_key', options_list=['--primary-key', '--pk'],
                          help='The primary symmetric shared access key stored in base64 format. ')
-        context.argument('secondary_key', options_list=['--secondary-key', '-sk'],
+        context.argument('secondary_key', options_list=['--secondary-key', '--sk'],
                          help='The secondary symmetric shared access key stored in base64 format. ')
 
     with self.argument_context('iot dps enrollment update') as context:

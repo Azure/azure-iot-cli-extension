@@ -143,7 +143,7 @@ class IoTDpsTest(LiveScenarioTest):
                  checks=[self.check('registrationId', enrollment_id)])
 
         self.cmd('iot dps enrollment update -g {} --dps-name {} --enrollment-id {}'
-                 ' --provisioning-status {} --etag {} -rc'
+                 ' --provisioning-status {} --etag {} --rc'
                  .format(rg, dps, enrollment_id, self.provisioning_status_new, etag),
                  checks=[
                      self.check('attestation.type', attestation_type),
@@ -171,10 +171,10 @@ class IoTDpsTest(LiveScenarioTest):
         reprovisionPolicy_reprovisionandresetdata = 'reprovisionandresetdata'
 
         etag = self.cmd('iot dps enrollment create --enrollment-id {} --attestation-type {}'
-                        ' -g {} --dps-name {} -pk {} -sk {}'
+                        ' -g {} --dps-name {} --pk {} --sk {}'
                         ' --provisioning-status {} --device-id {}'
                         ' --initial-twin-tags {} --initial-twin-properties {}'
-                        ' --allocation-policy {} -rp {}'
+                        ' --allocation-policy {} --rp {}'
                         .format(enrollment_id, attestation_type, rg, dps, primary_key,
                                 secondary_key, self.provisioning_status, device_id,
                                 '"{generic_dict}"', '"{generic_dict}"',
@@ -206,7 +206,7 @@ class IoTDpsTest(LiveScenarioTest):
                  checks=[self.check('registrationId', enrollment_id)])
 
         self.cmd('iot dps enrollment update -g {} --dps-name {} --enrollment-id {}'
-                 ' --provisioning-status {} --etag {} -rc'
+                 ' --provisioning-status {} --etag {} --rc'
                  .format(rg, dps, enrollment_id, self.provisioning_status_new, etag),
                  checks=[
                      self.check('attestation.type', attestation_type),
@@ -228,7 +228,7 @@ class IoTDpsTest(LiveScenarioTest):
         reprovisionPolicy_never = 'never'
         hub_host_name = '{}.azure-devices.net'.format(hub)
         etag = self.cmd('iot dps enrollment-group create --enrollment-id {} -g {} --dps-name {}'
-                        ' -cp {} -scp {} --provisioning-status {} --allocation-policy {}'
+                        ' --cp {} --scp {} --provisioning-status {} --allocation-policy {}'
                         ' --iot-hubs {}'
                         .format(enrollment_id, rg, dps, cert_path, cert_path,
                                 self.provisioning_status, AllocationType.geolatency.value,
@@ -254,7 +254,7 @@ class IoTDpsTest(LiveScenarioTest):
                  checks=[self.check('enrollmentGroupId', enrollment_id)])
 
         self.cmd('iot dps enrollment-group update -g {} --dps-name {} --enrollment-id {}'
-                 ' --provisioning-status {} -rsc --etag {} -rp {} --allocation-policy {}'
+                 ' --provisioning-status {} --rsc --etag {} --rp {} --allocation-policy {}'
                  .format(rg, dps, enrollment_id, self.provisioning_status_new, etag,
                          reprovisionPolicy_never, AllocationType.hashed.value),
                  checks=[
@@ -279,7 +279,7 @@ class IoTDpsTest(LiveScenarioTest):
                              checks=[self.check('name', cert_name)]).get_output_in_json()['etag']
 
         self.cmd('iot dps enrollment-group update -g {} --dps-name {} --enrollment-id {}'
-                 ' -cn {} --etag {}'
+                 ' --cn {} --etag {}'
                  .format(rg, dps, enrollment_id, cert_name),
                  checks=[
                      self.check('attestation.type',
