@@ -455,7 +455,7 @@ def _process_config_content(content, content_type='module'):
     if content_key in content:
         content = content[content_key]
     elif 'module' in content_type and legacy_key in content:
-        logger.warn("'{}' is deprecated use '{}' instead - request is still processing...".format(legacy_key, content_key))
+        logger.warning("'%s' is deprecated use '%s' instead - request is still processing...", legacy_key, content_key)
         content = content[legacy_key]
     else:
         raise CLIError("content json must include the '{}' property".format(content_key))

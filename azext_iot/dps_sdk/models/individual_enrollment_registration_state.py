@@ -5,11 +5,11 @@
 # regenerated.
 # --------------------------------------------------------------------------
 
-from msrest.serialization import Model
+from .device_registration_state import DeviceRegistrationState
 
 
-class DeviceRegistrationState(Model):
-    """Device registration state.
+class IndividualEnrollmentRegistrationState(DeviceRegistrationState):
+    """Current registration status.
 
     Variables are only populated by the server, and will be ignored when
     sending a request.
@@ -62,28 +62,5 @@ class DeviceRegistrationState(Model):
         'etag': {'readonly': True},
     }
 
-    _attribute_map = {
-        'registration_id': {'key': 'registrationId', 'type': 'str'},
-        'created_date_time_utc': {'key': 'createdDateTimeUtc', 'type': 'iso-8601'},
-        'assigned_hub': {'key': 'assignedHub', 'type': 'str'},
-        'device_id': {'key': 'deviceId', 'type': 'str'},
-        'status': {'key': 'status', 'type': 'str'},
-        'substatus': {'key': 'substatus', 'type': 'str'},
-        'error_code': {'key': 'errorCode', 'type': 'int'},
-        'error_message': {'key': 'errorMessage', 'type': 'str'},
-        'last_updated_date_time_utc': {'key': 'lastUpdatedDateTimeUtc', 'type': 'iso-8601'},
-        'etag': {'key': 'etag', 'type': 'str'},
-    }
-
     def __init__(self):
-        super(DeviceRegistrationState, self).__init__()
-        self.registration_id = None
-        self.created_date_time_utc = None
-        self.assigned_hub = None
-        self.device_id = None
-        self.status = None
-        self.substatus = None
-        self.error_code = None
-        self.error_message = None
-        self.last_updated_date_time_utc = None
-        self.etag = None
+        super(IndividualEnrollmentRegistrationState, self).__init__()

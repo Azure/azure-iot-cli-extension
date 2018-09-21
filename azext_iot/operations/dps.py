@@ -7,16 +7,18 @@
 from knack.log import get_logger
 from knack.util import CLIError
 from azext_iot.common.shared import (SdkType,
-                                     AttestationType)
+                                     AttestationType,
+                                     ReprovisionType,
+                                     AllocationType)
 from azext_iot.common._azure import get_iot_dps_connection_string
 from azext_iot.common.utility import shell_safe_json_parse
 from azext_iot.common.certops import open_certificate
 from azext_iot.operations.generic import _execute_query
 from azext_iot._factory import _bind_sdk
-
 from azext_iot.dps_sdk.models.individual_enrollment import IndividualEnrollment
 from azext_iot.dps_sdk.models.attestation_mechanism import AttestationMechanism
 from azext_iot.dps_sdk.models.tpm_attestation import TpmAttestation
+from azext_iot.dps_sdk.models.symmetric_key_attestation import SymmetricKeyAttestation
 from azext_iot.dps_sdk.models.x509_attestation import X509Attestation
 from azext_iot.dps_sdk.models.x509_certificates import X509Certificates
 from azext_iot.dps_sdk.models.x509_certificate_with_info import X509CertificateWithInfo
@@ -25,6 +27,7 @@ from azext_iot.dps_sdk.models.twin_collection import TwinCollection
 from azext_iot.dps_sdk.models.initial_twin_properties import InitialTwinProperties
 from azext_iot.dps_sdk.models.enrollment_group import EnrollmentGroup
 from azext_iot.dps_sdk.models.x509_ca_references import X509CAReferences
+from azext_iot.dps_sdk.models.reprovision_policy import ReprovisionPolicy
 
 logger = get_logger(__name__)
 
@@ -40,7 +43,7 @@ def iot_dps_device_enrollment_list(client, dps_name, resource_group_name, top=No
         query_command = "SELECT *"
         query = QuerySpecification(query_command)
         return _execute_query(query, m_sdk.device_enrollment.query, top)
-    except errors.ErrorDetailsException as e:
+    except errors.ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
 
@@ -49,10 +52,11 @@ def iot_dps_device_enrollment_get(client, enrollment_id, dps_name, resource_grou
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
         return m_sdk.device_enrollment.get(enrollment_id)
-    except errors.ErrorDetailsException as e:
+    except errors.ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
 
+# pylint: disable=too-many-locals
 def iot_dps_device_enrollment_create(client,
                                      enrollment_id,
                                      attestation_type,
@@ -61,38 +65,55 @@ def iot_dps_device_enrollment_create(client,
                                      endorsement_key=None,
                                      certificate_path=None,
                                      secondary_certificate_path=None,
+                                     primary_key=None,
+                                     secondary_key=None,
                                      device_id=None,
                                      iot_hub_host_name=None,
                                      initial_twin_tags=None,
                                      initial_twin_properties=None,
-                                     provisioning_status=None):
+                                     provisioning_status=None,
+                                     reprovision_policy=None,
+                                     allocation_policy=None,
+                                     iot_hubs=None):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
-
         if attestation_type == AttestationType.tpm.value:
             if not endorsement_key:
                 raise CLIError('Endorsement key is requried')
-            tpm = TpmAttestation(endorsement_key)
-            attestation = AttestationMechanism(AttestationType.tpm.value, tpm)
+            attestation = AttestationMechanism(AttestationType.tpm.value, TpmAttestation(endorsement_key))
         if attestation_type == AttestationType.x509.value:
             attestation = _get_attestation_with_x509_client_cert(certificate_path, secondary_certificate_path)
-
+        if attestation_type == AttestationType.symmetricKey.value:
+            attestation = AttestationMechanism(AttestationType.symmetricKey.value,
+                                               None,
+                                               None,
+                                               SymmetricKeyAttestation(primary_key, secondary_key))
+        reprovision = _get_reprovision_policy(reprovision_policy)
         initial_twin = _get_initial_twin(initial_twin_tags, initial_twin_properties)
+        iot_hub_list = iot_hubs.split() if iot_hubs else iot_hubs
+        _validate_allocation_policy_for_enrollment(allocation_policy, iot_hub_host_name, iot_hub_list)
+        if iot_hub_host_name and allocation_policy is None:
+            allocation_policy = AllocationType.static.value
+            iot_hub_list = iot_hub_host_name.split()
+
         enrollment = IndividualEnrollment(enrollment_id,
                                           attestation,
+                                          None,
                                           device_id,
                                           None,
-                                          iot_hub_host_name,
                                           initial_twin,
                                           None,
-                                          provisioning_status)
-
+                                          provisioning_status,
+                                          reprovision,
+                                          allocation_policy,
+                                          iot_hub_list)
         return m_sdk.device_enrollment.create_or_update(enrollment_id, enrollment)
-    except errors.ErrorDetailsException as e:
+    except errors.ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
 
+# pylint: disable=too-many-locals
 def iot_dps_device_enrollment_update(client,
                                      enrollment_id,
                                      dps_name,
@@ -103,56 +124,73 @@ def iot_dps_device_enrollment_update(client,
                                      secondary_certificate_path=None,
                                      remove_certificate=None,
                                      remove_secondary_certificate=None,
+                                     primary_key=None,
+                                     secondary_key=None,
                                      device_id=None,
                                      iot_hub_host_name=None,
                                      initial_twin_tags=None,
                                      initial_twin_properties=None,
-                                     provisioning_status=None):
+                                     provisioning_status=None,
+                                     reprovision_policy=None,
+                                     allocation_policy=None,
+                                     iot_hubs=None):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
-
         enrollment_record = m_sdk.device_enrollment.get(enrollment_id)
-
         # Verify etag
-        if etag and 'etag' in enrollment_record and etag != enrollment_record['etag'].replace('"', ''):
+        if etag and hasattr(enrollment_record, 'etag') and etag != enrollment_record.etag.replace('"', ''):
             raise LookupError("enrollment etag doesn't match.")
         if not etag:
-            etag = enrollment_record['etag'].replace('"', '')
-
+            etag = enrollment_record.etag.replace('"', '')
         # Verify and update attestation information
-        attestation_type = enrollment_record['attestation']['type']
+        attestation_type = enrollment_record.attestation.type
+        _validate_arguments_for_attestation_mechanism(attestation_type,
+                                                      endorsement_key,
+                                                      certificate_path,
+                                                      secondary_certificate_path,
+                                                      remove_certificate,
+                                                      remove_secondary_certificate,
+                                                      primary_key,
+                                                      secondary_key)
         if attestation_type == AttestationType.tpm.value:
-            if certificate_path or secondary_certificate_path:
-                raise CLIError('Cannot update certificate while enrollment is using tpm attestation mechanism')
-            if remove_certificate or remove_secondary_certificate:
-                raise CLIError('Cannot remove certificate while enrollment is using tpm attestation mechanism')
             if endorsement_key:
-                enrollment_record['attestation']['tpm']['endorsement_key'] = endorsement_key
+                enrollment_record.attestation.tpm.endorsement_key = endorsement_key
+        elif attestation_type == AttestationType.x509.value:
+            enrollment_record.attestation = _get_updated_attestation_with_x509_client_cert(enrollment_record.attestation,
+                                                                                           certificate_path,
+                                                                                           secondary_certificate_path,
+                                                                                           remove_certificate,
+                                                                                           remove_secondary_certificate)
         else:
-            if endorsement_key:
-                raise CLIError('Cannot update endorsement key while enrollment is using x509 attestation mechanism')
-            enrollment_record['attestation'] = _get_updated_attestation_with_x509_client_cert(enrollment_record['attestation'],
-                                                                                              certificate_path,
-                                                                                              secondary_certificate_path,
-                                                                                              remove_certificate,
-                                                                                              remove_secondary_certificate)
-
+            enrollment_record.attestation = m_sdk.device_enrollment.attestation_mechanism_method(enrollment_id)
+            if primary_key:
+                enrollment_record.attestation.symmetric_key.primary_key = primary_key
+            if secondary_key:
+                enrollment_record.attestation.symmetric_key.secondary_key = secondary_key
         # Update enrollment information
         if iot_hub_host_name:
-            enrollment_record['iotHubHostName'] = iot_hub_host_name
+            enrollment_record.allocation_policy = AllocationType.static.value
+            enrollment_record.iot_hubs = iot_hub_host_name.split()
+            enrollment_record.iot_hub_host_name = None
         if device_id:
-            enrollment_record['deviceId'] = device_id
+            enrollment_record.device_id = device_id
         if provisioning_status:
-            enrollment_record['provisioningStatus'] = provisioning_status
-        enrollment_record['registrationState'] = None
-
-        enrollment_record['initialTwin'] = _get_updated_inital_twin(enrollment_record,
-                                                                    initial_twin_tags,
-                                                                    initial_twin_properties)
-
+            enrollment_record.provisioning_status = provisioning_status
+        enrollment_record.registrationState = None
+        if reprovision_policy:
+            enrollment_record.reprovision_policy = _get_reprovision_policy(reprovision_policy)
+        enrollment_record.initial_twin = _get_updated_inital_twin(enrollment_record,
+                                                                  initial_twin_tags,
+                                                                  initial_twin_properties)
+        iot_hub_list = iot_hubs.split() if iot_hubs else iot_hubs
+        _validate_allocation_policy_for_enrollment(allocation_policy, iot_hub_host_name, iot_hub_list)
+        if allocation_policy:
+            enrollment_record.allocation_policy = allocation_policy
+            enrollment_record.iot_hubs = iot_hub_list
+            enrollment_record.iot_hub_host_name = None
         return m_sdk.device_enrollment.create_or_update(enrollment_id, enrollment_record, etag)
-    except errors.ErrorDetailsException as e:
+    except errors.ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
 
@@ -161,7 +199,7 @@ def iot_dps_device_enrollment_delete(client, enrollment_id, dps_name, resource_g
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
         return m_sdk.device_enrollment.delete(enrollment_id)
-    except errors.ErrorDetailsException as e:
+    except errors.ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
 
@@ -174,9 +212,9 @@ def iot_dps_device_enrollment_group_list(client, dps_name, resource_group_name, 
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
 
         query_command = "SELECT *"
-        query = QuerySpecification(query_command)
-        return _execute_query(query, m_sdk.device_enrollment_group.query, top)
-    except errors.ErrorDetailsException as e:
+        query1 = QuerySpecification(query_command)
+        return _execute_query(query1, m_sdk.device_enrollment_group.query, top)
+    except errors.ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
 
@@ -185,7 +223,7 @@ def iot_dps_device_enrollment_group_get(client, enrollment_id, dps_name, resourc
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
         return m_sdk.device_enrollment_group.get(enrollment_id)
-    except errors.ErrorDetailsException as e:
+    except errors.ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
 
@@ -197,38 +235,50 @@ def iot_dps_device_enrollment_group_create(client,
                                            secondary_certificate_path=None,
                                            root_ca_name=None,
                                            secondary_root_ca_name=None,
+                                           primary_key=None,
+                                           secondary_key=None,
                                            iot_hub_host_name=None,
                                            initial_twin_tags=None,
                                            initial_twin_properties=None,
-                                           provisioning_status=None):
+                                           provisioning_status=None,
+                                           reprovision_policy=None,
+                                           allocation_policy=None,
+                                           iot_hubs=None):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
-
         if not certificate_path and not secondary_certificate_path:
             if not root_ca_name and not secondary_root_ca_name:
-                raise CLIError('Please provide at least one certificate')
-
+                attestation = AttestationMechanism(AttestationType.symmetricKey.value,
+                                                   None,
+                                                   None,
+                                                   SymmetricKeyAttestation(primary_key, secondary_key))
         if certificate_path or secondary_certificate_path:
             if root_ca_name or secondary_root_ca_name:
                 raise CLIError('Please provide either certificate path or certficate name')
             attestation = _get_attestation_with_x509_signing_cert(certificate_path, secondary_certificate_path)
-
         if root_ca_name or secondary_root_ca_name:
             if certificate_path or secondary_certificate_path:
                 raise CLIError('Please provide either certificate path or certficate name')
             attestation = _get_attestation_with_x509_ca_cert(root_ca_name, secondary_root_ca_name)
-
+        reprovision = _get_reprovision_policy(reprovision_policy)
         initial_twin = _get_initial_twin(initial_twin_tags, initial_twin_properties)
+        iot_hub_list = iot_hubs.split() if iot_hubs else iot_hubs
+        _validate_allocation_policy_for_enrollment(allocation_policy, iot_hub_host_name, iot_hub_list)
+        if iot_hub_host_name and allocation_policy is None:
+            allocation_policy = AllocationType.static.value
+            iot_hub_list = iot_hub_host_name.split()
         group_enrollment = EnrollmentGroup(enrollment_id,
                                            attestation,
-                                           iot_hub_host_name,
+                                           None,
                                            initial_twin,
                                            None,
-                                           provisioning_status)
-
+                                           provisioning_status,
+                                           reprovision,
+                                           allocation_policy,
+                                           iot_hub_list)
         return m_sdk.device_enrollment_group.create_or_update(enrollment_id, group_enrollment)
-    except errors.ErrorDetailsException as e:
+    except errors.ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
 
@@ -243,64 +293,80 @@ def iot_dps_device_enrollment_group_update(client,
                                            secondary_root_ca_name=None,
                                            remove_certificate=None,
                                            remove_secondary_certificate=None,
+                                           primary_key=None,
+                                           secondary_key=None,
                                            iot_hub_host_name=None,
                                            initial_twin_tags=None,
                                            initial_twin_properties=None,
-                                           provisioning_status=None):
+                                           provisioning_status=None,
+                                           reprovision_policy=None,
+                                           allocation_policy=None,
+                                           iot_hubs=None):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
-
         enrollment_record = m_sdk.device_enrollment_group.get(enrollment_id)
-
         # Verify etag
-        if etag and 'etag' in enrollment_record and etag != enrollment_record['etag'].replace('"', ''):
+        if etag and hasattr(enrollment_record, 'etag') and etag != enrollment_record.etag.replace('"', ''):
             raise LookupError("enrollment etag doesn't match.")
         if not etag:
-            etag = enrollment_record['etag'].replace('"', '')
-
+            etag = enrollment_record.etag.replace('"', '')
         # Update enrollment information
-        if not certificate_path and not secondary_certificate_path:
-            if not root_ca_name and not secondary_root_ca_name:
-                # Check if certificate can be safely removed while no new certificate has been provided
-                if remove_certificate and remove_secondary_certificate:
-                    raise CLIError('Please provide at least one certificate')
+        if enrollment_record.attestation.type == AttestationType.symmetricKey.value:
+            enrollment_record.attestation = m_sdk.device_enrollment_group.attestation_mechanism_method(enrollment_id)
+            if primary_key:
+                enrollment_record.attestation.symmetric_key.primary_key = primary_key
+            if secondary_key:
+                enrollment_record.attestation.symmetric_key.secondary_key = secondary_key
 
-                if not _can_remove_primary_certificate(remove_certificate, enrollment_record['attestation']):
-                    raise CLIError('Please provide at least one certificate while removing the only primary certificate')
+        if enrollment_record.attestation.type == AttestationType.x509.value:
+            if not certificate_path and not secondary_certificate_path:
+                if not root_ca_name and not secondary_root_ca_name:
+                    # Check if certificate can be safely removed while no new certificate has been provided
+                    if remove_certificate and remove_secondary_certificate:
+                        raise CLIError('Please provide at least one certificate')
 
-                if not _can_remove_secondary_certificate(remove_secondary_certificate, enrollment_record['attestation']):
-                    raise CLIError('Please provide at least one certificate while removing the only secondary certificate')
+                    if not _can_remove_primary_certificate(remove_certificate, enrollment_record.attestation):
+                        raise CLIError('Please provide at least one certificate while removing the only primary certificate')
 
-        if certificate_path or secondary_certificate_path:
-            if root_ca_name or secondary_root_ca_name:
-                raise CLIError('Please provide either certificate path or certficate name')
-            enrollment_record['attestation'] = _get_updated_attestation_with_x509_signing_cert(enrollment_record['attestation'],
-                                                                                               certificate_path,
-                                                                                               secondary_certificate_path,
-                                                                                               remove_certificate,
-                                                                                               remove_secondary_certificate)
+                    if not _can_remove_secondary_certificate(remove_secondary_certificate, enrollment_record.attestation):
+                        raise CLIError('Please provide at least one certificate while removing the only secondary certificate')
 
-        if root_ca_name or secondary_root_ca_name:
             if certificate_path or secondary_certificate_path:
-                raise CLIError('Please provide either certificate path or certficate name')
-            enrollment_record['attestation'] = _get_updated_attestation_with_x509_ca_cert(enrollment_record['attestation'],
-                                                                                          root_ca_name,
-                                                                                          secondary_root_ca_name,
-                                                                                          remove_certificate,
-                                                                                          remove_secondary_certificate)
-
+                if root_ca_name or secondary_root_ca_name:
+                    raise CLIError('Please provide either certificate path or certficate name')
+                enrollment_record.attestation = _get_updated_attestation_with_x509_signing_cert(enrollment_record.attestation,
+                                                                                                certificate_path,
+                                                                                                secondary_certificate_path,
+                                                                                                remove_certificate,
+                                                                                                remove_secondary_certificate)
+            if root_ca_name or secondary_root_ca_name:
+                if certificate_path or secondary_certificate_path:
+                    raise CLIError('Please provide either certificate path or certficate name')
+                enrollment_record.attestation = _get_updated_attestation_with_x509_ca_cert(enrollment_record.attestation,
+                                                                                           root_ca_name,
+                                                                                           secondary_root_ca_name,
+                                                                                           remove_certificate,
+                                                                                           remove_secondary_certificate)
         if iot_hub_host_name:
-            enrollment_record['iotHubHostName'] = iot_hub_host_name
+            enrollment_record.allocation_policy = AllocationType.static.value
+            enrollment_record.iot_hubs = iot_hub_host_name.split()
+            enrollment_record.iot_hub_host_name = None
         if provisioning_status:
-            enrollment_record['provisioningStatus'] = provisioning_status
-
-        enrollment_record['initialTwin'] = _get_updated_inital_twin(enrollment_record,
-                                                                    initial_twin_tags,
-                                                                    initial_twin_properties)
-
+            enrollment_record.provisioning_status = provisioning_status
+        if reprovision_policy:
+            enrollment_record.reprovision_policy = _get_reprovision_policy(reprovision_policy)
+        enrollment_record.initial_twin = _get_updated_inital_twin(enrollment_record,
+                                                                  initial_twin_tags,
+                                                                  initial_twin_properties)
+        iot_hub_list = iot_hubs.split() if iot_hubs else iot_hubs
+        _validate_allocation_policy_for_enrollment(allocation_policy, iot_hub_host_name, iot_hub_list)
+        if allocation_policy:
+            enrollment_record.allocation_policy = allocation_policy
+            enrollment_record.iot_hubs = iot_hub_list
+            enrollment_record.iot_hub_host_name = None
         return m_sdk.device_enrollment_group.create_or_update(enrollment_id, enrollment_record, etag)
-    except errors.ErrorDetailsException as e:
+    except errors.ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
 
@@ -309,7 +375,7 @@ def iot_dps_device_enrollment_group_delete(client, enrollment_id, dps_name, reso
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
         return m_sdk.device_enrollment_group.delete(enrollment_id)
-    except errors.ErrorDetailsException as e:
+    except errors.ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
 
@@ -319,8 +385,8 @@ def iot_dps_registration_list(client, dps_name, resource_group_name, enrollment_
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
-        return m_sdk.registration_status.query_registration_state(enrollment_id)
-    except errors.ErrorDetailsException as e:
+        return m_sdk.registration_state.query_registration_state(enrollment_id)
+    except errors.ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
 
@@ -328,8 +394,8 @@ def iot_dps_registration_get(client, dps_name, resource_group_name, registration
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
-        return m_sdk.registration_status.get_registration_state(registration_id)
-    except errors.ErrorDetailsException as e:
+        return m_sdk.registration_state.get_registration_state(registration_id)
+    except errors.ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
 
@@ -337,8 +403,8 @@ def iot_dps_registration_delete(client, dps_name, resource_group_name, registrat
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
-        return m_sdk.registration_status.delete_registration_state(registration_id)
-    except errors.ErrorDetailsException as e:
+        return m_sdk.registration_state.delete_registration_state(registration_id)
+    except errors.ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
 
@@ -352,35 +418,32 @@ def _get_initial_twin(initial_twin_tags=None, initial_twin_properties=None):
         initial_twin_properties = None
     elif initial_twin_properties:
         initial_twin_properties = shell_safe_json_parse(str(initial_twin_properties))
-
     return InitialTwin(TwinCollection(initial_twin_tags),
                        InitialTwinProperties(TwinCollection(initial_twin_properties)))
 
 
 def _get_updated_inital_twin(enrollment_record, initial_twin_tags=None, initial_twin_properties=None):
     if initial_twin_properties != "" and not initial_twin_tags:
-        if 'initialTwin' in enrollment_record:
-            if 'tags' in enrollment_record['initialTwin']:
-                initial_twin_tags = enrollment_record['initialTwin']['tags']
+        if hasattr(enrollment_record, 'initial_twin'):
+            if hasattr(enrollment_record.initial_twin, 'tags'):
+                initial_twin_tags = enrollment_record.initial_twin.tags
     if initial_twin_properties != "" and not initial_twin_properties:
-        if 'initialTwin' in enrollment_record:
-            if 'properties' in enrollment_record['initialTwin']:
-                if 'desired' in enrollment_record['initialTwin']['properties']:
-                    initial_twin_properties = enrollment_record['initialTwin']['properties']['desired']
+        if hasattr(enrollment_record, 'initial_twin'):
+            if hasattr(enrollment_record.initial_twin, 'properties'):
+                if hasattr(enrollment_record.initial_twin.properties, 'desired'):
+                    initial_twin_properties = enrollment_record.initial_twin.properties.desired
     return _get_initial_twin(initial_twin_tags, initial_twin_properties)
 
 
 def _get_x509_certificate(certificate_path, secondary_certificate_path):
     x509certificate = X509Certificates(_get_certificate_info(certificate_path),
                                        _get_certificate_info(secondary_certificate_path))
-
     return x509certificate
 
 
 def _get_certificate_info(certificate_path):
     if not certificate_path:
         return None
-
     certificate_content = open_certificate(certificate_path)
     certificate_with_info = X509CertificateWithInfo(certificate_content)
     return certificate_with_info
@@ -392,7 +455,6 @@ def _get_attestation_with_x509_client_cert(primary_certificate_path, secondary_c
     certificate = _get_x509_certificate(primary_certificate_path, secondary_certificate_path)
     x509Attestation = X509Attestation(certificate)
     attestation = AttestationMechanism(AttestationType.x509.value, None, x509Attestation)
-
     return attestation
 
 
@@ -402,32 +464,27 @@ def _get_updated_attestation_with_x509_client_cert(attestation,
                                                    remove_primary_certificate,
                                                    remove_secondary_certificate):
     if remove_primary_certificate:
-        attestation['x509']['clientCertificates']['primary'] = None
+        attestation.x509.client_certificates.primary = None
     if remove_secondary_certificate:
-        attestation['x509']['clientCertificates']['secondary'] = None
+        attestation.x509.client_certificates.secondary = None
     if primary_certificate_path:
-        attestation['x509']['clientCertificates']['primary'] = _get_certificate_info(primary_certificate_path)
+        attestation.x509.client_certificates.primary = _get_certificate_info(primary_certificate_path)
     if secondary_certificate_path:
-        attestation['x509']['clientCertificates']['secondary'] = _get_certificate_info(secondary_certificate_path)
-
+        attestation.x509.client_certificates.secondary = _get_certificate_info(secondary_certificate_path)
     return attestation
 
 
-def _get_attestation_with_x509_signing_cert(primary_certificate_path,
-                                            secondary_certificate_path):
+def _get_attestation_with_x509_signing_cert(primary_certificate_path, secondary_certificate_path):
     certificate = _get_x509_certificate(primary_certificate_path, secondary_certificate_path)
     x509Attestation = X509Attestation(None, certificate)
     attestation = AttestationMechanism(AttestationType.x509.value, None, x509Attestation)
-
     return attestation
 
 
-def _get_attestation_with_x509_ca_cert(root_ca_name,
-                                       secondary_root_ca_name):
+def _get_attestation_with_x509_ca_cert(root_ca_name, secondary_root_ca_name):
     certificate = X509CAReferences(root_ca_name, secondary_root_ca_name)
     x509Attestation = X509Attestation(None, None, certificate)
     attestation = AttestationMechanism(AttestationType.x509.value, None, x509Attestation)
-
     return attestation
 
 
@@ -436,18 +493,16 @@ def _get_updated_attestation_with_x509_signing_cert(attestation,
                                                     secondary_certificate_path,
                                                     remove_primary_certificate,
                                                     remove_secondary_certificate):
-    if 'signingCertificates' in attestation['x509']:
+    if hasattr(attestation.x509, 'signing_certificates'):
         if remove_primary_certificate:
-            attestation['x509']['signingCertificates']['primary'] = None
+            attestation.x509.signing_certificates.primary = None
         if remove_secondary_certificate:
-            attestation['x509']['signingCertificates']['secondary'] = None
+            attestation.x509.signing_certificates.secondary = None
         if primary_certificate_path:
-            attestation['x509']['signingCertificates']['primary'] = _get_certificate_info(primary_certificate_path)
+            attestation.x509.signing_certificates.primary = _get_certificate_info(primary_certificate_path)
         if secondary_certificate_path:
-            attestation['x509']['signingCertificates']['secondary'] = _get_certificate_info(secondary_certificate_path)
-
+            attestation.x509.signing_certificates.secondary = _get_certificate_info(secondary_certificate_path)
         return attestation
-
     return _get_attestation_with_x509_signing_cert(primary_certificate_path, secondary_certificate_path)
 
 
@@ -456,44 +511,102 @@ def _get_updated_attestation_with_x509_ca_cert(attestation,
                                                secondary_root_ca_name,
                                                remove_primary_certificate,
                                                remove_secondary_certificate):
-    if 'caReferences' in attestation['x509']:
+    if hasattr(attestation.x509, 'ca_references') and attestation.x509.ca_references is not None:
         if remove_primary_certificate:
-            attestation['x509']['caReferences']['primary'] = None
+            attestation.x509.ca_references.primary = None
         if remove_secondary_certificate:
-            attestation['x509']['caReferences']['secondary'] = None
+            attestation.x509.ca_references.secondary = None
         if root_ca_name:
-            attestation['x509']['caReferences']['primary'] = root_ca_name
+            attestation.x509.ca_references.primary = root_ca_name
         if secondary_root_ca_name:
-            attestation['x509']['caReferences']['secondary'] = secondary_root_ca_name
-
+            attestation.x509.ca_references.secondary = secondary_root_ca_name
         return attestation
-
     return _get_attestation_with_x509_ca_cert(root_ca_name, secondary_root_ca_name)
 
 
-def _can_remove_primary_certificate(remove_certificate,
-                                    attestation):
+def _can_remove_primary_certificate(remove_certificate, attestation):
     if remove_certificate:
-        if 'signingCertificates' in attestation['x509']:
-            if ('secondary' not in attestation['x509']['signingCertificates'] or
-                    not attestation['x509']['signingCertificates']['secondary']):
+        if hasattr(attestation.x509, 'signing_certificates'):
+            if (not hasattr(attestation.x509.signing_certificates, 'secondary') or
+                    not attestation.x509.signing_certificates.secondary):
                 return False
-        if 'caReferences' in attestation['x509']:
-            if ('secondary' not in attestation['x509']['caReferences'] or
-                    not attestation['x509']['caReferences']['secondary']):
+        if hasattr(attestation.x509, 'ca_references'):
+            if (not hasattr(attestation.x509.ca_references, 'secondary') or
+                    not attestation.x509.ca_references.secondary):
                 return False
     return True
 
 
-def _can_remove_secondary_certificate(remove_certificate,
-                                      attestation):
+def _can_remove_secondary_certificate(remove_certificate, attestation):
     if remove_certificate:
-        if 'signingCertificates' in attestation['x509']:
-            if ('primary' not in attestation['x509']['signingCertificates'] or
-                    not attestation['x509']['signingCertificates']['primary']):
+        if hasattr(attestation.x509, 'signing_certificates'):
+            if (not hasattr(attestation.x509.signing_certificates, 'primary') or
+                    not attestation.x509.signing_certificates.primary):
                 return False
-        if 'caReferences' in attestation['x509']:
-            if ('primary' not in attestation['x509']['caReferences'] or
-                    not attestation['x509']['caReferences']['primary']):
+        if hasattr(attestation.x509, 'ca_references'):
+            if (not hasattr(attestation.x509.ca_references, 'primary') or
+                    not attestation.x509.ca_references.primary):
                 return False
     return True
+
+
+def _get_reprovision_policy(reprovision_policy):
+    if reprovision_policy:
+        if reprovision_policy == ReprovisionType.reprovisionandmigratedata.value:
+            reprovision = ReprovisionPolicy(True, True)
+        elif reprovision_policy == ReprovisionType.reprovisionandresetdata.value:
+            reprovision = ReprovisionPolicy(True, False)
+        elif reprovision_policy == ReprovisionType.never.value:
+            reprovision = ReprovisionPolicy(False, False)
+        else:
+            raise CLIError('Invalid Reprovision Policy.')
+    else:
+        reprovision = ReprovisionPolicy(True, True)
+    return reprovision
+
+
+def _validate_arguments_for_attestation_mechanism(attestation_type,
+                                                  endorsement_key,
+                                                  certificate_path,
+                                                  secondary_certificate_path,
+                                                  remove_certificate,
+                                                  remove_secondary_certificate,
+                                                  primary_key,
+                                                  secondary_key):
+    if attestation_type == AttestationType.tpm.value:
+        if certificate_path or secondary_certificate_path:
+            raise CLIError('Cannot update certificate while enrollment is using tpm attestation mechanism')
+        if remove_certificate or remove_secondary_certificate:
+            raise CLIError('Cannot remove certificate while enrollment is using tpm attestation mechanism')
+        if primary_key or secondary_key:
+            raise CLIError('Cannot update primary or secondary key while enrollment is using tpm attestation mechanism')
+    elif attestation_type == AttestationType.x509.value:
+        if endorsement_key:
+            raise CLIError('Cannot update endorsement key while enrollment is using x509 attestation mechanism')
+        if primary_key or secondary_key:
+            raise CLIError('Cannot update primary or secondary key while enrollment is using x509 attestation mechanism')
+    else:
+        if certificate_path or secondary_certificate_path:
+            raise CLIError('Cannot update certificate while enrollment is using symmetric key attestation mechanism')
+        if remove_certificate or remove_secondary_certificate:
+            raise CLIError('Cannot remove certificate while enrollment is using symmetric key attestation mechanism')
+        if endorsement_key:
+            raise CLIError('Cannot update endorsement key while enrollment is using symmetric key attestation mechanism')
+
+
+def _validate_allocation_policy_for_enrollment(allocation_policy,
+                                               iot_hub_host_name,
+                                               iot_hub_list):
+    if allocation_policy:
+        if iot_hub_host_name is not None:
+            raise CLIError('\'iot_hub_host_name\' is not required when allocation-policy is defined.')
+        if not any(allocation_policy == allocation.value for allocation in AllocationType):
+            raise CLIError('Please provide valid allocation policy.')
+        if allocation_policy == AllocationType.static.value:
+            if iot_hub_list is None:
+                raise CLIError('Please provide a hub to be assigned with device.')
+            if iot_hub_list and len(iot_hub_list) > 1:
+                raise CLIError('Only one hub is required in static allocation policy.')
+    else:
+        if iot_hub_list:
+            raise CLIError('Please provide allocation policy.')

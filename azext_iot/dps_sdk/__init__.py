@@ -5,10 +5,10 @@
 # regenerated.
 # --------------------------------------------------------------------------
 
-from .device_provisioning_service_service_runtime_client import DeviceProvisioningServiceServiceRuntimeClient
+from .provisioning_service_client import ProvisioningServiceClient
 from .version import VERSION
 
-__all__ = ['DeviceProvisioningServiceServiceRuntimeClient']
+__all__ = ['ProvisioningServiceClient']
 
 __version__ = VERSION
 

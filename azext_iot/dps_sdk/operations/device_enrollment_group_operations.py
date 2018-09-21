@@ -4,12 +4,11 @@
 # Changes may cause incorrect behavior and will be lost if the code is
 # regenerated.
 # --------------------------------------------------------------------------
-
 import uuid
 from msrest.pipeline import ClientRawResponse
-from msrestazure.azure_exceptions import CloudError
 
 from .. import models
+
 
 class DeviceEnrollmentGroupOperations(object):
     """DeviceEnrollmentGroupOperations operations.
@@ -17,7 +16,8 @@ class DeviceEnrollmentGroupOperations(object):
     :param client: Client for service requests.
     :param config: Configuration of service client.
     :param serializer: An object model serializer.
-    :param deserializer: An objec model deserializer.
+    :param deserializer: An object model deserializer.
+    :ivar api_version: The API version to use for the request. Supported versions include: 2018-09-01-preview. Constant value: "2018-09-01-preview".
     """
 
     models = models
@@ -27,9 +27,9 @@ class DeviceEnrollmentGroupOperations(object):
         self._client = client
         self._serialize = serializer
         self._deserialize = deserializer
+        self.api_version = "2018-09-01-preview"
 
         self.config = config
-        self.api_version = "2017-11-15"
 
     def get(
             self, id, custom_headers=None, raw=False, **operation_config):
@@ -46,10 +46,11 @@ class DeviceEnrollmentGroupOperations(object):
         :rtype:
          ~microsoft.azure.management.provisioningservices.models.EnrollmentGroup
          or ~msrest.pipeline.ClientRawResponse
-        :raises: :class:`CloudError<msrestazure.azure_exceptions.CloudError>`
+        :raises:
+         :class:`ProvisioningServiceErrorDetailsException<microsoft.azure.management.provisioningservices.models.ProvisioningServiceErrorDetailsException>`
         """
         # Construct URL
-        url = '/enrollmentGroups/{id}'
+        url = self.get.metadata['url']
         path_format_arguments = {
             'id': self._serialize.url("id", id, 'str')
         }
@@ -57,7 +58,7 @@ class DeviceEnrollmentGroupOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("api_version", self.api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
 
         # Construct headers
         header_parameters = {}
@@ -71,21 +72,22 @@ class DeviceEnrollmentGroupOperations(object):
 
         # Construct and send request
         request = self._client.get(url, query_parameters)
-        response = self._client.send(request, header_parameters, **operation_config)
+        response = self._client.send(request, header_parameters, stream=False, **operation_config)
 
         if response.status_code not in [200]:
-            raise models.error_details.ErrorDetailsException(self._deserialize, response)
+            raise models.ProvisioningServiceErrorDetailsException(self._deserialize, response)
 
         deserialized = None
 
         if response.status_code == 200:
-            deserialized = self._deserialize('object', response)
+            deserialized = self._deserialize('EnrollmentGroup', response)
 
         if raw:
             client_raw_response = ClientRawResponse(deserialized, response)
             return client_raw_response
 
         return deserialized
+    get.metadata = {'url': '/enrollmentGroups/{id}'}
 
     def create_or_update(
             self, id, enrollment_group, if_match=None, custom_headers=None, raw=False, **operation_config):
@@ -107,10 +109,11 @@ class DeviceEnrollmentGroupOperations(object):
         :rtype:
          ~microsoft.azure.management.provisioningservices.models.EnrollmentGroup
          or ~msrest.pipeline.ClientRawResponse
-        :raises: :class:`CloudError<msrestazure.azure_exceptions.CloudError>`
+        :raises:
+         :class:`ProvisioningServiceErrorDetailsException<microsoft.azure.management.provisioningservices.models.ProvisioningServiceErrorDetailsException>`
         """
         # Construct URL
-        url = '/enrollmentGroups/{id}'
+        url = self.create_or_update.metadata['url']
         path_format_arguments = {
             'id': self._serialize.url("id", id, 'str')
         }
@@ -118,7 +121,7 @@ class DeviceEnrollmentGroupOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("api_version", self.api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
 
         # Construct headers
         header_parameters = {}
@@ -133,26 +136,27 @@ class DeviceEnrollmentGroupOperations(object):
             header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
 
         # Construct body
-        body_content = self._serialize.body(enrollment_group, 'object')
+        body_content = self._serialize.body(enrollment_group, 'EnrollmentGroup')
 
         # Construct and send request
         request = self._client.put(url, query_parameters)
         response = self._client.send(
-            request, header_parameters, body_content, **operation_config)
+            request, header_parameters, body_content, stream=False, **operation_config)
 
         if response.status_code not in [200]:
-            raise models.error_details.ErrorDetailsException(self._deserialize, response)
+            raise models.ProvisioningServiceErrorDetailsException(self._deserialize, response)
 
         deserialized = None
 
         if response.status_code == 200:
-            deserialized = self._deserialize('object', response)
+            deserialized = self._deserialize('EnrollmentGroup', response)
 
         if raw:
             client_raw_response = ClientRawResponse(deserialized, response)
             return client_raw_response
 
         return deserialized
+    create_or_update.metadata = {'url': '/enrollmentGroups/{id}'}
 
     def delete(
             self, id, if_match=None, custom_headers=None, raw=False, **operation_config):
@@ -169,10 +173,11 @@ class DeviceEnrollmentGroupOperations(object):
          overrides<msrest:optionsforoperations>`.
         :return: None or ClientRawResponse if raw=true
         :rtype: None or ~msrest.pipeline.ClientRawResponse
-        :raises: :class:`CloudError<msrestazure.azure_exceptions.CloudError>`
+        :raises:
+         :class:`ProvisioningServiceErrorDetailsException<microsoft.azure.management.provisioningservices.models.ProvisioningServiceErrorDetailsException>`
         """
         # Construct URL
-        url = '/enrollmentGroups/{id}'
+        url = self.delete.metadata['url']
         path_format_arguments = {
             'id': self._serialize.url("id", id, 'str')
         }
@@ -180,7 +185,7 @@ class DeviceEnrollmentGroupOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("api_version", self.api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
 
         # Construct headers
         header_parameters = {}
@@ -196,22 +201,27 @@ class DeviceEnrollmentGroupOperations(object):
 
         # Construct and send request
         request = self._client.delete(url, query_parameters)
-        response = self._client.send(request, header_parameters, **operation_config)
+        response = self._client.send(request, header_parameters, stream=False, **operation_config)
 
         if response.status_code not in [204]:
-            raise models.error_details.ErrorDetailsException(self._deserialize, response)
+            raise models.ProvisioningServiceErrorDetailsException(self._deserialize, response)
 
         if raw:
             client_raw_response = ClientRawResponse(None, response)
             return client_raw_response
+    delete.metadata = {'url': '/enrollmentGroups/{id}'}
 
     def query(
-            self, query_specification, custom_headers=None, raw=False, **operation_config):
+            self, query_specification, x_ms_max_item_count=None, x_ms_continuation=None, custom_headers=None, raw=False, **operation_config):
         """Query the device enrollment groups.
 
         :param query_specification: The query specification.
         :type query_specification:
          ~microsoft.azure.management.provisioningservices.models.QuerySpecification
+        :param x_ms_max_item_count: pageSize
+        :type x_ms_max_item_count: int
+        :param x_ms_continuation: continuation token
+        :type x_ms_continuation: str
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
          deserialized response
@@ -221,14 +231,15 @@ class DeviceEnrollmentGroupOperations(object):
         :rtype:
          list[~microsoft.azure.management.provisioningservices.models.EnrollmentGroup]
          or ~msrest.pipeline.ClientRawResponse
-        :raises: :class:`CloudError<msrestazure.azure_exceptions.CloudError>`
+        :raises:
+         :class:`ProvisioningServiceErrorDetailsException<microsoft.azure.management.provisioningservices.models.ProvisioningServiceErrorDetailsException>`
         """
         # Construct URL
-        url = '/enrollmentGroups/query'
+        url = self.query.metadata['url']
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("api_version", self.api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
 
         # Construct headers
         header_parameters = {}
@@ -237,6 +248,10 @@ class DeviceEnrollmentGroupOperations(object):
             header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
         if custom_headers:
             header_parameters.update(custom_headers)
+        if x_ms_max_item_count is not None:
+            header_parameters['x-ms-max-item-count'] = self._serialize.header("x_ms_max_item_count", x_ms_max_item_count, 'int')
+        if x_ms_continuation is not None:
+            header_parameters['x-ms-continuation'] = self._serialize.header("x_ms_continuation", x_ms_continuation, 'str')
         if self.config.accept_language is not None:
             header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
 
@@ -246,16 +261,16 @@ class DeviceEnrollmentGroupOperations(object):
         # Construct and send request
         request = self._client.post(url, query_parameters)
         response = self._client.send(
-            request, header_parameters, body_content, **operation_config)
+            request, header_parameters, body_content, stream=False, **operation_config)
 
         if response.status_code not in [200]:
-            raise models.error_details.ErrorDetailsException(self._deserialize, response)
+            raise models.ProvisioningServiceErrorDetailsException(self._deserialize, response)
 
         deserialized = None
         header_dict = {}
 
         if response.status_code == 200:
-            deserialized = self._deserialize('[object]', response)
+            deserialized = self._deserialize('[EnrollmentGroup]', response)
             header_dict = {
                 'x-ms-continuation': 'str',
                 'x-ms-max-item-count': 'int',
@@ -271,3 +286,62 @@ class DeviceEnrollmentGroupOperations(object):
         continuation = response.headers.get('x-ms-continuation')
 
         return deserialized, continuation
+    query.metadata = {'url': '/enrollmentGroups/query'}
+
+    def attestation_mechanism_method(
+            self, id, custom_headers=None, raw=False, **operation_config):
+        """Get the attestation mechanism in the device enrollment group record.
+
+        :param id: Enrollment group ID
+        :type id: str
+        :param dict custom_headers: headers that will be added to the request
+        :param bool raw: returns the direct response alongside the
+         deserialized response
+        :param operation_config: :ref:`Operation configuration
+         overrides<msrest:optionsforoperations>`.
+        :return: AttestationMechanism or ClientRawResponse if raw=true
+        :rtype:
+         ~microsoft.azure.management.provisioningservices.models.AttestationMechanism
+         or ~msrest.pipeline.ClientRawResponse
+        :raises:
+         :class:`ProvisioningServiceErrorDetailsException<microsoft.azure.management.provisioningservices.models.ProvisioningServiceErrorDetailsException>`
+        """
+        # Construct URL
+        url = self.attestation_mechanism_method.metadata['url']
+        path_format_arguments = {
+            'id': self._serialize.url("id", id, 'str')
+        }
+        url = self._client.format_url(url, **path_format_arguments)
+
+        # Construct parameters
+        query_parameters = {}
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+
+        # Construct headers
+        header_parameters = {}
+        header_parameters['Content-Type'] = 'application/json; charset=utf-8'
+        if self.config.generate_client_request_id:
+            header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
+        if custom_headers:
+            header_parameters.update(custom_headers)
+        if self.config.accept_language is not None:
+            header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
+
+        # Construct and send request
+        request = self._client.post(url, query_parameters)
+        response = self._client.send(request, header_parameters, stream=False, **operation_config)
+
+        if response.status_code not in [200]:
+            raise models.ProvisioningServiceErrorDetailsException(self._deserialize, response)
+
+        deserialized = None
+
+        if response.status_code == 200:
+            deserialized = self._deserialize('AttestationMechanism', response)
+
+        if raw:
+            client_raw_response = ClientRawResponse(deserialized, response)
+            return client_raw_response
+
+        return deserialized
+    attestation_mechanism_method.metadata = {'url': '/enrollmentGroups/{id}/attestationmechanism'}

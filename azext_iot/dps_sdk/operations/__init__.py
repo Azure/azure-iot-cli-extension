@@ -7,10 +7,10 @@
 
 from .device_enrollment_operations import DeviceEnrollmentOperations
 from .device_enrollment_group_operations import DeviceEnrollmentGroupOperations
-from .registration_status_operations import RegistrationStatusOperations
+from .registration_state_operations import RegistrationStateOperations
 
 __all__ = [
     'DeviceEnrollmentOperations',
     'DeviceEnrollmentGroupOperations',
-    'RegistrationStatusOperations',
+    'RegistrationStateOperations',
 ]

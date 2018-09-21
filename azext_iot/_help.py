@@ -647,6 +647,30 @@ helps['iot dps enrollment create'] = """
         az iot dps enrollment create -g [Resource Group Name] --dps-name [DPS Name]
         --enrollment-id [Enrollment ID] --attestation-type tpm
         --endorsement-key 14963E8F3BA5B3984110B3C1CA8E8B89
+    - name: Create an enrollment 'MyEnrollment' with attestation type 'symmetrickey' in the Azure
+            IoT Device Provisioning service '[DPS Name]' in the resource group '[Resource Group Name]'.
+      text: >
+        az iot dps enrollment create -g [Resource Group Name] --dps-name [DPS Name]
+        --enrollment-id [Enrollment ID] --attestation-type symmetrickey
+        --primary-key [Primary Key] --secondary-key [Secondary Key]
+    - name: Create an enrollment 'MyEnrollment' with reprovision in the Azure IoT Device Provisioning
+            service '[DPS Name]' in the resource group '[Resource Group Name]'.
+      text: >
+        az iot dps enrollment create -g [Resource Group Name] --dps-name [DPS Name]
+        --enrollment-id [Enrollment ID] --attestation-type tpm
+        --reprovision-policy [Reprovision Type] --endorsement-key 14963E8F3BA5B3984110B3C1CA8E8B89
+    - name: Create an enrollment 'MyEnrollment' with static allocation policy in the Azure
+            IoT Device Provisioning service '[DPS Name]' in the resource group '[Resource Group Name]'.
+      text: >
+        az iot dps enrollment create -g [Resource Group Name] --dps-name [DPS Name]
+        --enrollment-id [Enrollment ID] --attestation-type tpm --allocation-policy static
+        --endorsement-key 14963E8F3BA5B3984110B3C1CA8E8B89 --iot-hubs [iot hub host name]
+    - name: Create an enrollment 'MyEnrollment' with hashed allocation policy and multiple hubs in the Azure
+            IoT Device Provisioning service '[DPS Name]' in the resource group '[Resource Group Name]'.
+      text: >
+        az iot dps enrollment create -g [Resource Group Name] --dps-name [DPS Name]
+        --enrollment-id [Enrollment ID] --attestation-type tpm --allocation-policy hashed
+        --endorsement-key 14963E8F3BA5B3984110B3C1CA8E8B89 --iot-hubs "[iot hub host name1] [iot hub host name2]"
 """
 
 helps['iot dps enrollment update'] = """
@@ -665,6 +689,24 @@ helps['iot dps enrollment update'] = """
         az iot dps enrollment update -g [Resource Group Name] --dps-name [DPS Name]
         --enrollment-id [Enrollment ID] --endorsement-key 14963E8F3BA5B3984110B3C1CA8E8B89
         --etag AAAAAAAAAAA=
+    - name: Update enrollment '[Enrollment ID]' with a new primary key in the Azure IoT
+            Device Provisioning Service '[DPS Name]' in the resource group '[Resource Group Name]'.
+      text: >
+        az iot dps enrollment update -g [Resource Group Name] --dps-name [DPS Name]
+        --enrollment-id [Enrollment ID] --primary-key [New Primary Key]
+        --etag AAAAAAAAAAA=
+    - name: Update enrollment '[Enrollment ID]' with a new reprovision type in the Azure IoT
+            Device Provisioning Service '[DPS Name]' in the resource group '[Resource Group Name]'.
+      text: >
+        az iot dps enrollment update -g [Resource Group Name] --dps-name [DPS Name]
+        --enrollment-id [Enrollment ID] --reprovision-policy [Reprovision Type]
+        --etag AAAAAAAAAAA=
+    - name: Update enrollment '[Enrollment ID]' with a new allocation policy in the Azure IoT
+            Device Provisioning Service '[DPS Name]' in the resource group '[Resource Group Name]'.
+      text: >
+        az iot dps enrollment update -g [Resource Group Name] --dps-name [DPS Name]
+        --enrollment-id [Enrollment ID] --allocation-policy geolatency
+        --etag AAAAAAAAAAA= --iot-hubs "[iot hub host name1] [iot hub host name2] [iot hub host name3]"
 """
 
 helps['iot dps enrollment delete'] = """
@@ -711,6 +753,12 @@ helps['iot dps enrollment-group create'] = """
         --enrollment-id [Enrollment ID] --certificate-path /certificates/Certificate.pem
         --provisioning-status enabled --iot-hub-host-name [IoTHub Host Name]
         --initial-twin-tags "{'location':{'region':'US'}}"
+    - name: Create an enrollment group '[Enrollment ID]' in the Azure IoT provisioning service
+            '[DPS Name]' in the resource group '[Resource Group Name] with attestation type 'symmetrickey'.
+      text: >
+        az iot dps enrollment-group create -g [Resource Group Name] --dps-name [DPS Name]
+        --enrollment-id [Enrollment ID] --primary-key [Primary Key] --secondary-key [Secondary Key]
+
 """
 
 helps['iot dps enrollment-group update'] = """
@@ -736,6 +784,11 @@ helps['iot dps enrollment-group update'] = """
         az iot dps enrollment-group update -g [Resource Group Name] --dps-name [DPS Name]
         --enrollment-id [Enrollment ID] --secondary-certificate-name [Certificate Name]
         --remove-certificate --etag AAAAAAAAAAA=
+    - name: Update enrollment group '[Enrollment ID]' in the Azure IoT provisioning service '[DPS name]'
+            in the resource group '[Resource Group Name]' with new primary key.
+      text: >
+        az iot dps enrollment-group update -g [Resource Group Name] --dps-name [DPS Name]
+        --enrollment-id [Enrollment ID] --primary-key [New Primary Key] --etag AAAAAAAAAAA=
 """
 
 helps['iot dps enrollment-group delete'] = """

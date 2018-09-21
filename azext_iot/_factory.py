@@ -54,7 +54,7 @@ def _bind_sdk(target, sdk_type, device_id=None):
     from azext_iot.service_sdk.iot_hub_gateway_service_apis import IotHubGatewayServiceAPIs
 
     from azext_iot.custom_sdk.custom_api import CustomClient
-    from azext_iot.dps_sdk import DeviceProvisioningServiceServiceRuntimeClient
+    from azext_iot.dps_sdk import ProvisioningServiceClient
 
     sas_uri = target['entity']
     endpoint = "https://{}".format(sas_uri)
@@ -90,7 +90,7 @@ def _bind_sdk(target, sdk_type, device_id=None):
 
     if sdk_type is SdkType.dps_sdk:
         return (
-            DeviceProvisioningServiceServiceRuntimeClient(
+            ProvisioningServiceClient(
                 SasTokenAuthentication(
                     sas_uri, target['policy'], target['primarykey']),
                 endpoint),
@@ -107,6 +107,6 @@ def _get_sdk_exception_type(sdk_type):
         SdkType.custom_sdk: import_module('azext_iot.custom_sdk.models.error_details'),
         SdkType.service_sdk: import_module('msrestazure.azure_exceptions'),
         SdkType.device_sdk: import_module('msrestazure.azure_exceptions'),
-        SdkType.dps_sdk: import_module('azext_iot.dps_sdk.models.error_details')
+        SdkType.dps_sdk: import_module('azext_iot.dps_sdk.models.provisioning_service_error_details')
     }
     return exception_library.get(sdk_type, None)

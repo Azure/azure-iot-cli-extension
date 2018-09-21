@@ -3,6 +3,13 @@
 Release History
 ===============
 
+0.6.0
++++++++++++++++
+* Upgrade DPS Sdk to V20180901 (#39)
+* Add Reprovision and SymmetricKey attestation to the enrollment
+* Support allocation-policy in enrollment
+* Add new examples in help docs
+
 0.5.4
 +++++++++++++++
 * Replaced multi-character short options ('-props', for example) with long option prefixes '--' to satisfy Azure CLI CI linter requirements

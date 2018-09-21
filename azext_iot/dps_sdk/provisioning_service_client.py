@@ -11,13 +11,12 @@ from msrestazure import AzureConfiguration
 from .version import VERSION
 from .operations.device_enrollment_operations import DeviceEnrollmentOperations
 from .operations.device_enrollment_group_operations import DeviceEnrollmentGroupOperations
-from .operations.registration_status_operations import RegistrationStatusOperations
+from .operations.registration_state_operations import RegistrationStateOperations
 from . import models
-from azext_iot._constants import VERSION as extver
 
 
-class DeviceProvisioningServiceServiceRuntimeClientConfiguration(AzureConfiguration):
-    """Configuration for DeviceProvisioningServiceServiceRuntimeClient
+class ProvisioningServiceClientConfiguration(AzureConfiguration):
+    """Configuration for ProvisioningServiceClient
     Note that all parameters used to create this instance are saved as instance
     attributes.
 
@@ -33,28 +32,28 @@ class DeviceProvisioningServiceServiceRuntimeClientConfiguration(AzureConfigurat
         if credentials is None:
             raise ValueError("Parameter 'credentials' must not be None.")
         if not base_url:
-            base_url = 'https://<fully-qualified IoT hub domain name>'
+            base_url = 'https://localhost'
 
-        super(DeviceProvisioningServiceServiceRuntimeClientConfiguration, self).__init__(base_url)
+        super(ProvisioningServiceClientConfiguration, self).__init__(base_url)
 
-        self.add_user_agent('deviceprovisioningserviceserviceruntimeclient/{}'.format(VERSION))
-        self.add_user_agent('MicrosoftAzure/IoTPlatformCliExtension/{}'.format(extver))
+        self.add_user_agent('provisioningserviceclient/{}'.format(VERSION))
+        self.add_user_agent('Azure-SDK-For-Python')
 
         self.credentials = credentials
 
 
-class DeviceProvisioningServiceServiceRuntimeClient(object):
-    """API for service operations with the Azure IotHub Device Provisioning Service
+class ProvisioningServiceClient(object):
+    """API for service operations with the Azure IoT Hub Device Provisioning Service
 
     :ivar config: Configuration for client.
-    :vartype config: DeviceProvisioningServiceServiceRuntimeClientConfiguration
+    :vartype config: ProvisioningServiceClientConfiguration
 
     :ivar device_enrollment: DeviceEnrollment operations
     :vartype device_enrollment: microsoft.azure.management.provisioningservices.operations.DeviceEnrollmentOperations
     :ivar device_enrollment_group: DeviceEnrollmentGroup operations
     :vartype device_enrollment_group: microsoft.azure.management.provisioningservices.operations.DeviceEnrollmentGroupOperations
-    :ivar registration_status: RegistrationStatus operations
-    :vartype registration_status: microsoft.azure.management.provisioningservices.operations.RegistrationStatusOperations
+    :ivar registration_state: RegistrationState operations
+    :vartype registration_state: microsoft.azure.management.provisioningservices.operations.RegistrationStateOperations
 
     :param credentials: Credentials needed for the client to connect to Azure.
     :type credentials: :mod:`A msrestazure Credentials
@@ -65,11 +64,11 @@ class DeviceProvisioningServiceServiceRuntimeClient(object):
     def __init__(
             self, credentials, base_url=None):
 
-        self.config = DeviceProvisioningServiceServiceRuntimeClientConfiguration(credentials, base_url)
+        self.config = ProvisioningServiceClientConfiguration(credentials, base_url)
         self._client = ServiceClient(self.config.credentials, self.config)
 
         client_models = {k: v for k, v in models.__dict__.items() if isinstance(v, type)}
-        self.api_version = '2017-11-15'
+        self.api_version = '2018-09-01-preview'
         self._serialize = Serializer(client_models)
         self._deserialize = Deserializer(client_models)
 
@@ -77,5 +76,5 @@ class DeviceProvisioningServiceServiceRuntimeClient(object):
             self._client, self.config, self._serialize, self._deserialize)
         self.device_enrollment_group = DeviceEnrollmentGroupOperations(
             self._client, self.config, self._serialize, self._deserialize)
-        self.registration_status = RegistrationStatusOperations(
+        self.registration_state = RegistrationStateOperations(
             self._client, self.config, self._serialize, self._deserialize)

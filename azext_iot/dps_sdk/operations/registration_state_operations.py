@@ -7,18 +7,18 @@
 
 import uuid
 from msrest.pipeline import ClientRawResponse
-from msrestazure.azure_exceptions import CloudError
 
 from .. import models
 
 
-class RegistrationStatusOperations(object):
-    """RegistrationStatusOperations operations.
+class RegistrationStateOperations(object):
+    """RegistrationStateOperations operations.
 
     :param client: Client for service requests.
     :param config: Configuration of service client.
     :param serializer: An object model serializer.
-    :param deserializer: An objec model deserializer.
+    :param deserializer: An object model deserializer.
+    :ivar api_version: The API version to use for the request. Supported versions include: 2018-09-01-preview. Constant value: "2018-09-01-preview".
     """
 
     models = models
@@ -28,9 +28,9 @@ class RegistrationStatusOperations(object):
         self._client = client
         self._serialize = serializer
         self._deserialize = deserializer
+        self.api_version = "2018-09-01-preview"
 
         self.config = config
-        self.api_version = "2017-11-15"
 
     def get_registration_state(
             self, id, custom_headers=None, raw=False, **operation_config):
@@ -47,10 +47,11 @@ class RegistrationStatusOperations(object):
         :rtype:
          ~microsoft.azure.management.provisioningservices.models.DeviceRegistrationState
          or ~msrest.pipeline.ClientRawResponse
-        :raises: :class:`CloudError<msrestazure.azure_exceptions.CloudError>`
+        :raises:
+         :class:`ProvisioningServiceErrorDetailsException<microsoft.azure.management.provisioningservices.models.ProvisioningServiceErrorDetailsException>`
         """
         # Construct URL
-        url = '/registrations/{id}'
+        url = self.get_registration_state.metadata['url']
         path_format_arguments = {
             'id': self._serialize.url("id", id, 'str')
         }
@@ -58,7 +59,7 @@ class RegistrationStatusOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("api_version", self.api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
 
         # Construct headers
         header_parameters = {}
@@ -72,21 +73,22 @@ class RegistrationStatusOperations(object):
 
         # Construct and send request
         request = self._client.get(url, query_parameters)
-        response = self._client.send(request, header_parameters, **operation_config)
+        response = self._client.send(request, header_parameters, stream=False, **operation_config)
 
         if response.status_code not in [200]:
-            raise models.error_details.ErrorDetailsException(self._deserialize, response)
+            raise models.ProvisioningServiceErrorDetailsException(self._deserialize, response)
 
         deserialized = None
 
         if response.status_code == 200:
-            deserialized = self._deserialize('object', response)
+            deserialized = self._deserialize('DeviceRegistrationState', response)
 
         if raw:
             client_raw_response = ClientRawResponse(deserialized, response)
             return client_raw_response
 
         return deserialized
+    get_registration_state.metadata = {'url': '/registrations/{id}'}
 
     def delete_registration_state(
             self, id, if_match=None, custom_headers=None, raw=False, **operation_config):
@@ -103,10 +105,11 @@ class RegistrationStatusOperations(object):
          overrides<msrest:optionsforoperations>`.
         :return: None or ClientRawResponse if raw=true
         :rtype: None or ~msrest.pipeline.ClientRawResponse
-        :raises: :class:`CloudError<msrestazure.azure_exceptions.CloudError>`
+        :raises:
+         :class:`ProvisioningServiceErrorDetailsException<microsoft.azure.management.provisioningservices.models.ProvisioningServiceErrorDetailsException>`
         """
         # Construct URL
-        url = '/registrations/{id}'
+        url = self.delete_registration_state.metadata['url']
         path_format_arguments = {
             'id': self._serialize.url("id", id, 'str')
         }
@@ -114,7 +117,7 @@ class RegistrationStatusOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("api_version", self.api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
 
         # Construct headers
         header_parameters = {}
@@ -130,14 +133,15 @@ class RegistrationStatusOperations(object):
 
         # Construct and send request
         request = self._client.delete(url, query_parameters)
-        response = self._client.send(request, header_parameters, **operation_config)
+        response = self._client.send(request, header_parameters, stream=False, **operation_config)
 
         if response.status_code not in [204]:
-            raise models.error_details.ErrorDetailsException(self._deserialize, response)
+            raise models.ProvisioningServiceErrorDetailsException(self._deserialize, response)
 
         if raw:
             client_raw_response = ClientRawResponse(None, response)
             return client_raw_response
+    delete_registration_state.metadata = {'url': '/registrations/{id}'}
 
     def query_registration_state(
             self, id, custom_headers=None, raw=False, **operation_config):
@@ -154,10 +158,11 @@ class RegistrationStatusOperations(object):
         :rtype:
          list[~microsoft.azure.management.provisioningservices.models.DeviceRegistrationState]
          or ~msrest.pipeline.ClientRawResponse
-        :raises: :class:`CloudError<msrestazure.azure_exceptions.CloudError>`
+        :raises:
+         :class:`ProvisioningServiceErrorDetailsException<microsoft.azure.management.provisioningservices.models.ProvisioningServiceErrorDetailsException>`
         """
         # Construct URL
-        url = '/registrations/{id}/query'
+        url = self.query_registration_state.metadata['url']
         path_format_arguments = {
             'id': self._serialize.url("id", id, 'str')
         }
@@ -165,7 +170,7 @@ class RegistrationStatusOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("api_version", self.api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
 
         # Construct headers
         header_parameters = {}
@@ -179,18 +184,19 @@ class RegistrationStatusOperations(object):
 
         # Construct and send request
         request = self._client.post(url, query_parameters)
-        response = self._client.send(request, header_parameters, **operation_config)
+        response = self._client.send(request, header_parameters, stream=False, **operation_config)
 
         if response.status_code not in [200]:
-            raise models.error_details.ErrorDetailsException(self._deserialize, response)
+            raise models.ProvisioningServiceErrorDetailsException(self._deserialize, response)
 
         deserialized = None
 
         if response.status_code == 200:
-            deserialized = self._deserialize('[object]', response)
+            deserialized = self._deserialize('[DeviceRegistrationState]', response)
 
         if raw:
             client_raw_response = ClientRawResponse(deserialized, response)
             return client_raw_response
 
         return deserialized
+    query_registration_state.metadata = {'url': '/registrations/{id}/query'}

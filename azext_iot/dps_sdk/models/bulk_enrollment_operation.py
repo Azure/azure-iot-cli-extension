@@ -11,26 +11,26 @@ from msrest.serialization import Model
 class BulkEnrollmentOperation(Model):
     """Bulk operation.
 
+    :param enrollments: Enrollment items
+    :type enrollments:
+     list[~microsoft.azure.management.provisioningservices.models.IndividualEnrollment]
     :param mode: Operation mode. Possible values include: 'create', 'update',
      'updateIfMatchETag', 'delete'
     :type mode: str or
      ~microsoft.azure.management.provisioningservices.models.enum
-    :param enrollments: Enrollment items
-    :type enrollments:
-     list[~microsoft.azure.management.provisioningservices.models.IndividualEnrollment]
     """
 
     _validation = {
-        'mode': {'required': True},
         'enrollments': {'required': True},
+        'mode': {'required': True},
     }
 
     _attribute_map = {
-        'mode': {'key': 'mode', 'type': 'str'},
         'enrollments': {'key': 'enrollments', 'type': '[IndividualEnrollment]'},
+        'mode': {'key': 'mode', 'type': 'str'},
     }
 
-    def __init__(self, mode, enrollments):
+    def __init__(self, enrollments, mode):
         super(BulkEnrollmentOperation, self).__init__()
-        self.mode = mode
         self.enrollments = enrollments
+        self.mode = mode

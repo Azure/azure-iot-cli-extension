@@ -5,19 +5,25 @@
 # regenerated.
 # --------------------------------------------------------------------------
 
-from .device_registration_state import DeviceRegistrationState
+from .provisioning_service_error_details import ProvisioningServiceErrorDetails, ProvisioningServiceErrorDetailsException
+from .device_capabilities import DeviceCapabilities
+from .individual_enrollment_registration_state import IndividualEnrollmentRegistrationState
 from .tpm_attestation import TpmAttestation
 from .x509_certificate_info import X509CertificateInfo
 from .x509_certificate_with_info import X509CertificateWithInfo
 from .x509_certificates import X509Certificates
 from .x509_ca_references import X509CAReferences
 from .x509_attestation import X509Attestation
+from .symmetric_key_attestation import SymmetricKeyAttestation
 from .attestation_mechanism import AttestationMechanism
 from .metadata import Metadata
 from .twin_collection import TwinCollection
 from .initial_twin_properties import InitialTwinProperties
 from .initial_twin import InitialTwin
+from .reprovision_policy import ReprovisionPolicy
+from .custom_allocation_definition import CustomAllocationDefinition
 from .individual_enrollment import IndividualEnrollment
+from .device_registration_state import DeviceRegistrationState
 from .enrollment_group import EnrollmentGroup
 from .bulk_enrollment_operation import BulkEnrollmentOperation
 from .bulk_enrollment_operation_error import BulkEnrollmentOperationError
@@ -25,19 +31,25 @@ from .bulk_enrollment_operation_result import BulkEnrollmentOperationResult
 from .query_specification import QuerySpecification
 
 __all__ = [
-    'DeviceRegistrationState',
+    'ProvisioningServiceErrorDetails', 'ProvisioningServiceErrorDetailsException',
+    'DeviceCapabilities',
+    'IndividualEnrollmentRegistrationState',
     'TpmAttestation',
     'X509CertificateInfo',
     'X509CertificateWithInfo',
     'X509Certificates',
     'X509CAReferences',
     'X509Attestation',
+    'SymmetricKeyAttestation',
     'AttestationMechanism',
     'Metadata',
     'TwinCollection',
     'InitialTwinProperties',
     'InitialTwin',
+    'ReprovisionPolicy',
+    'CustomAllocationDefinition',
     'IndividualEnrollment',
+    'DeviceRegistrationState',
     'EnrollmentGroup',
     'BulkEnrollmentOperation',
     'BulkEnrollmentOperationError',
