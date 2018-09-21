@@ -3,16 +3,18 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-import pdb
+
 from knack.util import CLIError
 from azext_iot.assets.user_messages import ERROR_PARAM_TOP_OUT_OF_BOUNDS
 
 
 def _execute_query(query, query_method, top=None):
     payload = []
-    x_ms_max_item_count = top
+    headers = {}
 
-    result, token = query_method(query, x_ms_max_item_count)
+    if top:
+        headers['x-ms-max-item-count'] = str(top)
+    result, token = query_method(query, custom_headers=headers)
     payload.extend(result)
     while token:
         # In case requested count is > service max page size
@@ -20,11 +22,11 @@ def _execute_query(query, query_method, top=None):
             pl = len(payload)
             if pl < top:
                 page = top - pl
-                x_ms_max_item_count = page
+                headers['x-ms-max-item-count'] = str(page)
             else:
                 break
-        x_ms_continuation = token
-        result, token = query_method(query, x_ms_max_item_count, x_ms_continuation)
+        headers['x-ms-continuation'] = token
+        result, token = query_method(query, custom_headers=headers)
         payload.extend(result)
     return payload[:top] if top else payload
 

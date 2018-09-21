@@ -757,7 +757,7 @@ helps['iot dps enrollment-group create'] = """
             '[DPS Name]' in the resource group '[Resource Group Name] with attestation type 'symmetrickey'.
       text: >
         az iot dps enrollment-group create -g [Resource Group Name] --dps-name [DPS Name]
-        --enrollment-id [Enrollment ID] --primary-key [Primary Key] --secondary-key [Secondary Key] 
+        --enrollment-id [Enrollment ID] --primary-key [Primary Key] --secondary-key [Secondary Key]
 
 """
 

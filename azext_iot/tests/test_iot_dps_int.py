@@ -28,7 +28,7 @@ class IoTDpsTest(LiveScenarioTest):
     provisioning_status = EntityStatusType.enabled.value
     provisioning_status_new = EntityStatusType.disabled.value
 
-    def __init__(self, test_method):
+    def __init__(self, test_method):  # pylint: disable=W0613
         super(IoTDpsTest, self).__init__('test_dps_enrollment_tpm_lifecycle')
         output_dir = os.getcwd()
         create_self_signed_certificate(cert_name, 200, output_dir, True)
@@ -107,7 +107,7 @@ class IoTDpsTest(LiveScenarioTest):
         hub_host_name = '{}.azure-devices.net'.format(hub)
 
         etag = self.cmd('iot dps enrollment create --enrollment-id {} --attestation-type {}'
-                        ' -g {} --dps-name {} -cp {} -scp {}'
+                        ' -g {} --dps-name {} --cp {} --scp {}'
                         ' --provisioning-status {} --device-id {}'
                         ' --initial-twin-tags {} --initial-twin-properties {}'
                         ' --allocation-policy {} --iot-hubs {}'
@@ -169,6 +169,7 @@ class IoTDpsTest(LiveScenarioTest):
         secondary_key = 'PahMnOSBblv9CRn5B765iK35jTvnjDUjYP9hKBZa4Ug='
         device_id = self.create_random_name('device-id-for-test', length=48)
         reprovisionPolicy_reprovisionandresetdata = 'reprovisionandresetdata'
+        hub_host_name = '{}.azure-devices.net'.format(hub)
 
         etag = self.cmd('iot dps enrollment create --enrollment-id {} --attestation-type {}'
                         ' -g {} --dps-name {} --pk {} --sk {}'
@@ -187,6 +188,7 @@ class IoTDpsTest(LiveScenarioTest):
                                        self.provisioning_status),
                             self.check('deviceId', device_id),
                             self.check('allocationPolicy', AllocationType.geolatency.value),
+                            self.check('iotHubHostName', hub_host_name),
                             self.check('initialTwin.tags',
                                        self.kwargs['generic_dict']),
                             self.check('initialTwin.properties.desired',
@@ -215,6 +217,7 @@ class IoTDpsTest(LiveScenarioTest):
                                 self.provisioning_status_new),
                      self.check('deviceId', device_id),
                      self.check('allocationPolicy', AllocationType.geolatency.value),
+                     self.check('iotHubHostName', hub_host_name),
                      self.exists('initialTwin.tags'),
                      self.exists('initialTwin.properties.desired'),
                      self.check('attestation.symmetric_key.primary_key', primary_key)
@@ -273,14 +276,14 @@ class IoTDpsTest(LiveScenarioTest):
                  .format(rg, dps, enrollment_id),
                  checks=[self.check('length(@)', 0)])
 
-        cert_name = self.create_random_name('certificate-for-test', length=48)
+        cert_name = self.create_random_name('certificate-for-test', length=48)  # pylint: disable=W0621
         cert_etag = self.cmd('iot dps certificate create -g {} --dps-name {} --name {} --p {}'
                              .format(rg, dps, cert_name, cert_path),
                              checks=[self.check('name', cert_name)]).get_output_in_json()['etag']
 
         self.cmd('iot dps enrollment-group update -g {} --dps-name {} --enrollment-id {}'
                  ' --cn {} --etag {}'
-                 .format(rg, dps, enrollment_id, cert_name),
+                 .format(rg, dps, enrollment_id, cert_name, cert_etag),
                  checks=[
                      self.check('attestation.type',
                                 AttestationType.x509.value),

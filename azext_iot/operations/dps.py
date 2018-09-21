@@ -318,7 +318,7 @@ def iot_dps_device_enrollment_group_update(client,
                 enrollment_record.attestation.symmetric_key.primary_key = primary_key
             if secondary_key:
                 enrollment_record.attestation.symmetric_key.secondary_key = secondary_key
-        
+
         if enrollment_record.attestation.type == AttestationType.x509.value:
             if not certificate_path and not secondary_certificate_path:
                 if not root_ca_name and not secondary_root_ca_name:
