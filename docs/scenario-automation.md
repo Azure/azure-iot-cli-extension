@@ -52,3 +52,15 @@ done
 az $monitor_events
 
 ```
+
+### Delete IoT Edge deployments based on criteria
+
+```powershell
+# List all deployments on target hub and filter on a target condition, then select the ID.
+$deployments = az iot edge deployment list -n YourIoTHub --query "[?targetCondition=='tags.building=9'].id" | ConvertFrom-Json
+ 
+# After getting the filtered deployments, iterate and delete
+$deployments | ForEach-Object -process {az iot edge deployment delete -n YourIoTHub -d $_}
+
+```
+
