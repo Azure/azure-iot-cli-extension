@@ -6,10 +6,11 @@ echo "Installing azure-cli-testsdk and azure-cli..."
 
 # Update the git commit or branch when we need a new version of azure-cli-testsdk
 pip install --pre azure-cli --extra-index-url https://azurecliprod.blob.core.windows.net/edge
-pip install "git+https://github.com/Azure/azure-cli@master#egg=azure-cli-testsdk&subdirectory=src/azure-cli-testsdk" -q
+pip install -e "git+https://github.com/Azure/azure-cli@dev#egg=azure-cli-dev-tools&subdirectory=tools" -q
 
 echo "Installed."
 az --version
+set +x
 
 EXT='azure-cli-iot-ext'
 
@@ -20,7 +21,7 @@ az --debug
 
 export PYTHONPATH=$AZURE_EXTENSION_DIR/$EXT/:$(pwd)/
 
-echo "Running tests..."
+echo "Running IoT extension unit tests..."
 echo "Executing - IoT Hub unit tests"
 pytest -v azext_iot/tests/test_iot_ext_unit.py
 
