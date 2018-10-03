@@ -259,15 +259,29 @@ def test_import(package):
     return True
 
 
+def unpack_pnp_http_error(e):
+    error = unpack_msrest_error(e)
+    if isinstance(error, dict):
+        if error.get('error'):
+            error = error['error']
+        if error.get('stackTrace'):
+            error.pop('stackTrace')
+    return error
+
+
 def unpack_msrest_error(e, clouderror=True):
     """ Obtains full response text from an msrest error """
     if clouderror:
+        op_err = None
         try:
-            return json.loads(e.response.text)
+            op_err = json.loads(e.response.text)
         except ValueError:
-            return e.response.text
+            op_err = e.response.text
         except TypeError:
-            return e.response.text
+            op_err = e.response.text
+        if not op_err:
+            return str(e)
+        return op_err
     return e
 
 
@@ -280,3 +294,21 @@ def calculate_millisec_since_unix_epoch_utc():
     now = datetime.utcnow()
     epoch = datetime.utcfromtimestamp(0)
     return int(1000 * (now - epoch).total_seconds())
+
+
+def get_sas_token(target):
+    from azext_iot.common.digitaltwin_sas_token_auth import DigitalTwinSasTokenAuthentication
+    token = ''
+    if target.get('repository_id'):
+        token = DigitalTwinSasTokenAuthentication(target["repository_id"],
+                                                  target["entity"],
+                                                  target["policy"],
+                                                  target["primarykey"]).generate_sas_token()
+    return {'Authorization': '{}'.format(token)}
+
+
+def dict_clean(d):
+    """ Remove None from dictionary """
+    if not isinstance(d, dict):
+        return d
+    return dict((k, dict_clean(v)) for k, v in d.items() if v is not None)

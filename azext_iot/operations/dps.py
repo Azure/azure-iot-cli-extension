@@ -409,15 +409,16 @@ def iot_dps_registration_delete(client, dps_name, resource_group_name, registrat
 
 
 def _get_initial_twin(initial_twin_tags=None, initial_twin_properties=None):
+    from azext_iot.common.utility import dict_clean
     if initial_twin_tags == "":
         initial_twin_tags = None
     elif initial_twin_tags:
-        initial_twin_tags = shell_safe_json_parse(str(initial_twin_tags))
+        initial_twin_tags = dict_clean(shell_safe_json_parse(str(initial_twin_tags)))
 
     if initial_twin_properties == "":
         initial_twin_properties = None
     elif initial_twin_properties:
-        initial_twin_properties = shell_safe_json_parse(str(initial_twin_properties))
+        initial_twin_properties = dict_clean(shell_safe_json_parse(str(initial_twin_properties)))
     return InitialTwin(TwinCollection(initial_twin_tags),
                        InitialTwinProperties(TwinCollection(initial_twin_properties)))
 

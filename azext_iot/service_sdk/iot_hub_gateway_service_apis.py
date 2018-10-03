@@ -18,7 +18,7 @@ from msrestazure.azure_exceptions import CloudError
 import uuid
 from . import models
 from azext_iot._constants import VERSION as extver
-from azext_iot._constants import BASE_API_VERSION
+from azext_iot._constants import BASE_API_VERSION, PNP_API_VERSION
 
 
 class IotHubGatewayServiceAPIsConfiguration(AzureConfiguration):
@@ -2357,3 +2357,376 @@ class IotHubGatewayServiceAPIs(object):
 
     # @digimaun - change device param from {id} to {deviceId}
     invoke_device_method1.metadata = {'url': '/twins/{deviceId}/modules/{moduleId}/methods'}
+
+    def get_interfaces(
+            self, digital_twin_id, custom_headers=None, raw=False, **operation_config):
+        """Gets the list of interfaces.
+
+        :param digital_twin_id: Digital Twin ID. Format of digitalTwinId is
+         DeviceId[~ModuleId]. ModuleId is optional.
+        :type digital_twin_id: str
+        :param dict custom_headers: headers that will be added to the request
+        :param bool raw: returns the direct response alongside the
+         deserialized response
+        :param operation_config: :ref:`Operation configuration
+         overrides<msrest:optionsforoperations>`.
+        :return: DigitalTwinInterfaces or ClientRawResponse if raw=true
+        :rtype: ~service.models.DigitalTwinInterfaces or
+         ~msrest.pipeline.ClientRawResponse
+        :raises: class:`CloudError<msrestazure.azure_exceptions.CloudError>`
+        """
+        # Construct URL
+        url = self.get_interfaces.metadata['url']
+        path_format_arguments = {
+            'digitalTwinId': self._serialize.url("digital_twin_id", digital_twin_id, 'str')
+        }
+        url = self._client.format_url(url, **path_format_arguments)
+
+        # Construct parameters
+        query_parameters = {}
+        # @anusapan - Changed self.api_version to PNP_API_VERSION until new version get released
+        query_parameters['api-version'] = self._serialize.query("self.api_version", PNP_API_VERSION, 'str')
+
+        # Construct headers
+        header_parameters = {}
+        header_parameters['Content-Type'] = 'application/json; charset=utf-8'
+        if self.config.generate_client_request_id:
+            header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
+        if custom_headers:
+            header_parameters.update(custom_headers)
+        if self.config.accept_language is not None:
+            header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
+
+        # Construct and send request
+        request = self._client.get(url, query_parameters)
+        response = self._client.send(request, header_parameters, stream=False, **operation_config)
+
+        if response.status_code not in [200]:
+            exp = CloudError(response)
+            exp.request_id = response.headers.get('x-ms-request-id')
+            raise exp
+
+        deserialized = None
+        header_dict = {}
+
+        # @anusapan - deserialize as {object} from DigitalTwinInterfaces
+        if response.status_code == 200:
+            deserialized = self._deserialize('{object}', response)
+            header_dict = {
+                'ETag': 'str',
+            }
+
+        if raw:
+            client_raw_response = ClientRawResponse(deserialized, response)
+            client_raw_response.add_headers(header_dict)
+            return client_raw_response
+
+        return deserialized
+    get_interfaces.metadata = {'url': '/digitalTwins/{digitalTwinId}/interfaces'}
+
+    def update_interfaces(
+            self, digital_twin_id, if_match=None, interfaces=None, custom_headers=None, raw=False, **operation_config):
+        """Updates desired properties of multiple interfaces.
+        Example URI: "digitalTwins/{digitalTwinId}/interfaces".
+
+        :param digital_twin_id: Digital Twin ID. Format of digitalTwinId is
+         DeviceId[~ModuleId]. ModuleId is optional.
+        :type digital_twin_id: str
+        :param if_match:
+        :type if_match: str
+        :param interfaces: Interface(s) data to patch in the digital twin.
+        :type interfaces: dict[str,
+         ~service.models.DigitalTwinInterfacesPatchInterfacesValue]
+        :param dict custom_headers: headers that will be added to the request
+        :param bool raw: returns the direct response alongside the
+         deserialized response
+        :param operation_config: :ref:`Operation configuration
+         overrides<msrest:optionsforoperations>`.
+        :return: DigitalTwinInterfaces or ClientRawResponse if raw=true
+        :rtype: ~service.models.DigitalTwinInterfaces or
+         ~msrest.pipeline.ClientRawResponse
+        :raises: class:`CloudError<msrestazure.azure_exceptions.CloudError>`
+        """
+        interfaces_patch_info = models.DigitalTwinInterfacesPatch(interfaces=interfaces)
+
+        # Construct URL
+        url = self.update_interfaces.metadata['url']
+        path_format_arguments = {
+            'digitalTwinId': self._serialize.url("digital_twin_id", digital_twin_id, 'str')
+        }
+        url = self._client.format_url(url, **path_format_arguments)
+
+        # Construct parameters
+        query_parameters = {}
+        # @anusapan - Changed self.api_version to PNP_API_VERSION until new version get released
+        query_parameters['api-version'] = self._serialize.query("self.api_version", PNP_API_VERSION, 'str')
+
+        # Construct headers
+        header_parameters = {}
+        header_parameters['Content-Type'] = 'application/json; charset=utf-8'
+        if self.config.generate_client_request_id:
+            header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
+        if custom_headers:
+            header_parameters.update(custom_headers)
+        if self.config.accept_language is not None:
+            header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
+
+        if if_match is not None:
+            header_parameters['If-Match'] = self._serialize.header("if_match", if_match, 'str')
+
+        # Construct body
+        body_content = self._serialize.body(interfaces_patch_info, 'DigitalTwinInterfacesPatch')
+
+        # Construct and send request
+        request = self._client.patch(url, query_parameters)
+        response = self._client.send(request, header_parameters, body_content, stream=False, **operation_config)
+
+        if response.status_code not in [200]:
+            exp = CloudError(response)
+            exp.request_id = response.headers.get('x-ms-request-id')
+            raise exp
+
+
+        deserialized = None
+        header_dict = {}
+
+        # @anusapan - deserialize as {object} from DigitalTwinInterfaces
+        if response.status_code == 200:
+            deserialized = self._deserialize('{object}', response)
+            header_dict = {
+                'ETag': 'str',
+            }
+
+        if raw:
+            client_raw_response = ClientRawResponse(deserialized, response)
+            client_raw_response.add_headers(header_dict)
+            return client_raw_response
+
+        return deserialized
+    update_interfaces.metadata = {'url': '/digitalTwins/{digitalTwinId}/interfaces'}
+
+    def get_interface(
+            self, digital_twin_id, interface_name, custom_headers=None, raw=False, **operation_config):
+        """Gets the interface of given interfaceId.
+        Example URI: "digitalTwins/{digitalTwinId}/interfaces/{interfaceName}".
+
+        :param digital_twin_id: Digital Twin ID. Format of digitalTwinId is
+         DeviceId[~ModuleId]. ModuleId is optional.
+        :type digital_twin_id: str
+        :param interface_name: The interface name.
+        :type interface_name: str
+        :param dict custom_headers: headers that will be added to the request
+        :param bool raw: returns the direct response alongside the
+         deserialized response
+        :param operation_config: :ref:`Operation configuration
+         overrides<msrest:optionsforoperations>`.
+        :return: DigitalTwinInterfaces or ClientRawResponse if raw=true
+        :rtype: ~service.models.DigitalTwinInterfaces or
+         ~msrest.pipeline.ClientRawResponse
+        :raises: class:`CloudError<msrestazure.azure_exceptions.CloudError>`
+        """
+        # Construct URL
+        url = self.get_interface.metadata['url']
+        path_format_arguments = {
+            'digitalTwinId': self._serialize.url("digital_twin_id", digital_twin_id, 'str'),
+            'interfaceName': self._serialize.url("interface_name", interface_name, 'str')
+        }
+        url = self._client.format_url(url, **path_format_arguments)
+
+        # Construct parameters
+        query_parameters = {}
+        # @anusapan - Changed self.api_version to PNP_API_VERSION until new version get released
+        query_parameters['api-version'] = self._serialize.query("self.api_version", PNP_API_VERSION, 'str')
+
+        # Construct headers
+        header_parameters = {}
+        if self.config.generate_client_request_id:
+            header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
+        if custom_headers:
+            header_parameters.update(custom_headers)
+        if self.config.accept_language is not None:
+            header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
+
+        # Construct and send request
+        request = self._client.get(url, query_parameters)
+        response = self._client.send(request, header_parameters, stream=False, **operation_config)
+
+        if response.status_code not in [200]:
+            exp = CloudError(response)
+            exp.request_id = response.headers.get('x-ms-request-id')
+            raise exp
+
+        deserialized = None
+        header_dict = {}
+
+        # @anusapan - deserialize as {object} from DigitalTwinInterfaces
+        if response.status_code == 200:
+            deserialized = self._deserialize('{object}', response)
+            header_dict = {
+                'ETag': 'str',
+            }
+
+        if raw:
+            client_raw_response = ClientRawResponse(deserialized, response)
+            client_raw_response.add_headers(header_dict)
+            return client_raw_response
+
+        return deserialized
+    get_interface.metadata = {'url': '/digitalTwins/{digitalTwinId}/interfaces/{interfaceName}'}
+
+    def get_digital_twin_model(
+            self, model_id, expand=None, custom_headers=None, raw=False, **operation_config):
+        """Returns a DigitalTwin model definition for the given id.
+        If "expand" is present in the query parameters and id is for a device
+        capability model then it returns
+        the capability metamodel with expanded interface definitions.
+
+        :param model_id: Model id Ex:
+         <example>urn:contoso:TemperatureSensor:1</example>
+        :type model_id: str
+        :param expand: Indicates whether to expand the device capability
+         model's interface definitions inline or not.
+         This query parameter ONLY applies to Capability model.
+        :type expand: bool
+        :param dict custom_headers: headers that will be added to the request
+        :param bool raw: returns the direct response alongside the
+         deserialized response
+        :param operation_config: :ref:`Operation configuration
+         overrides<msrest:optionsforoperations>`.
+        :return: object or ClientRawResponse if raw=true
+        :rtype: object or ~msrest.pipeline.ClientRawResponse
+        :raises: class:`CloudError<msrestazure.azure_exceptions.CloudError>`
+        """
+        # Construct URL
+        url = self.get_digital_twin_model.metadata['url']
+        path_format_arguments = {
+            'modelId': self._serialize.url("model_id", model_id, 'str')
+        }
+        url = self._client.format_url(url, **path_format_arguments)
+
+        # Construct parameters
+        query_parameters = {}
+        if expand is not None:
+            query_parameters['expand'] = self._serialize.query("expand", expand, 'bool')
+        # @anusapan - Changed self.api_version to PNP_API_VERSION until new version get released
+        query_parameters['api-version'] = self._serialize.query("self.api_version", PNP_API_VERSION, 'str')
+
+        # Construct headers
+        header_parameters = {}
+        if self.config.generate_client_request_id:
+            header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
+        if custom_headers:
+            header_parameters.update(custom_headers)
+        if self.config.accept_language is not None:
+            header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
+
+        # Construct and send request
+        request = self._client.get(url, query_parameters)
+        response = self._client.send(request, header_parameters, stream=False, **operation_config)
+
+        if response.status_code not in [200]:
+            exp = CloudError(response)
+            exp.request_id = response.headers.get('x-ms-request-id')
+            raise exp
+
+        deserialized = None
+        header_dict = {}
+
+        if response.status_code == 200:
+            deserialized = self._deserialize('object', response)
+            header_dict = {
+                'ETag': 'str',
+                'x-ms-model-id': 'str',
+            }
+
+        if raw:
+            client_raw_response = ClientRawResponse(deserialized, response)
+            client_raw_response.add_headers(header_dict)
+            return client_raw_response
+
+        return deserialized
+    get_digital_twin_model.metadata = {'url': '/digitalTwins/models/{modelId}'}
+
+    def invoke_interface_command(
+            self, digital_twin_id, interface_name, command_name, payload, connect_timeout_in_seconds=None, response_timeout_in_seconds=None, custom_headers=None, raw=False, **operation_config):
+        """Invoke a digital twin interface command.
+
+        Invoke a digital twin interface command.
+
+        :param digital_twin_id:
+        :type digital_twin_id: str
+        :param interface_name:
+        :type interface_name: str
+        :param command_name:
+        :type command_name: str
+        :param payload:
+        :type payload: object
+        :param connect_timeout_in_seconds: Connect timeout in seconds.
+        :type connect_timeout_in_seconds: int
+        :param response_timeout_in_seconds: Response timeout in seconds.
+        :type response_timeout_in_seconds: int
+        :param dict custom_headers: headers that will be added to the request
+        :param bool raw: returns the direct response alongside the
+         deserialized response
+        :param operation_config: :ref:`Operation configuration
+         overrides<msrest:optionsforoperations>`.
+        :return: object or ClientRawResponse if raw=true
+        :rtype: object or ~msrest.pipeline.ClientRawResponse
+        :raises: class:`CloudError<msrestazure.azure_exceptions.CloudError>`
+        """
+        # Construct URL
+        url = self.invoke_interface_command.metadata['url']
+        path_format_arguments = {
+            'digitalTwinId': self._serialize.url("digital_twin_id", digital_twin_id, 'str'),
+            'interfaceName': self._serialize.url("interface_name", interface_name, 'str'),
+            'commandName': self._serialize.url("command_name", command_name, 'str')
+        }
+        url = self._client.format_url(url, **path_format_arguments)
+
+        # Construct parameters
+        query_parameters = {}
+        # @anusapan - Changed self.api_version to PNP_API_VERSION until new version get released
+        query_parameters['api-version'] = self._serialize.query("self.api_version", PNP_API_VERSION, 'str')
+        if connect_timeout_in_seconds is not None:
+            query_parameters['connectTimeoutInSeconds'] = self._serialize.query("connect_timeout_in_seconds", connect_timeout_in_seconds, 'int')
+        if response_timeout_in_seconds is not None:
+            query_parameters['responseTimeoutInSeconds'] = self._serialize.query("response_timeout_in_seconds", response_timeout_in_seconds, 'int')
+
+        # Construct headers
+        header_parameters = {}
+        if self.config.generate_client_request_id:
+            header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
+        if custom_headers:
+            header_parameters.update(custom_headers)
+        if self.config.accept_language is not None:
+            header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
+
+        # Construct body
+        body_content = self._serialize.body(payload, 'object')
+
+        # Construct and send request
+        request = self._client.post(url, query_parameters)
+        response = self._client.send(request, header_parameters, body_content, stream=False, **operation_config)
+
+        if response.status_code not in [200]:
+            exp = CloudError(response)
+            exp.request_id = response.headers.get('x-ms-request-id')
+            raise exp
+
+        deserialized = None
+        header_dict = {}
+
+        if response.status_code == 200:
+            deserialized = self._deserialize('object', response)
+            header_dict = {
+                'x-ms-command-statuscode': 'int',
+                'x-ms-request-id': 'str',
+            }
+
+        if raw:
+            client_raw_response = ClientRawResponse(deserialized, response)
+            client_raw_response.add_headers(header_dict)
+            return client_raw_response
+
+        return deserialized
+    invoke_interface_command.metadata = {'url': '/digitalTwins/{digitalTwinId}/interfaces/{interfaceName}/commands/{commandName}'}

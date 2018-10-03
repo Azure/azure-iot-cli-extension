@@ -9,4 +9,21 @@
 # regenerated.
 # --------------------------------------------------------------------------
 
-VERSION = "2019-07-01-preview"
+from msrest.serialization import Model
+
+
+class Desired(Model):
+    """Desired.
+
+    :param value: The desired value of the interface property to set in a
+     digitalTwin.
+    :type value: object
+    """
+
+    _attribute_map = {
+        'value': {'key': 'value', 'type': 'object'},
+    }
+
+    def __init__(self, value=None):
+        super(Desired, self).__init__()
+        self.value = value

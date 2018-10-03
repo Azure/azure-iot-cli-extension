@@ -6,7 +6,7 @@
 
 import os
 
-VERSION = '0.7.1'
+VERSION = '0.8.0'
 EXTENSION_NAME = 'azure-cli-iot-ext'
 EXTENSION_ROOT = os.path.dirname(os.path.abspath(__file__))
 EXTENSION_CONFIG_ROOT_KEY = 'iotext'
@@ -16,6 +16,9 @@ METHOD_INVOKE_MIN_TIMEOUT_SEC = 10
 MIN_SIM_MSG_INTERVAL = 1
 MIN_SIM_MSG_COUNT = 1
 SIM_RECEIVE_SLEEP_SEC = 3
+PNP_API_VERSION = '2019-07-01-preview'
+PNP_ENDPOINT = 'https://provider.azureiotrepository.com'
+PNP_REPO_ENDPOINT = 'https://repo.azureiotrepository.com'
 DEVICE_DEVICESCOPE_PREFIX = 'ms-azure-iot-edge://'
 TRACING_PROPERTY = 'azureiot*com^dtracing^1'
 TRACING_ALLOWED_FOR_LOCATION = ('northeurope', 'westus2', 'west us 2', 'southeastasia')
