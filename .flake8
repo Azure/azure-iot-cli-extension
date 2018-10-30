@@ -5,4 +5,5 @@ ignore =
     E501,  # line too long, it is covered by pylint
     E722,  # bare except, bad practice, to be removed in the future
     F401,  # imported but unused, it is covered by pylint
-    C901   # code flow is too complex, to be removed in the future
+    C901,  # code flow is too complex, to be removed in the future
+    W504   # line break after binary operator

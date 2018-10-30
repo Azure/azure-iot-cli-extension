@@ -9,7 +9,7 @@ score=no
 # too-many-arguments: Due to the nature of the CLI many commands have large arguments set which reflect in large arguments set in corresponding methods
 # useless-object-inheritance: Because we have to be explict for Py2
 # useless-import-alias: This is quite subjective and depends on the dev
-disable=missing-docstring,locally-disabled,fixme,cyclic-import,too-many-arguments,invalid-name,wrong-import-order,useless-object-inheritance,useless-import-alias
+disable=missing-docstring,locally-disabled,fixme,cyclic-import,too-many-arguments,invalid-name,wrong-import-order,useless-object-inheritance,useless-import-alias,W504
 
 [TYPECHECK]
 # For Azure CLI extensions, we ignore some import errors as they'll be available in the environment of the CLI
