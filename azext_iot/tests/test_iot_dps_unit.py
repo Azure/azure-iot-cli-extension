@@ -48,20 +48,16 @@ def fixture_sas(mocker):
 @pytest.fixture(params=[400, 401, 500])
 def serviceclient_generic_error(mocker, fixture_gdcs, fixture_sas, request):
     service_client = mocker.patch(path_service_client)
-    response = mocker.MagicMock(name='response')
-    response.error_code = request.param
-    del response._attribute_map
-    response.text = json.dumps({'error': 'something failed'})
-
-    service_client.return_value = response
+    service_client.return_value = build_mock_response(mocker, request.param, {'error': 'something failed'})
     return service_client
 
 
 def build_mock_response(mocker, status_code=200, payload=None):
     response = mocker.MagicMock(name='response')
     response.status_code = status_code
-    response.text = json.dumps(payload)
+    del response.context
     del response._attribute_map
+    response.text.return_value = json.dumps(payload)
     return response
 
 
@@ -419,11 +415,7 @@ class TestEnrollmentShow():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_gdcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        del response._attribute_map
-        response.status_code = request.param
-        response.text = json.dumps(generate_enrollment_show())
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker, request.param, generate_enrollment_show())
         return service_client
 
     def test_enrollment_show(self, serviceclient):
@@ -447,10 +439,7 @@ class TestEnrollmentList():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_gdcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        del response._attribute_map
-        response.status_code = request.param
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker, request.param, {})
         return service_client
 
     @pytest.mark.parametrize("servresult, servtotal, top", [
@@ -461,7 +450,7 @@ class TestEnrollmentList():
         ([generate_enrollment_show()], 1, 100)
     ])
     def test_enrollment_list(self, serviceclient, servresult, servtotal, top):
-        serviceclient.return_value.text = json.dumps(servresult)
+        serviceclient.return_value.text.return_value = json.dumps(servresult)
         pagesize = len(servresult)
         continuation = []
 
@@ -930,11 +919,7 @@ class TestEnrollmentGroupShow():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_gdcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        del response._attribute_map
-        response.status_code = request.param
-        response.text = json.dumps(generate_enrollment_group_show())
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker, request.param, generate_enrollment_group_show())
         return service_client
 
     def test_enrollment_group_show(self, serviceclient):
@@ -957,10 +942,7 @@ class TestEnrollmentGroupList():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_gdcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        del response._attribute_map
-        response.status_code = request.param
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker, request.param, {})
         return service_client
 
     @pytest.mark.parametrize("servresult, servtotal, top", [
@@ -971,7 +953,7 @@ class TestEnrollmentGroupList():
         ([generate_enrollment_group_show()], 1, 100)
     ])
     def test_enrollment_group_list(self, serviceclient, servresult, servtotal, top):
-        serviceclient.return_value.text = json.dumps(servresult)
+        serviceclient.return_value.text.return_value = json.dumps(servresult)
         pagesize = len(servresult)
         continuation = []
 
@@ -1031,10 +1013,7 @@ class TestEnrollmentGroupDelete():
     @pytest.fixture(params=[204])
     def serviceclient(self, mocker, fixture_gdcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        del response._attribute_map
-        response.status_code = request.param
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker, request.param, {})
         return service_client
 
     def test_enrollment_group_delete(self, serviceclient):
@@ -1062,11 +1041,7 @@ class TestRegistrationShow():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_gdcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        del response._attribute_map
-        response.status_code = request.param
-        response.text = json.dumps(generate_registration_state_show())
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker, request.param, generate_registration_state_show())
         return service_client
 
     def test_registration_show(self, serviceclient):
@@ -1089,13 +1064,9 @@ class TestRegistrationList():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_gdcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        del response._attribute_map
-        response.status_code = request.param
         result = []
         result.append(generate_registration_state_show())
-        response.text = json.dumps(result)
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker, request.param, result)
         return service_client
 
     def test_registration_list(self, serviceclient):
@@ -1117,10 +1088,7 @@ class TestRegistrationDelete():
     @pytest.fixture(params=[204])
     def serviceclient(self, mocker, fixture_gdcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        del response._attribute_map
-        response.status_code = request.param
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker, request.param, {})
         return service_client
 
     def test_registration_delete(self, serviceclient):

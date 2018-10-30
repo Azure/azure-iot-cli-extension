@@ -77,24 +77,14 @@ def fixture_sas(mocker):
 @pytest.fixture(params=[400, 401, 500])
 def serviceclient_generic_error(mocker, fixture_ghcs, fixture_sas, request):
     service_client = mocker.patch(path_service_client)
-    response = mocker.MagicMock(name='response')
-    response.status_code = request.param
-    del response._attribute_map
-    response.text = json.dumps({'error': 'something failed'})
-
-    service_client.return_value = response
+    service_client.return_value = build_mock_response(mocker, request.param, {'error': 'something failed'})
     return service_client
 
 
 @pytest.fixture(params=[{'etag': None}, {}])
 def serviceclient_generic_invalid_or_missing_etag(mocker, fixture_ghcs, fixture_sas, request):
     service_client = mocker.patch(path_service_client)
-    response = mocker.MagicMock(name='response')
-    response.status_code = 200
-    del response._attribute_map
-    response.text = json.dumps(request.param)
-
-    service_client.return_value = response
+    service_client.return_value = build_mock_response(mocker, 200, request.param)
     return service_client
 
 
@@ -108,10 +98,11 @@ def mqttclient_generic_error(mocker, fixture_ghcs, fixture_sas):
 def build_mock_response(mocker, status_code=200, payload=None, headers=None):
     response = mocker.MagicMock(name='response')
     response.status_code = status_code
-    response.text = json.dumps(payload)
+    del response.context
+    del response._attribute_map
+    response.text.return_value = json.dumps(payload)
     if headers:
         response.headers = headers
-    del response._attribute_map
     return response
 
 
@@ -311,17 +302,15 @@ class TestDeviceList():
     @pytest.fixture(params=[(200, 10), (200, 0)])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        response.status_code = request.param[0]
-        del response._attribute_map
         result = []
         size = request.param[1]
         for _ in range(size):
             result.append(generate_device_show())
         service_client.expected_size = size
-        response.text = json.dumps(result)
-        response.headers = {'x-ms-continuation': None}
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker,
+                                                          request.param[0],
+                                                          result,
+                                                          {'x-ms-continuation': None})
         return service_client
 
     @pytest.mark.parametrize("top, edge", [(10, True), (1000, False)])
@@ -514,11 +503,7 @@ class TestDeviceModuleShow():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        del response._attribute_map
-        response.status_code = request.param
-        response.text = json.dumps(generate_device_module_show())
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker, request.param, {})
         return service_client
 
     def test_device_module_show(self, serviceclient):
@@ -540,17 +525,15 @@ class TestDeviceModuleList():
     @pytest.fixture(params=[(200, 10), (200, 0)])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        response.status_code = request.param[0]
-        del response._attribute_map
         result = []
         size = request.param[1]
         for _ in range(size):
             result.append(generate_device_module_show())
         service_client.expected_size = size
-        response.text = json.dumps(result)
-        response.headers = {'x-ms-continuation': None}
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker,
+                                                          request.param[0],
+                                                          result,
+                                                          {'x-ms-continuation': None})
         return service_client
 
     @pytest.mark.parametrize("top", [10, 1000])
@@ -824,9 +807,6 @@ class TestConfigList():
     @pytest.fixture(params=[(200, 10)])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        response.status_code = request.param[0]
-        del response._attribute_map
         result = []
         size = request.param[1]
         for _ in range(size):
@@ -834,9 +814,10 @@ class TestConfigList():
         for _ in range(size):
             result.append(generate_device_config(content_type='device', scenario='update'))
         service_client.expected_size = size
-        response.text = json.dumps(result)
-        response.headers = {'x-ms-continuation': None}
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker,
+                                                          request.param[0],
+                                                          result,
+                                                          {'x-ms-continuation': None})
         return service_client
 
     @pytest.mark.parametrize("top", [1, 10])
@@ -1054,12 +1035,9 @@ class TestDeviceTwinShow():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        del response._attribute_map
-        response.status_code = request.param
-        response.text = json.dumps([generate_device_twin_show()])
-        response.headers = {'x-ms-continuation': None}
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker, request.param,
+                                                          [generate_device_twin_show()],
+                                                          {'x-ms-continuation': None})
         return service_client
 
     def test_device_twin_show(self, serviceclient):
@@ -1113,11 +1091,9 @@ class TestDeviceTwinReplace():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        response.status_code = request.param
-        del response._attribute_map
-        response.text = json.dumps(generate_device_twin_show(moduleId=module_id))
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker,
+                                                          request.param,
+                                                          generate_device_twin_show(moduleId=module_id))
         return service_client
 
     # Replace does a GET/SHOW first
@@ -1146,7 +1122,7 @@ class TestDeviceTwinReplace():
     ])
     def test_device_twin_replace_invalid_args(self, serviceclient, req, exp):
         with pytest.raises(exp):
-            serviceclient.return_value.text = json.dumps(req)
+            serviceclient.return_value.text.return_value = json.dumps(req)
             subject.iot_device_twin_replace(fixture_cmd, device_id, hub_name=mock_target['entity'],
                                             target_json=json.dumps(req))
 
@@ -1221,7 +1197,8 @@ class TestDeviceModuleTwinReplace():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        service_client.return_value = build_mock_response(mocker, request.param,
+        service_client.return_value = build_mock_response(mocker,
+                                                          request.param,
                                                           payload=generate_device_twin_show(moduleId=module_id))
         return service_client
 
@@ -1252,7 +1229,7 @@ class TestDeviceModuleTwinReplace():
     ])
     def test_device_module_twin_replace_invalid_args(self, serviceclient, req, exp):
         with pytest.raises(exp):
-            serviceclient.return_value.text = json.dumps(req)
+            serviceclient.return_value.text.return_value = json.dumps(req)
             subject.iot_device_module_twin_replace(fixture_cmd, device_id, hub_name=mock_target['entity'],
                                                    module_id=module_id, target_json=json.dumps(req))
 
@@ -1272,10 +1249,7 @@ class TestQuery():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        response.status_code = request.param
-        del response._attribute_map
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker, request.param, {})
         return service_client
 
     @pytest.mark.parametrize("query, servresult, servtotal, top", [
@@ -1286,7 +1260,7 @@ class TestQuery():
         (generic_query, [generate_device_twin_show()], 1, 100)
     ])
     def test_query_basic(self, serviceclient, query, servresult, servtotal, top):
-        serviceclient.return_value.text = json.dumps(servresult)
+        serviceclient.return_value.text.return_value = json.dumps(servresult)
         pagesize = len(servresult)
         continuation = []
 
@@ -1346,11 +1320,9 @@ class TestDeviceMethodInvoke():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        del response._attribute_map
-        response.status_code = request.param
-        response.text = json.dumps({'payload': 'value', 'status': 0})
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker,
+                                                          request.param,
+                                                          {'payload': 'value', 'status': 0})
         return service_client
 
     @pytest.mark.parametrize("methodbody", ['{"key":"value"}', None])
@@ -1402,11 +1374,7 @@ class TestDeviceModuleMethodInvoke():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        del response._attribute_map
-        response.status_code = request.param
-        response.text = json.dumps({'payload': 'value', 'status': 0})
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker, request.param, {'payload': 'value', 'status': 0})
         return service_client
 
     @pytest.mark.parametrize("methodbody", ['{"key":"value"}', None])
@@ -1595,9 +1563,7 @@ class TestDeviceMessaging():
     @pytest.fixture
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        del response._attribute_map
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker)
         return service_client
 
     def test_c2d_receive(self, serviceclient):
@@ -1714,11 +1680,7 @@ class TestDeviceSimulate():
     @pytest.fixture(params=[204])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        del response._attribute_map
-        response.status_code = request.param
-        response.text = ""
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker, request.param, "")
         return service_client
 
     @pytest.fixture()
@@ -1775,10 +1737,7 @@ class TestMonitorEvents():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        del response._attribute_map
-        response.status_code = request.param
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker, request.param)
         existing_target = fixture_ghcs.return_value
         existing_target['events'] = {}
         existing_target['events']['partition_ids'] = []
