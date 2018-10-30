@@ -6,7 +6,8 @@
 
 
 def ERROR_NO_HUB_OR_LOGIN_ON_INPUT(entity_type='IoT Hub'):
-    return 'Please provide an {0} entity name or {0} connection string via --login...'.format(entity_type)
+    return ("Please provide an {0} entity name (via the '--hub-name' or '-n' parameter)"
+            " or {0} connection string via --login...").format(entity_type)
 
 
 def ERROR_PARAM_TOP_OUT_OF_BOUNDS(upper_limit=None):
