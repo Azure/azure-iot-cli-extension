@@ -77,26 +77,14 @@ def fixture_sas(mocker):
 @pytest.fixture(params=[400, 401, 500])
 def serviceclient_generic_error(mocker, fixture_ghcs, fixture_sas, request):
     service_client = mocker.patch(path_service_client)
-    response = mocker.MagicMock(name='response')
-    response.status_code = request.param
-    del response.context
-    del response._attribute_map
-    response.text.return_value = json.dumps({'error': 'something failed'})
-
-    service_client.return_value = response
+    service_client.return_value = build_mock_response(mocker, request.param, {'error': 'something failed'})
     return service_client
 
 
 @pytest.fixture(params=[{'etag': None}, {}])
 def serviceclient_generic_invalid_or_missing_etag(mocker, fixture_ghcs, fixture_sas, request):
     service_client = mocker.patch(path_service_client)
-    response = mocker.MagicMock(name='response')
-    response.status_code = 200
-    del response.context
-    del response._attribute_map
-    response.text.return_value = json.dumps(request.param)
-
-    service_client.return_value = response
+    service_client.return_value = build_mock_response(mocker, 200, request.param)
     return service_client
 
 
@@ -1261,11 +1249,7 @@ class TestQuery():
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        response = mocker.MagicMock(name='response')
-        response.status_code = request.param
-        del response.context
-        del response._attribute_map
-        service_client.return_value = response
+        service_client.return_value = build_mock_response(mocker, request.param, {})
         return service_client
 
     @pytest.mark.parametrize("query, servresult, servtotal, top", [
