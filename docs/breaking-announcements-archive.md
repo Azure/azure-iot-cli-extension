@@ -1,6 +1,12 @@
 ## :exclamation: Breaking Announcements :exclamation:
 
-**NEW** 6/21/18 -
+**9/14/18**
+In order to satisfy new CI linter rules for the Azure CLI, we have replaced multi-character short options (like '-props', or '-pri') with long option versions ('--props', '--pri').
+
+The option names have not changed, but to fix any existing scripts, please use the '--' prefix for any command options that are not single characters. Single character options such as '-l', '-n', and '-d' are unaffected.
+
+
+**6/21/18**
 The Windows Installer for Azure CLI since version 2.0.34 has an issue with the packaged pip. This issue prevents the IoT extension from being installed. 
 
 To fix, upgrade using at least the 2.0.39 MSI.

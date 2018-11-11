@@ -4,7 +4,7 @@ This section aims to provide the community with example automation scripts using
 
 
 
-### Provision, simulate and monitor devices
+### Provision, Simulate and Monitor devices
 
 ```bash
 #!/usr/bin/env bash
