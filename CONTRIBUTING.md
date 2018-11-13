@@ -7,6 +7,8 @@
     - Follow the [Azure CLI: Setting up your development environment](https://github.com/Azure/azure-cli/blob/master/doc/configuring_your_machine.md) steps to setup your machine for general Azure CLI development.
     - Move on to the next step when you can successfully run `azdev` and see the help message.
 
+    > Make sure you keep the virtual environment you created above activated while completing following steps.
+
 1. Update AZURE_EXTENSION_DIR and PYTHONPATH Environment Variables
 
     By default, CLI extensions are installed to the `~/.azure/cliextensions` directory.  For extension development, you'll want to update the AZURE_EXTENSION_DIR environment variable to `~/.azure/devcliextensions`, so your development extensions don't collide with your production extensions.
@@ -21,15 +23,15 @@
 
     1. Run the following script to set the environment variables.
 
-    - Windows:  
+    **Windows:**
 
     ```
     set EXTENSION_PATH=%USERPROFILE%\.azure\devcliextensions\
     mkdir %EXTENSION_PATH%
-    setx AZURE_EXTENSION_DIR %EXTENSION_PATH%
-    setx PYTHONPATH %PYTHONPATH%;%EXTENSION_PATH%azure-cli-iot-ext;%CD%
+    set AZURE_EXTENSION_DIR=%EXTENSION_PATH%
+    set PYTHONPATH=%PYTHONPATH%;%EXTENSION_PATH%azure-cli-iot-ext;%CD%
     ```
-    - Linux: 
+    **Linux:**
 
     ```
     export EXTENSION_PATH=~/.azure/devcliextensions/
@@ -48,12 +50,12 @@
 
     1. Install the Extension
 
-    - Windows:
+    **Windows:**
     ```
     pip install -U --target %AZURE_EXTENSION_DIR%/azure-cli-iot-ext .
     ```
 
-    - Linux: 
+    **Linux:**
     ```
     pip install -U --target $AZURE_EXTENSION_DIR/azure-cli-iot-ext .
     ```
@@ -62,18 +64,13 @@
 
     Run the following command to view installed extensions:
 
-    `az extension list`
+    `az -debug`
 
-    You should see the following output.
+    That will output which directory is being used to load extensions and it will show that the `azure-cli-iot-ext` extension has been loaded.
 
-    ```json
-    [
-    {
-        "extensionType": "whl",
-        "name": "azure-cli-iot-ext",
-        "version": "0.6.0"
-    }
-    ]
+    ```
+    Extensions directory: '...\.azure\devcliextensions\'
+    Found 1 extensions: ['azure-cli-iot-ext']
     ```
 
 Please use `az --debug` if you run into any issues, or file an issue in this GitHub repo.
@@ -84,78 +81,73 @@ Please refer to the [Azure CLI Extension Guide](https://github.com/Azure/azure-c
 
 1. Install Dependencies
 
-    The tests make use of [pytest](https://docs.pytest.org/en/latest/) and [unittest](https://docs.python.org/3.6/library/unittest.html). We also use `pytest-mock` and `pytest-cov` plugins for pytest so make sure you `pip install` these dependencies beforehand. You can leverage our `dev_requirements` file at the root of this project to install from.
+    This project utilizes the following: [pytest](https://docs.pytest.org/en/latest/), [unittest](https://docs.python.org/3.6/library/unittest.html), `pytest-mock`, and `pytest-cov`.
 
-    Run the following to install of the Python dependencies for this extension:
+    Run the following to install them:
 
     `pip install -r dev_requirements`
 
 1. Activate Virtual Environment
 
-    1. Navigate to the root of of your CLI extension project
+    Ensure that the virtual environment you created while setting up your machine for general Azure CLI development is activated and the dev_setup.py script has been run.
 
-    1. Create a new virtual environment “env” for Python in the root of your clone. You can do this by running:
-
-        Windows:
-        ```BatchFile
-        python -m venv env
-        ```
-        OSX/Ubuntu (bash):
-        ```Shell
-        python -m venv env
-        ```
-    1. Activate the env virtual environment by running:
-
-        Windows:
-        ```BatchFile
-        env\scripts\activate.bat
-        ```
-        OSX/Ubuntu (bash):
-        ```Shell
-        ./env/bin/activate
-        ```
-
-#### Unit tests
+#### Unit Tests
 
 _Hub:_  
 `pytest azext_iot/tests/test_iot_ext_unit.py`
 
 _DPS:_  
-`pytest <extension root>/azext_iot/tests/test_iot_dps_unit.py`
+`pytest azext_iot/tests/test_iot_dps_unit.py`
 
-#### Integration tests
+#### Integration Tests
 
-Currently integration tests leverage Azure CLI live scenario tests. Update the following environment variables OR use an updated pytest.ini (copying and renaming pytest.ini.example) in the extension root directory prior to running integration tests.
+Integration tests are run against Azure resources and depend on environment variables.
 
-These variables are **shared** between Hub and DPS integration tests:
+##### Azure Resource Setup
 
-`AZURE_TEST_RUN_LIVE` # Set to 'True' to hit live endpoints.
+1. Create IoT Hub
+> IMPORTANT: Your IoT Hub must be created specifically for integration tests and must not contain any devices when the tests are run.
+1. Create Files Storage - In IoT Hub, click Files, create a new Storage Account and link to an empty Container.
+1. Create IoT Hub Device Provisioning Service (DPS)
+1. Link IoT Hub to DPS - From DPS, click "Linked IoT Hub" and link the IoT Hub you just created.
 
-`azext_iot_testrg` # Target resource group for tests.
+##### Environment Variables
+You can either manually set the environment variables or use the `pytest.ini.example` file in the root of the extension repo. To use that file, rename it to `pytest.ini`, open it and set the variables as indicated below.
 
-`azext_iot_testhub` # Target IoT Hub for respective category of tests.
+```
+    AZURE_TEST_RUN_LIVE=True
+    azext_iot_testrg="Resource Group that contains your IoT Hub"
+    azext_iot_testhub="IoT Hub Name"
+    azext_iot_testhub_cs="IoT Hub Connection String"
+    azext_iot_testdps="IoT Hub DPS Name"
+    azext_iot_teststorageuri="Blob Container SAS Uri"
+```
 
-Now you can run **Hub** integration tests:
-
-`pytest <extension root>/azext_iot/tests/test_iot_ext_int.py`
-
-_Optionally_ set `azext_iot_teststorageuri` to your empty blob container sas uri to test device export and enable file upload test. For file upload, you will need to have configured your IoT Hub before running.
-
-For **DPS** update the following environment variable prior to running.
-
-`azext_iot_testdps` # Target IoT Hub DPS for respective category of tests.
-
-Now you can run **DPS** integration tests:
-
-`pytest <extension root>/azext_iot/tests/test_iot_dps_int.py`
-
-#### All tests and coverage in one command
-
-At this point if your environment has been setup to execute all tests, you can leverage pytest discovery to run all tests and provide a coverage report.
-
-`pytest -v <extension root> --cov=azext_iot --cov-config <extension root>/.coveragerc`
+`azext_iot_teststorageuri` is optional and only required when you want to test device export and file upload functionality. You can generate a SAS Uri for your Blob container using the [Azure Storage Explorer](https://azure.microsoft.com/en-us/features/storage-explorer/).  You must also configure your IoT Hub's File Upload storage container via the Azure Portal for this test to pass.
 
 
+##### IoT Hub
+
+Execute the following command to run the IoT Hub integration tests:
+
+`pytest azext_iot/tests/test_iot_ext_int.py`
+
+
+##### Device Provisioning Service
+
+Execute the following command to run the IoT Hub DPS integration tests:
+
+`pytest azext_iot/tests/test_iot_dps_int.py`
+
+#### Unit and Integration Tests Single Command
+
+Execute the following command from the root of your extension to run both Unit and Integration tests and output a Code Coverage report to a `.coveragerc` file.
+
+`pytest -v . --cov=azext_iot --cov-config .coveragerc`
+
+
+
+#### Microsoft CLA
 
 This project welcomes contributions and suggestions.  Most contributions require you to agree to a
 Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us

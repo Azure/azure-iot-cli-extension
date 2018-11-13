@@ -1,6 +1,6 @@
 ## Automation Scenarios
 
-This section aims to provide the community with example automation scripts using the CLI IoT extension in order to jump start Azure IoT scenario ideas.
+This section aims to provide the community with example automation scripts using the IoT CLI extension in order to jump start Azure IoT scenario ideas.
 
 
 

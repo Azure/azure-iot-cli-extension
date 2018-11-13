@@ -1,5 +1,15 @@
 ## Installation Troubleshooting Guide
 
+### Compatibility
+Before installation ensure that your Azure CLI version meets the following criteria. The criteria differs based on OS and method of installation. Use `az --version` to determine the CLI version.
+
+In all cases your CLI needs to be at least `v2.0.24`.
+
+| CLI Install Method  | NOT compatible with |
+| ------------- | ------------- |
+| Windows via MSI  | v2.0.34 to v2.0.38  |
+| Windows via PIP, Linux or macOS  | v2.0.34 to v2.0.36  |
+
 **Problem**
 
 After installing Azure CLI in my supported Linux environment, I try to install the extension via `az extension add --name azure-cli-iot-ext` but I get an error that looks like:
@@ -18,12 +28,3 @@ On an Ubuntu 16.04 environment provided with the [Windows Subsystem for Linux](h
 
 `deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ xenial main`
 
-### Compatibility
-Before installation ensure that your Azure CLI version meets the following criteria. The criteria differs based on OS and method of installation. Use `az --version` to determine the CLI version.
-
-In all cases your CLI needs to be at least `v2.0.24`.
-
-| CLI Install Method  | NOT compatible with |
-| ------------- | ------------- |
-| Windows via MSI  | v2.0.34 to v2.0.38  |
-| Windows via PIP, Linux or macOS  | v2.0.34 to v2.0.36  |

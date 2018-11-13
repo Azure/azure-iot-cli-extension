@@ -5,7 +5,7 @@
 The **Azure IoT Extension for Azure CLI** adds _IoT Hub_, _IoT Edge_, and _IoT Device Provisioning Service (DPS)_ specific commands to the official [Azure CLI](https://docs.microsoft.com/en-us/cli/azure).
 
 ## Commands
-Please refer to the official "az iot" page on [Microosft Docs](https://docs.microsoft.com/en-us/cli/azure/ext/azure-cli-iot-ext) for a complete list of supported commands.  You can also find IoT CLI usage tips on the [wiki](https://github.com/Azure/azure-iot-cli-extension/wiki/Tips).
+Please refer to the official "az iot" page on [Microsoft Docs](https://docs.microsoft.com/en-us/cli/azure/ext/azure-cli-iot-ext) for a complete list of supported commands.  You can also find IoT CLI usage tips on the [wiki](https://github.com/Azure/azure-iot-cli-extension/wiki/Tips).
 
 ## Installation
 
