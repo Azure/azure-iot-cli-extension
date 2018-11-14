@@ -64,7 +64,7 @@
 
     Run the following command to view installed extensions:
 
-    `az -debug`
+    `az --debug`
 
     That will output which directory is being used to load extensions and it will show that the `azure-cli-iot-ext` extension has been loaded.
 
@@ -141,11 +141,9 @@ Execute the following command to run the IoT Hub DPS integration tests:
 
 #### Unit and Integration Tests Single Command
 
-Execute the following command from the root of your extension to run both Unit and Integration tests and output a Code Coverage report to a `.coveragerc` file.
+Execute the following command to run both Unit and Integration tests and output a code coverage report to the console and to a `.coverage` file.  You can configure code coverage with the `.coveragerc` file.
 
 `pytest -v . --cov=azext_iot --cov-config .coveragerc`
-
-
 
 #### Microsoft CLA
 
