@@ -1,4 +1,14 @@
-## Installation Troubleshooting
+## Installation Troubleshooting Guide
+
+### Compatibility
+Before installation ensure that your Azure CLI version meets the following criteria. The criteria differs based on OS and method of installation. Use `az --version` to determine the CLI version.
+
+In all cases your CLI needs to be at least `v2.0.24`.
+
+| CLI Install Method  | NOT compatible with |
+| ------------- | ------------- |
+| Windows via MSI  | v2.0.34 to v2.0.38  |
+| Windows via PIP, Linux or macOS  | v2.0.34 to v2.0.36  |
 
 **Problem**
 
@@ -17,3 +27,4 @@ For example using the recommended installation path of [Linux via apt](https://d
 On an Ubuntu 16.04 environment provided with the [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/install-win10) the sources list file should have an entry tagged with 'xenial':
 
 `deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ xenial main`
+
