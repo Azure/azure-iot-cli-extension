@@ -20,15 +20,14 @@ from azext_iot.common.utility import url_encode_str
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.utility import unicode_binary_map, parse_entity
 
-
 logger = get_logger(__name__)
 
 DEBUG = True
 
 
-def executor(target, consumer_group, enqueued_time, device_id=None, properties=None, timeout=0):
+def executor(target, consumer_group, enqueued_time, device_id=None, properties=None, timeout=0, output=None):
     coroutines = []
-    coroutines.append(initiate_event_monitor(target, consumer_group, enqueued_time, device_id, properties, timeout))
+    coroutines.append(initiate_event_monitor(target, consumer_group, enqueued_time, device_id, properties, timeout, output))
 
     loop = asyncio.get_event_loop()
     if loop.is_closed():
@@ -65,7 +64,7 @@ def executor(target, consumer_group, enqueued_time, device_id=None, properties=N
                 raise RuntimeError(error)
 
 
-async def initiate_event_monitor(target, consumer_group, enqueued_time, device_id=None, properties=None, timeout=0):
+async def initiate_event_monitor(target, consumer_group, enqueued_time, device_id=None, properties=None, timeout=0, output=None):
     def _get_conn_props():
         properties = {}
         properties["product"] = "az.cli.iot.extension"
@@ -107,12 +106,13 @@ async def initiate_event_monitor(target, consumer_group, enqueued_time, device_i
                                              enqueuedtimeutc=enqueued_time,
                                              properties=properties,
                                              device_id=device_id,
-                                             timeout=timeout))
+                                             timeout=timeout,
+                                             output=output))
         await asyncio.gather(*coroutines, return_exceptions=True)
 
 
 async def monitor_events(endpoint, connection, path, auth, partition, consumer_group, enqueuedtimeutc,
-                         properties, device_id=None, timeout=0):
+                         properties, device_id=None, timeout=0, output=None):
     source = uamqp.address.Source('amqps://{}/{}/ConsumerGroups/{}/Partitions/{}'.format(endpoint, path,
                                                                                          consumer_group, partition))
     source.set_filter(
@@ -127,7 +127,15 @@ async def monitor_events(endpoint, connection, path, auth, partition, consumer_g
         event_source = {'event': {}}
 
         event_source['event']['origin'] = origin
-        event_source['event']['payload'] = str(next(msg.get_data()), 'utf8')
+
+        payload = ''
+
+        data = msg.get_data()
+        if data:
+            payload = str(next(data), 'utf8')
+
+        event_source['event']['payload'] = payload
+
         if 'anno' in properties or 'all' in properties:
             event_source['event']['annotations'] = unicode_binary_map(msg.annotations)
         if 'sys' in properties or 'all' in properties:
@@ -142,7 +150,18 @@ async def monitor_events(endpoint, connection, path, auth, partition, consumer_g
             if app_prop:
                 event_source['event']['properties']['application'] = unicode_binary_map(app_prop)
 
-        six.print_(yaml.dump(event_source, default_flow_style=False), flush=True)
+        if output and output == 'json':
+            try:
+                if event_source['event']['payload']:
+                    event_source['event']['payload'] = json.loads(event_source['event']['payload'].replace('\\n', '').replace('\\r', ''))
+            except Exception:  # pylint: disable=broad-except
+                # We don't want to crash the monitor if JSON parsing fails.
+                six.print_('Message payload is not valid JSON.')
+            dump = json.dumps(event_source, indent=4)
+        else:
+            dump = yaml.safe_dump(event_source, default_flow_style=False)
+
+        six.print_(dump, flush=True)
 
     exp_cancelled = False
     receive_client = uamqp.ReceiveClientAsync(source, auth=auth, timeout=timeout, prefetch=0, debug=DEBUG)
