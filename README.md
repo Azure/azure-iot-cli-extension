@@ -22,7 +22,11 @@ Please refer to the [Installation Troubleshooting Guide](docs/install-help.md) i
 Please refer to the [Example Automation Scripts](docs/scenario-automation.md) page for an example of how to use the IoT CLI to automate your scenarios.
 
 ## Contributing
+<<<<<<< HEAD
 Please refer to the [Contributing](contributing.md) page for developer setup instructions and contribution guidelines.
+=======
+Please refer to the [Contributing](CONTRIBUTING.md) page for developer setup instructions and contribution guidelines.
+>>>>>>> upstream/dev
 
 
 ## Code of Conduct
