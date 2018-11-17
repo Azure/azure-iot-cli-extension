@@ -11,7 +11,7 @@ import six
 from knack.log import get_logger
 from knack.util import CLIError
 from azure.cli.core.util import read_file_content
-from azure.cli.core._output import get_output_format
+#from azure.cli.core._output import get_output_format
 from azext_iot._constants import EXTENSION_ROOT, BASE_API_VERSION
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import (DeviceAuthType,
@@ -1126,7 +1126,7 @@ def iot_hub_monitor_events(cmd, hub_name=None, device_id=None, consumer_group='$
     timeout = (timeout * 1000)
 
     config = cmd.cli_ctx.config
-    output = get_output_format(cmd.cli_ctx)
+    output = cmd.cli_ctx.invocation.data.get("output", None) #get_output_format(cmd.cli_ctx)
     ensure_uamqp(config, yes, repair)
 
     events3 = importlib.import_module('azext_iot.operations.events3._events')
