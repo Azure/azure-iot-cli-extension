@@ -3,18 +3,21 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-# pylint: disable=too-many-statements
+# pylint: disable=too-many-statements,wrong-import-position
 
 import os
 import random
 import json
 import pytest
-from uuid import uuid4
+import sys
 
+from uuid import uuid4
 from azure.cli.testsdk import LiveScenarioTest
 from azure.cli.core.util import read_file_content
 from azext_iot.common.utility import validate_min_python_version, execute_onthread
 
+# Add test tools to path
+sys.path.append(os.path.abspath(os.path.join('.', 'iotext_test_tools')))
 
 # Set these to the proper IoT Hub, IoT Hub Cstring and Resource Group for Live Integration Tests.
 LIVE_HUB = os.environ.get('azext_iot_testhub')
