@@ -9,6 +9,10 @@ import os
 import random
 import json
 import pytest
+import sys
+import io
+
+from contextlib import contextmanager
 from uuid import uuid4
 
 from azure.cli.testsdk import LiveScenarioTest
@@ -32,6 +36,48 @@ CWD = os.path.dirname(os.path.abspath(__file__))
 
 PRIMARY_THUMBPRINT = 'A361EA6A7119A8B0B7BBFFA2EAFDAD1F9D5BED8C'
 SECONDARY_THUMBPRINT = '14963E8F3BA5B3984110B3C1CA8E8B8988599087'
+
+
+# TODO: Move to test tools common module
+@contextmanager
+def capture_output():
+    class stream_buffer_tee(object):
+        def __init__(self):
+            self.stdout = sys.stdout
+            self.buffer = io.StringIO()
+
+        def write(self, message):
+            self.stdout.write(message)
+            self.buffer.write(message)
+
+        def flush(self):
+            self.stdout.flush()
+            self.buffer.flush()
+
+        def get_output(self):
+            return self.buffer.getvalue()
+
+        def close(self):
+            self.buffer.close()
+
+    _stdout = sys.stdout
+    buffer_tee = stream_buffer_tee()
+    sys.stdout = buffer_tee
+    try:
+        yield buffer_tee
+    finally:
+        sys.stdout = _stdout
+        buffer_tee.close()
+
+class TestA():
+    def test_a(self):
+        with capture_output() as buffer:
+            print('hey how is it going')
+            print('This is a test')
+            print('!!')
+            output = buffer.get_output()
+
+        print('***Received = {}***'.format(output))
 
 
 class TestIoTHub(LiveScenarioTest):
