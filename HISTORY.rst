@@ -3,6 +3,12 @@
 Release History
 ===============
 
+0.6.1
++++++++++++++++
+* Added --output support to monitor-events. Supports either json or yaml, i.e. az iot hub monitor-events --hub-name {} -d {} --output yaml
+* Changed monitor-events to output JSON by default
+* Added support to parse payload as JSON if system property Content-Type is provided and application/json (i.e. --props $.ct=application/json from the CLI)
+
 0.6.0
 +++++++++++++++
 * Upgrade DPS Sdk to V20180901 (#39)

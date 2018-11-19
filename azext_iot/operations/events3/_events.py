@@ -5,20 +5,21 @@
 # --------------------------------------------------------------------------------------------
 
 import asyncio
+import json
+import re
+import sys
 from time import time
 from uuid import uuid4
-import sys
+
+import six
 
 import uamqp
-import six
 import yaml
-import json
-
-from knack.log import get_logger
 from azext_iot._constants import VERSION
-from azext_iot.common.utility import url_encode_str
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
-from azext_iot.common.utility import unicode_binary_map, parse_entity
+from azext_iot.common.utility import (parse_entity, unicode_binary_map,
+                                      url_encode_str)
+from knack.log import get_logger
 
 logger = get_logger(__name__)
 
@@ -133,6 +134,16 @@ async def monitor_events(endpoint, connection, path, auth, partition, consumer_g
         data = msg.get_data()
         if data:
             payload = str(next(data), 'utf8')
+        
+        system_props = unicode_binary_map(parse_entity(msg.properties, True))
+        content_type = system_props['content_type'].lower() if 'content_type' in system_props else ''
+
+        if content_type == 'application/json':
+            try:
+                payload = json.loads(re.compile(r'(\\r\\n)+|\\r+|\\n+').sub('', payload))
+            except Exception:  # pylint: disable=broad-except
+                # We don't want to crash the monitor if JSON parsing fails. Not logging exception because the default is json and error message would print for every message received
+                pass
 
         event_source['event']['payload'] = payload
 
@@ -141,7 +152,7 @@ async def monitor_events(endpoint, connection, path, auth, partition, consumer_g
         if 'sys' in properties or 'all' in properties:
             if not event_source['event'].get('properties'):
                 event_source['event']['properties'] = {}
-            event_source['event']['properties']['system'] = unicode_binary_map(parse_entity(msg.properties, True))
+            event_source['event']['properties']['system'] = system_props
         if 'app' in properties or 'all' in properties:
             if not event_source['event'].get('properties'):
                 event_source['event']['properties'] = {}
@@ -149,14 +160,8 @@ async def monitor_events(endpoint, connection, path, auth, partition, consumer_g
 
             if app_prop:
                 event_source['event']['properties']['application'] = unicode_binary_map(app_prop)
-
-        if output and output == 'json':
-            try:
-                if event_source['event']['payload']:
-                    event_source['event']['payload'] = json.loads(event_source['event']['payload'].replace('\\n', '').replace('\\r', ''))
-            except Exception:  # pylint: disable=broad-except
-                # We don't want to crash the monitor if JSON parsing fails.
-                six.print_('Message payload is not valid JSON.')
+            
+        if output.lower() == 'json':
             dump = json.dumps(event_source, indent=4)
         else:
             dump = yaml.safe_dump(event_source, default_flow_style=False)
