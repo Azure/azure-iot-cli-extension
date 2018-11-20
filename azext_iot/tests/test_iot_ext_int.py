@@ -1180,16 +1180,15 @@ class TestIoTHub(LiveScenarioTest):
                              args=[client, device_ids[i], LIVE_HUB, 'complete', 'Ping from event monitor test 1, part a', 5, 1],
                              max_runs=1)
 
-        self.cmd('iot hub monitor-events -n {} -g {} -t 10 -y -p sys anno app'.format(
-            LIVE_HUB, LIVE_RG), checks=None)
-
+        self.command_execute_assert('iot hub monitor-events -n {} -g {} -t 10 -y -p sys anno app'.format(LIVE_HUB, LIVE_RG), device_ids)
+        
         # With connection string
         for i in range(device_count):
             execute_onthread(method=iot_simulate_device,
                              args=[client, device_ids[i], LIVE_HUB, 'complete', 'Ping from event monitor test 1, part b', 5, 1],
                              max_runs=1)
 
-        self.cmd('iot hub monitor-events -t 10 -y -p all --login {}'.format(LIVE_HUB_CS), checks=None)
+        self.command_execute_assert('iot hub monitor-events -t 10 -y -p all --login {}'.format(LIVE_HUB_CS), device_ids)
 
         # Leverage app and system properties
         execute_onthread(method=iot_device_send_message,
@@ -1198,8 +1197,8 @@ class TestIoTHub(LiveScenarioTest):
                                '$.mid=12345;key0=value0;key1=1', 5],
                          max_runs=3)
 
-        self.cmd('iot hub monitor-events -t 10 -y -p all --login {}'.format(LIVE_HUB_CS), checks=None)
-
+        self.command_execute_assert('iot hub monitor-events -t 10 -y -p all --login {}'.format(LIVE_HUB_CS), [device_ids[0], '"message_id": "12345"', '"key0": "value0"', '"key1": "1"'])
+        
     @pytest.mark.skipif(not validate_min_python_version(3, 5, exit_on_fail=False), reason="minimum python version not satisfied")
     def test_hub_monitor_event_device(self):
         from azext_iot.operations.hub import iot_simulate_device
@@ -1224,17 +1223,15 @@ class TestIoTHub(LiveScenarioTest):
                                    'Ping from event monitor test 2, part a', 5, 1, 'http'],
                              max_runs=1)
 
-        self.cmd('iot hub monitor-events -n {} -t 10 -y -p all -d {}'.format(
-            LIVE_HUB, device_ids[0]), checks=None)
+
+        self.command_execute_assert('iot hub monitor-events -n {} -t 10 -y -p all -d {}'.format(LIVE_HUB, device_ids[0]), device_ids[0])
 
         # With connection string
-        for i in range(device_count):
-            execute_onthread(method=iot_simulate_device,
-                             args=[client, device_ids[i], LIVE_HUB, 'complete', 'Ping from event monitor test 2, part b', 5, 1],
-                             max_runs=1)
+        execute_onthread(method=iot_simulate_device,
+                         args=[client, device_ids[0], LIVE_HUB, 'complete', 'Ping from event monitor test 2, part b', 5, 1],
+                         max_runs=1)
 
-        self.cmd('iot hub monitor-events -t 10 -y -p sys anno app --device-id {} --login {}'.format(
-            device_ids[0], LIVE_HUB_CS), checks=None)
+        self.command_execute_assert('iot hub monitor-events -t 10 -y -p sys anno app --device-id {} --login {}'.format(device_ids[0], LIVE_HUB_CS), device_ids[0])
 
     @pytest.mark.skipif(not validate_min_python_version(3, 4, exit_on_fail=False), reason="minimum python version not satisfied")
     def test_hub_monitor_feedback(self):
@@ -1260,7 +1257,7 @@ class TestIoTHub(LiveScenarioTest):
         self.cmd('iot device c2d-message complete -d {} --hub-name {} -g {} -e {}'
                  .format(device_ids[0], LIVE_HUB, LIVE_RG, etag))
 
-        self.cmd('iot hub monitor-feedback -n {} -g {} -w {} -y'.format(LIVE_HUB, LIVE_RG, msg_id))
+        self.command_execute_assert('iot hub monitor-feedback -n {} -g {} -w {} -y'.format(LIVE_HUB, LIVE_RG, msg_id), ['description: Success'])
 
         # With connection string - filter on device
         ack = 'positive'
@@ -1276,7 +1273,7 @@ class TestIoTHub(LiveScenarioTest):
         self.cmd('iot device c2d-message complete -d {} --login {} -e {}'
                  .format(device_ids[0], LIVE_HUB_CS, etag))
 
-        self.cmd('iot hub monitor-feedback --login {} -w {} -d {} -y'.format(LIVE_HUB_CS, msg_id, device_ids[0]))
+        self.command_execute_assert('iot hub monitor-feedback --login {} -w {} -d {} -y'.format(LIVE_HUB_CS, msg_id, device_ids[0]), ['description: Success'])
 
         # With connection string - dead lettered case + unrelated ack
         ack = 'negative'
@@ -1303,8 +1300,20 @@ class TestIoTHub(LiveScenarioTest):
         self.cmd('iot device c2d-message reject -d {} --login {} -e {}'
                  .format(device_ids[0], LIVE_HUB_CS, etag))
 
-        self.cmd('iot hub monitor-feedback --login {} -w {} -y'.format(LIVE_HUB_CS, msg_id))
+        self.command_execute_assert('iot hub monitor-feedback --login {} -w {} -y'.format(LIVE_HUB_CS, msg_id), ['description: Message rejected'])
+        
 
+    def command_execute_assert(self, command, asserts):
+        from iotext_test_tools import capture_output
+
+        with capture_output() as buffer:
+            self.cmd(command, checks=None)
+            output = buffer.get_output()
+
+        for a in asserts:
+            assert a in output
+        
+    
     @pytest.mark.skipif(not LIVE_STORAGE, reason="empty azext_iot_teststorageuri env var")
     def test_storage(self):
         device_count = 1
