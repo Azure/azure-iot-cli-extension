@@ -28,8 +28,7 @@ LIVE_HUB_CS = os.environ.get('azext_iot_testhub_cs')
 # Set this environment variable to your empty blob container sas uri to test device export and enable file upload test.
 # For file upload, you will need to have configured your IoT Hub before running.
 LIVE_STORAGE = os.environ.get('azext_iot_teststorageuri')
-LIVE_CONSUMER_GROUP1 = 'test1'
-LIVE_CONSUMER_GROUP2 = 'test2'
+LIVE_CONSUMER_GROUPS = ['test1', 'test2', 'test3']
 
 if not all([LIVE_HUB, LIVE_HUB_CS, LIVE_RG]):
     raise ValueError('Set azext_iot_testhub, azext_iot_testhub_cs and azext_iot_testrg to run IoT Hub integration tests.')
@@ -48,8 +47,9 @@ class TestIoTHub(LiveScenarioTest):
 
     def setUp(self):
         self._entity_names = None
-        self.cmd('az iot hub consumer-group create --hub-name {} --resource-group {} --name {}'.format(LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUP1), checks=[self.check('name', LIVE_CONSUMER_GROUP1)])
-        self.cmd('az iot hub consumer-group create --hub-name {} --resource-group {} --name {}'.format(LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUP2), checks=[self.check('name', LIVE_CONSUMER_GROUP2)])
+        for cg in LIVE_CONSUMER_GROUPS:
+            self.cmd('az iot hub consumer-group create --hub-name {} --resource-group {} --name {}'.format(LIVE_HUB, LIVE_RG, cg), checks=[self.check('name', cg)])
+
 
     #TODO: @digimaun - Maybe put a helper like this in the shared lib, when you create it?
     def command_execute_assert(self, command, asserts):
@@ -1202,15 +1202,16 @@ class TestIoTHub(LiveScenarioTest):
             execute_onthread(method=iot_device_send_message,
                              args=[client, device_ids[i], LIVE_HUB, '{\r\n"payload_data1":"payload_value1"\r\n}', '$.mid=12345;key0=value0;key1=1', 1, LIVE_RG],
                              max_runs=1)
-
         # Monitor events for all devices and include sys, anno, app
-        self.command_execute_assert('iot hub monitor-events -n {} -g {} -t 10 -y -p sys anno app'.format(LIVE_HUB, LIVE_RG), device_ids + ['system', 'annotations', 'application', '"message_id": "12345"', '"key0": "value0"', '"key1": "1"'])
+        self.command_execute_assert('iot hub monitor-events -n {} -g {} --cg {} --et {} -t 10 -y -p sys anno app'.format(LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUPS[0], enqueued_time), device_ids + ['system', 'annotations', 'application', '"message_id": "12345"', '"key0": "value0"', '"key1": "1"'])
 
         # Monitor events for a single device
-        self.command_execute_assert('iot hub monitor-events -n {} -g {} -d {} --consumer-group {} --et {} -t 10 -y -p sys anno app'.format(LIVE_HUB, LIVE_RG, device_ids[0], LIVE_CONSUMER_GROUP1, enqueued_time), [device_ids[0], 'system', 'annotations', 'application', '"message_id": "12345"', '"key0": "value0"', '"key1": "1"'])
+        self.command_execute_assert('iot hub monitor-events -n {} -g {} -d {} --cg {} --et {} -t 10 -y -p sys anno app'.format(LIVE_HUB, LIVE_RG, device_ids[0], LIVE_CONSUMER_GROUPS[1], enqueued_time), [device_ids[0], 'system', 'annotations', 'application', '"message_id": "12345"', '"key0": "value0"', '"key1": "1"'])
 
         # Monitor events with --login parameter
-        self.command_execute_assert('iot hub monitor-events -t 10 -y -p all --consumer-group {} --et {} --login {}'.format(LIVE_CONSUMER_GROUP2, enqueued_time, LIVE_HUB_CS), device_ids)
+        self.command_execute_assert('iot hub monitor-events -t 10 -y -p all --cg {} --et {} --login {}'.format(LIVE_CONSUMER_GROUPS[2], enqueued_time, LIVE_HUB_CS), device_ids)
+
+        enqueued_time = calculate_millisec_since_unix_epoch_utc()
 
         # Send messages that have JSON payload, but do not pass $.ct property
         execute_onthread(method=iot_device_send_message,
@@ -1218,7 +1219,10 @@ class TestIoTHub(LiveScenarioTest):
             max_runs=1)
 
         # Monitor messages for ugly JSON output
-        self.command_execute_assert('iot hub monitor-events -n {} -g {} -t 10 -y'.format(LIVE_HUB, LIVE_RG), ['\\r\\n'])
+        self.command_execute_assert('iot hub monitor-events -n {} -g {} --cg {} --et {} -t 10 -y'.format(LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUPS[0], enqueued_time), ['\\r\\n'])
+
+        # Monitor messages and parse payload as JSON with the --ct parameter
+        self.command_execute_assert('iot hub monitor-events -n {} -g {} --cg {} --et {} -t 10 --ct application/json -y'.format(LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUPS[1], enqueued_time), ['"payload_data1": "payload_value1"'])
 
         enqueued_time = calculate_millisec_since_unix_epoch_utc()
 
@@ -1228,10 +1232,12 @@ class TestIoTHub(LiveScenarioTest):
             max_runs=1)
         
         # Monitor messages for pretty JSON output
-        self.command_execute_assert('iot hub monitor-events -n {} -g {} -t 10 -y'.format(LIVE_HUB, LIVE_RG), ['"payload_data1": "payload_value1"'])
+        self.command_execute_assert('iot hub monitor-events -n {} -g {} --cg {} --et {} -t 10 -y'.format(LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUPS[0], enqueued_time), ['"payload_data1": "payload_value1"'])
 
         # Monitor messages with yaml output
-        self.command_execute_assert('iot hub monitor-events -n {} -g {} --consumer-group {} --et {} -t 10 -y -o yaml'.format(LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUP2, enqueued_time), ['payload_data1: payload_value1'])
+        self.command_execute_assert('iot hub monitor-events -n {} -g {} --cg {} --et {} -t 10 -y -o yaml'.format(LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUPS[1], enqueued_time), ['payload_data1: payload_value1'])
+
+        enqueued_time = calculate_millisec_since_unix_epoch_utc()
 
         # Send messages that have improperly formatted JSON payload and a $.ct property
         execute_onthread(method=iot_device_send_message,
@@ -1239,7 +1245,7 @@ class TestIoTHub(LiveScenarioTest):
             max_runs=1)
         
         # Monitor messages to ensure it returns improperly formatted JSON
-        self.command_execute_assert('iot hub monitor-events -n {} -g {} -t 10 -y'.format(LIVE_HUB, LIVE_RG), ['{\r\n"payload_data1""payload_value1"\r\n}'])
+        self.command_execute_assert('iot hub monitor-events -n {} -g {} --cg {} --et {} -t 10 -y'.format(LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUPS[0], enqueued_time), ['{\\r\\n\\"payload_data1\\"\\"payload_value1\\"\\r\\n}'])
 
 
     @pytest.mark.skipif(not validate_min_python_version(3, 4, exit_on_fail=False), reason="minimum python version not satisfied")

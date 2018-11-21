@@ -54,6 +54,9 @@ helps['iot hub monitor-events'] = """
     - name: Receive all message attributes from all device messages
       text: >
         az iot hub monitor-events -n [IoTHub Name] --props all
+    - name: Receive all messages and parse message payload as JSON
+      text: >
+        az iot hub monitor-events -n [IoTHub Name] --content-type application/json
 """
 
 helps['iot hub monitor-feedback'] = """
