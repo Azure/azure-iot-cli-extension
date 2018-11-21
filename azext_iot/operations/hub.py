@@ -1113,7 +1113,7 @@ def iot_device_upload_file(cmd, device_id, file_path, content_type, hub_name=Non
 # pylint: disable=too-many-locals
 def iot_hub_monitor_events(cmd, hub_name=None, device_id=None, consumer_group='$Default', timeout=300,
                            enqueued_time=None, resource_group_name=None, yes=False, properties=None, repair=False,
-                           login=None):
+                           login=None, content_type=None):
     import importlib
     from datetime import datetime
     from azext_iot.common.deps import ensure_uamqp
@@ -1139,14 +1139,14 @@ def iot_hub_monitor_events(cmd, hub_name=None, device_id=None, consumer_group='$
         enqueued_time = calculate_millisec_since_unix_epoch_utc()
 
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, include_events=True, login=login)
-
     events3.executor(target,
                      consumer_group=consumer_group,
                      enqueued_time=enqueued_time,
                      properties=properties,
                      timeout=timeout,
                      device_id=device_id,
-                     output=output)
+                     output=output,
+                     content_type=content_type)
 
 
 def iot_hub_monitor_feedback(cmd, hub_name=None, device_id=None, yes=False,
