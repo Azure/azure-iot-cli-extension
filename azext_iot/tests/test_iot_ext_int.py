@@ -1239,7 +1239,7 @@ class TestIoTHub(LiveScenarioTest):
             max_runs=1)
         
         # Monitor messages to ensure it returns improperly formatted JSON
-        self.command_execute_assert('iot hub monitor-events -n {} -g {} -t 10 -y'.format(LIVE_HUB, LIVE_RG), ['{\r\n"payload_data1""payload_value1"\r\n}'])
+        self.command_execute_assert('iot hub monitor-events -n {} -g {} -t 10 -y'.format(LIVE_HUB, LIVE_RG), ['{\\r\\n\\"payload_data1\\"\\"payload_value1\\"\\r\\n}'])
 
 
     @pytest.mark.skipif(not validate_min_python_version(3, 4, exit_on_fail=False), reason="minimum python version not satisfied")
