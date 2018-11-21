@@ -138,10 +138,10 @@ async def monitor_events(endpoint, connection, path, auth, partition, consumer_g
 
         system_props = unicode_binary_map(parse_entity(msg.properties, True))
 
-        ct=content_type
+        ct = content_type
         if not ct:
             ct = system_props['content_type'].lower() if 'content_type' in system_props else ''
-        
+
         if ct == 'application/json':
             try:
                 payload = json.loads(re.compile(r'(\\r\\n)+|\\r+|\\n+').sub('', payload))
