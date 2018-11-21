@@ -41,6 +41,11 @@ SECONDARY_THUMBPRINT = '14963E8F3BA5B3984110B3C1CA8E8B8988599087'
 
 
 class TestIoTHub(LiveScenarioTest):
+    def __init__(self, _):
+        from iotext_test_tools import DummyCliOutputProducer
+        super(TestIoTHub, self).__init__(_)
+        self.cli_ctx = DummyCliOutputProducer()
+
     def setUp(self):
         self._entity_names = None
         self.cmd('az iot hub consumer-group create --hub-name {} --resource-group {} --name {}'.format(LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUP1), checks=[self.check('name', LIVE_CONSUMER_GROUP1)])
