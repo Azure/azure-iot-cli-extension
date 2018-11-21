@@ -28,8 +28,8 @@ DEBUG = True
 
 def executor(target, consumer_group, enqueued_time, device_id=None, properties=None, timeout=0, output=None, content_type=None):
     coroutines = []
-    coroutines.append(initiate_event_monitor(target, consumer_group, enqueued_time, device_id, properties, timeout, output, content_type))
-
+    coroutines.append(initiate_event_monitor(target, consumer_group, enqueued_time, device_id, properties,
+                                             timeout, output, content_type))
     loop = asyncio.get_event_loop()
     if loop.is_closed():
         loop = asyncio.new_event_loop()
@@ -65,7 +65,8 @@ def executor(target, consumer_group, enqueued_time, device_id=None, properties=N
                 raise RuntimeError(error)
 
 
-async def initiate_event_monitor(target, consumer_group, enqueued_time, device_id=None, properties=None, timeout=0, output=None, content_type=None):
+async def initiate_event_monitor(target, consumer_group, enqueued_time, device_id=None, properties=None,
+                                 timeout=0, output=None, content_type=None):
     def _get_conn_props():
         properties = {}
         properties["product"] = "az.cli.iot.extension"
@@ -140,13 +141,13 @@ async def monitor_events(endpoint, connection, path, auth, partition, consumer_g
 
         ct = content_type
         if not ct:
-            ct = system_props['content_type'].lower() if 'content_type' in system_props else ''
+            ct = system_props['content_type'] if 'content_type' in system_props else ''
 
-        if ct == 'application/json':
+        if ct and ct.lower() == 'application/json':
             try:
                 payload = json.loads(re.compile(r'(\\r\\n)+|\\r+|\\n+').sub('', payload))
             except Exception:  # pylint: disable=broad-except
-                # We don't want to crash the monitor if JSON parsing fails. Not logging exception because the default is json and error message would print for every message received
+                # We don't want to crash the monitor if JSON parsing fails
                 pass
 
         event_source['event']['payload'] = payload

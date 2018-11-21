@@ -116,7 +116,8 @@ def load_arguments(self, _):
                          'Units are milliseconds since unix epoch. '
                          'If no time is indicated "now" is used.')
         context.argument('properties', options_list=['--properties', '--props', '-p'], arg_type=event_msg_prop_type)
-        context.argument('content_type', options_list=['--content-type', '--ct'], help='Specify the Content-Type of the message payload to automatically format the output to that type.')
+        context.argument('content_type', options_list=['--content-type', '--ct'],
+                         help='Specify the Content-Type of the message payload to automatically format the output to that type.')
 
     with self.argument_context('iot hub monitor-feedback') as context:
         context.argument('wait_on_id', options_list=['--wait-on-msg', '-w'],

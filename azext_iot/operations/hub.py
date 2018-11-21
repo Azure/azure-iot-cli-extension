@@ -1115,7 +1115,6 @@ def iot_hub_monitor_events(cmd, hub_name=None, device_id=None, consumer_group='$
                            enqueued_time=None, resource_group_name=None, yes=False, properties=None, repair=False,
                            login=None, content_type=None):
     import importlib
-    from datetime import datetime
     from azext_iot.common.deps import ensure_uamqp
     from azext_iot.common.utility import validate_min_python_version
 
