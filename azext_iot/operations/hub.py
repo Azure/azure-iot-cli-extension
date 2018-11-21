@@ -11,6 +11,7 @@ import six
 from knack.log import get_logger
 from knack.util import CLIError
 from azure.cli.core.util import read_file_content
+from azext_iot.common.utility import calculate_millisec_since_unix_epoch_utc
 from azext_iot._constants import EXTENSION_ROOT, BASE_API_VERSION
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import (DeviceAuthType,
@@ -1134,13 +1135,8 @@ def iot_hub_monitor_events(cmd, hub_name=None, device_id=None, consumer_group='$
         properties = []
     properties = set((key.lower() for key in properties))
 
-    def _calculate_millisec_since_unix_epoch_utc():
-        now = datetime.utcnow()
-        epoch = datetime.utcfromtimestamp(0)
-        return int(1000 * (now - epoch).total_seconds())
-
     if not enqueued_time:
-        enqueued_time = _calculate_millisec_since_unix_epoch_utc()
+        enqueued_time = calculate_millisec_since_unix_epoch_utc()
 
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, include_events=True, login=login)
 

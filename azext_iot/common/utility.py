@@ -9,12 +9,13 @@ utility: Define helper functions for 'common' scripts.
 
 """
 
+import ast
+import contextlib
+import json
 import os
 import sys
-import contextlib
-import ast
-import json
-from threading import Thread, Event
+from threading import Event, Thread
+from datetime import datetime
 
 
 @contextlib.contextmanager
@@ -273,3 +274,9 @@ def unpack_msrest_error(e, clouderror=True):
 def dict_transform_lower_case_key(d):
     """ Converts a dictionary to an identical one with all lower case keys """
     return {k.lower(): v for k, v in d.items()}
+
+
+def calculate_millisec_since_unix_epoch_utc():
+    now = datetime.utcnow()
+    epoch = datetime.utcfromtimestamp(0)
+    return int(1000 * (now - epoch).total_seconds())

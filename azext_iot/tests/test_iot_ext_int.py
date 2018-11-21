@@ -10,12 +10,12 @@ import random
 import json
 import pytest
 import sys
-import datetime
 
 from uuid import uuid4
 from azure.cli.testsdk import LiveScenarioTest
 from azure.cli.core.util import read_file_content
-from azext_iot.common.utility import validate_min_python_version, execute_onthread
+from azext_iot.common.utility import validate_min_python_version, execute_onthread, calculate_millisec_since_unix_epoch_utc
+
 
 # Add test tools to path
 sys.path.append(os.path.abspath(os.path.join('.', 'iotext_test_tools')))
@@ -45,6 +45,17 @@ class TestIoTHub(LiveScenarioTest):
         self._entity_names = None
         self.cmd('az iot hub consumer-group create --hub-name {} --resource-group {} --name {}'.format(LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUP1), checks=[self.check('name', LIVE_CONSUMER_GROUP1)])
         self.cmd('az iot hub consumer-group create --hub-name {} --resource-group {} --name {}'.format(LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUP2), checks=[self.check('name', LIVE_CONSUMER_GROUP2)])
+
+    #TODO: @digimaun - Maybe put a helper like this in the shared lib, when you create it?
+    def command_execute_assert(self, command, asserts):
+        from iotext_test_tools import capture_output
+
+        with capture_output() as buffer:
+            self.cmd(command, checks=None)
+            output = buffer.get_output()
+
+        for a in asserts:
+            assert a in output
 
     def _create_entity_names(self, devices=0, edge_devices=0, modules=0, configs=0):
         result = {}
@@ -1180,11 +1191,11 @@ class TestIoTHub(LiveScenarioTest):
             self.cmd('iot hub device-identity create -d {} -n {} -g {}'.format(device_ids[i], LIVE_HUB, LIVE_RG),
                      checks=[self.check('deviceId', device_ids[i])])
 
-        enqueued_time = datetime.datetime.now().microsecond
+        enqueued_time = calculate_millisec_since_unix_epoch_utc()
 
         for i in range(device_count):
             execute_onthread(method=iot_device_send_message,
-                             args=[client, device_ids[i], LIVE_HUB, 'Ping from event monitor test 1, part a', '$.mid=12345;key0=value0;key1=1', 1, LIVE_RG],
+                             args=[client, device_ids[i], LIVE_HUB, '{\r\n"payload_data1":"payload_value1"\r\n}', '$.mid=12345;key0=value0;key1=1', 1, LIVE_RG],
                              max_runs=1)
 
         # Monitor events for all devices and include sys, anno, app
@@ -1195,6 +1206,36 @@ class TestIoTHub(LiveScenarioTest):
 
         # Monitor events with --login parameter
         self.command_execute_assert('iot hub monitor-events -t 10 -y -p all --consumer-group {} --et {} --login {}'.format(LIVE_CONSUMER_GROUP2, enqueued_time, LIVE_HUB_CS), device_ids)
+
+        # Send messages that have JSON payload, but do not pass $.ct property
+        execute_onthread(method=iot_device_send_message,
+            args=[client, device_ids[i], LIVE_HUB, '{\r\n"payload_data1":"payload_value1"\r\n}', '', 1, LIVE_RG],
+            max_runs=1)
+
+        # Monitor messages for ugly JSON output
+        self.command_execute_assert('iot hub monitor-events -n {} -g {} -t 10 -y'.format(LIVE_HUB, LIVE_RG), ['\\r\\n'])
+
+        enqueued_time = calculate_millisec_since_unix_epoch_utc()
+
+        # Send messages that have JSON payload and have $.ct property
+        execute_onthread(method=iot_device_send_message,
+            args=[client, device_ids[i], LIVE_HUB, '{\r\n"payload_data1":"payload_value1"\r\n}', '$.ct=application/json', 1, LIVE_RG],
+            max_runs=1)
+        
+        # Monitor messages for pretty JSON output
+        self.command_execute_assert('iot hub monitor-events -n {} -g {} -t 10 -y'.format(LIVE_HUB, LIVE_RG), ['"payload_data1": "payload_value1"'])
+
+        # Monitor messages with yaml output
+        self.command_execute_assert('iot hub monitor-events -n {} -g {} --consumer-group {} --et {} -t 10 -y -o yaml'.format(LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUP2, enqueued_time), ['payload_data1: payload_value1'])
+
+        # Send messages that have improperly formatted JSON payload and a $.ct property
+        execute_onthread(method=iot_device_send_message,
+            args=[client, device_ids[i], LIVE_HUB, '{\r\n"payload_data1""payload_value1"\r\n}', '$.ct=application/json', 1, LIVE_RG],
+            max_runs=1)
+        
+        # Monitor messages to ensure it returns improperly formatted JSON
+        self.command_execute_assert('iot hub monitor-events -n {} -g {} -t 10 -y'.format(LIVE_HUB, LIVE_RG), ['{\r\n"payload_data1""payload_value1"\r\n}'])
+
 
     @pytest.mark.skipif(not validate_min_python_version(3, 4, exit_on_fail=False), reason="minimum python version not satisfied")
     def test_hub_monitor_feedback(self):
@@ -1264,16 +1305,6 @@ class TestIoTHub(LiveScenarioTest):
                  .format(device_ids[0], LIVE_HUB_CS, etag))
 
         self.command_execute_assert('iot hub monitor-feedback --login {} -w {} -y'.format(LIVE_HUB_CS, msg_id), ['description: Message rejected'])
-
-    def command_execute_assert(self, command, asserts):
-        from iotext_test_tools import capture_output
-
-        with capture_output() as buffer:
-            self.cmd(command, checks=None)
-            output = buffer.get_output()
-
-        for a in asserts:
-            assert a in output
 
     @pytest.mark.skipif(not LIVE_STORAGE, reason="empty azext_iot_teststorageuri env var")
     def test_storage(self):
