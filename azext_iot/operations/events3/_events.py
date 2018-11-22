@@ -114,6 +114,7 @@ async def initiate_event_monitor(target, consumer_group, enqueued_time, device_i
         await asyncio.gather(*coroutines, return_exceptions=True)
 
 
+# pylint: disable=too-many-statements
 async def monitor_events(endpoint, connection, path, auth, partition, consumer_group, enqueuedtimeutc,
                          properties, device_id=None, timeout=0, output=None, content_type=None):
     source = uamqp.address.Source('amqps://{}/{}/ConsumerGroups/{}/Partitions/{}'.format(endpoint, path,

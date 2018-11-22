@@ -40,6 +40,7 @@ event_msg_prop_type = CLIArgumentType(
     'sys = system properties, app = application properties, anno = annotations'
 )
 
+
 # pylint: disable=too-many-statements
 def load_arguments(self, _):
     """
@@ -165,7 +166,7 @@ def load_arguments(self, _):
 
     with self.argument_context('iot device') as context:
         context.argument('data', options_list=['--data', '--da'], help='Message body.')
-        context.argument('properties', options_list=['--properties', '--props'],
+        context.argument('properties', options_list=['--properties', '--props', '-p'],
                          help='Message property bag in key-value pairs with the '
                          'following format: a=b;c=d')
         context.argument('msg_count', options_list=['--msg-count', '--mc'], type=int,

@@ -95,12 +95,17 @@ def mqttclient_generic_error(mocker, fixture_ghcs, fixture_sas):
     return mqtt_client
 
 
-def build_mock_response(mocker, status_code=200, payload=None, headers=None):
+def build_mock_response(mocker, status_code=200, payload=None, headers=None, raw=False):
     response = mocker.MagicMock(name='response')
     response.status_code = status_code
     del response.context
     del response._attribute_map
-    response.text.return_value = json.dumps(payload)
+
+    if raw:
+        response.text = payload
+    else:
+        response.text.return_value = json.dumps(payload)
+
     if headers:
         response.headers = headers
     return response
@@ -1566,14 +1571,17 @@ class TestDeviceMessaging():
         service_client.return_value = build_mock_response(mocker)
         return service_client
 
-    def test_c2d_receive(self, serviceclient):
-        data = "sample data"
-        serviceclient.return_value.status_code = 200
-        serviceclient.return_value.headers = sample_c2d_receive
-        serviceclient.return_value.content = data
+    @pytest.fixture
+    def fixture_mocker(self, mocker, fixture_ghcs, fixture_sas, request):
+        return mocker
+
+    def test_c2d_receive(self, fixture_mocker):
+        data = '{"data": "value"}'
+        service_client = fixture_mocker.patch(path_service_client)
+        service_client.return_value = build_mock_response(fixture_mocker, 200, data, sample_c2d_receive, raw=True)
         timeout = 120
         result = subject.iot_c2d_message_receive(fixture_cmd, device_id, mock_target['entity'], timeout)
-        args = serviceclient.call_args
+        args = service_client.call_args
         url = args[0][0].url
         method = args[0][0].method
         headers = args[0][1]

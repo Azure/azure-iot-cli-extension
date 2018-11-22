@@ -551,8 +551,8 @@ class TestIoTHub(LiveScenarioTest):
         assert len(result) == 4
 
         self.cmd('''iot hub module-identity update -d {} -n {} -g {} -m {}
-                    --set authentication.symmetricKey.primaryKey="" authentication.symmetricKey.secondaryKey=""'''.format(
-                        edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0]),
+                    --set authentication.symmetricKey.primaryKey="" authentication.symmetricKey.secondaryKey=""'''
+                 .format(edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0]),
                  checks=[self.check('deviceId', edge_device_ids[0]),
                          self.check('moduleId', module_ids[0]),
                          self.exists('authentication.symmetricKey.primaryKey'),
@@ -560,8 +560,8 @@ class TestIoTHub(LiveScenarioTest):
 
         # With connection string
         self.cmd('''iot hub module-identity update -d {} --login {} -m {}
-                    --set authentication.symmetricKey.primaryKey="" authentication.symmetricKey.secondaryKey=""'''.format(
-                        edge_device_ids[0], LIVE_HUB_CS, module_ids[0]),
+                    --set authentication.symmetricKey.primaryKey="" authentication.symmetricKey.secondaryKey=""'''
+                 .format(edge_device_ids[0], LIVE_HUB_CS, module_ids[0]),
                  checks=[self.check('deviceId', edge_device_ids[0]),
                          self.check('moduleId', module_ids[0]),
                          self.exists('authentication.symmetricKey.primaryKey'),
@@ -1201,14 +1201,14 @@ class TestIoTHub(LiveScenarioTest):
                                    '$.mid=12345;key0=value0;key1=1', 1, LIVE_RG],
                              max_runs=1)
         # Monitor events for all devices and include sys, anno, app
-        self.command_execute_assert('iot hub monitor-events -n {} -g {} --cg {} --et {} -t 10 -y -p sys anno app'.format(
-            LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUPS[0], enqueued_time),
+        self.command_execute_assert('iot hub monitor-events -n {} -g {} --cg {} --et {} -t 10 -y -p sys anno app'
+                                    .format(LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUPS[0], enqueued_time),
                                     device_ids + ['system', 'annotations', 'application',
                                                   '"message_id": "12345"', '"key0": "value0"', '"key1": "1"'])
 
         # Monitor events for a single device
-        self.command_execute_assert('iot hub monitor-events -n {} -g {} -d {} --cg {} --et {} -t 10 -y -p sys anno app'.format(
-            LIVE_HUB, LIVE_RG, device_ids[0], LIVE_CONSUMER_GROUPS[1], enqueued_time),
+        self.command_execute_assert('iot hub monitor-events -n {} -g {} -d {} --cg {} --et {} -t 10 -y -p sys anno app'
+                                    .format(LIVE_HUB, LIVE_RG, device_ids[0], LIVE_CONSUMER_GROUPS[1], enqueued_time),
                                     [device_ids[0], 'system', 'annotations', 'application', '"message_id": "12345"',
                                      '"key0": "value0"', '"key1": "1"'])
 

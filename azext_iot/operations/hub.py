@@ -940,7 +940,7 @@ def _iot_c2d_message_receive(target, device_id, lock_timeout=60):
             return {
                 'ack': result.headers['iothub-ack'],
                 'correlationId': result.headers['iothub-correlationid'],
-                'data': result.response.content,
+                'data': result.response.text,
                 'deliveryCount': result.headers['iothub-deliverycount'],
                 'enqueuedTime': result.headers['iothub-enqueuedtime'],
                 'expiry': result.headers['iothub-expiry'],
@@ -1126,6 +1126,8 @@ def iot_hub_monitor_events(cmd, hub_name=None, device_id=None, consumer_group='$
 
     config = cmd.cli_ctx.config
     output = cmd.cli_ctx.invocation.data.get("output", None)
+    if not output:
+        output = 'json'
     ensure_uamqp(config, yes, repair)
 
     events3 = importlib.import_module('azext_iot.operations.events3._events')
