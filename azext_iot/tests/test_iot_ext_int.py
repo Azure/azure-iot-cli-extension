@@ -3,7 +3,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-# pylint: disable=too-many-statements,wrong-import-position
+# pylint: disable=too-many-statements,wrong-import-position,too-many-lines,import-error
 
 import os
 import random
@@ -14,7 +14,7 @@ import sys
 from uuid import uuid4
 from azure.cli.testsdk import LiveScenarioTest
 from azure.cli.core.util import read_file_content
-from azext_iot.common.utility import validate_min_python_version, execute_onthread
+from azext_iot.common.utility import validate_min_python_version, execute_onthread, calculate_millisec_since_unix_epoch_utc
 
 # Add test tools to path
 sys.path.append(os.path.abspath(os.path.join('.', 'iotext_test_tools')))
@@ -27,6 +27,7 @@ LIVE_HUB_CS = os.environ.get('azext_iot_testhub_cs')
 # Set this environment variable to your empty blob container sas uri to test device export and enable file upload test.
 # For file upload, you will need to have configured your IoT Hub before running.
 LIVE_STORAGE = os.environ.get('azext_iot_teststorageuri')
+LIVE_CONSUMER_GROUPS = ['test1', 'test2', 'test3']
 
 if not all([LIVE_HUB, LIVE_HUB_CS, LIVE_RG]):
     raise ValueError('Set azext_iot_testhub, azext_iot_testhub_cs and azext_iot_testrg to run IoT Hub integration tests.')
@@ -38,8 +39,24 @@ SECONDARY_THUMBPRINT = '14963E8F3BA5B3984110B3C1CA8E8B8988599087'
 
 
 class TestIoTHub(LiveScenarioTest):
+    def __init__(self, _):
+        from iotext_test_tools import DummyCliOutputProducer
+        super(TestIoTHub, self).__init__(_)
+        self.cli_ctx = DummyCliOutputProducer()
+
     def setUp(self):
         self._entity_names = None
+
+    # TODO: @digimaun - Maybe put a helper like this in the shared lib, when you create it?
+    def command_execute_assert(self, command, asserts):
+        from iotext_test_tools import capture_output
+
+        with capture_output() as buffer:
+            self.cmd(command, checks=None)
+            output = buffer.get_output()
+
+        for a in asserts:
+            assert a in output
 
     def _create_entity_names(self, devices=0, edge_devices=0, modules=0, configs=0):
         result = {}
@@ -522,12 +539,9 @@ class TestIoTHub(LiveScenarioTest):
                  checks=[self.check('deviceId', edge_device_ids[1]),
                          self.check('moduleId', module_ids[0]),
                          self.check('connectionState', 'Disconnected'),
-                         self.check(
-                             'authentication.symmetricKey.primaryKey', None),
-                         self.check(
-                             'authentication.symmetricKey.secondaryKey', None),
-                         self.check(
-                             'authentication.x509Thumbprint.primaryThumbprint', None),
+                         self.check('authentication.symmetricKey.primaryKey', None),
+                         self.check('authentication.symmetricKey.secondaryKey', None),
+                         self.check('authentication.x509Thumbprint.primaryThumbprint', None),
                          self.check('authentication.x509Thumbprint.secondaryThumbprint', None)])
 
         # Includes $edgeAgent && $edgeHub system modules
@@ -538,7 +552,7 @@ class TestIoTHub(LiveScenarioTest):
 
         self.cmd('''iot hub module-identity update -d {} -n {} -g {} -m {}
                     --set authentication.symmetricKey.primaryKey="" authentication.symmetricKey.secondaryKey=""'''.format(
-                 edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0]),
+                        edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0]),
                  checks=[self.check('deviceId', edge_device_ids[0]),
                          self.check('moduleId', module_ids[0]),
                          self.exists('authentication.symmetricKey.primaryKey'),
@@ -547,7 +561,7 @@ class TestIoTHub(LiveScenarioTest):
         # With connection string
         self.cmd('''iot hub module-identity update -d {} --login {} -m {}
                     --set authentication.symmetricKey.primaryKey="" authentication.symmetricKey.secondaryKey=""'''.format(
-                 edge_device_ids[0], LIVE_HUB_CS, module_ids[0]),
+                        edge_device_ids[0], LIVE_HUB_CS, module_ids[0]),
                  checks=[self.check('deviceId', edge_device_ids[0]),
                          self.check('moduleId', module_ids[0]),
                          self.exists('authentication.symmetricKey.primaryKey'),
@@ -1156,8 +1170,12 @@ class TestIoTHub(LiveScenarioTest):
                  .format(device_ids[0], LIVE_HUB_CS), checks=self.is_empty())
 
     @pytest.mark.skipif(not validate_min_python_version(3, 5, exit_on_fail=False), reason="minimum python version not satisfied")
-    def test_hub_monitor_event_all(self):
-        from azext_iot.operations.hub import iot_simulate_device, iot_device_send_message
+    def test_hub_monitor_events(self):
+        for cg in LIVE_CONSUMER_GROUPS:
+            self.cmd('az iot hub consumer-group create --hub-name {} --resource-group {} --name {}'.format(LIVE_HUB, LIVE_RG, cg),
+                     checks=[self.check('name', cg)])
+
+        from azext_iot.operations.hub import iot_device_send_message
         from azext_iot._factory import iot_hub_service_factory
         from azure.cli.core.mock import DummyCli
 
@@ -1165,76 +1183,80 @@ class TestIoTHub(LiveScenarioTest):
         client = iot_hub_service_factory(cli_ctx)
         device_count = 10
 
-        # Event monitor should throw runtime exception in case of error
-        self.cmd('iot hub monitor-events -t 10 -y -p all --login {}'.format(LIVE_HUB_CS + 'zzz'), expect_failure=True)
+        # Test with invalid connection string
+        self.cmd('iot hub monitor-events -t 1 -y --login {}'.format(LIVE_HUB_CS + 'zzz'), expect_failure=True)
 
-        names = self._create_entity_names(devices=device_count)
-        device_ids = names['device_ids']
+        # Create and Simulate Devices
+        device_ids = self._create_entity_names(devices=device_count)['device_ids']
 
         for i in range(device_count):
             self.cmd('iot hub device-identity create -d {} -n {} -g {}'.format(device_ids[i], LIVE_HUB, LIVE_RG),
                      checks=[self.check('deviceId', device_ids[i])])
 
+        enqueued_time = calculate_millisec_since_unix_epoch_utc()
+
         for i in range(device_count):
-            execute_onthread(method=iot_simulate_device,
-                             args=[client, device_ids[i], LIVE_HUB, 'complete', 'Ping from event monitor test 1, part a', 5, 1],
+            execute_onthread(method=iot_device_send_message,
+                             args=[client, device_ids[i], LIVE_HUB, '{\r\n"payload_data1":"payload_value1"\r\n}',
+                                   '$.mid=12345;key0=value0;key1=1', 1, LIVE_RG],
                              max_runs=1)
+        # Monitor events for all devices and include sys, anno, app
+        self.command_execute_assert('iot hub monitor-events -n {} -g {} --cg {} --et {} -t 10 -y -p sys anno app'.format(
+            LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUPS[0], enqueued_time),
+                                    device_ids + ['system', 'annotations', 'application',
+                                                  '"message_id": "12345"', '"key0": "value0"', '"key1": "1"'])
 
-        self.cmd('iot hub monitor-events -n {} -g {} -t 10 -y -p sys anno app'.format(
-            LIVE_HUB, LIVE_RG), checks=None)
+        # Monitor events for a single device
+        self.command_execute_assert('iot hub monitor-events -n {} -g {} -d {} --cg {} --et {} -t 10 -y -p sys anno app'.format(
+            LIVE_HUB, LIVE_RG, device_ids[0], LIVE_CONSUMER_GROUPS[1], enqueued_time),
+                                    [device_ids[0], 'system', 'annotations', 'application', '"message_id": "12345"',
+                                     '"key0": "value0"', '"key1": "1"'])
 
-        # With connection string
-        for i in range(device_count):
-            execute_onthread(method=iot_simulate_device,
-                             args=[client, device_ids[i], LIVE_HUB, 'complete', 'Ping from event monitor test 1, part b', 5, 1],
-                             max_runs=1)
+        # Monitor events with --login parameter
+        self.command_execute_assert('iot hub monitor-events -t 10 -y -p all --cg {} --et {} --login {}'.format(
+            LIVE_CONSUMER_GROUPS[2], enqueued_time, LIVE_HUB_CS), device_ids)
 
-        self.cmd('iot hub monitor-events -t 10 -y -p all --login {}'.format(LIVE_HUB_CS), checks=None)
+        enqueued_time = calculate_millisec_since_unix_epoch_utc()
 
-        # Leverage app and system properties
+        # Send messages that have JSON payload, but do not pass $.ct property
+        execute_onthread(method=iot_device_send_message, args=[client, device_ids[i], LIVE_HUB,
+                                                               '{\r\n"payload_data1":"payload_value1"\r\n}', '', 1,
+                                                               LIVE_RG], max_runs=1)
+
+        # Monitor messages for ugly JSON output
+        self.command_execute_assert('iot hub monitor-events -n {} -g {} --cg {} --et {} -t 10 -y'.format(
+            LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUPS[0], enqueued_time), ['\\r\\n'])
+
+        # Monitor messages and parse payload as JSON with the --ct parameter
+        self.command_execute_assert('iot hub monitor-events -n {} -g {} --cg {} --et {} -t 10 --ct application/json -y'.format(
+            LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUPS[1], enqueued_time), ['"payload_data1": "payload_value1"'])
+
+        enqueued_time = calculate_millisec_since_unix_epoch_utc()
+
+        # Send messages that have JSON payload and have $.ct property
         execute_onthread(method=iot_device_send_message,
-                         args=[client, device_ids[0], LIVE_HUB,
-                               'Ping from event monitor test 1, part c',
-                               '$.mid=12345;key0=value0;key1=1', 5],
-                         max_runs=3)
+                         args=[client, device_ids[i], LIVE_HUB, '{\r\n"payload_data1":"payload_value1"\r\n}',
+                               '$.ct=application/json', 1, LIVE_RG],
+                         max_runs=1)
 
-        self.cmd('iot hub monitor-events -t 10 -y -p all --login {}'.format(LIVE_HUB_CS), checks=None)
+        # Monitor messages for pretty JSON output
+        self.command_execute_assert('iot hub monitor-events -n {} -g {} --cg {} --et {} -t 10 -y'.format(
+            LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUPS[0], enqueued_time), ['"payload_data1": "payload_value1"'])
 
-    @pytest.mark.skipif(not validate_min_python_version(3, 5, exit_on_fail=False), reason="minimum python version not satisfied")
-    def test_hub_monitor_event_device(self):
-        from azext_iot.operations.hub import iot_simulate_device
-        from azext_iot._factory import iot_hub_service_factory
-        from azure.cli.core.mock import DummyCli
+        # Monitor messages with yaml output
+        self.command_execute_assert('iot hub monitor-events -n {} -g {} --cg {} --et {} -t 10 -y -o yaml'.format(
+            LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUPS[1], enqueued_time), ['payload_data1: payload_value1'])
 
-        cli_ctx = DummyCli()
-        client = iot_hub_service_factory(cli_ctx)
+        enqueued_time = calculate_millisec_since_unix_epoch_utc()
 
-        device_count = 2
+        # Send messages that have improperly formatted JSON payload and a $.ct property
+        execute_onthread(method=iot_device_send_message,
+                         args=[client, device_ids[i], LIVE_HUB, '{\r\n"payload_data1""payload_value1"\r\n}',
+                               '$.ct=application/json', 1, LIVE_RG], max_runs=1)
 
-        names = self._create_entity_names(devices=device_count)
-        device_ids = names['device_ids']
-
-        for i in range(device_count):
-            self.cmd('iot hub device-identity create -d {} -n {} -g {}'.format(device_ids[i], LIVE_HUB, LIVE_RG),
-                     checks=[self.check('deviceId', device_ids[i])])
-
-        for i in range(device_count):
-            execute_onthread(method=iot_simulate_device,
-                             args=[client, device_ids[i], LIVE_HUB, 'complete',
-                                   'Ping from event monitor test 2, part a', 5, 1, 'http'],
-                             max_runs=1)
-
-        self.cmd('iot hub monitor-events -n {} -t 10 -y -p all -d {}'.format(
-            LIVE_HUB, device_ids[0]), checks=None)
-
-        # With connection string
-        for i in range(device_count):
-            execute_onthread(method=iot_simulate_device,
-                             args=[client, device_ids[i], LIVE_HUB, 'complete', 'Ping from event monitor test 2, part b', 5, 1],
-                             max_runs=1)
-
-        self.cmd('iot hub monitor-events -t 10 -y -p sys anno app --device-id {} --login {}'.format(
-            device_ids[0], LIVE_HUB_CS), checks=None)
+        # Monitor messages to ensure it returns improperly formatted JSON
+        self.command_execute_assert('iot hub monitor-events -n {} -g {} --cg {} --et {} -t 10 -y'.format(
+            LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUPS[0], enqueued_time), ['{\\r\\n\\"payload_data1\\"\\"payload_value1\\"\\r\\n}'])
 
     @pytest.mark.skipif(not validate_min_python_version(3, 4, exit_on_fail=False), reason="minimum python version not satisfied")
     def test_hub_monitor_feedback(self):
@@ -1260,7 +1282,8 @@ class TestIoTHub(LiveScenarioTest):
         self.cmd('iot device c2d-message complete -d {} --hub-name {} -g {} -e {}'
                  .format(device_ids[0], LIVE_HUB, LIVE_RG, etag))
 
-        self.cmd('iot hub monitor-feedback -n {} -g {} -w {} -y'.format(LIVE_HUB, LIVE_RG, msg_id))
+        self.command_execute_assert('iot hub monitor-feedback -n {} -g {} -w {} -y'.format(
+            LIVE_HUB, LIVE_RG, msg_id), ['description: Success'])
 
         # With connection string - filter on device
         ack = 'positive'
@@ -1276,7 +1299,8 @@ class TestIoTHub(LiveScenarioTest):
         self.cmd('iot device c2d-message complete -d {} --login {} -e {}'
                  .format(device_ids[0], LIVE_HUB_CS, etag))
 
-        self.cmd('iot hub monitor-feedback --login {} -w {} -d {} -y'.format(LIVE_HUB_CS, msg_id, device_ids[0]))
+        self.command_execute_assert('iot hub monitor-feedback --login {} -w {} -d {} -y'.format(
+            LIVE_HUB_CS, msg_id, device_ids[0]), ['description: Success'])
 
         # With connection string - dead lettered case + unrelated ack
         ack = 'negative'
@@ -1303,7 +1327,8 @@ class TestIoTHub(LiveScenarioTest):
         self.cmd('iot device c2d-message reject -d {} --login {} -e {}'
                  .format(device_ids[0], LIVE_HUB_CS, etag))
 
-        self.cmd('iot hub monitor-feedback --login {} -w {} -y'.format(LIVE_HUB_CS, msg_id))
+        self.command_execute_assert('iot hub monitor-feedback --login {} -w {} -y'.format(
+            LIVE_HUB_CS, msg_id), ['description: Message rejected'])
 
     @pytest.mark.skipif(not LIVE_STORAGE, reason="empty azext_iot_teststorageuri env var")
     def test_storage(self):
