@@ -170,26 +170,11 @@ class IotHubGatewayDeviceAPIs(object):
             raise exp
 
         # @digimaun - Altered to support msg headers
-        header_dict = {}
         if response.status_code == 200:
-            header_dict = {
-                'ETag': 'str',
-                'iothub-sequencenumber': 'str',
-                'iothub-enqueuedtime': 'str',
-                'iothub-expiry': 'str',
-                'iothub-deliverycount': 'str',
-                'iothub-messageid': 'str',
-                'iothub-correlationid': 'str',
-                'iothub-userid': 'str',
-                'iothub-to': 'str',
-                'iothub-ack': 'str',
-                'Content-Type': 'str',
-                'Content-Encoding': 'str',
-            }
+            return response
 
         if raw:
             client_raw_response = ClientRawResponse(None, response)
-            client_raw_response.add_headers(header_dict)
             return client_raw_response
     receive_device_bound_notification.metadata = {'url': '/devices/{id}/messages/deviceBound'}
 

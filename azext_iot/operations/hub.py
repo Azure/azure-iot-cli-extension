@@ -935,21 +935,24 @@ def _iot_c2d_message_receive(target, device_id, lock_timeout=60):
         request_headers['IotHub-MessageLockTimeout'] = str(lock_timeout)
 
     try:
-        result = device_sdk.receive_device_bound_notification(device_id, raw=True, custom_headers=request_headers)
-        if result and result.response.status_code == 200:
-            return {
-                'ack': result.headers['iothub-ack'],
-                'correlationId': result.headers['iothub-correlationid'],
-                'data': result.response.text,
-                'deliveryCount': result.headers['iothub-deliverycount'],
-                'enqueuedTime': result.headers['iothub-enqueuedtime'],
-                'expiry': result.headers['iothub-expiry'],
-                'etag': result.headers['ETag'].strip('"'),
-                'messageId': result.headers['iothub-messageid'],
-                'sequenceNumber': result.headers['iothub-sequencenumber'],
-                'to': result.headers['iothub-to'],
-                'userId': result.headers['iothub-userid']
+        result = device_sdk.receive_device_bound_notification(device_id, custom_headers=request_headers)
+        if result and result.status_code == 200:
+            payload = {
+                'ack': result.headers.get('iothub-ack'),
+                'correlationId': result.headers.get('iothub-correlationid'),
+                'data': result.text,
+                'deliveryCount': result.headers.get('iothub-deliverycount'),
+                'enqueuedTime': result.headers.get('iothub-enqueuedtime'),
+                'expiry': result.headers.get('iothub-expiry'),
+                'etag': result.headers.get('ETag'),
+                'messageId': result.headers.get('iothub-messageid'),
+                'sequenceNumber': result.headers.get('iothub-sequencenumber'),
+                'to': result.headers.get('iothub-to'),
+                'userId': result.headers.get('iothub-userid')
             }
+            if payload.get('etag'):
+                payload['etag'] = payload['etag'].strip('"')
+            return payload
         return
     except errors.CloudError as e:
         raise CLIError(unpack_msrest_error(e))

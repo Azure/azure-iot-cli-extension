@@ -1565,23 +1565,18 @@ sample_c2d_receive = {
 
 
 class TestDeviceMessaging():
+    data = '{"data": "value"}'
+
     @pytest.fixture
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        service_client.return_value = build_mock_response(mocker)
+        service_client.return_value = build_mock_response(mocker, 200, TestDeviceMessaging.data, sample_c2d_receive, raw=True)
         return service_client
 
-    @pytest.fixture
-    def fixture_mocker(self, mocker, fixture_ghcs, fixture_sas, request):
-        return mocker
-
-    def test_c2d_receive(self, fixture_mocker):
-        data = '{"data": "value"}'
-        service_client = fixture_mocker.patch(path_service_client)
-        service_client.return_value = build_mock_response(fixture_mocker, 200, data, sample_c2d_receive, raw=True)
+    def test_c2d_receive(self, serviceclient):
         timeout = 120
         result = subject.iot_c2d_message_receive(fixture_cmd, device_id, mock_target['entity'], timeout)
-        args = service_client.call_args
+        args = serviceclient.call_args
         url = args[0][0].url
         method = args[0][0].method
         headers = args[0][1]
@@ -1592,7 +1587,7 @@ class TestDeviceMessaging():
 
         assert result['ack'] == sample_c2d_receive['iothub-ack']
         assert result['correlationId'] == sample_c2d_receive['iothub-correlationid']
-        assert result['data'] == data
+        assert result['data'] == TestDeviceMessaging.data
         assert result['deliveryCount'] == sample_c2d_receive['iothub-deliverycount']
         assert result['enqueuedTime'] == sample_c2d_receive['iothub-enqueuedtime']
         assert result['etag'] == sample_c2d_receive['ETag'].strip('"')
