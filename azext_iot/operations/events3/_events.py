@@ -26,10 +26,11 @@ logger = get_logger(__name__)
 DEBUG = True
 
 
-def executor(target, consumer_group, enqueued_time, device_id=None, properties=None, timeout=0, output=None, content_type=None):
+def executor(target, consumer_group, enqueued_time, device_id=None, properties=None, timeout=0, output=None, content_type=None,
+             device_regex=None):
     coroutines = []
     coroutines.append(initiate_event_monitor(target, consumer_group, enqueued_time, device_id, properties,
-                                             timeout, output, content_type))
+                                             timeout, output, content_type, device_regex))
     loop = asyncio.get_event_loop()
     if loop.is_closed():
         loop = asyncio.new_event_loop()
@@ -66,7 +67,7 @@ def executor(target, consumer_group, enqueued_time, device_id=None, properties=N
 
 
 async def initiate_event_monitor(target, consumer_group, enqueued_time, device_id=None, properties=None,
-                                 timeout=0, output=None, content_type=None):
+                                 timeout=0, output=None, content_type=None, device_regex=None):
     def _get_conn_props():
         properties = {}
         properties["product"] = "az.cli.iot.extension"
@@ -110,13 +111,14 @@ async def initiate_event_monitor(target, consumer_group, enqueued_time, device_i
                                              device_id=device_id,
                                              timeout=timeout,
                                              output=output,
-                                             content_type=content_type))
+                                             content_type=content_type,
+                                             device_regex=device_regex))
         await asyncio.gather(*coroutines, return_exceptions=True)
 
 
 # pylint: disable=too-many-statements
 async def monitor_events(endpoint, connection, path, auth, partition, consumer_group, enqueuedtimeutc,
-                         properties, device_id=None, timeout=0, output=None, content_type=None):
+                         properties, device_id=None, timeout=0, output=None, content_type=None, device_regex=None):
     source = uamqp.address.Source('amqps://{}/{}/ConsumerGroups/{}/Partitions/{}'.format(endpoint, path,
                                                                                          consumer_group, partition))
     source.set_filter(
@@ -125,7 +127,7 @@ async def monitor_events(endpoint, connection, path, auth, partition, consumer_g
     def _output_msg_kpi(msg):
         # TODO: Determine if amqp filters can support boolean operators for multiple conditions
         origin = str(msg.annotations.get(b'iothub-connection-device-id'), 'utf8')
-        if device_id and origin != device_id:
+        if (device_id and origin != device_id) or (device_regex and not re.match(device_regex, origin)):
             return
 
         event_source = {'event': {}}
