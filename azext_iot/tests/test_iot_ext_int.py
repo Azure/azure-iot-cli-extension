@@ -36,6 +36,8 @@ CWD = os.path.dirname(os.path.abspath(__file__))
 
 PRIMARY_THUMBPRINT = 'A361EA6A7119A8B0B7BBFFA2EAFDAD1F9D5BED8C'
 SECONDARY_THUMBPRINT = '14963E8F3BA5B3984110B3C1CA8E8B8988599087'
+device_regex_prefix = "regex-test-device-"
+device_prefix = 'test-device-'
 
 
 class TestIoTHub(LiveScenarioTest):
@@ -58,12 +60,12 @@ class TestIoTHub(LiveScenarioTest):
         for a in asserts:
             assert a in output
 
-    def _create_entity_names(self, devices=0, edge_devices=0, modules=0, configs=0):
+    def _create_entity_names(self, devices=0, edge_devices=0, modules=0, configs=0, regex_test_devices=0):
         result = {}
         if devices:
             device_ids = []
             for _ in range(devices):
-                device_ids.append(self.create_random_name(prefix='test-device-', length=32))
+                device_ids.append(self.create_random_name(prefix=device_prefix, length=32))
             result['device_ids'] = device_ids
 
         if edge_devices:
@@ -84,6 +86,12 @@ class TestIoTHub(LiveScenarioTest):
                 config_ids.append(self.create_random_name(prefix='test-config-', length=32))
             result['config_ids'] = config_ids
 
+        if regex_test_devices:
+            regex_device_ids = []
+            for _ in range(regex_test_devices):
+                regex_device_ids.append(self.create_random_name(prefix=device_regex_prefix, length=32))
+            result['regex_device_ids'] = regex_device_ids
+
         self._entity_names = result
         return result
 
@@ -98,6 +106,9 @@ class TestIoTHub(LiveScenarioTest):
         edge_device_ids = names.get('edge_device_ids')
         if edge_device_ids:
             device_ids.extend(edge_device_ids)
+        regex_device_ids = names.get('regex_device_ids')
+        if regex_device_ids:
+            device_ids.extend(regex_device_ids)
 
         for i in device_ids:
             if device_ids.index(i) == (len(device_ids) - 1):
@@ -1183,15 +1194,24 @@ class TestIoTHub(LiveScenarioTest):
         client = iot_hub_service_factory(cli_ctx)
         device_count = 10
 
+        regex_device_count = 5
+        device_regex = device_regex_prefix + "[a-z]*"
+
         # Test with invalid connection string
         self.cmd('iot hub monitor-events -t 1 -y --login {}'.format(LIVE_HUB_CS + 'zzz'), expect_failure=True)
 
         # Create and Simulate Devices
-        device_ids = self._create_entity_names(devices=device_count)['device_ids']
+        entities = self._create_entity_names(devices=device_count, regex_test_devices=regex_device_count)
+        regex_device_ids = entities['regex_device_ids']
+        device_ids = entities['device_ids']
 
         for i in range(device_count):
             self.cmd('iot hub device-identity create -d {} -n {} -g {}'.format(device_ids[i], LIVE_HUB, LIVE_RG),
                      checks=[self.check('deviceId', device_ids[i])])
+
+        for i in range(regex_device_count):
+            self.cmd('iot hub device-identity create -d {} -n {} -g {}'.format(regex_device_ids[i], LIVE_HUB, LIVE_RG),
+                     checks=[self.check('deviceId', regex_device_ids[i])])
 
         enqueued_time = calculate_millisec_since_unix_epoch_utc()
 
@@ -1211,6 +1231,11 @@ class TestIoTHub(LiveScenarioTest):
                                     .format(LIVE_HUB, LIVE_RG, device_ids[0], LIVE_CONSUMER_GROUPS[1], enqueued_time),
                                     [device_ids[0], 'system', 'annotations', 'application', '"message_id": "12345"',
                                      '"key0": "value0"', '"key1": "1"'])
+
+        # Monitor events with device-id wildcards
+        self.command_execute_assert('iot hub monitor-events -n {} -g {} -d {} --et {} -t 10 -y -p sys anno app'
+                                    .format(LIVE_HUB, LIVE_RG, device_prefix + '*', enqueued_time),
+                                    device_ids)
 
         # Monitor events with --login parameter
         self.command_execute_assert('iot hub monitor-events -t 10 -y -p all --cg {} --et {} --login {}'.format(
@@ -1257,6 +1282,27 @@ class TestIoTHub(LiveScenarioTest):
         # Monitor messages to ensure it returns improperly formatted JSON
         self.command_execute_assert('iot hub monitor-events -n {} -g {} --cg {} --et {} -t 10 -y'.format(
             LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUPS[0], enqueued_time), ['{\\r\\n\\"payload_data1\\"\\"payload_value1\\"\\r\\n}'])
+
+
+        enqueued_time = calculate_millisec_since_unix_epoch_utc()
+
+        # Send messages from all regex devices
+        for i in range(regex_device_count):
+            execute_onthread(method=iot_device_send_message,
+                             args=[client, regex_device_ids[i], LIVE_HUB, '{\r\n"payload_data1":"payload_value1"\r\n}',
+                                   '$.mid=12345;key0=value0;key1=1', 1, LIVE_RG],
+                             max_runs=1)
+
+        # Monitor events for a specific regex device filter
+        self.command_execute_assert('iot hub monitor-events -n {} -g {} --regex {} --et {} -t 10 -y -p sys anno app'
+                                    .format(LIVE_HUB, LIVE_RG, device_regex, enqueued_time),
+                                    regex_device_ids)
+
+        # Should fail for devices that don't pass regex filter
+        with pytest.raises(Exception):
+            self.command_execute_assert('iot hub monitor-events -n {} -g {} --regex {} --et {} -t 10 -y -p sys anno app'
+                                        .format(LIVE_HUB, LIVE_RG, device_regex, enqueued_time),
+                                        device_ids)
 
     @pytest.mark.skipif(not validate_min_python_version(3, 4, exit_on_fail=False), reason="minimum python version not satisfied")
     def test_hub_monitor_feedback(self):

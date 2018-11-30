@@ -127,7 +127,12 @@ async def monitor_events(endpoint, connection, path, auth, partition, consumer_g
     def _output_msg_kpi(msg):
         # TODO: Determine if amqp filters can support boolean operators for multiple conditions
         origin = str(msg.annotations.get(b'iothub-connection-device-id'), 'utf8')
-        if (device_id and origin != device_id) or (device_regex and not re.match(device_regex, origin)):
+        if device_id:
+            regex = re.escape(device_id).replace("\\*", ".*").replace('\\?', ".") + "$"
+            if not re.match(regex, origin):
+                return
+
+        if device_regex and not re.match(device_regex, origin):
             return
 
         event_source = {'event': {}}
