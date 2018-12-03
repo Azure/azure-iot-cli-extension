@@ -36,8 +36,9 @@ CWD = os.path.dirname(os.path.abspath(__file__))
 
 PRIMARY_THUMBPRINT = 'A361EA6A7119A8B0B7BBFFA2EAFDAD1F9D5BED8C'
 SECONDARY_THUMBPRINT = '14963E8F3BA5B3984110B3C1CA8E8B8988599087'
-device_regex_prefix = "regex-test-device-"
-device_prefix = 'test-device-'
+
+DEVICE_REGEX_PREFIX = 'regex-test-device-'
+DEVICE_PREFIX = 'test-device-'
 
 
 class TestIoTHub(LiveScenarioTest):
@@ -65,7 +66,7 @@ class TestIoTHub(LiveScenarioTest):
         if devices:
             device_ids = []
             for _ in range(devices):
-                device_ids.append(self.create_random_name(prefix=device_prefix, length=32))
+                device_ids.append(self.create_random_name(prefix=DEVICE_PREFIX, length=32))
             result['device_ids'] = device_ids
 
         if edge_devices:
@@ -89,7 +90,7 @@ class TestIoTHub(LiveScenarioTest):
         if regex_test_devices:
             regex_device_ids = []
             for _ in range(regex_test_devices):
-                regex_device_ids.append(self.create_random_name(prefix=device_regex_prefix, length=32))
+                regex_device_ids.append(self.create_random_name(prefix=DEVICE_REGEX_PREFIX, length=32))
             result['regex_device_ids'] = regex_device_ids
 
         self._entity_names = result
@@ -1195,7 +1196,7 @@ class TestIoTHub(LiveScenarioTest):
         device_count = 10
 
         regex_device_count = 5
-        device_regex = device_regex_prefix + "[a-z]*"
+        device_regex = DEVICE_REGEX_PREFIX + '[.]*'
 
         # Test with invalid connection string
         self.cmd('iot hub monitor-events -t 1 -y --login {}'.format(LIVE_HUB_CS + 'zzz'), expect_failure=True)
@@ -1234,7 +1235,7 @@ class TestIoTHub(LiveScenarioTest):
 
         # Monitor events with device-id wildcards
         self.command_execute_assert('iot hub monitor-events -n {} -g {} -d {} --et {} -t 10 -y -p sys anno app'
-                                    .format(LIVE_HUB, LIVE_RG, device_prefix + '*', enqueued_time),
+                                    .format(LIVE_HUB, LIVE_RG, DEVICE_PREFIX + '*', enqueued_time),
                                     device_ids)
 
         # Monitor events with --login parameter
@@ -1282,7 +1283,6 @@ class TestIoTHub(LiveScenarioTest):
         # Monitor messages to ensure it returns improperly formatted JSON
         self.command_execute_assert('iot hub monitor-events -n {} -g {} --cg {} --et {} -t 10 -y'.format(
             LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUPS[0], enqueued_time), ['{\\r\\n\\"payload_data1\\"\\"payload_value1\\"\\r\\n}'])
-
 
         enqueued_time = calculate_millisec_since_unix_epoch_utc()
 
