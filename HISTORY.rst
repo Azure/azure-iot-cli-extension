@@ -3,9 +3,12 @@
 Release History
 ===============
 
-0.6.1
+0.6.2
 +++++++++++++++
 * Added wildcard and regex device filtering to monitor-events.
+
+0.6.1
++++++++++++++++
 * Added --output support to monitor-events. Supports either json or yaml, i.e. az iot hub monitor-events --hub-name {} -d {} --output yaml
 * Changed monitor-events to output JSON by default
 * Added support to parse and display payload as JSON if system property Content-Type is provided and application/json (i.e. send-d2c-message ... --props $.ct=application/json from the CLI) or if monitor-events has a property --content-type/--ct of application/json (i.e. monitor-events --ct application/json).
