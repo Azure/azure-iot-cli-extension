@@ -1116,7 +1116,7 @@ def iot_device_upload_file(cmd, device_id, file_path, content_type, hub_name=Non
 # pylint: disable=too-many-locals
 def iot_hub_monitor_events(cmd, hub_name=None, device_id=None, consumer_group='$Default', timeout=300,
                            enqueued_time=None, resource_group_name=None, yes=False, properties=None, repair=False,
-                           login=None, content_type=None, device_regex=None):
+                           login=None, content_type=None):
     import importlib
     from azext_iot.common.deps import ensure_uamqp
     from azext_iot.common.utility import validate_min_python_version
@@ -1149,9 +1149,7 @@ def iot_hub_monitor_events(cmd, hub_name=None, device_id=None, consumer_group='$
                      timeout=timeout,
                      device_id=device_id,
                      output=output,
-                     content_type=content_type,
-                     device_regex=device_regex)
-
+                     content_type=content_type)
 
 def iot_hub_monitor_feedback(cmd, hub_name=None, device_id=None, yes=False,
                              wait_on_id=None, repair=False, resource_group_name=None, login=None):
