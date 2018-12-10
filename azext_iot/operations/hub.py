@@ -1160,6 +1160,7 @@ def iot_hub_monitor_events(cmd, hub_name=None, device_id=None, consumer_group='$
                      content_type=content_type,
                      devices=device_ids)
 
+
 def iot_hub_monitor_feedback(cmd, hub_name=None, device_id=None, yes=False,
                              wait_on_id=None, repair=False, resource_group_name=None, login=None):
     from azext_iot.common.deps import ensure_uamqp
