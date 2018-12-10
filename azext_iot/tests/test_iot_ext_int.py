@@ -39,7 +39,6 @@ SECONDARY_THUMBPRINT = '14963E8F3BA5B3984110B3C1CA8E8B8988599087'
 
 DEVICE_PREFIX = 'test-device-'
 
-
 class TestIoTHub(LiveScenarioTest):
     def __init__(self, _):
         from iotext_test_tools import DummyCliOutputProducer
@@ -1218,6 +1217,22 @@ class TestIoTHub(LiveScenarioTest):
         self.command_execute_assert('iot hub monitor-events -n {} -g {} -d {} --et {} -t 10 -y -p sys anno app'
                                     .format(LIVE_HUB, LIVE_RG, DEVICE_PREFIX + '*', enqueued_time),
                                     device_ids)
+
+        # Monitor events for specific devices using query language
+        device_subset_include = device_ids[:device_count//2]
+        device_include_string = ', '.join(['\'' + deviceId + '\'' for deviceId in device_subset_include])
+        query_string = 'select * from devices where deviceId in [{}]'.format(device_include_string)
+
+        self.command_execute_assert('iot hub monitor-events -n {} -g {} --device-query "{}" --et {} -t 10 -y -p sys anno app'
+                                    .format(LIVE_HUB, LIVE_RG, query_string, enqueued_time),
+                                    device_subset_include)
+
+        # Expect failure for excluded devices
+        device_subset_exclude = device_ids[device_count//2:]
+        with pytest.raises(Exception):
+            self.command_execute_assert('iot hub monitor-events -n {} -g {} --device-query "{}" --et {} -t 10 -y -p sys anno app'
+                                        .format(LIVE_HUB, LIVE_RG, query_string, enqueued_time),
+                                        device_subset_exclude)
 
         # Monitor events with --login parameter
         self.command_execute_assert('iot hub monitor-events -t 10 -y -p all --cg {} --et {} --login {}'.format(

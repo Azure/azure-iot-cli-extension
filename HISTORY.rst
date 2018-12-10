@@ -5,7 +5,7 @@ Release History
 
 0.6.2
 +++++++++++++++
-* Added wildcard and regex device filtering to monitor-events.
+* Added support for deviceId wildcards and IoT Hub query language filtering to monitor-events.
 
 0.6.1
 +++++++++++++++
