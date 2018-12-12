@@ -37,6 +37,8 @@ CWD = os.path.dirname(os.path.abspath(__file__))
 PRIMARY_THUMBPRINT = 'A361EA6A7119A8B0B7BBFFA2EAFDAD1F9D5BED8C'
 SECONDARY_THUMBPRINT = '14963E8F3BA5B3984110B3C1CA8E8B8988599087'
 
+DEVICE_PREFIX = 'test-device-'
+
 
 class TestIoTHub(LiveScenarioTest):
     def __init__(self, _):
@@ -63,7 +65,7 @@ class TestIoTHub(LiveScenarioTest):
         if devices:
             device_ids = []
             for _ in range(devices):
-                device_ids.append(self.create_random_name(prefix='test-device-', length=32))
+                device_ids.append(self.create_random_name(prefix=DEVICE_PREFIX, length=32))
             result['device_ids'] = device_ids
 
         if edge_devices:
@@ -1211,6 +1213,27 @@ class TestIoTHub(LiveScenarioTest):
                                     .format(LIVE_HUB, LIVE_RG, device_ids[0], LIVE_CONSUMER_GROUPS[1], enqueued_time),
                                     [device_ids[0], 'system', 'annotations', 'application', '"message_id": "12345"',
                                      '"key0": "value0"', '"key1": "1"'])
+
+        # Monitor events with device-id wildcards
+        self.command_execute_assert('iot hub monitor-events -n {} -g {} -d {} --et {} -t 10 -y -p sys anno app'
+                                    .format(LIVE_HUB, LIVE_RG, DEVICE_PREFIX + '*', enqueued_time),
+                                    device_ids)
+
+        # Monitor events for specific devices using query language
+        device_subset_include = device_ids[:device_count // 2]
+        device_include_string = ', '.join(['\'' + deviceId + '\'' for deviceId in device_subset_include])
+        query_string = 'select * from devices where deviceId in [{}]'.format(device_include_string)
+
+        self.command_execute_assert('iot hub monitor-events -n {} -g {} --device-query "{}" --et {} -t 10 -y -p sys anno app'
+                                    .format(LIVE_HUB, LIVE_RG, query_string, enqueued_time),
+                                    device_subset_include)
+
+        # Expect failure for excluded devices
+        device_subset_exclude = device_ids[device_count // 2:]
+        with pytest.raises(Exception):
+            self.command_execute_assert('iot hub monitor-events -n {} -g {} --device-query "{}" --et {} -t 10 -y -p sys anno app'
+                                        .format(LIVE_HUB, LIVE_RG, query_string, enqueued_time),
+                                        device_subset_exclude)
 
         # Monitor events with --login parameter
         self.command_execute_assert('iot hub monitor-events -t 10 -y -p all --cg {} --et {} --login {}'.format(

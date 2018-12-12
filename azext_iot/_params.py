@@ -119,6 +119,7 @@ def load_arguments(self, _):
         context.argument('properties', options_list=['--properties', '--props', '-p'], arg_type=event_msg_prop_type)
         context.argument('content_type', options_list=['--content-type', '--ct'],
                          help='Specify the Content-Type of the message payload to automatically format the output to that type.')
+        context.argument('device_query', options_list=['--device-query', '-q'], help='Specify a custom query to filter devices.')
 
     with self.argument_context('iot hub monitor-feedback') as context:
         context.argument('wait_on_id', options_list=['--wait-on-msg', '-w'],

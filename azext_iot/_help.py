@@ -42,6 +42,12 @@ helps['iot hub monitor-events'] = """
     - name: Basic usage when filtering on target device
       text: >
         az iot hub monitor-events -n [IoTHub Name] -d [Device ID]
+    - name: Basic usage when filtering targeted devices with a wildcard in the ID
+      text: >
+        az iot hub monitor-events -n [IoTHub Name] -d Device*
+    - name: Filter devices using IoT Hub query language
+      text: >
+        az iot hub monitor-events -n [IoTHub Name] -q "select * from devices where tags.location.region = 'US'"
     - name: Filter device and specify an Event Hub consumer group to bind to.
       text: >
         az iot hub monitor-events -n [IoTHub Name] -d [Device ID] --cg [Consumer Group Name]
