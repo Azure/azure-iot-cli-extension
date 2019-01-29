@@ -739,8 +739,8 @@ def iot_device_module_method(cmd, device_id, module_id, method_name, hub_name=No
 
 # Utility
 
-def iot_get_sas_token(cmd, hub_name=None, device_id=None, policy_name='iothubowner', module_id=None,
-                      key_type='primary', duration=3600, resource_group_name=None, login=None):
+def iot_get_sas_token(cmd, hub_name=None, device_id=None, policy_name='iothubowner', key_type='primary',
+                      duration=3600, resource_group_name=None, login=None, module_id=None):
     key_type = key_type.lower()
     policy_name = policy_name.lower()
 
@@ -757,7 +757,7 @@ def iot_get_sas_token(cmd, hub_name=None, device_id=None, policy_name='iothubown
 
 def _iot_build_sas_token(cmd, hub_name=None, device_id=None, module_id=None, policy_name='iothubowner',
                          key_type='primary', duration=3600, resource_group_name=None, login=None):
-    from azext_iot.common._azure import (parse_iot_device_connection_string, 
+    from azext_iot.common._azure import (parse_iot_device_connection_string,
                                          parse_iot_device_module_connection_string)
 
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, policy_name, login=login)

@@ -1678,6 +1678,20 @@ class TestSasTokenAuth():
         assert 'sr=iot-hub-for-test.azure-devices.net' in token
         assert 'skn=iothubowner' in token
 
+        # Prepare parameters
+        uri = 'iot-hub-for-test.azure-devices.net/devices/iot-device-for-test/modules/module-for-test'
+
+        # Action
+        sas_auth = SasTokenAuthentication(uri, policy_name, access_key, expiry)
+        token = sas_auth.generate_sas_token()
+
+        # Assertion
+        assert 'SharedAccessSignature ' in token
+        assert 'sig=JwAxBBBPYA0E%2FTHdnrXzUfBfuZ7deH6pppCniJ23Uu0%3D' in token
+        assert 'se=1471940363' in token
+        assert 'sr=iot-hub-for-test.azure-devices.net%2Fdevices%2Fiot-device-for-test%2Fmodules%2Fmodule-for-test' in token
+        assert 'skn=iothubowner' in token
+
 
 class TestDeviceSimulate():
     @pytest.fixture(params=[204])
