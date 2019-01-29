@@ -504,6 +504,15 @@ class TestIoTHub(LiveScenarioTest):
                          self.exists('authentication.symmetricKey.primaryKey'),
                          self.exists('authentication.symmetricKey.secondaryKey')])
 
+        # Error can't get a sas token for module without device
+        self.cmd('az iot hub generate-sas-token -n {} -g {} -m {}'
+                 .format(LIVE_HUB, LIVE_RG, module_ids[1]), expect_failure=True)
+
+        # sas token for module
+        self.cmd('iot hub generate-sas-token -n {} -g {} -d {} -m {}'
+                 .format(LIVE_HUB, LIVE_RG, edge_device_ids[0], module_ids[1]),
+                 checks=[self.exists('sas')])
+
         # X509 Thumbprint
         # With connection string
         self.cmd('''iot hub module-identity create --module-id {} --device-id {} --login {}

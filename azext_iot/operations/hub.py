@@ -259,6 +259,10 @@ def iot_device_module_list(cmd, device_id, hub_name=None, top=1000, resource_gro
 
 def iot_device_module_show(cmd, device_id, module_id, hub_name=None, resource_group_name=None, login=None):
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
+    return _iot_device_module_show(target, device_id, module_id)
+
+
+def _iot_device_module_show(target, device_id, module_id):
     service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
     try:
         module = service_sdk.get_module(device_id, module_id)
@@ -735,7 +739,7 @@ def iot_device_module_method(cmd, device_id, module_id, method_name, hub_name=No
 
 # Utility
 
-def iot_get_sas_token(cmd, hub_name=None, device_id=None, policy_name='iothubowner',
+def iot_get_sas_token(cmd, hub_name=None, device_id=None, policy_name='iothubowner', module_id=None,
                       key_type='primary', duration=3600, resource_group_name=None, login=None):
     key_type = key_type.lower()
     policy_name = policy_name.lower()
@@ -744,14 +748,17 @@ def iot_get_sas_token(cmd, hub_name=None, device_id=None, policy_name='iothubown
         raise CLIError('You are unable to change the sas policy with a hub connection string login.')
     if login and key_type != 'primary' and not device_id:
         raise CLIError('For non-device sas, you are unable to change the key type with a connection string login.')
+    if module_id and not device_id:
+        raise CLIError('You are unable to get sas token for module without device information.')
 
-    return {'sas': _iot_build_sas_token(cmd, hub_name, device_id,
+    return {'sas': _iot_build_sas_token(cmd, hub_name, device_id, module_id,
                                         policy_name, key_type, duration, resource_group_name, login).generate_sas_token()}
 
 
-def _iot_build_sas_token(cmd, hub_name=None, device_id=None, policy_name='iothubowner',
+def _iot_build_sas_token(cmd, hub_name=None, device_id=None, module_id=None, policy_name='iothubowner',
                          key_type='primary', duration=3600, resource_group_name=None, login=None):
-    from azext_iot.common._azure import parse_iot_device_connection_string
+    from azext_iot.common._azure import (parse_iot_device_connection_string, 
+                                         parse_iot_device_module_connection_string)
 
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, policy_name, login=login)
     uri = None
@@ -760,15 +767,27 @@ def _iot_build_sas_token(cmd, hub_name=None, device_id=None, policy_name='iothub
     if device_id:
         logger.info('Obtaining device "%s" details from registry, using IoT Hub policy "%s"', device_id, policy_name)
         device = _iot_device_show(target, device_id)
-        device_cs = _build_device_or_module_connection_string(device=device, key_type=key_type)
-        uri = '{}/devices/{}'.format(target['entity'], device_id)
-        try:
-            parsed_device_cs = parse_iot_device_connection_string(device_cs)
-        except ValueError as e:
-            logger.debug(e)
-            raise CLIError('This device does not support SAS auth.')
+        if module_id:
+            module = _iot_device_module_show(target, device_id, module_id)
+            module_cs = _build_device_or_module_connection_string(device=device, key_type=key_type, module=module)
+            uri = '{}/devices/{}/modules/{}'.format(target['entity'], device_id, module_id)
+            try:
+                parsed_module_cs = parse_iot_device_module_connection_string(module_cs)
+            except ValueError as e:
+                logger.debug(e)
+                raise CLIError('This module does not support SAS auth.')
 
-        key = parsed_device_cs['SharedAccessKey']
+            key = parsed_module_cs['SharedAccessKey']
+        else:
+            device_cs = _build_device_or_module_connection_string(device=device, key_type=key_type)
+            uri = '{}/devices/{}'.format(target['entity'], device_id)
+            try:
+                parsed_device_cs = parse_iot_device_connection_string(device_cs)
+            except ValueError as e:
+                logger.debug(e)
+                raise CLIError('This device does not support SAS auth.')
+
+            key = parsed_device_cs['SharedAccessKey']
     else:
         uri = target['entity']
         policy = target['policy']
