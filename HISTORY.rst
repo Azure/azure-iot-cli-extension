@@ -3,6 +3,10 @@
 Release History
 ===============
 
+0.6.2
++++++++++++++++
+* Added support for deviceId wildcards and IoT Hub query language filtering to monitor-events.
+
 0.6.1
 +++++++++++++++
 * Added --output support to monitor-events. Supports either json or yaml, i.e. az iot hub monitor-events --hub-name {} -d {} --output yaml
