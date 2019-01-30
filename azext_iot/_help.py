@@ -34,35 +34,35 @@ helps['iot hub monitor-events'] = """
     examples:
     - name: Basic usage
       text: >
-        az iot hub monitor-events -n [IoTHub Name]
+        az iot hub monitor-events -n [IoTHub_Name]
     - name: Basic usage with an IoT Hub connection string
       text: >
-        az iot hub monitor-events -n [IoTHub Name]
+        az iot hub monitor-events -n [IoTHub_Name]
         --login 'HostName=myhub.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey=12345'
     - name: Basic usage when filtering on target device
       text: >
-        az iot hub monitor-events -n [IoTHub Name] -d [Device ID]
+        az iot hub monitor-events -n [IoTHub_Name] -d [Device_Id]
     - name: Basic usage when filtering targeted devices with a wildcard in the ID
       text: >
-        az iot hub monitor-events -n [IoTHub Name] -d Device*
+        az iot hub monitor-events -n [IoTHub_Name] -d Device*
     - name: Filter devices using IoT Hub query language
       text: >
-        az iot hub monitor-events -n [IoTHub Name] -q "select * from devices where tags.location.region = 'US'"
+        az iot hub monitor-events -n [IoTHub_Name] -q "select * from devices where tags.location.region = 'US'"
     - name: Filter device and specify an Event Hub consumer group to bind to.
       text: >
-        az iot hub monitor-events -n [IoTHub Name] -d [Device ID] --cg [Consumer Group Name]
+        az iot hub monitor-events -n [IoTHub_Name] -d [Device_Id] --cg [Consumer_Group_Name]
     - name: Receive message annotations (message headers)
       text: >
-        az iot hub monitor-events -n [IoTHub Name] -d [Device ID] --properties anno
+        az iot hub monitor-events -n [IoTHub_Name] -d [Device_Id] --properties anno
     - name: Receive message annotations + system properties. Never time out.
       text: >
-        az iot hub monitor-events -n [IoTHub Name] -d [Device ID] --properties anno sys --timeout 0
+        az iot hub monitor-events -n [IoTHub_Name] -d [Device_Id] --properties anno sys --timeout 0
     - name: Receive all message attributes from all device messages
       text: >
-        az iot hub monitor-events -n [IoTHub Name] --props all
+        az iot hub monitor-events -n [IoTHub_Name] --props all
     - name: Receive all messages and parse message payload as JSON
       text: >
-        az iot hub monitor-events -n [IoTHub Name] --content-type application/json
+        az iot hub monitor-events -n [IoTHub_Name] --content-type application/json
 """
 
 helps['iot hub monitor-feedback'] = """
@@ -75,17 +75,17 @@ helps['iot hub monitor-feedback'] = """
     examples:
     - name: Basic usage
       text: >
-        az iot hub monitor-feedback -n [IoTHub Name]
+        az iot hub monitor-feedback -n [IoTHub_Name]
     - name: Basic usage with an IoT Hub connection string
       text: >
-        az iot hub monitor-feedback -n [IoTHub Name]
+        az iot hub monitor-feedback -n [IoTHub_Name]
         --login 'HostName=myhub.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey=12345'
     - name: Basic usage when filtering on target device
       text: >
-        az iot hub monitor-feedback -n [IoTHub Name] -d [Device ID]
+        az iot hub monitor-feedback -n [IoTHub_Name] -d [Device_Id]
     - name: Exit feedback monitor upon receiving a message with specific id (uuid)
       text: >
-        az iot hub monitor-feedback -n [IoTHub Name] -d [Device ID] -w [Message Id]
+        az iot hub monitor-feedback -n [IoTHub_Name] -d [Device_Id] -w [Message_Id]
 """
 
 helps['iot hub device-identity'] = """
@@ -99,25 +99,25 @@ helps['iot hub device-identity create'] = """
     examples:
     - name: Create an edge enabled IoT device with default authorization (shared private key).
       text: >
-        az iot hub device-identity create -n [IoTHub Name] -d [Device ID] --ee
+        az iot hub device-identity create -n [IoTHub_Name] -d [Device_Id] --ee
     - name: Create an IoT device with self-signed certificate authorization,
             generate a cert valid for 10 days then use its thumbprint.
       text: >
-        az iot hub device-identity create -n [IoTHub Name] -d [Device ID]
+        az iot hub device-identity create -n [IoTHub_Name] -d [Device_Id]
         --am x509_thumbprint --valid-days 10
     - name: Create an IoT device with self-signed certificate authorization,
             generate a cert of default expiration (365 days) and output to target directory.
       text: >
-        az iot hub device-identity create -n [IoTHub Name] -d [Device ID] --am x509_thumbprint
+        az iot hub device-identity create -n [IoTHub_Name] -d [Device_Id] --am x509_thumbprint
         --output-dir /path/to/output
     - name: Create an IoT device with self-signed certificate authorization and
             explicitly provide primary and secondary thumbprints.
       text: >
-        az iot hub device-identity create -n [IoTHub Name] -d [Device ID] --am x509_thumbprint
+        az iot hub device-identity create -n [IoTHub_Name] -d [Device_Id] --am x509_thumbprint
         --ptp [Thumbprint 1] --stp [Thumbprint 2]
     - name: Create an IoT device with root CA authorization with disabled status and reason
       text: >
-        az iot hub device-identity create -n [IoTHub Name] -d [Device ID] --am x509_ca
+        az iot hub device-identity create -n [IoTHub_Name] -d [Device_Id] --am x509_ca
         --status disabled --status-reason 'for reasons'
 """
 
@@ -139,14 +139,14 @@ helps['iot hub device-identity update'] = """
     examples:
     - name: Turn on edge capabilities for device
       text: >
-        az iot hub device-identity update -d [Device ID] -n [IoTHub Name]
+        az iot hub device-identity update -d [Device_Id] -n [IoTHub_Name]
         --set capabilities.iotEdge=true
     - name: Disable device status
       text: >
-        az iot hub device-identity update -d [Device ID] -n [IoTHub Name] --set status=disabled
+        az iot hub device-identity update -d [Device_Id] -n [IoTHub_Name] --set status=disabled
     - name: In one command
       text: >
-        az iot hub device-identity update -d [Device ID] -n [IoTHub Name]
+        az iot hub device-identity update -d [Device_Id] -n [IoTHub_Name]
         --set status=disabled capabilities.iotEdge=true
 """
 
@@ -192,11 +192,11 @@ helps['iot hub device-twin update'] = """
     examples:
     - name: Add nested tags to device twin.
       text: >
-        az iot hub device-twin update --device-id [Device ID] --hub-name [IoTHub Name]
+        az iot hub device-twin update --device-id [Device_Id] --hub-name [IoTHub_Name]
         --set tags='{"location":{"region":"US"}}'
     - name: Remove the 'region' property from parent 'location' property
       text: >
-        az iot hub device-twin update --device-id [Device ID] --hub-name [IoTHub Name]
+        az iot hub device-twin update --device-id [Device_Id] --hub-name [IoTHub_Name]
         --set tags.location.region='null'
 """
 
@@ -207,7 +207,7 @@ helps['iot hub device-twin replace'] = """
     examples:
     - name: Replace device twin with file contents.
       text: >
-        az iot hub device-twin replace -d [Device ID] -n [IoTHub Name] -j ../mydevicetwin.json
+        az iot hub device-twin replace -d [Device_Id] -n [IoTHub_Name] -j ../mydevicetwin.json
 """
 
 helps['iot hub module-identity'] = """
@@ -243,7 +243,7 @@ helps['iot hub module-identity update'] = """
     examples:
     - name: Regenerate module symmetric authentication keys
       text: >
-        az iot hub module-identity update -m [Module Name] -d [Device ID] -n [IoTHub Name]
+        az iot hub module-identity update -m [Module_Name] -d [Device_Id] -n [IoTHub_Name]
         --set authentication.symmetricKey.primaryKey=""
         authentication.symmetricKey.secondaryKey=""
 """
@@ -271,7 +271,7 @@ helps['iot hub module-twin update'] = """
     examples:
     - name: Add desired properties to module twin.
       text: >
-        az iot hub module-twin update -d [Device ID] -n [IoTHub Name] -m [Module Name] --set
+        az iot hub module-twin update -d [Device_Id] -n [IoTHub_Name] -m [Module_Name] --set
         properties.desired='{"conditions":{"temperature":{"warning":70, "critical":100}}}'
     - name: Remove 'critical' property from parent 'temperature'
       text: >
@@ -286,8 +286,8 @@ helps['iot hub module-twin replace'] = """
     examples:
     - name: Replace a module twin with file contents.
       text: >
-        az iot hub module-twin replace -d [Device ID] -n [IoTHub Name]
-        -m [Module Name] -j ../mymodtwin.json
+        az iot hub module-twin replace -d [Device_Id] -n [IoTHub_Name]
+        -m [Module_Name] -j ../mymodtwin.json
 """
 
 helps['iot hub apply-configuration'] = """
@@ -299,7 +299,7 @@ helps['iot hub apply-configuration'] = """
     examples:
     - name: Test modules while in development.
       text: >
-        az iot hub apply-configuration --hub-name [IoTHub Name] --device-id [Device ID]
+        az iot hub apply-configuration --hub-name [IoTHub_Name] --device-id [Device_Id]
         --content ../mycontent.json
 """
 
@@ -312,16 +312,16 @@ helps['iot hub generate-sas-token'] = """
     examples:
     - name: Generate an IoT Hub SAS token using the iothubowner policy and primary key.
       text: >
-        az iot hub generate-sas-token -n [IoTHub Name]
+        az iot hub generate-sas-token -n [IoTHub_Name]
     - name: Generate an IoT Hub SAS token using the registryRead policy and secondary key.
       text: >
-        az iot hub generate-sas-token -n [IoTHub Name] --policy registryRead --key-type secondary
-    - name: Generate a device SAS token using the iothubowner policy to access the [IoTHub Name] device registry.
+        az iot hub generate-sas-token -n [IoTHub_Name] --policy registryRead --key-type secondary
+    - name: Generate a device SAS token using the iothubowner policy to access the [IoTHub_Name] device registry.
       text: >
-        az iot hub generate-sas-token -d [Device ID] -n [IoTHub Name]
+        az iot hub generate-sas-token -d [Device_Id] -n [IoTHub_Name]
     - name: Generate a device SAS token using an IoT Hub connection string (with registry access)
       text: >
-        az iot hub generate-sas-token -d [Device ID]
+        az iot hub generate-sas-token -d [Device_Id]
         --login 'HostName=myhub.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey=12345'
 """
 
@@ -345,10 +345,10 @@ helps['iot hub query'] = """
     examples:
     - name: Query all device twin data in an Azure IoT Hub.
       text: >
-        az iot hub query -n [IoTHub Name] -q "select * from devices"
+        az iot hub query -n [IoTHub_Name] -q "select * from devices"
     - name: Query all module twin data on target device.
       text: >
-        az iot hub query -n [IoTHub Name] -q "select * from devices.modules where devices.deviceId = '[Device ID]'"
+        az iot hub query -n [IoTHub_Name] -q "select * from devices.modules where devices.deviceId = '[Device_Id]'"
 """
 
 helps['iot hub show-connection-string'] = """
@@ -376,16 +376,16 @@ helps['iot hub configuration create'] = """
     - name: Create a device configuration that applies on condition where a device is in 'building 9' and
             the environment is 'test'.
       text: >
-        az iot hub configuration create -c [Config Name] -n [IoTHub Name] --content ../device_content.json
+        az iot hub configuration create -c [Config_Name] -n [IoTHub_Name] --content ../device_content.json
         --target-condition "tags.building=9 and tags.environment='test'"
     - name: Create a device configuration with labels and provide user metrics inline (bash syntax example)
       text: >
-        az iot hub configuration create -c [Config Name] -n [IoTHub Name] --content ../device_content.json
+        az iot hub configuration create -c [Config_Name] -n [IoTHub_Name] --content ../device_content.json
         --target-condition "tags.building=9" --labels '{"key0":"value0", "key1":"value1"}'
         --metrics '{"metrics": {"queries": {"mymetrik": "select deviceId from devices where tags.location='US'"}}}'
     - name: Create a device configuration with labels and provide user metrics inline (cmd syntax example)
       text: >
-        az iot hub configuration create -c [Config Name] -n [IoTHub Name] --content ../device_content.json
+        az iot hub configuration create -c [Config_Name] -n [IoTHub_Name] --content ../device_content.json
         --target-condition "tags.building=9" --labels "{\\"key0\\":\\"value0\\", \\"key1\\":\\"value1\\"}"
         --metrics "{\\"metrics\\": {\\"queries\\": {\\"mymetrik\\":
         \\"select deviceId from devices where tags.location='US'\\"}}}"
@@ -409,7 +409,7 @@ helps['iot hub configuration update'] = """
     examples:
     - name: Alter the priority of a device configuration and update its target condition
       text: >
-        az iot hub configuration update -c [Configuration Name] -n [IoTHub Name] --set priority=10
+        az iot hub configuration update -c [Configuration_Name] -n [IoTHub_Name] --set priority=10
         targetCondition="tags.building=43 and tags.environment='dev'"
 """
 
@@ -424,10 +424,10 @@ helps['iot hub configuration show-metric'] = """
     examples:
     - name: Evaluate the user defined 'warningLimit' metric
       text: >
-        az iot hub configuration show-metric -m warningLimit -d [Configuration Name] -n [IoTHub Name]
+        az iot hub configuration show-metric -m warningLimit -c [Configuration_Name] -n [IoTHub_Name]
     - name: Evaluate the system 'appliedCount' metric
       text: >
-        az iot hub configuration show-metric --metric-id appliedCount -d [Configuration Name] -n [IoTHub Name]
+        az iot hub configuration show-metric --metric-id appliedCount -c [Configuration_Name] -n [IoTHub_Name]
         --metric-type system
 """
 
@@ -471,13 +471,13 @@ helps['iot device c2d-message send'] = """
     examples:
     - name: Basic usage with default message body
       text: >
-        az iot device c2d-message send -d [Device Id] -n [IoTHub Name]
+        az iot device c2d-message send -d [Device_Id] -n [IoTHub_Name]
     - name: Send cloud-to-device message with custom data and properties.
       text: >
-        az iot device c2d-message send -d [Device Id] -n [IoTHub Name] --data 'Hello World' --props 'key0=value0;key1=value1'
+        az iot device c2d-message send -d [Device_Id] -n [IoTHub_Name] --data 'Hello World' --props 'key0=value0;key1=value1'
     - name: Send a C2D message and wait for device acknowledgement
       text: >
-        az iot device c2d-message send -d [Device Id] -n [IoTHub Name] --wait
+        az iot device c2d-message send -d [Device_Id] -n [IoTHub_Name] --wait
 """
 
 helps['iot device send-d2c-message'] = """
@@ -486,13 +486,13 @@ helps['iot device send-d2c-message'] = """
     long-summary: Supports application and system properties to send with message.
     examples:
     - name: Basic usage
-      text: az iot device send-d2c-message -n [IotHub Name] -d [Device Id]
+      text: az iot device send-d2c-message -n [IoTHub_Name] -d [Device_Id]
     - name: Basic usage with custom data
-      text: az iot device send-d2c-message -n [IotHub Name] -d [Device Id] --data <message body>
+      text: az iot device send-d2c-message -n [IoTHub_Name] -d [Device_Id] --data <message body>
     - name: Send application properties
-      text: az iot device send-d2c-message -n [IotHub Name] -d [Device Id] --props 'key0=value0;key1=value1'
+      text: az iot device send-d2c-message -n [IoTHub_Name] -d [Device_Id] --props 'key0=value0;key1=value1'
     - name: Send system properties (Message Id and Correlation Id)
-      text: az iot device send-d2c-message -n [IotHub Name] -d [Device Id] --props '$.mid=<id>;$.cid=<id>'
+      text: az iot device send-d2c-message -n [IoTHub_Name] -d [Device_Id] --props '$.mid=<id>;$.cid=<id>'
 """
 
 helps['iot device simulate'] = """
@@ -504,13 +504,13 @@ helps['iot device simulate'] = """
                   selection which can be complete, reject or abandon.
     examples:
     - name: Basic usage (mqtt).
-      text: az iot device simulate -n [IotHub Name] -d [Device Id]
+      text: az iot device simulate -n [IoTHub_Name] -d [Device_Id]
     - name: Basic usage (http).
-      text: az iot device simulate -n [IotHub Name] -d [Device Id] --protocol http
+      text: az iot device simulate -n [IoTHub_Name] -d [Device_Id] --protocol http
     - name: Choose total message count and interval between messages.
-      text: az iot device simulate -n [IotHub Name] -d [Device Id] --msg-count 1000 --msg-interval 5
+      text: az iot device simulate -n [IoTHub_Name] -d [Device_Id] --msg-count 1000 --msg-interval 5
     - name: Reject or abandon c2d messages (http only)
-      text: az iot device simulate -n [IotHub Name] -d [Device Id] --rs [reject|abandon]
+      text: az iot device simulate -n [IoTHub_Name] -d [Device_Id] --rs [reject|abandon]
 """
 
 helps['iot device upload-file'] = """
@@ -542,7 +542,7 @@ helps['iot edge set-modules'] = """
     examples:
     - name: Test edge modules while in development by setting modules on a target device.
       text: >
-        az iot edge set-modules --hub-name [IoTHub Name] --device-id [Device ID] --content ../modules_content.json
+        az iot edge set-modules --hub-name [IoTHub_Name] --device-id [Device_Id] --content ../modules_content.json
 """
 
 helps['iot edge deployment'] = """
@@ -562,12 +562,12 @@ helps['iot edge deployment create'] = """
     - name: Create a deployment with labels (bash syntax example) that applies for devices in 'building 9' and
             the environment is 'test'.
       text: >
-        az iot edge deployment create -d [Deployment Name] -n [IoTHub Name] --content ../modules_content.json
+        az iot edge deployment create -d [Deployment_Name] -n [IoTHub_Name] --content ../modules_content.json
         --labels '{"key0":"value0", "key1":"value1"}'
         --target-condition "tags.building=9 and tags.environment='test'" --priority 3
     - name: Create a deployment with labels (cmd syntax example) that applies for devices tagged with environment 'dev'.
       text: >
-        az iot edge deployment create -d [Deployment Name] -n [IoTHub Name] --content ../modules_content.json
+        az iot edge deployment create -d [Deployment_Name] -n [IoTHub_Name] --content ../modules_content.json
         --labels "{\\"key\\":\\"value\\"}"
         --target-condition "tags.environment='dev'"
 """
@@ -590,7 +590,7 @@ helps['iot edge deployment update'] = """
     examples:
     - name: Alter the labels and target condition of an existing edge deployment
       text: >
-        az iot edge deployment update -d [Deployment Name] -n [IoTHub Name]
+        az iot edge deployment update -d [Deployment_Name] -n [IoTHub_Name]
         --set labels='{"purpose":"dev", "owners":"IoTEngineering"}' targetCondition='tags.building=9'
 """
 
@@ -605,7 +605,7 @@ helps['iot edge deployment show-metric'] = """
     examples:
     - name: Evaluate the 'appliedCount' system metric
       text: >
-        az iot edge deployment show-metric -m appliedCount -d [Deployment Name] -n [IoTHub Name]
+        az iot edge deployment show-metric -m appliedCount -d [Deployment_Name] -n [IoTHub_Name]
 """
 
 helps['iot dps'] = """
@@ -633,89 +633,89 @@ helps['iot dps enrollment create'] = """
     type: command
     short-summary: Create a device enrollment in an Azure IoT Hub Device Provisioning Service.
     examples:
-    - name: Create an enrollment '[Enrollment ID]' with attestation type 'x509' in the Azure
-            IoT provisioning service '[DPS Name]' in the resource group '[Resource Group Name]'
+    - name: Create an enrollment '[Enrollment_ID]' with attestation type 'x509' in the Azure
+            IoT provisioning service '[DPS_Name]' in the resource group '[Resource_Group_Name]'
       text: >
-        az iot dps enrollment create -g [Resource Group Name] --dps-name [DPS Name]
-        --enrollment-id [Enrollment ID] --attestation-type x509
+        az iot dps enrollment create -g [Resource_Group_Name] --dps-name [DPS_Name]
+        --enrollment-id [Enrollment_ID] --attestation-type x509
         --certificate-path /certificates/Certificate.pem
-    - name: Create an enrollment '[Enrollment ID]' with attestation type 'x509' in the Azure
-            IoT Device Provisioning Service '[DPS Name]' in the resource group
-            '[Resource Group Name]' with provisioning status 'disabled', target IoT Hub
-            '[IoTHub Host Name]', device id '[Device ID]' and initial twin
+    - name: Create an enrollment '[Enrollment_ID]' with attestation type 'x509' in the Azure
+            IoT Device Provisioning Service '[DPS_Name]' in the resource group
+            '[Resource_Group_Name]' with provisioning status 'disabled', target IoT Hub
+            '[IoTHub_Host_Name]', device id '[Device_Id]' and initial twin
             properties '{"location":{"region":"US"}}'.
       text: >
-        az iot dps enrollment create -g [Resource Group Name] --dps-name [DPS Name]
-        --enrollment-id [Enrollment ID] --attestation-type x509
+        az iot dps enrollment create -g [Resource_Group_Name] --dps-name [DPS_Name]
+        --enrollment-id [Enrollment_ID] --attestation-type x509
         --certificate-path /certificates/Certificate.pem --provisioning-status disabled
-        --iot-hub-host-name [IoTHub Host Name]
-        --initial-twin-properties "{'location':{'region':'US'}}" --device-id [Device ID]
+        --iot-hub-host-name [IoTHub_Host_Name]
+        --initial-twin-properties "{'location':{'region':'US'}}" --device-id [Device_Id]
     - name: Create an enrollment 'MyEnrollment' with attestation type 'tpm' in the Azure IoT
-            Device Provisioning Service '[DPS Name]' in the resource group '[Resource Group Name]'.
+            Device Provisioning Service '[DPS_Name]' in the resource group '[Resource_Group_Name]'.
       text: >
-        az iot dps enrollment create -g [Resource Group Name] --dps-name [DPS Name]
-        --enrollment-id [Enrollment ID] --attestation-type tpm
+        az iot dps enrollment create -g [Resource_Group_Name] --dps-name [DPS_Name]
+        --enrollment-id [Enrollment_ID] --attestation-type tpm
         --endorsement-key 14963E8F3BA5B3984110B3C1CA8E8B89
     - name: Create an enrollment 'MyEnrollment' with attestation type 'symmetrickey' in the Azure
-            IoT Device Provisioning service '[DPS Name]' in the resource group '[Resource Group Name]'.
+            IoT Device Provisioning service '[DPS_Name]' in the resource group '[Resource_Group_Name]'.
       text: >
-        az iot dps enrollment create -g [Resource Group Name] --dps-name [DPS Name]
-        --enrollment-id [Enrollment ID] --attestation-type symmetrickey
-        --primary-key [Primary Key] --secondary-key [Secondary Key]
+        az iot dps enrollment create -g [Resource_Group_Name] --dps-name [DPS_Name]
+        --enrollment-id [Enrollment_ID] --attestation-type symmetrickey
+        --primary-key [Primary_Key] --secondary-key [Secondary_Key]
     - name: Create an enrollment 'MyEnrollment' with reprovision in the Azure IoT Device Provisioning
-            service '[DPS Name]' in the resource group '[Resource Group Name]'.
+            service '[DPS_Name]' in the resource group '[Resource_Group_Name]'.
       text: >
-        az iot dps enrollment create -g [Resource Group Name] --dps-name [DPS Name]
-        --enrollment-id [Enrollment ID] --attestation-type tpm
-        --reprovision-policy [Reprovision Type] --endorsement-key 14963E8F3BA5B3984110B3C1CA8E8B89
+        az iot dps enrollment create -g [Resource_Group_Name] --dps-name [DPS_Name]
+        --enrollment-id [Enrollment_ID] --attestation-type tpm
+        --reprovision-policy [Reprovision_Type] --endorsement-key 14963E8F3BA5B3984110B3C1CA8E8B89
     - name: Create an enrollment 'MyEnrollment' with static allocation policy in the Azure
-            IoT Device Provisioning service '[DPS Name]' in the resource group '[Resource Group Name]'.
+            IoT Device Provisioning service '[DPS_Name]' in the resource group '[Resource_Group_Name]'.
       text: >
-        az iot dps enrollment create -g [Resource Group Name] --dps-name [DPS Name]
-        --enrollment-id [Enrollment ID] --attestation-type tpm --allocation-policy static
-        --endorsement-key 14963E8F3BA5B3984110B3C1CA8E8B89 --iot-hubs [iot hub host name]
+        az iot dps enrollment create -g [Resource_Group_Name] --dps-name [DPS_Name]
+        --enrollment-id [Enrollment_ID] --attestation-type tpm --allocation-policy static
+        --endorsement-key 14963E8F3BA5B3984110B3C1CA8E8B89 --iot-hubs [iot_hub_host_name]
     - name: Create an enrollment 'MyEnrollment' with hashed allocation policy and multiple hubs in the Azure
-            IoT Device Provisioning service '[DPS Name]' in the resource group '[Resource Group Name]'.
+            IoT Device Provisioning service '[DPS_Name]' in the resource group '[Resource_Group_Name]'.
       text: >
-        az iot dps enrollment create -g [Resource Group Name] --dps-name [DPS Name]
-        --enrollment-id [Enrollment ID] --attestation-type tpm --allocation-policy hashed
-        --endorsement-key 14963E8F3BA5B3984110B3C1CA8E8B89 --iot-hubs "[iot hub host name1] [iot hub host name2]"
+        az iot dps enrollment create -g [Resource_Group_Name] --dps-name [DPS_Name]
+        --enrollment-id [Enrollment_ID] --attestation-type tpm --allocation-policy hashed
+        --endorsement-key 14963E8F3BA5B3984110B3C1CA8E8B89 --iot-hubs "[iot_hub_host_name1] [iot_hub_host_name2]"
 """
 
 helps['iot dps enrollment update'] = """
     type: command
     short-summary: Update a device enrollment in an Azure IoT Hub Device Provisioning Service.
     examples:
-    - name: Update enrollment '[Enrollment ID]' with a new x509 certificate in the Azure IoT
-            Device Provisioning Service '[DPS Name]' in the resource group '[Resource Group Name]'.
+    - name: Update enrollment '[Enrollment_ID]' with a new x509 certificate in the Azure IoT
+            Device Provisioning Service '[DPS_Name]' in the resource group '[Resource_Group_Name]'.
       text: >
-        az iot dps enrollment update -g [Resource Group Name] --dps-name [DPS Name]
-        --enrollment-id [Enrolment ID] --certificate-path /certificates/NewCertificate.pem
+        az iot dps enrollment update -g [Resource_Group_Name] --dps-name [DPS_Name]
+        --enrollment-id [Enrolment_ID] --certificate-path /certificates/NewCertificate.pem
         --etag AAAAAAAAAAA=
-    - name: Update enrollment '[Enrollment ID]' with a new endorsement key in the Azure IoT
-            Device Provisioning Service '[DPS Name]' in the resource group '[Resource Group Name]'.
+    - name: Update enrollment '[Enrollment_ID]' with a new endorsement key in the Azure IoT
+            Device Provisioning Service '[DPS_Name]' in the resource group '[Resource_Group_Name]'.
       text: >
-        az iot dps enrollment update -g [Resource Group Name] --dps-name [DPS Name]
-        --enrollment-id [Enrollment ID] --endorsement-key 14963E8F3BA5B3984110B3C1CA8E8B89
+        az iot dps enrollment update -g [Resource_Group_Name] --dps-name [DPS_Name]
+        --enrollment-id [Enrollment_ID] --endorsement-key 14963E8F3BA5B3984110B3C1CA8E8B89
         --etag AAAAAAAAAAA=
-    - name: Update enrollment '[Enrollment ID]' with a new primary key in the Azure IoT
-            Device Provisioning Service '[DPS Name]' in the resource group '[Resource Group Name]'.
+    - name: Update enrollment '[Enrollment_ID]' with a new primary key in the Azure IoT
+            Device Provisioning Service '[DPS_Name]' in the resource group '[Resource_Group_Name]'.
       text: >
-        az iot dps enrollment update -g [Resource Group Name] --dps-name [DPS Name]
-        --enrollment-id [Enrollment ID] --primary-key [New Primary Key]
+        az iot dps enrollment update -g [Resource_Group_Name] --dps-name [DPS_Name]
+        --enrollment-id [Enrollment_ID] --primary-key [New_Primary_Key]
         --etag AAAAAAAAAAA=
-    - name: Update enrollment '[Enrollment ID]' with a new reprovision type in the Azure IoT
-            Device Provisioning Service '[DPS Name]' in the resource group '[Resource Group Name]'.
+    - name: Update enrollment '[Enrollment_ID]' with a new reprovision type in the Azure IoT
+            Device Provisioning Service '[DPS_Name]' in the resource group '[Resource_Group_Name]'.
       text: >
-        az iot dps enrollment update -g [Resource Group Name] --dps-name [DPS Name]
-        --enrollment-id [Enrollment ID] --reprovision-policy [Reprovision Type]
+        az iot dps enrollment update -g [Resource_Group_Name] --dps-name [DPS_Name]
+        --enrollment-id [Enrollment_ID] --reprovision-policy [Reprovision_Type]
         --etag AAAAAAAAAAA=
-    - name: Update enrollment '[Enrollment ID]' with a new allocation policy in the Azure IoT
-            Device Provisioning Service '[DPS Name]' in the resource group '[Resource Group Name]'.
+    - name: Update enrollment '[Enrollment_ID]' with a new allocation policy in the Azure IoT
+            Device Provisioning Service '[DPS_Name]' in the resource group '[Resource_Group_Name]'.
       text: >
-        az iot dps enrollment update -g [Resource Group Name] --dps-name [DPS Name]
-        --enrollment-id [Enrollment ID] --allocation-policy geolatency
-        --etag AAAAAAAAAAA= --iot-hubs "[iot hub host name1] [iot hub host name2] [iot hub host name3]"
+        az iot dps enrollment update -g [Resource_Group_Name] --dps-name [DPS_Name]
+        --enrollment-id [Enrollment_ID] --allocation-policy geolatency
+        --etag AAAAAAAAAAA= --iot-hubs "[iot_hub_host_name1] [iot_hub_host_name2] [iot_hub_host_name3]"
 """
 
 helps['iot dps enrollment delete'] = """
@@ -742,31 +742,31 @@ helps['iot dps enrollment-group create'] = """
     type: command
     short-summary: Create an enrollment group in an Azure IoT Hub Device Provisioning Service.
     examples:
-    - name: Create an enrollment group '[Enrollment ID]' in the Azure IoT provisioning service
-            '[DPS Name]' in the resource group '[Resource Group Name] using an intermediate certificate as primary certificate'.
+    - name: Create an enrollment group '[Enrollment_ID]' in the Azure IoT provisioning service
+            '[DPS_Name]' in the resource group '[Resource_Group_Name] using an intermediate certificate as primary certificate'.
       text: >
-        az iot dps enrollment-group create -g [Resource Group Name] --dps-name [DPS Name]
-        --enrollment-id [Enrollment ID] --certificate-path /certificates/Certificate.pem
-    - name: Create an enrollment group '[Enrollment ID]' in the Azure IoT provisioning service
-            '[DPS Name]' in the resource group '[Resource Group Name] using a CA certificate [Certificate Name]
+        az iot dps enrollment-group create -g [Resource_Group_Name] --dps-name [DPS_Name]
+        --enrollment-id [Enrollment_ID] --certificate-path /certificates/Certificate.pem
+    - name: Create an enrollment group '[Enrollment_ID]' in the Azure IoT provisioning service
+            '[DPS_Name]' in the resource group '[Resource_Group_Name] using a CA certificate [Certificate_Name]
             as secondary certificate'.
       text: >
-        az iot dps enrollment-group create -g [Resource Group Name] --dps-name [DPS Name]
-        --enrollment-id [Enrollment ID] --secondary-certificate-name [Certificate Name]
-    - name: Create an enrollment group '[Enrollment ID]' in the Azure IoT provisioning service
-            'MyDps' in the resource group '[Resource Group Name]' with provisioning status
-            'enabled', target IoT Hub '[IoTHub Host Name]' and initial twin
+        az iot dps enrollment-group create -g [Resource_Group_Name] --dps-name [DPS_Name]
+        --enrollment-id [Enrollment_ID] --secondary-certificate-name [Certificate_Name]
+    - name: Create an enrollment group '[Enrollment_ID]' in the Azure IoT provisioning service
+            'MyDps' in the resource group '[Resource_Group_Name]' with provisioning status
+            'enabled', target IoT Hub '[IoTHub_Host_Name]' and initial twin
             tags '{"location":{"region":"US"}} using an intermediate certificate as primary certificate'.
       text: >
-        az iot dps enrollment-group create -g [Resource Group Name] --dps-name [DPS Name]
-        --enrollment-id [Enrollment ID] --certificate-path /certificates/Certificate.pem
-        --provisioning-status enabled --iot-hub-host-name [IoTHub Host Name]
+        az iot dps enrollment-group create -g [Resource_Group_Name] --dps-name [DPS_Name]
+        --enrollment-id [Enrollment_ID] --certificate-path /certificates/Certificate.pem
+        --provisioning-status enabled --iot-hub-host-name [IoTHub_Host_Name]
         --initial-twin-tags "{'location':{'region':'US'}}"
-    - name: Create an enrollment group '[Enrollment ID]' in the Azure IoT provisioning service
-            '[DPS Name]' in the resource group '[Resource Group Name] with attestation type 'symmetrickey'.
+    - name: Create an enrollment group '[Enrollment_ID]' in the Azure IoT provisioning service
+            '[DPS_Name]' in the resource group '[Resource_Group_Name] with attestation type 'symmetrickey'.
       text: >
-        az iot dps enrollment-group create -g [Resource Group Name] --dps-name [DPS Name]
-        --enrollment-id [Enrollment ID] --primary-key [Primary Key] --secondary-key [Secondary Key]
+        az iot dps enrollment-group create -g [Resource_Group_Name] --dps-name [DPS_Name]
+        --enrollment-id [Enrollment_ID] --primary-key [Primary_Key] --secondary-key [Secondary_Key]
 
 """
 
@@ -774,30 +774,30 @@ helps['iot dps enrollment-group update'] = """
     type: command
     short-summary: Update an enrollment group in an Azure IoT Hub Device Provisioning Service.
     examples:
-    - name: Update enrollment group '[Enrollment ID]' in the Azure IoT provisioning service '[DPS name]'
-            in the resource group '[Resource Group Name]' with new initial twin tags.
+    - name: Update enrollment group '[Enrollment_ID]' in the Azure IoT provisioning service '[DPS_Name]'
+            in the resource group '[Resource_Group_Name]' with new initial twin tags.
       text: >
-        az iot dps enrollment-group update -g [Resource Group Name] --dps-name [DPS Name]
-        --enrollment-id [Enrollment ID] --initial-twin-tags "{'location':{'region':'US2'}}" --etag AAAAAAAAAAA=
-    - name: Update enrollment group '[Enrollment ID]' in the Azure IoT provisioning service '[DPS name]'
-            in the resource group '[Resource Group Name]' with new primary intermediate certificate
+        az iot dps enrollment-group update -g [Resource_Group_Name] --dps-name [DPS_Name]
+        --enrollment-id [Enrollment_ID] --initial-twin-tags "{'location':{'region':'US2'}}" --etag AAAAAAAAAAA=
+    - name: Update enrollment group '[Enrollment_ID]' in the Azure IoT provisioning service '[DPS_Name]'
+            in the resource group '[Resource_Group_Name]' with new primary intermediate certificate
             and remove existing secondary intermediate certificate.
       text: >
-        az iot dps enrollment-group update -g [Resource Group Name] --dps-name [DPS Name]
-        --enrollment-id [Enrollment ID] --certificate-path /certificates/NewCertificate.pem
+        az iot dps enrollment-group update -g [Resource_Group_Name] --dps-name [DPS_Name]
+        --enrollment-id [Enrollment_ID] --certificate-path /certificates/NewCertificate.pem
         --remove-secondary-certificate --etag AAAAAAAAAAA=
-    - name: Update enrollment group '[Enrollment ID]' in the Azure IoT provisioning service '[DPS name]'
-            in the resource group '[Resource Group Name]' with new secondary CA certificate
-            '[Certificate Name]' and remove existing primary CA certificate.
+    - name: Update enrollment group '[Enrollment_ID]' in the Azure IoT provisioning service '[DPS_Name]'
+            in the resource group '[Resource_Group_Name]' with new secondary CA certificate
+            '[Certificate_Name]' and remove existing primary CA certificate.
       text: >
-        az iot dps enrollment-group update -g [Resource Group Name] --dps-name [DPS Name]
-        --enrollment-id [Enrollment ID] --secondary-certificate-name [Certificate Name]
+        az iot dps enrollment-group update -g [Resource_Group_Name] --dps-name [DPS_Name]
+        --enrollment-id [Enrollment_ID] --secondary-certificate-name [Certificate_Name]
         --remove-certificate --etag AAAAAAAAAAA=
-    - name: Update enrollment group '[Enrollment ID]' in the Azure IoT provisioning service '[DPS name]'
-            in the resource group '[Resource Group Name]' with new primary key.
+    - name: Update enrollment group '[Enrollment_ID]' in the Azure IoT provisioning service '[DPS_Name]'
+            in the resource group '[Resource_Group_Name]' with new primary key.
       text: >
-        az iot dps enrollment-group update -g [Resource Group Name] --dps-name [DPS Name]
-        --enrollment-id [Enrollment ID] --primary-key [New Primary Key] --etag AAAAAAAAAAA=
+        az iot dps enrollment-group update -g [Resource_Group_Name] --dps-name [DPS_Name]
+        --enrollment-id [Enrollment_ID] --primary-key [New_Primary_Key] --etag AAAAAAAAAAA=
 """
 
 helps['iot dps enrollment-group delete'] = """
