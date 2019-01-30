@@ -515,6 +515,11 @@ class TestIoTHub(LiveScenarioTest):
                  .format(LIVE_HUB, LIVE_RG, edge_device_ids[0], module_ids[1]),
                  checks=[self.exists('sas')])
 
+        # sas token for module with connection string
+        self.cmd('iot hub generate-sas-token -d {} -m {} --login {}'
+                 .format(edge_device_ids[0], module_ids[1], LIVE_HUB_CS),
+                 checks=[self.exists('sas')])
+
         # X509 Thumbprint
         # With connection string
         self.cmd('''iot hub module-identity create --module-id {} --device-id {} --login {}
