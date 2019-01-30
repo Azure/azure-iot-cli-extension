@@ -114,7 +114,7 @@ helps['iot hub device-identity create'] = """
             explicitly provide primary and secondary thumbprints.
       text: >
         az iot hub device-identity create -n [IoTHub_Name] -d [Device_Id] --am x509_thumbprint
-        --ptp [Thumbprint 1] --stp [Thumbprint 2]
+        --ptp [Thumbprint_1] --stp [Thumbprint_2]
     - name: Create an IoT device with root CA authorization with disabled status and reason
       text: >
         az iot hub device-identity create -n [IoTHub_Name] -d [Device_Id] --am x509_ca
@@ -488,7 +488,7 @@ helps['iot device send-d2c-message'] = """
     - name: Basic usage
       text: az iot device send-d2c-message -n [IoTHub_Name] -d [Device_Id]
     - name: Basic usage with custom data
-      text: az iot device send-d2c-message -n [IoTHub_Name] -d [Device_Id] --data <message body>
+      text: az iot device send-d2c-message -n [IoTHub_Name] -d [Device_Id] --data <message_body>
     - name: Send application properties
       text: az iot device send-d2c-message -n [IoTHub_Name] -d [Device_Id] --props 'key0=value0;key1=value1'
     - name: Send system properties (Message Id and Correlation Id)
@@ -752,7 +752,7 @@ helps['iot dps enrollment-group create'] = """
             as secondary certificate'.
       text: >
         az iot dps enrollment-group create -g [Resource_Group_Name] --dps-name [DPS_Name]
-        --enrollment-id [Enrollment_ID] --secondary-certificate-name [Certificate_Name]
+        --enrollment-id [Enrollment_ID] --secondary-ca-name [Certificate_Name]
     - name: Create an enrollment group '[Enrollment_ID]' in the Azure IoT provisioning service
             'MyDps' in the resource group '[Resource_Group_Name]' with provisioning status
             'enabled', target IoT Hub '[IoTHub_Host_Name]' and initial twin
@@ -791,7 +791,7 @@ helps['iot dps enrollment-group update'] = """
             '[Certificate_Name]' and remove existing primary CA certificate.
       text: >
         az iot dps enrollment-group update -g [Resource_Group_Name] --dps-name [DPS_Name]
-        --enrollment-id [Enrollment_ID] --secondary-certificate-name [Certificate_Name]
+        --enrollment-id [Enrollment_ID] --secondary-ca-name [Certificate_Name]
         --remove-certificate --etag AAAAAAAAAAA=
     - name: Update enrollment group '[Enrollment_ID]' in the Azure IoT provisioning service '[DPS_Name]'
             in the resource group '[Resource_Group_Name]' with new primary key.
