@@ -33,10 +33,15 @@ mock_target['policy'] = 'iothubowner'
 mock_target['subscription'] = "5952cff8-bcd1-4235-9554-af2c0348bf23"
 
 generic_cs_template = 'HostName={};SharedAccessKeyName={};SharedAccessKey={}'
+generic_lower_cs_template = 'hostname={};sharedaccesskeyname={};sharedaccesskey={}'
 
 
 def generate_cs(hub=hub_entity, policy=mock_target['policy'], key=mock_target['primarykey']):
     return generic_cs_template.format(hub, policy, key)
+
+
+def generate_lower_cs(hub=hub_entity, policy=mock_target['policy'], key=mock_target['primarykey']):
+    return generic_lower_cs_template.format(hub, policy, key)
 
 
 mock_target['cs'] = generate_cs()
@@ -1533,8 +1538,10 @@ class TestGetIoTHubConnString():
                 policy = str(uuid4())
                 key = str(uuid4())
                 cs = generate_cs(hub, policy, key)
+                lower_cs = generate_lower_cs(hub, policy, key)
 
                 result = get_iot_hub_connection_string(cmd, targethub, rg_name, policy_name, login=cs)
+                result_lower = get_iot_hub_connection_string(cmd, targethub, rg_name, policy_name, login=lower_cs)
 
                 assert result['entity'] == hub
                 assert result['policy'] == policy
@@ -1542,6 +1549,15 @@ class TestGetIoTHubConnString():
                 assert not result.get('resourcegroup')
                 assert not result.get('subscription')
                 assert result['cs'] == generic_cs_template.format(
+                    hub,
+                    policy,
+                    key)
+                assert result_lower['entity'] == hub
+                assert result_lower['policy'] == policy
+                assert result_lower['primarykey'] == key
+                assert not result_lower.get('resourcegroup')
+                assert not result_lower.get('subscription')
+                assert result_lower['cs'] == generic_lower_cs_template.format(
                     hub,
                     policy,
                     key)
