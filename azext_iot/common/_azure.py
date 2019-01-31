@@ -16,7 +16,7 @@ def _parse_connection_string(cs, validate=None, cstring_type='entity'):
     decomposed_lower = dict((k.lower(), v) for k, v in decomposed.items())
     if validate:
         for k in validate:
-            if not decomposed.get(k) and not decomposed_lower.get(k.lower()):
+            if not any([decomposed.get(k), decomposed_lower.get(k.lower())]):
                 raise ValueError('{} connection string has missing property: {}'.format(cstring_type, k))
     return decomposed
 
