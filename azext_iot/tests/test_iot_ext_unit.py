@@ -33,10 +33,15 @@ mock_target['policy'] = 'iothubowner'
 mock_target['subscription'] = "5952cff8-bcd1-4235-9554-af2c0348bf23"
 
 generic_cs_template = 'HostName={};SharedAccessKeyName={};SharedAccessKey={}'
+generic_lower_cs_template = 'hostname={};sharedaccesskeyname={};sharedaccesskey={}'
 
 
 def generate_cs(hub=hub_entity, policy=mock_target['policy'], key=mock_target['primarykey']):
     return generic_cs_template.format(hub, policy, key)
+
+
+def generate_lower_cs(hub=hub_entity, policy=mock_target['policy'], key=mock_target['primarykey']):
+    return generic_lower_cs_template.format(hub, policy, key)
 
 
 mock_target['cs'] = generate_cs()
@@ -1533,8 +1538,10 @@ class TestGetIoTHubConnString():
                 policy = str(uuid4())
                 key = str(uuid4())
                 cs = generate_cs(hub, policy, key)
+                lower_cs = generate_lower_cs(hub, policy, key)
 
                 result = get_iot_hub_connection_string(cmd, targethub, rg_name, policy_name, login=cs)
+                result_lower = get_iot_hub_connection_string(cmd, targethub, rg_name, policy_name, login=lower_cs)
 
                 assert result['entity'] == hub
                 assert result['policy'] == policy
@@ -1542,6 +1549,15 @@ class TestGetIoTHubConnString():
                 assert not result.get('resourcegroup')
                 assert not result.get('subscription')
                 assert result['cs'] == generic_cs_template.format(
+                    hub,
+                    policy,
+                    key)
+                assert result_lower['entity'] == hub
+                assert result_lower['policy'] == policy
+                assert result_lower['primarykey'] == key
+                assert not result_lower.get('resourcegroup')
+                assert not result_lower.get('subscription')
+                assert result_lower['cs'] == generic_lower_cs_template.format(
                     hub,
                     policy,
                     key)
@@ -1676,6 +1692,20 @@ class TestSasTokenAuth():
         assert 'sig=770sPjjYxRYpNz8%2FhEN7XR5XU5KDGYGTinSP8YyeTXw%3D' in token
         assert 'se=1471940363' in token
         assert 'sr=iot-hub-for-test.azure-devices.net' in token
+        assert 'skn=iothubowner' in token
+
+        # Prepare parameters
+        uri = 'iot-hub-for-test.azure-devices.net/devices/iot-device-for-test/modules/module-for-test'
+
+        # Action
+        sas_auth = SasTokenAuthentication(uri, policy_name, access_key, expiry)
+        token = sas_auth.generate_sas_token()
+
+        # Assertion
+        assert 'SharedAccessSignature ' in token
+        assert 'sig=JwAxBBBPYA0E%2FTHdnrXzUfBfuZ7deH6pppCniJ23Uu0%3D' in token
+        assert 'se=1471940363' in token
+        assert 'sr=iot-hub-for-test.azure-devices.net%2Fdevices%2Fiot-device-for-test%2Fmodules%2Fmodule-for-test' in token
         assert 'skn=iothubowner' in token
 
 

@@ -1,6 +1,6 @@
 pytest
 pytest-mock
-pytest-cov
+pytest-cov==2.6.0
 pytest-env
 pylint
 flake8

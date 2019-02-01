@@ -23,6 +23,7 @@ sys.path.append(os.path.abspath(os.path.join('.', 'iotext_test_tools')))
 LIVE_HUB = os.environ.get('azext_iot_testhub')
 LIVE_RG = os.environ.get('azext_iot_testrg')
 LIVE_HUB_CS = os.environ.get('azext_iot_testhub_cs')
+LIVE_HUB_MIXED_CASE_CS = LIVE_HUB_CS.replace('HostName', 'hostname', 1)
 
 # Set this environment variable to your empty blob container sas uri to test device export and enable file upload test.
 # For file upload, you will need to have configured your IoT Hub before running.
@@ -505,6 +506,25 @@ class TestIoTHub(LiveScenarioTest):
                          self.check('moduleId', module_ids[0]),
                          self.exists('authentication.symmetricKey.primaryKey'),
                          self.exists('authentication.symmetricKey.secondaryKey')])
+
+        # Error can't get a sas token for module without device
+        self.cmd('az iot hub generate-sas-token -n {} -g {} -m {}'
+                 .format(LIVE_HUB, LIVE_RG, module_ids[1]), expect_failure=True)
+
+        # sas token for module
+        self.cmd('iot hub generate-sas-token -n {} -g {} -d {} -m {}'
+                 .format(LIVE_HUB, LIVE_RG, edge_device_ids[0], module_ids[1]),
+                 checks=[self.exists('sas')])
+
+        # sas token for module with connection string
+        self.cmd('iot hub generate-sas-token -d {} -m {} --login {}'
+                 .format(edge_device_ids[0], module_ids[1], LIVE_HUB_CS),
+                 checks=[self.exists('sas')])
+
+        # sas token for module with mixed case connection string
+        self.cmd('iot hub generate-sas-token -d {} -m {} --login {}'
+                 .format(edge_device_ids[0], module_ids[1], LIVE_HUB_MIXED_CASE_CS),
+                 checks=[self.exists('sas')])
 
         # X509 Thumbprint
         # With connection string
