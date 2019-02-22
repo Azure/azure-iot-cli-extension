@@ -185,9 +185,9 @@ def iot_device_get_parent(cmd, device_id, hub_name=None, resource_group_name=Non
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     child_device = _iot_device_show(target, device_id)
     if child_device['capabilities']['iotEdge']:
-        raise CLIError('The device should be non-Edge device')
+        raise CLIError('The device should be non-edge device.')
     if 'deviceScope' not in child_device:
-        raise CLIError('The device doesn\'t have any parent set')
+        raise CLIError('Device doesn\'t support parent device functionality.')
     device_scope = child_device['deviceScope']
     parent_device_id = device_scope[len(DEVICE_DEVICESCOPE_PREFIX):device_scope.rindex('-')]
     return _iot_device_show(target, parent_device_id)
@@ -209,7 +209,7 @@ def iot_device_children_add(cmd, device_id, child_list, force=False, hub_name=No
             if force:
                 devices.append(nonedge_device)
                 continue
-            raise CLIError('The entered device "{}" already has a parent set and use \'--force\''
+            raise CLIError('The entered device "{}" already has a parent device, please use \'--force\''
                            ' to overwrite'.format(non_edge_device_id.strip()))
 
     for device in devices:
@@ -236,7 +236,7 @@ def iot_device_children_remove(cmd, device_id, child_list=None, remove_all=False
             if 'deviceScope' not in nonedge_device or nonedge_device['deviceScope'] == '':
                 raise CLIError('The entered device "{}" isn\'t a child device.'.format(non_edge_device_id.strip()))
             if nonedge_device['deviceScope'] != edge_device['deviceScope']:
-                raise CLIError('The entered child device "{}" isn\'t assigned a child of edge device "{}"'
+                raise CLIError('The entered child device "{}" isn\'t assigned as a child of edge device "{}"'
                                .format(non_edge_device_id.strip(), device_id))
             if nonedge_device['deviceScope'] == edge_device['deviceScope']:
                 devices.append(nonedge_device)

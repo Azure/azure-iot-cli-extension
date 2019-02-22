@@ -522,7 +522,7 @@ helps['iot device get-parent'] = """
     type: command
     short-summary: Get the parent device of the specified device.
     examples:
-    - name: Get the parent device of the specified device .
+    - name: Get the parent device of the specified device.
       text: >
         az iot device get-parent -d [Non_Edge_Device_Id] -n [IoTHub_Name]
 """
@@ -558,7 +558,7 @@ helps['iot device children list'] = """
 
 helps['iot device children remove'] = """
     type: command
-    short-summary: Remove comma-separated list of devices as children of specified device.
+    short-summary: Remove non edge devices as children from specified edge device.
     examples:
     - name: Remove all mentioned devices as children of specified device.
       text: >

@@ -207,19 +207,19 @@ def load_arguments(self, _):
                          help='MIME Type of file.')
 
     with self.argument_context('iot device get-parent') as context:
-        context.argument('device_id', help='This is an non-Edge device.')
+        context.argument('device_id', help='Id of non-edge device.')
 
     with self.argument_context('iot device children add') as context:
-        context.argument('device_id', help='This is an Edge device.')
+        context.argument('device_id', help='Id of edge device.')
 
     with self.argument_context('iot device children add') as context:
         context.argument('child_list', options_list=['--child-list'],
-                         help='Child device list includes only non-Edge devices.')
-        context.argument('force', options_list=['--force', '-f'], help='Overwrites the non-Edge device\'s parent set.')
+                         help='Child device list includes only non-edge devices.')
+        context.argument('force', options_list=['--force', '-f'], help='Overwrites the non-edge device\'s parent device.')
 
     with self.argument_context('iot device children remove') as context:
         context.argument('child_list', options_list=['--child-list'],
-                         help='Child device list includes only non-Edge devices.')
+                         help='Child device list includes only non-edge devices.')
         context.argument('remove_all', options_list=['--remove-all'], help='To remove all children.')
 
     # Remove after deprecation
