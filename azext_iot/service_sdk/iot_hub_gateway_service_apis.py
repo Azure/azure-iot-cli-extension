@@ -555,6 +555,14 @@ class IotHubGatewayServiceAPIs(object):
         """Create, update, or delete the identities of multiple devices from the
         IoT hub identity registry.
 
+        Create, update, or delete the identiies of multiple devices from the
+        IoT hub identity registry. A device identity can be specified only once
+        in the list. Different operations (create, update, delete) on different
+        devices are allowed. A maximum of 100 devices can be specified per
+        invocation. For large scale operations, consider using the import
+        feature using blob
+        storage(https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities).
+
         :param devices:
         :type devices: list[~service.models.ExportImportDevice]
         :param dict custom_headers: headers that will be added to the request
@@ -736,6 +744,11 @@ class IotHubGatewayServiceAPIs(object):
         """Create or update the identity of a device in the identity registry of
         an IoT hub.
 
+        Create or update the identity of a device in the identity registry of
+        an IoT hub. An ETag must not be specified for the create operation. An
+        ETag must be specified for the update operation. Note that generationId
+        and deviceId cannot be updated by the user.
+
         :param id: Device ID.
         :type id: str
         :param device:
@@ -804,6 +817,16 @@ class IotHubGatewayServiceAPIs(object):
         """Delete the identity of a device from the identity registry of an IoT
         hub.
 
+        Delete the identity of a device from the identity registry of an IoT
+        hub. This request requires the If-Match header. The client may specify
+        the ETag for the device identity on the request in order to compare to
+        the ETag maintained by the service for the purpose of optimistic
+        concurrency. The delete operation is performed only if the ETag sent by
+        the client matches the value maintained by the server, indicating that
+        the device identity has not been modified since it was retrieved by the
+        client. To force an unconditional delete, set If-Match to the wildcard
+        character (*).
+
         :param id: Device ID.
         :type id: str
         :param if_match:
@@ -856,9 +879,12 @@ class IotHubGatewayServiceAPIs(object):
 
     def apply_configuration_on_device(
             self, id, content, custom_headers=None, raw=False, **operation_config):
-        """
+        """Applies the provided configuration content to the specified device.
 
-        :param id:
+        Applies the provided configuration content to the specified device.
+        Configuration content must have modules content.
+
+        :param id: Device ID.
         :type id: str
         :param content:
         :type content: ~service.models.ConfigurationContent
@@ -919,7 +945,11 @@ class IotHubGatewayServiceAPIs(object):
 
     def create_job(
             self, job_properties, custom_headers=None, raw=False, **operation_config):
-        """
+        """Create a new job on an IoT hub.
+
+        Create a new job on an IoT hub. See
+        https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
+        for more information.
 
         :param job_properties:
         :type job_properties: ~service.models.JobProperties
@@ -977,7 +1007,11 @@ class IotHubGatewayServiceAPIs(object):
 
     def get_jobs(
             self, custom_headers=None, raw=False, **operation_config):
-        """
+        """Gets the status of all jobs in an iot hub.
+
+        Gets the status of all jobs in an iot hub. See
+        https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
+        for more information.
 
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
@@ -1029,9 +1063,13 @@ class IotHubGatewayServiceAPIs(object):
 
     def get_job(
             self, id, custom_headers=None, raw=False, **operation_config):
-        """
+        """Gets the status of job in an iot hub.
 
-        :param id:
+        Gets the status of job in an iot hub. See
+        https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
+        for more information.
+
+        :param id: Job ID.
         :type id: str
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
@@ -1087,9 +1125,13 @@ class IotHubGatewayServiceAPIs(object):
 
     def cancel_job(
             self, id, custom_headers=None, raw=False, **operation_config):
-        """
+        """Cancels job in an IoT hub.
 
-        :param id:
+        Cancels job in an IoT hub. See
+        https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
+        for more information.
+
+        :param id: Job ID.
         :type id: str
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
@@ -1204,6 +1246,10 @@ class IotHubGatewayServiceAPIs(object):
             self, id, custom_headers=None, raw=False, **operation_config):
         """Get a device twin.
 
+        Get a device twin. See
+        https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-device-twins
+        for more information.
+
         :param id: Device ID.
         :type id: str
         :param dict custom_headers: headers that will be added to the request
@@ -1260,11 +1306,15 @@ class IotHubGatewayServiceAPIs(object):
 
     def replace_twin(
             self, id, device_twin_info, if_match=None, custom_headers=None, raw=False, **operation_config):
-        """Updates tags and desired properties of a device twin.
+        """Replaces tags and desired properties of a device twin.
+
+        Replaces a device twin. See
+        https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-device-twins
+        for more information.
 
         :param id: Device ID.
         :type id: str
-        :param device_twin_info:
+        :param device_twin_info: Device twin info
         :type device_twin_info: ~service.models.Twin
         :param if_match:
         :type if_match: str
@@ -1330,9 +1380,13 @@ class IotHubGatewayServiceAPIs(object):
             self, id, device_twin_info, if_match=None, custom_headers=None, raw=False, **operation_config):
         """Updates tags and desired properties of a device twin.
 
+        Updates a device twin. See
+        https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-device-twins
+        for more information.
+
         :param id: Device ID.
         :type id: str
-        :param device_twin_info:
+        :param device_twin_info: Device twin info
         :type device_twin_info: ~service.models.Twin
         :param if_match:
         :type if_match: str
@@ -1395,11 +1449,15 @@ class IotHubGatewayServiceAPIs(object):
 
     def get_module_twin(
             self, id, mid, custom_headers=None, raw=False, **operation_config):
-        """
+        """Gets a module twin.
 
-        :param id:
+        Gets a module twin. See
+        https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-device-twins
+        for more information.
+
+        :param id: Device ID.
         :type id: str
-        :param mid:
+        :param mid: Module ID.
         :type mid: str
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
@@ -1456,13 +1514,17 @@ class IotHubGatewayServiceAPIs(object):
 
     def replace_module_twin(
             self, id, mid, device_twin_info, if_match=None, custom_headers=None, raw=False, **operation_config):
-        """
+        """Replaces tags and desired properties of a module twin.
 
-        :param id:
+        Replaces a module twin. See
+        https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-device-twins
+        for more information.
+
+        :param id: Device ID.
         :type id: str
-        :param mid:
+        :param mid: Module ID.
         :type mid: str
-        :param device_twin_info:
+        :param device_twin_info: Device twin info
         :type device_twin_info: ~service.models.Twin
         :param if_match:
         :type if_match: str
@@ -1527,13 +1589,17 @@ class IotHubGatewayServiceAPIs(object):
 
     def update_module_twin(
             self, id, mid, device_twin_info, if_match=None, custom_headers=None, raw=False, **operation_config):
-        """
+        """Updates tags and desired properties of a module twin.
 
-        :param id:
+        Updates a module twin. See
+        https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-device-twins
+        for more information.
+
+        :param id: Device ID.
         :type id: str
-        :param mid:
+        :param mid: Module ID.
         :type mid: str
-        :param device_twin_info:
+        :param device_twin_info: Device twin information
         :type device_twin_info: ~service.models.Twin
         :param if_match:
         :type if_match: str
@@ -1594,6 +1660,57 @@ class IotHubGatewayServiceAPIs(object):
 
         return deserialized
     update_module_twin.metadata = {'url': '/twins/{id}/modules/{mid}'}
+
+    def send_device_command(
+            self, custom_headers=None, raw=False, **operation_config):
+        """
+
+        :param dict custom_headers: headers that will be added to the request
+        :param bool raw: returns the direct response alongside the
+         deserialized response
+        :param operation_config: :ref:`Operation configuration
+         overrides<msrest:optionsforoperations>`.
+        :return: object or ClientRawResponse if raw=true
+        :rtype: object or ~msrest.pipeline.ClientRawResponse
+        :raises: :class:`CloudError<msrestazure.azure_exceptions.CloudError>`
+        """
+        # Construct URL
+        url = self.send_device_command.metadata['url']
+
+        # Construct parameters
+        query_parameters = {}
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+
+        # Construct headers
+        header_parameters = {}
+        header_parameters['Content-Type'] = 'application/json; charset=utf-8'
+        if self.config.generate_client_request_id:
+            header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
+        if custom_headers:
+            header_parameters.update(custom_headers)
+        if self.config.accept_language is not None:
+            header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
+
+        # Construct and send request
+        request = self._client.post(url, query_parameters)
+        response = self._client.send(request, header_parameters, stream=False, **operation_config)
+
+        if response.status_code not in [200]:
+            exp = CloudError(response)
+            exp.request_id = response.headers.get('x-ms-request-id')
+            raise exp
+
+        deserialized = None
+
+        if response.status_code == 200:
+            deserialized = self._deserialize('object', response)
+
+        if raw:
+            client_raw_response = ClientRawResponse(deserialized, response)
+            return client_raw_response
+
+        return deserialized
+    send_device_command.metadata = {'url': '/messages/deviceBound'}
 
     def get_job1(
             self, id, custom_headers=None, raw=False, **operation_config):
@@ -1780,9 +1897,9 @@ class IotHubGatewayServiceAPIs(object):
         """Query an IoT hub to retrieve information regarding jobs using the IoT
         Hub query language.
 
-        :param job_type:
+        :param job_type: Job Type.
         :type job_type: str
-        :param job_status:
+        :param job_status: Job Status.
         :type job_status: str
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the

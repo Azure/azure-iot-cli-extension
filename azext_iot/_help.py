@@ -518,6 +518,57 @@ helps['iot device upload-file'] = """
     short-summary: Upload a local file as a device to a pre-configured blob storage container.
 """
 
+helps['iot device get-parent'] = """
+    type: command
+    short-summary: Get the parent device of the specified device.
+    examples:
+    - name: Get the parent device of the specified device .
+      text: >
+        az iot device get-parent -d [Non_Edge_Device_Id] -n [IoTHub_Name]
+"""
+
+helps['iot device children'] = """
+    type: group
+    short-summary: Manage Edge offline.
+"""
+
+helps['iot device children add'] = """
+    type: command
+    short-summary: Add specified comma-separated list of non edge device ids as children of specified edge device.
+    examples:
+    - name: Add non-edge devices as a children to the edge device.
+      text: >
+        az iot device children add -d [Edge_Device_Id] --child-list [Comma_Separated_Non_Edge_Device_Id]
+        -n [IoTHub_Name]
+    - name: Add non-edge devices as a children to the edge device irrespectively the non-edge device is
+            already a child of other edge device.
+      text: >
+        az iot device children add -d [Edge_Device_Id] --child-list [Comma_Separated_Non_Edge_Device_Id]
+        -n [IoTHub_Name] -f
+"""
+
+helps['iot device children list'] = """
+    type: command
+    short-summary: Print comma-separated list of assigned child devices.
+    examples:
+    - name: Show all assigned non-edge devices as comma-separated list.
+      text: >
+        az iot device children list -d [Edge_Device_Id] -n [IoTHub_Name]
+"""
+
+helps['iot device children remove'] = """
+    type: command
+    short-summary: Remove comma-separated list of devices as children of specified device.
+    examples:
+    - name: Remove all mentioned devices as children of specified device.
+      text: >
+        az iot device children remove -d [Edge_Device_Id] --child-list [Comma_Separated_Non_Edge_Device_Id]
+        -n [IoTHub_Name]
+    - name: Remove all non-edge devices as children specified edge device.
+      text: >
+        az iot device children remove -d [Edge_Device_Id] --remove-all
+"""
+
 helps['iot edge'] = """
     type: group
     short-summary: Manage IoT solutions on the Edge.
