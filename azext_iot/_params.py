@@ -213,14 +213,14 @@ def load_arguments(self, _):
         context.argument('device_id', help='Id of edge device.')
 
     with self.argument_context('iot device children add') as context:
-        context.argument('child_list', options_list=['--child-list'],
+        context.argument('child_list', options_list=['--child-list', '--cl'],
                          help='Child device list includes only non-edge devices.')
         context.argument('force', options_list=['--force', '-f'], help='Overwrites the non-edge device\'s parent device.')
 
     with self.argument_context('iot device children remove') as context:
-        context.argument('child_list', options_list=['--child-list'],
+        context.argument('child_list', options_list=['--child-list', '--cl'],
                          help='Child device list includes only non-edge devices.')
-        context.argument('remove_all', options_list=['--remove-all'], help='To remove all children.')
+        context.argument('remove_all', options_list=['--remove-all', '-a'], help='To remove all children.')
 
     # Remove after deprecation
     with self.argument_context('iot hub apply-configuration') as context:

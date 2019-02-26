@@ -186,7 +186,7 @@ def iot_device_get_parent(cmd, device_id, hub_name=None, resource_group_name=Non
     child_device = _iot_device_show(target, device_id)
     if child_device['capabilities']['iotEdge']:
         raise CLIError('The device should be non-edge device.')
-    if 'deviceScope' not in child_device:
+    if 'deviceScope' not in child_device or child_device['deviceScope'] == '':
         raise CLIError('Device doesn\'t support parent device functionality.')
     device_scope = child_device['deviceScope']
     parent_device_id = device_scope[len(DEVICE_DEVICESCOPE_PREFIX):device_scope.rindex('-')]
@@ -241,8 +241,6 @@ def iot_device_children_remove(cmd, device_id, child_list=None, remove_all=False
             if nonedge_device['deviceScope'] == edge_device['deviceScope']:
                 devices.append(nonedge_device)
                 continue
-    else:
-        raise CLIError('Please specify comma-separated child list or use --remove-all to remove all children.')
 
     for device in devices:
         _update_nonedge_devicescope(target, device)
