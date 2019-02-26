@@ -1468,14 +1468,10 @@ class TestIoTHub(LiveScenarioTest):
                  checks=self.is_empty())
 
         # list child devices of edge device
-        output = self.cmd('iot device children list -d {} -n {} -g {}'.format(edge_device_ids[0], LIVE_HUB, LIVE_RG),
+        output = self.cmd('iot device children list -d {} -n {} -g {}'.format(edge_device_ids[1], LIVE_HUB, LIVE_RG),
                           expect_failure=False)
-        expected_output = '{}, {}'.format(device_ids[1], device_ids[2])
+        expected_output = '{}'.format(device_ids[0])
         assert output.get_output_in_json() == expected_output
-
-        # one of the argument missing while remove
-        self.cmd('iot device children remove -d {} -n {} -g {}'.format(device_ids[0], LIVE_HUB, LIVE_RG),
-                 expect_failure=True)
 
         # removing all child devices of non-edge device
         self.cmd('iot device children remove -d {} -n {} -g {} --remove-all'.format(device_ids[0], LIVE_HUB, LIVE_RG),
