@@ -184,10 +184,8 @@ def iot_device_delete(cmd, device_id, hub_name=None, resource_group_name=None, l
 def iot_device_get_parent(cmd, device_id, hub_name=None, resource_group_name=None, login=None):
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     child_device = _iot_device_show(target, device_id)
-    if child_device['capabilities']['iotEdge']:
-        raise CLIError('The device should be non-edge device.')
-    if 'deviceScope' not in child_device or child_device['deviceScope'] == '':
-        raise CLIError('Device doesn\'t support parent device functionality.')
+    _validate_nonedge_device(child_device)
+    _is_child_device(child_device)
     device_scope = child_device['deviceScope']
     parent_device_id = device_scope[len(DEVICE_DEVICESCOPE_PREFIX):device_scope.rindex('-')]
     return _iot_device_show(target, parent_device_id)
@@ -233,8 +231,7 @@ def iot_device_children_remove(cmd, device_id, child_list=None, remove_all=False
         for non_edge_device_id in child_list.split(','):
             nonedge_device = _iot_device_show(target, non_edge_device_id.strip())
             _validate_nonedge_device(nonedge_device)
-            if 'deviceScope' not in nonedge_device or nonedge_device['deviceScope'] == '':
-                raise CLIError('The entered device "{}" isn\'t a child device.'.format(non_edge_device_id.strip()))
+            _is_child_device(nonedge_device)
             if nonedge_device['deviceScope'] != edge_device['deviceScope']:
                 raise CLIError('The entered child device "{}" isn\'t assigned as a child of edge device "{}"'
                                .format(non_edge_device_id.strip(), device_id))
@@ -285,6 +282,11 @@ def _validate_edge_device(device):
 def _validate_nonedge_device(device):
     if device['capabilities']['iotEdge']:
         raise CLIError('The entered child device "{}" should be non-edge device.'.format(device['deviceId']))
+
+
+def _is_child_device(device):
+    if 'deviceScope' not in device or device['deviceScope'] == '':
+        raise CLIError('Device "{}" doesn\'t support parent device functionality.'.format(device['deviceId']))
 
 
 # Module
