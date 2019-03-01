@@ -100,6 +100,14 @@ helps['iot hub device-identity create'] = """
     - name: Create an edge enabled IoT device with default authorization (shared private key).
       text: >
         az iot hub device-identity create -n {iothub_name} -d {device_id} --ee
+    - name: Create an edge enabled IoT device with default authorization (shared private key) and
+            add child devices as well.
+      text: >
+        az iot hub device-identity create -n {iothub_name} -d {device_id} --ee --cl {child_device_id}
+    - name: Create an IoT device with default authorization (shared private key) and
+            set parent device as well.
+      text: >
+        az iot hub device-identity create -n {iothub_name} -d {device_id} --pd {edge_device_id}
     - name: Create an IoT device with self-signed certificate authorization,
             generate a cert valid for 10 days then use its thumbprint.
       text: >
@@ -172,6 +180,65 @@ helps['iot hub device-identity import'] = """
     short-summary: Import device identities to an IoT Hub from a blob.
     long-summary: For more information, see
                   https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
+"""
+
+helps['iot hub device-identity get-parent'] = """
+    type: command
+    short-summary: Get the parent device of the specified device.
+    examples:
+    - name: Get the parent device of the specified device.
+      text: >
+        az iot hub device-identity get-parent -d {non_edge_device_id} -n {iothub_name}
+"""
+
+helps['iot hub device-identity set-parent'] = """
+    type: command
+    short-summary: Set the parent device of the specified non-edge device.
+    examples:
+    - name: Set the parent device of the specified non-edge device.
+      text: >
+        az iot hub device-identity set-parent -d {non_edge_device_id} --pd {edge_device_id} -n {iothub_name}
+    - name: Set the parent device of the specified non-edge device irrespectively the non-edge device is
+            already a child of other edge device.
+      text: >
+        az iot hub device-identity set-parent -d {non_edge_device_id} --pd {edge_device_id} --force -n {iothub_name}
+"""
+
+helps['iot hub device-identity add-children'] = """
+    type: command
+    short-summary: Add specified comma-separated list of non edge device ids as children of specified edge device.
+    examples:
+    - name: Add non-edge devices as a children to the edge device.
+      text: >
+        az iot hub device-identity add-children -d {edge_device_id} --child-list {comma_separated_non_edge_device_id}
+        -n {iothub_name}
+    - name: Add non-edge devices as a children to the edge device irrespectively the non-edge device is
+            already a child of other edge device.
+      text: >
+        az iot hub device-identity add-children -d {edge_device_id} --child-list {comma_separated_non_edge_device_id}
+        -n {iothub_name} -f
+"""
+
+helps['iot hub device-identity list-children'] = """
+    type: command
+    short-summary: Print comma-separated list of assigned child devices.
+    examples:
+    - name: Show all assigned non-edge devices as comma-separated list.
+      text: >
+        az iot hub device-identity list-children -d {edge_device_id} -n {iothub_name}
+"""
+
+helps['iot hub device-identity remove-children'] = """
+    type: command
+    short-summary: Remove non edge devices as children from specified edge device.
+    examples:
+    - name: Remove all mentioned devices as children of specified device.
+      text: >
+        az iot hub device-identity remove-children -d {edge_device_id} --child-list {comma_separated_non_edge_device_id}
+        -n {iothub_name}
+    - name: Remove all non-edge devices as children specified edge device.
+      text: >
+        az iot hub device-identity remove-children -d {edge_device_id} --remove-all
 """
 
 helps['iot hub device-twin'] = """
@@ -518,57 +585,6 @@ helps['iot device simulate'] = """
 helps['iot device upload-file'] = """
     type: command
     short-summary: Upload a local file as a device to a pre-configured blob storage container.
-"""
-
-helps['iot device get-parent'] = """
-    type: command
-    short-summary: Get the parent device of the specified device.
-    examples:
-    - name: Get the parent device of the specified device.
-      text: >
-        az iot device get-parent -d {non_edge_device_id} -n {iothub_name}
-"""
-
-helps['iot device children'] = """
-    type: group
-    short-summary: Manage Edge offline.
-"""
-
-helps['iot device children add'] = """
-    type: command
-    short-summary: Add specified comma-separated list of non edge device ids as children of specified edge device.
-    examples:
-    - name: Add non-edge devices as a children to the edge device.
-      text: >
-        az iot device children add -d {edge_device_id} --child-list {comma_separated_non_edge_device_id}
-        -n {iothub_name}
-    - name: Add non-edge devices as a children to the edge device irrespectively the non-edge device is
-            already a child of other edge device.
-      text: >
-        az iot device children add -d {edge_device_id} --child-list {comma_separated_non_edge_device_id}
-        -n {iothub_name} -f
-"""
-
-helps['iot device children list'] = """
-    type: command
-    short-summary: Print comma-separated list of assigned child devices.
-    examples:
-    - name: Show all assigned non-edge devices as comma-separated list.
-      text: >
-        az iot device children list -d {edge_device_id} -n {iothub_name}
-"""
-
-helps['iot device children remove'] = """
-    type: command
-    short-summary: Remove non edge devices as children from specified edge device.
-    examples:
-    - name: Remove all mentioned devices as children of specified device.
-      text: >
-        az iot device children remove -d {edge_device_id} --child-list {comma_separated_non_edge_device_id}
-        -n {iothub_name}
-    - name: Remove all non-edge devices as children specified edge device.
-      text: >
-        az iot device children remove -d {edge_device_id} --remove-all
 """
 
 helps['iot edge'] = """

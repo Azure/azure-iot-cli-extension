@@ -135,6 +135,13 @@ def load_arguments(self, _):
         context.argument('status_reason', options_list=['--status-reason', '--star'],
                          help='Description for device status.')
 
+    with self.argument_context('iot hub device-identity create') as context:
+        context.argument('force', options_list=['--force', '-f'],
+                         help='Overwrites the non-edge device\'s parent device.')
+        context.argument('set_parent_id', options_list=['--set-parent', '--pd'], help='Id of edge device.')
+        context.argument('add_children', options_list=['--add-children', '--cl'],
+                         help='Child device list (comma separated) includes only non-edge devices.')
+
     with self.argument_context('iot hub device-identity export') as context:
         context.argument('blob_container_uri',
                          options_list=['--blob-container-uri', '--bcu'],
@@ -158,6 +165,31 @@ def load_arguments(self, _):
                          help='Blob Shared Access Signature URI with write access '
                          'to a blob container. This is used to output the status of '
                          'the job and the results.')
+
+    with self.argument_context('iot hub device-identity get-parent') as context:
+        context.argument('device_id', help='Id of non-edge device.')
+
+    with self.argument_context('iot hub device-identity set-parent') as context:
+        context.argument('device_id', help='Id of non-edge device.')
+        context.argument('parent_id', options_list=['--parent-device-id', '--pd'], help='Id of edge device.')
+        context.argument('force', options_list=['--force', '-f'],
+                         help='Overwrites the non-edge device\'s parent device.')
+
+    with self.argument_context('iot hub device-identity add-children') as context:
+        context.argument('device_id', help='Id of edge device.')
+        context.argument('child_list', options_list=['--child-list', '--cl'],
+                         help='Child device list (comma separated) includes only non-edge devices.')
+        context.argument('force', options_list=['--force', '-f'],
+                         help='Overwrites the non-edge device\'s parent device.')
+
+    with self.argument_context('iot hub device-identity remove-children') as context:
+        context.argument('device_id', help='Id of edge device.')
+        context.argument('child_list', options_list=['--child-list', '--cl'],
+                         help='Child device list (comma separated) includes only non-edge devices.')
+        context.argument('remove_all', options_list=['--remove-all', '-a'], help='To remove all children.')
+
+    with self.argument_context('iot hub device-identity list-children') as context:
+        context.argument('device_id', help='Id of edge device.')
 
     with self.argument_context('iot hub query') as context:
         context.argument('query_command', options_list=['--query-command', '-q'],
@@ -205,22 +237,6 @@ def load_arguments(self, _):
                          help='Path to file for upload.')
         context.argument('content_type', options_list=['--content-type', '--ct'],
                          help='MIME Type of file.')
-
-    with self.argument_context('iot device get-parent') as context:
-        context.argument('device_id', help='Id of non-edge device.')
-
-    with self.argument_context('iot device children add') as context:
-        context.argument('device_id', help='Id of edge device.')
-
-    with self.argument_context('iot device children add') as context:
-        context.argument('child_list', options_list=['--child-list', '--cl'],
-                         help='Child device list includes only non-edge devices.')
-        context.argument('force', options_list=['--force', '-f'], help='Overwrites the non-edge device\'s parent device.')
-
-    with self.argument_context('iot device children remove') as context:
-        context.argument('child_list', options_list=['--child-list', '--cl'],
-                         help='Child device list includes only non-edge devices.')
-        context.argument('remove_all', options_list=['--remove-all', '-a'], help='To remove all children.')
 
     # Remove after deprecation
     with self.argument_context('iot hub apply-configuration') as context:

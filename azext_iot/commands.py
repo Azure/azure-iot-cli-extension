@@ -39,6 +39,11 @@ def load_command_table(self, _):
         cmd_group.command('show-connection-string', 'iot_get_device_connection_string')
         cmd_group.command('import', 'iot_device_import')
         cmd_group.command('export', 'iot_device_export')
+        cmd_group.command('add-children', 'iot_device_children_add')
+        cmd_group.command('remove-children', 'iot_device_children_remove')
+        cmd_group.command('list-children', 'iot_device_children_list')
+        cmd_group.command('get-parent', 'iot_device_get_parent')
+        cmd_group.command('set-parent', 'iot_device_set_parent')
 
     with self.command_group('iot hub module-identity', command_type=iothub_ops) as cmd_group:
         cmd_group.command('create', 'iot_device_module_create')
@@ -87,12 +92,6 @@ def load_command_table(self, _):
         cmd_group.command('send-d2c-message', 'iot_device_send_message')
         cmd_group.command('simulate', 'iot_simulate_device')
         cmd_group.command('upload-file', 'iot_device_upload_file')
-        cmd_group.command('get-parent', 'iot_device_get_parent')
-
-    with self.command_group('iot device children', command_type=iothub_ops) as cmd_group:
-        cmd_group.command('add', 'iot_device_children_add')
-        cmd_group.command('list', 'iot_device_children_list')
-        cmd_group.command('remove', 'iot_device_children_remove')
 
     with self.command_group('iot device c2d-message', command_type=iothub_ops) as cmd_group:
         cmd_group.command('complete', 'iot_c2d_message_complete')
