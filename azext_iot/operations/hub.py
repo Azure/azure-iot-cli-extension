@@ -256,11 +256,11 @@ def iot_device_children_remove(cmd, device_id, child_list=None, remove_all=False
             nonedge_device = _iot_device_show(target, non_edge_device_id.strip())
             _validate_nonedge_device(nonedge_device)
             _validate_child_device(nonedge_device)
-            if nonedge_device['deviceScope'] != edge_device['deviceScope']:
+            if nonedge_device['deviceScope'] == edge_device['deviceScope']:
+                devices.append(nonedge_device)
+            else:
                 raise CLIError('The entered child device "{}" isn\'t assigned as a child of edge device "{}"'
                                .format(non_edge_device_id.strip(), device_id))
-            else:
-                devices.append(nonedge_device)
     else:
         raise CLIError('Please specify comma-separated child list or use --remove-all to remove all children.')
 
