@@ -15,6 +15,7 @@ from uuid import uuid4
 from azure.cli.testsdk import LiveScenarioTest
 from azure.cli.core.util import read_file_content
 from azext_iot.common.utility import validate_min_python_version, execute_onthread, calculate_millisec_since_unix_epoch_utc
+from azext_iot._constants import DEVICE_DEVICESCOPE_PREFIX
 
 # Add test tools to path
 sys.path.append(os.path.abspath(os.path.join('.', 'iotext_test_tools')))
@@ -178,15 +179,25 @@ class TestIoTHub(LiveScenarioTest):
                  expect_failure=True)
 
     def test_hub_devices(self):
-        device_count = 3
+        device_count = 5
         edge_device_count = 2
 
         names = self._create_entity_names(devices=device_count, edge_devices=edge_device_count)
         device_ids = names['device_ids']
         edge_device_ids = names['edge_device_ids']
 
+        self.cmd('iot hub device-identity create -d {} -n {} -g {}'.format(device_ids[4], LIVE_HUB, LIVE_RG),
+                 checks=[self.check('deviceId', device_ids[4]),
+                         self.check('status', 'enabled'),
+                         self.check('statusReason', None),
+                         self.check('connectionState', 'Disconnected'),
+                         self.check('capabilities.iotEdge', False),
+                         self.exists('authentication.symmetricKey.primaryKey'),
+                         self.exists('authentication.symmetricKey.secondaryKey')])
+
         for i in range(edge_device_count):
-            self.cmd('iot hub device-identity create -d {} -n {} -g {} --ee'.format(edge_device_ids[i], LIVE_HUB, LIVE_RG),
+            self.cmd('iot hub device-identity create -d {} -n {} -g {} --ee --add-children {} --force'
+                     .format(edge_device_ids[i], LIVE_HUB, LIVE_RG, device_ids[4]),
                      checks=[self.check('deviceId', edge_device_ids[i]),
                              self.check('status', 'enabled'),
                              self.check('statusReason', None),
@@ -195,9 +206,15 @@ class TestIoTHub(LiveScenarioTest):
                              self.exists('authentication.symmetricKey.primaryKey'),
                              self.exists('authentication.symmetricKey.secondaryKey')])
 
-        query_checks = [self.check('length([*])', edge_device_count)]
+            device_scope_str_pattern = r'^{}{}-'.format(DEVICE_DEVICESCOPE_PREFIX, edge_device_ids[i])
+            self.cmd('iot hub device-identity show -d {} -n {} -g {}'.format(device_ids[4], LIVE_HUB, LIVE_RG),
+                     checks=[self.check('deviceId', device_ids[4]),
+                             self.check_pattern('deviceScope', device_scope_str_pattern)])
+
+        query_checks = [self.check('length([*])', edge_device_count + 1)]
         for i in range(edge_device_count):
             query_checks.append(self.exists('[?deviceId==`{}`]'.format(edge_device_ids[i])))
+        query_checks.append(self.exists('[?deviceId==`{}`]'.format(device_ids[4])))
 
         # Not currently supported
         self.cmd('iot hub device-identity create -d {} -n {} -g {} --auth-method x509_thumbprint --ee'.format(
@@ -265,6 +282,26 @@ class TestIoTHub(LiveScenarioTest):
                          self.check(
                              'authentication.x509Thumbprint.primaryThumbprint', None),
                          self.check('authentication.x509Thumbprint.secondaryThumbprint', None)])
+
+        child_device_scope_str_pattern = r'^{}{}-'.format(DEVICE_DEVICESCOPE_PREFIX, edge_device_ids[0])
+
+        # Create device with parent device
+        self.cmd('''iot hub device-identity create --device-id {} --hub-name {} --resource-group {}
+                    --auth-method x509_thumbprint --valid-days {} --set-parent {}'''
+                 .format(device_ids[3], LIVE_HUB, LIVE_RG, 10, edge_device_ids[0]),
+                 checks=[self.check('deviceId', device_ids[3]),
+                         self.check('status', 'enabled'),
+                         self.check('statusReason', None),
+                         self.check('capabilities.iotEdge', False),
+                         self.check('connectionState', 'Disconnected'),
+                         self.check(
+                             'authentication.symmetricKey.primaryKey', None),
+                         self.check(
+                             'authentication.symmetricKey.secondaryKey', None),
+                         self.exists('authentication.x509Thumbprint.primaryThumbprint'),
+                         self.check('authentication.x509Thumbprint.secondaryThumbprint', None),
+                         self.exists('deviceScope'),
+                         self.check_pattern('deviceScope', child_device_scope_str_pattern)])
 
         self.cmd('iot hub device-identity show -d {} -n {} -g {}'.format(edge_device_ids[0], LIVE_HUB, LIVE_RG),
                  checks=[self.check('deviceId', edge_device_ids[0]),
@@ -1399,3 +1436,132 @@ class TestIoTHub(LiveScenarioTest):
                      self.check('failureReason', None),
                      self.check('type', 'export'),
                      self.exists('jobId')])
+
+    def test_edge_offline(self):
+        device_count = 3
+        edge_device_count = 2
+
+        names = self._create_entity_names(devices=device_count, edge_devices=edge_device_count)
+        device_ids = names['device_ids']
+        edge_device_ids = names['edge_device_ids']
+
+        for i in range(edge_device_count):
+            self.cmd('iot hub device-identity create -d {} -n {} -g {} --ee'.format(edge_device_ids[i], LIVE_HUB, LIVE_RG),
+                     checks=[self.check('deviceId', edge_device_ids[i]),
+                             self.check('status', 'enabled'),
+                             self.check('statusReason', None),
+                             self.check('connectionState', 'Disconnected'),
+                             self.check('capabilities.iotEdge', True),
+                             self.exists('authentication.symmetricKey.primaryKey'),
+                             self.exists('authentication.symmetricKey.secondaryKey'),
+                             self.exists('deviceScope')])
+
+        for i in range(device_count):
+            self.cmd('iot hub device-identity create -d {} -n {} -g {}'.format(device_ids[i], LIVE_HUB, LIVE_RG),
+                     checks=[self.check('deviceId', device_ids[i]),
+                             self.check('status', 'enabled'),
+                             self.check('statusReason', None),
+                             self.check('connectionState', 'Disconnected'),
+                             self.check('capabilities.iotEdge', False),
+                             self.exists('authentication.symmetricKey.primaryKey'),
+                             self.exists('authentication.symmetricKey.secondaryKey'),
+                             self.check('deviceScope', None)])
+
+        # get-parent of edge device
+        self.cmd('iot hub device-identity get-parent -d {} -n {} -g {}'.format(edge_device_ids[0], LIVE_HUB, LIVE_RG),
+                 expect_failure=True)
+
+        # get-parent of device which doesn't have any parent set
+        self.cmd('iot hub device-identity get-parent -d {} -n {} -g {}'.format(device_ids[0], LIVE_HUB, LIVE_RG),
+                 expect_failure=True)
+
+        # setting non-edge device as a parent of non-edge device
+        self.cmd('iot hub device-identity set-parent -d {} --pd {} -n {} -g {}'.format(device_ids[0], device_ids[1],
+                 LIVE_HUB, LIVE_RG), expect_failure=True)
+
+        # setting edge device as a parent of edge device
+        self.cmd('iot hub device-identity set-parent -d {} --pd {} -n {} -g {}'.format(edge_device_ids[0],
+                 edge_device_ids[1], LIVE_HUB, LIVE_RG), expect_failure=True)
+
+        # add device as a child of non-edge device
+        self.cmd('iot hub device-identity add-children -d {} --child-list {} -n {} -g {}'
+                 .format(device_ids[0], device_ids[1], LIVE_HUB, LIVE_RG), expect_failure=True)
+
+        # add device list as children of edge device
+        self.cmd('iot hub device-identity add-children -d {} --child-list \'{}\' -n {} -g {}'
+                 .format(edge_device_ids[0], ', '.join(device_ids), LIVE_HUB, LIVE_RG),
+                 checks=self.is_empty())
+
+        # setting edge device as a parent of non-edge device which already having different parent device
+        self.cmd('iot hub device-identity set-parent -d {} --pd {} -n {} -g {}'.format(device_ids[2],
+                 edge_device_ids[1], LIVE_HUB, LIVE_RG), expect_failure=True)
+
+        # setting edge device as a parent of non-edge device which already having different parent device by force
+        self.cmd('iot hub device-identity set-parent -d {} --pd {} -n {} -g {} --force'.format(device_ids[2],
+                 edge_device_ids[1], LIVE_HUB, LIVE_RG), checks=self.is_empty())
+
+        # get-parent of device
+        self.cmd('iot hub device-identity get-parent -d {} -n {} -g {}'.format(device_ids[0], LIVE_HUB, LIVE_RG),
+                 checks=[self.check('deviceId', edge_device_ids[0]),
+                         self.exists('deviceScope')])
+
+        # add same device as a child of same parent device
+        self.cmd('iot hub device-identity add-children -d {} --child-list {} -n {} -g {}'
+                 .format(edge_device_ids[0], device_ids[0], LIVE_HUB, LIVE_RG),
+                 checks=self.is_empty())
+
+        # add same device as a child of another edge device
+        self.cmd('iot hub device-identity add-children -d {} --child-list {} -n {} -g {}'
+                 .format(edge_device_ids[1], device_ids[0], LIVE_HUB, LIVE_RG),
+                 expect_failure=True)
+
+        # add same device as a child of another edge device by force
+        self.cmd('iot hub device-identity add-children -d {} --child-list {} -n {} -g {} --force'
+                 .format(edge_device_ids[1], device_ids[0], LIVE_HUB, LIVE_RG),
+                 checks=self.is_empty())
+
+        # list child devices of edge device
+        output = self.cmd('iot hub device-identity list-children -d {} -n {} -g {}'.format(edge_device_ids[0],
+                          LIVE_HUB, LIVE_RG), expect_failure=False)
+        expected_output = '{}'.format(device_ids[1])
+        assert output.get_output_in_json() == expected_output
+
+        # removing all child devices of non-edge device
+        self.cmd('iot hub device-identity remove-children -d {} -n {} -g {} --remove-all'.format(device_ids[0],
+                 LIVE_HUB, LIVE_RG), expect_failure=True)
+
+        # remove all child devices from edge device
+        self.cmd('iot hub device-identity remove-children -d {} -n {} -g {} --remove-all'.format(edge_device_ids[1],
+                 LIVE_HUB, LIVE_RG), checks=self.is_empty())
+
+        # removing all child devices of edge device which doesn't have any child devices
+        self.cmd('iot hub device-identity remove-children -d {} -n {} -g {} --remove-all'.format(edge_device_ids[1],
+                 LIVE_HUB, LIVE_RG), expect_failure=True)
+
+        # removing child devices of edge device neither passing child devices list nor remove-all parameter
+        self.cmd('iot hub device-identity remove-children -d {} -n {} -g {}'.format(edge_device_ids[1],
+                 LIVE_HUB, LIVE_RG), expect_failure=True)
+
+        # remove edge device from edge device
+        self.cmd('iot hub device-identity remove-children -d {} --child-list {} -n {} -g {}'
+                 .format(edge_device_ids[1], edge_device_ids[0], LIVE_HUB, LIVE_RG),
+                 expect_failure=True)
+
+        # remove device from edge device but device is a child of another edge device
+        self.cmd('iot hub device-identity remove-children -d {} --child-list {} -n {} -g {}'
+                 .format(edge_device_ids[1], device_ids[1], LIVE_HUB, LIVE_RG),
+                 expect_failure=True)
+
+        # remove device
+        self.cmd('iot hub device-identity remove-children -d {} --child-list {} -n {} -g {}'
+                 .format(edge_device_ids[0], device_ids[1], LIVE_HUB, LIVE_RG),
+                 checks=self.is_empty())
+
+        # remove device which doesn't have any parent set
+        self.cmd('iot hub device-identity remove-children -d {} --child-list {} -n {} -g {}'
+                 .format(edge_device_ids[0], device_ids[0], LIVE_HUB, LIVE_RG),
+                 expect_failure=True)
+
+        # list child devices of edge device which doesn't have any children
+        self.cmd('iot hub device-identity list-children -d {} -n {} -g {}'.format(edge_device_ids[1], LIVE_HUB, LIVE_RG),
+                 expect_failure=True)

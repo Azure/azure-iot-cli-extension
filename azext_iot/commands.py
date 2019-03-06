@@ -39,6 +39,11 @@ def load_command_table(self, _):
         cmd_group.command('show-connection-string', 'iot_get_device_connection_string')
         cmd_group.command('import', 'iot_device_import')
         cmd_group.command('export', 'iot_device_export')
+        cmd_group.command('add-children', 'iot_device_children_add')
+        cmd_group.command('remove-children', 'iot_device_children_remove')
+        cmd_group.command('list-children', 'iot_device_children_list')
+        cmd_group.command('get-parent', 'iot_device_get_parent')
+        cmd_group.command('set-parent', 'iot_device_set_parent')
 
     with self.command_group('iot hub module-identity', command_type=iothub_ops) as cmd_group:
         cmd_group.command('create', 'iot_device_module_create')

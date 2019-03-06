@@ -20,6 +20,7 @@ from azure.cli.core.util import read_file_content
 
 
 device_id = 'mydevice'
+child_device_id = 'child_device1'
 module_id = 'mymod'
 config_id = 'myconfig'
 
@@ -118,11 +119,13 @@ def build_mock_response(mocker, status_code=200, payload=None, headers=None, raw
 
 def generate_device_create_req(ee=False, auth='shared_private_key', ptp='123',
                                stp='321', status='enabled', status_reason=None,
-                               valid_days=None, output_dir=None):
+                               valid_days=None, output_dir=None, set_parent_id=None,
+                               add_children=None, force=False):
     return {'client': None, 'device_id': device_id,
             'hub_name': mock_target['entity'], 'ee': ee, 'auth': auth,
             'ptp': ptp, 'stp': stp, 'status': status, 'status_reason': status_reason,
-            'valid_days': valid_days, 'output_dir': output_dir}
+            'valid_days': valid_days, 'output_dir': output_dir, 'set_parent_id': set_parent_id,
+            'add_children': add_children, 'force': force}
 
 
 class TestDeviceCreate():
@@ -172,6 +175,112 @@ class TestDeviceCreate():
                 assert x509tp.get('secondaryThumbprint') is None
             else:
                 assert x509tp['secondaryThumbprint'] == req['stp']
+
+    @pytest.fixture(params=[(200, 200)])
+    def sc_device_create_setparent(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0], generate_parent_device()),
+            build_mock_response(mocker, request.param[0], {})
+        ]
+        service_client.side_effect = test_side_effect
+        return service_client
+
+    @pytest.mark.parametrize("req", [
+        (generate_device_create_req(set_parent_id=device_id))
+    ])
+    def test_device_create_setparent(self, sc_device_create_setparent, req):
+        subject.iot_device_create(fixture_cmd, child_device_id, req['hub_name'],
+                                  req['ee'], req['auth'], req['ptp'], req['stp'], req['status'],
+                                  req['status_reason'], req['valid_days'], req['output_dir'],
+                                  req['set_parent_id'])
+
+        args = sc_device_create_setparent.call_args
+        url = args[0][0].url
+        assert "{}/devices/{}?".format(mock_target['entity'], child_device_id) in url
+        assert args[0][0].method == 'PUT'
+
+        body = args[0][2]
+        assert body['deviceId'] == child_device_id
+        assert body['deviceScope'] == generate_parent_device().get('deviceScope')
+
+    @pytest.fixture(params=[(200, 0)])
+    def sc_invalid_args_device_create_setparent(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        edge_kvp = {}
+        if request.param[1] == 0:
+            edge_kvp.setdefault('capabilities', {'iotEdge': False})
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0], generate_parent_device(**edge_kvp))
+        ]
+        service_client.side_effect = test_side_effect
+        return service_client
+
+    @pytest.mark.parametrize("req, exp", [
+        (generate_device_create_req(), CLIError)
+    ])
+    def test_device_create_setparent_invalid_args(self, sc_invalid_args_device_create_setparent, req, exp):
+        with pytest.raises(exp):
+            subject.iot_device_create(fixture_cmd, child_device_id, req['hub_name'],
+                                      req['ee'], req['auth'], req['ptp'], req['stp'], req['status'],
+                                      req['status_reason'], req['valid_days'], req['output_dir'],
+                                      device_id)
+
+    @pytest.fixture(params=[(200, 0), (200, 1)])
+    def sc_device_create_addchildren(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        nonedge_kvp = {}
+        if request.param[1] == 1:
+            nonedge_kvp.setdefault('deviceScope', 'abcd')
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0], generate_child_device(**nonedge_kvp)),
+            build_mock_response(mocker, request.param[0], generate_parent_device()),
+            build_mock_response(mocker, request.param[0], generate_child_device(**nonedge_kvp)),
+            build_mock_response(mocker, request.param[0], {})
+        ]
+        service_client.side_effect = test_side_effect
+        return service_client
+
+    @pytest.mark.parametrize("req", [
+        (generate_device_create_req())
+    ])
+    def test_device_create_addchildren(self, sc_device_create_addchildren, req):
+        subject.iot_device_create(fixture_cmd, req['device_id'], req['hub_name'],
+                                  True, req['auth'], req['ptp'], req['stp'], req['status'],
+                                  req['status_reason'], req['valid_days'], req['output_dir'],
+                                  None, child_device_id, True)
+
+        args = sc_device_create_addchildren.call_args
+        url = args[0][0].url
+        body = args[0][2]
+        assert "{}/devices/{}?".format(mock_target['entity'], child_device_id) in url
+        assert args[0][0].method == 'PUT'
+        assert body['deviceId'] == child_device_id
+        assert body['deviceScope'] == generate_parent_device().get('deviceScope')
+
+    @pytest.fixture(params=[(200, 0), (200, 1)])
+    def sc_invalid_args_device_create_addchildren(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        nonedge_kvp = {}
+        if request.param[1] == 0:
+            nonedge_kvp.setdefault('capabilities', {'iotEdge': True})
+        if request.param[1] == 1:
+            nonedge_kvp.setdefault('deviceScope', 'abcd')
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0], generate_child_device(**nonedge_kvp))
+        ]
+        service_client.side_effect = test_side_effect
+        return service_client
+
+    @pytest.mark.parametrize("req, exp", [
+        (generate_device_create_req(), CLIError)
+    ])
+    def test_device_create_addchildren_invalid_args(self, sc_invalid_args_device_create_addchildren, req, exp):
+        with pytest.raises(exp):
+            subject.iot_device_create(fixture_cmd, req['device_id'], req['hub_name'],
+                                      True, req['auth'], req['ptp'], req['stp'], req['status'],
+                                      req['status_reason'], req['valid_days'], req['output_dir'],
+                                      None, child_device_id, False)
 
     @pytest.mark.parametrize("req, exp", [
         (generate_device_create_req(ee=True, auth='x509_thumbprint'), CLIError),
@@ -1782,3 +1891,445 @@ class TestMonitorEvents():
     def test_monitor_events_invalid_args(self, fixture_cmd, serviceclient, timeout, exception):
         with pytest.raises(exception):
             subject.iot_hub_monitor_events(fixture_cmd, mock_target['entity'], device_id, timeout=timeout)
+
+
+def generate_parent_device(**kvp):
+    payload = {'etag': 'abcd', 'capabilities': {'iotEdge': True},
+               'deviceId': device_id, 'status': 'disabled',
+               'deviceScope': 'ms-azure-iot-edge://{}-1234'.format(device_id)}
+    for k in kvp:
+        if payload.get(k):
+            payload[k] = kvp[k]
+    return payload
+
+
+def generate_child_device(**kvp):
+    payload = {'etag': 'abcd', 'capabilities': {'iotEdge': False},
+               'deviceId': child_device_id, 'status': 'disabled',
+               'deviceScope': ''}
+    for k in kvp:
+        payload[k] = kvp[k]
+    return payload
+
+
+class TestEdgeOffline():
+
+    # get-parent
+    @pytest.fixture(params=[(200, 200)])
+    def sc_getparent(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        nonedge_kvp = {}
+        nonedge_kvp.setdefault('deviceScope', generate_parent_device().get('deviceScope'))
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0], generate_child_device(**nonedge_kvp)),
+            build_mock_response(mocker, request.param[0], generate_parent_device())
+        ]
+        service_client.side_effect = test_side_effect
+        return service_client
+
+    def test_device_get_parent(self, sc_getparent):
+        result = subject.iot_device_get_parent(fixture_cmd, child_device_id, mock_target['entity'])
+        args = sc_getparent.call_args
+        url = args[0][0].url
+        assert "{}/devices/{}?".format(mock_target['entity'], device_id) in url
+        assert args[0][0].method == 'GET'
+        assert json.dumps(result)
+
+    @pytest.fixture(params=[(200, 0), (200, 1)])
+    def sc_invalid_args_getparent(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        nonedge_kvp = {}
+        if request.param[1] == 0:
+            nonedge_kvp.setdefault('capabilities', {'iotEdge': True})
+        if request.param[1] == 1:
+            nonedge_kvp.setdefault('deviceId', '')
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0], generate_child_device(**nonedge_kvp))
+        ]
+        service_client.side_effect = test_side_effect
+        return service_client
+
+    @pytest.mark.parametrize("exp", [CLIError])
+    def test_device_getparent_invalid_args(self, sc_invalid_args_getparent, exp):
+        with pytest.raises(exp):
+            subject.iot_device_get_parent(fixture_cmd, device_id, mock_target['entity'])
+
+    def test_device_getparent_error(self, serviceclient_generic_error):
+        with pytest.raises(CLIError):
+            subject.iot_device_get_parent(fixture_cmd, device_id, mock_target['entity'])
+
+    # set-parent
+    @pytest.fixture(params=[(200, 0), (200, 1)])
+    def sc_setparent(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        nonedge_kvp = {}
+        if request.param[1] == 1:
+            nonedge_kvp.setdefault('deviceScope', 'abcd')
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0], generate_parent_device()),
+            build_mock_response(mocker, request.param[0], generate_child_device(**nonedge_kvp)),
+            build_mock_response(mocker, request.param[0], {})
+        ]
+        service_client.side_effect = test_side_effect
+        return service_client
+
+    def test_device_set_parent(self, sc_setparent):
+        subject.iot_device_set_parent(fixture_cmd, child_device_id, device_id, True, mock_target['entity'])
+        args = sc_setparent.call_args
+        url = args[0][0].url
+        body = args[0][2]
+        assert "{}/devices/{}?".format(mock_target['entity'], child_device_id) in url
+        assert args[0][0].method == 'PUT'
+        assert body['deviceId'] == child_device_id
+        assert body['deviceScope'] == generate_parent_device().get('deviceScope')
+
+    @pytest.fixture(params=[(200, 0), (200, 1), (200, 2)])
+    def sc_invalid_args_setparent(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        edge_kvp = {}
+        nonedge_kvp = {}
+        if request.param[1] == 0:
+            edge_kvp.setdefault('capabilities', {'iotEdge': False})
+        if request.param[1] == 1:
+            nonedge_kvp.setdefault('capabilities', {'iotEdge': True})
+        if request.param[1] == 2:
+            nonedge_kvp.setdefault('deviceScope', 'abcd')
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0], generate_parent_device(**edge_kvp)),
+            build_mock_response(mocker, request.param[0], generate_child_device(**nonedge_kvp))
+        ]
+        service_client.side_effect = test_side_effect
+        return service_client
+
+    @pytest.mark.parametrize("exp", [CLIError])
+    def test_device_setparent_invalid_args(self, sc_invalid_args_setparent, exp):
+        with pytest.raises(exp):
+            subject.iot_device_set_parent(fixture_cmd, child_device_id, device_id, False, mock_target['entity'])
+
+    @pytest.fixture(params=[(200, 400), (200, 401), (200, 500)])
+    def sc_setparent_error(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0], generate_parent_device()),
+            build_mock_response(mocker, request.param[0], generate_child_device()),
+            build_mock_response(mocker, request.param[1], {})
+        ]
+        service_client.side_effect = test_side_effect
+        return service_client
+
+    def test_device_setparent_error(self, sc_setparent_error):
+        with pytest.raises(CLIError):
+            subject.iot_device_set_parent(fixture_cmd, child_device_id, device_id, False, mock_target['entity'])
+
+    @pytest.fixture(params=[(200, 200)])
+    def sc_invalid_etag_setparent(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        nonedge_kvp = {}
+        nonedge_kvp.setdefault('etag', None)
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0], generate_parent_device()),
+            build_mock_response(mocker, request.param[0], generate_child_device(**nonedge_kvp))
+        ]
+        service_client.side_effect = test_side_effect
+        return service_client
+
+    @pytest.mark.parametrize("exp", [LookupError])
+    def test_device_setparent_invalid_etag(self, sc_invalid_etag_setparent, exp):
+        with pytest.raises(exp):
+            subject.iot_device_set_parent(fixture_cmd, child_device_id, device_id, True, mock_target['entity'])
+
+    # add-children
+    @pytest.fixture(params=[(200, 0), (200, 1)])
+    def sc_addchildren(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        nonedge_kvp = {}
+        if request.param[1] == 1:
+            nonedge_kvp.setdefault('deviceScope', 'abcd')
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0], generate_parent_device()),
+            build_mock_response(mocker, request.param[0], generate_child_device(**nonedge_kvp)),
+            build_mock_response(mocker, request.param[0], {})
+        ]
+        service_client.side_effect = test_side_effect
+        return service_client
+
+    def test_device_children_add(self, sc_addchildren):
+        subject.iot_device_children_add(None, device_id, child_device_id, True, mock_target['entity'])
+        args = sc_addchildren.call_args
+        url = args[0][0].url
+        body = args[0][2]
+        assert "{}/devices/{}?".format(mock_target['entity'], child_device_id) in url
+        assert args[0][0].method == 'PUT'
+        assert body['deviceId'] == child_device_id
+        assert body['deviceScope'] == generate_parent_device().get('deviceScope')
+
+    @pytest.fixture(params=[(200, 0), (200, 1), (200, 2)])
+    def sc_invalid_args_addchildren(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        edge_kvp = {}
+        nonedge_kvp = {}
+        if request.param[1] == 0:
+            edge_kvp.setdefault('capabilities', {'iotEdge': False})
+        if request.param[1] == 1:
+            nonedge_kvp.setdefault('capabilities', {'iotEdge': True})
+        if request.param[1] == 2:
+            nonedge_kvp.setdefault('deviceScope', 'abcd')
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0], generate_parent_device(**edge_kvp)),
+            build_mock_response(mocker, request.param[0], generate_child_device(**nonedge_kvp))
+        ]
+        service_client.side_effect = test_side_effect
+        return service_client
+
+    @pytest.mark.parametrize("exp", [CLIError])
+    def test_device_addchildren_invalid_args(self, sc_invalid_args_addchildren, exp):
+        with pytest.raises(exp):
+            subject.iot_device_children_add(fixture_cmd, device_id, child_device_id, False, mock_target['entity'])
+
+    @pytest.fixture(params=[(200, 400), (200, 401), (200, 500)])
+    def sc_addchildren_error(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0], generate_parent_device()),
+            build_mock_response(mocker, request.param[0], generate_child_device()),
+            build_mock_response(mocker, request.param[1], {})
+        ]
+        service_client.side_effect = test_side_effect
+        return service_client
+
+    def test_device_addchildren_error(self, sc_addchildren_error):
+        with pytest.raises(CLIError):
+            subject.iot_device_children_add(fixture_cmd, device_id, child_device_id, True, mock_target['entity'])
+
+    @pytest.fixture(params=[(200, 200)])
+    def sc_invalid_etag_addchildren(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        nonedge_kvp = {}
+        nonedge_kvp.setdefault('etag', None)
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0], generate_parent_device()),
+            build_mock_response(mocker, request.param[0], generate_child_device(**nonedge_kvp))
+        ]
+        service_client.side_effect = test_side_effect
+        return service_client
+
+    @pytest.mark.parametrize("exp", [LookupError])
+    def test_device_addchildren_invalid_etag(self, sc_invalid_etag_setparent, exp):
+        with pytest.raises(exp):
+            subject.iot_device_children_add(fixture_cmd, device_id, child_device_id, True, mock_target['entity'])
+
+    # list-children
+    @pytest.fixture(params=[(200, 200)])
+    def sc_listchildren(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        nonedge_kvp = {}
+        nonedge_kvp.setdefault('deviceScope', generate_parent_device().get('deviceScope'))
+        result = []
+        result.append(generate_child_device(**nonedge_kvp))
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0], generate_parent_device()),
+            build_mock_response(mocker, request.param[0], result, {'x-ms-continuation': None})
+        ]
+        service_client.side_effect = test_side_effect
+        return service_client
+
+    def test_device_children_list(self, sc_listchildren):
+        result = subject.iot_device_children_list(fixture_cmd, device_id, mock_target['entity'])
+        args = sc_listchildren.call_args
+        url = args[0][0].url
+        assert "{}/devices/query?".format(mock_target['entity']) in url
+        assert args[0][0].method == 'POST'
+        assert result == child_device_id
+
+    @pytest.fixture(params=[(200, 0), (200, 1)])
+    def sc_invalid_args_listchildren(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        edge_kvp = {}
+        if request.param[1] == 0:
+            edge_kvp.setdefault('capabilities', {'iotEdge': False})
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0], generate_parent_device(**edge_kvp)),
+            build_mock_response(mocker, request.param[0], [], {'x-ms-continuation': None})
+        ]
+        service_client.side_effect = test_side_effect
+        return service_client
+
+    @pytest.mark.parametrize("exp", [CLIError])
+    def test_device_listchildren_invalid_args(self, sc_invalid_args_listchildren, exp):
+        with pytest.raises(exp):
+            subject.iot_device_children_list(fixture_cmd, device_id, mock_target['entity'])
+
+    def test_device_listchildren_error(self, serviceclient_generic_error):
+        with pytest.raises(CLIError):
+            subject.iot_device_children_list(fixture_cmd, device_id, mock_target['entity'])
+
+    # remove-children
+    @pytest.fixture(params=[(200, 200)])
+    def sc_removechildrenlist(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        nonedge_kvp = {}
+        nonedge_kvp.setdefault('deviceScope', generate_parent_device().get('deviceScope'))
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0], generate_parent_device()),
+            build_mock_response(mocker, request.param[0], generate_child_device(**nonedge_kvp)),
+            build_mock_response(mocker, request.param[0], {})
+        ]
+        service_client.side_effect = test_side_effect
+        return service_client
+
+    def test_device_children_remove_list(self, sc_removechildrenlist):
+        subject.iot_device_children_remove(fixture_cmd, device_id, child_device_id, False, mock_target['entity'])
+        args = sc_removechildrenlist.call_args
+        url = args[0][0].url
+        assert "{}/devices/{}?".format(mock_target['entity'], child_device_id) in url
+        assert args[0][0].method == 'PUT'
+
+    @pytest.fixture(params=[(200, 0), (200, 1), (200, 2), (200, 3)])
+    def sc_invalid_args_removechildrenlist(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        edge_kvp = {}
+        nonedge_kvp = {}
+        if request.param[1] == 0:
+            edge_kvp.setdefault('capabilities', {'iotEdge': False})
+        if request.param[1] == 1:
+            nonedge_kvp.setdefault('capabilities', {'iotEdge': True})
+        if request.param[1] == 2:
+            nonedge_kvp.setdefault('deviceScope', '')
+        if request.param[1] == 3:
+            nonedge_kvp.setdefault('deviceScope', 'other')
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0], generate_parent_device(**edge_kvp)),
+            build_mock_response(mocker, request.param[0], generate_child_device(**nonedge_kvp))
+        ]
+        service_client.side_effect = test_side_effect
+        return service_client
+
+    @pytest.mark.parametrize("exp", [CLIError])
+    def test_device_removechildrenlist_invalid_args(self, sc_invalid_args_removechildrenlist, exp):
+        with pytest.raises(exp):
+            subject.iot_device_children_remove(fixture_cmd, device_id, child_device_id, False, mock_target['entity'])
+
+    @pytest.fixture(params=[(200, 200)])
+    def sc_invalid_etag_removechildrenlist(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        nonedge_kvp = {}
+        nonedge_kvp.setdefault('deviceScope', generate_parent_device().get('deviceScope'))
+        nonedge_kvp.setdefault('etag', None)
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0], generate_parent_device()),
+            build_mock_response(mocker, request.param[0], generate_child_device(**nonedge_kvp)),
+            build_mock_response(mocker, request.param[0], {})
+        ]
+        service_client.side_effect = test_side_effect
+        return service_client
+
+    @pytest.mark.parametrize("exp", [LookupError])
+    def test_device_removechildrenlist_invalid_etag(self, sc_invalid_etag_removechildrenlist, exp):
+        with pytest.raises(exp):
+            subject.iot_device_children_remove(fixture_cmd, device_id, child_device_id, False, mock_target['entity'])
+
+    @pytest.fixture(params=[(200, 400), (200, 401), (200, 500)])
+    def sc_removechildrenlist_error(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        nonedge_kvp = {}
+        nonedge_kvp.setdefault('deviceScope', generate_parent_device().get('deviceScope'))
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0], generate_parent_device()),
+            build_mock_response(mocker, request.param[0], generate_child_device(**nonedge_kvp)),
+            build_mock_response(mocker, request.param[1], {})
+        ]
+        service_client.side_effect = test_side_effect
+        return service_client
+
+    def test_device_removechildrenlist_error(self, sc_removechildrenlist_error):
+        with pytest.raises(CLIError):
+            subject.iot_device_children_remove(fixture_cmd, device_id, child_device_id, False, mock_target['entity'])
+
+    @pytest.fixture(params=[(200, 200)])
+    def sc_removechildrenall(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        nonedge_kvp = {}
+        nonedge_kvp.setdefault('deviceScope', generate_parent_device().get('deviceScope'))
+        result = []
+        result.append(generate_child_device(**nonedge_kvp))
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0], generate_parent_device()),
+            build_mock_response(mocker, request.param[0], result, {'x-ms-continuation': None}),
+            build_mock_response(mocker, request.param[0], generate_child_device(**nonedge_kvp)),
+            build_mock_response(mocker, request.param[0], {})
+        ]
+        service_client.side_effect = test_side_effect
+        return service_client
+
+    def test_device_children_remove_all(self, sc_removechildrenall):
+        subject.iot_device_children_remove(fixture_cmd, device_id, None, True, mock_target['entity'])
+        args = sc_removechildrenall.call_args
+        url = args[0][0].url
+        assert "{}/devices/{}?".format(mock_target['entity'], child_device_id) in url
+        assert args[0][0].method == 'PUT'
+
+    @pytest.fixture(params=[(200, 0), (200, 1)])
+    def sc_invalid_args_removechildrenall(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        edge_kvp = {}
+        nonedge_kvp = {}
+        nonedge_kvp.setdefault('deviceScope', generate_parent_device().get('deviceScope'))
+        result = []
+        result.append(generate_child_device(**nonedge_kvp))
+        if request.param[1] == 0:
+            edge_kvp.setdefault('capabilities', {'iotEdge': False})
+        if request.param[1] == 1:
+            result = []
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0], generate_parent_device(**edge_kvp)),
+            build_mock_response(mocker, request.param[0], result, {'x-ms-continuation': None})
+        ]
+        service_client.side_effect = test_side_effect
+        return service_client
+
+    @pytest.mark.parametrize("exp", [CLIError])
+    def test_device_removechildrenall_invalid_args(self, sc_invalid_args_removechildrenall, exp):
+        with pytest.raises(exp):
+            subject.iot_device_children_remove(fixture_cmd, device_id, None, True, mock_target['entity'])
+
+    @pytest.fixture(params=[(200, 200)])
+    def sc_invalid_etag_removechildrenall(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        nonedge_kvp = {}
+        nonedge_kvp.setdefault('deviceScope', generate_parent_device().get('deviceScope'))
+        nonedge_kvp.setdefault('etag', None)
+        result = []
+        result.append(generate_child_device(**nonedge_kvp))
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0], generate_parent_device()),
+            build_mock_response(mocker, request.param[0], result, {'x-ms-continuation': None}),
+            build_mock_response(mocker, request.param[0], generate_child_device(**nonedge_kvp)),
+            build_mock_response(mocker, request.param[0], {})
+        ]
+        service_client.side_effect = test_side_effect
+        return service_client
+
+    @pytest.mark.parametrize("exp", [LookupError])
+    def test_device_removechildrenall_invalid_etag(self, sc_invalid_etag_removechildrenall, exp):
+        with pytest.raises(exp):
+            subject.iot_device_children_remove(fixture_cmd, device_id, None, True, mock_target['entity'])
+
+    @pytest.fixture(params=[(200, 400), (200, 401), (200, 500)])
+    def sc_removechildrenall_error(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        nonedge_kvp = {}
+        nonedge_kvp.setdefault('deviceScope', generate_parent_device().get('deviceScope'))
+        result = []
+        result.append(generate_child_device(**nonedge_kvp))
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0], generate_parent_device()),
+            build_mock_response(mocker, request.param[0], result, {'x-ms-continuation': None}),
+            build_mock_response(mocker, request.param[0], generate_child_device(**nonedge_kvp)),
+            build_mock_response(mocker, request.param[1], {})
+        ]
+        service_client.side_effect = test_side_effect
+        return service_client
+
+    def test_device_removechildrenall_error(self, sc_removechildrenall_error):
+        with pytest.raises(CLIError):
+            subject.iot_device_children_remove(fixture_cmd, device_id, None, True, mock_target['entity'])

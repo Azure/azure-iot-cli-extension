@@ -3,7 +3,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-# pylint: disable=wrong-import-order
+# pylint: disable=wrong-import-order,too-many-lines
 
 from os.path import exists, basename
 from time import time, sleep
@@ -12,7 +12,7 @@ from knack.log import get_logger
 from knack.util import CLIError
 from azure.cli.core.util import read_file_content
 from azext_iot.common.utility import calculate_millisec_since_unix_epoch_utc
-from azext_iot._constants import EXTENSION_ROOT, BASE_API_VERSION
+from azext_iot._constants import EXTENSION_ROOT, BASE_API_VERSION, DEVICE_DEVICESCOPE_PREFIX
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import (DeviceAuthType,
                                      SdkType,
@@ -71,14 +71,29 @@ def iot_device_list(cmd, hub_name=None, top=1000, edge_enabled=False, resource_g
     return result
 
 
+# pylint: disable=too-many-locals
 def iot_device_create(cmd, device_id, hub_name=None, edge_enabled=False,
                       auth_method='shared_private_key', primary_thumbprint=None,
                       secondary_thumbprint=None, status='enabled', status_reason=None,
-                      valid_days=None, output_dir=None, resource_group_name=None, login=None):
+                      valid_days=None, output_dir=None, set_parent_id=None, add_children=None,
+                      force=False, resource_group_name=None, login=None):
 
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
+    service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
+    deviceScope = None
     if edge_enabled:
         if auth_method != DeviceAuthType.shared_private_key.name:
             raise CLIError('currently edge devices are limited to symmetric key auth')
+        if add_children:
+            for non_edge_device_id in add_children.split(','):
+                nonedge_device = _iot_device_show(target, non_edge_device_id.strip())
+                _validate_nonedge_device(nonedge_device)
+                _validate_parent_child_relation(nonedge_device, '-', force)
+    else:
+        if set_parent_id:
+            edge_device = _iot_device_show(target, set_parent_id)
+            _validate_edge_device(edge_device)
+            deviceScope = edge_device['deviceScope']
 
     if any([valid_days, output_dir]):
         valid_days = 365 if not valid_days else int(valid_days)
@@ -87,25 +102,31 @@ def iot_device_create(cmd, device_id, hub_name=None, edge_enabled=False,
         cert = _create_self_signed_cert(device_id, valid_days, output_dir)
         primary_thumbprint = cert['thumbprint']
 
-    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
-    service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
     try:
-        device = _assemble_device(
-            device_id, auth_method, edge_enabled, primary_thumbprint, secondary_thumbprint, status, status_reason)
-        return service_sdk.create_or_update_device(device_id, device)
+        device = _assemble_device(device_id, auth_method, edge_enabled, primary_thumbprint,
+                                  secondary_thumbprint, status, status_reason, deviceScope)
+        output = service_sdk.create_or_update_device(device_id, device)
     except errors.CloudError as e:
         raise CLIError(unpack_msrest_error(e))
 
+    if add_children:
+        for non_edge_device_id in add_children.split(','):
+            nonedge_device = _iot_device_show(target, non_edge_device_id.strip())
+            _update_nonedge_devicescope(target, nonedge_device, output.device_scope)
+
+    return output
+
 
 def _assemble_device(device_id, auth_method, edge_enabled, pk=None, sk=None,
-                     status='enabled', status_reason=None):
+                     status='enabled', status_reason=None, device_scope=None):
     from azext_iot.service_sdk.models.device_capabilities import DeviceCapabilities
     from azext_iot.service_sdk.models.device import Device
 
     auth = _assemble_auth(auth_method, pk, sk)
     cap = DeviceCapabilities(edge_enabled)
     device = Device(device_id=device_id, authentication=auth,
-                    capabilities=cap, status=status, status_reason=status_reason)
+                    capabilities=cap, status=status, status_reason=status_reason,
+                    device_scope=device_scope)
     return device
 
 
@@ -179,6 +200,128 @@ def iot_device_delete(cmd, device_id, hub_name=None, resource_group_name=None, l
         raise LookupError("device etag not found")
     except errors.CloudError as e:
         raise CLIError(unpack_msrest_error(e))
+
+
+def iot_device_get_parent(cmd, device_id, hub_name=None, resource_group_name=None, login=None):
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
+    child_device = _iot_device_show(target, device_id)
+    _validate_nonedge_device(child_device)
+    _validate_child_device(child_device)
+    device_scope = child_device['deviceScope']
+    parent_device_id = device_scope[len(DEVICE_DEVICESCOPE_PREFIX):device_scope.rindex('-')]
+    return _iot_device_show(target, parent_device_id)
+
+
+def iot_device_set_parent(cmd, device_id, parent_id, force=False, hub_name=None, resource_group_name=None, login=None):
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
+    parent_device = _iot_device_show(target, parent_id)
+    _validate_edge_device(parent_device)
+    child_device = _iot_device_show(target, device_id)
+    _validate_nonedge_device(child_device)
+    _validate_parent_child_relation(child_device, parent_device['deviceScope'], force)
+    _update_nonedge_devicescope(target, child_device, parent_device['deviceScope'])
+
+
+def iot_device_children_add(cmd, device_id, child_list, force=False, hub_name=None,
+                            resource_group_name=None, login=None):
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
+    devices = []
+    edge_device = _iot_device_show(target, device_id)
+    _validate_edge_device(edge_device)
+    for non_edge_device_id in child_list.split(','):
+        nonedge_device = _iot_device_show(target, non_edge_device_id.strip())
+        _validate_nonedge_device(nonedge_device)
+        _validate_parent_child_relation(nonedge_device, edge_device['deviceScope'], force)
+        devices.append(nonedge_device)
+
+    for device in devices:
+        _update_nonedge_devicescope(target, device, edge_device['deviceScope'])
+
+
+def iot_device_children_remove(cmd, device_id, child_list=None, remove_all=False, hub_name=None,
+                               resource_group_name=None, login=None):
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
+    devices = []
+    if remove_all:
+        result = _iot_device_children_list(cmd, device_id, hub_name, resource_group_name, login)
+        if not result:
+            raise CLIError('No registered child devices found for "{}" edge device.'.format(device_id))
+        for non_edge_device_id in ([str(x['deviceId']) for x in result]):
+            nonedge_device = _iot_device_show(target, non_edge_device_id.strip())
+            devices.append(nonedge_device)
+    elif child_list:
+        edge_device = _iot_device_show(target, device_id)
+        _validate_edge_device(edge_device)
+        for non_edge_device_id in child_list.split(','):
+            nonedge_device = _iot_device_show(target, non_edge_device_id.strip())
+            _validate_nonedge_device(nonedge_device)
+            _validate_child_device(nonedge_device)
+            if nonedge_device['deviceScope'] == edge_device['deviceScope']:
+                devices.append(nonedge_device)
+            else:
+                raise CLIError('The entered child device "{}" isn\'t assigned as a child of edge device "{}"'
+                               .format(non_edge_device_id.strip(), device_id))
+    else:
+        raise CLIError('Please specify comma-separated child list or use --remove-all to remove all children.')
+
+    for device in devices:
+        _update_nonedge_devicescope(target, device)
+
+
+def iot_device_children_list(cmd, device_id, hub_name=None, resource_group_name=None, login=None):
+    result = _iot_device_children_list(cmd, device_id, hub_name, resource_group_name, login)
+    if not result:
+        raise CLIError('No registered child devices found for "{}" edge device.'.format(device_id))
+    return ', '.join([str(x['deviceId']) for x in result])
+
+
+def _iot_device_children_list(cmd, device_id, hub_name=None, resource_group_name=None, login=None):
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
+    device = _iot_device_show(target, device_id)
+    _validate_edge_device(device)
+    query = ('select * from devices where capabilities.iotEdge=false and deviceScope=\'{}\''
+             .format(device['deviceScope']))
+    return iot_query(cmd, query, hub_name, None, resource_group_name, login=login)
+
+
+def _update_nonedge_devicescope(target, nonedge_device, deviceScope=''):
+    service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
+    try:
+        nonedge_device['deviceScope'] = deviceScope
+        etag = nonedge_device.get('etag', None)
+        if etag:
+            headers = {}
+            headers["If-Match"] = '"{}"'.format(etag)
+            service_sdk.create_or_update_device(nonedge_device['deviceId'], nonedge_device, custom_headers=headers)
+        else:
+            raise LookupError("device etag not found.")
+    except errors.CloudError as e:
+        raise CLIError(unpack_msrest_error(e))
+
+
+def _validate_edge_device(device):
+    if not device['capabilities']['iotEdge']:
+        raise CLIError('The device "{}" should be edge device.'.format(device['deviceId']))
+
+
+def _validate_nonedge_device(device):
+    if device['capabilities']['iotEdge']:
+        raise CLIError('The entered child device "{}" should be non-edge device.'.format(device['deviceId']))
+
+
+def _validate_child_device(device):
+    if 'deviceScope' not in device or device['deviceScope'] == '':
+        raise CLIError('Device "{}" doesn\'t support parent device functionality.'.format(device['deviceId']))
+
+
+def _validate_parent_child_relation(child_device, deviceScope, force):
+    if 'deviceScope' not in child_device or child_device['deviceScope'] == '':
+        return
+    if child_device['deviceScope'] != deviceScope:
+        if not force:
+            raise CLIError('The entered device "{}" already has a parent device, please use \'--force\''
+                           ' to overwrite'.format(child_device['deviceId']))
+        return
 
 
 # Module
