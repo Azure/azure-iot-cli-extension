@@ -6,6 +6,9 @@ Release History
 0.6.2
 +++++++++++++++
 * Added support for deviceId wildcards and IoT Hub query language filtering to monitor-events.
+* Added support for edge offline commands.
+* Upgrade service Sdk to 2018-08-30-preview.
+* Added --set-parent and --add-children to device-identity create to support edge offline feature.
 
 0.6.1
 +++++++++++++++
