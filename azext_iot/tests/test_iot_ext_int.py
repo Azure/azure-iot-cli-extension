@@ -128,19 +128,6 @@ class TestIoTHub(LiveScenarioTest):
             self._remove_entities()
 
     def test_hub(self):
-        hub_policy = "iothubowner"
-
-        hub_conn_str_pattern = r'^HostName={}\.azure-devices\.net;SharedAccessKeyName={};SharedAccessKey='.format(
-            LIVE_HUB, hub_policy)
-
-        self.cmd('iot hub show-connection-string -n {} -g {}'.format(LIVE_HUB, LIVE_RG), checks=[
-            self.check_pattern('cs', hub_conn_str_pattern)
-        ])
-        self.cmd('iot hub show-connection-string -n {} -g {} --kt {}'.format(LIVE_HUB, LIVE_RG, 'secondary'), checks=[
-            self.check_pattern('cs', hub_conn_str_pattern)
-        ])
-        self.cmd('iot hub show-connection-string -n {} -g {} --kt {} --pn doesnotexist'.format(LIVE_HUB, LIVE_RG, 'secondary'),
-                 expect_failure=True)
 
         self.cmd('az iot hub generate-sas-token -n {} -g {}'.format(LIVE_HUB, LIVE_RG), checks=[
             self.exists('sas')
@@ -369,15 +356,15 @@ class TestIoTHub(LiveScenarioTest):
 
         self.cmd('iot hub device-identity show-connection-string -d {} -n {} -g {}'
                  .format(edge_device_ids[0], LIVE_HUB, LIVE_RG),
-                 checks=[self.check_pattern('cs', sym_conn_str_pattern)])
+                 checks=[self.check_pattern('connectionString', sym_conn_str_pattern)])
 
         self.cmd('iot hub device-identity show-connection-string -d {} -n {} -g {} --kt {}'
                  .format(edge_device_ids[0], LIVE_HUB, LIVE_RG, 'secondary'),
-                 checks=[self.check_pattern('cs', sym_conn_str_pattern)])
+                 checks=[self.check_pattern('connectionString', sym_conn_str_pattern)])
 
         self.cmd('iot hub device-identity show-connection-string -d {} -n {} -g {}'
                  .format(device_ids[2], LIVE_HUB, LIVE_RG),
-                 checks=[self.check_pattern('cs', cer_conn_str_pattern)])
+                 checks=[self.check_pattern('connectionString', cer_conn_str_pattern)])
 
         self.cmd('iot hub generate-sas-token -n {} -g {} -d {}'.format(LIVE_HUB, LIVE_RG, edge_device_ids[0]), checks=[
             self.exists('sas')
@@ -663,16 +650,16 @@ class TestIoTHub(LiveScenarioTest):
             LIVE_HUB, edge_device_ids[0], module_ids[0])
         self.cmd('iot hub module-identity show-connection-string -d {} -n {} -g {} -m {}'
                  .format(edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0]),
-                 checks=[self.check_pattern('cs', mod_sym_conn_str_pattern)])
+                 checks=[self.check_pattern('connectionString', mod_sym_conn_str_pattern)])
 
         # With connection string
         self.cmd('iot hub module-identity show-connection-string -d {} --login {} -m {}'
                  .format(edge_device_ids[0], LIVE_HUB_CS, module_ids[0]),
-                 checks=[self.check_pattern('cs', mod_sym_conn_str_pattern)])
+                 checks=[self.check_pattern('connectionString', mod_sym_conn_str_pattern)])
 
         self.cmd('iot hub module-identity show-connection-string -d {} -n {} -g {} -m {} --kt {}'
                  .format(edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0], "secondary"),
-                 checks=[self.check_pattern('cs', mod_sym_conn_str_pattern)])
+                 checks=[self.check_pattern('connectionString', mod_sym_conn_str_pattern)])
 
         for i in module_ids:
             if module_ids.index(i) == (len(module_ids) - 1):

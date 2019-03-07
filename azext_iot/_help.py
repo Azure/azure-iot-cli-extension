@@ -418,11 +418,6 @@ helps['iot hub query'] = """
         az iot hub query -n {iothub_name} -q "select * from devices.modules where devices.deviceId = '{device_id}'"
 """
 
-helps['iot hub show-connection-string'] = """
-    type: command
-    short-summary: Show a target IoT Hub Connection String.
-"""
-
 helps['iot hub configuration'] = """
     type: group
     short-summary: Manage IoT device configurations at scale

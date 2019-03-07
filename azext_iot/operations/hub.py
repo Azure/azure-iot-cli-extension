@@ -961,6 +961,8 @@ def _build_device_or_module_connection_string(device, key_type='primary', module
     raise CLIError('Unable to form target connection string')
 
 
+# Introducing breaking changes by removing this command as same command exist in core-cli.
+# Only removing the command and keeping command defination for further references.
 def iot_get_hub_connection_string(cmd, hub_name, policy_name='iothubowner', key_type='primary',
                                   resource_group_name=None):
     result = {}
@@ -974,7 +976,7 @@ def iot_get_device_connection_string(cmd, device_id, hub_name=None, key_type='pr
     result = {}
     device = iot_device_show(cmd, device_id,
                              hub_name=hub_name, resource_group_name=resource_group_name, login=login)
-    result['cs'] = _build_device_or_module_connection_string(device, key_type)
+    result['connectionString'] = _build_device_or_module_connection_string(device, key_type)
     return result
 
 
@@ -983,7 +985,7 @@ def iot_get_module_connection_string(cmd, device_id, module_id, hub_name=None, k
     result = {}
     module = iot_device_module_show(cmd, device_id, module_id,
                                     resource_group_name=resource_group_name, hub_name=hub_name, login=login)
-    result['cs'] = _build_device_or_module_connection_string(None, key_type, module)
+    result['connectionString'] = _build_device_or_module_connection_string(None, key_type, module)
     return result
 
 
