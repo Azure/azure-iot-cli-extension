@@ -128,19 +128,6 @@ class TestIoTHub(LiveScenarioTest):
             self._remove_entities()
 
     def test_hub(self):
-        hub_policy = "iothubowner"
-
-        hub_conn_str_pattern = r'^HostName={}\.azure-devices\.net;SharedAccessKeyName={};SharedAccessKey='.format(
-            LIVE_HUB, hub_policy)
-
-        self.cmd('iot hub show-connection-string -n {} -g {}'.format(LIVE_HUB, LIVE_RG), checks=[
-            self.check_pattern('cs', hub_conn_str_pattern)
-        ])
-        self.cmd('iot hub show-connection-string -n {} -g {} --kt {}'.format(LIVE_HUB, LIVE_RG, 'secondary'), checks=[
-            self.check_pattern('cs', hub_conn_str_pattern)
-        ])
-        self.cmd('iot hub show-connection-string -n {} -g {} --kt {} --pn doesnotexist'.format(LIVE_HUB, LIVE_RG, 'secondary'),
-                 expect_failure=True)
 
         self.cmd('az iot hub generate-sas-token -n {} -g {}'.format(LIVE_HUB, LIVE_RG), checks=[
             self.exists('sas')

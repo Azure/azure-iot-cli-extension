@@ -9,6 +9,7 @@ Release History
 * Added support for edge offline commands.
 * Upgrade service Sdk to 2018-08-30-preview.
 * Added --set-parent and --add-children to device-identity create to support edge offline feature.
+* BREAKING CHANGES: The command "az iot hub show-connection-string" will no longer return the output with key "cs".
 
 0.6.1
 +++++++++++++++
