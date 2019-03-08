@@ -3,7 +3,7 @@
 Release History
 ===============
 
-0.6.2
+0.7.0
 +++++++++++++++
 * Added support for deviceId wildcards and IoT Hub query language filtering to monitor-events.
 * Added support for edge offline commands.
