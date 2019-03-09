@@ -6,7 +6,7 @@
 
 import os
 
-VERSION = '0.6.2'
+VERSION = '0.7.0'
 EXTENSION_NAME = 'azure-cli-iot-ext'
 EXTENSION_ROOT = os.path.dirname(os.path.abspath(__file__))
 EXTENSION_CONFIG_ROOT_KEY = 'iotext'
