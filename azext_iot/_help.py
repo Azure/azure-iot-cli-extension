@@ -372,7 +372,7 @@ helps['iot hub apply-configuration'] = """
 
 helps['iot hub generate-sas-token'] = """
     type: command
-    short-summary: Generate a SAS token for a target IoT Hub or device.
+    short-summary: Generate a SAS token for a target IoT Hub, device or module.
     long-summary: For device SAS tokens, the policy parameter is used to
                   access the the device registry only. Therefore the policy should have
                   read access to the registry. For IoT Hub tokens the policy is part of the SAS.
