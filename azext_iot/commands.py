@@ -74,6 +74,10 @@ def load_command_table(self, _):
         cmd_group.generic_update_command('update', getter_name='iot_hub_configuration_show',
                                          setter_name='iot_hub_configuration_update')
 
+    with self.command_group('iot hub distributed-tracing', command_type=iothub_ops) as cmd_group:
+        cmd_group.command('show', 'iot_hub_distributed_tracing_show')
+        cmd_group.command('update', 'iot_hub_distributed_tracing_update')
+
     with self.command_group('iot edge', command_type=iothub_ops) as cmd_group:
         cmd_group.command('set-modules', 'iot_edge_set_modules')
 

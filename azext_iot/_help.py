@@ -372,7 +372,7 @@ helps['iot hub apply-configuration'] = """
 
 helps['iot hub generate-sas-token'] = """
     type: command
-    short-summary: Generate a SAS token for a target IoT Hub or device.
+    short-summary: Generate a SAS token for a target IoT Hub, device or module.
     long-summary: For device SAS tokens, the policy parameter is used to
                   access the the device registry only. Therefore the policy should have
                   read access to the registry. For IoT Hub tokens the policy is part of the SAS.
@@ -491,6 +491,29 @@ helps['iot hub configuration show-metric'] = """
       text: >
         az iot hub configuration show-metric --metric-id appliedCount -c {configuration_name} -n {iothub_name}
         --metric-type system
+"""
+
+helps['iot hub distributed-tracing'] = """
+    type: group
+    short-summary: Manage distributed settings per-device.
+"""
+
+helps['iot hub distributed-tracing show'] = """
+    type: command
+    short-summary: Get the distributed tracing settings for a device.
+    examples:
+    - name: Get the distributed tracing settings for a device
+      text: >
+        az iot hub distributed-tracing show -d {device_id} -n {iothub_name}
+"""
+
+helps['iot hub distributed-tracing update'] = """
+    type: command
+    short-summary: Update the distributed tracing options for a device.
+    examples:
+    - name: Update the distributed tracing options for a device
+      text: >
+        az iot hub distributed-tracing update -d {device_id} --sm on --sr 50 -n {iothub_name}
 """
 
 helps['iot device'] = """

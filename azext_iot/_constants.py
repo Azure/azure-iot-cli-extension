@@ -17,6 +17,9 @@ MIN_SIM_MSG_INTERVAL = 1
 MIN_SIM_MSG_COUNT = 1
 SIM_RECEIVE_SLEEP_SEC = 3
 DEVICE_DEVICESCOPE_PREFIX = 'ms-azure-iot-edge://'
+TRACING_PROPERTY = 'azureiot*com^dtracing^1'
+TRACING_ALLOWED_FOR_LOCATION = ('northeurope', 'westus2', 'west us 2', 'southeastasia')
+TRACING_ALLOWED_FOR_SKU = 'standard'
 
 # (Lib name, minimum version (including), maximum version (excluding))
 EVENT_LIB = ('uamqp', '1.0.3', '1.1')
