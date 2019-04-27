@@ -428,7 +428,7 @@ class TestIoTHub(LiveScenarioTest):
     def test_hub_device_twins(self):
         self.kwargs['generic_dict'] = {'key': 'value'}
         self.kwargs['bad_format'] = "{'key: 'value'}"
-        device_count = 2
+        device_count = 3
 
         names = self._create_entity_names(devices=device_count)
         device_ids = names['device_ids']
@@ -497,6 +497,16 @@ class TestIoTHub(LiveScenarioTest):
                          self.check('properties.desired.temperature.min', 10),
                          self.check('properties.desired.temperature.max', 100),
                          self.check('tags.location.region', 'US')])
+
+        self.cmd('iot hub distributed-tracing show -d {} -n {} -g {}'.format(device_ids[2], LIVE_HUB, LIVE_RG),
+                 checks=self.is_empty())
+
+        result = self.cmd('iot hub distributed-tracing update -d {} -n {} -g {} --sm on --sr 50'.format(device_ids[2],
+                          LIVE_HUB, LIVE_RG)).get_output_in_json()
+        assert result['deviceId'] == device_ids[2]
+        assert result['samplingMode'] == 'enabled'
+        assert result['samplingRate'] == '50%'
+        assert not result['isSynced']
 
     def test_hub_modules(self):
         edge_device_count = 2

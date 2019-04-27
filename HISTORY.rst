@@ -3,6 +3,10 @@
 Release History
 ===============
 
+0.7.1
++++++++++++++++
+* Added support for distribution tracing commands.
+
 0.7.0
 +++++++++++++++
 * Added support for deviceId wildcards and IoT Hub query language filtering to monitor-events.

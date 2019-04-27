@@ -15,6 +15,7 @@ from random import randint
 from azext_iot.operations import hub as subject
 from azext_iot.common.utility import evaluate_literal, validate_min_python_version
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
+from azext_iot._constants import TRACING_PROPERTY
 from knack.util import CLIError
 from azure.cli.core.util import read_file_content
 
@@ -32,6 +33,8 @@ mock_target['primarykey'] = 'rJx/6rJ6rmG4ak890+eW5MYGH+A0uzRvjGNjg3Ve8sfo='
 mock_target['secondarykey'] = 'aCd/6rJ6rmG4ak890+eW5MYGH+A0uzRvjGNjg3Ve8sfo='
 mock_target['policy'] = 'iothubowner'
 mock_target['subscription'] = "5952cff8-bcd1-4235-9554-af2c0348bf23"
+mock_target['location'] = "westus2"
+mock_target['sku_tier'] = "Standard"
 
 generic_cs_template = 'HostName={};SharedAccessKeyName={};SharedAccessKey={}'
 generic_lower_cs_template = 'hostname={};sharedaccesskeyname={};sharedaccesskey={}'
@@ -2333,3 +2336,124 @@ class TestEdgeOffline():
     def test_device_removechildrenall_error(self, sc_removechildrenall_error):
         with pytest.raises(CLIError):
             subject.iot_device_children_remove(fixture_cmd, device_id, None, True, mock_target['entity'])
+
+
+class TestDeviceDistributedTracing():
+
+    @pytest.fixture(params=[(200, 200)])
+    def sc_distributed_tracing_show(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        twin_kvp = {}
+        twin_kvp.setdefault('capabilities', {'iotEdge': False})
+        twin_kvp.setdefault('properties', {'desired': {TRACING_PROPERTY: {"sampling_mode": 1, "sampling_rate": 50}},
+                                           'reported': {}})
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0], [generate_device_twin_show(**twin_kvp)], {'x-ms-continuation': None})
+        ]
+        service_client.side_effect = test_side_effect
+        return service_client
+
+    def test_distributed_tracing_show(self, sc_distributed_tracing_show):
+        result = subject.iot_hub_distributed_tracing_show(fixture_cmd, mock_target['entity'], device_id)
+        args = sc_distributed_tracing_show.call_args
+        url = args[0][0].url
+        assert '{}/devices/query?'.format(mock_target['entity']) in url
+        assert args[0][0].method == 'POST'
+        assert result['deviceId'] == device_id
+        assert result['samplingMode'] == 'enabled'
+        assert result['samplingRate'] == '50%'
+        assert not result['isSynced']
+        assert json.dumps(result)
+
+    @pytest.fixture(params=[(200, 0), (200, 1), (200, 2)])
+    def sc_invalid_args_distributed_tracing_show(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        twin_kvp = {}
+        twin_kvp.setdefault('capabilities', {'iotEdge': False})
+        if request.param[1] == 0:
+            mock_target['location'] = 'westus'
+        if request.param[1] == 1:
+            mock_target['sku_tier'] = 'Basic'
+        if request.param[1] == 2:
+            twin_kvp.setdefault('capabilities', {'iotEdge': True})
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0], [generate_device_twin_show(**twin_kvp)], {'x-ms-continuation': None})
+        ]
+        service_client.side_effect = test_side_effect
+        return service_client
+
+    @pytest.mark.parametrize("exp", [CLIError])
+    def test_distributed_tracing_show_invalid_args(self, sc_invalid_args_distributed_tracing_show, exp):
+        with pytest.raises(exp):
+            subject.iot_hub_distributed_tracing_show(fixture_cmd, mock_target['entity'], device_id)
+
+    def test_distributed_tracing_show_error(self, serviceclient_generic_error):
+        with pytest.raises(CLIError):
+            subject.iot_hub_distributed_tracing_show(fixture_cmd, mock_target['entity'], device_id)
+
+    @pytest.fixture(params=[(200, 0), (200, 1), (200, 2)])
+    def sc_distributed_tracing_update(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        twin_kvp = {}
+        twin_kvp.setdefault('capabilities', {'iotEdge': False})
+        mock_target['location'] = 'westus2'
+        mock_target['sku_tier'] = 'Standard'
+        if request.param[1] == 0:
+            twin_kvp.setdefault('properties',
+                                {'desired': {TRACING_PROPERTY: {"sampling_mode": 1, "sampling_rate": 50}},
+                                 'reported': {}})
+        if request.param[1] == 1:
+            twin_kvp.setdefault('properties', {'desired': {}, 'reported': {}})
+        if request.param[1] == 2:
+            twin_kvp.setdefault('properties',
+                                {'desired': {TRACING_PROPERTY: {"sampling_mode": 2, "sampling_rate": 0}},
+                                 'reported': {}})
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0],
+                                [generate_device_twin_show(**twin_kvp)], {'x-ms-continuation': None}),
+            build_mock_response(mocker, request.param[0],
+                                generate_device_twin_show(properties={'desired':
+                                                                      {TRACING_PROPERTY: {"sampling_mode": 1,
+                                                                                          "sampling_rate": 58}},
+                                                                      'reported': {}}))
+        ]
+        service_client.side_effect = test_side_effect
+        return service_client
+
+    def test_distributed_tracing_update(self, sc_distributed_tracing_update):
+        result = subject.iot_hub_distributed_tracing_update(fixture_cmd, mock_target['entity'], device_id, 'on', 58)
+        args = sc_distributed_tracing_update.call_args
+        url = args[0][0].url
+        assert '{}/twins/{}?'.format(mock_target['entity'], device_id) in url
+        assert args[0][0].method == 'PATCH'
+        assert result['deviceId'] == device_id
+        assert result['samplingMode'] == 'enabled'
+        assert result['samplingRate'] == '58%'
+        assert not result['isSynced']
+        assert json.dumps(result)
+
+    @pytest.fixture(params=[(200, 0), (200, 1), (200, 2)])
+    def sc_invalid_args_distributed_tracing_update(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        twin_kvp = {}
+        twin_kvp.setdefault('capabilities', {'iotEdge': False})
+        if request.param[1] == 0:
+            mock_target['location'] = 'westus'
+        if request.param[1] == 1:
+            mock_target['sku_tier'] = 'Basic'
+        if request.param[1] == 2:
+            twin_kvp.setdefault('capabilities', {'iotEdge': True})
+        test_side_effect = [
+            build_mock_response(mocker, request.param[0], [generate_device_twin_show(**twin_kvp)], {'x-ms-continuation': None})
+        ]
+        service_client.side_effect = test_side_effect
+        return service_client
+
+    @pytest.mark.parametrize("exp", [CLIError])
+    def test_distributed_tracing_update_invalid_args(self, sc_invalid_args_distributed_tracing_update, exp):
+        with pytest.raises(exp):
+            subject.iot_hub_distributed_tracing_update(fixture_cmd, mock_target['entity'], device_id, 'on', 58)
+
+    def test_distributed_tracing_update_error(self, serviceclient_generic_error):
+        with pytest.raises(CLIError):
+            subject.iot_hub_distributed_tracing_update(fixture_cmd, mock_target['entity'], device_id, 'on', 58)

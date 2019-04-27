@@ -12,7 +12,12 @@ from knack.log import get_logger
 from knack.util import CLIError
 from azure.cli.core.util import read_file_content
 from azext_iot.common.utility import calculate_millisec_since_unix_epoch_utc
-from azext_iot._constants import EXTENSION_ROOT, BASE_API_VERSION, DEVICE_DEVICESCOPE_PREFIX
+from azext_iot._constants import (EXTENSION_ROOT,
+                                  BASE_API_VERSION,
+                                  DEVICE_DEVICESCOPE_PREFIX,
+                                  TRACING_PROPERTY,
+                                  TRACING_ALLOWED_FOR_LOCATION,
+                                  TRACING_ALLOWED_FOR_SKU)
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import (DeviceAuthType,
                                      SdkType,
@@ -1345,3 +1350,57 @@ def _iot_hub_monitor_feedback(target, device_id, wait_on_id):
 
     events3 = importlib.import_module('azext_iot.operations.events3._events')
     events3.monitor_feedback(target=target, device_id=device_id, wait_on_id=wait_on_id, token_duration=3600)
+
+
+def iot_hub_distributed_tracing_show(cmd, hub_name, device_id, resource_group_name=None):
+    device_twin = _iot_hub_distributed_tracing_show(cmd, hub_name, device_id, resource_group_name)
+    return _customize_device_tracing_output(device_twin['deviceId'], device_twin['properties']['desired'],
+                                            device_twin['properties']['reported'])
+
+
+def iot_hub_distributed_tracing_update(cmd, hub_name, device_id, sampling_mode, sampling_rate,
+                                       resource_group_name=None):
+    if int(sampling_rate) not in range(0, 101):
+        raise CLIError('Sampling rate is a percentage, So only values from 0 to 100(inclusive) are permitted.')
+    device_twin = _iot_hub_distributed_tracing_show(cmd, hub_name, device_id, resource_group_name)
+    if TRACING_PROPERTY not in device_twin['properties']['desired']:
+        device_twin['properties']['desired'][TRACING_PROPERTY] = {}
+    device_twin['properties']['desired'][TRACING_PROPERTY]['sampling_rate'] = int(sampling_rate)
+    device_twin['properties']['desired'][TRACING_PROPERTY]['sampling_mode'] = 1 if sampling_mode.lower() == 'on' else 2
+    result = iot_device_twin_update(cmd, device_id, device_twin, hub_name, resource_group_name)
+    return _customize_device_tracing_output(result.device_id, result.properties.desired,
+                                            result.properties.reported)
+
+
+def _iot_hub_distributed_tracing_show(cmd, hub_name, device_id, resource_group_name=None):
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name)
+    device_twin = iot_device_twin_show(cmd, device_id, hub_name, resource_group_name)
+    _validate_device_tracing(target, device_twin)
+    return device_twin
+
+
+def _validate_device_tracing(target, device_twin):
+    if target['location'].lower() not in TRACING_ALLOWED_FOR_LOCATION:
+        raise CLIError('Distributed tracing isn\'t supported for the hub located at "{}" location.'
+                       .format(target['location']))
+    if target['sku_tier'].lower() != TRACING_ALLOWED_FOR_SKU:
+        raise CLIError('Distributed tracing isn\'t supported for the hub belongs to "{}" sku tier.'
+                       .format(target['sku_tier']))
+    if device_twin['capabilities']['iotEdge']:
+        raise CLIError('The device "{}" should be non-edge device.'.format(device_twin['deviceId']))
+
+
+def _customize_device_tracing_output(device_id, desired, reported):
+    output = {}
+    desired_tracing = desired.get(TRACING_PROPERTY, None)
+    if desired_tracing:
+        output['deviceId'] = device_id
+        output['samplingMode'] = 'enabled' if desired_tracing.get('sampling_mode') == 1 else 'disabled'
+        output['samplingRate'] = '{}%'.format(desired_tracing.get('sampling_rate'))
+        output['isSynced'] = False
+        reported_tracing = reported.get(TRACING_PROPERTY, None)
+        if (reported_tracing and
+                desired_tracing.get('sampling_mode') == reported_tracing.get('sampling_mode').get('value', None) and
+                desired_tracing.get('sampling_rate') == reported_tracing.get('sampling_rate').get('value', None)):
+            output['isSynced'] = True
+    return output

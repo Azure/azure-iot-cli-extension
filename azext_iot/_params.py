@@ -25,7 +25,8 @@ from azext_iot.common.shared import (
     AckType,
     MetricType,
     ReprovisionType,
-    AllocationType
+    AllocationType,
+    DistributedTracingSamplingModeType
 )
 from azext_iot._validators import mode2_iot_login_handler
 
@@ -187,6 +188,14 @@ def load_arguments(self, _):
         context.argument('child_list', options_list=['--child-list', '--cl'],
                          help='Child device list (comma separated) includes only non-edge devices.')
         context.argument('remove_all', options_list=['--remove-all', '-a'], help='To remove all children.')
+
+    with self.argument_context('iot hub distributed-tracing update') as context:
+        context.argument('sampling_mode', options_list=['--sampling-mode', '--sm'],
+                         help='Turns sampling for distributed tracing on and off. 1 is On and, 2 is Off.',
+                         arg_type=get_enum_type(DistributedTracingSamplingModeType))
+        context.argument('sampling_rate', options_list=['--sampling-rate', '--sr'],
+                         help='Controls the amount of messages sampled for adding trace context. This value is'
+                              'a percentage. Only values from 0 to 100 (inclusive) are permitted.')
 
     with self.argument_context('iot hub device-identity list-children') as context:
         context.argument('device_id', help='Id of edge device.')
