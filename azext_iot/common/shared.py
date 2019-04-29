@@ -130,3 +130,12 @@ class AllocationType(Enum):
     hashed = 'hashed'
     geolatency = 'geolatency'
     static = 'static'
+
+
+# pylint: disable=too-few-public-methods
+class DistributedTracingSamplingModeType(Enum):
+    """
+    Enable distributed tracing to add correlation IDs to messages.
+    """
+    off = 'off'
+    on = 'on'

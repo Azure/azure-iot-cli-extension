@@ -493,6 +493,29 @@ helps['iot hub configuration show-metric'] = """
         --metric-type system
 """
 
+helps['iot hub distributed-tracing'] = """
+    type: group
+    short-summary: Manage distributed settings per-device.
+"""
+
+helps['iot hub distributed-tracing show'] = """
+    type: command
+    short-summary: Get the distributed tracing settings for a device.
+    examples:
+    - name: Get the distributed tracing settings for a device
+      text: >
+        az iot hub distributed-tracing show -d {device_id} -n {iothub_name}
+"""
+
+helps['iot hub distributed-tracing update'] = """
+    type: command
+    short-summary: Update the distributed tracing options for a device.
+    examples:
+    - name: Update the distributed tracing options for a device
+      text: >
+        az iot hub distributed-tracing update -d {device_id} --sm on --sr 50 -n {iothub_name}
+"""
+
 helps['iot device'] = """
     type: group
     short-summary: Leverage device-to-cloud and cloud-to-device messaging capabilities.

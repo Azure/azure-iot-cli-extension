@@ -135,6 +135,8 @@ def get_iot_hub_connection_string(
     result['secondarykey'] = policy.secondary_key
     result['subscription'] = client.config.subscription_id
     result['resourcegroup'] = resource_group_name
+    result['location'] = target_hub.location
+    result['sku_tier'] = target_hub.sku.tier.value
 
     if include_events:
         events = {}
