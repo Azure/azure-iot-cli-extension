@@ -6,6 +6,7 @@ Release History
 0.7.1
 +++++++++++++++
 * Added support for distribution tracing commands.
+* Minor fixes.
 
 0.7.0
 +++++++++++++++

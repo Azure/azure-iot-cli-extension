@@ -23,8 +23,7 @@ iotdps_ops = CliCommandType(
 
 class IoTExtCommandsLoader(AzCommandsLoader):
     def __init__(self, cli_ctx=None):
-        super(IoTExtCommandsLoader, self).__init__(cli_ctx=cli_ctx,
-                                                   min_profile='2017-03-10-profile')
+        super(IoTExtCommandsLoader, self).__init__(cli_ctx=cli_ctx)
 
     def load_command_table(self, args):
         from azext_iot.commands import load_command_table
