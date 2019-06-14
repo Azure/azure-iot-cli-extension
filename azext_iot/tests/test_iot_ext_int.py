@@ -629,7 +629,7 @@ class TestIoTHub(LiveScenarioTest):
                          self.exists("[?moduleId=='$edgeHub']")])
 
         self.cmd('iot hub module-identity list -d {} -n {} -g {} --top -1'.format(edge_device_ids[0], LIVE_HUB, LIVE_RG),
-                 checks=[self.check('length([*])', 4),
+                 checks=[self.check('length([*])', 3),
                          self.exists("[?moduleId=='$edgeAgent']"),
                          self.exists("[?moduleId=='$edgeHub']")])
 

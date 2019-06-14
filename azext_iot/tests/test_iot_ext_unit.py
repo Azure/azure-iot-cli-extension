@@ -654,8 +654,7 @@ class TestDeviceModuleList():
         service_client.expected_size = size
         service_client.return_value = build_mock_response(mocker,
                                                           request.param[0],
-                                                          result,
-                                                          {'x-ms-continuation': None})
+                                                          result)
         return service_client
 
     @pytest.mark.parametrize("top", [10, 1000])
@@ -664,20 +663,9 @@ class TestDeviceModuleList():
         args = serviceclient.call_args
         url = args[0][0].url
         method = args[0][0].method
-        body = args[0][2]
-        headers = args[0][1]
-
-        assert method == 'POST'
-        assert '{}/devices/query?'.format(mock_target['entity']) in url
-        assert body['query'] == "select * from devices.modules where devices.deviceId = '{}'".format(device_id)
-        assert json.dumps(result)
+        assert method == 'GET'
+        assert '{}/devices/{}/modules?'.format(mock_target['entity'], device_id) in url
         assert len(result) == serviceclient.expected_size
-        assert headers['x-ms-max-item-count'] == str(top)
-
-    @pytest.mark.parametrize("top", [-2, 0])
-    def test_device_module_list_invalid_args(self, serviceclient, top):
-        with pytest.raises(CLIError):
-            subject.iot_device_module_list(fixture_cmd, device_id, hub_name=mock_target['entity'], top=top)
 
     def test_device_module_list_error(self, serviceclient_generic_error):
         with pytest.raises(CLIError):
@@ -1086,7 +1074,7 @@ class TestConfigApply():
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
         service_client.side_effect = [build_mock_response(mocker),
-                                      build_mock_response(mocker, payload=[], headers={'x-ms-continuation': None})]
+                                      build_mock_response(mocker, payload=[])]
         return service_client
 
     @pytest.mark.parametrize("req", [
@@ -1116,9 +1104,11 @@ class TestConfigApply():
                 assert body == json.loads(req['content'])['content']
 
         mod_list_args = serviceclient.call_args_list[1]
-        mod_list_body = mod_list_args[0][2]
+        url = mod_list_args[0][0].url
+        method = mod_list_args[0][0].method
 
-        assert mod_list_body['query'] == "select * from devices.modules where devices.deviceId = '{}'".format(device_id)
+        assert method == 'GET'
+        assert '{}/devices/{}/modules?'.format(mock_target['entity'], device_id) in url
         assert result is not None
 
     @pytest.mark.parametrize('req, arg', [
@@ -1158,16 +1148,18 @@ class TestDeviceTwinShow():
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
         service_client.return_value = build_mock_response(mocker, request.param,
-                                                          [generate_device_twin_show()],
-                                                          {'x-ms-continuation': None})
+                                                          payload=generate_device_twin_show())
         return service_client
 
     def test_device_twin_show(self, serviceclient):
-        result = subject.iot_device_twin_show(None, device_id, mock_target['entity'])
+        result = subject.iot_device_twin_show(fixture_cmd, device_id, mock_target['entity'])
         args = serviceclient.call_args
-        body = args[0][2]
+        url = args[0][0].url
+        method = args[0][0].method
+
         assert json.dumps(result)
-        assert body['query'] == "select * from devices where devices.deviceId='{}'".format(device_id)
+        assert method == 'GET'
+        assert '{}/twins/{}?'.format(mock_target['entity'], device_id) in url
 
     def test_device_twin_show_error(self, serviceclient_generic_error):
         with pytest.raises(CLIError):
@@ -2348,7 +2340,7 @@ class TestDeviceDistributedTracing():
         twin_kvp.setdefault('properties', {'desired': {TRACING_PROPERTY: {"sampling_mode": 1, "sampling_rate": 50}},
                                            'reported': {}})
         test_side_effect = [
-            build_mock_response(mocker, request.param[0], [generate_device_twin_show(**twin_kvp)], {'x-ms-continuation': None})
+            build_mock_response(mocker, request.param[0], payload=generate_device_twin_show(**twin_kvp))
         ]
         service_client.side_effect = test_side_effect
         return service_client
@@ -2357,8 +2349,8 @@ class TestDeviceDistributedTracing():
         result = subject.iot_hub_distributed_tracing_show(fixture_cmd, mock_target['entity'], device_id)
         args = sc_distributed_tracing_show.call_args
         url = args[0][0].url
-        assert '{}/devices/query?'.format(mock_target['entity']) in url
-        assert args[0][0].method == 'POST'
+        assert '{}/twins/{}?'.format(mock_target['entity'], device_id) in url
+        assert args[0][0].method == 'GET'
         assert result['deviceId'] == device_id
         assert result['samplingMode'] == 'enabled'
         assert result['samplingRate'] == '50%'
@@ -2377,7 +2369,7 @@ class TestDeviceDistributedTracing():
         if request.param[1] == 2:
             twin_kvp.setdefault('capabilities', {'iotEdge': True})
         test_side_effect = [
-            build_mock_response(mocker, request.param[0], [generate_device_twin_show(**twin_kvp)], {'x-ms-continuation': None})
+            build_mock_response(mocker, request.param[0], payload=generate_device_twin_show(**twin_kvp))
         ]
         service_client.side_effect = test_side_effect
         return service_client
@@ -2410,7 +2402,7 @@ class TestDeviceDistributedTracing():
                                  'reported': {}})
         test_side_effect = [
             build_mock_response(mocker, request.param[0],
-                                [generate_device_twin_show(**twin_kvp)], {'x-ms-continuation': None}),
+                                payload=generate_device_twin_show(**twin_kvp)),
             build_mock_response(mocker, request.param[0],
                                 generate_device_twin_show(properties={'desired':
                                                                       {TRACING_PROPERTY: {"sampling_mode": 1,
@@ -2444,7 +2436,7 @@ class TestDeviceDistributedTracing():
         if request.param[1] == 2:
             twin_kvp.setdefault('capabilities', {'iotEdge': True})
         test_side_effect = [
-            build_mock_response(mocker, request.param[0], [generate_device_twin_show(**twin_kvp)], {'x-ms-continuation': None})
+            build_mock_response(mocker, request.param[0], payload=generate_device_twin_show(**twin_kvp))
         ]
         service_client.side_effect = test_side_effect
         return service_client
