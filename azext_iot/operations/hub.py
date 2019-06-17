@@ -398,11 +398,12 @@ def _parse_auth(parameters):
 
 
 def iot_device_module_list(cmd, device_id, hub_name=None, top=1000, resource_group_name=None, login=None):
-    query = "select * from devices.modules where devices.deviceId = '{}'".format(device_id)
-    result = iot_query(cmd, query, hub_name, top, resource_group_name, login=login)
-    if not result:
-        logger.info('No modules found on registered device "%s".', device_id)
-    return result
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
+    service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
+    try:
+        return service_sdk.get_modules_on_device(device_id)[:top]
+    except errors.CloudError as e:
+        raise CLIError(unpack_msrest_error(e))
 
 
 def iot_device_module_show(cmd, device_id, module_id, hub_name=None, resource_group_name=None, login=None):
@@ -507,7 +508,7 @@ def iot_edge_set_modules(cmd, device_id, content, hub_name=None, resource_group_
 
         content = ConfigurationContent(modules_content=modules_content)
         service_sdk.apply_configuration_on_device(device_id, content)
-        return iot_device_module_list(cmd, device_id, hub_name=hub_name, top=-1, login=login)
+        return iot_device_module_list(cmd, device_id, hub_name=hub_name, login=login)
     except ValueError as j:
         raise CLIError('improperly formatted json: {}'.format(j))
     except errors.CloudError as e:
@@ -773,11 +774,12 @@ def iot_hub_configuration_metric_show(cmd, config_id, metric_id, metric_type='us
 # Device Twin
 
 def iot_device_twin_show(cmd, device_id, hub_name=None, resource_group_name=None, login=None):
-    query = "select * from devices where devices.deviceId='{}'".format(device_id)
-    result = iot_query(cmd, query, hub_name, None, resource_group_name, login=login)
-    if not result:
-        raise CLIError('No registered device "{}" found.'.format(device_id))
-    return result[0]
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
+    service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
+    try:
+        return service_sdk.get_twin(device_id)
+    except errors.CloudError as e:
+        raise CLIError(unpack_msrest_error(e))
 
 
 def iot_device_twin_update(cmd, device_id, parameters, hub_name=None, resource_group_name=None, login=None):

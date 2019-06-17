@@ -629,7 +629,7 @@ class TestIoTHub(LiveScenarioTest):
                          self.exists("[?moduleId=='$edgeHub']")])
 
         self.cmd('iot hub module-identity list -d {} -n {} -g {} --top -1'.format(edge_device_ids[0], LIVE_HUB, LIVE_RG),
-                 checks=[self.check('length([*])', 4),
+                 checks=[self.check('length([*])', 3),
                          self.exists("[?moduleId=='$edgeAgent']"),
                          self.exists("[?moduleId=='$edgeHub']")])
 
@@ -1334,6 +1334,10 @@ class TestIoTHub(LiveScenarioTest):
         # Monitor messages to ensure it returns improperly formatted JSON
         self.command_execute_assert('iot hub monitor-events -n {} -g {} --cg {} --et {} -t 10 -y'.format(
             LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUPS[0], enqueued_time), ['{\\r\\n\\"payload_data1\\"\\"payload_value1\\"\\r\\n}'])
+
+        for cg in LIVE_CONSUMER_GROUPS:
+            self.cmd('az iot hub consumer-group delete --hub-name {} --resource-group {} --name {}'.format(LIVE_HUB, LIVE_RG, cg),
+                     expect_failure=False)
 
     @pytest.mark.skipif(not validate_min_python_version(3, 4, exit_on_fail=False), reason="minimum python version not satisfied")
     def test_hub_monitor_feedback(self):
