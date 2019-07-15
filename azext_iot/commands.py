@@ -9,7 +9,7 @@
 Load CLI commands
 """
 
-from azext_iot import iothub_ops, iotdps_ops
+from azext_iot import iothub_ops, iotdps_ops, iotcentral_ops
 
 
 def load_command_table(self, _):
@@ -120,3 +120,6 @@ def load_command_table(self, _):
         cmd_group.command('list', 'iot_dps_registration_list')
         cmd_group.command('show', 'iot_dps_registration_get')
         cmd_group.command('delete', 'iot_dps_registration_delete')
+
+    with self.command_group('iotcentral app', command_type=iotcentral_ops) as cmd_group:
+        cmd_group.command('monitor-events', 'iot_central_monitor_events')

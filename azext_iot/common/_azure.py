@@ -9,7 +9,24 @@ from knack.util import CLIError
 from azext_iot.common.utility import validate_key_value_pairs
 from azext_iot.common.utility import trim_from_start
 from azext_iot._factory import iot_hub_service_factory
+from azure.cli.core._profile import Profile
 
+def get_aad_token(cmd, subscription=None, resource=None):
+    '''
+    get AAD token to access to a specified resource
+    :param resource: Azure resource endpoints. Default to Azure Resource Manager
+    Use 'az cloud show' command for other Azure resources
+    '''
+    resource = (resource or cmd.cli_ctx.cloud.endpoints.active_directory_resource_id)
+    profile = Profile(cli_ctx=cmd.cli_ctx)
+    creds, subscription, tenant = profile.get_raw_token(subscription=subscription, resource=resource)
+    return {
+        'tokenType': creds[0],
+        'accessToken': creds[1],
+        'expiresOn': creds[2].get('expiresOn', 'N/A'),
+        'subscription': subscription,
+        'tenant': tenant
+    }
 
 def _parse_connection_string(cs, validate=None, cstring_type='entity'):
     decomposed = validate_key_value_pairs(cs)
@@ -217,3 +234,22 @@ def get_iot_dps_connection_string(
     result['subscription'] = client.config.subscription_id
 
     return result
+
+
+def get_event_hub_target_from_central_app_id(cmd, app_id):
+    def get_event_hub_token(app_id, iotcAccessToken):
+        import requests
+        url = "https://api.azureiotcentral.com/v1-beta/applications/{}/diagnostics/sasTokens".format(app_id)
+        response = requests.post(url, headers={'Authorization':  'Bearer {}'.format(iotcAccessToken['accessToken'])})
+        return response.json()
+    accessToken = get_aad_token(cmd, resource="https://apps.azureiotcentral.com")
+    tokens = get_event_hub_token(app_id, accessToken)
+    eventHubToken = tokens['eventhubSasToken']
+    hostnameWithoutPrefix = eventHubToken['hostname'].split("/")[2]
+    target = {}
+    target['address'] = "amqps://{}/{}/$management".format(hostnameWithoutPrefix, eventHubToken["entityPath"])
+    target['path'] = eventHubToken["entityPath"]
+    target['endpoint'] = hostnameWithoutPrefix
+    target['token'] = eventHubToken['sasToken']
+    target['tokenExpiry'] = tokens['expiry']
+    return target

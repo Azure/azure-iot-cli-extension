@@ -25,11 +25,15 @@ logger = get_logger(__name__)
 
 DEBUG = True
 
+def executor(consumer_group, enqueued_time, target=None, central_target=None, device_id=None, properties=None, timeout=0, 
+             output=None, content_type=None, devices=None):
 
-def executor(target, consumer_group, enqueued_time, device_id=None, properties=None, timeout=0, output=None, content_type=None,
-             devices=None):
+    if central_target is None and target is None:
+        logger.debug('No target provided.')
+        return
+
     coroutines = []
-    coroutines.append(initiate_event_monitor(target, consumer_group, enqueued_time, device_id, properties,
+    coroutines.append(initiate_event_monitor(consumer_group, enqueued_time, target, central_target, device_id, properties,
                                              timeout, output, content_type, devices))
     loop = asyncio.get_event_loop()
     if loop.is_closed():
@@ -66,7 +70,7 @@ def executor(target, consumer_group, enqueued_time, device_id=None, properties=N
                 raise RuntimeError(error)
 
 
-async def initiate_event_monitor(target, consumer_group, enqueued_time, device_id=None, properties=None,
+async def initiate_event_monitor(consumer_group, enqueued_time, target=None, central_target=None, device_id=None, properties=None,
                                  timeout=0, output=None, content_type=None, devices=None):
     def _get_conn_props():
         properties = {}
@@ -76,19 +80,43 @@ async def initiate_event_monitor(target, consumer_group, enqueued_time, device_i
         properties["platform"] = sys.platform
         return properties
 
-    if not target.get('events'):
-        endpoint = _build_iothub_amqp_endpoint_from_target(target)
-        _, update = await evaluate_redirect(endpoint)
-        target['events'] = update['events']
+    if not target and not central_target:
+        logger.debug('No Event Hub target found provided.')
+        return
+
+    if target:
+        endpoint = target['events']['endpoint']
+        path = target['events']['path']
+        if not target.get('events'):
+            endpoint = _build_iothub_amqp_endpoint_from_target(target)
+            _, update = await evaluate_redirect(endpoint)
+            target['events'] = update['events']
+            endpoint = target['events']['endpoint']
+            path = target['events']['path']
+            auth = _build_auth_container(target)
+            meta_data = await query_meta_data(target['events']['address'], target['events']['path'], auth)
+            partition_count = meta_data[b'partition_count']
+            partition_ids = []
+            for i in range(int(partition_count)):
+                partition_ids.append(str(i))
+            target['events']['partition_ids'] = partition_ids
+        partitions = target['events']['partition_ids']
         auth = _build_auth_container(target)
-        meta_data = await query_meta_data(target['events']['address'], target['events']['path'], auth)
+
+    if central_target:
+        endpoint = central_target['endpoint']
+        path = central_target['path']
+        address = central_target['address']
+        token = central_target['token']
+        tokenExpiry = central_target['tokenExpiry']
+        auth = _build_auth_container_from_token(endpoint, path, token, tokenExpiry)
+        meta_data = await query_meta_data(address, path, auth)
         partition_count = meta_data[b'partition_count']
         partition_ids = []
         for i in range(int(partition_count)):
             partition_ids.append(str(i))
-        target['events']['partition_ids'] = partition_ids
-
-    partitions = target['events']['partition_ids']
+        partitions = partition_ids
+        auth = _build_auth_container_from_token(endpoint, path, token, tokenExpiry)
 
     if not partitions:
         logger.debug('No Event Hub partitions found to listen on.')
@@ -96,13 +124,12 @@ async def initiate_event_monitor(target, consumer_group, enqueued_time, device_i
 
     coroutines = []
 
-    auth = _build_auth_container(target)
-    async with uamqp.ConnectionAsync(target['events']['endpoint'], sasl=auth,
+    async with uamqp.ConnectionAsync(endpoint, sasl=auth,
                                      debug=DEBUG, container_id=str(uuid4()), properties=_get_conn_props()) as conn:
         for p in partitions:
-            coroutines.append(monitor_events(endpoint=target['events']['endpoint'],
+            coroutines.append(monitor_events(endpoint=endpoint,
                                              connection=conn,
-                                             path=target['events']['path'],
+                                             path=path,
                                              auth=auth,
                                              partition=p,
                                              consumer_group=consumer_group,
@@ -138,9 +165,7 @@ async def monitor_events(endpoint, connection, path, auth, partition, consumer_g
             return
 
         event_source = {'event': {}}
-
         event_source['event']['origin'] = origin
-
         payload = ''
 
         data = msg.get_data()
@@ -161,7 +186,6 @@ async def monitor_events(endpoint, connection, path, auth, partition, consumer_g
                 pass
 
         event_source['event']['payload'] = payload
-
         if 'anno' in properties or 'all' in properties:
             event_source['event']['annotations'] = unicode_binary_map(msg.annotations)
         if 'sys' in properties or 'all' in properties:
@@ -175,12 +199,10 @@ async def monitor_events(endpoint, connection, path, auth, partition, consumer_g
 
             if app_prop:
                 event_source['event']['properties']['application'] = unicode_binary_map(app_prop)
-
         if output.lower() == 'json':
             dump = json.dumps(event_source, indent=4)
         else:
             dump = yaml.safe_dump(event_source, default_flow_style=False)
-
         six.print_(dump, flush=True)
 
     exp_cancelled = False
@@ -215,6 +237,9 @@ def _build_auth_container(target):
     sas_uri = 'sb://{}/{}'.format(target['events']['endpoint'], target['events']['path'])
     return uamqp.authentication.SASTokenAsync.from_shared_access_key(sas_uri, target['policy'], target['primarykey'])
 
+def _build_auth_container_from_token(endpoint, path, token, tokenExpiry):
+    sas_uri = 'sb://{}/{}'.format(endpoint, path)
+    return uamqp.authentication.SASTokenAsync(audience=sas_uri, uri=sas_uri, expires_at=tokenExpiry, token=token)
 
 async def evaluate_redirect(endpoint):
     source = uamqp.address.Source('amqps://{}/messages/events/$management'.format(endpoint))

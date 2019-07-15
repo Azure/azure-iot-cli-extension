@@ -1,0 +1,1 @@
+az extension add --source ./dist/azure_cli_iot_ext-0.7.1-py2.py3-none-any.whl --debug
