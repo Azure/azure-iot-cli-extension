@@ -378,3 +378,22 @@ def load_arguments(self, _):
 
     with self.argument_context('iot dps registration list') as context:
         context.argument('enrollment_id', help='ID of enrollment group')
+
+    with self.argument_context('iotcentral app monitor-events') as context:
+        context.argument('device_id', options_list=['--device-id', '-d'], help='Target Device.')
+        context.argument('app_id', options_list=['--app-id'], help='Target App.')
+        context.argument('timeout', options_list=['--timeout', '--to', '-t'], type=int,
+                         help='Maximum seconds to maintain connection without receiving message. Use 0 for infinity. ')
+        context.argument('consumer_group', options_list=['--consumer-group', '--cg', '-c'],
+                         help='Specify the consumer group to use when connecting to event hub endpoint.')
+        context.argument('enqueued_time', options_list=['--enqueued-time', '--et', '-e'], type=int,
+                         help='Indicates the time that should be used as a starting point to read messages from the partitions. '
+                         'Units are milliseconds since unix epoch. '
+                         'If no time is indicated "now" is used.')
+        context.argument('properties', options_list=['--properties', '--props', '-p'], arg_type=event_msg_prop_type)
+        context.argument('content_type', options_list=['--content-type', '--ct'],
+                         help='Specify the Content-Type of the message payload to automatically format the output to that type.')
+        context.argument('device_query', options_list=['--device-query', '-q'], help='Specify a custom query to filter devices.')
+        context.argument('repair', options_list=['--repair', '-r'],
+                         arg_type=get_three_state_flag(),
+                         help='Reinstall uamqp dependency compatible with extension version. Default: false')
