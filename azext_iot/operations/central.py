@@ -1,9 +1,9 @@
 from knack.util import CLIError
 from azext_iot.common._azure import get_event_hub_target_from_central_app_id
-from azext_iot.operations.hub import iot_query
 
-def iot_central_monitor_events(cmd, app_id, device_id=None, consumer_group='$Default', timeout=300, enqueued_time=None, 
-                                repair=False, properties=None):
+
+def iot_central_monitor_events(cmd, app_id, device_id=None, consumer_group='$Default', timeout=300, enqueued_time=None,
+                               repair=False, properties=None):
     import importlib
     from datetime import datetime
     from azext_iot.common.deps import ensure_uamqp
@@ -42,5 +42,4 @@ def iot_central_monitor_events(cmd, app_id, device_id=None, consumer_group='$Def
                      properties=properties,
                      timeout=timeout,
                      device_id=device_id,
-                     output=output,
-                     device_ids=device_ids)
+                     output=output)
