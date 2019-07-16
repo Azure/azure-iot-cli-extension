@@ -11,6 +11,7 @@ from azext_iot.common.utility import trim_from_start
 from azext_iot._factory import iot_hub_service_factory
 from azure.cli.core._profile import Profile
 
+
 def get_aad_token(cmd, subscription=None, resource=None):
     '''
     get AAD token to access to a specified resource
@@ -27,6 +28,7 @@ def get_aad_token(cmd, subscription=None, resource=None):
         'subscription': subscription,
         'tenant': tenant
     }
+
 
 def _parse_connection_string(cs, validate=None, cstring_type='entity'):
     decomposed = validate_key_value_pairs(cs)
