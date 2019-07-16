@@ -944,5 +944,5 @@ helps['iotcentral app monitor-events'] = """
         az iotcentral app monitor-events --app-id {app_id} --props all
     - name: Receive all messages and parse message payload as JSON
       text: >
-        az iotcentral app monitor-events --app-id {app_id} --content-type application/json
+        az iotcentral app monitor-events --app-id {app_id} --output json
 """
