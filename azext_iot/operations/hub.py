@@ -1321,9 +1321,9 @@ def iot_hub_monitor_events(cmd, hub_name=None, device_id=None, consumer_group='$
                 device_ids[device_result['deviceId']] = True
 
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, include_events=True, login=login)
-    events3.executor(consumer_group=consumer_group,
+    events3.executor(target,
+                     consumer_group=consumer_group,
                      enqueued_time=enqueued_time,
-                     target=target,
                      properties=properties,
                      timeout=timeout,
                      device_id=device_id,

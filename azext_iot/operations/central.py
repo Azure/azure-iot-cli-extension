@@ -33,11 +33,11 @@ def iot_central_monitor_events(cmd, app_id, device_id=None, consumer_group='$Def
     if not enqueued_time:
         enqueued_time = _calculate_millisec_since_unix_epoch_utc()
 
-    target = get_event_hub_target_from_central_app_id(cmd, app_id)
-
-    events3.executor(consumer_group=consumer_group,
+    target = {}
+    target['central'] = get_event_hub_target_from_central_app_id(cmd, app_id)
+    events3.executor(target,
+                     consumer_group=consumer_group,
                      enqueued_time=enqueued_time,
-                     central_target=target,
                      properties=properties,
                      timeout=timeout,
                      device_id=device_id,

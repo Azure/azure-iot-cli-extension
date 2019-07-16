@@ -25,15 +25,11 @@ logger = get_logger(__name__)
 
 DEBUG = True
 
-def executor(consumer_group, enqueued_time, target=None, central_target=None, device_id=None, properties=None, timeout=0, 
+def executor(target, consumer_group, enqueued_time, device_id=None, properties=None, timeout=0,
              output=None, content_type=None, devices=None):
 
-    if central_target is None and target is None:
-        logger.debug('No target provided.')
-        return
-
     coroutines = []
-    coroutines.append(initiate_event_monitor(consumer_group, enqueued_time, target, central_target, device_id, properties,
+    coroutines.append(initiate_event_monitor(target, consumer_group, enqueued_time, device_id, properties,
                                              timeout, output, content_type, devices))
     loop = asyncio.get_event_loop()
     if loop.is_closed():
@@ -70,7 +66,7 @@ def executor(consumer_group, enqueued_time, target=None, central_target=None, de
                 raise RuntimeError(error)
 
 
-async def initiate_event_monitor(consumer_group, enqueued_time, target=None, central_target=None, device_id=None, properties=None,
+async def initiate_event_monitor(target, consumer_group, enqueued_time, device_id=None, properties=None,
                                  timeout=0, output=None, content_type=None, devices=None):
     def _get_conn_props():
         properties = {}
@@ -80,11 +76,11 @@ async def initiate_event_monitor(consumer_group, enqueued_time, target=None, cen
         properties["platform"] = sys.platform
         return properties
 
-    if not target and not central_target:
+    if not target:
         logger.debug('No Event Hub target found provided.')
         return
 
-    if target:
+    if not target.get('central'):
         endpoint = target['events']['endpoint']
         path = target['events']['path']
         if not target.get('events'):
@@ -102,21 +98,20 @@ async def initiate_event_monitor(consumer_group, enqueued_time, target=None, cen
             target['events']['partition_ids'] = partition_ids
         partitions = target['events']['partition_ids']
         auth = _build_auth_container(target)
-
-    if central_target:
+    else:
+        # iot central
+        central_target = target['central']
         endpoint = central_target['endpoint']
         path = central_target['path']
-        address = central_target['address']
-        token = central_target['token']
         tokenExpiry = central_target['tokenExpiry']
-        auth = _build_auth_container_from_token(endpoint, path, token, tokenExpiry)
-        meta_data = await query_meta_data(address, path, auth)
+        auth = _build_auth_container_from_token(endpoint, path, central_target['token'], tokenExpiry)
+        meta_data = await query_meta_data(central_target['address'], path, auth)
         partition_count = meta_data[b'partition_count']
         partition_ids = []
         for i in range(int(partition_count)):
             partition_ids.append(str(i))
         partitions = partition_ids
-        auth = _build_auth_container_from_token(endpoint, path, token, tokenExpiry)
+        auth = _build_auth_container_from_token(endpoint, path, central_target['token'], tokenExpiry)
 
     if not partitions:
         logger.debug('No Event Hub partitions found to listen on.')
