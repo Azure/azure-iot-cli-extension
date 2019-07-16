@@ -242,7 +242,7 @@ def get_event_hub_target_from_central_app_id(cmd, app_id):
     def get_event_hub_token(app_id, iotcAccessToken):
         import requests
         url = "https://api.azureiotcentral.com/v1-beta/applications/{}/diagnostics/sasTokens".format(app_id)
-        response = requests.post(url, headers={'Authorization':  'Bearer {}'.format(iotcAccessToken['accessToken'])})
+        response = requests.post(url, headers={'Authorization': 'Bearer {}'.format(iotcAccessToken['accessToken'])})
         return response.json()
 
     accessToken = get_aad_token(cmd, resource="https://apps.azureiotcentral.com")

@@ -25,6 +25,7 @@ logger = get_logger(__name__)
 
 DEBUG = True
 
+
 def executor(target, consumer_group, enqueued_time, device_id=None, properties=None, timeout=0,
              output=None, content_type=None, devices=None):
 
@@ -232,9 +233,11 @@ def _build_auth_container(target):
     sas_uri = 'sb://{}/{}'.format(target['events']['endpoint'], target['events']['path'])
     return uamqp.authentication.SASTokenAsync.from_shared_access_key(sas_uri, target['policy'], target['primarykey'])
 
+
 def _build_auth_container_from_token(endpoint, path, token, tokenExpiry):
     sas_uri = 'sb://{}/{}'.format(endpoint, path)
     return uamqp.authentication.SASTokenAsync(audience=sas_uri, uri=sas_uri, expires_at=tokenExpiry, token=token)
+
 
 async def evaluate_redirect(endpoint):
     source = uamqp.address.Source('amqps://{}/messages/events/$management'.format(endpoint))
