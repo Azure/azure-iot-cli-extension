@@ -397,3 +397,7 @@ def load_arguments(self, _):
         context.argument('repair', options_list=['--repair', '-r'],
                          arg_type=get_three_state_flag(),
                          help='Reinstall uamqp dependency compatible with extension version. Default: false')
+
+    with self.argument_context('iotcentral device show') as context:
+        context.argument('device_id', options_list=['--device-id', '-d'], help='Target Device.')
+        context.argument('app_id', options_list=['--app-id'], help='Target App.')

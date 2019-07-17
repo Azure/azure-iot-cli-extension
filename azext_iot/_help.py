@@ -945,4 +945,14 @@ helps['iotcentral app monitor-events'] = """
     - name: Receive all messages and parse message payload as JSON
       text: >
         az iotcentral app monitor-events --app-id {app_id} --output json
+  """
+
+helps['iotcentral device'] = """
+    type: group
+    short-summary: Manage IoT Central devices.
+"""
+
+helps['iotcentral device show'] = """
+    type: command
+    short-summary: Get the device twin from IoT Hub.
 """
