@@ -238,7 +238,7 @@ def get_iot_dps_connection_string(
     return result
 
 
-def get_event_hub_target_from_central_app_id(cmd, app_id):
+def get_iot_central_tokens(cmd, app_id):
     def get_event_hub_token(app_id, iotcAccessToken):
         import requests
         url = "https://api.azureiotcentral.com/v1-beta/applications/{}/diagnostics/sasTokens".format(app_id)
@@ -253,6 +253,11 @@ def get_event_hub_target_from_central_app_id(cmd, app_id):
             'Error {} getting tokens. {}'.format(tokens['error']['code'], tokens['error']['message'])
         )
 
+    return tokens
+
+
+def get_event_hub_target_from_central_app_id(cmd, app_id):
+    tokens = get_iot_central_tokens(cmd, app_id)
     eventHubToken = tokens['eventhubSasToken']
     hostnameWithoutPrefix = eventHubToken['hostname'].split("/")[2]
     target = {}
@@ -262,3 +267,7 @@ def get_event_hub_target_from_central_app_id(cmd, app_id):
     target['token'] = eventHubToken['sasToken']
     target['tokenExpiry'] = tokens['expiry']
     return target
+
+
+def get_iot_hub_token_from_central_app_id(cmd, app_id):
+    return get_iot_central_tokens(cmd, app_id)['iothubTenantSasToken']['sasToken']
