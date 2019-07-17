@@ -35,14 +35,12 @@ logger = get_logger(__name__)
 
 # Query
 
-def iot_query(cmd, query_command, hub_name=None, top=None, resource_group_name=None, login=None, target=None):
+def iot_query(cmd, query_command, hub_name=None, top=None, resource_group_name=None, login=None):
     top = _process_top(top)
 
     from azext_iot.service_sdk.models import QuerySpecification
 
-    if not target:
-        target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
-
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
     try:
         query = QuerySpecification(query_command)
