@@ -18,11 +18,13 @@ app_id = 'myapp'
 device_twin_result = '{device twin result}'
 resource = 'shared_resource'
 
+
 @pytest.fixture()
 def fixture_iot_token(mocker):
     sas = mocker.patch('azext_iot.operations.central.get_iot_hub_token_from_central_app_id')
     sas.return_value = 'SharedAccessSignature sr={}&sig=signature&se=expiry&skn=service'.format(resource)
     return sas
+
 
 @pytest.fixture()
 def fixture_cmd(mocker):
