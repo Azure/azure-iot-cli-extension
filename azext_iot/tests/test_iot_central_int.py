@@ -23,7 +23,6 @@ class TestIotCentral(LiveScenarioTest):
     def __init__(self, test_method):  # pylint: disable=W0613
         super(TestIotCentral, self).__init__('test_central_device_show')
 
-
     def test_central_device_show(self):
         # Verify incorrect token throws error
         self.cmd('az iotcentral device show --app-id "{}"  --device-id "{}"  --aad-token incorrect-token'.
@@ -38,7 +37,6 @@ class TestIotCentral(LiveScenarioTest):
         # We cannot verify that the result is correct, as the Azure CLI for IoT Central does not support adding devices
         self.cmd('az iotcentral device show --app-id "{}"  --device-id "{}"  --aad-token "{}"'.
                  format(APP_ID, DEVICE_ID, AAD_TOKEN), expect_failure=False)
-
 
     def test_central_monitor_events(self):
         # Test with invalid aad token
