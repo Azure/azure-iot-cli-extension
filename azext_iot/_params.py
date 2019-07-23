@@ -401,3 +401,4 @@ def load_arguments(self, _):
     with self.argument_context('iotcentral device show') as context:
         context.argument('device_id', options_list=['--device-id', '-d'], help='Target Device.')
         context.argument('app_id', options_list=['--app-id'], help='Target App.')
+        context.argument('aad_token', options_list=['--aad-token'], help='AAD Token to use.')
