@@ -81,9 +81,10 @@ async def initiate_event_monitor(target, consumer_group, enqueued_time, device_i
         logger.debug('No Event Hub target found provided.')
         return
 
+    print(target)
     if not target.get('central'):
-        endpoint = target['events']['endpoint']
-        path = target['events']['path']
+        # endpoint = target['events']['endpoint']
+        # path = target['events']['path']
         if not target.get('events'):
             endpoint = _build_iothub_amqp_endpoint_from_target(target)
             _, update = await evaluate_redirect(endpoint)
@@ -97,6 +98,9 @@ async def initiate_event_monitor(target, consumer_group, enqueued_time, device_i
             for i in range(int(partition_count)):
                 partition_ids.append(str(i))
             target['events']['partition_ids'] = partition_ids
+        else:
+            endpoint = target['events']['endpoint']
+            path = target['events']['path']
         partitions = target['events']['partition_ids']
         auth = _build_auth_container(target)
     else:
