@@ -81,7 +81,6 @@ async def initiate_event_monitor(target, consumer_group, enqueued_time, device_i
         logger.debug('No Event Hub target found provided.')
         return
 
-    print(target)
     if not target.get('central'):
         if not target.get('events'):
             endpoint = _build_iothub_amqp_endpoint_from_target(target)
