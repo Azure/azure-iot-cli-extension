@@ -83,8 +83,6 @@ async def initiate_event_monitor(target, consumer_group, enqueued_time, device_i
 
     print(target)
     if not target.get('central'):
-        # endpoint = target['events']['endpoint']
-        # path = target['events']['path']
         if not target.get('events'):
             endpoint = _build_iothub_amqp_endpoint_from_target(target)
             _, update = await evaluate_redirect(endpoint)
