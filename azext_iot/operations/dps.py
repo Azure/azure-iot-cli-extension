@@ -10,7 +10,7 @@ from azext_iot.common.shared import (SdkType,
                                      AttestationType,
                                      ReprovisionType,
                                      AllocationType)
-from azext_iot.common._azure import get_iot_dps_connection_string
+from azext_iot.common.azure import get_iot_dps_connection_string
 from azext_iot.common.utility import shell_safe_json_parse
 from azext_iot.common.certops import open_certificate
 from azext_iot.operations.generic import _execute_query

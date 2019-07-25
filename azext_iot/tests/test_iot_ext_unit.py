@@ -54,7 +54,7 @@ mock_target['cs'] = generate_cs()
 path_mqtt_client = 'azext_iot.operations._mqtt.mqtt.Client'
 path_service_client = 'msrest.service_client.ServiceClient.send'
 path_ghcs = 'azext_iot.operations.hub.get_iot_hub_connection_string'
-path_iot_hub_service_factory = 'azext_iot.common._azure.iot_hub_service_factory'
+path_iot_hub_service_factory = 'azext_iot.common.azure.iot_hub_service_factory'
 path_sas = 'azext_iot._factory.SasTokenAuthentication'
 
 # TODO generalize all fixtures across DPS/Hub unit tests
@@ -1555,7 +1555,7 @@ class TestGetIoTHubConnString():
     ])
     def test_get_hub_conn_string(self, mocker, hubcount, targethub, policy_name, rg_name,
                                  include_events, login, failure_reason, mgmt_sdk_ver):
-        from azext_iot.common._azure import get_iot_hub_connection_string
+        from azext_iot.common.azure import get_iot_hub_connection_string
 
         def _build_hub(hub, name, rg):
             hub.name = name
