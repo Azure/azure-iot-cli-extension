@@ -908,7 +908,7 @@ def iot_get_sas_token(cmd, hub_name=None, device_id=None, policy_name='iothubown
 def _iot_build_sas_token(cmd, hub_name=None, device_id=None, module_id=None, policy_name='iothubowner',
                          key_type='primary', duration=3600, resource_group_name=None, login=None):
     from azext_iot.common._azure import (parse_iot_device_connection_string,
-                                        parse_iot_device_module_connection_string)
+                                         parse_iot_device_module_connection_string)
 
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, policy_name, login=login)
     uri = None

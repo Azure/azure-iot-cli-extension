@@ -12,7 +12,7 @@ from azext_iot._factory import iot_hub_service_factory
 from azure.cli.core._profile import Profile
 
 
-def _get_aad_token(cmd, subscription=None, resource=None):
+def _get_aad_token(cmd, resource=None):
     '''
     get AAD token to access to a specified resource
     :param resource: Azure resource endpoints. Default to Azure Resource Manager
@@ -20,7 +20,7 @@ def _get_aad_token(cmd, subscription=None, resource=None):
     '''
     resource = (resource or cmd.cli_ctx.cloud.endpoints.active_directory_resource_id)
     profile = Profile(cli_ctx=cmd.cli_ctx)
-    creds, subscription, tenant = profile.get_raw_token(subscription=subscription, resource=resource)
+    creds, subscription, tenant = profile.get_raw_token(subscription=None, resource=resource)
     return {
         'tokenType': creds[0],
         'accessToken': creds[1],
