@@ -21,9 +21,9 @@ from azext_iot._constants import DEVICE_DEVICESCOPE_PREFIX
 sys.path.append(os.path.abspath(os.path.join('.', 'iotext_test_tools')))
 
 # Set these to the proper IoT Hub, IoT Hub Cstring and Resource Group for Live Integration Tests.
-LIVE_HUB ='jabarkhub2'
-LIVE_RG = 'jabark'
-LIVE_HUB_CS = 'HostName=jabarkhub2.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey=SZlWmFJNP/GgTvrWWYSI8IBl34TyYUTgD6/3i07s6v4='
+LIVE_HUB = os.environ.get('azext_iot_testhub')
+LIVE_RG = os.environ.get('azext_iot_testrg')
+LIVE_HUB_CS = os.environ.get('azext_iot_testhub_cs')
 LIVE_HUB_MIXED_CASE_CS = LIVE_HUB_CS.replace('HostName', 'hostname', 1)
 
 # Set this environment variable to your empty blob container sas uri to test device export and enable file upload test.
@@ -128,7 +128,7 @@ class TestIoTHub(LiveScenarioTest):
         #     self._remove_entities()
         return
 
-    def test_hub_jabark(self):
+    def test_hub(self):
 
         self.cmd('az iot hub generate-sas-token -n {} -g {}'.format(LIVE_HUB, LIVE_RG), checks=[
             self.exists('sas')
@@ -166,7 +166,7 @@ class TestIoTHub(LiveScenarioTest):
         self.cmd('iot hub query -q "{}" -l "{}"'.format("select * from devices", 'Hostname=badlogin;key=1235'),
                  expect_failure=True)
 
-    def test_hub_devices_jabark(self):
+    def test_hub_devices(self):
         device_count = 5
         edge_device_count = 2
 
@@ -204,13 +204,13 @@ class TestIoTHub(LiveScenarioTest):
             query_checks.append(self.exists('[?deviceId==`{}`]'.format(edge_device_ids[i])))
         query_checks.append(self.exists('[?deviceId==`{}`]'.format(device_ids[4])))
 
-        # # Not currently supported
-        # self.cmd('iot hub device-identity create -d {} -n {} -g {} --auth-method x509_thumbprint --ee'.format(
-        #     'willnotwork', LIVE_HUB, LIVE_RG), expect_failure=True)
+        # Not currently supported
+        self.cmd('iot hub device-identity create -d {} -n {} -g {} --auth-method x509_thumbprint --ee'.format(
+            'willnotwork', LIVE_HUB, LIVE_RG), expect_failure=True)
 
-        # # Not currently supported
-        # self.cmd('iot hub device-identity create -d {} -n {} -g {} --auth-method x509_ca --ee'.format(
-        #     'willnotwork', LIVE_HUB, LIVE_RG), expect_failure=True)
+        # Not currently supported
+        self.cmd('iot hub device-identity create -d {} -n {} -g {} --auth-method x509_ca --ee'.format(
+            'willnotwork', LIVE_HUB, LIVE_RG), expect_failure=True)
 
         self.cmd('iot hub query --hub-name {} -g {} -q "{}"'.format(LIVE_HUB, LIVE_RG, "select * from devices"),
                  checks=query_checks)
@@ -782,7 +782,7 @@ class TestIoTHub(LiveScenarioTest):
             self.cmd('iot hub module-identity delete -d {} -n {} -g {} --module-id {}'
                      .format(edge_device_ids[0], LIVE_HUB, LIVE_RG, i), checks=self.is_empty())
 
-    def test_device_configurations_jabark(self):
+    def test_device_configurations(self):
         self.kwargs['generic_dict'] = {'key': 'value'}
         self.kwargs['bad_format'] = "{'key: 'value'}"
         config_count = 5

@@ -5,6 +5,7 @@ from azext_iot.common.shared import SdkType
 from azext_iot.common.utility import (unpack_msrest_error, init_monitoring)
 from azext_iot.common.basic_sas_token_auth import BasicSasTokenAuthentication
 
+
 def find_between(s, start, end):
     return (s.split(start))[1].split(end)[0]
 
