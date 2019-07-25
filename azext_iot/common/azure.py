@@ -246,7 +246,7 @@ def get_iot_central_tokens(cmd, app_id, aad_token=None):
         return response.json()
 
     if not aad_token:
-        aad_token = get_aad_token(cmd, resource="https://apps.azureiotcentral.com")['accessToken']
+        aad_token = _get_aad_token(cmd, resource="https://apps.azureiotcentral.com")['accessToken']
 
     tokens = get_event_hub_token(app_id, aad_token)
 

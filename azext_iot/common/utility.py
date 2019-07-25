@@ -284,7 +284,7 @@ def calculate_millisec_since_unix_epoch_utc():
 
 def init_monitoring(cmd, timeout, properties, enqueued_time, repair, yes):
     from azext_iot.common.deps import ensure_uamqp
-    from azext_iot.common.utility import validate_min_python_version
+    from knack.util import CLIError
 
     validate_min_python_version(3, 5)
 

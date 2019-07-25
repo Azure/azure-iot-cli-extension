@@ -4,7 +4,6 @@ from azext_iot.common.azure import (get_iot_hub_token_from_central_app_id, get_e
 from azext_iot.common.shared import SdkType
 from azext_iot.common.utility import (unpack_msrest_error, init_monitoring)
 from azext_iot.common.basic_sas_token_auth import BasicSasTokenAuthentication
-from azext_iot.common.utility import calculate_millisec_since_unix_epoch_utc
 
 def find_between(s, start, end):
     return (s.split(start))[1].split(end)[0]

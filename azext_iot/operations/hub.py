@@ -11,7 +11,6 @@ import six
 from knack.log import get_logger
 from knack.util import CLIError
 from azure.cli.core.util import read_file_content
-from azext_iot.common.utility import calculate_millisec_since_unix_epoch_utc
 from azext_iot._constants import (EXTENSION_ROOT,
                                   BASE_API_VERSION,
                                   DEVICE_DEVICESCOPE_PREFIX,
@@ -25,7 +24,7 @@ from azext_iot.common.shared import (DeviceAuthType,
 from azext_iot.common.azure import get_iot_hub_connection_string
 from azext_iot.common.utility import (shell_safe_json_parse,
                                       validate_key_value_pairs, url_encode_dict,
-                                      evaluate_literal, unpack_msrest_error, 
+                                      evaluate_literal, unpack_msrest_error,
                                       init_monitoring)
 from azext_iot._factory import _bind_sdk
 from azext_iot.operations.generic import _execute_query, _process_top
@@ -909,7 +908,7 @@ def iot_get_sas_token(cmd, hub_name=None, device_id=None, policy_name='iothubown
 def _iot_build_sas_token(cmd, hub_name=None, device_id=None, module_id=None, policy_name='iothubowner',
                          key_type='primary', duration=3600, resource_group_name=None, login=None):
     from azext_iot.common.azure import (parse_iot_device_connection_string,
-                                         parse_iot_device_module_connection_string)
+                                        parse_iot_device_module_connection_string)
 
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, policy_name, login=login)
     uri = None
