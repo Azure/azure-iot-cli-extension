@@ -1,6 +1,6 @@
 from knack.util import CLIError
 from azext_iot._factory import _bind_sdk
-from azext_iot.common.azure import (get_iot_hub_token_from_central_app_id, get_event_hub_target_from_central_app_id)
+from azext_iot.common._azure import (get_iot_hub_token_from_central_app_id, get_event_hub_target_from_central_app_id)
 from azext_iot.common.shared import SdkType
 from azext_iot.common.utility import (unpack_msrest_error, init_monitoring)
 from azext_iot.common.basic_sas_token_auth import BasicSasTokenAuthentication
