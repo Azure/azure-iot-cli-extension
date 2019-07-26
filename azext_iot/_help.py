@@ -952,7 +952,7 @@ helps['iotcentral device'] = """
     short-summary: Manage IoT Central devices.
 """
 
-helps['iotcentral device show'] = """
+helps['iotcentral device-twin show'] = """
     type: command
     short-summary: Get the device twin from IoT Hub.
 """
