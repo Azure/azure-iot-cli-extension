@@ -947,9 +947,9 @@ helps['iotcentral app monitor-events'] = """
         az iotcentral app monitor-events --app-id {app_id} --output json
   """
 
-helps['iotcentral device'] = """
+helps['iotcentral device-twin'] = """
     type: group
-    short-summary: Manage IoT Central devices.
+    short-summary: Manage IoT Central device twins.
 """
 
 helps['iotcentral device-twin show'] = """
