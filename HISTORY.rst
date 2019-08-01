@@ -3,6 +3,10 @@
 Release History
 ===============
 
+0.8.0
++++++++++++++++
+* Added support for iot central commands, monitor-events and device-twin show
+
 0.7.1
 +++++++++++++++
 * Added support for distribution tracing commands.
