@@ -142,7 +142,7 @@ async def initiate_event_monitor(target, consumer_group, enqueued_time, device_i
         return
 
     coroutines = []
-    print('big boiiiiii')
+
     async with uamqp.ConnectionAsync(target['endpoint'], sasl=target['auth'],
                                      debug=DEBUG, container_id=str(uuid4()), properties=_get_conn_props()) as conn:
         for p in target['partitions']:
