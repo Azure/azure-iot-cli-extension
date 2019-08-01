@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 # pylint: disable=wrong-import-order,too-many-lines
 
+import asyncio
 from os.path import exists, basename
 from time import time, sleep
 import six
@@ -1292,7 +1293,6 @@ def iot_hub_monitor_events(cmd, hub_name=None, device_id=None, consumer_group='$
     (enqueued_time, properties, timeout, output) = init_monitoring(cmd, timeout, properties, enqueued_time, repair, yes)
 
     import importlib
-    import asyncio
     events3 = importlib.import_module('azext_iot.operations.events3._events')
 
     device_ids = {}
