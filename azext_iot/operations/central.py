@@ -29,7 +29,6 @@ def iot_central_device_show(cmd, device_id, app_id, aad_token=None):
         raise CLIError(unpack_msrest_error(e))
 
 
-
 def iot_central_monitor_events(cmd, app_id, device_id=None, consumer_group='$Default', timeout=300, enqueued_time=None,
                                repair=False, properties=None, yes=False, aad_token=None):
 

@@ -74,6 +74,7 @@ class SasTokenAuthentication(Authentication):
 
         return 'SharedAccessSignature ' + urlencode(result)
 
+
 class BasicSasTokenAuthentication(Authentication):
     """
     Basic Shared Access Signature authorization for Azure IoT Hub.
