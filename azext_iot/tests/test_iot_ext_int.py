@@ -124,9 +124,8 @@ class TestIoTHub(LiveScenarioTest):
                              .format(i, LIVE_HUB, LIVE_RG), checks=self.is_empty())
 
     def tearDown(self):
-        # if self._entity_names:
-        #     self._remove_entities()
-        return
+        if self._entity_names:
+            self._remove_entities()
 
     def test_hub(self):
 

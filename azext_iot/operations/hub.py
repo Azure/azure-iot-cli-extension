@@ -5,7 +5,6 @@
 # --------------------------------------------------------------------------------------------
 # pylint: disable=wrong-import-order,too-many-lines
 
-import asyncio
 from os.path import exists, basename
 from time import time, sleep
 import six
@@ -1304,9 +1303,7 @@ def iot_hub_monitor_events(cmd, hub_name=None, device_id=None, consumer_group='$
 
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, include_events=True, login=login)
 
-    eventLoop = asyncio.new_event_loop()
-    asyncio.set_event_loop(eventLoop)
-    hubTarget = eventLoop.run_until_complete(events3.buildIotHubTarget(target))
+    hubTarget = events3.buildIotHubTargetSync(target)
 
     events3.executor(hubTarget,
                      consumer_group=consumer_group,

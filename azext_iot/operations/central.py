@@ -5,7 +5,6 @@
 # --------------------------------------------------------------------------------------------
 # pylint: disable=wrong-import-order,too-many-lines
 
-import asyncio
 from knack.util import CLIError
 from azext_iot._factory import _bind_sdk
 from azext_iot.common._azure import (get_iot_hub_token_from_central_app_id, get_event_hub_target_from_central_app_id)
@@ -32,7 +31,7 @@ def iot_central_device_show(cmd, device_id, app_id, aad_token=None):
 
 
 def iot_central_monitor_events(cmd, app_id, device_id=None, consumer_group='$Default', timeout=300, enqueued_time=None,
-                               repair=False, properties=None, yes=False):
+                               repair=False, properties=None, yes=False, aad_token=None):
 
     (enqueued_time, properties, timeout, output) = init_monitoring(cmd, timeout, properties, enqueued_time, repair, yes)
 
@@ -40,10 +39,7 @@ def iot_central_monitor_events(cmd, app_id, device_id=None, consumer_group='$Def
 
     events3 = importlib.import_module('azext_iot.operations.events3._events')
 
-    eventLoop = asyncio.new_event_loop()
-    asyncio.set_event_loop(eventLoop)
-    eventHubTarget = eventLoop.run_until_complete(events3.buildCentralEventHubTarget(cmd, app_id, None))
-
+    eventHubTarget = events3.buildCentralEventHubTargetSync(cmd, app_id, None)
     events3.executor(eventHubTarget,
                      consumer_group=consumer_group,
                      enqueued_time=enqueued_time,

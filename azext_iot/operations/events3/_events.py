@@ -68,6 +68,14 @@ def executor(buildOutputs, consumer_group, enqueued_time, device_id=None, proper
                 raise RuntimeError(error)
 
 
+def buildCentralEventHubTargetSync(cmd, app_id, aad_token):
+    eventLoop = asyncio.new_event_loop()
+    asyncio.set_event_loop(eventLoop)
+
+    centralTarget = eventLoop.run_until_complete(buildCentralEventHubTarget(cmd, app_id, aad_token))
+    return centralTarget
+
+
 async def buildCentralEventHubTarget(cmd, app_id, aad_token):
     from azext_iot.common._azure import get_iot_central_tokens
 
@@ -95,6 +103,14 @@ async def buildCentralEventHubTarget(cmd, app_id, aad_token):
     }
 
     return eventHubTarget
+
+
+def buildIotHubTargetSync(target):
+    eventLoop = asyncio.new_event_loop()
+    asyncio.set_event_loop(eventLoop)
+
+    hubTarget = eventLoop.run_until_complete(buildIotHubTarget(target))
+    return hubTarget
 
 
 async def buildIotHubTarget(target):
