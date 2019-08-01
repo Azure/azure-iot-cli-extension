@@ -25,17 +25,17 @@ class TestIotCentral(LiveScenarioTest):
 
     def test_central_device_show(self):
         # Verify incorrect token throws error
-        self.cmd('az iotcentral device show --app-id "{}"  --device-id "{}"  --aad-token incorrect-token'.
+        self.cmd('az iotcentral device-twin show --app-id "{}"  --device-id "{}"  --aad-token incorrect-token'.
                  format(APP_ID, DEVICE_ID), expect_failure=True)
         # Verify incorrect app-id throws error
-        self.cmd('az iotcentral device show --app-id incorrect-app  --device-id "{}"  --aad-token {}'.
+        self.cmd('az iotcentral device-twin show --app-id incorrect-app  --device-id "{}"  --aad-token {}'.
                  format(DEVICE_ID, AAD_TOKEN), expect_failure=True)
         # Verify incorrect device-id throws error
-        self.cmd('az iotcentral device show --app-id "{}"  --device-id incorrect-device  --aad-token {}'.
+        self.cmd('az iotcentral device-twin show --app-id "{}"  --device-id incorrect-device  --aad-token {}'.
                  format(APP_ID, AAD_TOKEN), expect_failure=True)
         # Verify that no errors are thrown when device shown
         # We cannot verify that the result is correct, as the Azure CLI for IoT Central does not support adding devices
-        self.cmd('az iotcentral device show --app-id "{}"  --device-id "{}"  --aad-token "{}"'.
+        self.cmd('az iotcentral device-twin show --app-id "{}"  --device-id "{}"  --aad-token "{}"'.
                  format(APP_ID, DEVICE_ID, AAD_TOKEN), expect_failure=False)
 
     def test_central_monitor_events(self):

@@ -26,11 +26,12 @@ logger = get_logger(__name__)
 DEBUG = True
 
 
-def executor(target, consumer_group, enqueued_time, device_id=None, properties=None, timeout=0,
+def executor(buildOutputs, consumer_group, enqueued_time, device_id=None, properties=None, timeout=0,
              output=None, content_type=None, devices=None):
 
     coroutines = []
-    coroutines.append(initiate_event_monitor(target, consumer_group, enqueued_time, device_id, properties,
+
+    coroutines.append(initiate_event_monitor(buildOutputs, consumer_group, enqueued_time, device_id, properties,
                                              timeout, output, content_type, devices))
     loop = asyncio.get_event_loop()
     if loop.is_closed():
@@ -67,6 +68,65 @@ def executor(target, consumer_group, enqueued_time, device_id=None, properties=N
                 raise RuntimeError(error)
 
 
+async def buildCentralEventHubTarget(cmd, app_id, aad_token):
+    from azext_iot.common._azure import get_iot_central_tokens
+
+    tokens = get_iot_central_tokens(cmd, app_id, aad_token)
+    eventHubToken = tokens['eventhubSasToken']
+    hostnameWithoutPrefix = eventHubToken['hostname'].split("/")[2]
+    endpoint = hostnameWithoutPrefix
+    path = eventHubToken["entityPath"]
+    tokenExpiry = tokens['expiry']
+    auth = _build_auth_container_from_token(endpoint, path, eventHubToken['sasToken'], tokenExpiry)
+    address = "amqps://{}/{}/$management".format(hostnameWithoutPrefix, eventHubToken["entityPath"])
+    meta_data = await query_meta_data(address, path, auth)
+    partition_count = meta_data[b'partition_count']
+    partition_ids = []
+    for i in range(int(partition_count)):
+        partition_ids.append(str(i))
+    partitions = partition_ids
+    auth = _build_auth_container_from_token(endpoint, path, eventHubToken['sasToken'], tokenExpiry)
+
+    eventHubTarget = {
+        'endpoint': endpoint,
+        'path': path,
+        'auth': auth,
+        'partitions': partitions
+    }
+
+    return eventHubTarget
+
+
+async def buildIotHubTarget(target):
+    if 'events' not in target:
+        endpoint = _build_iothub_amqp_endpoint_from_target(target)
+        _, update = await evaluate_redirect(endpoint)
+        target['events'] = update['events']
+        endpoint = target['events']['endpoint']
+        path = target['events']['path']
+        auth = _build_auth_container(target)
+        meta_data = await query_meta_data(target['events']['address'], target['events']['path'], auth)
+        partition_count = meta_data[b'partition_count']
+        partition_ids = []
+        for i in range(int(partition_count)):
+            partition_ids.append(str(i))
+        target['events']['partition_ids'] = partition_ids
+    else:
+        endpoint = target['events']['endpoint']
+        path = target['events']['path']
+    partitions = target['events']['partition_ids']
+    auth = _build_auth_container(target)
+
+    iotHubTarget = {
+        'endpoint': endpoint,
+        'path': path,
+        'auth': auth,
+        'partitions': partitions
+    }
+
+    return iotHubTarget
+
+
 async def initiate_event_monitor(target, consumer_group, enqueued_time, device_id=None, properties=None,
                                  timeout=0, output=None, content_type=None, devices=None):
     def _get_conn_props():
@@ -77,57 +137,19 @@ async def initiate_event_monitor(target, consumer_group, enqueued_time, device_i
         properties["platform"] = sys.platform
         return properties
 
-    if not target:
-        logger.debug('No Event Hub target provided.')
-        return
-
-    if 'central' not in target:
-        if 'events' not in target:
-            endpoint = _build_iothub_amqp_endpoint_from_target(target)
-            _, update = await evaluate_redirect(endpoint)
-            target['events'] = update['events']
-            endpoint = target['events']['endpoint']
-            path = target['events']['path']
-            auth = _build_auth_container(target)
-            meta_data = await query_meta_data(target['events']['address'], target['events']['path'], auth)
-            partition_count = meta_data[b'partition_count']
-            partition_ids = []
-            for i in range(int(partition_count)):
-                partition_ids.append(str(i))
-            target['events']['partition_ids'] = partition_ids
-        else:
-            endpoint = target['events']['endpoint']
-            path = target['events']['path']
-        partitions = target['events']['partition_ids']
-        auth = _build_auth_container(target)
-    else:
-        # iot central
-        central_target = target['central']
-        endpoint = central_target['endpoint']
-        path = central_target['path']
-        tokenExpiry = central_target['tokenExpiry']
-        auth = _build_auth_container_from_token(endpoint, path, central_target['token'], tokenExpiry)
-        meta_data = await query_meta_data(central_target['address'], path, auth)
-        partition_count = meta_data[b'partition_count']
-        partition_ids = []
-        for i in range(int(partition_count)):
-            partition_ids.append(str(i))
-        partitions = partition_ids
-        auth = _build_auth_container_from_token(endpoint, path, central_target['token'], tokenExpiry)
-
-    if not partitions:
+    if not target['partitions']:
         logger.debug('No Event Hub partitions found to listen on.')
         return
 
     coroutines = []
-
-    async with uamqp.ConnectionAsync(endpoint, sasl=auth,
+    print('big boiiiiii')
+    async with uamqp.ConnectionAsync(target['endpoint'], sasl=target['auth'],
                                      debug=DEBUG, container_id=str(uuid4()), properties=_get_conn_props()) as conn:
-        for p in partitions:
-            coroutines.append(monitor_events(endpoint=endpoint,
+        for p in target['partitions']:
+            coroutines.append(monitor_events(endpoint=target['endpoint'],
                                              connection=conn,
-                                             path=path,
-                                             auth=auth,
+                                             path=target['path'],
+                                             auth=target['auth'],
                                              partition=p,
                                              consumer_group=consumer_group,
                                              enqueuedtimeutc=enqueued_time,

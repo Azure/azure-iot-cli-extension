@@ -1292,6 +1292,7 @@ def iot_hub_monitor_events(cmd, hub_name=None, device_id=None, consumer_group='$
     (enqueued_time, properties, timeout, output) = init_monitoring(cmd, timeout, properties, enqueued_time, repair, yes)
 
     import importlib
+    import asyncio
     events3 = importlib.import_module('azext_iot.operations.events3._events')
 
     device_ids = {}
@@ -1302,7 +1303,12 @@ def iot_hub_monitor_events(cmd, hub_name=None, device_id=None, consumer_group='$
                 device_ids[device_result['deviceId']] = True
 
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, include_events=True, login=login)
-    events3.executor(target,
+
+    eventLoop = asyncio.new_event_loop()
+    asyncio.set_event_loop(eventLoop)
+    hubTarget = eventLoop.run_until_complete(events3.buildIotHubTarget(target))
+
+    events3.executor(hubTarget,
                      consumer_group=consumer_group,
                      enqueued_time=enqueued_time,
                      properties=properties,
