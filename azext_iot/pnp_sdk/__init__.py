@@ -9,4 +9,10 @@
 # regenerated.
 # --------------------------------------------------------------------------
 
-VERSION = "2019-07-01-preview"
+from .digital_twin_repository_service import DigitalTwinRepositoryService
+from .version import VERSION
+
+__all__ = ['DigitalTwinRepositoryService']
+
+__version__ = VERSION
+

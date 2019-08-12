@@ -55,6 +55,7 @@ def _bind_sdk(target, sdk_type, device_id=None):
 
     from azext_iot.custom_sdk.custom_api import CustomClient
     from azext_iot.dps_sdk import ProvisioningServiceClient
+    from azext_iot.pnp_sdk.digital_twin_repository_service import DigitalTwinRepositoryService
 
     sas_uri = target['entity']
     endpoint = "https://{}".format(sas_uri)
@@ -97,6 +98,12 @@ def _bind_sdk(target, sdk_type, device_id=None):
             _get_sdk_exception_type(sdk_type)
         )
 
+    if sdk_type is SdkType.pnp_sdk:
+        return (
+            DigitalTwinRepositoryService(endpoint),
+            _get_sdk_exception_type(sdk_type)
+        )
+
     return None
 
 
@@ -107,6 +114,7 @@ def _get_sdk_exception_type(sdk_type):
         SdkType.custom_sdk: import_module('azext_iot.custom_sdk.models.error_details'),
         SdkType.service_sdk: import_module('msrestazure.azure_exceptions'),
         SdkType.device_sdk: import_module('msrestazure.azure_exceptions'),
-        SdkType.dps_sdk: import_module('azext_iot.dps_sdk.models.provisioning_service_error_details')
+        SdkType.dps_sdk: import_module('azext_iot.dps_sdk.models.provisioning_service_error_details'),
+        SdkType.pnp_sdk: import_module('msrest.exceptions')
     }
     return exception_library.get(sdk_type, None)

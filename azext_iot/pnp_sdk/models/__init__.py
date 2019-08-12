@@ -9,4 +9,17 @@
 # regenerated.
 # --------------------------------------------------------------------------
 
-VERSION = "2019-07-01-preview"
+try:
+    from .search_options_py3 import SearchOptions
+    from .model_information_py3 import ModelInformation
+    from .search_response_py3 import SearchResponse
+except (SyntaxError, ImportError):
+    from .search_options import SearchOptions
+    from .model_information import ModelInformation
+    from .search_response import SearchResponse
+
+__all__ = [
+    'SearchOptions',
+    'ModelInformation',
+    'SearchResponse',
+]

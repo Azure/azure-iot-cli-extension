@@ -10,11 +10,11 @@ import re
 import sys
 from time import time
 from uuid import uuid4
-
 import six
 
 import uamqp
 import yaml
+
 from azext_iot._constants import VERSION
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.utility import (parse_entity, unicode_binary_map,
@@ -26,11 +26,15 @@ logger = get_logger(__name__)
 DEBUG = True
 
 
-def executor(target, consumer_group, enqueued_time, device_id=None, properties=None, timeout=0, output=None, content_type=None,
-             devices=None):
+def executor(target, consumer_group, enqueued_time, properties=None,
+             timeout=0, device_id=None, output=None, content_type=None,
+             devices=None, interface_id=None, pnp_context=None):
+
     coroutines = []
-    coroutines.append(initiate_event_monitor(target, consumer_group, enqueued_time, device_id, properties,
-                                             timeout, output, content_type, devices))
+    coroutines.append(initiate_event_monitor(target, consumer_group, enqueued_time,
+                                             device_id, properties, timeout, output, content_type, devices,
+                                             interface_id, pnp_context))
+
     loop = asyncio.get_event_loop()
     if loop.is_closed():
         loop = asyncio.new_event_loop()
@@ -50,7 +54,8 @@ def executor(target, consumer_group, enqueued_time, device_id=None, properties=N
             except Exception:  # pylint: disable=broad-except
                 pass
 
-        six.print_('Starting event monitor,{} use ctrl-c to stop...'.format(device_filter_txt if device_filter_txt else ''))
+        six.print_('Starting {}event monitor,{} use ctrl-c to stop...'.format('PnP ' if pnp_context else '',
+                                                                              device_filter_txt if device_filter_txt else ''))
         future.add_done_callback(lambda future: stop_and_suppress_eloop())
         result = loop.run_until_complete(future)
     except KeyboardInterrupt:
@@ -66,8 +71,9 @@ def executor(target, consumer_group, enqueued_time, device_id=None, properties=N
                 raise RuntimeError(error)
 
 
-async def initiate_event_monitor(target, consumer_group, enqueued_time, device_id=None, properties=None,
-                                 timeout=0, output=None, content_type=None, devices=None):
+async def initiate_event_monitor(target, consumer_group, enqueued_time, device_id=None,
+                                 properties=None, timeout=0, output=None, content_type=None,
+                                 devices=None, interface_id=None, pnp_context=None):
     def _get_conn_props():
         properties = {}
         properties["product"] = "az.cli.iot.extension"
@@ -112,20 +118,22 @@ async def initiate_event_monitor(target, consumer_group, enqueued_time, device_i
                                              timeout=timeout,
                                              output=output,
                                              content_type=content_type,
-                                             devices=devices))
+                                             devices=devices,
+                                             interface_id=interface_id,
+                                             pnp_context=pnp_context))
         await asyncio.gather(*coroutines, return_exceptions=True)
 
 
-# pylint: disable=too-many-statements
+# pylint: disable=too-many-statements, too-many-branches
 async def monitor_events(endpoint, connection, path, auth, partition, consumer_group, enqueuedtimeutc,
-                         properties, device_id=None, timeout=0, output=None, content_type=None, devices=None):
+                         properties, device_id=None, timeout=0, output=None, content_type=None, devices=None,
+                         interface_id=None, pnp_context=None):
     source = uamqp.address.Source('amqps://{}/{}/ConsumerGroups/{}/Partitions/{}'.format(endpoint, path,
                                                                                          consumer_group, partition))
     source.set_filter(
         bytes('amqp.annotation.x-opt-enqueuedtimeutc > ' + str(enqueuedtimeutc), 'utf8'))
 
     def _output_msg_kpi(msg):
-        # TODO: Determine if amqp filters can support boolean operators for multiple conditions
         origin = str(msg.annotations.get(b'iothub-connection-device-id'), 'utf8')
         if device_id and device_id != origin:
             if '*' in device_id or '?' in device_id:
@@ -136,6 +144,15 @@ async def monitor_events(endpoint, connection, path, auth, partition, consumer_g
                 return
         if devices and origin not in devices:
             return
+
+        if pnp_context:
+            msg_interface_id = str(msg.annotations.get(b'iothub-interface-id'), 'utf8')
+            if not msg_interface_id:
+                return
+
+            if interface_id:
+                if msg_interface_id != interface_id:
+                    return
 
         event_source = {'event': {}}
 
@@ -161,6 +178,23 @@ async def monitor_events(endpoint, connection, path, auth, partition, consumer_g
                 pass
 
         event_source['event']['payload'] = payload
+
+        if pnp_context:
+            event_source['event']['interface'] = msg_interface_id
+
+            msg_schema = str(msg.application_properties.get(b'iothub-message-schema'), 'utf8')
+            interface_context = pnp_context['interface'].get(msg_interface_id)
+            if interface_context:
+                msg_schema_context = interface_context.get(msg_schema)
+                if msg_schema_context:
+                    msg_context_display = msg_schema_context.get('display')
+                    msg_context_unit = msg_schema_context.get('unit')
+
+                    if msg_context_display:
+                        event_source['event']['payload'] = {}
+                        event_source['event']['payload'][msg_context_display] = payload
+                        if msg_context_unit:
+                            event_source['event']['payload']['unit'] = msg_context_unit
 
         if 'anno' in properties or 'all' in properties:
             event_source['event']['annotations'] = unicode_binary_map(msg.annotations)

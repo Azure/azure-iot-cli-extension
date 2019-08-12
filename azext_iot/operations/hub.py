@@ -11,7 +11,6 @@ import six
 from knack.log import get_logger
 from knack.util import CLIError
 from azure.cli.core.util import read_file_content
-from azext_iot.common.utility import calculate_millisec_since_unix_epoch_utc
 from azext_iot._constants import (EXTENSION_ROOT,
                                   BASE_API_VERSION,
                                   DEVICE_DEVICESCOPE_PREFIX,
@@ -24,6 +23,7 @@ from azext_iot.common.shared import (DeviceAuthType,
                                      MetricType)
 from azext_iot.common._azure import get_iot_hub_connection_string
 from azext_iot.common.utility import (shell_safe_json_parse,
+                                      calculate_millisec_since_unix_epoch_utc,
                                       validate_key_value_pairs, url_encode_dict,
                                       evaluate_literal, unpack_msrest_error)
 from azext_iot._factory import _bind_sdk
@@ -1288,6 +1288,38 @@ def iot_device_upload_file(cmd, device_id, file_path, content_type, hub_name=Non
 def iot_hub_monitor_events(cmd, hub_name=None, device_id=None, consumer_group='$Default', timeout=300,
                            enqueued_time=None, resource_group_name=None, yes=False, properties=None, repair=False,
                            login=None, content_type=None, device_query=None):
+    _iot_hub_monitor_events(cmd, interface=None, pnp_context=None, hub_name=hub_name, device_id=device_id,
+                            consumer_group=consumer_group, timeout=timeout, enqueued_time=enqueued_time,
+                            resource_group_name=resource_group_name, yes=yes, properties=properties,
+                            repair=repair, login=login, content_type=content_type, device_query=device_query)
+
+
+def iot_hub_monitor_feedback(cmd, hub_name=None, device_id=None, yes=False,
+                             wait_on_id=None, repair=False, resource_group_name=None, login=None):
+    from azext_iot.common.deps import ensure_uamqp
+    from azext_iot.common.utility import validate_min_python_version
+
+    validate_min_python_version(3, 4)
+
+    config = cmd.cli_ctx.config
+    ensure_uamqp(config, yes, repair)
+
+    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
+
+    return _iot_hub_monitor_feedback(target=target, device_id=device_id, wait_on_id=wait_on_id)
+
+
+def iot_hub_distributed_tracing_show(cmd, hub_name, device_id, resource_group_name=None):
+    device_twin = _iot_hub_distributed_tracing_show(cmd, hub_name, device_id, resource_group_name)
+    return _customize_device_tracing_output(device_twin['deviceId'], device_twin['properties']['desired'],
+                                            device_twin['properties']['reported'])
+
+
+# pylint: disable=too-many-locals
+def _iot_hub_monitor_events(cmd, interface=None, pnp_context=None,
+                            hub_name=None, device_id=None, consumer_group='$Default', timeout=300,
+                            enqueued_time=None, resource_group_name=None, yes=False, properties=None, repair=False,
+                            login=None, content_type=None, device_query=None):
     import importlib
     from azext_iot.common.deps import ensure_uamqp
     from azext_iot.common.utility import validate_min_python_version
@@ -1329,35 +1361,9 @@ def iot_hub_monitor_events(cmd, hub_name=None, device_id=None, consumer_group='$
                      device_id=device_id,
                      output=output,
                      content_type=content_type,
-                     devices=device_ids)
-
-
-def iot_hub_monitor_feedback(cmd, hub_name=None, device_id=None, yes=False,
-                             wait_on_id=None, repair=False, resource_group_name=None, login=None):
-    from azext_iot.common.deps import ensure_uamqp
-    from azext_iot.common.utility import validate_min_python_version
-
-    validate_min_python_version(3, 4)
-
-    config = cmd.cli_ctx.config
-    ensure_uamqp(config, yes, repair)
-
-    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
-
-    return _iot_hub_monitor_feedback(target=target, device_id=device_id, wait_on_id=wait_on_id)
-
-
-def _iot_hub_monitor_feedback(target, device_id, wait_on_id):
-    import importlib
-
-    events3 = importlib.import_module('azext_iot.operations.events3._events')
-    events3.monitor_feedback(target=target, device_id=device_id, wait_on_id=wait_on_id, token_duration=3600)
-
-
-def iot_hub_distributed_tracing_show(cmd, hub_name, device_id, resource_group_name=None):
-    device_twin = _iot_hub_distributed_tracing_show(cmd, hub_name, device_id, resource_group_name)
-    return _customize_device_tracing_output(device_twin['deviceId'], device_twin['properties']['desired'],
-                                            device_twin['properties']['reported'])
+                     devices=device_ids,
+                     interface_id=interface,
+                     pnp_context=pnp_context)
 
 
 def iot_hub_distributed_tracing_update(cmd, hub_name, device_id, sampling_mode, sampling_rate,
@@ -1372,6 +1378,13 @@ def iot_hub_distributed_tracing_update(cmd, hub_name, device_id, sampling_mode, 
     result = iot_device_twin_update(cmd, device_id, device_twin, hub_name, resource_group_name)
     return _customize_device_tracing_output(result.device_id, result.properties.desired,
                                             result.properties.reported)
+
+
+def _iot_hub_monitor_feedback(target, device_id, wait_on_id):
+    import importlib
+
+    events3 = importlib.import_module('azext_iot.operations.events3._events')
+    events3.monitor_feedback(target=target, device_id=device_id, wait_on_id=wait_on_id, token_duration=3600)
 
 
 def _iot_hub_distributed_tracing_show(cmd, hub_name, device_id, resource_group_name=None):

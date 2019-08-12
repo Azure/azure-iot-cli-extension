@@ -21,6 +21,11 @@ def _parse_connection_string(cs, validate=None, cstring_type='entity'):
     return decomposed
 
 
+def parse_pnp_connection_string(cs):
+    validate = ['HostName', 'RepositoryId', 'SharedAccessKeyName', 'SharedAccessKey']
+    return _parse_connection_string(cs, validate, 'PnP Model Repository')
+
+
 def parse_iot_hub_connection_string(cs):
     validate = ['HostName', 'SharedAccessKeyName', 'SharedAccessKey']
     return _parse_connection_string(cs, validate, 'IoT Hub')
@@ -216,4 +221,87 @@ def get_iot_dps_connection_string(
     result['secondarykey'] = policy.secondary_key
     result['subscription'] = client.config.subscription_id
 
+    return result
+
+
+# pylint: disable=broad-except
+def get_iot_pnp_connection_string(
+        cmd,
+        endpoint,
+        repo_id,
+        user_role='Admin',
+        login=None):
+    """
+    Function used to build up dictionary of IoT PnP connection string parts
+
+    Args:
+        cmd (object): Knack cmd
+        endpoint (str): PnP endpoint
+        repository_id (str): PnP repository Id.
+        user_role (str): User role of the access key for the given PnP repository.
+
+    Returns:
+        (dict): of connection string elements.
+
+    Raises:
+        CLIError: on input validation failure.
+
+    """
+
+    # pylint: disable=line-too-long
+    from azure.cli.command_modules.iot.digitaltwinrepositoryprovisioningservice import DigitalTwinRepositoryProvisioningService
+    from azure.cli.command_modules.iot._utils import get_auth_header
+    from azext_iot._constants import PNP_REPO_ENDPOINT
+
+    result = {}
+    client = None
+    headers = None
+
+    if login:
+
+        try:
+            decomposed = parse_pnp_connection_string(login)
+        except ValueError as e:
+            raise CLIError(e)
+
+        result = {}
+        result['cs'] = login
+        result['policy'] = decomposed['SharedAccessKeyName']
+        result['primarykey'] = decomposed['SharedAccessKey']
+        result['repository_id'] = decomposed['RepositoryId']
+        result['entity'] = decomposed['HostName']
+        result['entity'] = result['entity'].replace('https://', '')
+        result['entity'] = result['entity'].replace('http://', '')
+        return result
+
+    def _find_key_from_list(keys, user_role):
+        if keys:
+            return next((key for key in keys if key.user_role.lower() == user_role.lower()), None)
+        return None
+
+    if repo_id:
+        client = DigitalTwinRepositoryProvisioningService(endpoint)
+        headers = get_auth_header(cmd)
+        keys = client.get_keys_async(repository_id=repo_id, api_version=client.api_version, custom_headers=headers)
+
+        if keys is None:
+            raise CLIError('Auth key required for repository "{}"'.format(repo_id))
+
+        policy = _find_key_from_list(keys, user_role)
+
+        if policy is None:
+            raise CLIError(
+                'No auth key found for repository "{}" with user_role "{}".'.format(repo_id, user_role)
+            )
+
+        result['cs'] = policy.connection_string
+        result['entity'] = policy.service_endpoint
+        result['policy'] = policy.id
+        result['primarykey'] = policy.secret
+        result['repository_id'] = policy.repository_id
+    else:
+        result['entity'] = PNP_REPO_ENDPOINT
+
+    result['entity'] = result['entity'].replace('https://', '')
+    result['entity'] = result['entity'].replace('http://', '')
     return result

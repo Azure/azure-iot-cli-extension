@@ -38,6 +38,16 @@ from .device_job_statistics import DeviceJobStatistics
 from .job_response import JobResponse
 from .module import Module
 from .cloud_to_device_method_result import CloudToDeviceMethodResult
+from .desired import Desired
+from .desired_state import DesiredState
+from .digital_twin_interfaces import DigitalTwinInterfaces
+from .digital_twin_interfaces_patch import DigitalTwinInterfacesPatch
+from .digital_twin_interfaces_patch_interfaces_value import DigitalTwinInterfacesPatchInterfacesValue
+from .digital_twin_interfaces_patch_interfaces_value_properties_value import DigitalTwinInterfacesPatchInterfacesValuePropertiesValue
+from .digital_twin_interfaces_patch_interfaces_value_properties_value_desired import DigitalTwinInterfacesPatchInterfacesValuePropertiesValueDesired
+from .interface import Interface
+from .property import Property
+from .reported import Reported
 
 __all__ = [
     'ConfigurationMetrics',
@@ -69,4 +79,14 @@ __all__ = [
     'JobResponse',
     'Module',
     'CloudToDeviceMethodResult',
+    'Desired',
+    'DigitalTwinInterfaces',
+    'DigitalTwinInterfacesPatch',
+    'DigitalTwinInterfacesPatchInterfacesValue',
+    'DigitalTwinInterfacesPatchInterfacesValuePropertiesValue',
+    'DigitalTwinInterfacesPatchInterfacesValuePropertiesValueDesired',
+    'DesiredState',
+    'Interface',
+    'Property',
+    'Reported',
 ]
