@@ -494,7 +494,8 @@ def iot_device_module_twin_replace(cmd, device_id, module_id, target_json, hub_n
 
 # Configuration
 
-def iot_edge_set_modules(cmd, device_id, content, hub_name=None, resource_group_name=None, login=None):
+def iot_edge_set_modules(cmd, device_id, content,
+                         hub_name=None, resource_group_name=None, login=None):
     from azext_iot.service_sdk.models.configuration_content import ConfigurationContent
 
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
@@ -607,6 +608,10 @@ def _process_config_content(content, content_type='module'):
         content = content['content']
 
     if content_key in content:
+        # Schema based validation currently for IoT edge deployment only
+        if content_key == 'modulesContent':
+            _validate_payload_schema(content)
+
         content = content[content_key]
     elif 'module' in content_type and legacy_key in content:
         logger.warning("'%s' is deprecated use '%s' instead - request is still processing...", legacy_key, content_key)
@@ -615,6 +620,28 @@ def _process_config_content(content, content_type='module'):
         raise CLIError("content json must include the '{}' property".format(content_key))
 
     return content
+
+
+def _validate_payload_schema(content):
+    from jsonschema import validate
+    from jsonschema.exceptions import ValidationError, SchemaError
+    from azext_iot._constants import EDGE_DEPLOYMENT_SCHEMA_2_PATH as schema_path
+
+    try:
+        logger.info("Validating deployment payload...")
+
+        if not exists(schema_path):
+            logger.warning("Invalid schema path %s, skipping validation...", schema_path)
+            return
+
+        schema_content = str(read_file_content(schema_path))
+        schema_content = shell_safe_json_parse(schema_content)
+
+        validate(instance=content, schema=schema_content)
+    except ValidationError as ve:
+        raise CLIError(ve)
+    except SchemaError as se:
+        raise CLIError(se)
 
 
 def iot_hub_configuration_update(cmd, config_id, parameters, hub_name=None, resource_group_name=None, login=None):
