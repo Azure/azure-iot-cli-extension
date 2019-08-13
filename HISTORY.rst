@@ -3,6 +3,10 @@
 Release History
 ===============
 
+0.8.0
++++++++++++++++
+* Added Azure IoT Plug & Play public preview functionality
+
 0.7.1
 +++++++++++++++
 * Added support for distribution tracing commands.

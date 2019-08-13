@@ -9,6 +9,7 @@ import json
 import os
 import sys
 
+from io import open
 from os.path import exists
 from uuid import uuid4
 from azure.cli.testsdk import LiveScenarioTest
