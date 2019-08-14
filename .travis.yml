@@ -7,8 +7,8 @@ before_install:
   - chmod +x ./scripts/ci/test_static_py2.sh
   - chmod +x ./scripts/ci/test_clicore_linter.sh
 install:
-    - pip install -r ./dev_requirements -q
     - pip install -e .
+    - pip install -r ./dev_requirements
 jobs:
   include:
    - stage: precondition
