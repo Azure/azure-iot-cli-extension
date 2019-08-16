@@ -1,0 +1,11 @@
+{
+	"environmentalSensor": {
+		"properties": {
+			"name": {
+				"desired": {
+					"value": "test-update"
+				}
+			}
+		}
+	}
+}

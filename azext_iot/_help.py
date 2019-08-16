@@ -956,3 +956,254 @@ helps['iotcentral device-twin show'] = """
     type: command
     short-summary: Get the device twin from IoT Hub.
 """
+
+helps['iot dt'] = """
+    type: group
+    short-summary: Manage digital twin of an IoT Plug and Play device.
+"""
+
+helps['iot dt invoke-command'] = """
+    type: command
+    short-summary: Executes a command on an IoT Plug and Play device.
+    long-summary: You can leverage az login and provide --hub-name instead of --login for every command.
+    examples:
+    - name: Execute a command on device .
+      text: >
+        az iot dt invoke-command --login {iothub_cs}
+        --interface {plug_and_play_interface} --device-id {device_id}
+        --command-name {command_name} --command-payload {payload}
+    - name: Execute a command on device within current session.
+      text: >
+        az iot dt invoke-command --hub-name {iothub_name}
+        --interface {plug_and_play_interface} --device-id {device_id}
+        --command-name {command_name} --command-payload {payload}
+"""
+
+helps['iot dt list-interfaces'] = """
+    type: command
+    short-summary: List interfaces of a target IoT Plug and Play device.
+    long-summary: You can leverage az login and provide --hub-name instead of --login for every command.
+    examples:
+    - name: List all IoT Plug and Play interfaces on a device.
+      text: >
+        az iot dt list-interfaces --login {iothub_cs}
+        --device-id {device_id}
+    - name: List all IoT Plug and Play interfaces on a device within current session.
+      text: >
+        az iot dt list-interfaces --hub-name {iothub_name} --device-id {device_id}
+"""
+
+helps['iot dt list-properties'] = """
+    type: command
+    short-summary: List properties of a target IoT Plug and Play device interface(s).
+    long-summary: You can leverage az login and provide --hub-name instead of --login for every command.
+    examples:
+    - name: List all properties of all device's interfaces on an IoT Plug and Play device.
+      text: >
+        az iot dt list-properties --login {iothub_cs} --source device
+        --device-id {device_id}
+    - name: List all properties of all public interfaces on an IoT Plug and Play device within current session.
+      text: >
+        az iot dt list-properties --hub-name {iothub_name} --device-id {device_id} --source public
+    - name: List all properties of device's interface on an IoT Plug and Play device.
+      text: >
+        az iot dt list-properties --login {iothub_cs} --source device
+        --device-id {device_id} --interface {plug_and_play_interface}
+"""
+
+helps['iot dt list-commands'] = """
+    type: command
+    short-summary: List commands of an IoT Plug and Play devices interface(s).
+    long-summary: You can leverage az login and provide --hub-name instead of --login for every command.
+    examples:
+    - name: List all commands of all private interfaces on an IoT Plug and Play device.
+      text: >
+        az iot dt list-commands --login {iothub_cs} --source private
+        --device-id {device_id} --repo-id {plug_and_play_model_repository_id}
+    - name: List all commands of a private interface on an IoT Plug and Play device.
+      text: >
+        az iot dt list-commands --login {iothub_cs} --source private
+        --device-id {device_id} --repo-id {plug_and_play_model_repository_id}
+        --interface {plug_and_play_interface}
+    - name: List all commands of all public interfaces on an IoT Plug and Play device.
+      text: >
+        az iot dt list-commands --login {iothub_cs} --source public
+        --device-id {device_id}
+    - name: List all commands of device's interface on an IoT Plug and Play device.
+      text: >
+        az iot dt list-commands --login {iothub_cs} --source device
+        --device-id {device_id} --interface {plug_and_play_interface}
+"""
+
+helps['iot dt monitor-events'] = """
+    type: command
+    short-summary: Monitor digital twin events.
+    long-summary: You can leverage az login and provide --hub-name instead of --login for every command.
+    examples:
+    - name: Monitor digital twin events of device's interface.
+      text: >
+        az iot dt monitor-events --login {iothub_cs} --device-id {device_id} --source device
+        --interface {plug_and_play_interface} --consumer-group {consumer_group_name}
+    - name: Monitor digital twin events of public interface within current session.
+      text: >
+        az iot dt monitor-events --hub-name {iothub_name} --device-id {device_id} --source public
+        --interface {plug_and_play_interface} --consumer-group {consumer_group_name}
+    - name: Monitor digital twin events of device's interface and see all message properties.
+      text: >
+        az iot dt monitor-events --login {iothub_cs} --device-id {device_id}
+        --interface {plug_and_play_interface} --consumer-group {consumer_group_name}
+        --properties all --source device
+"""
+
+helps['iot dt update-property'] = """
+    type: command
+    short-summary: Update an IoT Plug and Play device interfaces writable property.
+    examples:
+    - name: Update an IoT Plug and Play device interfaces read-write property.
+      text: >
+        az iot dt update-property --login {iothub_cs} --device-id {device_id}
+        --interface-payload {payload}
+    - name: Update an IoT Plug and Play device interfaces read-write property within current session.
+      text: >
+        az iot dt update-property --hub-name {iothub_name} --device-id {device_id}
+        --interface-payload {payload}
+"""
+
+helps['iot pnp'] = """
+    type: group
+    short-summary: Manage entities of an IoT Plug and Play model repository.
+"""
+
+helps['iot pnp interface'] = """
+    type: group
+    short-summary: Manage interfaces in an IoT Plug and Play model repository.
+"""
+
+helps['iot pnp interface publish'] = """
+    type: command
+    short-summary: Publish an interface to public repository.
+    examples:
+    - name: Publish an interface to public repository.
+      text: >
+        az iot pnp interface publish -r {pnp_repository} --interface {plug_and_play_interface_id}
+"""
+
+helps['iot pnp interface create'] = """
+    type: command
+    short-summary: Create an interface in the company repository.
+    examples:
+    - name: Create an interface in the company repository.
+      text: >
+        az iot pnp interface create --def {plug_and_play_interface_file_path} -r {pnp_repository}
+"""
+
+helps['iot pnp interface update'] = """
+    type: command
+    short-summary: Update an interface in the company repository.
+    examples:
+    - name: Update an interface in the company repository.
+      text: >
+        az iot pnp interface update --def {updated_plug_and_play_interface_file_path} -r {pnp_repository}
+"""
+
+helps['iot pnp interface list'] = """
+    type: command
+    short-summary: List all interfaces.
+    examples:
+    - name: List all company repository's interfaces.
+      text: >
+        az iot pnp interface list -r {pnp_repository}
+    - name: List all public interfaces.
+      text: >
+        az iot pnp interface list
+"""
+
+helps['iot pnp interface show'] = """
+    type: command
+    short-summary: Get the details of an interface.
+    examples:
+    - name: Get the details of a company repository interface.
+      text: >
+        az iot pnp interface show -r {pnp_repository} --interface {plug_and_play_interface_id}
+    - name: Get the details of public interface.
+      text: >
+        az iot pnp interface show --interface {plug_and_play_interface_id}
+"""
+
+helps['iot pnp interface delete'] = """
+    type: command
+    short-summary: Delete an interface in the company repository.
+    examples:
+    - name: Delete an interface in the company repository.
+      text: >
+        az iot pnp interface delete -r {pnp_repository} --interface {plug_and_play_interface_id}
+"""
+
+helps['iot pnp capability-model'] = """
+    type: group
+    short-summary: Manage device capability models in an IoT Plug and Play model repository.
+"""
+
+helps['iot pnp capability-model list'] = """
+    type: command
+    short-summary: List all capability-model.
+    examples:
+    - name: List all company repository's capability-model.
+      text: >
+        az iot pnp capability-model list -r {pnp_repository}
+    - name: List all public capability-model.
+      text: >
+        az iot pnp capability-model list
+"""
+
+helps['iot pnp capability-model show'] = """
+    type: command
+    short-summary: Get the details of a capability-model.
+    examples:
+    - name: Get the details of a company repository capability-model.
+      text: >
+        az iot pnp capability-model show -r {pnp_repository} --model {plug_and_play_capability_model_id}
+    - name: Get the details of public capability-model.
+      text: >
+        az iot pnp capability-model show --model {plug_and_play_capability_model_id}
+"""
+
+helps['iot pnp capability-model create'] = """
+    type: command
+    short-summary: Create a capability-model in the company repository.
+    examples:
+    - name: Create a capability-model in the company repository.
+      text: >
+        az iot pnp capability-model create --def {plug_and_play_capability_model_file_path} -r {pnp_repository}
+"""
+
+helps['iot pnp capability-model publish'] = """
+    type: command
+    short-summary: Publish the capability-model to public repository.
+    examples:
+    - name: Publish the capability-model to public repository.
+      text: >
+        az iot pnp capability-model publish -r {pnp_repository}
+        --model {plug_and_play_capability_model_id}
+"""
+
+helps['iot pnp capability-model delete'] = """
+    type: command
+    short-summary: Delete the capability-model in the company repository.
+    examples:
+    - name: Delete the capability-model in the company repository.
+      text: >
+        az iot pnp capability-model delete -r {pnp_repository}
+        --model {plug_and_play_capability_model_id}
+"""
+
+helps['iot pnp capability-model update'] = """
+    type: command
+    short-summary: Update the capability-model in the company repository.
+    examples:
+    - name: Update the capability-model in the company repository.
+      text: >
+        az iot pnp capability-model update --def {updated_plug_and_play_capability_model_file_path}
+        -r {pnp_repository}
+>>>>>>> master
+"""

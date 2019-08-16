@@ -8,9 +8,11 @@
 
 import ssl
 import os
-from time import time, sleep
 import six
+
+from time import time, sleep
 from paho.mqtt import client as mqtt
+
 from azext_iot._constants import EXTENSION_ROOT
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 

@@ -10,7 +10,7 @@ from azext_iot.assets.user_messages import ERROR_PARAM_TOP_OUT_OF_BOUNDS
 
 def _execute_query(query, query_method, top=None):
     payload = []
-    headers = {}
+    headers = {'Cache-Control': 'no-cache, must-revalidate'}
 
     if top:
         headers['x-ms-max-item-count'] = str(top)

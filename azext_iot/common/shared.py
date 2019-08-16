@@ -25,6 +25,7 @@ class SdkType(Enum):
     dps_sdk = 5
     device_sdk = 6
     service_sdk = 7
+    pnp_sdk = 8
 
 
 # pylint: disable=too-few-public-methods
@@ -139,3 +140,23 @@ class DistributedTracingSamplingModeType(Enum):
     """
     off = 'off'
     on = 'on'
+
+
+# pylint: disable=too-few-public-methods
+class PnPModelType(Enum):
+    """
+    Type of PnP Model.
+    """
+    any = 'any'
+    interface = 'Interface'
+    capabilityModel = 'capabilityModel'
+
+
+# pylint: disable=too-few-public-methods
+class ModelSourceType(Enum):
+    """
+    Type of source to get model definition.
+    """
+    public = 'public'
+    private = 'private'
+    device = 'device'

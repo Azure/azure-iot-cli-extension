@@ -34,4 +34,10 @@ pytest -v azext_iot/tests/test_iot_utility_unit.py
 echo "Executing - IoT Central unit tests"
 pytest -v azext_iot/tests/test_iot_central_unit.py
 
+echo "Executing - Pnp unit tests"
+pytest -v azext_iot/tests/test_iot_pnp_unit.py
+
+echo "Executing - Digitaltwin unit tests"
+pytest -v azext_iot/tests/test_iot_digitaltwin_unit.py
+
 echo "Tests completed."

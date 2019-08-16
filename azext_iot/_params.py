@@ -26,7 +26,8 @@ from azext_iot.common.shared import (
     MetricType,
     ReprovisionType,
     AllocationType,
-    DistributedTracingSamplingModeType
+    DistributedTracingSamplingModeType,
+    ModelSourceType
 )
 from azext_iot._validators import mode2_iot_login_handler
 
@@ -87,6 +88,8 @@ def load_arguments(self, _):
         context.argument('repair', options_list=['--repair', '-r'],
                          arg_type=get_three_state_flag(),
                          help='Reinstall uamqp dependency compatible with extension version. Default: false')
+        context.argument('repo_endpoint', options_list=['--endpoint', '-e'], help='IoT Plug and Play endpoint.')
+        context.argument('repo_id', options_list=['--repo-id', '-r'], help='IoT Plug and Play repository Id.')
 
     with self.argument_context('iot hub') as context:
         context.argument('target_json', options_list=['--json', '-j'],
@@ -407,3 +410,70 @@ def load_arguments(self, _):
         context.argument('device_id', options_list=['--device-id', '-d'], help='Target Device.')
         context.argument('app_id', options_list=['--app-id'], help='Target App.')
         context.argument('aad_token', options_list=['--aad-token'], help='AAD Token to use.')
+
+    with self.argument_context('iot dt') as context:
+        context.argument('repo_login', options_list=['--repo-login', '--rl'],
+                         help='This command supports an entity connection string with rights to perform action. '
+                         'Use to avoid PnP endpoint and repository name if repository is private. '
+                         'If both an entity connection string and name are provided the connection string takes priority.')
+        context.argument('interface', options_list=['--interface', '-i'],
+                         help='Target interface name. This should be the name of the interface not the urn-id.')
+        context.argument('command_name', options_list=['--command-name', '--cn'],
+                         help='IoT Plug and Play interface command name.')
+        context.argument('command_payload', options_list=['--command-payload', '--cp', '--cv'],
+                         help='IoT Plug and Play interface command payload. '
+                         'Content can be directly input or extracted from a file path.')
+        context.argument('interface_payload', options_list=['--interface-payload', '--ip', '--iv'],
+                         help='IoT Plug and Play interface payload. '
+                         'Content can be directly input or extracted from a file path.')
+        context.argument('source_model', options_list=['--source', '-s'],
+                         help='Choose your option to get model definition from specified source. ',
+                         arg_type=get_enum_type(ModelSourceType))
+        context.argument('schema', options_list=['--schema'],
+                         help='Show interface with entity schema.')
+
+    with self.argument_context('iot dt monitor-events') as context:
+        context.argument('consumer_group', options_list=['--consumer-group', '--cg'],
+                         help='Specify the consumer group to use when connecting to event hub endpoint.')
+        context.argument('properties', options_list=['--properties', '--props', '-p'], arg_type=event_msg_prop_type)
+        context.argument('pnp_context', options_list=['--pnp-context'],
+                         arg_type=get_three_state_flag(),
+                         help='Plug and Play telemetry context.')
+        context.argument('repair', options_list=['--repair'],
+                         arg_type=get_three_state_flag(),
+                         help='Reinstall uamqp dependency compatible with extension version. Default: false')
+
+    with self.argument_context('iot pnp') as context:
+        context.argument('model', options_list=['--model', '-m'],
+                         help='Target capability-model urn-id. Example: urn:example:capabilityModels:Mxchip:1')
+        context.argument('interface', options_list=['--interface', '-i'],
+                         help='Target interface urn-id. Example: urn:example:interfaces:MXChip:1')
+
+    with self.argument_context('iot pnp interface') as context:
+        context.argument('interface_definition', options_list=['--definition', '--def'],
+                         help='IoT Plug and Play interface definition written in PPDL (JSON-LD). '
+                         'Can be directly input or a file path where the content is extracted.')
+
+    with self.argument_context('iot pnp interface list') as context:
+        context.argument('search_string', options_list=['--search', '--ss'],
+                         help='Searches IoT Plug and Play interfaces for given string in the'
+                              ' \"Description, DisplayName, comment and Id\".')
+        context.argument('top', type=int, options_list=['--top'],
+                         help='Maximum number of interface to return.')
+
+    with self.argument_context('iot pnp capability-model') as context:
+        context.argument('model_definition', options_list=['--definition', '--def'],
+                         help='IoT Plug and Play capability-model definition written in PPDL (JSON-LD). '
+                         'Can be directly input or a file path where the content is extracted.')
+
+    with self.argument_context('iot pnp capability-model show') as context:
+        context.argument('expand', options_list=['--expand'],
+                         help='Indicates whether to expand the device capability model\'s'
+                              ' interface definitions or not.')
+
+    with self.argument_context('iot pnp capability-model list') as context:
+        context.argument('search_string', options_list=['--search', '--ss'],
+                         help='Searches IoT Plug and Play models for given string in the'
+                              ' \"Description, DisplayName, comment and Id\".')
+        context.argument('top', type=int, options_list=['--top'],
+                         help='Maximum number of capability-model to return.')

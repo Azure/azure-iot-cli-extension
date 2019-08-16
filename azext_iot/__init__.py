@@ -24,8 +24,17 @@ iotcentral_ops = CliCommandType(
     operations_tmpl='azext_iot.operations.central#{}'
 )
 
+iotdigitaltwin_ops = CliCommandType(
+    operations_tmpl='azext_iot.operations.digitaltwin#{}'
+)
+
+iotpnp_ops = CliCommandType(
+    operations_tmpl='azext_iot.operations.pnp#{}'
+)
+
 
 class IoTExtCommandsLoader(AzCommandsLoader):
+
     def __init__(self, cli_ctx=None):
         super(IoTExtCommandsLoader, self).__init__(cli_ctx=cli_ctx)
 
