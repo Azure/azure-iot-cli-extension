@@ -3,13 +3,13 @@
 Release History
 ===============
 
+0.9.0
++++++++++++++++
+* Added support for iot central commands, monitor-events and device-twin show
+
 0.8.0
 +++++++++++++++
-<<<<<<< HEAD
-* Added support for iot central commands, monitor-events and device-twin show
-=======
 * Added Azure IoT Plug & Play public preview functionality
->>>>>>> master
 
 0.7.1
 +++++++++++++++
