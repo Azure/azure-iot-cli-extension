@@ -23,7 +23,6 @@ from azext_iot.common.shared import (DeviceAuthType,
                                      MetricType)
 from azext_iot.common._azure import get_iot_hub_connection_string
 from azext_iot.common.utility import (shell_safe_json_parse,
-                                      calculate_millisec_since_unix_epoch_utc,
                                       validate_key_value_pairs, url_encode_dict,
                                       evaluate_literal, unpack_msrest_error,
                                       init_monitoring)
@@ -1322,13 +1321,9 @@ def _iot_hub_monitor_events(cmd, interface=None, pnp_context=None,
                             enqueued_time=None, resource_group_name=None, yes=False, properties=None, repair=False,
                             login=None, content_type=None, device_query=None):
     import importlib
-    from azext_iot.common.deps import ensure_uamqp
-    from azext_iot.common.utility import validate_min_python_version
-
 
     (enqueued_time, properties, timeout, output) = init_monitoring(cmd, timeout, properties, enqueued_time, repair, yes)
 
-    import importlib
     events3 = importlib.import_module('azext_iot.operations.events3._events')
 
     device_ids = {}
