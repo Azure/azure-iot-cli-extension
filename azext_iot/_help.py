@@ -1205,5 +1205,4 @@ helps['iot pnp capability-model update'] = """
       text: >
         az iot pnp capability-model update --def {updated_plug_and_play_capability_model_file_path}
         -r {pnp_repository}
->>>>>>> master
 """
