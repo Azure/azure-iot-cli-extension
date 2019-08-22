@@ -628,12 +628,11 @@ def _validate_payload_schema(content):
     from azext_iot._constants import EDGE_DEPLOYMENT_SCHEMA_2_PATH as schema_path
 
     try:
-        logger.info("Validating deployment payload...")
-
         if not exists(schema_path):
             logger.warning("Invalid schema path %s, skipping validation...", schema_path)
             return
 
+        logger.info("Validating deployment payload...")
         schema_content = str(read_file_content(schema_path))
         schema_content = shell_safe_json_parse(schema_content)
 
