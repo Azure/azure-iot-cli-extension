@@ -3,6 +3,10 @@
 Release History
 ===============
 
+0.8.1
++++++++++++++++
+* Schema validation applies for creation of IoT Edge deployments or when setting modules per device
+
 0.8.0
 +++++++++++++++
 * Added Azure IoT Plug & Play public preview functionality
