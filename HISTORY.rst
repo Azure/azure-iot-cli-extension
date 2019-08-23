@@ -3,7 +3,7 @@
 Release History
 ===============
 
-0.9.0
+0.8.1
 +++++++++++++++
 * Added support for iot central commands, monitor-events and device-twin show
 

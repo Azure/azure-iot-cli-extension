@@ -21,9 +21,9 @@ from azext_iot._constants import DEVICE_DEVICESCOPE_PREFIX
 sys.path.append(os.path.abspath(os.path.join('.', 'iotext_test_tools')))
 
 # Set these to the proper IoT Hub, IoT Hub Cstring and Resource Group for Live Integration Tests.
-LIVE_HUB = 'jabarkhub2'
-LIVE_RG = 'jabark'
-LIVE_HUB_CS = 'HostName=jabarkhub2.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey=SZlWmFJNP/GgTvrWWYSI8IBl34TyYUTgD6/3i07s6v4='
+LIVE_HUB = os.environ.get('azext_iot_testhub')
+LIVE_RG = os.environ.get('azext_iot_testrg')
+LIVE_HUB_CS = os.environ.get('azext_iot_testhub_cs')
 LIVE_HUB_MIXED_CASE_CS = LIVE_HUB_CS.replace('HostName', 'hostname', 1)
 
 # Set this environment variable to your empty blob container sas uri to test device export and enable file upload test.
