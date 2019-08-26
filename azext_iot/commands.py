@@ -127,6 +127,12 @@ def load_command_table(self, _):
     with self.command_group('iotcentral device-twin', command_type=iotcentral_ops) as cmd_group:
         cmd_group.command('show', 'iot_central_device_show')
 
+    with self.command_group('iot central app', command_type=iotcentral_ops) as cmd_group:
+        cmd_group.command('monitor-events', 'iot_central_monitor_events')
+
+    with self.command_group('iot central device-twin', command_type=iotcentral_ops) as cmd_group:
+        cmd_group.command('show', 'iot_central_device_show')
+
     with self.command_group('iot dt', command_type=iotdigitaltwin_ops, is_preview=True) as cmd_group:
         cmd_group.command('list-interfaces', 'iot_digitaltwin_interface_list')
         cmd_group.command('list-properties', 'iot_digitaltwin_properties_list')
