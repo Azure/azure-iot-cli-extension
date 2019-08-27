@@ -1,7 +1,8 @@
 import asyncio
-from azext_iot.common.sas_token_auth import SasTokenAuthentication
 import uamqp
 from time import time
+
+from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.utility import (parse_entity, unicode_binary_map, url_encode_str)
 
 DEBUG = True
