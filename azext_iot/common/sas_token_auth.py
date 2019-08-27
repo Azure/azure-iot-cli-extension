@@ -40,7 +40,7 @@ class SasTokenAuthentication(Authentication):
         else:
             self.expiry = expiry
 
-    def signed_session(self, session=None):
+    def signed_session(self):
         """
         Create requests session with SAS auth headers.
 
