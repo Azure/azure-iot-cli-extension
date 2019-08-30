@@ -1325,7 +1325,7 @@ def _iot_hub_monitor_events(cmd, interface=None, pnp_context=None,
     (enqueued_time, properties, timeout, output) = init_monitoring(cmd, timeout, properties, enqueued_time, repair, yes)
 
     events3 = importlib.import_module('azext_iot.operations.events3._events')
-    EventTargetBuilder = importlib.import_module('azext_iot.operations.events3.EventTargetBuilder')
+    builders = importlib.import_module('azext_iot.operations.events3._builders')
 
     device_ids = {}
     if device_query:
@@ -1333,12 +1333,12 @@ def _iot_hub_monitor_events(cmd, interface=None, pnp_context=None,
         if devices_result:
             for device_result in devices_result:
                 device_ids[device_result['deviceId']] = True
-
+    
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, include_events=True, login=login)
 
-    hubTarget = EventTargetBuilder.buildIotHubTargetSync(target)
+    eventHubTarget = builders.EventTargetBuilder().buildIotHubTarget(target)
 
-    events3.executor(hubTarget,
+    events3.executor(eventHubTarget,
                      consumer_group=consumer_group,
                      enqueued_time=enqueued_time,
                      properties=properties,
