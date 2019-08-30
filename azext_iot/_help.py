@@ -913,6 +913,50 @@ helps['iot dps registration delete'] = """
     short-summary: Delete a device registration in an Azure IoT Hub Device Provisioning Service.
 """
 
+helps['iotcentral app monitor-events'] = """
+    type: command
+    short-summary: Monitor device telemetry & messages sent to the IoT Hub for an IoT Central app.
+    long-summary: |
+                  EXPERIMENTAL requires Python 3.5+
+                  This command relies on and may install dependent Cython package (uamqp) upon first execution.
+                  https://github.com/Azure/azure-uamqp-python
+    examples:
+    - name: Basic usage
+      text: >
+        az iotcentral app monitor-events --app-id {app_id}
+    - name: Basic usage when filtering on target device
+      text: >
+        az iotcentral app monitor-events --app-id {app_id} -d {device_id}
+    - name: Basic usage when filtering targeted devices with a wildcard in the ID
+      text: >
+        az iotcentral app monitor-events --app-id {app_id} -d Device*
+    - name: Filter device and specify an Event Hub consumer group to bind to.
+      text: >
+        az iotcentral app monitor-events --app-id {app_id} -d {device_id} --cg {consumer_group_name}
+    - name: Receive message annotations (message headers)
+      text: >
+        az iotcentral app monitor-events --app-id {app_id} -d {device_id} --properties anno
+    - name: Receive message annotations + system properties. Never time out.
+      text: >
+        az iotcentral app monitor-events --app-id {app_id} -d {device_id} --properties anno sys --timeout 0
+    - name: Receive all message attributes from all device messages
+      text: >
+        az iotcentral app monitor-events --app-id {app_id} --props all
+    - name: Receive all messages and parse message payload as JSON
+      text: >
+        az iotcentral app monitor-events --app-id {app_id} --output json
+  """
+
+helps['iotcentral device-twin'] = """
+    type: group
+    short-summary: Manage IoT Central device twins.
+"""
+
+helps['iotcentral device-twin show'] = """
+    type: command
+    short-summary: Get the device twin from IoT Hub.
+"""
+
 helps['iot dt'] = """
     type: group
     short-summary: Manage digital twin of an IoT Plug and Play device.
