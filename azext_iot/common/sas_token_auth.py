@@ -85,7 +85,7 @@ class BasicSasTokenAuthentication(Authentication):
     def __init__(self, sas_token):
         self.sas_token = sas_token
 
-    def signed_session(self, session=None):
+    def signed_session(self):
         """
         Create requests session with SAS auth headers.
 
