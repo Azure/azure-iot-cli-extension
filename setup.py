@@ -11,26 +11,28 @@ from io import open  # pylint: disable=W0622
 from setuptools import setup, find_packages
 
 
-package_folder_path = 'azext_iot'
+package_folder_path = "azext_iot"
 
 # Version extraction inspired from 'requests'
-with open(os.path.join(package_folder_path, '_constants.py'), 'r') as fd:
-    VERSION = re.search(r'^VERSION\s*=\s*[\'"]([^\'"]*)[\'"]',
-                        fd.read(), re.MULTILINE).group(1)
+with open(os.path.join(package_folder_path, "_constants.py"), "r") as fd:
+    VERSION = re.search(
+        r'^VERSION\s*=\s*[\'"]([^\'"]*)[\'"]', fd.read(), re.MULTILINE
+    ).group(1)
 
 
 CLASSIFIERS = [
-    'Development Status :: 4 - Beta',
-    'Intended Audience :: Developers',
-    'Intended Audience :: System Administrators',
-    'Programming Language :: Python',
-    'Programming Language :: Python :: 2',
-    'Programming Language :: Python :: 2.7',
-    'Programming Language :: Python :: 3',
-    'Programming Language :: Python :: 3.4',
-    'Programming Language :: Python :: 3.5',
-    'Programming Language :: Python :: 3.6',
-    'License :: OSI Approved :: MIT License',
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 2",
+    "Programming Language :: Python :: 2.7",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.4",
+    "Programming Language :: Python :: 3.5",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "License :: OSI Approved :: MIT License",
 ]
 
 # The following dependencies are needed by the IoT extension.
@@ -40,28 +42,27 @@ CLASSIFIERS = [
 # 'jmespath==0.9.3',
 # 'pyyaml==3.13'
 # 'knack>=0.3.1'
+# 'jsonschema~=3.0.2'
 
 # There is also a dependency for uamqp for amqp based commands
 # though that is installed out of band (managed by the extension)
 # for compatibility reasons.
 
-DEPENDENCIES = [
-    'paho-mqtt==1.3.1'
-]
+DEPENDENCIES = ["paho-mqtt==1.3.1", "jsonschema~=3.0.2"]
 
 
 setup(
-    name='azure-cli-iot-ext',
+    name="azure-cli-iot-ext",
     version=VERSION,
-    description='Provides the data plane command layer for Azure IoT Hub, IoT Edge and IoT Device Provisioning Service',
-    long_description='Authoritative IoT data plane extension for Azure CLI. '
-    'Focused on providing data plane commands for Azure IoT Hub, IoT Edge and IoT Device Provisioning Service',
-    license='MIT',
-    author='Microsoft',
-    author_email='iotupx@microsoft.com',  # +@digimaun
-    url='https://github.com/azure/azure-iot-cli-extension',
+    description="Provides the data plane command layer for Azure IoT Hub, IoT Edge and IoT Device Provisioning Service",
+    long_description="Authoritative IoT data plane extension for Azure CLI. "
+    "Focused on providing data plane commands for Azure IoT Hub, IoT Edge and IoT Device Provisioning Service",
+    license="MIT",
+    author="Microsoft",
+    author_email="iotupx@microsoft.com",  # +@digimaun
+    url="https://github.com/azure/azure-iot-cli-extension",
     classifiers=CLASSIFIERS,
-    packages=find_packages(),
-    package_data={'azext_iot': ['azext_metadata.json', 'digicert.pem']},
-    install_requires=DEPENDENCIES
+    packages=find_packages(exclude=["tests", "tests.*", "scripts"]),
+    package_data={"azext_iot": ["azext_metadata.json", "digicert.pem", "assets/edge-deploy-2.0.schema.json"]},
+    install_requires=DEPENDENCIES,
 )

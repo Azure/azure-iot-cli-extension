@@ -35,7 +35,7 @@
                             "version": "1.1",
                             "type": "docker",
                             "status": "running",
-                            "restartPolicy": "on-failure",
+                            "restartPolicy": "on-failured",
                             "settings": {
                                 "image": "mongo:1.5",
                                 "createOptions": ""

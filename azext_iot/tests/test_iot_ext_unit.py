@@ -697,7 +697,14 @@ def generate_device_config(condition="tags.building=43 and tags.environment='tes
     elif content_type == 'modules' and scenario == 'update':
         result['metrics'] = {'queries': {}, 'results': {}}
 
-    content_path = 'test_config_modules_content.json' if content_type == 'modules' else 'test_config_device_content.json'
+    content_path = None
+    if content_type == 'modules':
+        content_path = 'test_config_modules_content.json'
+    elif content_type == 'malformed_modules':
+        content_path = 'test_config_modules_content_malformed.json'
+    else:
+        content_path = 'test_config_device_content.json'
+
     if content_from_file:
         result['content'] = content_path
     else:
@@ -820,13 +827,23 @@ class TestConfigCreate():
                                                        priority=req['priority'], labels=req['labels'])
 
     @pytest.mark.parametrize("req", [
-        (generate_device_config(content_type='device'))
+        (generate_device_config(content_type='device')),
     ])
     def test_config_create_error(self, serviceclient_generic_error, req):
         with pytest.raises(CLIError):
-            subject.iot_hub_configuration_create(fixture_cmd, config_id=config_id, hub_name=mock_target['entity'],
-                                                 content=req['content'], target_condition=req['targetCondition'],
-                                                 priority=req['priority'], labels=req['labels'], metrics=req.get('metrics'))
+            if req['content_type'] == 'device':
+                subject.iot_hub_configuration_create(fixture_cmd, config_id=config_id, hub_name=mock_target['entity'],
+                                                     content=req['content'], target_condition=req['targetCondition'],
+                                                     priority=req['priority'], labels=req['labels'], metrics=req.get('metrics'))
+
+    @pytest.mark.parametrize("req", [
+        (generate_device_config(content_type='malformed_modules'))
+    ])
+    def test_config_create_schema_validation_error(self, serviceclient, req):
+        with pytest.raises(CLIError):
+            subject.iot_edge_deployment_create(fixture_cmd, config_id=config_id, hub_name=mock_target['entity'],
+                                               content=req['content'], target_condition=req['targetCondition'],
+                                               priority=req['priority'], labels=req['labels'])
 
 
 class TestConfigUpdate():
@@ -1126,6 +1143,14 @@ class TestConfigApply():
         (generate_device_config())
     ])
     def test_config_apply_error(self, serviceclient_generic_error, req):
+        with pytest.raises(CLIError):
+            subject.iot_edge_set_modules(fixture_cmd, device_id,
+                                         hub_name=mock_target['entity'], content=req['content'])
+
+    @pytest.mark.parametrize("req", [
+        (generate_device_config(content_type="malformed_modules"))
+    ])
+    def test_config_apply_schema_validation_error(self, serviceclient, req):
         with pytest.raises(CLIError):
             subject.iot_edge_set_modules(fixture_cmd, device_id,
                                          hub_name=mock_target['entity'], content=req['content'])

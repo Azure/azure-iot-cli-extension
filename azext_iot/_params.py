@@ -436,9 +436,6 @@ def load_arguments(self, _):
         context.argument('consumer_group', options_list=['--consumer-group', '--cg'],
                          help='Specify the consumer group to use when connecting to event hub endpoint.')
         context.argument('properties', options_list=['--properties', '--props', '-p'], arg_type=event_msg_prop_type)
-        context.argument('pnp_context', options_list=['--pnp-context'],
-                         arg_type=get_three_state_flag(),
-                         help='Plug and Play telemetry context.')
         context.argument('repair', options_list=['--repair'],
                          arg_type=get_three_state_flag(),
                          help='Reinstall uamqp dependency compatible with extension version. Default: false')
