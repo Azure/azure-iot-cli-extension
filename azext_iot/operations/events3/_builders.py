@@ -7,12 +7,13 @@ from azext_iot.common.utility import (parse_entity, unicode_binary_map, url_enco
 
 DEBUG = True
 
+
 class AmqpBuilder():
     def build_iothub_amqp_endpoint_from_target(self, target, duration=360):
         hub_name = target['entity'].split('.')[0]
         user = "{}@sas.root.{}".format(target['policy'], hub_name)
         sas_token = SasTokenAuthentication(target['entity'], target['policy'],
-                                    target['primarykey'], time() + duration).generate_sas_token()
+                                           target['primarykey'], time() + duration).generate_sas_token()
         return url_encode_str(user) + ":{}@{}".format(url_encode_str(sas_token), target['entity'])
 
 
@@ -22,24 +23,19 @@ class EventTargetBuilder():
         self.eventLoop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.eventLoop)
 
-
     def buildIotHubTarget(self, target):
         return self.eventLoop.run_until_complete(self._buildIotHubTargetAsync(target))
 
-
     def buildCentralEventHubTarget(self, cmd, app_id, aad_token):
         return self.eventLoop.run_until_complete(self._buildCentralEventHubTargetAsync(cmd, app_id, aad_token))
-
 
     def _build_auth_container(self, target):
         sas_uri = 'sb://{}/{}'.format(target['events']['endpoint'], target['events']['path'])
         return uamqp.authentication.SASTokenAsync.from_shared_access_key(sas_uri, target['policy'], target['primarykey'])
 
-
     def _build_auth_container_from_token(self, endpoint, path, token, tokenExpiry):
         sas_uri = 'sb://{}/{}'.format(endpoint, path)
         return uamqp.authentication.SASTokenAsync(audience=sas_uri, uri=sas_uri, expires_at=tokenExpiry, token=token)
-
 
     async def _query_meta_data(self, endpoint, path, auth):
         source = uamqp.address.Source(endpoint)
@@ -61,7 +57,6 @@ class EventTargetBuilder():
         finally:
             await receive_client.close_async()
 
-
     async def _evaluate_redirect(self, endpoint):
         source = uamqp.address.Source('amqps://{}/messages/events/$management'.format(endpoint))
         receive_client = uamqp.ReceiveClientAsync(source, timeout=30000, prefetch=1, debug=DEBUG)
@@ -79,7 +74,6 @@ class EventTargetBuilder():
             return redirect, result
         finally:
             await receive_client.close_async()
-
 
     async def _buildCentralEventHubTargetAsync(self, cmd, app_id, aad_token):
         from azext_iot.common._azure import get_iot_central_tokens
@@ -108,7 +102,6 @@ class EventTargetBuilder():
         }
 
         return eventHubTarget
-
 
     async def _buildIotHubTargetAsync(self, target):
         if 'events' not in target:

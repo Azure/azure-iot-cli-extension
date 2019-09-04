@@ -256,7 +256,6 @@ def send_c2d_message(target, device_id, data, properties=None,
     return msg_id, errors
 
 
-
 def monitor_feedback(target, device_id, wait_on_id=None, token_duration=3600):
 
     def handle_msg(msg):
