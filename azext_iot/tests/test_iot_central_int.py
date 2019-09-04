@@ -27,25 +27,39 @@ class TestIotCentral(LiveScenarioTest):
         # Verify incorrect token throws error
         self.cmd('az iotcentral device-twin show --app-id "{}"  --device-id "{}"  --aad-token incorrect-token'.
                  format(APP_ID, DEVICE_ID), expect_failure=True)
+        self.cmd('az iot central device-twin show --app-id "{}"  --device-id "{}"  --aad-token incorrect-token'.
+                 format(APP_ID, DEVICE_ID), expect_failure=True)
         # Verify incorrect app-id throws error
         self.cmd('az iotcentral device-twin show --app-id incorrect-app  --device-id "{}"  --aad-token {}'.
                  format(DEVICE_ID, AAD_TOKEN), expect_failure=True)
+        self.cmd('az iot central device-twin show --app-id incorrect-app  --device-id "{}"  --aad-token {}'.
+                 format(DEVICE_ID, AAD_TOKEN), expect_failure=True)
         # Verify incorrect device-id throws error
         self.cmd('az iotcentral device-twin show --app-id "{}"  --device-id incorrect-device  --aad-token {}'.
+                 format(APP_ID, AAD_TOKEN), expect_failure=True)
+        self.cmd('az iot central device-twin show --app-id "{}"  --device-id incorrect-device  --aad-token {}'.
                  format(APP_ID, AAD_TOKEN), expect_failure=True)
         # Verify that no errors are thrown when device shown
         # We cannot verify that the result is correct, as the Azure CLI for IoT Central does not support adding devices
         self.cmd('az iotcentral device-twin show --app-id "{}"  --device-id "{}"  --aad-token "{}"'.
                  format(APP_ID, DEVICE_ID, AAD_TOKEN), expect_failure=False)
+        # self.cmd('az iot central device-twin show --app-id "{}"  --device-id "{}"  --aad-token "{}"'.
+        #          format(APP_ID, DEVICE_ID, AAD_TOKEN), expect_failure=False)
 
-    def test_central_monitor_events(self):
-        # Test with invalid aad token
-        self.cmd('iotcentral app monitor-events --app-id {} --aad-token {}'.
-                 format(APP_ID, AAD_TOKEN + "zzz"), expect_failure=True)
-        # Test with invalid app-id
-        self.cmd('iotcentral app monitor-events --app-id {} --aad-token {}'.
-                 format(APP_ID + "zzz", AAD_TOKEN), expect_failure=True)
-        # Ensure no failure
-        # We cannot verify that the result is correct, as the Azure CLI for IoT Central does not support adding devices
-        self.cmd('iotcentral app monitor-events --app-id {} --aad-token {}'.
-                 format(APP_ID, AAD_TOKEN), expect_failure=False)
+    # def test_central_monitor_events(self):
+    #     # Test with invalid aad token
+    #     self.cmd('iotcentral app monitor-events --app-id {} --aad-token {}'.
+    #              format(APP_ID, AAD_TOKEN + "zzz"), expect_failure=True)
+    #     self.cmd('iot central app monitor-events --app-id {} --aad-token {}'.
+    #              format(APP_ID, AAD_TOKEN + "zzz"), expect_failure=True)
+    #     # Test with invalid app-id
+    #     self.cmd('iotcentral app monitor-events --app-id {} --aad-token {}'.
+    #              format(APP_ID + "zzz", AAD_TOKEN), expect_failure=True)
+    #     self.cmd('iot central app monitor-events --app-id {} --aad-token {}'.
+    #              format(APP_ID + "zzz", AAD_TOKEN), expect_failure=True)
+    #     # Ensure no failure
+    #     # We cannot verify that the result is correct, as the Azure CLI for IoT Central does not support adding devices
+    #     self.cmd('iotcentral app monitor-events --app-id {} --aad-token {}'.
+    #              format(APP_ID, AAD_TOKEN), expect_failure=False)
+    #     self.cmd('iot central app monitor-events --app-id {} --aad-token {}'.
+    #              format(APP_ID, AAD_TOKEN), expect_failure=False)
