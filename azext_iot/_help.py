@@ -957,6 +957,11 @@ helps['iotcentral device-twin show'] = """
     short-summary: Please use the corresponding command in "az iot central" command group. Get the device twin from IoT Hub.
 """
 
+helps['iot central app'] = """
+    type: group
+    short-summary: Manage Azure IoT Central applications.
+"""
+
 helps['iot central app monitor-events'] = """
     type: command
     short-summary: Monitor device telemetry & messages sent to the IoT Hub for an IoT Central app.
