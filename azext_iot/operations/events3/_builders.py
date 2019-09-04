@@ -23,7 +23,7 @@ class EventTargetBuilder():
         asyncio.set_event_loop(self.eventLoop)
 
 
-    def buildIotHubTargetSync(self, target):
+    def buildIotHubTarget(self, target):
         return self.eventLoop.run_until_complete(self._buildIotHubTargetAsync(target))
 
 
