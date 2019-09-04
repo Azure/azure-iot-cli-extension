@@ -7,22 +7,28 @@ from azext_iot.common.utility import (parse_entity, unicode_binary_map, url_enco
 
 DEBUG = True
 
+class AmqpBuilder():
+    def build_iothub_amqp_endpoint_from_target(self, target, duration=360):
+        hub_name = target['entity'].split('.')[0]
+        user = "{}@sas.root.{}".format(target['policy'], hub_name)
+        sas_token = SasTokenAuthentication(target['entity'], target['policy'],
+                                    target['primarykey'], time() + duration).generate_sas_token()
+        return url_encode_str(user) + ":{}@{}".format(url_encode_str(sas_token), target['entity'])
+
+
 class EventTargetBuilder():
 
-    def buildIotHubTargetSync(self, target):
-        eventLoop = asyncio.new_event_loop()
-        asyncio.set_event_loop(eventLoop)
+    def __init__(self):
+        self.eventLoop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.eventLoop)
 
-        hubTarget = eventLoop.run_until_complete(self._buildIotHubTargetAsync(target))
-        return hubTarget
+
+    def buildIotHubTargetSync(self, target):
+        return self.eventLoop.run_until_complete(self._buildIotHubTargetAsync(target))
 
 
     def buildCentralEventHubTarget(self, cmd, app_id, aad_token):
-        eventLoop = asyncio.new_event_loop()
-        asyncio.set_event_loop(eventLoop)
-
-        centralTarget = eventLoop.run_until_complete(self._buildCentralEventHubTargetAsync(cmd, app_id, aad_token))
-        return centralTarget
+        return self.eventLoop.run_until_complete(self._buildCentralEventHubTargetAsync(cmd, app_id, aad_token))
 
 
     def _build_auth_container(self, target):
@@ -104,18 +110,9 @@ class EventTargetBuilder():
         return eventHubTarget
 
 
-    # TODO: This is both here and in _events
-    def _build_iothub_amqp_endpoint_from_target(self, target, duration=360):
-        hub_name = target['entity'].split('.')[0]
-        user = "{}@sas.root.{}".format(target['policy'], hub_name)
-        sas_token = SasTokenAuthentication(target['entity'], target['policy'],
-                                        target['primarykey'], time() + duration).generate_sas_token()
-        return url_encode_str(user) + ":{}@{}".format(url_encode_str(sas_token), target['entity'])
-
-
     async def _buildIotHubTargetAsync(self, target):
         if 'events' not in target:
-            endpoint = self._build_iothub_amqp_endpoint_from_target(target)
+            endpoint = AmqpBuilder().build_iothub_amqp_endpoint_from_target(target)
             _, update = await self._evaluate_redirect(endpoint)
             target['events'] = update['events']
             endpoint = target['events']['endpoint']

@@ -20,6 +20,7 @@ from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.utility import (parse_entity, unicode_binary_map,
                                       url_encode_str)
 from knack.log import get_logger
+from azext_iot.operations.events3._builders import AmqpBuilder
 
 logger = get_logger(__name__)
 
@@ -246,7 +247,7 @@ def send_c2d_message(target, device_id, data, properties=None,
     message = uamqp.Message(msg_content, properties=msg_props, application_properties=app_props)
 
     operation = '/messages/devicebound'
-    endpoint = _build_iothub_amqp_endpoint_from_target(target)
+    endpoint = EventTargetBuilder().build_iothub_amqp_endpoint_from_target(target)
     endpoint = endpoint + operation
     client = uamqp.SendClient('amqps://' + endpoint, debug=DEBUG)
     client.queue_message(message)
@@ -254,13 +255,6 @@ def send_c2d_message(target, device_id, data, properties=None,
     errors = [m for m in result if m == uamqp.constants.MessageState.SendFailed]
     return msg_id, errors
 
-
-def _build_iothub_amqp_endpoint_from_target(target, duration=360):
-    hub_name = target['entity'].split('.')[0]
-    user = "{}@sas.root.{}".format(target['policy'], hub_name)
-    sas_token = SasTokenAuthentication(target['entity'], target['policy'],
-                                       target['primarykey'], time() + duration).generate_sas_token()
-    return url_encode_str(user) + ":{}@{}".format(url_encode_str(sas_token), target['entity'])
 
 
 def monitor_feedback(target, device_id, wait_on_id=None, token_duration=3600):
@@ -282,7 +276,7 @@ def monitor_feedback(target, device_id, wait_on_id=None, token_duration=3600):
         return None
 
     operation = '/messages/servicebound/feedback'
-    endpoint = _build_iothub_amqp_endpoint_from_target(target, duration=token_duration)
+    endpoint = EventTargetBuilder().build_iothub_amqp_endpoint_from_target(target, duration=token_duration)
     endpoint = endpoint + operation
 
     device_filter_txt = None
