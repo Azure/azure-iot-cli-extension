@@ -915,11 +915,13 @@ helps['iot dps registration delete'] = """
 
 helps['iotcentral app monitor-events'] = """
     type: command
-    short-summary: Please use the corresponding command in "az iot central" command group. Monitor device telemetry & messages sent to the IoT Hub for an IoT Central app.
+    short-summary: Monitor device telemetry & messages sent to the IoT Hub for an IoT Central app.
     long-summary: |
                   EXPERIMENTAL requires Python 3.5+
                   This command relies on and may install dependent Cython package (uamqp) upon first execution.
                   https://github.com/Azure/azure-uamqp-python
+
+                  DEPRECATED. Use 'az iot central app monitor-events' instead.
     examples:
     - name: Basic usage
       text: >
@@ -949,12 +951,14 @@ helps['iotcentral app monitor-events'] = """
 
 helps['iotcentral device-twin'] = """
     type: group
-    short-summary: Please use the corresponding command in "az iot central" command group. Manage IoT Central device twins.
+    short-summary: Manage IoT Central device twins.
+    long-summary: DEPRECATED. Use 'az iot central device-twin' instead.
 """
 
 helps['iotcentral device-twin show'] = """
     type: command
-    short-summary: Please use the corresponding command in "az iot central" command group. Get the device twin from IoT Hub.
+    short-summary: Get the device twin from IoT Hub.
+    long-summary: DEPRECATED. Use 'az iot central device-twin show' instead.
 """
 
 helps['iot central app'] = """
