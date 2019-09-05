@@ -9,6 +9,7 @@ DEBUG = True
 
 
 class AmqpBuilder():
+    @classmethod
     def build_iothub_amqp_endpoint_from_target(self, target, duration=360):
         hub_name = target['entity'].split('.')[0]
         user = "{}@sas.root.{}".format(target['policy'], hub_name)
@@ -23,11 +24,11 @@ class EventTargetBuilder():
         self.eventLoop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.eventLoop)
 
-    def buildIotHubTarget(self, target):
-        return self.eventLoop.run_until_complete(self._buildIotHubTargetAsync(target))
+    def build_iot_hub_target(self, target):
+        return self.eventLoop.run_until_complete(self._build_iot_hub_target_async(target))
 
-    def buildCentralEventHubTarget(self, cmd, app_id, aad_token):
-        return self.eventLoop.run_until_complete(self._buildCentralEventHubTargetAsync(cmd, app_id, aad_token))
+    def build_central_event_hub_target(self, cmd, app_id, aad_token):
+        return self.eventLoop.run_until_complete(self._build_central_event_hub_target_async(cmd, app_id, aad_token))
 
     def _build_auth_container(self, target):
         sas_uri = 'sb://{}/{}'.format(target['events']['endpoint'], target['events']['path'])
@@ -75,7 +76,7 @@ class EventTargetBuilder():
         finally:
             await receive_client.close_async()
 
-    async def _buildCentralEventHubTargetAsync(self, cmd, app_id, aad_token):
+    async def _build_central_event_hub_target_async(self, cmd, app_id, aad_token):
         from azext_iot.common._azure import get_iot_central_tokens
 
         tokens = get_iot_central_tokens(cmd, app_id, aad_token)
@@ -103,9 +104,9 @@ class EventTargetBuilder():
 
         return eventHubTarget
 
-    async def _buildIotHubTargetAsync(self, target):
+    async def _build_iot_hub_target_async(self, target):
         if 'events' not in target:
-            endpoint = AmqpBuilder().build_iothub_amqp_endpoint_from_target(target)
+            endpoint = AmqpBuilder.build_iothub_amqp_endpoint_from_target(target)
             _, update = await self._evaluate_redirect(endpoint)
             target['events'] = update['events']
             endpoint = target['events']['endpoint']

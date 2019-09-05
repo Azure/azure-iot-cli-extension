@@ -39,7 +39,7 @@ def iot_central_monitor_events(cmd, app_id, device_id=None, consumer_group='$Def
     events3 = importlib.import_module('azext_iot.operations.events3._events')
     builders = importlib.import_module('azext_iot.operations.events3._builders')
 
-    eventHubTarget = builders.EventTargetBuilder().buildCentralEventHubTarget(cmd, app_id, aad_token)
+    eventHubTarget = builders.EventTargetBuilder().build_central_event_hub_target(cmd, app_id, aad_token)
     events3.executor(eventHubTarget,
                      consumer_group=consumer_group,
                      enqueued_time=enqueued_time,

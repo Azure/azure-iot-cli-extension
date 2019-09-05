@@ -247,7 +247,7 @@ def send_c2d_message(target, device_id, data, properties=None,
     message = uamqp.Message(msg_content, properties=msg_props, application_properties=app_props)
 
     operation = '/messages/devicebound'
-    endpoint = AmqpBuilder().build_iothub_amqp_endpoint_from_target(target)
+    endpoint = AmqpBuilder.build_iothub_amqp_endpoint_from_target(target)
     endpoint = endpoint + operation
     client = uamqp.SendClient('amqps://' + endpoint, debug=DEBUG)
     client.queue_message(message)
@@ -275,7 +275,7 @@ def monitor_feedback(target, device_id, wait_on_id=None, token_duration=3600):
         return None
 
     operation = '/messages/servicebound/feedback'
-    endpoint = AmqpBuilder().build_iothub_amqp_endpoint_from_target(target, duration=token_duration)
+    endpoint = AmqpBuilder.build_iothub_amqp_endpoint_from_target(target, duration=token_duration)
     endpoint = endpoint + operation
 
     device_filter_txt = None

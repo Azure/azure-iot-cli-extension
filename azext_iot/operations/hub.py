@@ -1362,7 +1362,7 @@ def _iot_hub_monitor_events(cmd, interface=None, pnp_context=None,
 
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, include_events=True, login=login)
 
-    eventHubTarget = builders.EventTargetBuilder().buildIotHubTarget(target)
+    eventHubTarget = builders.EventTargetBuilder().build_iot_hub_target(target)
 
     events3.executor(eventHubTarget,
                      consumer_group=consumer_group,
