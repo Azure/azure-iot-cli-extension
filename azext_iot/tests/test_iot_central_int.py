@@ -10,7 +10,7 @@ from azure.cli.testsdk import LiveScenarioTest
 # az account get-access-token --resource "https://apps.azureiotcentral.com"
 AAD_TOKEN = os.environ.get("azext_iot_central_aad_token")
 APP_ID = os.environ.get("azext_iot_central_app_id")
-DEVICE_ID = os.environ.get("nd azext_iot_central_device_id")
+DEVICE_ID = os.environ.get("azext_iot_central_device_id")
 
 if not all([AAD_TOKEN, APP_ID, DEVICE_ID]):
     raise ValueError('Set azext_iot_central_aad_token, azext_iot_central_app_id '
