@@ -49,7 +49,7 @@ def iot_service_provisioning_factory(cli_ctx, *_):
 
 
 # pylint: disable=too-many-return-statements
-def _bind_sdk(target, sdk_type, device_id=None):
+def _bind_sdk(target, sdk_type, device_id=None, auth=None):
     from azext_iot.device_sdk.iot_hub_gateway_device_apis import IotHubGatewayDeviceAPIs
     from azext_iot.service_sdk.iot_hub_gateway_service_apis import IotHubGatewayServiceAPIs
 
@@ -62,45 +62,36 @@ def _bind_sdk(target, sdk_type, device_id=None):
     if device_id:
         sas_uri = '{}/devices/{}'.format(sas_uri, device_id)
 
+    if sdk_type is SdkType.pnp_sdk:
+        return (
+            DigitalTwinRepositoryService(endpoint),
+            _get_sdk_exception_type(sdk_type)
+        )
+
+    if not auth:
+        auth = SasTokenAuthentication(sas_uri, target['policy'], target['primarykey'])
+
     if sdk_type is SdkType.device_sdk:
         return (
-            IotHubGatewayDeviceAPIs(
-                SasTokenAuthentication(
-                    sas_uri, target['policy'], target['primarykey']),
-                endpoint),
+            IotHubGatewayDeviceAPIs(auth, endpoint),
             _get_sdk_exception_type(sdk_type)
         )
 
     if sdk_type is SdkType.service_sdk:
         return (
-            IotHubGatewayServiceAPIs(
-                SasTokenAuthentication(
-                    sas_uri, target['policy'], target['primarykey']),
-                endpoint),
+            IotHubGatewayServiceAPIs(auth, endpoint),
             _get_sdk_exception_type(sdk_type)
         )
 
     if sdk_type is SdkType.custom_sdk:
         return (
-            CustomClient(
-                SasTokenAuthentication(
-                    sas_uri, target['policy'], target['primarykey']),
-                endpoint),
+            CustomClient(auth, endpoint),
             _get_sdk_exception_type(sdk_type)
         )
 
     if sdk_type is SdkType.dps_sdk:
         return (
-            ProvisioningServiceClient(
-                SasTokenAuthentication(
-                    sas_uri, target['policy'], target['primarykey']),
-                endpoint),
-            _get_sdk_exception_type(sdk_type)
-        )
-
-    if sdk_type is SdkType.pnp_sdk:
-        return (
-            DigitalTwinRepositoryService(endpoint),
+            ProvisioningServiceClient(auth, endpoint),
             _get_sdk_exception_type(sdk_type)
         )
 

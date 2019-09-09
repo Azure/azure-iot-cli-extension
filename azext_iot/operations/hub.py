@@ -23,9 +23,9 @@ from azext_iot.common.shared import (DeviceAuthType,
                                      MetricType)
 from azext_iot.common._azure import get_iot_hub_connection_string
 from azext_iot.common.utility import (shell_safe_json_parse,
-                                      calculate_millisec_since_unix_epoch_utc,
                                       validate_key_value_pairs, url_encode_dict,
-                                      evaluate_literal, unpack_msrest_error)
+                                      evaluate_literal, unpack_msrest_error,
+                                      init_monitoring)
 from azext_iot._factory import _bind_sdk
 from azext_iot.operations.generic import _execute_query, _process_top
 
@@ -1347,29 +1347,11 @@ def _iot_hub_monitor_events(cmd, interface=None, pnp_context=None,
                             enqueued_time=None, resource_group_name=None, yes=False, properties=None, repair=False,
                             login=None, content_type=None, device_query=None):
     import importlib
-    from azext_iot.common.deps import ensure_uamqp
-    from azext_iot.common.utility import validate_min_python_version
 
-    validate_min_python_version(3, 5)
-
-    if timeout < 0:
-        raise CLIError('Monitoring timeout must be 0 (inf) or greater.')
-    timeout = (timeout * 1000)
-
-    config = cmd.cli_ctx.config
-    output = cmd.cli_ctx.invocation.data.get("output", None)
-    if not output:
-        output = 'json'
-    ensure_uamqp(config, yes, repair)
+    (enqueued_time, properties, timeout, output) = init_monitoring(cmd, timeout, properties, enqueued_time, repair, yes)
 
     events3 = importlib.import_module('azext_iot.operations.events3._events')
-
-    if not properties:
-        properties = []
-    properties = set((key.lower() for key in properties))
-
-    if not enqueued_time:
-        enqueued_time = calculate_millisec_since_unix_epoch_utc()
+    builders = importlib.import_module('azext_iot.operations.events3._builders')
 
     device_ids = {}
     if device_query:
@@ -1379,7 +1361,10 @@ def _iot_hub_monitor_events(cmd, interface=None, pnp_context=None,
                 device_ids[device_result['deviceId']] = True
 
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, include_events=True, login=login)
-    events3.executor(target,
+
+    eventHubTarget = builders.EventTargetBuilder().build_iot_hub_target(target)
+
+    events3.executor(eventHubTarget,
                      consumer_group=consumer_group,
                      enqueued_time=enqueued_time,
                      properties=properties,
