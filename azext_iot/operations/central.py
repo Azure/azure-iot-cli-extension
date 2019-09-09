@@ -17,8 +17,8 @@ def find_between(s, start, end):
     return (s.split(start))[1].split(end)[0]
 
 
-def iot_central_device_show(cmd, device_id, app_id, aad_token=None):
-    sasToken = get_iot_hub_token_from_central_app_id(cmd, app_id, aad_token)
+def iot_central_device_show(cmd, device_id, app_id):
+    sasToken = get_iot_hub_token_from_central_app_id(cmd, app_id)
     endpoint = find_between(sasToken, 'SharedAccessSignature sr=', '&sig=')
     target = {'entity': endpoint}
     auth = BasicSasTokenAuthentication(sas_token=sasToken)
@@ -30,7 +30,7 @@ def iot_central_device_show(cmd, device_id, app_id, aad_token=None):
 
 
 def iot_central_monitor_events(cmd, app_id, device_id=None, consumer_group='$Default', timeout=300, enqueued_time=None,
-                               repair=False, properties=None, yes=False, aad_token=None):
+                               repair=False, properties=None, yes=False):
 
     (enqueued_time, properties, timeout, output) = init_monitoring(cmd, timeout, properties, enqueued_time, repair, yes)
 
@@ -39,7 +39,7 @@ def iot_central_monitor_events(cmd, app_id, device_id=None, consumer_group='$Def
     events3 = importlib.import_module('azext_iot.operations.events3._events')
     builders = importlib.import_module('azext_iot.operations.events3._builders')
 
-    eventHubTarget = builders.EventTargetBuilder().build_central_event_hub_target(cmd, app_id, aad_token)
+    eventHubTarget = builders.EventTargetBuilder().build_central_event_hub_target(cmd, app_id)
     events3.executor(eventHubTarget,
                      consumer_group=consumer_group,
                      enqueued_time=enqueued_time,

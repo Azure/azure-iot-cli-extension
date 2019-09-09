@@ -27,8 +27,8 @@ class EventTargetBuilder():
     def build_iot_hub_target(self, target):
         return self.eventLoop.run_until_complete(self._build_iot_hub_target_async(target))
 
-    def build_central_event_hub_target(self, cmd, app_id, aad_token):
-        return self.eventLoop.run_until_complete(self._build_central_event_hub_target_async(cmd, app_id, aad_token))
+    def build_central_event_hub_target(self, cmd, app_id):
+        return self.eventLoop.run_until_complete(self._build_central_event_hub_target_async(cmd, app_id))
 
     def _build_auth_container(self, target):
         sas_uri = 'sb://{}/{}'.format(target['events']['endpoint'], target['events']['path'])
@@ -76,10 +76,10 @@ class EventTargetBuilder():
         finally:
             await receive_client.close_async()
 
-    async def _build_central_event_hub_target_async(self, cmd, app_id, aad_token):
+    async def _build_central_event_hub_target_async(self, cmd, app_id):
         from azext_iot.common._azure import get_iot_central_tokens
 
-        tokens = get_iot_central_tokens(cmd, app_id, aad_token)
+        tokens = get_iot_central_tokens(cmd, app_id)
         eventHubToken = tokens['eventhubSasToken']
         hostnameWithoutPrefix = eventHubToken['hostname'].split("/")[2]
         endpoint = hostnameWithoutPrefix

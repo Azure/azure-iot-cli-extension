@@ -397,7 +397,6 @@ def load_arguments(self, _):
         context.argument('content_type', options_list=['--content-type', '--ct'],
                          help='Specify the Content-Type of the message payload to automatically format the output to that type.')
         context.argument('device_query', options_list=['--device-query', '-q'], help='Specify a custom query to filter devices.')
-        context.argument('aad_token', options_list=['--aad-token'], help='AAD Token to use.')
         context.argument('repair', options_list=['--repair', '-r'],
                          arg_type=get_three_state_flag(),
                          help='Reinstall uamqp dependency compatible with extension version. Default: false')
@@ -409,11 +408,9 @@ def load_arguments(self, _):
     with self.argument_context('iotcentral device-twin show') as context:
         context.argument('device_id', options_list=['--device-id', '-d'], help='Target Device.')
         context.argument('app_id', options_list=['--app-id'], help='Target App.')
-        context.argument('aad_token', options_list=['--aad-token'], help='AAD Token to use.')
 
     with self.argument_context('iot central') as context:
         context.argument('app_id', options_list=['--app-id'], help='Target App.')
-        context.argument('aad_token', options_list=['--aad-token'], help='AAD Token to use.')
 
     with self.argument_context('iot central app monitor-events') as context:
         context.argument('timeout', options_list=['--timeout', '--to', '-t'], type=int,
