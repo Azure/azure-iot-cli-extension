@@ -122,7 +122,6 @@ class TestCentralHelpers():
             'tokenType': 'raw token 0 - A'
         }
 
-
     def test_get_iot_hub_token_from_central_app_id(self, fixture_get_iot_central_tokens):
         from azext_iot.common._azure import get_iot_hub_token_from_central_app_id
 
