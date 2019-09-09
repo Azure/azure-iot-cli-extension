@@ -50,14 +50,17 @@ def fixture_requests_post(mocker):
     class MockJsonObject:
         def get(self, _value):
             return ''
+
         def value(self):
             return 'fixture_requests_post value'
+
     class ReturnObject:
         def json(self):
             return MockJsonObject()
 
     mock = mocker.patch('requests.post')
     mock.return_value = ReturnObject()
+
 
 @pytest.fixture()
 def fixture_azure_profile(mocker):
@@ -76,7 +79,7 @@ def fixture_azure_profile(mocker):
 @pytest.fixture()
 def fixture_get_iot_central_tokens(mocker):
     mock = mocker.patch('azext_iot.common._azure.get_iot_central_tokens')
-    
+
     mock.return_value = {
         'eventhubSasToken': {
             'hostname': 'part1/part2/part3',
@@ -95,15 +98,16 @@ class TestCentralHelpers():
         from azext_iot.common._azure import get_iot_central_tokens
         import requests
 
-        #Test to ensure get_iot_central_tokens calls requests.post and tokens are returned
+        # Test to ensure get_iot_central_tokens calls requests.post and tokens are returned
         assert get_iot_central_tokens({}, 'app_id', 'aad_token').value() == 'fixture_requests_post value'
 
     def test_get_aad_token(self, fixture_azure_profile):
         from azext_iot.common._azure import _get_aad_token
+
         class Cmd:
             cli_ctx = 'test'
 
-        #Test to ensure _get_aad_token is called and returns the right values based on profile.get_raw_tokens
+        # Test to ensure _get_aad_token is called and returns the right values based on profile.get_raw_tokens
         assert _get_aad_token(Cmd(), 'resource') == {
             'accessToken': 'raw token 0 -b',
             'expiresOn': 'value',
@@ -115,11 +119,11 @@ class TestCentralHelpers():
     def test_get_event_hub_target_from_central_app_id(self, fixture_get_iot_central_tokens):
         from azext_iot.common._azure import get_event_hub_target_from_central_app_id
 
-        #Test to ensure get_event_hub_target_from_central_app_id builds right return value from get_iot_central_tokens
+        # Test to ensure get_event_hub_target_from_central_app_id builds right return value from get_iot_central_tokens
         assert get_event_hub_target_from_central_app_id({}, 'app_id', 'aad_token') == {
-            'address': 'amqps://part3/entityPath/$management', 
-            'endpoint': 'part3', 
-            'path': 'entityPath', 
+            'address': 'amqps://part3/entityPath/$management',
+            'endpoint': 'part3',
+            'path': 'entityPath',
             'token': 'sasToken',
             'tokenExpiry': '0000'
         }
@@ -127,9 +131,8 @@ class TestCentralHelpers():
     def test_get_iot_hub_token_from_central_app_id(self, fixture_get_iot_central_tokens):
         from azext_iot.common._azure import get_iot_hub_token_from_central_app_id
 
-        #Test to ensure get_iot_hub_token_from_central_app_id returns iothubTenantSasToken
+        # Test to ensure get_iot_hub_token_from_central_app_id returns iothubTenantSasToken
         assert get_iot_hub_token_from_central_app_id({}, 'app_id', 'aad_token') == 'iothubTenantSasToken'
-
 
 
 class TestDeviceTwinShow():
