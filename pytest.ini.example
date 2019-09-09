@@ -19,3 +19,5 @@ env =
     azext_pnp_endpoint=
     azext_pnp_repository=
     azext_pnp_cs=
+    azext_iot_central_app_id=
+    azext_iot_central_device_id=
