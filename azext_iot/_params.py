@@ -396,7 +396,6 @@ def load_arguments(self, _):
         context.argument('properties', options_list=['--properties', '--props', '-p'], arg_type=event_msg_prop_type)
         context.argument('content_type', options_list=['--content-type', '--ct'],
                          help='Specify the Content-Type of the message payload to automatically format the output to that type.')
-        context.argument('device_query', options_list=['--device-query', '-q'], help='Specify a custom query to filter devices.')
         context.argument('repair', options_list=['--repair', '-r'],
                          arg_type=get_three_state_flag(),
                          help='Reinstall uamqp dependency compatible with extension version. Default: false')
@@ -424,7 +423,6 @@ def load_arguments(self, _):
         context.argument('properties', options_list=['--properties', '--props', '-p'], arg_type=event_msg_prop_type)
         context.argument('content_type', options_list=['--content-type', '--ct'],
                          help='Specify the Content-Type of the message payload to automatically format the output to that type.')
-        context.argument('device_query', options_list=['--device-query', '-q'], help='Specify a custom query to filter devices.')
 
     with self.argument_context('iot dt') as context:
         context.argument('repo_login', options_list=['--repo-login', '--rl'],
