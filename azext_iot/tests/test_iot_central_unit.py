@@ -45,8 +45,94 @@ def fixture_bind_sdk(mocker):
     return mock
 
 
-class TestDeviceTwinShow():
+@pytest.fixture()
+def fixture_requests_post(mocker):
+    class MockJsonObject:
+        def get(self, _value):
+            return ''
+        def value(self):
+            return 'fixture_requests_post value'
+    class ReturnObject:
+        def json(self):
+            return MockJsonObject()
 
+    mock = mocker.patch('requests.post')
+    mock.return_value = ReturnObject()
+
+@pytest.fixture()
+def fixture_azure_profile(mocker):
+    mock = mocker.patch('azure.cli.core._profile.Profile.__init__')
+    mock.return_value = None
+
+    mock_method = mocker.patch('azure.cli.core._profile.Profile.get_raw_token')
+
+    class MockTokenWithGet:
+        def get(self, _value, _default):
+            return 'value'
+
+    mock_method.return_value = [['raw token 0 - A', 'raw token 0 -b', MockTokenWithGet()], 'raw token 1', 'raw token 2']
+
+
+@pytest.fixture()
+def fixture_get_iot_central_tokens(mocker):
+    mock = mocker.patch('azext_iot.common._azure.get_iot_central_tokens')
+    
+    mock.return_value = {
+        'eventhubSasToken': {
+            'hostname': 'part1/part2/part3',
+            'entityPath': 'entityPath',
+            'sasToken': 'sasToken'
+        },
+        'expiry': '0000',
+        'iothubTenantSasToken': {
+            'sasToken': 'iothubTenantSasToken'
+        }
+    }
+
+
+class TestCentralHelpers():
+    def test_get_iot_central_tokens(self, fixture_requests_post):
+        from azext_iot.common._azure import get_iot_central_tokens
+        import requests
+
+        #Test to ensure get_iot_central_tokens calls requests.post and tokens are returned
+        assert get_iot_central_tokens({}, 'app_id', 'aad_token').value() == 'fixture_requests_post value'
+
+    def test_get_aad_token(self, fixture_azure_profile):
+        from azext_iot.common._azure import _get_aad_token
+        class Cmd:
+            cli_ctx = 'test'
+
+        #Test to ensure _get_aad_token is called and returns the right values based on profile.get_raw_tokens
+        assert _get_aad_token(Cmd(), 'resource') == {
+            'accessToken': 'raw token 0 -b',
+            'expiresOn': 'value',
+            'subscription': 'raw token 1',
+            'tenant': 'raw token 2',
+            'tokenType': 'raw token 0 - A'
+        }
+
+    def test_get_event_hub_target_from_central_app_id(self, fixture_get_iot_central_tokens):
+        from azext_iot.common._azure import get_event_hub_target_from_central_app_id
+
+        #Test to ensure get_event_hub_target_from_central_app_id builds right return value from get_iot_central_tokens
+        assert get_event_hub_target_from_central_app_id({}, 'app_id', 'aad_token') == {
+            'address': 'amqps://part3/entityPath/$management', 
+            'endpoint': 'part3', 
+            'path': 'entityPath', 
+            'token': 'sasToken',
+            'tokenExpiry': '0000'
+        }
+
+    def test_get_iot_hub_token_from_central_app_id(self, fixture_get_iot_central_tokens):
+        from azext_iot.common._azure import get_iot_hub_token_from_central_app_id
+
+        #Test to ensure get_iot_hub_token_from_central_app_id returns iothubTenantSasToken
+        assert get_iot_hub_token_from_central_app_id({}, 'app_id', 'aad_token') == 'iothubTenantSasToken'
+
+
+
+class TestDeviceTwinShow():
     def test_device_twin_show_calls_get_twin(self, fixture_iot_token, fixture_bind_sdk, fixture_cmd):
         result = subject.iot_central_device_show(fixture_cmd, device_id, app_id)
 
