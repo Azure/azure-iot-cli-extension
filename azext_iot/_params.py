@@ -405,7 +405,6 @@ def load_arguments(self, _):
                          arg_type=get_three_state_flag(),
                          help='Skip user prompts. Indicates acceptance of dependency installation (if required). '
                          'Used primarily for automation scenarios. Default: false')
-        context.argument('aad_token', options_list=['--aad-token'], help='AAD Token to use.')
 
     with self.argument_context('iotcentral device-twin show') as context:
         context.argument('device_id', options_list=['--device-id', '-d'], help='Target Device.')
