@@ -126,7 +126,7 @@ def load_command_table(self, _):
 
     with self.command_group('iotcentral device-twin', command_type=iotcentral_ops) as cmd_group:
         cmd_group.command('show', 'iot_central_device_show',
-                          deprecate_info='az iot edge set-modules')
+                          deprecate_info='az iot central device-twin')
 
     with self.command_group('iot central app', command_type=iotcentral_ops) as cmd_group:
         cmd_group.command('monitor-events', 'iot_central_monitor_events',
