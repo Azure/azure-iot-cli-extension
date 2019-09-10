@@ -296,6 +296,31 @@ def calculate_millisec_since_unix_epoch_utc():
     return int(1000 * (now - epoch).total_seconds())
 
 
+def init_monitoring(cmd, timeout, properties, enqueued_time, repair, yes):
+    from azext_iot.common.deps import ensure_uamqp
+    from knack.util import CLIError
+
+    validate_min_python_version(3, 5)
+
+    if timeout < 0:
+        raise CLIError('Monitoring timeout must be 0 (inf) or greater.')
+    timeout = (timeout * 1000)
+
+    config = cmd.cli_ctx.config
+    output = cmd.cli_ctx.invocation.data.get("output", None)
+    if not output:
+        output = 'json'
+    ensure_uamqp(config, yes, repair)
+
+    if not properties:
+        properties = []
+    properties = set((key.lower() for key in properties))
+
+    if not enqueued_time:
+        enqueued_time = calculate_millisec_since_unix_epoch_utc()
+    return (enqueued_time, properties, timeout, output)
+
+
 def get_sas_token(target):
     from azext_iot.common.digitaltwin_sas_token_auth import DigitalTwinSasTokenAuthentication
     token = ''

@@ -5,6 +5,7 @@ Release History
 
 0.8.1
 +++++++++++++++
+* Added support for iot central commands, monitor-events and device-twin show
 * Schema validation applies for creation of IoT Edge deployments or when setting modules per device
 
 0.8.0
