@@ -175,9 +175,10 @@ def iot_digitaltwin_property_update(cmd, interface_payload, device_id,
         raise CLIError(unpack_msrest_error(e))
 
 
-def iot_digitaltwin_monitor_events(cmd, device_id=None, device_query=None, interface=None, source_model='public',
-                                   repo_endpoint=PNP_ENDPOINT, repo_id=None, consumer_group='$Default', timeout=300,
-                                   hub_name=None, resource_group_name=None, yes=False, properties=None, repair=False,
+def iot_digitaltwin_monitor_events(cmd, device_id=None, device_query=None, interface=None,
+                                   source_model=ModelSourceType.public.value, repo_endpoint=PNP_ENDPOINT,
+                                   repo_id=None, consumer_group='$Default', timeout=300, hub_name=None,
+                                   resource_group_name=None, yes=False, properties=None, repair=False,
                                    login=None, repo_login=None):
     source_model = source_model.lower()
     pnp_context = {'enabled': True, 'interface': {}}
