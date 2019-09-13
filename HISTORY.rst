@@ -5,12 +5,14 @@ Release History
 
 0.8.1
 +++++++++++++++
-* Added support for iot central commands, monitor-events and device-twin show
-* Schema validation applies for creation of IoT Edge deployments or when setting modules per device
+* PnP monitor events commands - Adds an option for filtering devices by twin query.
+* PnP monitor events commands - Some existing mandatory parameters are now optional.
+* Added support for iot central commands, monitor-events and device-twin show.
+* Schema validation applies for creation of IoT Edge deployments or when setting modules per device.
 
 0.8.0
 +++++++++++++++
-* Added Azure IoT Plug & Play public preview functionality
+* Added Azure IoT Plug & Play public preview functionality.
 
 0.7.1
 +++++++++++++++
