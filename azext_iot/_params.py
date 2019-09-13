@@ -452,6 +452,8 @@ def load_arguments(self, _):
         context.argument('repair', options_list=['--repair'],
                          arg_type=get_three_state_flag(),
                          help='Reinstall uamqp dependency compatible with extension version. Default: false')
+        context.argument('device_query', options_list=['--device-query', '-q'],
+                         help='Specify a custom query to filter devices.')
 
     with self.argument_context('iot pnp') as context:
         context.argument('model', options_list=['--model', '-m'],

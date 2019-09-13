@@ -1093,6 +1093,12 @@ helps['iot dt monitor-events'] = """
     short-summary: Monitor digital twin events.
     long-summary: You can leverage az login and provide --hub-name instead of --login for every command.
     examples:
+    - name: Monitor digital twin events of all devices.
+      text: >
+        az iot dt monitor-events --login {iothub_cs}
+    - name: Monitor digital twin events of filtered devices using IoT Hub query language.
+      text: >
+        az iot dt monitor-events --login {iothub_cs} -q "select * from devices where tags.location.region = 'US'"
     - name: Monitor digital twin events of device's interface.
       text: >
         az iot dt monitor-events --login {iothub_cs} --device-id {device_id} --source device
@@ -1105,7 +1111,7 @@ helps['iot dt monitor-events'] = """
       text: >
         az iot dt monitor-events --login {iothub_cs} --device-id {device_id}
         --interface {plug_and_play_interface} --consumer-group {consumer_group_name}
-        --properties all --source device
+        --properties all --source private -r {pnp_repository}
 """
 
 helps['iot dt update-property'] = """
