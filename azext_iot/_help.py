@@ -961,6 +961,11 @@ helps['iotcentral device-twin show'] = """
     long-summary: DEPRECATED. Use 'az iot central device-twin show' instead.
 """
 
+helps['iot central'] = """
+    type: group
+    short-summary: Manage Azure IoT Central assets.
+"""
+
 helps['iot central app'] = """
     type: group
     short-summary: Manage Azure IoT Central applications.
