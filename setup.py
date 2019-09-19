@@ -48,7 +48,7 @@ CLASSIFIERS = [
 # though that is installed out of band (managed by the extension)
 # for compatibility reasons.
 
-DEPENDENCIES = ["paho-mqtt==1.3.1", "jsonschema~=3.0.2"]
+DEPENDENCIES = ["paho-mqtt==1.3.1", "jsonschema~=3.0.2", "setuptools"]
 
 
 setup(

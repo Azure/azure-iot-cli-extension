@@ -3,6 +3,10 @@
 Release History
 ===============
 
+0.8.2
++++++++++++++++
+* Resolve jsonschema dependency issue.
+
 0.8.1
 +++++++++++++++
 * PnP monitor events commands - Adds an option for filtering devices by twin query.

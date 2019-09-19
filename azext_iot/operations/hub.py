@@ -623,6 +623,12 @@ def _process_config_content(content, content_type='module'):
 
 
 def _validate_payload_schema(content):
+    from azure.cli.core.extension import get_extension_path
+    from azext_iot._constants import EXTENSION_NAME
+    import pkg_resources
+
+    pkg_resources.working_set.add_entry(get_extension_path(EXTENSION_NAME))
+
     from jsonschema import validate
     from jsonschema.exceptions import ValidationError, SchemaError
     from azext_iot._constants import EDGE_DEPLOYMENT_SCHEMA_2_PATH as schema_path
