@@ -131,7 +131,7 @@ async def monitor_events(endpoint, connection, path, auth, partition, consumer_g
             return
 
         if pnp_context:
-            msg_interface_id = str(msg.annotations.get(b'iothub-interface-id'), 'utf8')
+            msg_interface_id = str(msg.annotations.get(b'iothub-interface-name'), 'utf8')
             if not msg_interface_id:
                 return
 
