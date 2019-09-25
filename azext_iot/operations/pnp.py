@@ -10,7 +10,7 @@ from knack.log import get_logger
 from knack.util import CLIError
 from azext_iot.common.shared import SdkType, PnPModelType
 from azext_iot.common._azure import get_iot_pnp_connection_string
-from azext_iot.pnp_sdk.models import SearchOptions
+from azext_iot.sdk.pnp.models import SearchOptions
 from azext_iot._factory import _bind_sdk
 from azext_iot._constants import PNP_API_VERSION, PNP_ENDPOINT
 from azext_iot.common.utility import (unpack_pnp_http_error,

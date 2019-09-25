@@ -15,19 +15,19 @@ from azext_iot.common.utility import shell_safe_json_parse
 from azext_iot.common.certops import open_certificate
 from azext_iot.operations.generic import _execute_query
 from azext_iot._factory import _bind_sdk
-from azext_iot.dps_sdk.models.individual_enrollment import IndividualEnrollment
-from azext_iot.dps_sdk.models.attestation_mechanism import AttestationMechanism
-from azext_iot.dps_sdk.models.tpm_attestation import TpmAttestation
-from azext_iot.dps_sdk.models.symmetric_key_attestation import SymmetricKeyAttestation
-from azext_iot.dps_sdk.models.x509_attestation import X509Attestation
-from azext_iot.dps_sdk.models.x509_certificates import X509Certificates
-from azext_iot.dps_sdk.models.x509_certificate_with_info import X509CertificateWithInfo
-from azext_iot.dps_sdk.models.initial_twin import InitialTwin
-from azext_iot.dps_sdk.models.twin_collection import TwinCollection
-from azext_iot.dps_sdk.models.initial_twin_properties import InitialTwinProperties
-from azext_iot.dps_sdk.models.enrollment_group import EnrollmentGroup
-from azext_iot.dps_sdk.models.x509_ca_references import X509CAReferences
-from azext_iot.dps_sdk.models.reprovision_policy import ReprovisionPolicy
+from azext_iot.sdk.dps.models.individual_enrollment import IndividualEnrollment
+from azext_iot.sdk.dps.models.attestation_mechanism import AttestationMechanism
+from azext_iot.sdk.dps.models.tpm_attestation import TpmAttestation
+from azext_iot.sdk.dps.models.symmetric_key_attestation import SymmetricKeyAttestation
+from azext_iot.sdk.dps.models.x509_attestation import X509Attestation
+from azext_iot.sdk.dps.models.x509_certificates import X509Certificates
+from azext_iot.sdk.dps.models.x509_certificate_with_info import X509CertificateWithInfo
+from azext_iot.sdk.dps.models.initial_twin import InitialTwin
+from azext_iot.sdk.dps.models.twin_collection import TwinCollection
+from azext_iot.sdk.dps.models.initial_twin_properties import InitialTwinProperties
+from azext_iot.sdk.dps.models.enrollment_group import EnrollmentGroup
+from azext_iot.sdk.dps.models.x509_ca_references import X509CAReferences
+from azext_iot.sdk.dps.models.reprovision_policy import ReprovisionPolicy
 
 logger = get_logger(__name__)
 
@@ -35,7 +35,7 @@ logger = get_logger(__name__)
 # DPS Enrollments
 
 def iot_dps_device_enrollment_list(client, dps_name, resource_group_name, top=None):
-    from azext_iot.dps_sdk.models.query_specification import QuerySpecification
+    from azext_iot.sdk.dps.models.query_specification import QuerySpecification
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
@@ -206,7 +206,7 @@ def iot_dps_device_enrollment_delete(client, enrollment_id, dps_name, resource_g
 # DPS Enrollments Group
 
 def iot_dps_device_enrollment_group_list(client, dps_name, resource_group_name, top=None):
-    from azext_iot.dps_sdk.models.query_specification import QuerySpecification
+    from azext_iot.sdk.dps.models.query_specification import QuerySpecification
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)

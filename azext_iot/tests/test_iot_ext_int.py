@@ -3,7 +3,6 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-# pylint: disable=too-many-statements,wrong-import-position,too-many-lines,import-error
 
 import os
 import random
@@ -50,7 +49,7 @@ DEVICE_PREFIX = "test-device-"
 
 class TestIoTHub(LiveScenarioTest):
     def __init__(self, _):
-        from iotext_test_tools import DummyCliOutputProducer
+        from . import DummyCliOutputProducer
 
         super(TestIoTHub, self).__init__(_)
         self.cli_ctx = DummyCliOutputProducer()
@@ -60,7 +59,7 @@ class TestIoTHub(LiveScenarioTest):
 
     # TODO: @digimaun - Maybe put a helper like this in the shared lib, when you create it?
     def command_execute_assert(self, command, asserts):
-        from iotext_test_tools import capture_output
+        from . import capture_output
 
         with capture_output() as buffer:
             self.cmd(command, checks=None)

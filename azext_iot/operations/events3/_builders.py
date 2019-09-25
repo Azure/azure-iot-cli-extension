@@ -10,7 +10,7 @@ DEBUG = True
 
 class AmqpBuilder():
     @classmethod
-    def build_iothub_amqp_endpoint_from_target(self, target, duration=360):
+    def build_iothub_amqp_endpoint_from_target(cls, target, duration=360):
         hub_name = target['entity'].split('.')[0]
         user = "{}@sas.root.{}".format(target['policy'], hub_name)
         sas_token = SasTokenAuthentication(target['entity'], target['policy'],

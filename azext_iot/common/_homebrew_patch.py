@@ -3,9 +3,6 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-# This module is copied from Azure CLI
-# https://github.com/Azure/azure-cli/blob/master/src/command_modules/azure-cli-extension/azure/cli/command_modules/extension/_homebrew_patch.py
-
 import os
 import sys
 
@@ -22,7 +19,7 @@ def is_homebrew():
 
 
 # A workaround for https://github.com/Azure/azure-cli/issues/4428
-class HomebrewPipPatch(object):  # pylint: disable=too-few-public-methods
+class HomebrewPipPatch(object):
 
     CFG_FILE = os.path.expanduser(os.path.join('~', '.pydistutils.cfg'))
 
