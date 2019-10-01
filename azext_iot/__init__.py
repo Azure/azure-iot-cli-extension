@@ -7,7 +7,7 @@
 from azure.cli.core import AzCommandsLoader
 from azure.cli.core.commands import CliCommandType
 from azext_iot._factory import iot_service_provisioning_factory
-from azext_iot._constants import VERSION
+from azext_iot.constants import VERSION
 import azext_iot._help  # noqa: F401
 
 

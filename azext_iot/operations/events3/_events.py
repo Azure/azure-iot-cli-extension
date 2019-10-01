@@ -14,7 +14,7 @@ import six
 import uamqp
 import yaml
 
-from azext_iot._constants import VERSION
+from azext_iot.constants import VERSION
 from azext_iot.common.utility import parse_entity, unicode_binary_map
 from knack.log import get_logger
 from azext_iot.operations.events3._builders import AmqpBuilder
@@ -71,7 +71,7 @@ def executor(
         def stop_and_suppress_eloop():
             try:
                 loop.stop()
-            except Exception:  # pylint: disable=broad-except
+            except Exception:
                 pass
 
         six.print_(
@@ -222,7 +222,7 @@ async def monitor_events(
                 payload = json.loads(
                     re.compile(r"(\\r\\n)+|\\r+|\\n+").sub("", payload)
                 )
-            except Exception:  # pylint: disable=broad-except
+            except Exception:
                 # We don't want to crash the monitor if JSON parsing fails
                 pass
 

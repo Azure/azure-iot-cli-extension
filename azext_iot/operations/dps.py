@@ -56,7 +56,6 @@ def iot_dps_device_enrollment_get(client, enrollment_id, dps_name, resource_grou
         raise CLIError(e)
 
 
-# pylint: disable=too-many-locals
 def iot_dps_device_enrollment_create(client,
                                      enrollment_id,
                                      attestation_type,
@@ -113,7 +112,6 @@ def iot_dps_device_enrollment_create(client,
         raise CLIError(e)
 
 
-# pylint: disable=too-many-locals
 def iot_dps_device_enrollment_update(client,
                                      enrollment_id,
                                      dps_name,

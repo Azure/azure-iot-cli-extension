@@ -3,7 +3,6 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-# pylint: disable=unused-argument,no-self-use
 
 
 import ssl
@@ -13,7 +12,7 @@ import six
 from time import time, sleep
 from paho.mqtt import client as mqtt
 
-from azext_iot._constants import EXTENSION_ROOT
+from azext_iot.constants import EXTENSION_ROOT
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 
 connection_result = {0: "success", 1: "refused - incorrect protocol version", 2: "refused - invalid client id",

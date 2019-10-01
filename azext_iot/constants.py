@@ -7,7 +7,7 @@
 import os
 
 VERSION = "0.8.3"
-EXTENSION_NAME = "azure-iot"
+EXTENSION_NAME = "azure-cli-iot-ext"
 EXTENSION_ROOT = os.path.dirname(os.path.abspath(__file__))
 EXTENSION_CONFIG_ROOT_KEY = "iotext"
 EDGE_DEPLOYMENT_SCHEMA_2_PATH = os.path.join(EXTENSION_ROOT, 'assets', 'edge-deploy-2.0.schema.json')

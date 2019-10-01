@@ -3,7 +3,6 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-# pylint: disable=W0613,W0621
 
 from azext_iot.operations import central as subject
 from azext_iot.common.shared import SdkType

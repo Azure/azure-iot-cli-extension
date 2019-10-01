@@ -62,7 +62,6 @@ def parse_iot_device_module_connection_string(cs):
 CONN_STR_TEMPLATE = 'HostName={};SharedAccessKeyName={};SharedAccessKey={}'
 
 
-# pylint: disable=broad-except
 def get_iot_hub_connection_string(
         cmd,
         hub_name,
@@ -172,7 +171,6 @@ def get_iot_hub_connection_string(
     return result
 
 
-# pylint: disable=broad-except
 def get_iot_dps_connection_string(
         client,
         dps_name,
@@ -265,7 +263,6 @@ def get_iot_hub_token_from_central_app_id(cmd, app_id):
     return get_iot_central_tokens(cmd, app_id)['iothubTenantSasToken']['sasToken']
 
 
-# pylint: disable=broad-except
 def get_iot_pnp_connection_string(
         cmd,
         endpoint,
@@ -291,7 +288,7 @@ def get_iot_pnp_connection_string(
 
     from azure.cli.command_modules.iot.digitaltwinrepositoryprovisioningservice import DigitalTwinRepositoryProvisioningService
     from azure.cli.command_modules.iot._utils import get_auth_header
-    from azext_iot._constants import PNP_REPO_ENDPOINT
+    from azext_iot.constants import PNP_REPO_ENDPOINT
 
     result = {}
     client = None

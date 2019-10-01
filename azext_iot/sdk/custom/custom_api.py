@@ -18,10 +18,9 @@ from msrest.pipeline import ClientRawResponse
 from msrestazure import AzureConfiguration
 from . import models
 from .version import VERSION
-from azext_iot._constants import VERSION as extver
+from azext_iot.constants import VERSION as extver
 
 
-# pylint: disable=too-few-public-methods
 class CustomAPIConfiguration(AzureConfiguration):
     """
     Configuration for CustomClient.
@@ -76,7 +75,6 @@ class CustomClient(object):
         self._serialize = Serializer()
         self._deserialize = Deserializer()
 
-    # pylint: disable=too-many-locals
     def build_device_file_container(
             self, deviceid, blob_name, custom_headers=None, raw=False, **operation_config):
         """
@@ -150,7 +148,6 @@ class CustomClient(object):
 
         return deserialized
 
-    # pylint: disable=too-many-locals
     def post_file_notification(
             self, deviceid, correlation_id, custom_headers=None, raw=False, **operation_config):
         """

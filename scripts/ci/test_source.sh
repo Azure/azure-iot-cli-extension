@@ -6,7 +6,7 @@ echo "Installing azure-cli-testsdk and azure-cli..."
 
 # Update the git commit or branch when we need a new version of azure-cli-testsdk
 pip install --pre azure-cli --extra-index-url https://azurecliprod.blob.core.windows.net/edge
-pip install -e "git+https://github.com/Azure/azure-cli@dev#egg=azure-cli-dev-tools&subdirectory=tools" -q
+pip install -e "git+https://github.com/Azure/azure-cli@dev#egg=azure-cli-testsdk&subdirectory=src/azure-cli-testsdk"
 
 echo "Installed."
 az --version
@@ -17,9 +17,9 @@ EXT='azure-cli-iot-ext'
 echo "Setting up extension directory..."
 export AZURE_EXTENSION_DIR=$(mktemp -d)
 pip install --upgrade --target $AZURE_EXTENSION_DIR/$EXT .
-az --debug
+pip install -r dev_requirements
 
-export PYTHONPATH=$AZURE_EXTENSION_DIR/$EXT/:$(pwd)/
+az --debug
 
 echo "Running IoT extension unit tests..."
 echo "Executing - IoT Hub unit tests"
@@ -41,3 +41,11 @@ echo "Executing - Digitaltwin unit tests"
 pytest -v azext_iot/tests/test_iot_digitaltwin_unit.py
 
 echo "Tests completed."
+
+proc_number=`python -c 'import multiprocessing; print(multiprocessing.cpu_count())'`
+
+echo "Running IoT extension linters..."
+
+# Run pylint/flake8 on IoT extension
+pylint azext_iot/ --rcfile=.pylintrc -j $proc_number
+flake8 azext_iot/ --statistics --config=setup.cfg

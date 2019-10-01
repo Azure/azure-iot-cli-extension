@@ -17,8 +17,8 @@ from msrest.pipeline import ClientRawResponse
 from msrestazure.azure_exceptions import CloudError
 import uuid
 from . import models
-from azext_iot._constants import VERSION as extver
-from azext_iot._constants import BASE_API_VERSION, PNP_API_VERSION
+from azext_iot.constants import VERSION as extver
+from azext_iot.constants import BASE_API_VERSION, PNP_API_VERSION
 
 
 class IotHubGatewayServiceAPIsConfiguration(AzureConfiguration):

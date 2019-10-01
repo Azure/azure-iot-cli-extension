@@ -8,7 +8,7 @@ import subprocess
 import sys
 from azure.cli.core.extension import get_extension_path, extension_exists
 from knack.log import get_logger
-from azext_iot._constants import EXTENSION_NAME
+from azext_iot.constants import EXTENSION_NAME
 
 
 logger = get_logger(__name__)

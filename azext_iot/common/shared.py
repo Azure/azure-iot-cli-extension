@@ -12,7 +12,6 @@ shared: Define shared data types(enums); hub and dps connection string functions
 from enum import Enum
 
 
-# pylint: disable=too-few-public-methods
 class SdkType(Enum):
     """
     Target SDK for interop.
@@ -28,7 +27,6 @@ class SdkType(Enum):
     pnp_sdk = 8
 
 
-# pylint: disable=too-few-public-methods
 class EntityStatusType(Enum):
     """
     Resource status.
@@ -37,7 +35,6 @@ class EntityStatusType(Enum):
     enabled = 'enabled'
 
 
-# pylint: disable=too-few-public-methods
 class SettleType(Enum):
     """
     Settlement state of C2D message.
@@ -47,7 +44,6 @@ class SettleType(Enum):
     reject = 'reject'
 
 
-# pylint: disable=too-few-public-methods
 class DeviceAuthType(Enum):
     """
     Device Authorization type.
@@ -57,7 +53,6 @@ class DeviceAuthType(Enum):
     x509_ca = 'x509_ca'
 
 
-# pylint: disable=too-few-public-methods
 class KeyType(Enum):
     """
     Shared private key.
@@ -66,7 +61,6 @@ class KeyType(Enum):
     secondary = 'secondary'
 
 
-# pylint: disable=too-few-public-methods
 class AttestationType(Enum):
     """
     Type of atestation (TMP or certificate based).
@@ -76,7 +70,6 @@ class AttestationType(Enum):
     symmetricKey = 'symmetricKey'
 
 
-# pylint: disable=too-few-public-methods
 class ProtocolType(Enum):
     """
     Device message protocol.
@@ -85,7 +78,6 @@ class ProtocolType(Enum):
     mqtt = 'mqtt'
 
 
-# pylint: disable=too-few-public-methods
 class AckType(Enum):
     """
     Type of request for acknowledgement of c2d message.
@@ -95,7 +87,6 @@ class AckType(Enum):
     full = 'full'
 
 
-# pylint: disable=too-few-public-methods
 class QueryType(Enum):
     """
     Type of request for acknowledgement of c2d message.
@@ -104,7 +95,6 @@ class QueryType(Enum):
     job = 'job'
 
 
-# pylint: disable=too-few-public-methods
 class MetricType(Enum):
     """
     Type of request for acknowledgement of c2d message.
@@ -113,7 +103,6 @@ class MetricType(Enum):
     user = 'user'
 
 
-# pylint: disable=too-few-public-methods
 class ReprovisionType(Enum):
     """
     Type of re-provisioning for device data to different IoT Hub.
@@ -123,7 +112,6 @@ class ReprovisionType(Enum):
     never = 'never'
 
 
-# pylint: disable=too-few-public-methods
 class AllocationType(Enum):
     """
     Type of allocation for device assigned to the Hub.
@@ -133,7 +121,6 @@ class AllocationType(Enum):
     static = 'static'
 
 
-# pylint: disable=too-few-public-methods
 class DistributedTracingSamplingModeType(Enum):
     """
     Enable distributed tracing to add correlation IDs to messages.
@@ -142,7 +129,6 @@ class DistributedTracingSamplingModeType(Enum):
     on = 'on'
 
 
-# pylint: disable=too-few-public-methods
 class PnPModelType(Enum):
     """
     Type of PnP Model.
@@ -152,7 +138,6 @@ class PnPModelType(Enum):
     capabilityModel = 'capabilityModel'
 
 
-# pylint: disable=too-few-public-methods
 class ModelSourceType(Enum):
     """
     Type of source to get model definition.

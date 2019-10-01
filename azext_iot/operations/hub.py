@@ -10,12 +10,12 @@ import six
 from knack.log import get_logger
 from knack.util import CLIError
 from azure.cli.core.util import read_file_content
-from azext_iot._constants import (EXTENSION_ROOT,
-                                  BASE_API_VERSION,
-                                  DEVICE_DEVICESCOPE_PREFIX,
-                                  TRACING_PROPERTY,
-                                  TRACING_ALLOWED_FOR_LOCATION,
-                                  TRACING_ALLOWED_FOR_SKU)
+from azext_iot.constants import (EXTENSION_ROOT,
+                                 BASE_API_VERSION,
+                                 DEVICE_DEVICESCOPE_PREFIX,
+                                 TRACING_PROPERTY,
+                                 TRACING_ALLOWED_FOR_LOCATION,
+                                 TRACING_ALLOWED_FOR_SKU)
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import (DeviceAuthType,
                                      SdkType,
@@ -622,14 +622,14 @@ def _process_config_content(content, content_type='module'):
 
 def _validate_payload_schema(content):
     from azure.cli.core.extension import get_extension_path
-    from azext_iot._constants import EXTENSION_NAME
+    from azext_iot.constants import EXTENSION_NAME
     import pkg_resources
 
     pkg_resources.working_set.add_entry(get_extension_path(EXTENSION_NAME))
 
     from jsonschema import validate
     from jsonschema.exceptions import ValidationError, SchemaError
-    from azext_iot._constants import EDGE_DEPLOYMENT_SCHEMA_2_PATH as schema_path
+    from azext_iot.constants import EDGE_DEPLOYMENT_SCHEMA_2_PATH as schema_path
 
     try:
         if not exists(schema_path):
@@ -863,7 +863,7 @@ def iot_device_twin_replace(cmd, device_id, target_json, hub_name=None, resource
 def iot_device_method(cmd, device_id, method_name, hub_name=None, method_payload="{}",
                       timeout=60, resource_group_name=None, login=None):
     from azext_iot.sdk.service.models.cloud_to_device_method import CloudToDeviceMethod
-    from azext_iot._constants import METHOD_INVOKE_MAX_TIMEOUT_SEC, METHOD_INVOKE_MIN_TIMEOUT_SEC
+    from azext_iot.constants import METHOD_INVOKE_MAX_TIMEOUT_SEC, METHOD_INVOKE_MIN_TIMEOUT_SEC
 
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     if timeout > METHOD_INVOKE_MAX_TIMEOUT_SEC:
@@ -893,7 +893,7 @@ def iot_device_method(cmd, device_id, method_name, hub_name=None, method_payload
 def iot_device_module_method(cmd, device_id, module_id, method_name, hub_name=None, method_payload="{}",
                              timeout=60, resource_group_name=None, login=None):
     from azext_iot.sdk.service.models.cloud_to_device_method import CloudToDeviceMethod
-    from azext_iot._constants import METHOD_INVOKE_MAX_TIMEOUT_SEC, METHOD_INVOKE_MIN_TIMEOUT_SEC
+    from azext_iot.constants import METHOD_INVOKE_MAX_TIMEOUT_SEC, METHOD_INVOKE_MIN_TIMEOUT_SEC
 
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     if timeout > METHOD_INVOKE_MAX_TIMEOUT_SEC:
@@ -1203,7 +1203,7 @@ def iot_simulate_device(cmd, device_id, hub_name=None, receive_settle='complete'
     import json
     from azext_iot.operations._mqtt import mqtt_client_wrap
     from azext_iot.common.utility import execute_onthread
-    from azext_iot._constants import MIN_SIM_MSG_INTERVAL, MIN_SIM_MSG_COUNT, SIM_RECEIVE_SLEEP_SEC
+    from azext_iot.constants import MIN_SIM_MSG_INTERVAL, MIN_SIM_MSG_COUNT, SIM_RECEIVE_SLEEP_SEC
 
     if protocol_type == 'mqtt':
         if receive_settle != 'complete':

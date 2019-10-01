@@ -11,17 +11,25 @@ from codecs import open
 from setuptools import setup, find_packages
 
 
-PACKAGE_NAME = "azure-iot"
 EXTENSION_REF_NAME = "azext_iot"
 
 # Version extraction inspired from 'requests'
-with open(os.path.join(EXTENSION_REF_NAME, "_constants.py"), "r") as fd:
+with open(os.path.join(EXTENSION_REF_NAME, "constants.py"), "r", encoding="utf-8") as fd:
+    constants_raw = fd.read()
     VERSION = re.search(
-        r'^VERSION\s*=\s*[\'"]([^\'"]*)[\'"]', fd.read(), re.MULTILINE
+        r'^VERSION\s*=\s*[\'"]([^\'"]*)[\'"]', constants_raw, re.MULTILINE
     ).group(1)
+
+    PACKAGE_NAME = re.search(
+        r'^EXTENSION_NAME\s*=\s*[\'"]([^\'"]*)[\'"]', constants_raw, re.MULTILINE
+    ).group(1)
+
 
 if not VERSION:
     raise RuntimeError("Cannot find version information")
+
+if not PACKAGE_NAME:
+    raise RuntimeError("Cannot find package information")
 
 
 # The following dependencies are needed by the IoT extension.
@@ -31,13 +39,13 @@ if not VERSION:
 # 'jmespath==0.9.3',
 # 'pyyaml==3.13'
 # 'knack>=0.3.1'
-# 'jsonschema~=3.0.2'
+# 'jsonschema==3.0.2'
 
 # There is also a dependency for uamqp for amqp based commands
 # though that is installed out of band (managed by the extension)
 # for compatibility reasons.
 
-DEPENDENCIES = ["paho-mqtt==1.3.1", "jsonschema~=3.0.2", "setuptools"]
+DEPENDENCIES = ["paho-mqtt==1.3.1", "jsonschema==3.0.2", "setuptools"]
 
 
 CLASSIFIERS = [
