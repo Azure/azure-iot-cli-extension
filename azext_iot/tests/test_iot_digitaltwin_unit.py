@@ -3,18 +3,15 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-# pylint: disable=W0613,W0621
 
 import pytest
-import random
 import json
 import os
 import sys
 
-from uuid import uuid4
 from azext_iot.operations import digitaltwin as subject
 from azext_iot.operations.digitaltwin import INTERFACE_KEY_NAME
-from azext_iot.common.utility import url_encode_str, validate_min_python_version
+from azext_iot.common.utility import validate_min_python_version
 from knack.util import CLIError
 from azure.cli.core.util import read_file_content
 

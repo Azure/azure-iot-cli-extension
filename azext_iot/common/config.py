@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from azext_iot._constants import CONFIG_KEY_UAMQP_EXT_VERSION, EXTENSION_CONFIG_ROOT_KEY
+from azext_iot.constants import CONFIG_KEY_UAMQP_EXT_VERSION, EXTENSION_CONFIG_ROOT_KEY
 
 
 def get_uamqp_ext_version(config):

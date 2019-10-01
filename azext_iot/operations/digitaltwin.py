@@ -1,13 +1,13 @@
 # coding=utf-8
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
-# Unpublished works.
+# Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
 from os.path import exists
 from knack.util import CLIError
 from azure.cli.core.util import read_file_content
-from azext_iot._constants import PNP_ENDPOINT
+from azext_iot.constants import PNP_ENDPOINT
 from azext_iot._factory import _bind_sdk
 from azext_iot.common.shared import SdkType, ModelSourceType
 from azext_iot.common._azure import get_iot_hub_connection_string
@@ -114,7 +114,6 @@ def iot_digitaltwin_properties_list(cmd, device_id, source_model, interface=None
     return {'interfaces': result}
 
 
-# pylint: disable=too-many-locals
 def iot_digitaltwin_invoke_command(cmd, interface, device_id, command_name, command_payload=None,
                                    timeout=10, hub_name=None, resource_group_name=None, login=None):
     device_interfaces = _iot_digitaltwin_interface_list(cmd, device_id, hub_name, resource_group_name, login)
@@ -291,6 +290,6 @@ def _device_interface_elements(cmd, device_id, interface, target_type, hub_name,
         return interface_elements
     except errors.CloudError as e:
         raise CLIError(unpack_msrest_error(e))
-    except Exception:  # pylint: disable=broad-except
+    except Exception:
         # returning an empty collection to continue
         return []

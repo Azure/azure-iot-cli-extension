@@ -3,7 +3,7 @@ from knack.util import CLIError
 from azext_iot.common.utility import validate_min_python_version
 from azext_iot.common.deps import ensure_uamqp
 from azext_iot._validators import mode2_iot_login_handler
-from azext_iot._constants import EVENT_LIB
+from azext_iot.constants import EVENT_LIB
 
 
 class TestMinPython():

@@ -4,25 +4,12 @@ language: python
 before_install:
   - chmod +x ./scripts/ci/test_source.sh
   - chmod +x ./scripts/ci/test_static.sh
-  - chmod +x ./scripts/ci/test_static_py2.sh
   - chmod +x ./scripts/ci/test_clicore_linter.sh
 install:
     - pip install -e .
     - pip install -r ./dev_requirements
 jobs:
   include:
-   - stage: precondition
-     env: PURPOSE='SourceStaticTests'
-     script: ./scripts/ci/test_static_py2.sh
-     python: 2.7
-   - stage: precondition
-     env: PURPOSE='SourceStaticTests'
-     script: ./scripts/ci/test_static.sh
-     python: 3.6
-   - stage: verify
-     env: PURPOSE='SourceUnitTests'
-     script: ./scripts/ci/test_source.sh
-     python: 2.7
    - stage: verify
      env: PURPOSE='SourceUnitTests'
      script: ./scripts/ci/test_source.sh

@@ -357,19 +357,6 @@ helps['iot hub module-twin replace'] = """
         -m {module_name} -j ../mymodtwin.json
 """
 
-helps['iot hub apply-configuration'] = """
-    type: command
-    short-summary: Apply a deployment manifest to a single device.
-    long-summary: DEPRECATED. Use 'az iot edge set-modules' instead.
-                  Manifest content is json and must have root element of 'content' or 'moduleContent'
-                  e.g. {"content":{...}} or {"moduleContent":{...}}
-    examples:
-    - name: Test modules while in development.
-      text: >
-        az iot hub apply-configuration --hub-name {iothub_name} --device-id {device_id}
-        --content ../mycontent.json
-"""
-
 helps['iot hub generate-sas-token'] = """
     type: command
     short-summary: Generate a SAS token for a target IoT Hub, device or module.

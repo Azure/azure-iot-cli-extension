@@ -1,23 +1,18 @@
 # coding=utf-8
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
-# Unpublished works.
+# Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-import pytest
+
 import random
 import json
 import os
-import sys
 
 from io import open
 from os.path import exists
-from uuid import uuid4
 from azure.cli.testsdk import LiveScenarioTest
 from azure.cli.core.util import read_file_content
 
-
-# Add test tools to path
-sys.path.append(os.path.abspath(os.path.join('.', 'iotext_test_tools')))
 
 # Set these to the proper PnP Endpoint, PnP Cstring and PnP Repository for Live Integration Tests.
 _endpoint = os.environ.get('azext_pnp_endpoint')
@@ -41,7 +36,7 @@ class TestPnPModel(LiveScenarioTest):
     rand_val = random.randint(1, 10001)
 
     def __init__(self, _):
-        from iotext_test_tools import DummyCliOutputProducer
+        from . import DummyCliOutputProducer
         super(TestPnPModel, self).__init__(_)
         self.cli_ctx = DummyCliOutputProducer()
         self.kwargs.update({

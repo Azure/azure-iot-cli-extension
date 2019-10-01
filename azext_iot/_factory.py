@@ -12,7 +12,6 @@ from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import SdkType
 
 
-# pylint: disable=invalid-name
 def iot_hub_service_factory(cli_ctx, *_):
     """
     Factory for importing deps and getting service client resources.
@@ -30,7 +29,6 @@ def iot_hub_service_factory(cli_ctx, *_):
     return get_mgmt_service_client(cli_ctx, IotHubClient).iot_hub_resource
 
 
-# pylint: disable=invalid-name,no-name-in-module
 def iot_service_provisioning_factory(cli_ctx, *_):
     """
     Factory for importing deps and getting service client resources.
@@ -48,14 +46,13 @@ def iot_service_provisioning_factory(cli_ctx, *_):
     return get_mgmt_service_client(cli_ctx, IotDpsClient)
 
 
-# pylint: disable=too-many-return-statements
 def _bind_sdk(target, sdk_type, device_id=None, auth=None):
-    from azext_iot.device_sdk.iot_hub_gateway_device_apis import IotHubGatewayDeviceAPIs
-    from azext_iot.service_sdk.iot_hub_gateway_service_apis import IotHubGatewayServiceAPIs
+    from azext_iot.sdk.device.iot_hub_gateway_device_apis import IotHubGatewayDeviceAPIs
+    from azext_iot.sdk.service.iot_hub_gateway_service_apis import IotHubGatewayServiceAPIs
 
-    from azext_iot.custom_sdk.custom_api import CustomClient
-    from azext_iot.dps_sdk import ProvisioningServiceClient
-    from azext_iot.pnp_sdk.digital_twin_repository_service import DigitalTwinRepositoryService
+    from azext_iot.sdk.custom.custom_api import CustomClient
+    from azext_iot.sdk.dps import ProvisioningServiceClient
+    from azext_iot.sdk.pnp.digital_twin_repository_service import DigitalTwinRepositoryService
 
     sas_uri = target['entity']
     endpoint = "https://{}".format(sas_uri)
@@ -102,10 +99,10 @@ def _get_sdk_exception_type(sdk_type):
     from importlib import import_module
 
     exception_library = {
-        SdkType.custom_sdk: import_module('azext_iot.custom_sdk.models.error_details'),
+        SdkType.custom_sdk: import_module('azext_iot.sdk.custom.models.error_details'),
         SdkType.service_sdk: import_module('msrestazure.azure_exceptions'),
         SdkType.device_sdk: import_module('msrestazure.azure_exceptions'),
-        SdkType.dps_sdk: import_module('azext_iot.dps_sdk.models.provisioning_service_error_details'),
+        SdkType.dps_sdk: import_module('azext_iot.sdk.dps.models.provisioning_service_error_details'),
         SdkType.pnp_sdk: import_module('msrest.exceptions')
     }
     return exception_library.get(sdk_type, None)

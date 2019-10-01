@@ -3,6 +3,10 @@
 Release History
 ===============
 
+0.8.3
++++++++++++++++
+* Fix DT monitor-events filter annotation.
+
 0.8.2
 +++++++++++++++
 * Resolve jsonschema dependency issue.

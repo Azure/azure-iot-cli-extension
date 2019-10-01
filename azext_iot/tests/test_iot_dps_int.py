@@ -3,7 +3,6 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-# pylint: disable=too-many-statements
 
 import os
 from azure.cli.testsdk import LiveScenarioTest
@@ -28,7 +27,7 @@ class IoTDpsTest(LiveScenarioTest):
     provisioning_status = EntityStatusType.enabled.value
     provisioning_status_new = EntityStatusType.disabled.value
 
-    def __init__(self, test_method):  # pylint: disable=W0613
+    def __init__(self, test_method):
         super(IoTDpsTest, self).__init__('test_dps_enrollment_tpm_lifecycle')
         output_dir = os.getcwd()
         create_self_signed_certificate(cert_name, 200, output_dir, True)
@@ -276,7 +275,7 @@ class IoTDpsTest(LiveScenarioTest):
                  .format(rg, dps, enrollment_id),
                  checks=[self.check('length(@)', 0)])
 
-        cert_name = self.create_random_name('certificate-for-test', length=48)  # pylint: disable=W0621
+        cert_name = self.create_random_name('certificate-for-test', length=48)
         cert_etag = self.cmd('iot dps certificate create -g {} --dps-name {} --name {} --p {}'
                              .format(rg, dps, cert_name, cert_path),
                              checks=[self.check('name', cert_name)]).get_output_in_json()['etag']

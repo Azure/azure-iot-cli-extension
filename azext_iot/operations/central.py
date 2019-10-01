@@ -3,7 +3,6 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-# pylint: disable=wrong-import-order,too-many-lines
 
 from knack.util import CLIError
 from azext_iot._factory import _bind_sdk

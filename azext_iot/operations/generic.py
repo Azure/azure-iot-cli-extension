@@ -10,10 +10,10 @@ from azext_iot.assets.user_messages import ERROR_PARAM_TOP_OUT_OF_BOUNDS
 
 def _execute_query(query, query_method, top=None):
     payload = []
-    headers = {'Cache-Control': 'no-cache, must-revalidate'}
+    headers = {"Cache-Control": "no-cache, must-revalidate"}
 
     if top:
-        headers['x-ms-max-item-count'] = str(top)
+        headers["x-ms-max-item-count"] = str(top)
     result, token = query_method(query, custom_headers=headers)
     payload.extend(result)
     while token:
@@ -22,10 +22,10 @@ def _execute_query(query, query_method, top=None):
             pl = len(payload)
             if pl < top:
                 page = top - pl
-                headers['x-ms-max-item-count'] = str(page)
+                headers["x-ms-max-item-count"] = str(page)
             else:
                 break
-        headers['x-ms-continuation'] = token
+        headers["x-ms-continuation"] = token
         result, token = query_method(query, custom_headers=headers)
         payload.extend(result)
     return payload[:top] if top else payload

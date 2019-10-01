@@ -43,7 +43,6 @@ event_msg_prop_type = CLIArgumentType(
 )
 
 
-# pylint: disable=too-many-statements
 def load_arguments(self, _):
     """
     Load CLI Args for Knack parser

@@ -3,7 +3,6 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-# pylint: disable=W0613,W0621
 
 from azext_iot.operations import central as subject
 from azext_iot.common.shared import SdkType
@@ -102,7 +101,6 @@ def fixture_get_iot_central_tokens(mocker):
 class TestCentralHelpers():
     def test_get_iot_central_tokens(self, fixture_requests_post, fixture_get_aad_token):
         from azext_iot.common._azure import get_iot_central_tokens
-        import requests
 
         # Test to ensure get_iot_central_tokens calls requests.post and tokens are returned
         assert get_iot_central_tokens({}, 'app_id').value() == 'fixture_requests_post value'

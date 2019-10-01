@@ -16,7 +16,7 @@ from time import time
 try:
     from urllib import (urlencode, quote_plus)
 except ImportError:
-    from urllib.parse import (urlencode, quote_plus)  # pylint: disable=import-error
+    from urllib.parse import (urlencode, quote_plus)
 from msrest.authentication import Authentication
 
 

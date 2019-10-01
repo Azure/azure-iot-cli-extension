@@ -3,7 +3,6 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-# pylint: disable=wrong-import-order,too-many-lines
 
 from os.path import exists, basename
 from time import time, sleep
@@ -11,12 +10,12 @@ import six
 from knack.log import get_logger
 from knack.util import CLIError
 from azure.cli.core.util import read_file_content
-from azext_iot._constants import (EXTENSION_ROOT,
-                                  BASE_API_VERSION,
-                                  DEVICE_DEVICESCOPE_PREFIX,
-                                  TRACING_PROPERTY,
-                                  TRACING_ALLOWED_FOR_LOCATION,
-                                  TRACING_ALLOWED_FOR_SKU)
+from azext_iot.constants import (EXTENSION_ROOT,
+                                 BASE_API_VERSION,
+                                 DEVICE_DEVICESCOPE_PREFIX,
+                                 TRACING_PROPERTY,
+                                 TRACING_ALLOWED_FOR_LOCATION,
+                                 TRACING_ALLOWED_FOR_SKU)
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import (DeviceAuthType,
                                      SdkType,
@@ -38,7 +37,7 @@ logger = get_logger(__name__)
 def iot_query(cmd, query_command, hub_name=None, top=None, resource_group_name=None, login=None):
     top = _process_top(top)
 
-    from azext_iot.service_sdk.models import QuerySpecification
+    from azext_iot.sdk.service.models import QuerySpecification
 
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
@@ -76,7 +75,6 @@ def iot_device_list(cmd, hub_name=None, top=1000, edge_enabled=False, resource_g
     return result
 
 
-# pylint: disable=too-many-locals
 def iot_device_create(cmd, device_id, hub_name=None, edge_enabled=False,
                       auth_method='shared_private_key', primary_thumbprint=None,
                       secondary_thumbprint=None, status='enabled', status_reason=None,
@@ -124,8 +122,8 @@ def iot_device_create(cmd, device_id, hub_name=None, edge_enabled=False,
 
 def _assemble_device(device_id, auth_method, edge_enabled, pk=None, sk=None,
                      status='enabled', status_reason=None, device_scope=None):
-    from azext_iot.service_sdk.models.device_capabilities import DeviceCapabilities
-    from azext_iot.service_sdk.models.device import Device
+    from azext_iot.sdk.service.models.device_capabilities import DeviceCapabilities
+    from azext_iot.sdk.service.models.device import Device
 
     auth = _assemble_auth(auth_method, pk, sk)
     cap = DeviceCapabilities(edge_enabled)
@@ -136,9 +134,9 @@ def _assemble_device(device_id, auth_method, edge_enabled, pk=None, sk=None,
 
 
 def _assemble_auth(auth_method, pk, sk):
-    from azext_iot.service_sdk.models.authentication_mechanism import AuthenticationMechanism
-    from azext_iot.service_sdk.models.symmetric_key import SymmetricKey
-    from azext_iot.service_sdk.models.x509_thumbprint import X509Thumbprint
+    from azext_iot.sdk.service.models.authentication_mechanism import AuthenticationMechanism
+    from azext_iot.sdk.service.models.symmetric_key import SymmetricKey
+    from azext_iot.sdk.service.models.x509_thumbprint import X509Thumbprint
 
     auth = None
     if auth_method in [DeviceAuthType.shared_private_key.name, 'sas']:
@@ -352,7 +350,7 @@ def iot_device_module_create(cmd, device_id, module_id, hub_name=None, auth_meth
 
 
 def _assemble_module(device_id, module_id, auth_method, pk=None, sk=None):
-    from azext_iot.service_sdk.models.module import Module
+    from azext_iot.sdk.service.models.module import Module
 
     auth = _assemble_auth(auth_method, pk, sk)
     module = Module(module_id=module_id, device_id=device_id, authentication=auth)
@@ -496,7 +494,7 @@ def iot_device_module_twin_replace(cmd, device_id, module_id, target_json, hub_n
 
 def iot_edge_set_modules(cmd, device_id, content,
                          hub_name=None, resource_group_name=None, login=None):
-    from azext_iot.service_sdk.models.configuration_content import ConfigurationContent
+    from azext_iot.sdk.service.models.configuration_content import ConfigurationContent
 
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
@@ -534,9 +532,9 @@ def iot_hub_configuration_create(cmd, config_id, content, hub_name=None, target_
 
 def _iot_hub_configuration_create(cmd, config_id, content, hub_name=None, target_condition="", priority=0,
                                   labels=None, metrics=None, edge=False, resource_group_name=None, login=None):
-    from azext_iot.service_sdk.models.configuration import Configuration
-    from azext_iot.service_sdk.models.configuration_content import ConfigurationContent
-    from azext_iot.service_sdk.models.configuration_metrics import ConfigurationMetrics
+    from azext_iot.sdk.service.models.configuration import Configuration
+    from azext_iot.sdk.service.models.configuration_content import ConfigurationContent
+    from azext_iot.sdk.service.models.configuration_metrics import ConfigurationMetrics
 
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
@@ -624,14 +622,14 @@ def _process_config_content(content, content_type='module'):
 
 def _validate_payload_schema(content):
     from azure.cli.core.extension import get_extension_path
-    from azext_iot._constants import EXTENSION_NAME
+    from azext_iot.constants import EXTENSION_NAME
     import pkg_resources
 
     pkg_resources.working_set.add_entry(get_extension_path(EXTENSION_NAME))
 
     from jsonschema import validate
     from jsonschema.exceptions import ValidationError, SchemaError
-    from azext_iot._constants import EDGE_DEPLOYMENT_SCHEMA_2_PATH as schema_path
+    from azext_iot.constants import EDGE_DEPLOYMENT_SCHEMA_2_PATH as schema_path
 
     try:
         if not exists(schema_path):
@@ -650,7 +648,7 @@ def _validate_payload_schema(content):
 
 
 def iot_hub_configuration_update(cmd, config_id, parameters, hub_name=None, resource_group_name=None, login=None):
-    from azext_iot.service_sdk.models.configuration import Configuration
+    from azext_iot.sdk.service.models.configuration import Configuration
     from azext_iot.common.utility import verify_transform
 
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
@@ -759,7 +757,7 @@ def iot_edge_deployment_metric_show(cmd, config_id, metric_id,
 
 def iot_hub_configuration_metric_show(cmd, config_id, metric_id, metric_type='user',
                                       hub_name=None, resource_group_name=None, login=None):
-    from azext_iot.service_sdk.models import QuerySpecification
+    from azext_iot.sdk.service.models import QuerySpecification
     from azext_iot.common.utility import dict_transform_lower_case_key
 
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
@@ -864,8 +862,8 @@ def iot_device_twin_replace(cmd, device_id, target_json, hub_name=None, resource
 
 def iot_device_method(cmd, device_id, method_name, hub_name=None, method_payload="{}",
                       timeout=60, resource_group_name=None, login=None):
-    from azext_iot.service_sdk.models.cloud_to_device_method import CloudToDeviceMethod
-    from azext_iot._constants import METHOD_INVOKE_MAX_TIMEOUT_SEC, METHOD_INVOKE_MIN_TIMEOUT_SEC
+    from azext_iot.sdk.service.models.cloud_to_device_method import CloudToDeviceMethod
+    from azext_iot.constants import METHOD_INVOKE_MAX_TIMEOUT_SEC, METHOD_INVOKE_MIN_TIMEOUT_SEC
 
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     if timeout > METHOD_INVOKE_MAX_TIMEOUT_SEC:
@@ -894,8 +892,8 @@ def iot_device_method(cmd, device_id, method_name, hub_name=None, method_payload
 
 def iot_device_module_method(cmd, device_id, module_id, method_name, hub_name=None, method_payload="{}",
                              timeout=60, resource_group_name=None, login=None):
-    from azext_iot.service_sdk.models.cloud_to_device_method import CloudToDeviceMethod
-    from azext_iot._constants import METHOD_INVOKE_MAX_TIMEOUT_SEC, METHOD_INVOKE_MIN_TIMEOUT_SEC
+    from azext_iot.sdk.service.models.cloud_to_device_method import CloudToDeviceMethod
+    from azext_iot.constants import METHOD_INVOKE_MAX_TIMEOUT_SEC, METHOD_INVOKE_MIN_TIMEOUT_SEC
 
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     if timeout > METHOD_INVOKE_MAX_TIMEOUT_SEC:
@@ -978,7 +976,6 @@ def _iot_build_sas_token(cmd, hub_name=None, device_id=None, module_id=None, pol
     return SasTokenAuthentication(uri, policy, key, time() + int(duration))
 
 
-# pylint: disable=inconsistent-return-statements
 def _build_device_or_module_connection_string(device, key_type='primary', module=None):
     template = 'HostName={};DeviceId={};ModuleId={};{}' if module else 'HostName={};DeviceId={};{}'
     auth = module.get('authentication') if module else device.get('authentication')
@@ -1197,7 +1194,6 @@ def _iot_c2d_message_send(target, device_id, data, properties=None,
         _iot_hub_monitor_feedback(target=target, device_id=device_id, wait_on_id=msg_id)
 
 
-# pylint: disable=too-many-locals
 def iot_simulate_device(cmd, device_id, hub_name=None, receive_settle='complete',
                         data='Ping from Az CLI IoT Extension', msg_count=100,
                         msg_interval=3, protocol_type='mqtt', resource_group_name=None, login=None):
@@ -1207,7 +1203,7 @@ def iot_simulate_device(cmd, device_id, hub_name=None, receive_settle='complete'
     import json
     from azext_iot.operations._mqtt import mqtt_client_wrap
     from azext_iot.common.utility import execute_onthread
-    from azext_iot._constants import MIN_SIM_MSG_INTERVAL, MIN_SIM_MSG_COUNT, SIM_RECEIVE_SLEEP_SEC
+    from azext_iot.constants import MIN_SIM_MSG_INTERVAL, MIN_SIM_MSG_COUNT, SIM_RECEIVE_SLEEP_SEC
 
     if protocol_type == 'mqtt':
         if receive_settle != 'complete':
@@ -1222,7 +1218,6 @@ def iot_simulate_device(cmd, device_id, hub_name=None, receive_settle='complete'
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     token = None
 
-    # pylint: disable=too-few-public-methods
     class generator(object):
         def __init__(self):
             self.calls = 0
@@ -1316,7 +1311,6 @@ def iot_device_upload_file(cmd, device_id, file_path, content_type, hub_name=Non
         raise CLIError(e)
 
 
-# pylint: disable=too-many-locals
 def iot_hub_monitor_events(cmd, hub_name=None, device_id=None, consumer_group='$Default', timeout=300,
                            enqueued_time=None, resource_group_name=None, yes=False, properties=None, repair=False,
                            login=None, content_type=None, device_query=None):
@@ -1347,7 +1341,6 @@ def iot_hub_distributed_tracing_show(cmd, hub_name, device_id, resource_group_na
                                             device_twin['properties']['reported'])
 
 
-# pylint: disable=too-many-locals
 def _iot_hub_monitor_events(cmd, interface=None, pnp_context=None,
                             hub_name=None, device_id=None, consumer_group='$Default', timeout=300,
                             enqueued_time=None, resource_group_name=None, yes=False, properties=None, repair=False,

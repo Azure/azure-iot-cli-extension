@@ -1,7 +1,8 @@
 [pytest]
-
 addopts =
-    -vv
+    -v
+    -p no:warnings
+
 norecursedirs =
     dist
     build

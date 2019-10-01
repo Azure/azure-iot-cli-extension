@@ -55,7 +55,6 @@ def parse_entity(entity, filter_none=False):
     return result
 
 
-# pylint: disable=broad-except
 def evaluate_literal(literal, expected):
     """
     Function to provide safe evaluation of code literal.

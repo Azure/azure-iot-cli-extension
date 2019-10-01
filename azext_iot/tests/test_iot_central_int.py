@@ -12,13 +12,11 @@ DEVICE_ID = os.environ.get("azext_iot_central_device_id")
 
 if not all([APP_ID, DEVICE_ID]):
     raise ValueError('Set azext_iot_central_app_id '
-                     'and azext_iot_central_device_id to run integration tests. '
-                     'An aad-token can be retrieved through the command `az account '
-                     'get-access-token --resource "https://apps.azureiotcentral.com"`.')
+                     'and azext_iot_central_device_id to run integration tests. ')
 
 
 class TestIotCentral(LiveScenarioTest):
-    def __init__(self, test_method):  # pylint: disable=W0613
+    def __init__(self, test_method):
         super(TestIotCentral, self).__init__('test_central_device_show')
 
     def test_central_device_show(self):
