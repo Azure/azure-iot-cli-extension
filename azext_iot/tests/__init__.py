@@ -8,7 +8,6 @@ import sys
 import io
 import os
 
-from azure.cli.core import AzCli
 from azure.cli.testsdk import LiveScenarioTest
 from contextlib import contextmanager
 
@@ -50,55 +49,8 @@ def capture_output():
         buffer_tee.close()
 
 
-class DummyCliOutputProducer(AzCli):
-    """A dummy CLI instance can be used to facilitate automation"""
-
-    def __init__(self, commands_loader_cls=None, **kwargs):
-        import os
-
-        from azure.cli.core import MainCommandsLoader
-        from azure.cli.core.commands import AzCliCommandInvoker
-        from azure.cli.core.azlogging import AzCliLogging
-        from azure.cli.core.cloud import get_active_cloud
-        from azure.cli.core.parser import AzCliCommandParser
-        from azure.cli.core._config import GLOBAL_CONFIG_DIR, ENV_VAR_PREFIX
-        from azure.cli.core._help import AzCliHelp
-        from azure.cli.core._output import AzOutputProducer
-
-        from knack.completion import ARGCOMPLETE_ENV_NAME
-
-        super(DummyCliOutputProducer, self).__init__(
-            cli_name="az",
-            config_dir=GLOBAL_CONFIG_DIR,
-            config_env_var_prefix=ENV_VAR_PREFIX,
-            commands_loader_cls=commands_loader_cls or MainCommandsLoader,
-            parser_cls=AzCliCommandParser,
-            logging_cls=AzCliLogging,
-            help_cls=AzCliHelp,
-            invocation_cls=AzCliCommandInvoker,
-            output_cls=AzOutputProducer,
-        )
-
-        self.data[
-            "headers"
-        ] = {}  # the x-ms-client-request-id is generated before a command is to execute
-        self.data["command"] = "unknown"
-        self.data["completer_active"] = ARGCOMPLETE_ENV_NAME in os.environ
-        self.data["query_active"] = False
-
-        loader = self.commands_loader_cls(self)
-        setattr(self, "commands_loader", loader)
-
-        self.cloud = get_active_cloud(self)
-
-    def get_cli_version(self):
-        from azure.cli.core import __version__ as cli_version
-
-        return cli_version
-
-
 class IoTLiveScenarioTest(LiveScenarioTest):
-    def __init__(self, test_scenario, entity_name, entity_rg, entity_cs, yaml_output=False):
+    def __init__(self, test_scenario, entity_name, entity_rg, entity_cs):
         assert test_scenario
         assert entity_name
         assert entity_rg
@@ -111,12 +63,7 @@ class IoTLiveScenarioTest(LiveScenarioTest):
         self.config_ids = []
 
         os.environ["AZURE_CORE_COLLECT_TELEMETRY"] = "no"
-
         super(IoTLiveScenarioTest, self).__init__(test_scenario)
-
-        if yaml_output:
-            from . import DummyCliOutputProducer
-            self.cli_ctx = DummyCliOutputProducer()
 
     def generate_device_names(self, count=1, edge=False):
         names = [

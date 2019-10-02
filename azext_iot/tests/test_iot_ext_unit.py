@@ -885,6 +885,7 @@ def change_dir():
     os.chdir(os.path.dirname(os.path.abspath(getsourcefile(lambda: 0))))
 
 
+# TODO: Refactor
 def generate_device_config(
     condition="tags.building=43 and tags.environment='test'",
     priority=randint(0, 100),
@@ -899,6 +900,7 @@ def generate_device_config(
     content_short_form=False,
     modules_schema="2.0",
     config_id=None,
+    filter_properties=None
 ):
     result = {}
     change_dir()
@@ -940,6 +942,10 @@ def generate_device_config(
             payload = result["content"]["content"]["modulesContent"]
             del result["content"]["content"]["modulesContent"]
             result["content"]["content"][content_key] = payload
+
+            if filter_properties:
+                for k in filter_properties:
+                    result["content"]["content"][k] = filter_properties[k]
         else:
             content_key = "deviceContent"
 
@@ -960,6 +966,7 @@ def generate_device_config(
     result["metrics_short_form"] = metrics_short_form
     result["content_from_file"] = content_from_file
     result["metrics_from_file"] = metrics_from_file
+    result["filter_properties"] = filter_properties if filter_properties else None
 
     return result
 
@@ -979,6 +986,7 @@ class TestConfigCreate:
             (generate_device_config(content_short_form=True)),
             (generate_device_config(modules_schema="1.0")),
             (generate_device_config(modules_schema="1.0", content_short_form=True)),
+            (generate_device_config(filter_properties={"$schema": "blah"})),
             (generate_device_config(content_type="device")),
             (generate_device_config(content_type="device", content_short_form=True)),
             (generate_device_config(content_type="device", content_from_file=True)),
@@ -1042,7 +1050,14 @@ class TestConfigCreate:
                     == json.loads(req["content"])["content"]["moduleContent"]
                 )
             else:
-                assert body["content"] == json.loads(req["content"])["content"]
+                filter_props = req.get("filter_properties")
+                payload = json.loads(req["content"])["content"]
+
+                if filter_props:
+                    for k in filter_props:
+                        del payload[k]
+
+                assert body["content"] == payload
 
         if req.get("metrics"):
             if req.get("metrics_short_form") or req.get("metrics_from_file"):
