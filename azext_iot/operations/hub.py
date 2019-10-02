@@ -608,6 +608,7 @@ def _process_config_content(content, content_type='module'):
     if content_key in content:
         # Schema based validation currently for IoT edge deployment only
         if content_key == 'modulesContent':
+            _filter_config_content(content)
             _validate_payload_schema(content)
 
         content = content[content_key]
@@ -618,6 +619,24 @@ def _process_config_content(content, content_type='module'):
         raise CLIError("content json must include the '{}' property".format(content_key))
 
     return content
+
+
+def _filter_config_content(content):
+    """ Remove common properties from payloads that fail json schema validation.
+
+    This function is not meant to resolve schema validation issues. Instead it reduces
+    usage friction by removing elements that are frequently included - such as the usage of
+    $schema during development.
+    """
+
+    to_filter = ["$schema"]
+
+    for element in to_filter:
+        if element in content:
+            logger.info("{} detected and removed from payload...".format(element))
+            del content["$schema"]
+
+    return
 
 
 def _validate_payload_schema(content):
@@ -643,8 +662,9 @@ def _validate_payload_schema(content):
         validate(instance=content, schema=schema_content)
     except ValidationError as ve:
         raise CLIError(ve)
-    except SchemaError as se:
-        raise CLIError(se)
+    except SchemaError:
+        logger.warning("Invalid IoT Edge deployment schema, skipping validation...")
+        return
 
 
 def iot_hub_configuration_update(cmd, config_id, parameters, hub_name=None, resource_group_name=None, login=None):

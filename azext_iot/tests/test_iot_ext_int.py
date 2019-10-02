@@ -38,9 +38,7 @@ SECONDARY_THUMBPRINT = "14963E8F3BA5B3984110B3C1CA8E8B8988599087"
 
 class TestIoTHub(IoTLiveScenarioTest):
     def __init__(self, test_case):
-        super(TestIoTHub, self).__init__(
-            test_case, LIVE_HUB, LIVE_RG, LIVE_HUB_CS
-        )
+        super(TestIoTHub, self).__init__(test_case, LIVE_HUB, LIVE_RG, LIVE_HUB_CS)
 
     def test_hub(self):
         self.cmd(
@@ -169,9 +167,7 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
         # All edge devices + child device
         query_checks = [self.check("length([*])", edge_device_count + 1)]
         for i in edge_device_ids:
-            query_checks.append(
-                self.exists("[?deviceId==`{}`]".format(i))
-            )
+            query_checks.append(self.exists("[?deviceId==`{}`]".format(i)))
         query_checks.append(self.exists("[?deviceId==`{}`]".format(device_ids[4])))
 
         # Not currently supported
@@ -1421,9 +1417,7 @@ class TestIoTHubDeviceConfigs(IoTLiveScenarioTest):
 
 class TestIoTEdge(IoTLiveScenarioTest):
     def __init__(self, test_case):
-        super(TestIoTEdge, self).__init__(
-            test_case, LIVE_HUB, LIVE_RG, LIVE_HUB_CS
-        )
+        super(TestIoTEdge, self).__init__(test_case, LIVE_HUB, LIVE_RG, LIVE_HUB_CS)
 
     def test_edge_set_modules(self):
         edge_device_count = 2
@@ -1494,16 +1488,28 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
         )
         content_path_v1 = os.path.join(CWD, "test_config_modules_content_v1.json")
 
-        self.kwargs["configuration_payload"] = read_file_content(content_path)
-        self.kwargs["configuration_payload_malformed"] = read_file_content(
-            content_path_malformed
-        )
-        self.kwargs["configuration_payload_v1"] = read_file_content(content_path_v1)
+        configuration_content = read_file_content(content_path)
+        configuration_content_v1 = read_file_content(content_path_v1)
+        configuration_content_malformed = read_file_content(content_path_malformed)
+
+        # TODO: Build configuration payload generators in common tooling.
+        config_object = json.loads(configuration_content)
+        config_object[
+            "$schema"
+        ] = "http://json.schemastore.org/azure-iot-edge-deployment-2.0"
+        configuration_content_with_schema = json.dumps(config_object)
+
+        self.kwargs["configuration_payload"] = configuration_content
+        self.kwargs["configuration_payload_malformed"] = configuration_content_malformed
+        self.kwargs["configuration_payload_v1"] = configuration_content_v1
+        self.kwargs[
+            "configuration_payload_with_schema"
+        ] = configuration_content_with_schema
 
         priority = random.randint(1, 10)
         condition = "tags.building=9 and tags.environment='test'"
 
-        # With connection string
+        # With connection string and file path
         self.cmd(
             "iot edge deployment create -d {} --login {} --pri {} --tc \"{}\" --lab {} -k '{}'".format(
                 config_ids[0],
@@ -1542,6 +1548,7 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
             expect_failure=True,
         )
 
+        # Certain elements such as $schema included in the edge payload will be popped before validation
         self.cmd(
             """iot edge deployment create --deployment-id {} --hub-name {} --resource-group {} --priority {}
                     --target-condition \"{}\" --labels {} --content '{}'""".format(
@@ -1551,7 +1558,7 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
                 priority,
                 condition,
                 '"{generic_dict}"',
-                "{configuration_payload}",
+                "{configuration_payload_with_schema}",
             ),
             checks=[
                 self.check("id", config_ids[1]),
@@ -1560,9 +1567,9 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
                 self.check("labels", self.kwargs["generic_dict"]),
                 self.check(
                     "content.modulesContent",
-                    json.loads(self.kwargs["configuration_payload"])["content"][
-                        "modulesContent"
-                    ],
+                    json.loads(self.kwargs["configuration_payload_with_schema"])[
+                        "content"
+                    ]["modulesContent"],
                 ),
             ],
         )
@@ -1746,9 +1753,7 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
 
 class TestIoTStorage(IoTLiveScenarioTest):
     def __init__(self, test_case):
-        super(TestIoTStorage, self).__init__(
-            test_case, LIVE_HUB, LIVE_RG, LIVE_HUB_CS
-        )
+        super(TestIoTStorage, self).__init__(test_case, LIVE_HUB, LIVE_RG, LIVE_HUB_CS)
 
     @pytest.mark.skipif(
         not LIVE_STORAGE, reason="empty azext_iot_teststorageuri env var"

@@ -658,9 +658,12 @@ helps['iot edge deployment list'] = """
 
 helps['iot edge deployment update'] = """
     type: command
-    short-summary: Update an IoT Edge deployment with the specified properties.
-    long-summary: Use --set followed by property assignments for updating a deployment.
-                  Leverage properties returned from 'az iot edge deployment show'.
+    short-summary: Update specified properties of an IoT Edge deployment.
+    long-summary: |
+                  Use --set followed by property assignments for updating a deployment.
+
+                  Note: IoT Edge deployment content is immutable. Deployment properties that can be
+                  updated are 'labels', 'metrics', 'priority' and 'targetCondition'.
     examples:
     - name: Alter the labels and target condition of an existing edge deployment
       text: >

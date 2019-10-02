@@ -36,9 +36,7 @@ class TestPnPModel(LiveScenarioTest):
     rand_val = random.randint(1, 10001)
 
     def __init__(self, _):
-        from . import DummyCliOutputProducer
         super(TestPnPModel, self).__init__(_)
-        self.cli_ctx = DummyCliOutputProducer()
         self.kwargs.update({
             'endpoint': _endpoint,
             'repo': _repo_id,
