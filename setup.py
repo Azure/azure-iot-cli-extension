@@ -78,7 +78,7 @@ setup(
     author_email="iotupx@microsoft.com",  # +@digimaun
     url="https://github.com/azure/azure-iot-cli-extension",
     classifiers=CLASSIFIERS,
-    packages=find_packages(exclude=["tests", "tests.*", "scripts"]),
+    packages=find_packages(exclude=["*.test", "*.test.*", "test.*", "*tests", "scripts"]),
     package_data={
         EXTENSION_REF_NAME: [
             "azext_metadata.json",
