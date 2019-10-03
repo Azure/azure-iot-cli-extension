@@ -5,7 +5,10 @@ Release History
 
 0.8.3
 +++++++++++++++
-* Fix DT monitor-events filter annotation.
+- Removes long since deprecated command `az iot hub apply-configuration`
+- Resolve issue #100
+- Improve help content for `az iot edge deployment update` to explicitly show what can be updated.
+- Fix message annotation used to filter Digital Twin events in `az iot dt monitor-events`
 
 0.8.2
 +++++++++++++++
