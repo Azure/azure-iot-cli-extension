@@ -193,14 +193,14 @@ async def monitor_events(
             return
 
         if pnp_context:
-            msg_interface_id = str(
+            msg_interface_name = str(
                 msg.annotations.get(b"iothub-interface-name"), "utf8"
             )
-            if not msg_interface_id:
+            if not msg_interface_name:
                 return
-
+            # interface_id: it is the interface name
             if interface_id:
-                if msg_interface_id != interface_id:
+                if msg_interface_name != interface_id:
                     return
 
         event_source = {"event": {}}
@@ -229,12 +229,12 @@ async def monitor_events(
         event_source["event"]["payload"] = payload
 
         if pnp_context:
-            event_source["event"]["interface"] = msg_interface_id
+            event_source["event"]["interface"] = msg_interface_name
 
             msg_schema = str(
                 msg.application_properties.get(b"iothub-message-schema"), "utf8"
             )
-            interface_context = pnp_context["interface"].get(msg_interface_id)
+            interface_context = pnp_context["interface"].get(msg_interface_name)
             if interface_context:
                 msg_schema_context = interface_context.get(msg_schema)
                 if msg_schema_context:

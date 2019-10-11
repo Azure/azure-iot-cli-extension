@@ -199,12 +199,12 @@ def iot_digitaltwin_monitor_events(cmd, device_id=None, device_query=None, inter
 
         if interface:
             target_interfaces.append(target_interface)
-            interface_id = target_interface['urn_id']
+            interface_id = interface
         else:
             target_interfaces = interface_list
 
         for entity in target_interfaces:
-            pnp_context['interface'][entity['urn_id']] = {}
+            pnp_context['interface'][entity['name']] = {}
             found_telemetry = []
             if source_model == ModelSourceType.device.value.lower():
                 found_telemetry = _device_interface_elements(cmd, device_id, entity['urn_id'], INTERFACE_TELEMETRY,
@@ -217,7 +217,7 @@ def iot_digitaltwin_monitor_events(cmd, device_id=None, device_query=None, inter
 
             for telemetry in found_telemetry:
                 telemetry_data = {'display': telemetry.get('displayName'), 'unit': telemetry.get('unit')}
-                pnp_context['interface'][entity['urn_id']][telemetry['name']] = telemetry_data
+                pnp_context['interface'][entity['name']][telemetry['name']] = telemetry_data
 
     _iot_hub_monitor_events(cmd=cmd, interface=interface_id, pnp_context=pnp_context,
                             hub_name=hub_name, device_id=device_id, consumer_group=consumer_group, timeout=timeout,
