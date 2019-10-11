@@ -894,9 +894,8 @@ class TestModelRepoModelList(object):
         headers = args[0][0].headers
 
         assert method == "POST"
-        assert (
-            "{}/models/search?repositoryId={}".format(_repo_endpoint, _repo_id) in url
-        )
+        assert "{}/models/search?".format(_repo_endpoint) in url
+        assert "repositoryId={}".format(_repo_id) in url
         assert len(result) == 1
         assert headers.get("Authorization")
 

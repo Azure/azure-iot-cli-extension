@@ -1,0 +1,3 @@
+steps:
+  - script: 'pip install -e "git+https://github.com/Azure/azure-cli@dev#egg=azure-cli-dev-tools&subdirectory=tools"'
+    displayName: 'Install azdev tool'
