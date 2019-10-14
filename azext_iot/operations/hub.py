@@ -1392,7 +1392,7 @@ def _iot_hub_monitor_events(cmd, interface=None, pnp_context=None,
                      output=output,
                      content_type=content_type,
                      devices=device_ids,
-                     interface_id=interface,
+                     interface_name=interface,
                      pnp_context=pnp_context)
 
 

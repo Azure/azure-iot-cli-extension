@@ -182,7 +182,7 @@ def iot_digitaltwin_monitor_events(cmd, device_id=None, device_query=None, inter
     source_model = source_model.lower()
     pnp_context = {'enabled': True, 'interface': {}}
     target_interfaces = []
-    interface_id = None
+    interface_name = None
     if all([device_id, device_query]):
         raise CLIError('You cannot use --device-id/-d and --device-query/-q at the same time!')
 
@@ -199,7 +199,7 @@ def iot_digitaltwin_monitor_events(cmd, device_id=None, device_query=None, inter
 
         if interface:
             target_interfaces.append(target_interface)
-            interface_id = interface
+            interface_name = interface
         else:
             target_interfaces = interface_list
 
@@ -219,7 +219,7 @@ def iot_digitaltwin_monitor_events(cmd, device_id=None, device_query=None, inter
                 telemetry_data = {'display': telemetry.get('displayName'), 'unit': telemetry.get('unit')}
                 pnp_context['interface'][entity['name']][telemetry['name']] = telemetry_data
 
-    _iot_hub_monitor_events(cmd=cmd, interface=interface_id, pnp_context=pnp_context,
+    _iot_hub_monitor_events(cmd=cmd, interface=interface_name, pnp_context=pnp_context,
                             hub_name=hub_name, device_id=device_id, consumer_group=consumer_group, timeout=timeout,
                             enqueued_time=None, resource_group_name=resource_group_name,
                             yes=yes, properties=properties, repair=repair,

@@ -34,7 +34,7 @@ def executor(
     output=None,
     content_type=None,
     devices=None,
-    interface_id=None,
+    interface_name=None,
     pnp_context=None,
 ):
 
@@ -50,7 +50,7 @@ def executor(
             output,
             content_type,
             devices,
-            interface_id,
+            interface_name,
             pnp_context,
         )
     )
@@ -105,7 +105,7 @@ async def initiate_event_monitor(
     output=None,
     content_type=None,
     devices=None,
-    interface_id=None,
+    interface_name=None,
     pnp_context=None,
 ):
     def _get_conn_props():
@@ -145,7 +145,7 @@ async def initiate_event_monitor(
                     output=output,
                     content_type=content_type,
                     devices=devices,
-                    interface_id=interface_id,
+                    interface_name=interface_name,
                     pnp_context=pnp_context,
                 )
             )
@@ -166,7 +166,7 @@ async def monitor_events(
     output=None,
     content_type=None,
     devices=None,
-    interface_id=None,
+    interface_name=None,
     pnp_context=None,
 ):
     source = uamqp.address.Source(
@@ -198,9 +198,8 @@ async def monitor_events(
             )
             if not msg_interface_name:
                 return
-            # interface_id: it is the interface name
-            if interface_id:
-                if msg_interface_name != interface_id:
+            if interface_name:
+                if msg_interface_name != interface_name:
                     return
 
         event_source = {"event": {}}
