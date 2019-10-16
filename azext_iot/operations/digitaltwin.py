@@ -219,7 +219,7 @@ def iot_digitaltwin_monitor_events(cmd, device_id=None, device_query=None, inter
                 telemetry_data = {'display': telemetry.get('displayName'), 'unit': telemetry.get('unit')}
                 pnp_context['interface'][entity['name']][telemetry['name']] = telemetry_data
 
-    _iot_hub_monitor_events(cmd=cmd, interface=interface_name, pnp_context=pnp_context,
+    _iot_hub_monitor_events(cmd=cmd, interface_name=interface_name, pnp_context=pnp_context,
                             hub_name=hub_name, device_id=device_id, consumer_group=consumer_group, timeout=timeout,
                             enqueued_time=None, resource_group_name=resource_group_name,
                             yes=yes, properties=properties, repair=repair,

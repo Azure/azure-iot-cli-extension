@@ -1334,7 +1334,7 @@ def iot_device_upload_file(cmd, device_id, file_path, content_type, hub_name=Non
 def iot_hub_monitor_events(cmd, hub_name=None, device_id=None, consumer_group='$Default', timeout=300,
                            enqueued_time=None, resource_group_name=None, yes=False, properties=None, repair=False,
                            login=None, content_type=None, device_query=None):
-    _iot_hub_monitor_events(cmd, interface=None, pnp_context=None, hub_name=hub_name, device_id=device_id,
+    _iot_hub_monitor_events(cmd, hub_name=hub_name, device_id=device_id,
                             consumer_group=consumer_group, timeout=timeout, enqueued_time=enqueued_time,
                             resource_group_name=resource_group_name, yes=yes, properties=properties,
                             repair=repair, login=login, content_type=content_type, device_query=device_query)
@@ -1361,7 +1361,7 @@ def iot_hub_distributed_tracing_show(cmd, hub_name, device_id, resource_group_na
                                             device_twin['properties']['reported'])
 
 
-def _iot_hub_monitor_events(cmd, interface=None, pnp_context=None,
+def _iot_hub_monitor_events(cmd, interface_name=None, pnp_context=None,
                             hub_name=None, device_id=None, consumer_group='$Default', timeout=300,
                             enqueued_time=None, resource_group_name=None, yes=False, properties=None, repair=False,
                             login=None, content_type=None, device_query=None):
@@ -1392,7 +1392,7 @@ def _iot_hub_monitor_events(cmd, interface=None, pnp_context=None,
                      output=output,
                      content_type=content_type,
                      devices=device_ids,
-                     interface_name=interface,
+                     interface_name=interface_name,
                      pnp_context=pnp_context)
 
 

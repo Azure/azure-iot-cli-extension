@@ -136,7 +136,7 @@ def serviceclient_generic_error(mocker, fixture_ghcs, request):
 
 @pytest.fixture()
 def fixture_monitor_events(mocker):
-    mocker.patch(path_iot_hub_monitor_events)
+    return mocker.patch(path_iot_hub_monitor_events)
 
 
 def build_mock_response(mocker, status_code=200, payload=None, headers=None, raw=False):
@@ -386,14 +386,14 @@ class TestDTInvokeCommand(object):
                                                    login=mock_target['cs'])
 
 
-def digitaltwin_monitor_events_create_req(device_id=None, device_query=None, interface=None,
+def digitaltwin_monitor_events_create_req(device_id=None, device_query=None, interface_name=None,
                                           source_model=None, repo_endpoint=PNP_ENDPOINT,
                                           repo_id=None, consumer_group='$Default', timeout=300, hub_name=None,
                                           resource_group_name=None, yes=False, properties=None, repair=False,
                                           login=None, repo_login=None):
     return {'device_id': device_id,
             'device_query': device_query,
-            'interface': interface,
+            'interface_name': interface_name,
             'source_model': source_model,
             'repo_endpoint': repo_endpoint,
             'repo_id': repo_id,
@@ -412,7 +412,7 @@ def digitaltwin_monitor_events_create_req(device_id=None, device_query=None, int
 class TestDTMonitorEvents(object):
 
     @pytest.fixture(params=[200])
-    def serviceclient(self, mocker, fixture_ghcs, fixture_pnpcs, fixture_monitor_events, request):
+    def serviceclient(self, mocker, fixture_ghcs, fixture_pnpcs, request):
         service_client = mocker.patch(path_service_client)
         output = generate_device_interfaces_payload()
         payload_list = generate_pnp_interface_list_payload()
@@ -429,17 +429,17 @@ class TestDTMonitorEvents(object):
 
     @pytest.mark.parametrize("req", [
         (digitaltwin_monitor_events_create_req(device_id=device_id,
-                                               interface='environmentalSensor',
+                                               interface_name='environmentalSensor',
                                                source_model='public',
                                                yes=True, properties='all',
                                                login=mock_target['cs'])),
         (digitaltwin_monitor_events_create_req(device_id=device_id,
-                                               interface='environmentalSensor',
+                                               interface_name='environmentalSensor',
                                                source_model='private', repo_id=mock_pnptarget['repository_id'],
                                                yes=True, properties='all',
                                                login=mock_target['cs'])),
         (digitaltwin_monitor_events_create_req(device_id=device_id,
-                                               interface='environmentalSensor',
+                                               interface_name='environmentalSensor',
                                                source_model='device', repo_login=mock_pnptarget['cs'],
                                                yes=True, properties='all',
                                                login=mock_target['cs'])),
@@ -456,12 +456,15 @@ class TestDTMonitorEvents(object):
                                                yes=True, properties='all',
                                                login=mock_target['cs'])),
         (digitaltwin_monitor_events_create_req(source_model='public',
+                                               login=mock_target['cs'])),
+        (digitaltwin_monitor_events_create_req(source_model='public',
+                                               interface_name='environmentalSensor',
                                                login=mock_target['cs']))])
-    def test_iot_digitaltwin_monitor_events(self, fixture_cmd, serviceclient, req):
+    def test_iot_digitaltwin_monitor_events(self, fixture_cmd, fixture_monitor_events, serviceclient, req):
         subject.iot_digitaltwin_monitor_events(fixture_cmd,
                                                req['device_id'],
                                                req['device_query'],
-                                               req['interface'],
+                                               req['interface_name'],
                                                req['source_model'],
                                                req['repo_endpoint'],
                                                req['repo_id'],
@@ -483,11 +486,15 @@ class TestDTMonitorEvents(object):
                 assert '/digitalTwins/' in url
                 assert method == 'POST'
             else:
-                if req['interface']:
+                if req['interface_name']:
                     assert method == 'GET'
                 else:
                     assert method == 'POST'
                 assert '/models/' in url
+        else:
+            monitor_events_args = fixture_monitor_events.call_args[1]
+            assert not monitor_events_args['device_id']
+            assert not monitor_events_args['interface_name']
 
     @pytest.fixture(params=[200])
     def serviceclienterror(self, mocker, fixture_ghcs, fixture_pnpcs, request):
@@ -512,17 +519,17 @@ class TestDTMonitorEvents(object):
                                                yes=True, properties='all',
                                                login=mock_target['cs'])),
         (digitaltwin_monitor_events_create_req(device_query='select * from devices',
-                                               interface='environmentalSensor',
+                                               interface_name='environmentalSensor',
                                                source_model='public',
                                                yes=True, properties='all',
                                                login=mock_target['cs'])),
         (digitaltwin_monitor_events_create_req(device_id=device_id,
-                                               interface='environmentalSensor1',
+                                               interface_name='environmentalSensor1',
                                                source_model='public',
                                                yes=True, properties='all',
                                                login=mock_target['cs'])),
         (digitaltwin_monitor_events_create_req(device_id=device_id,
-                                               interface='environmentalSensor',
+                                               interface_name='environmentalSensor',
                                                timeout=-1,
                                                source_model='public',
                                                yes=True, properties='all',
@@ -532,7 +539,7 @@ class TestDTMonitorEvents(object):
             subject.iot_digitaltwin_monitor_events(fixture_cmd,
                                                    req['device_id'],
                                                    req['device_query'],
-                                                   req['interface'],
+                                                   req['interface_name'],
                                                    req['source_model'],
                                                    req['repo_endpoint'],
                                                    req['repo_id'],
