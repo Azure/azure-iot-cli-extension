@@ -12,6 +12,7 @@ import sys
 from azext_iot.operations import digitaltwin as subject
 from azext_iot.operations.digitaltwin import INTERFACE_KEY_NAME
 from azext_iot.common.utility import validate_min_python_version
+from azext_iot.constants import PNP_ENDPOINT
 from knack.util import CLIError
 from azure.cli.core.util import read_file_content
 
@@ -31,6 +32,7 @@ hub_entity = 'myhub.azure-devices.net'
 path_mqtt_client = 'azext_iot.operations._mqtt.mqtt.Client'
 path_service_client = 'msrest.service_client.ServiceClient.send'
 path_ghcs = 'azext_iot.operations.hub.get_iot_hub_connection_string'
+path_pnpcs = 'azext_iot.operations.pnp.get_iot_pnp_connection_string'
 path_iot_hub_service_factory = 'azext_iot.common._azure.iot_hub_service_factory'
 path_sas = 'azext_iot._factory.SasTokenAuthentication'
 
@@ -44,11 +46,24 @@ mock_target['location'] = "westus2"
 mock_target['sku_tier'] = "Standard"
 generic_cs_template = 'HostName={};SharedAccessKeyName={};SharedAccessKey={}'
 
+mock_pnptarget = {}
+mock_pnptarget['entity'] = PNP_ENDPOINT
+mock_pnptarget['primarykey'] = 'rJx/6rJ6rmG4ak890+eW5MYGH+A0uzRvjGNjg3Ve8sfo='
+mock_pnptarget['repository_id'] = '1b10ab39a62946ffada85db3b785b3dd'
+mock_pnptarget['policy'] = '43325732479e453093a3d1ae5b95c62e'
+generic_pnpcs_template = 'HostName={};RepositoryId={};SharedAccessKeyName={};SharedAccessKey={}'
+
+
+def generate_pnpcs(pnp=PNP_ENDPOINT, repository=mock_pnptarget['repository_id'],
+                   policy=mock_target['policy'], key=mock_target['primarykey']):
+    return generic_pnpcs_template.format(pnp, repository, policy, key)
+
 
 def generate_cs(hub=hub_entity, policy=mock_target['policy'], key=mock_target['primarykey']):
     return generic_cs_template.format(hub, policy, key)
 
 
+mock_pnptarget['cs'] = generate_pnpcs()
 mock_target['cs'] = generate_cs()
 
 
@@ -103,6 +118,13 @@ def fixture_ghcs(mocker):
     ghcs = mocker.patch(path_ghcs)
     ghcs.return_value = mock_target
     return ghcs
+
+
+@pytest.fixture()
+def fixture_pnpcs(mocker):
+    pnpcs = mocker.patch(path_pnpcs)
+    pnpcs.return_value = mock_pnptarget
+    return pnpcs
 
 
 @pytest.fixture(params=[400, 401, 500])
@@ -364,11 +386,33 @@ class TestDTInvokeCommand(object):
                                                    login=mock_target['cs'])
 
 
+def digitaltwin_monitor_events_create_req(device_id=None, device_query=None, interface=None,
+                                          source_model=None, repo_endpoint=PNP_ENDPOINT,
+                                          repo_id=None, consumer_group='$Default', timeout=300, hub_name=None,
+                                          resource_group_name=None, yes=False, properties=None, repair=False,
+                                          login=None, repo_login=None):
+    return {'device_id': device_id,
+            'device_query': device_query,
+            'interface': interface,
+            'source_model': source_model,
+            'repo_endpoint': repo_endpoint,
+            'repo_id': repo_id,
+            'consumer_group': consumer_group,
+            'timeout': timeout,
+            'hub_name': hub_name,
+            'resource_group_name': resource_group_name,
+            'yes': yes,
+            'properties': properties,
+            'repair': repair,
+            'login': login,
+            'repo_login': repo_login}
+
+
 @pytest.mark.skipif(not validate_min_python_version(3, 5, exit_on_fail=False), reason="minimum python version not satisfied")
 class TestDTMonitorEvents(object):
 
     @pytest.fixture(params=[200])
-    def serviceclient(self, mocker, fixture_ghcs, fixture_monitor_events, request):
+    def serviceclient(self, mocker, fixture_ghcs, fixture_pnpcs, fixture_monitor_events, request):
         service_client = mocker.patch(path_service_client)
         output = generate_device_interfaces_payload()
         payload_list = generate_pnp_interface_list_payload()
@@ -376,24 +420,77 @@ class TestDTMonitorEvents(object):
         test_side_effect = [
             build_mock_response(mocker, request.param, payload=output),
             build_mock_response(mocker, request.param, payload=payload_list),
-            build_mock_response(mocker, request.param, payload=payload_show)
+            build_mock_response(mocker, request.param, payload=payload_show),
+            build_mock_response(mocker, request.param, payload={}),
+            build_mock_response(mocker, request.param, payload={})
         ]
         service_client.side_effect = test_side_effect
         return service_client
 
-    def test_iot_digitaltwin_monitor_events(self, fixture_cmd, serviceclient):
-        subject.iot_digitaltwin_monitor_events(fixture_cmd, device_id=device_id,
-                                               interface='environmentalSensor', source_model='public',
-                                               yes=True, properties='all', login=mock_target['cs'])
-        args = serviceclient.call_args
-        url = args[0][0].url
-        method = args[0][0].method
+    @pytest.mark.parametrize("req", [
+        (digitaltwin_monitor_events_create_req(device_id=device_id,
+                                               interface='environmentalSensor',
+                                               source_model='public',
+                                               yes=True, properties='all',
+                                               login=mock_target['cs'])),
+        (digitaltwin_monitor_events_create_req(device_id=device_id,
+                                               interface='environmentalSensor',
+                                               source_model='private', repo_id=mock_pnptarget['repository_id'],
+                                               yes=True, properties='all',
+                                               login=mock_target['cs'])),
+        (digitaltwin_monitor_events_create_req(device_id=device_id,
+                                               interface='environmentalSensor',
+                                               source_model='device', repo_login=mock_pnptarget['cs'],
+                                               yes=True, properties='all',
+                                               login=mock_target['cs'])),
+        (digitaltwin_monitor_events_create_req(device_id=device_id,
+                                               source_model='public',
+                                               yes=True, properties='all',
+                                               login=mock_target['cs'])),
+        (digitaltwin_monitor_events_create_req(device_id=device_id,
+                                               source_model='private', repo_id=mock_pnptarget['repository_id'],
+                                               yes=True, properties='all',
+                                               login=mock_target['cs'])),
+        (digitaltwin_monitor_events_create_req(device_id=device_id,
+                                               source_model='device', repo_login=mock_pnptarget['cs'],
+                                               yes=True, properties='all',
+                                               login=mock_target['cs'])),
+        (digitaltwin_monitor_events_create_req(source_model='public',
+                                               login=mock_target['cs']))])
+    def test_iot_digitaltwin_monitor_events(self, fixture_cmd, serviceclient, req):
+        subject.iot_digitaltwin_monitor_events(fixture_cmd,
+                                               req['device_id'],
+                                               req['device_query'],
+                                               req['interface'],
+                                               req['source_model'],
+                                               req['repo_endpoint'],
+                                               req['repo_id'],
+                                               req['consumer_group'],
+                                               req['timeout'],
+                                               req['hub_name'],
+                                               req['resource_group_name'],
+                                               req['yes'],
+                                               req['properties'],
+                                               req['repair'],
+                                               req['login'],
+                                               req['repo_login'])
+        if req['device_id']:
+            args = serviceclient.call_args
+            url = args[0][0].url
+            method = args[0][0].method
 
-        assert method == 'GET'
-        assert '/models/' in url
+            if req['source_model'] == 'device':
+                assert '/digitalTwins/' in url
+                assert method == 'POST'
+            else:
+                if req['interface']:
+                    assert method == 'GET'
+                else:
+                    assert method == 'POST'
+                assert '/models/' in url
 
     @pytest.fixture(params=[200])
-    def serviceclienterror(self, mocker, fixture_ghcs, request):
+    def serviceclienterror(self, mocker, fixture_ghcs, fixture_pnpcs, request):
         service_client = mocker.patch(path_service_client)
         output = generate_device_interfaces_payload()
         payload_list = generate_pnp_interface_list_payload()
@@ -401,14 +498,50 @@ class TestDTMonitorEvents(object):
         test_side_effect = [
             build_mock_response(mocker, request.param, payload=output),
             build_mock_response(mocker, request.param, payload=payload_list),
-            build_mock_response(mocker, request.param, payload=payload_show)
+            build_mock_response(mocker, request.param, payload=payload_show),
+            build_mock_response(mocker, request.param, payload={}),
+            build_mock_response(mocker, request.param, payload={})
         ]
         service_client.side_effect = test_side_effect
         return service_client
 
-    @pytest.mark.parametrize("interface, timeout", [('inter1', 0), ('environmentalSensor', -1)])
-    def test_iot_digitaltwin_monitor_events_error(self, fixture_cmd, serviceclienterror, interface, timeout):
+    @pytest.mark.parametrize("req", [
+        (digitaltwin_monitor_events_create_req(device_id=device_id,
+                                               device_query='select * from devices',
+                                               source_model='public',
+                                               yes=True, properties='all',
+                                               login=mock_target['cs'])),
+        (digitaltwin_monitor_events_create_req(device_query='select * from devices',
+                                               interface='environmentalSensor',
+                                               source_model='public',
+                                               yes=True, properties='all',
+                                               login=mock_target['cs'])),
+        (digitaltwin_monitor_events_create_req(device_id=device_id,
+                                               interface='environmentalSensor1',
+                                               source_model='public',
+                                               yes=True, properties='all',
+                                               login=mock_target['cs'])),
+        (digitaltwin_monitor_events_create_req(device_id=device_id,
+                                               interface='environmentalSensor',
+                                               timeout=-1,
+                                               source_model='public',
+                                               yes=True, properties='all',
+                                               login=mock_target['cs']))])
+    def test_iot_digitaltwin_monitor_events_error(self, fixture_cmd, serviceclienterror, req):
         with pytest.raises(CLIError):
-            subject.iot_digitaltwin_monitor_events(fixture_cmd, device_id=device_id, source_model='public',
-                                                   interface=interface, timeout=timeout,
-                                                   yes=True, properties='all', login=mock_target['cs'])
+            subject.iot_digitaltwin_monitor_events(fixture_cmd,
+                                                   req['device_id'],
+                                                   req['device_query'],
+                                                   req['interface'],
+                                                   req['source_model'],
+                                                   req['repo_endpoint'],
+                                                   req['repo_id'],
+                                                   req['consumer_group'],
+                                                   req['timeout'],
+                                                   req['hub_name'],
+                                                   req['resource_group_name'],
+                                                   req['yes'],
+                                                   req['properties'],
+                                                   req['repair'],
+                                                   req['login'],
+                                                   req['repo_login'])
