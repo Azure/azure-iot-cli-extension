@@ -432,19 +432,20 @@ class TestDTMonitorEvents(object):
                                                interface_name='environmentalSensor',
                                                source_model='public',
                                                yes=True, properties='all',
+                                               consumer_group='group1',
                                                login=mock_target['cs'])),
         (digitaltwin_monitor_events_create_req(device_id=device_id,
                                                interface_name='environmentalSensor',
                                                source_model='private', repo_id=mock_pnptarget['repository_id'],
-                                               yes=True, properties='all',
+                                               yes=False, properties='all',
                                                login=mock_target['cs'])),
         (digitaltwin_monitor_events_create_req(device_id=device_id,
                                                interface_name='environmentalSensor',
                                                source_model='device', repo_login=mock_pnptarget['cs'],
-                                               yes=True, properties='all',
+                                               yes=True, properties='sys',
                                                login=mock_target['cs'])),
         (digitaltwin_monitor_events_create_req(device_id=device_id,
-                                               source_model='public',
+                                               source_model='public', timeout=100,
                                                yes=True, properties='all',
                                                login=mock_target['cs'])),
         (digitaltwin_monitor_events_create_req(device_id=device_id,
@@ -453,9 +454,11 @@ class TestDTMonitorEvents(object):
                                                login=mock_target['cs'])),
         (digitaltwin_monitor_events_create_req(device_id=device_id,
                                                source_model='device', repo_login=mock_pnptarget['cs'],
-                                               yes=True, properties='all',
+                                               repair=True, login=mock_target['cs'])),
+        (digitaltwin_monitor_events_create_req(source_model='public',
                                                login=mock_target['cs'])),
         (digitaltwin_monitor_events_create_req(source_model='public',
+                                               device_query='select * from devices', 
                                                login=mock_target['cs'])),
         (digitaltwin_monitor_events_create_req(source_model='public',
                                                interface_name='environmentalSensor',
@@ -477,24 +480,61 @@ class TestDTMonitorEvents(object):
                                                req['repair'],
                                                req['login'],
                                                req['repo_login'])
+        monitor_events_args = fixture_monitor_events.call_args[1]
         if req['device_id']:
-            args = serviceclient.call_args
-            url = args[0][0].url
-            method = args[0][0].method
-
+            assert monitor_events_args['device_id'] == req['device_id']
+            assert monitor_events_args['pnp_context']
             if req['source_model'] == 'device':
-                assert '/digitalTwins/' in url
-                assert method == 'POST'
+                assert '/digitalTwins/' in serviceclient.call_args[0][0].url
+                assert 'POST' == serviceclient.call_args[0][0].method
             else:
+                assert '/models/' in serviceclient.call_args[0][0].url
                 if req['interface_name']:
-                    assert method == 'GET'
+                    assert 'GET' == serviceclient.call_args[0][0].method
                 else:
-                    assert method == 'POST'
-                assert '/models/' in url
+                    assert 'POST' == serviceclient.call_args[0][0].method
         else:
-            monitor_events_args = fixture_monitor_events.call_args[1]
             assert not monitor_events_args['device_id']
+            assert len(monitor_events_args['pnp_context']['interface']) == 0
+
+        if req['device_query']:
+            assert monitor_events_args['device_query'] == req['device_query']
+        else:
+            assert not monitor_events_args['device_query']
+
+        if req['interface_name']:
+            assert monitor_events_args['interface_name'] == req['interface_name']
+        else:
             assert not monitor_events_args['interface_name']
+
+        if req['consumer_group']:
+            assert monitor_events_args['consumer_group'] == req['consumer_group']
+        else:
+            assert not monitor_events_args['consumer_group']
+
+        if req['timeout']:
+            assert monitor_events_args['timeout'] == req['timeout']
+        else:
+            assert not monitor_events_args['timeout']
+
+        assert not monitor_events_args['hub_name']
+        assert not monitor_events_args['resource_group_name']
+        assert monitor_events_args['login'] == req['login']
+
+        if req['yes']:
+            assert monitor_events_args['yes'] == req['yes']
+        else:
+            assert not monitor_events_args['yes']
+
+        if req['properties']:
+            assert monitor_events_args['properties'] == req['properties']
+        else:
+            assert not monitor_events_args['properties']
+
+        if req['repair']:
+            assert monitor_events_args['repair'] == req['repair']
+        else:
+            assert not monitor_events_args['repair']
 
     @pytest.fixture(params=[200])
     def serviceclienterror(self, mocker, fixture_ghcs, fixture_pnpcs, request):
