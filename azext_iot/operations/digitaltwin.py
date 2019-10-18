@@ -185,9 +185,6 @@ def iot_digitaltwin_monitor_events(cmd, device_id=None, device_query=None, inter
     if all([device_id, device_query]):
         raise CLIError('You cannot use --device-id/-d and --device-query/-q at the same time!')
 
-    if all([interface, device_query]):
-        raise CLIError('You cannot use --interface/-i and --device-query/-q at the same time!')
-
     if device_id:
         device_interfaces = _iot_digitaltwin_interface_list(cmd, device_id, hub_name, resource_group_name, login)
         interface_list = _get_device_default_interface_dict(device_interfaces)

@@ -31,7 +31,7 @@ hub_entity = 'myhub.azure-devices.net'
 # Patch Paths #
 path_mqtt_client = 'azext_iot.operations._mqtt.mqtt.Client'
 path_service_client = 'msrest.service_client.ServiceClient.send'
-path_ghcs = 'azext_iot.operations.hub.get_iot_hub_connection_string'
+path_ghcs = 'azext_iot.operations.digitaltwin.get_iot_hub_connection_string'
 path_pnpcs = 'azext_iot.operations.pnp.get_iot_pnp_connection_string'
 path_iot_hub_service_factory = 'azext_iot.common._azure.iot_hub_service_factory'
 path_sas = 'azext_iot._factory.SasTokenAuthentication'
@@ -449,6 +449,15 @@ class TestDTMonitorEvents(object):
                                                yes=True, properties='all',
                                                login=mock_target['cs'])),
         (digitaltwin_monitor_events_create_req(device_id=device_id,
+                                               source_model='public', timeout=100,
+                                               yes=True, properties='all',
+                                               hub_name='myhub')),
+        (digitaltwin_monitor_events_create_req(device_id=device_id,
+                                               source_model='public', timeout=100,
+                                               yes=True, properties='all',
+                                               hub_name='myhub',
+                                               resource_group_name='myrg')),
+        (digitaltwin_monitor_events_create_req(device_id=device_id,
                                                source_model='private', repo_id=mock_pnptarget['repository_id'],
                                                yes=True, properties='all',
                                                login=mock_target['cs'])),
@@ -461,6 +470,10 @@ class TestDTMonitorEvents(object):
                                                device_query='select * from devices', 
                                                login=mock_target['cs'])),
         (digitaltwin_monitor_events_create_req(source_model='public',
+                                               interface_name='environmentalSensor',
+                                               login=mock_target['cs'])),
+        (digitaltwin_monitor_events_create_req(source_model='public',
+                                               device_query='select * from devices', 
                                                interface_name='environmentalSensor',
                                                login=mock_target['cs']))])
     def test_iot_digitaltwin_monitor_events(self, fixture_cmd, fixture_monitor_events, serviceclient, req):
@@ -517,9 +530,20 @@ class TestDTMonitorEvents(object):
         else:
             assert not monitor_events_args['timeout']
 
-        assert not monitor_events_args['hub_name']
-        assert not monitor_events_args['resource_group_name']
-        assert monitor_events_args['login'] == req['login']
+        if req['login']:
+            assert monitor_events_args['login'] == req['login']
+        else:
+            assert not monitor_events_args['login']
+
+        if req['hub_name']:
+            assert monitor_events_args['hub_name'] == req['hub_name']
+        else:
+            assert not monitor_events_args['hub_name']
+
+        if req['resource_group_name']:
+            assert monitor_events_args['resource_group_name'] == req['resource_group_name']
+        else:
+            assert not monitor_events_args['resource_group_name']
 
         if req['yes']:
             assert monitor_events_args['yes'] == req['yes']
@@ -555,11 +579,6 @@ class TestDTMonitorEvents(object):
     @pytest.mark.parametrize("req", [
         (digitaltwin_monitor_events_create_req(device_id=device_id,
                                                device_query='select * from devices',
-                                               source_model='public',
-                                               yes=True, properties='all',
-                                               login=mock_target['cs'])),
-        (digitaltwin_monitor_events_create_req(device_query='select * from devices',
-                                               interface_name='environmentalSensor',
                                                source_model='public',
                                                yes=True, properties='all',
                                                login=mock_target['cs'])),
