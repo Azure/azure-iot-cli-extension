@@ -467,13 +467,13 @@ class TestDTMonitorEvents(object):
         (digitaltwin_monitor_events_create_req(source_model='public',
                                                login=mock_target['cs'])),
         (digitaltwin_monitor_events_create_req(source_model='public',
-                                               device_query='select * from devices', 
+                                               device_query='select * from devices',
                                                login=mock_target['cs'])),
         (digitaltwin_monitor_events_create_req(source_model='public',
                                                interface_name='environmentalSensor',
                                                login=mock_target['cs'])),
         (digitaltwin_monitor_events_create_req(source_model='public',
-                                               device_query='select * from devices', 
+                                               device_query='select * from devices',
                                                interface_name='environmentalSensor',
                                                login=mock_target['cs']))])
     def test_iot_digitaltwin_monitor_events(self, fixture_cmd, fixture_monitor_events, serviceclient, req):
