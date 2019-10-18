@@ -34,7 +34,7 @@ def executor(
     output=None,
     content_type=None,
     devices=None,
-    interface_id=None,
+    interface_name=None,
     pnp_context=None,
 ):
 
@@ -50,7 +50,7 @@ def executor(
             output,
             content_type,
             devices,
-            interface_id,
+            interface_name,
             pnp_context,
         )
     )
@@ -105,7 +105,7 @@ async def initiate_event_monitor(
     output=None,
     content_type=None,
     devices=None,
-    interface_id=None,
+    interface_name=None,
     pnp_context=None,
 ):
     def _get_conn_props():
@@ -145,7 +145,7 @@ async def initiate_event_monitor(
                     output=output,
                     content_type=content_type,
                     devices=devices,
-                    interface_id=interface_id,
+                    interface_name=interface_name,
                     pnp_context=pnp_context,
                 )
             )
@@ -166,7 +166,7 @@ async def monitor_events(
     output=None,
     content_type=None,
     devices=None,
-    interface_id=None,
+    interface_name=None,
     pnp_context=None,
 ):
     source = uamqp.address.Source(
@@ -193,14 +193,13 @@ async def monitor_events(
             return
 
         if pnp_context:
-            msg_interface_id = str(
+            msg_interface_name = str(
                 msg.annotations.get(b"iothub-interface-name"), "utf8"
             )
-            if not msg_interface_id:
+            if not msg_interface_name:
                 return
-
-            if interface_id:
-                if msg_interface_id != interface_id:
+            if interface_name:
+                if msg_interface_name != interface_name:
                     return
 
         event_source = {"event": {}}
@@ -229,12 +228,12 @@ async def monitor_events(
         event_source["event"]["payload"] = payload
 
         if pnp_context:
-            event_source["event"]["interface"] = msg_interface_id
+            event_source["event"]["interface"] = msg_interface_name
 
             msg_schema = str(
                 msg.application_properties.get(b"iothub-message-schema"), "utf8"
             )
-            interface_context = pnp_context["interface"].get(msg_interface_id)
+            interface_context = pnp_context["interface"].get(msg_interface_name)
             if interface_context:
                 msg_schema_context = interface_context.get(msg_schema)
                 if msg_schema_context:
