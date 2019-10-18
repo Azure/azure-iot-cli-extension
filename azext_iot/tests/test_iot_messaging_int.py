@@ -261,6 +261,22 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             expect_failure=True,
         )
 
+        # Send arbitrary properties with device simulation - mqtt
+        self.cmd(
+            "iot device simulate -d {} -n {} -g {} --mc {} --mi {} --properties '{}'".format(
+                device_ids[0], LIVE_HUB, LIVE_RG, 2, 1, 'myprop=myvalue;$.ct=application/json'
+            ),
+            checks=self.is_empty(),
+        )
+
+        # Send arbitrary properties with device simulation - http
+        self.cmd(
+            "iot device simulate -d {} -n {} -g {} --mc {} --mi {} --proto http -p '{}'".format(
+                device_ids[0], LIVE_HUB, LIVE_RG, 2, 1, "iothub-app-myprop=myvalue;iothub-messageid=1"
+            ),
+            checks=self.is_empty(),
+        )
+
         self.cmd(
             "iot device send-d2c-message -d {} -n {} -g {}".format(
                 device_ids[0], LIVE_HUB, LIVE_RG
@@ -355,7 +371,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # Monitor events for a single device
         self.command_execute_assert(
-            "iot hub monitor-events -n {} -g {} -d {} --cg {} --et {} -t 10 -y -p sys anno app".format(
+            "iot hub monitor-events -n {} -g {} -d {} --cg {} --et {} -t 10 -y -p all".format(
                 LIVE_HUB, LIVE_RG, device_ids[0], LIVE_CONSUMER_GROUPS[1], enqueued_time
             ),
             [

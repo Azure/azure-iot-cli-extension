@@ -76,7 +76,7 @@ def executor(
 
         six.print_(
             "Starting {}event monitor,{} use ctrl-c to stop...".format(
-                "PnP " if pnp_context else "",
+                "Digital Twin " if pnp_context else "",
                 device_filter_txt if device_filter_txt else "",
             )
         )
@@ -216,7 +216,7 @@ async def monitor_events(
         if not ct:
             ct = system_props["content_type"] if "content_type" in system_props else ""
 
-        if ct and ct.lower() == "application/json":
+        if ct and "application/json" in ct.lower():
             try:
                 payload = json.loads(
                     re.compile(r"(\\r\\n)+|\\r+|\\n+").sub("", payload)

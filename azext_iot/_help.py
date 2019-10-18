@@ -555,7 +555,7 @@ helps['iot device c2d-message send'] = """
 helps['iot device send-d2c-message'] = """
     type: command
     short-summary: Send an mqtt device-to-cloud message.
-    long-summary: Supports application and system properties to send with message.
+                   The command supports sending messages with application and system properties.
     examples:
     - name: Basic usage
       text: az iot device send-d2c-message -n {iothub_name} -d {device_id}
@@ -569,22 +569,29 @@ helps['iot device send-d2c-message'] = """
 
 helps['iot device simulate'] = """
     type: command
-    short-summary: Simulate a device in an Azure IoT Hub.
-    long-summary: While the device simulation is running, the device will automatically receive
-                  and acknowledge cloud-to-device (c2d) messages. For mqtt simulation, all c2d messages will
-                  be acknowledged with completion. For http simulation c2d acknowledgement is based on user
-                  selection which can be complete, reject or abandon.
+    short-summary: |
+                   Simulate a device in an Azure IoT Hub.
+
+                   While the device simulation is running, the device will automatically receive
+                   and acknowledge cloud-to-device (c2d) messages. For mqtt simulation, all c2d messages will
+                   be acknowledged with completion. For http simulation c2d acknowledgement is based on user
+                   selection which can be complete, reject or abandon.
     examples:
-    - name: Basic usage (mqtt).
+    - name: Basic usage (mqtt)
       text: az iot device simulate -n {iothub_name} -d {device_id}
-    - name: Basic usage (http).
+    - name: Basic usage (mqtt) with sending mixed properties
+      text: az iot device simulate -n {iothub_name} -d {device_id} --properties "myprop=myvalue;$.ct=application/json"
+    - name: Basic usage (http)
       text: az iot device simulate -n {iothub_name} -d {device_id} --protocol http
-    - name: Choose total message count and interval between messages.
+    - name: Basic usage (http) with sending mixed properties
+      text: az iot device simulate -n {iothub_name} -d {device_id} --protocol http --properties
+            "iothub-app-myprop=myvalue;content-type=application/json;iothub-correlationid=12345"
+    - name: Choose total message count and interval between messages
       text: az iot device simulate -n {iothub_name} -d {device_id} --msg-count 1000 --msg-interval 5
     - name: Reject c2d messages (http only)
-      text: az iot device simulate -n {iothub_name} -d {device_id} --rs {reject}
+      text: az iot device simulate -n {iothub_name} -d {device_id} --rs {reject} --protocol http
     - name: Abandon c2d messages (http only)
-      text: az iot device simulate -n {iothub_name} -d {device_id} --rs {abandon}
+      text: az iot device simulate -n {iothub_name} -d {device_id} --rs {abandon} --protocol http
 """
 
 helps['iot device upload-file'] = """
@@ -658,8 +665,9 @@ helps['iot edge deployment list'] = """
 
 helps['iot edge deployment update'] = """
     type: command
-    short-summary: Update specified properties of an IoT Edge deployment.
-    long-summary: |
+    short-summary: |
+                  Update specified properties of an IoT Edge deployment.
+
                   Use --set followed by property assignments for updating a deployment.
 
                   Note: IoT Edge deployment content is immutable. Deployment properties that can be
@@ -1088,17 +1096,17 @@ helps['iot dt monitor-events'] = """
     short-summary: Monitor digital twin events.
     long-summary: You can leverage az login and provide --hub-name instead of --login for every command.
     examples:
-    - name: Monitor digital twin events of all devices.
+    - name: Monitor digital twin events of all devices using an IotHub connection string.
       text: >
         az iot dt monitor-events --login {iothub_cs}
     - name: Monitor digital twin events of filtered devices using IoT Hub query language.
       text: >
         az iot dt monitor-events --login {iothub_cs} -q "select * from devices where tags.location.region = 'US'"
-    - name: Monitor digital twin events of device's interface.
+    - name: Monitor digital twin events of a device's interface.
       text: >
         az iot dt monitor-events --login {iothub_cs} --device-id {device_id} --source device
         --interface {plug_and_play_interface} --consumer-group {consumer_group_name}
-    - name: Monitor digital twin events of public interface within current session.
+    - name: Monitor digital twin events of public interface within logged in (via az login) session.
       text: >
         az iot dt monitor-events --hub-name {iothub_name} --device-id {device_id} --source public
         --interface {plug_and_play_interface} --consumer-group {consumer_group_name}
