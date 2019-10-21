@@ -192,19 +192,22 @@ async def monitor_events(
         if devices and origin not in devices:
             return
 
+        event_source = {"event": {}}
+        event_source["event"]["origin"] = origin
+        payload = ""
+
         if pnp_context:
             msg_interface_name = str(
                 msg.annotations.get(b"iothub-interface-name"), "utf8"
             )
             if not msg_interface_name:
                 return
+
             if interface_name:
                 if msg_interface_name != interface_name:
                     return
 
-        event_source = {"event": {}}
-        event_source["event"]["origin"] = origin
-        payload = ""
+            event_source["event"]["interface"] = msg_interface_name
 
         data = msg.get_data()
         if data:
@@ -226,25 +229,6 @@ async def monitor_events(
                 pass
 
         event_source["event"]["payload"] = payload
-
-        if pnp_context:
-            event_source["event"]["interface"] = msg_interface_name
-
-            msg_schema = str(
-                msg.application_properties.get(b"iothub-message-schema"), "utf8"
-            )
-            interface_context = pnp_context["interface"].get(msg_interface_name)
-            if interface_context:
-                msg_schema_context = interface_context.get(msg_schema)
-                if msg_schema_context:
-                    msg_context_display = msg_schema_context.get("display")
-                    msg_context_unit = msg_schema_context.get("unit")
-
-                    if msg_context_display:
-                        event_source["event"]["payload"] = {}
-                        event_source["event"]["payload"][msg_context_display] = payload
-                        if msg_context_unit:
-                            event_source["event"]["payload"]["unit"] = msg_context_unit
 
         if "anno" in properties or "all" in properties:
             event_source["event"]["annotations"] = unicode_binary_map(msg.annotations)

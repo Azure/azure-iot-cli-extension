@@ -14,7 +14,7 @@ path_service_client = "msrest.service_client.ServiceClient.send"
 path_ghcs = "azext_iot.operations.hub.get_iot_hub_connection_string"
 path_sas = "azext_iot._factory.SasTokenAuthentication"
 path_mqtt_client = "azext_iot.operations._mqtt.mqtt.Client"
-
+path_iot_hub_monitor_events_entrypoint = "azext_iot.operations.hub._iot_hub_monitor_events"
 hub_entity = "myhub.azure-devices.net"
 
 mock_target = {}
@@ -85,6 +85,11 @@ def mqttclient_generic_error(mocker, fixture_ghcs, fixture_sas):
     mqtt_client = mocker.patch(path_mqtt_client)
     mqtt_client().connect.side_effect = Exception("something happened")
     return mqtt_client
+
+
+@pytest.fixture()
+def fixture_monitor_events_entrypoint(mocker):
+    return mocker.patch(path_iot_hub_monitor_events_entrypoint)
 
 
 def build_mock_response(mocker, status_code=200, payload=None, headers=None, raw=False):

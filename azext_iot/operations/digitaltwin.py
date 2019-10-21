@@ -174,51 +174,14 @@ def iot_digitaltwin_property_update(cmd, interface_payload, device_id,
         raise CLIError(unpack_msrest_error(e))
 
 
-def iot_digitaltwin_monitor_events(cmd, device_id=None, device_query=None, interface=None,
-                                   source_model=ModelSourceType.public.value, repo_endpoint=PNP_ENDPOINT,
-                                   repo_id=None, consumer_group='$Default', timeout=300, hub_name=None,
-                                   resource_group_name=None, yes=False, properties=None, repair=False,
-                                   login=None, repo_login=None):
-    source_model = source_model.lower()
-    pnp_context = {'enabled': True, 'interface': {}}
-    target_interfaces = []
-    if all([device_id, device_query]):
-        raise CLIError('You cannot use --device-id/-d and --device-query/-q at the same time!')
-
-    if device_id:
-        device_interfaces = _iot_digitaltwin_interface_list(cmd, device_id, hub_name, resource_group_name, login)
-        interface_list = _get_device_default_interface_dict(device_interfaces)
-
-        if interface:
-            desired_interface = next((k for k in interface_list if k['name'] == interface), None)
-            if not desired_interface:
-                raise CLIError("Desired interface '{}' is not implemented by the device!".format(interface))
-
-            target_interfaces.append(desired_interface)
-        else:
-            target_interfaces = interface_list
-
-        for entity in target_interfaces:
-            pnp_context['interface'][entity['name']] = {}
-            found_telemetry = []
-            if source_model == ModelSourceType.device.value.lower():
-                found_telemetry = _device_interface_elements(cmd, device_id, entity['urn_id'], INTERFACE_TELEMETRY,
-                                                             hub_name, resource_group_name, login)
-            else:
-                if source_model == ModelSourceType.private.value.lower():
-                    _validate_repository(repo_id, repo_login)
-                found_telemetry = _pnp_interface_elements(cmd, entity['urn_id'], INTERFACE_TELEMETRY,
-                                                          repo_endpoint, repo_id, repo_login)
-
-            for telemetry in found_telemetry:
-                telemetry_data = {'display': telemetry.get('displayName'), 'unit': telemetry.get('unit')}
-                pnp_context['interface'][entity['name']][telemetry['name']] = telemetry_data
-
-    _iot_hub_monitor_events(cmd=cmd, interface_name=interface, pnp_context=pnp_context,
-                            hub_name=hub_name, device_id=device_id, consumer_group=consumer_group,
-                            timeout=timeout, resource_group_name=resource_group_name,
-                            yes=yes, properties=properties, repair=repair,
-                            login=login, device_query=device_query)
+def iot_digitaltwin_monitor_events(cmd, hub_name=None, device_id=None, consumer_group='$Default', timeout=300,
+                                   enqueued_time=None, resource_group_name=None, yes=False, properties=None, repair=False,
+                                   login=None, content_type=None, device_query=None, interface=None):
+    _iot_hub_monitor_events(cmd=cmd, hub_name=hub_name, device_id=device_id,
+                            consumer_group=consumer_group, timeout=timeout, enqueued_time=enqueued_time,
+                            resource_group_name=resource_group_name, yes=yes, properties=properties,
+                            repair=repair, login=login, content_type=content_type, device_query=device_query,
+                            interface_name=interface, pnp_context=True)
 
 
 def _iot_digitaltwin_interface_show(cmd, device_id, interface, hub_name=None, resource_group_name=None, login=None):

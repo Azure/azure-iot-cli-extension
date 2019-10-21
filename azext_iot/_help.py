@@ -1093,28 +1093,26 @@ helps['iot dt list-commands'] = """
 
 helps['iot dt monitor-events'] = """
     type: command
-    short-summary: Monitor digital twin events.
+    short-summary: Monitor Digital Twin events.
     long-summary: You can leverage az login and provide --hub-name instead of --login for every command.
     examples:
-    - name: Monitor digital twin events of all devices using an IotHub connection string.
+    - name: Basic usage monitoring events of all devices and all interfaces using the logged in session.
+      text: >
+        az iot dt monitor-events -n {iothub_name}
+    - name: Basic usage monitoring events of all devices and all interfaces using an IotHub connection string.
       text: >
         az iot dt monitor-events --login {iothub_cs}
-    - name: Monitor digital twin events of filtered devices using IoT Hub query language.
+    - name: Basic usage when filtering on specific interface events while targeting devices with a wildcard in the ID.
       text: >
-        az iot dt monitor-events --login {iothub_cs} -q "select * from devices where tags.location.region = 'US'"
-    - name: Monitor digital twin events of a device's interface.
+        az iot dt monitor-events -n {iothub_name} -d Device* -i {plug_and_play_interface}
+    - name: Filter Digital Twin events of a subset of devices using IoT Hub query language.
       text: >
-        az iot dt monitor-events --login {iothub_cs} --device-id {device_id} --source device
-        --interface {plug_and_play_interface} --consumer-group {consumer_group_name}
-    - name: Monitor digital twin events of public interface within logged in (via az login) session.
-      text: >
-        az iot dt monitor-events --hub-name {iothub_name} --device-id {device_id} --source public
-        --interface {plug_and_play_interface} --consumer-group {consumer_group_name}
-    - name: Monitor digital twin events of device's interface and see all message properties.
+        az iot dt monitor-events -n {iothub_name} -q "select * from devices where tags.location.region = 'US'"
+    - name: Filter events on a device with a particular interface. Use a custom consumer group when binding and
+            see all message properties.
       text: >
         az iot dt monitor-events --login {iothub_cs} --device-id {device_id}
-        --interface {plug_and_play_interface} --consumer-group {consumer_group_name}
-        --properties all --source private -r {pnp_repository}
+        --interface {plug_and_play_interface} --consumer-group {consumer_group_name} --properties all
 """
 
 helps['iot dt update-property'] = """
