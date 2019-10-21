@@ -3,6 +3,12 @@
 Release History
 ===============
 
+0.8.4
++++++++++++++++
+- Device simulate now supports sending arbitrary message properties (like in send-d2c-message).
+- Fix issue filtering Digital Twin events (in the preview dt monitor command) when device Id is provided
+- Help content improvements
+
 0.8.3
 +++++++++++++++
 - Removes long since deprecated command `az iot hub apply-configuration`

@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from knack.util import CLIError
-from azext_iot.assets.user_messages import ERROR_PARAM_TOP_OUT_OF_BOUNDS
+from azext_iot.assets.user_messages import error_param_top_out_of_bounds
 
 
 def _execute_query(query, query_method, top=None):
@@ -38,5 +38,5 @@ def _process_top(top, upper_limit=None):
     if top == -1 and not upper_limit:
         return None
     if top <= 0 or (upper_limit and top > upper_limit):
-        raise CLIError(ERROR_PARAM_TOP_OUT_OF_BOUNDS(upper_limit))
+        raise CLIError(error_param_top_out_of_bounds(upper_limit))
     return int(top)

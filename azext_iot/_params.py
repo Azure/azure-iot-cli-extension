@@ -30,6 +30,7 @@ from azext_iot.common.shared import (
     ModelSourceType
 )
 from azext_iot._validators import mode2_iot_login_handler
+from azext_iot.assets.user_messages import info_param_properties_device
 
 hub_name_type = CLIArgumentType(
     completer=get_resource_name_completion_list('Microsoft.Devices/IotHubs'),
@@ -211,8 +212,7 @@ def load_arguments(self, _):
     with self.argument_context('iot device') as context:
         context.argument('data', options_list=['--data', '--da'], help='Message body.')
         context.argument('properties', options_list=['--properties', '--props', '-p'],
-                         help='Message property bag in key-value pairs with the '
-                         'following format: a=b;c=d')
+                         help=info_param_properties_device())
         context.argument('msg_count', options_list=['--msg-count', '--mc'], type=int,
                          help='Number of device messages to send to IoT Hub.')
         context.argument('msg_interval', options_list=['--msg-interval', '--mi'], type=int,
@@ -224,6 +224,10 @@ def load_arguments(self, _):
         context.argument('protocol_type', options_list=['--protocol', '--proto'],
                          arg_type=get_enum_type(ProtocolType),
                          help='Indicates device-to-cloud message protocol')
+
+    with self.argument_context('iot device simulate') as context:
+        context.argument('properties', options_list=['--properties', '--props', '-p'],
+                         help=info_param_properties_device(include_http=True))
 
     with self.argument_context('iot device c2d-message') as context:
         context.argument('ack', options_list=['--ack'], arg_type=get_enum_type(AckType),

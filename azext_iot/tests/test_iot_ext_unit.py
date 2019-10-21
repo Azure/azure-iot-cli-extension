@@ -11,7 +11,12 @@ import os
 from uuid import uuid4
 from random import randint
 from azext_iot.operations import hub as subject
-from azext_iot.common.utility import evaluate_literal, validate_min_python_version
+from azext_iot.common.utility import (
+    evaluate_literal,
+    validate_min_python_version,
+    url_encode_dict,
+    validate_key_value_pairs,
+)
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.constants import TRACING_PROPERTY
 from knack.util import CLIError
@@ -900,7 +905,7 @@ def generate_device_config(
     content_short_form=False,
     modules_schema="2.0",
     config_id=None,
-    filter_properties=None
+    filter_properties=None,
 ):
     result = {}
     change_dir()
@@ -2499,15 +2504,19 @@ class TestDeviceSimulate:
         return service_client
 
     @pytest.mark.parametrize(
-        "rs, mc, mi, protocol",
+        "rs, mc, mi, protocol, properties",
         [
-            ("complete", 1, 1, "http"),
-            ("reject", 1, 1, "http"),
-            ("abandon", 2, 1, "http"),
-            ("complete", 3, 1, "mqtt"),
+            ("complete", 1, 1, "http", None),
+            ("reject", 1, 1, "http", None),
+            ("abandon", 2, 1, "http", "iothub-app-myprop=myvalue;iothub-messageid=1"),
+            ("complete", 3, 1, "mqtt", None),
+            ("complete", 2, 1, "mqtt", "myprop=myvalue;$.ct=application/json"),
+            ("complete", 2, 1, "mqtt", "myprop;$.ct=application/json"),
         ],
     )
-    def test_device_simulate(self, serviceclient, mqttclient, rs, mc, mi, protocol):
+    def test_device_simulate(
+        self, serviceclient, mqttclient, rs, mc, mi, protocol, properties
+    ):
         subject.iot_simulate_device(
             fixture_cmd,
             device_id,
@@ -2516,27 +2525,50 @@ class TestDeviceSimulate:
             msg_count=mc,
             msg_interval=mi,
             protocol_type=protocol,
+            properties=properties,
         )
         if protocol == "http":
             args = serviceclient.call_args_list
             result = []
             for call in args:
-                call = call[0]
-                if call[0].method == "POST":
-                    result.append(call)
-
+                c = call[0]
+                if c[0].method == "POST":
+                    result.append(c)
             assert len(result) == mc
+
+            if properties:
+                # result[?][1] are the http request headers
+                assert result[0][1] == validate_key_value_pairs(properties)
+
+            # result[?][2] is the http request body (prior to stringify)
+            assert json.dumps(result[0][2])
+
         if protocol == "mqtt":
             assert mc == mqttclient().publish.call_count
-            assert mqttclient().publish.call_args[0][
-                0
-            ] == "devices/{}/messages/events/".format(device_id)
+
+            if properties:
+                assert mqttclient().publish.call_args[0][0] == "devices/{}/messages/events/{}".format(
+                    device_id,
+                    url_encode_dict(validate_key_value_pairs(properties))
+                    if properties
+                    else "",
+                )
+
+            # Body - which is a json string
+            assert json.loads(mqttclient().publish.call_args[0][1])
+
             assert mqttclient().tls_set.call_count == 1
             assert mqttclient().username_pw_set.call_count == 1
+            assert serviceclient.call_count == 0
 
     @pytest.mark.parametrize(
         "rs, mc, mi, protocol, exception",
-        [("reject", 4, 0, "mqtt", CLIError), ("complete", 0, 1, "mqtt", CLIError)],
+        [
+            ("complete", 2, 0, "mqtt", CLIError),
+            ("complete", 0, 1, "mqtt", CLIError),
+            ("reject", 1, 1, "mqtt", CLIError),
+            ("abandon", 1, 0, "http", CLIError),
+        ],
     )
     def test_device_simulate_invalid_args(
         self, serviceclient, rs, mc, mi, protocol, exception
@@ -2549,7 +2581,7 @@ class TestDeviceSimulate:
                 receive_settle=rs,
                 msg_count=mc,
                 msg_interval=mi,
-                protocol_type=protocol,
+                protocol_type=protocol
             )
 
     def test_device_simulate_http_error(self, serviceclient_generic_error):

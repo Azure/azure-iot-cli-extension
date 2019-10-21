@@ -189,12 +189,12 @@ def iot_digitaltwin_monitor_events(cmd, device_id=None, device_query=None, inter
         device_interfaces = _iot_digitaltwin_interface_list(cmd, device_id, hub_name, resource_group_name, login)
         interface_list = _get_device_default_interface_dict(device_interfaces)
 
-        target_interface = next((k for k in interface_list if k['name'] == interface), None)
-        if interface and not target_interface:
-            raise CLIError('Target interface is not implemented by the device!')
-
         if interface:
-            target_interfaces.append(target_interface)
+            desired_interface = next((k for k in interface_list if k['name'] == interface), None)
+            if not desired_interface:
+                raise CLIError("Desired interface '{}' is not implemented by the device!".format(interface))
+
+            target_interfaces.append(desired_interface)
         else:
             target_interfaces = interface_list
 

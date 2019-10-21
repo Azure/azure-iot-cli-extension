@@ -1079,24 +1079,14 @@ def _iot_device_send_message(target, device_id, data, properties=None, msg_count
         raise CLIError(x)
 
 
-def iot_device_send_message_http(cmd, device_id, data, hub_name=None, msg_id=None,
-                                 corr_id=None, user_id=None, resource_group_name=None, login=None):
+def iot_device_send_message_http(cmd, device_id, data, hub_name=None, headers=None,
+                                 resource_group_name=None, login=None):
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
-    return _iot_device_send_message_http(target, device_id, data, msg_id, corr_id, user_id)
+    return _iot_device_send_message_http(target, device_id, data, headers)
 
 
-def _iot_device_send_message_http(target, device_id, data, msg_id=None,
-                                  corr_id=None, user_id=None):
+def _iot_device_send_message_http(target, device_id, data, headers=None):
     device_sdk, errors = _bind_sdk(target, SdkType.device_sdk, device_id)
-
-    headers = {}
-
-    if msg_id:
-        headers['IotHub-MessageId'] = msg_id
-    if corr_id:
-        headers['IotHub-CorrelationId'] = corr_id
-    if user_id:
-        headers['IotHub-UserId'] = user_id
 
     try:
         return device_sdk.send_device_event(device_id, data, custom_headers=headers)
@@ -1216,16 +1206,18 @@ def _iot_c2d_message_send(target, device_id, data, properties=None,
 
 def iot_simulate_device(cmd, device_id, hub_name=None, receive_settle='complete',
                         data='Ping from Az CLI IoT Extension', msg_count=100,
-                        msg_interval=3, protocol_type='mqtt', resource_group_name=None, login=None):
+                        msg_interval=3, protocol_type='mqtt', properties=None,
+                        resource_group_name=None, login=None):
     import sys
     import uuid
     import datetime
     import json
+    from azext_iot.common.shared import ProtocolType
     from azext_iot.operations._mqtt import mqtt_client_wrap
     from azext_iot.common.utility import execute_onthread
     from azext_iot.constants import MIN_SIM_MSG_INTERVAL, MIN_SIM_MSG_COUNT, SIM_RECEIVE_SLEEP_SEC
 
-    if protocol_type == 'mqtt':
+    if protocol_type == ProtocolType.mqtt.name:
         if receive_settle != 'complete':
             raise CLIError('mqtt protocol only supports settle type of "complete"')
 
@@ -1234,6 +1226,9 @@ def iot_simulate_device(cmd, device_id, hub_name=None, receive_settle='complete'
 
     if msg_count < MIN_SIM_MSG_COUNT:
         raise CLIError('msg count must be at least {}'.format(MIN_SIM_MSG_COUNT))
+
+    if properties:
+        properties = validate_key_value_pairs(properties)
 
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     token = None
@@ -1250,12 +1245,12 @@ def iot_simulate_device(cmd, device_id, hub_name=None, receive_settle='complete'
 
     def http_wrap(target, device_id, generator):
         d = generator.generate(False)
-        _iot_device_send_message_http(target, device_id, d)
+        _iot_device_send_message_http(target, device_id, d, headers=properties)
         six.print_('.', end='', flush=True)
 
     try:
-        if protocol_type == 'mqtt':
-            wrap = mqtt_client_wrap(target, device_id)
+        if protocol_type == ProtocolType.mqtt.name:
+            wrap = mqtt_client_wrap(target, device_id, properties=properties)
             wrap.execute(generator(), publish_delay=msg_interval, msg_count=msg_count)
         else:
             six.print_('Sending and receiving events via https')
