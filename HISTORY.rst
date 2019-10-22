@@ -8,6 +8,7 @@ Release History
 - Device simulate now supports sending arbitrary message properties (like in send-d2c-message)
 - The preview dt monitor events command has been simplified. It works the same as vanilla iot hub monitoring but filters dt events and allows filtering by interface
 - Help content improvements
+- Remove long since deprecated parameter `--config-id` from edge deployments
 
 0.8.3
 +++++++++++++++

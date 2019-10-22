@@ -266,7 +266,7 @@ def load_arguments(self, _):
 
     with self.argument_context('iot hub configuration') as context:
         context.argument('config_id', options_list=['--config-id', '-c'],
-                         help='Target device configuration.')
+                         help='Target device configuration name.')
         context.argument('target_condition', options_list=['--target-condition', '--tc', '-t'],
                          help='Target condition in which a device configuration applies to.')
         context.argument('priority', options_list=['--priority', '--pri'],
