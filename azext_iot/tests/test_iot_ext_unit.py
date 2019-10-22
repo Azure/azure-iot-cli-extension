@@ -19,6 +19,7 @@ from azext_iot.common.utility import (
 )
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.constants import TRACING_PROPERTY
+from azext_iot.tests.generators import create_req_monitor_events
 from knack.util import CLIError
 from azure.cli.core.util import read_file_content
 from .conftest import (
@@ -2547,7 +2548,9 @@ class TestDeviceSimulate:
             assert mc == mqttclient().publish.call_count
 
             if properties:
-                assert mqttclient().publish.call_args[0][0] == "devices/{}/messages/events/{}".format(
+                assert mqttclient().publish.call_args[0][
+                    0
+                ] == "devices/{}/messages/events/{}".format(
                     device_id,
                     url_encode_dict(validate_key_value_pairs(properties))
                     if properties
@@ -2581,7 +2584,7 @@ class TestDeviceSimulate:
                 receive_settle=rs,
                 msg_count=mc,
                 msg_interval=mi,
-                protocol_type=protocol
+                protocol_type=protocol,
             )
 
     def test_device_simulate_http_error(self, serviceclient_generic_error):
@@ -2613,6 +2616,72 @@ class TestMonitorEvents:
         existing_target["events"] = {}
         existing_target["events"]["partition_ids"] = []
         return service_client
+
+    @pytest.mark.parametrize(
+        "req",
+        [
+            (
+                create_req_monitor_events(
+                    device_id="mydevice",
+                    device_query="select * from devices",
+                    consumer_group="group1",
+                    content_type="application/json",
+                    enqueued_time="54321",
+                    timeout="30",
+                    hub_name="myhub",
+                    resource_group_name="myrg",
+                    yes=True,
+                    properties="sys anno app",
+                    repair=True,
+                    login=mock_target["cs"],
+                )
+            ),
+        ],
+    )
+    def test_monitor_events_entrypoint(
+        self, fixture_cmd, fixture_monitor_events_entrypoint, req
+    ):
+        subject.iot_hub_monitor_events(
+            fixture_cmd,
+            device_id=req["device_id"],
+            device_query=req["device_query"],
+            consumer_group=req["consumer_group"],
+            content_type=req["content_type"],
+            enqueued_time=req["enqueued_time"],
+            timeout=req["timeout"],
+            hub_name=req["hub_name"],
+            resource_group_name=req["resource_group_name"],
+            yes=req["yes"],
+            properties=req["properties"],
+            repair=req["repair"],
+            login=req["login"],
+        )
+
+        monitor_events_args = fixture_monitor_events_entrypoint.call_args[1]
+
+        attribute_set = [
+            "device_id",
+            "device_query",
+            "consumer_group",
+            "enqueued_time",
+            "content_type",
+            "timeout",
+            "login",
+            "hub_name",
+            "resource_group_name",
+            "yes",
+            "properties",
+            "repair",
+        ]
+
+        assert "pnp_context" not in monitor_events_args
+        assert "interface" not in monitor_events_args
+
+        for attribute in attribute_set:
+            if req[attribute]:
+                assert monitor_events_args[attribute] == req[attribute]
+            else:
+                assert not monitor_events_args[attribute]
 
     @pytest.mark.parametrize("timeout, exception", [(-1, CLIError)])
     def test_monitor_events_invalid_args(

@@ -5,8 +5,8 @@ Release History
 
 0.8.4
 +++++++++++++++
-- Device simulate now supports sending arbitrary message properties (like in send-d2c-message).
-- Fix issue filtering Digital Twin events (in the preview dt monitor command) when device Id is provided
+- Device simulate now supports sending arbitrary message properties (like in send-d2c-message)
+- The preview dt monitor events command has been simplified. It works the same as vanilla iot hub monitoring but filters dt events and allows filtering by interface
 - Help content improvements
 
 0.8.3

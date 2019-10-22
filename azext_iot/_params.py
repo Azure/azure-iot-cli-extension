@@ -37,10 +37,17 @@ hub_name_type = CLIArgumentType(
     help='IoT Hub name.')
 
 event_msg_prop_type = CLIArgumentType(
+    options_list=['--properties', '--props', '-p'],
     nargs='*',
     choices=CaseInsensitiveList(['sys', 'app', 'anno', 'all']),
     help='Indicate key message properties to output. '
     'sys = system properties, app = application properties, anno = annotations'
+)
+
+event_timeout_type = CLIArgumentType(
+    options_list=['--timeout', '--to', '-t'],
+    type=int,
+    help='Maximum seconds to maintain connection without receiving message. Use 0 for infinity. '
 )
 
 
@@ -90,6 +97,15 @@ def load_arguments(self, _):
                          help='Reinstall uamqp dependency compatible with extension version. Default: false')
         context.argument('repo_endpoint', options_list=['--endpoint', '-e'], help='IoT Plug and Play endpoint.')
         context.argument('repo_id', options_list=['--repo-id', '-r'], help='IoT Plug and Play repository Id.')
+        context.argument('consumer_group', options_list=['--consumer-group', '--cg', '-c'],
+                         help='Specify the consumer group to use when connecting to event hub endpoint.')
+        context.argument('enqueued_time', options_list=['--enqueued-time', '--et', '-e'], type=int,
+                         help='Indicates the time that should be used as a starting point to read messages from the partitions. '
+                         'Units are milliseconds since unix epoch. '
+                         'If no time is indicated "now" is used.')
+        context.argument('content_type', options_list=['--content-type', '--ct'],
+                         help='Specify the Content-Type of the message payload to automatically format the output to that type.')
+        context.argument('device_query', options_list=['--device-query', '-q'], help='Specify a custom query to filter devices.')
 
     with self.argument_context('iot hub') as context:
         context.argument('target_json', options_list=['--json', '-j'],
@@ -112,18 +128,8 @@ def load_arguments(self, _):
                          'Output to specified target directory')
 
     with self.argument_context('iot hub monitor-events') as context:
-        context.argument('timeout', options_list=['--timeout', '--to', '-t'], type=int,
-                         help='Maximum seconds to maintain connection without receiving message. Use 0 for infinity. ')
-        context.argument('consumer_group', options_list=['--consumer-group', '--cg', '-c'],
-                         help='Specify the consumer group to use when connecting to event hub endpoint.')
-        context.argument('enqueued_time', options_list=['--enqueued-time', '--et', '-e'], type=int,
-                         help='Indicates the time that should be used as a starting point to read messages from the partitions. '
-                         'Units are milliseconds since unix epoch. '
-                         'If no time is indicated "now" is used.')
-        context.argument('properties', options_list=['--properties', '--props', '-p'], arg_type=event_msg_prop_type)
-        context.argument('content_type', options_list=['--content-type', '--ct'],
-                         help='Specify the Content-Type of the message payload to automatically format the output to that type.')
-        context.argument('device_query', options_list=['--device-query', '-q'], help='Specify a custom query to filter devices.')
+        context.argument('timeout', arg_type=event_timeout_type)
+        context.argument('properties', arg_type=event_msg_prop_type)
 
     with self.argument_context('iot hub monitor-feedback') as context:
         context.argument('wait_on_id', options_list=['--wait-on-msg', '-w'],
@@ -276,8 +282,8 @@ def load_arguments(self, _):
                          help='Maximum number of configurations to return.')
 
     with self.argument_context('iot edge') as context:
-        context.argument('config_id', options_list=['--deployment-id', '-d', '--config-id', '-c'],
-                         help='Target deployment. --config-id/-c is deprecated for deployments. Use --deployment-id/-d instead.')
+        context.argument('config_id', options_list=['--deployment-id', '-d'],
+                         help='Target deployment name.')
         context.argument('target_condition', options_list=['--target-condition', '--tc', '-t'],
                          help='Target condition in which an Edge deployment applies to.')
         context.argument('priority', options_list=['--priority', '--pri'],
@@ -385,6 +391,7 @@ def load_arguments(self, _):
     with self.argument_context('iot dps registration list') as context:
         context.argument('enrollment_id', help='ID of enrollment group')
 
+    # TODO: Remove 'iotcentral', non-conventional and no reuse of arguments. 'iot central' is the go forward.
     with self.argument_context('iotcentral app monitor-events') as context:
         context.argument('device_id', options_list=['--device-id', '-d'], help='Target Device.')
         context.argument('app_id', options_list=['--app-id'], help='Target App.')
@@ -396,7 +403,7 @@ def load_arguments(self, _):
                          help='Indicates the time that should be used as a starting point to read messages from the partitions. '
                          'Units are milliseconds since unix epoch. '
                          'If no time is indicated "now" is used.')
-        context.argument('properties', options_list=['--properties', '--props', '-p'], arg_type=event_msg_prop_type)
+        context.argument('properties', arg_type=event_msg_prop_type)
         context.argument('content_type', options_list=['--content-type', '--ct'],
                          help='Specify the Content-Type of the message payload to automatically format the output to that type.')
         context.argument('repair', options_list=['--repair', '-r'],
@@ -415,17 +422,8 @@ def load_arguments(self, _):
         context.argument('app_id', options_list=['--app-id'], help='Target App.')
 
     with self.argument_context('iot central app monitor-events') as context:
-        context.argument('timeout', options_list=['--timeout', '--to', '-t'], type=int,
-                         help='Maximum seconds to maintain connection without receiving message. Use 0 for infinity. ')
-        context.argument('consumer_group', options_list=['--consumer-group', '--cg', '-c'],
-                         help='Specify the consumer group to use when connecting to event hub endpoint.')
-        context.argument('enqueued_time', options_list=['--enqueued-time', '--et', '-e'], type=int,
-                         help='Indicates the time that should be used as a starting point to read messages from the partitions. '
-                         'Units are milliseconds since unix epoch. '
-                         'If no time is indicated "now" is used.')
-        context.argument('properties', options_list=['--properties', '--props', '-p'], arg_type=event_msg_prop_type)
-        context.argument('content_type', options_list=['--content-type', '--ct'],
-                         help='Specify the Content-Type of the message payload to automatically format the output to that type.')
+        context.argument('timeout', arg_type=event_timeout_type)
+        context.argument('properties', arg_type=event_msg_prop_type)
 
     with self.argument_context('iot dt') as context:
         context.argument('repo_login', options_list=['--repo-login', '--rl'],
@@ -449,14 +447,8 @@ def load_arguments(self, _):
                          help='Show interface with entity schema.')
 
     with self.argument_context('iot dt monitor-events') as context:
-        context.argument('consumer_group', options_list=['--consumer-group', '--cg'],
-                         help='Specify the consumer group to use when connecting to event hub endpoint.')
-        context.argument('properties', options_list=['--properties', '--props', '-p'], arg_type=event_msg_prop_type)
-        context.argument('repair', options_list=['--repair'],
-                         arg_type=get_three_state_flag(),
-                         help='Reinstall uamqp dependency compatible with extension version. Default: false')
-        context.argument('device_query', options_list=['--device-query', '-q'],
-                         help='Specify a custom query to filter devices.')
+        context.argument('timeout', arg_type=event_timeout_type)
+        context.argument('properties', arg_type=event_msg_prop_type)
 
     with self.argument_context('iot pnp') as context:
         context.argument('model', options_list=['--model', '-m'],
