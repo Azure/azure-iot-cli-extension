@@ -1666,13 +1666,13 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
         # Metrics
         system_metric_name = "appliedCount"
         config_output = self.cmd(
-            "iot edge deployment show --login {} --config-id {}".format(
+            "iot edge deployment show --login {} --deployment-id {}".format(
                 LIVE_HUB_CS, config_ids[2]
             )
         ).get_output_in_json()
 
         self.cmd(
-            "iot edge deployment show-metric --metric-id {} --config-id {} --hub-name {}".format(
+            "iot edge deployment show-metric --metric-id {} --deployment-id {} --hub-name {}".format(
                 system_metric_name, config_ids[2], LIVE_HUB
             ),
             checks=[
@@ -1686,14 +1686,14 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
 
         # With connection string
         self.cmd(
-            "iot edge deployment show-metric -m {} --login {} -c {}".format(
+            "iot edge deployment show-metric -m {} --login {} -d {}".format(
                 "doesnotexist", LIVE_HUB_CS, config_ids[2]
             ),
             expect_failure=True,
         )
 
         self.cmd(
-            "iot edge deployment show-metric --metric-id {} --login {} --config-id {}".format(
+            "iot edge deployment show-metric --metric-id {} --login {} --deployment-id {}".format(
                 system_metric_name, LIVE_HUB_CS, config_ids[2]
             ),
             checks=[
