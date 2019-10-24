@@ -1,4 +1,4 @@
-# :exclamation: Breaking Announcements :exclamation:
+# :exclamation: Breaking Announcements
 
 **9/14/18**
 In order to satisfy new CI linter rules for the Azure CLI, we have replaced multi-character short options (like '-props', or '-pri') with long option versions ('--props', '--pri').

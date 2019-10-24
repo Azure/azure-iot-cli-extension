@@ -51,7 +51,7 @@ az $monitor_events
 
 ```
 
-### Delete IoT Edge deployments based on criteria
+## Delete IoT Edge deployments based on criteria
 
 ```powershell
 # List all deployments on target hub and filter on a target condition, then select the ID.
