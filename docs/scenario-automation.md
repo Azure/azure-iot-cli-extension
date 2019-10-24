@@ -1,10 +1,8 @@
-## Automation Scenarios
+# Automation Scenarios
 
 This section aims to provide the community with example automation scripts using the IoT CLI extension in order to jump start Azure IoT scenario ideas.
 
-
-
-### Provision, Simulate and Monitor devices
+## Provision, Simulate and Monitor devices
 
 ```bash
 #!/usr/bin/env bash
@@ -58,9 +56,8 @@ az $monitor_events
 ```powershell
 # List all deployments on target hub and filter on a target condition, then select the ID.
 $deployments = az iot edge deployment list -n YourIoTHub --query "[?targetCondition=='tags.building=9'].id" | ConvertFrom-Json
- 
+
 # After getting the filtered deployments, iterate and delete
 $deployments | ForEach-Object -process {az iot edge deployment delete -n YourIoTHub -d $_}
 
 ```
-
