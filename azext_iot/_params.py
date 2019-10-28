@@ -259,11 +259,6 @@ def load_arguments(self, _):
         context.argument('content_type', options_list=['--content-type', '--ct'],
                          help='MIME Type of file.')
 
-    # Remove after deprecation
-    with self.argument_context('iot hub apply-configuration') as context:
-        context.argument('content', options_list=['--content', '-k'],
-                         help='Configuration content. Provide file path or raw json.')
-
     with self.argument_context('iot hub configuration') as context:
         context.argument('config_id', options_list=['--config-id', '-c'],
                          help='Target device configuration name.')
@@ -282,8 +277,9 @@ def load_arguments(self, _):
                          help='Maximum number of configurations to return.')
 
     with self.argument_context('iot edge') as context:
-        context.argument('config_id', options_list=['--deployment-id', '-d'],
-                         help='Target deployment name.')
+        context.argument('config_id', options_list=['--deployment-id', '-d', '--config-id', '-c'],
+                         help="Target deployment name. Option '--config-id' has been deprecated and will be "
+                         "removed in a future release. Use '--deployment-id' instead.")
         context.argument('target_condition', options_list=['--target-condition', '--tc', '-t'],
                          help='Target condition in which an Edge deployment applies to.')
         context.argument('priority', options_list=['--priority', '--pri'],
