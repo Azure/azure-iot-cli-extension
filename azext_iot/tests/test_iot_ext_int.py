@@ -1550,7 +1550,7 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
 
         # Certain elements such as $schema included in the edge payload will be popped before validation
         self.cmd(
-            """iot edge deployment create --deployment-id {} --hub-name {} --resource-group {} --priority {}
+            """iot edge deployment create --config-id {} --hub-name {} --resource-group {} --priority {}
                     --target-condition \"{}\" --labels {} --content '{}'""".format(
                 config_ids[1],
                 LIVE_HUB,
