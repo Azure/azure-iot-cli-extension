@@ -33,9 +33,10 @@ class CloudToDeviceMethod(Model):
     #     'payload': {'readonly': True},
     # }
 
+    # @digimaun - payload altered from '{object}' to 'object' since primitives can be passed in.
     _attribute_map = {
         'method_name': {'key': 'methodName', 'type': 'str'},
-        'payload': {'key': 'payload', 'type': '{object}'},
+        'payload': {'key': 'payload', 'type': 'object'},
         'response_timeout_in_seconds': {'key': 'responseTimeoutInSeconds', 'type': 'int'},
         'connect_timeout_in_seconds': {'key': 'connectTimeoutInSeconds', 'type': 'int'},
     }

@@ -10,9 +10,8 @@ import os
 
 from uuid import uuid4
 from azext_iot.operations import pnp as subject
-from azext_iot.common.utility import url_encode_str
+from azext_iot.common.utility import url_encode_str, read_file_content
 from knack.util import CLIError
-from azure.cli.core.util import read_file_content
 from .conftest import fixture_cmd, path_service_client, build_mock_response
 
 _repo_endpoint = "https://{}.{}".format(str(uuid4()), "com")

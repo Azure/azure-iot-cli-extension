@@ -11,7 +11,7 @@ import os
 from io import open
 from os.path import exists
 from azure.cli.testsdk import LiveScenarioTest
-from azure.cli.core.util import read_file_content
+from azext_iot.common.utility import read_file_content
 
 
 # Set these to the proper PnP Endpoint, PnP Cstring and PnP Repository for Live Integration Tests.

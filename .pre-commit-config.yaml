@@ -1,9 +1,10 @@
 exclude: ^(sdk/)
 repos:
-  - repo: https://github.com/psf/black
-    rev: stable
-    hooks:
-      - id: black
+  # Prevent python black hook from executing
+  #- repo: https://github.com/psf/black
+  #  rev: stable
+  #  hooks:
+  #    - id: black
   - repo: https://gitlab.com/pycqa/flake8
     rev: 3.7.8
     hooks:

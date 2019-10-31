@@ -7,6 +7,8 @@
 
 import pytest
 import json
+import os
+
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 
 path_iot_hub_service_factory = "azext_iot.common._azure.iot_hub_service_factory"
@@ -14,7 +16,9 @@ path_service_client = "msrest.service_client.ServiceClient.send"
 path_ghcs = "azext_iot.operations.hub.get_iot_hub_connection_string"
 path_sas = "azext_iot._factory.SasTokenAuthentication"
 path_mqtt_client = "azext_iot.operations._mqtt.mqtt.Client"
-path_iot_hub_monitor_events_entrypoint = "azext_iot.operations.hub._iot_hub_monitor_events"
+path_iot_hub_monitor_events_entrypoint = (
+    "azext_iot.operations.hub._iot_hub_monitor_events"
+)
 hub_entity = "myhub.azure-devices.net"
 
 mock_target = {}
@@ -25,6 +29,13 @@ mock_target["policy"] = "iothubowner"
 mock_target["subscription"] = "5952cff8-bcd1-4235-9554-af2c0348bf23"
 mock_target["location"] = "westus2"
 mock_target["sku_tier"] = "Standard"
+
+
+@pytest.fixture()
+def set_cwd():
+    from inspect import getsourcefile
+
+    os.chdir(os.path.dirname(os.path.abspath(getsourcefile(lambda: 0))))
 
 
 @pytest.fixture()
@@ -73,9 +84,7 @@ def serviceclient_generic_invalid_or_missing_etag(
 @pytest.fixture()
 def mqttclient(mocker, fixture_ghcs, fixture_sas):
     client = mocker.patch(path_mqtt_client)
-    mock_conn = mocker.patch(
-        "azext_iot.operations._mqtt.mqtt_client_wrap.is_connected"
-    )
+    mock_conn = mocker.patch("azext_iot.operations._mqtt.mqtt_client_wrap.is_connected")
     mock_conn.return_value = True
     return client
 

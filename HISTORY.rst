@@ -3,19 +3,28 @@
 Release History
 ===============
 
+0.8.6
++++++++++++++++
+- Improves json handling for arguments that require json.
+- Edge deployments support metric definitions at creation time (like device configurations)
+
+0.8.5
++++++++++++++++
+- Re-adds deprecated parameter --config-id to edge related commands. Note: --deployment-id/-d are the proper parameters to use in place of config-id when using edge deployment related commands.
+
 0.8.4
 +++++++++++++++
-- Device simulate now supports sending arbitrary message properties (like in send-d2c-message)
-- The preview dt monitor events command has been simplified. It works the same as vanilla iot hub monitoring but filters dt events and allows filtering by interface
-- Help content improvements
-- Remove long since deprecated parameter `--config-id` from edge deployments
+- Device simulate now supports sending arbitrary message properties (like in send-d2c-message).
+- The preview dt monitor events command has been simplified. It works the same as vanilla iot hub monitoring but filters dt events and allows filtering by interface.
+- Help content improvements.
+- Remove long since deprecated parameter `--config-id` from edge deployments.
 
 0.8.3
 +++++++++++++++
-- Removes long since deprecated command `az iot hub apply-configuration`
-- Resolve issue #100
+- Removes long since deprecated command `az iot hub apply-configuration`.
+- Resolve issue #100.
 - Improve help content for `az iot edge deployment update` to explicitly show what can be updated.
-- Fix message annotation used to filter Digital Twin events in `az iot dt monitor-events`
+- Fix message annotation used to filter Digital Twin events in `az iot dt monitor-events`.
 
 0.8.2
 +++++++++++++++

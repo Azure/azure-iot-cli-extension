@@ -15,8 +15,9 @@ from azext_iot._factory import _bind_sdk
 from azext_iot.constants import PNP_API_VERSION, PNP_ENDPOINT
 from azext_iot.common.utility import (unpack_pnp_http_error,
                                       get_sas_token,
-                                      shell_safe_json_parse)
-from azure.cli.core.util import read_file_content
+                                      shell_safe_json_parse,
+                                      read_file_content,
+                                      looks_like_file)
 
 logger = get_logger(__name__)
 
@@ -210,13 +211,6 @@ def _iot_pnp_model_delete(cmd, endpoint, repository, model_id, login):
         raise CLIError(unpack_pnp_http_error(e))
 
 
-def _looks_like_file(element):
-    element = element.lower()
-    if element.endswith(('.txt', '.json', '.md', '.rst', '.doc', '.docx')):
-        return True
-    return False
-
-
 def _validate_model_definition(model_def):
     if exists(model_def):
         model_def = str(read_file_content(model_def))
@@ -227,7 +221,7 @@ def _validate_model_definition(model_def):
         return shell_safe_json_parse(model_def)
     except ValueError as e:
         logger.debug('Received definition: %s', model_def)
-        if _looks_like_file(model_def):
+        if looks_like_file(model_def):
             raise CLIError('The definition content looks like its from a file. Please ensure the path is correct.')
         raise CLIError('Malformed capability model definition. '
                        'Use --debug to see what was received. Error details: {}'.format(e))

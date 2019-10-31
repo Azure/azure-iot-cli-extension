@@ -9,7 +9,6 @@ from time import time, sleep
 import six
 from knack.log import get_logger
 from knack.util import CLIError
-from azure.cli.core.util import read_file_content
 from azext_iot.constants import (EXTENSION_ROOT,
                                  BASE_API_VERSION,
                                  DEVICE_DEVICESCOPE_PREFIX,
@@ -22,9 +21,12 @@ from azext_iot.common.shared import (DeviceAuthType,
                                      MetricType)
 from azext_iot.common._azure import get_iot_hub_connection_string
 from azext_iot.common.utility import (shell_safe_json_parse,
-                                      validate_key_value_pairs, url_encode_dict,
-                                      evaluate_literal, unpack_msrest_error,
-                                      init_monitoring)
+                                      read_file_content,
+                                      validate_key_value_pairs,
+                                      url_encode_dict,
+                                      unpack_msrest_error,
+                                      init_monitoring,
+                                      process_json_arg)
 from azext_iot._factory import _bind_sdk
 from azext_iot.operations.generic import _execute_query, _process_top
 
@@ -173,17 +175,19 @@ def iot_device_update(cmd, device_id, parameters, hub_name=None, resource_group_
         raise LookupError("device etag not found.")
     except errors.CloudError as e:
         raise CLIError(unpack_msrest_error(e))
+    except LookupError as err:
+        raise CLIError(err)
 
 
 def _handle_device_update_params(parameters):
     status = parameters['status'].lower()
     possible_status = ['enabled', 'disabled']
     if status not in possible_status:
-        raise ValueError("status must be one of {}".format(possible_status))
+        raise CLIError("status must be one of {}".format(possible_status))
 
     edge = parameters.get('capabilities').get('iotEdge')
     if not isinstance(edge, bool):
-        raise ValueError("capabilities.iotEdge is of type bool")
+        raise CLIError("capabilities.iotEdge is of type bool")
 
     auth, pk, sk = _parse_auth(parameters)
     return _assemble_device(parameters['deviceId'], auth, edge, pk, sk, status, parameters.get('statusReason'))
@@ -203,6 +207,8 @@ def iot_device_delete(cmd, device_id, hub_name=None, resource_group_name=None, l
         raise LookupError("device etag not found")
     except errors.CloudError as e:
         raise CLIError(unpack_msrest_error(e))
+    except LookupError as err:
+        raise CLIError(err)
 
 
 def iot_device_get_parent(cmd, device_id, hub_name=None, resource_group_name=None, login=None):
@@ -296,10 +302,12 @@ def _update_nonedge_devicescope(target, nonedge_device, deviceScope=''):
             headers = {}
             headers["If-Match"] = '"{}"'.format(etag)
             service_sdk.create_or_update_device(nonedge_device['deviceId'], nonedge_device, custom_headers=headers)
-        else:
-            raise LookupError("device etag not found.")
+            return
+        raise LookupError("device etag not found.")
     except errors.CloudError as e:
         raise CLIError(unpack_msrest_error(e))
+    except LookupError as err:
+        raise CLIError(err)
 
 
 def _validate_edge_device(device):
@@ -371,6 +379,8 @@ def iot_device_module_update(cmd, device_id, module_id, parameters,
         raise LookupError("module etag not found.")
     except errors.CloudError as e:
         raise CLIError(unpack_msrest_error(e))
+    except LookupError as err:
+        raise CLIError(err)
 
 
 def _handle_module_update_params(parameters):
@@ -382,7 +392,7 @@ def _parse_auth(parameters):
     valid_auth = ['sas', 'selfSigned', 'certificateAuthority']
     auth = parameters.get('authentication').get('type')
     if auth not in valid_auth:
-        raise ValueError("authentication.type must be one of {}".format(valid_auth))
+        raise CLIError("authentication.type must be one of {}".format(valid_auth))
     pk = sk = None
     if auth == 'sas':
         pk = parameters.get('authentication').get('symmetricKey').get('primaryKey')
@@ -391,7 +401,7 @@ def _parse_auth(parameters):
         pk = parameters.get('authentication').get('x509Thumbprint').get('primaryThumbprint')
         sk = parameters.get('authentication').get('x509Thumbprint').get('secondaryThumbprint')
         if not any([pk, sk]):
-            raise ValueError("primary + secondary Thumbprint required with selfSigned auth")
+            raise CLIError("primary + secondary Thumbprint required with selfSigned auth")
     return auth, pk, sk
 
 
@@ -433,9 +443,9 @@ def iot_device_module_delete(cmd, device_id, module_id, hub_name=None, resource_
         raise LookupError("module etag not found")
     except errors.CloudError as e:
         raise CLIError(unpack_msrest_error(e))
+    except LookupError as err:
+        raise CLIError(err)
 
-
-# Module Twin
 
 def iot_device_module_twin_show(cmd, device_id, module_id, hub_name=None, resource_group_name=None, login=None):
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
@@ -464,19 +474,15 @@ def iot_device_module_twin_update(cmd, device_id, module_id, parameters, hub_nam
         raise LookupError("module twin etag not found")
     except errors.CloudError as e:
         raise CLIError(unpack_msrest_error(e))
-    except AttributeError as att_err:
-        raise CLIError(att_err)
-    except TypeError as val_err:
-        raise CLIError(val_err)
+    except (AttributeError, LookupError, TypeError) as err:
+        raise CLIError(err)
 
 
 def iot_device_module_twin_replace(cmd, device_id, module_id, target_json, hub_name=None, resource_group_name=None, login=None):
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
     try:
-        if exists(target_json):
-            target_json = str(read_file_content(target_json))
-        target_json = shell_safe_json_parse(target_json)
+        target_json = process_json_arg(target_json, argument_name="json")
         module = service_sdk.get_module_twin(device_id, module_id)
         etag = module.get('etag', None)
         if etag:
@@ -484,13 +490,11 @@ def iot_device_module_twin_replace(cmd, device_id, module_id, target_json, hub_n
             headers["If-Match"] = '"{}"'.format(etag)
             return service_sdk.replace_module_twin(device_id, module_id, target_json, custom_headers=headers)
         raise LookupError("module twin etag not found")
-    except ValueError as j:
-        raise CLIError('improperly formatted json: {}'.format(j))
     except errors.CloudError as e:
         raise CLIError(unpack_msrest_error(e))
+    except LookupError as err:
+        raise CLIError(err)
 
-
-# Configuration
 
 def iot_edge_set_modules(cmd, device_id, content,
                          hub_name=None, resource_group_name=None, login=None):
@@ -500,25 +504,21 @@ def iot_edge_set_modules(cmd, device_id, content,
     service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
 
     try:
-        if exists(content):
-            content = str(read_file_content(content))
-        content = shell_safe_json_parse(content)
+        content = process_json_arg(content, argument_name='content')
         modules_content = _process_config_content(content)
 
         content = ConfigurationContent(modules_content=modules_content)
         service_sdk.apply_configuration_on_device(device_id, content)
         return iot_device_module_list(cmd, device_id, hub_name=hub_name, login=login)
-    except ValueError as j:
-        raise CLIError('improperly formatted json: {}'.format(j))
     except errors.CloudError as e:
         raise CLIError(unpack_msrest_error(e))
 
 
 def iot_edge_deployment_create(cmd, config_id, content, hub_name=None, target_condition="", priority=0,
-                               labels=None, resource_group_name=None, login=None):
+                               labels=None, metrics=None, resource_group_name=None, login=None):
     return _iot_hub_configuration_create(cmd=cmd, config_id=config_id, content=content, hub_name=hub_name,
                                          target_condition=target_condition, priority=priority,
-                                         labels=labels, resource_group_name=resource_group_name,
+                                         labels=labels, metrics=metrics, resource_group_name=resource_group_name,
                                          login=login, edge=True)
 
 
@@ -541,58 +541,37 @@ def _iot_hub_configuration_create(cmd, config_id, content, hub_name=None, target
 
     metrics_key = 'queries'
 
+    content = process_json_arg(content, argument_name="content")
+    content = _process_config_content(content, 'module' if edge else 'device')
+
+    if metrics:
+        metrics = process_json_arg(metrics, argument_name="metrics")
+
+        if 'metrics' in metrics:
+            metrics = metrics['metrics']
+        if metrics_key not in metrics:
+            raise CLIError("metrics json must include the '{}' property".format(metrics_key))
+        metrics = metrics[metrics_key]
+
+    if labels:
+        labels = process_json_arg(labels, argument_name="labels")
+
+    if edge:
+        config_content = ConfigurationContent(modules_content=content)
+    else:
+        config_content = ConfigurationContent(device_content=content)
+
+    config_metrics = ConfigurationMetrics(queries=metrics)
+    config = Configuration(id=config_id,
+                           schema_version='2.0',
+                           labels=labels,
+                           content=config_content,
+                           metrics=config_metrics,
+                           target_condition=target_condition,
+                           etag=None,
+                           priority=priority,
+                           content_type='assignment')
     try:
-        json_from_file = None
-
-        if exists(content):
-            json_from_file = content
-            content = str(read_file_content(content))
-        try:
-            content = shell_safe_json_parse(content)
-        except ValueError as j:
-            raise CLIError("improperly formatted json argument 'content'{}: {}".format(
-                '(in file {})'.format(json_from_file) if json_from_file else '', j))
-
-        content = _process_config_content(content, 'module' if edge else 'device')
-
-        if metrics:
-            json_from_file = None
-            if exists(metrics):
-                json_from_file = metrics
-                metrics = str(read_file_content(metrics))
-            try:
-                metrics = shell_safe_json_parse(metrics)
-            except ValueError as j:
-                raise CLIError("improperly formatted json argument 'metrics'{}: {}".format(
-                    '(in file {})'.format(json_from_file) if json_from_file else '', j))
-
-            if 'metrics' in metrics:
-                metrics = metrics['metrics']
-            if metrics_key not in metrics:
-                raise CLIError("metrics json must include the '{}' property".format(metrics_key))
-            metrics = metrics[metrics_key]
-
-        if labels:
-            try:
-                labels = shell_safe_json_parse(labels)
-            except ValueError as j:
-                raise CLIError("improperly formatted json argument 'labels': {}".format(j))
-
-        if edge:
-            config_content = ConfigurationContent(modules_content=content)
-        else:
-            config_content = ConfigurationContent(device_content=content)
-
-        config_metrics = ConfigurationMetrics(queries=metrics)
-        config = Configuration(id=config_id,
-                               schema_version='2.0',
-                               labels=labels,
-                               content=config_content,
-                               metrics=config_metrics,
-                               target_condition=target_condition,
-                               etag=None,
-                               priority=priority,
-                               content_type='assignment')
         return service_sdk.create_or_update_configuration(config_id, config)
     except errors.CloudError as e:
         raise CLIError(unpack_msrest_error(e))
@@ -692,26 +671,10 @@ def iot_hub_configuration_update(cmd, config_id, parameters, hub_name=None, reso
                                priority=parameters['priority'],
                                content_type='assignment')
         return service_sdk.create_or_update_configuration(config_id, config, custom_headers=headers)
-    except ValueError as j:
-        raise CLIError('improperly formatted json: {}'.format(j))
     except errors.CloudError as e:
         raise CLIError(unpack_msrest_error(e))
-    except AttributeError as att_err:
-        raise CLIError(att_err)
-    except TypeError as val_err:
-        raise CLIError(val_err)
-
-
-def _handle_configuration_update_params(parameters):
-    labels = parameters.get('labels', None)
-    if labels:
-        if not isinstance(labels, dict):
-            labels = evaluate_literal(labels, dict)
-            if not labels:
-                raise ValueError('labels are malformed, expecting dictionary')
-            parameters['labels'] = labels
-
-    return parameters
+    except (AttributeError, LookupError, TypeError) as err:
+        raise CLIError(err)
 
 
 def iot_hub_configuration_show(cmd, config_id, hub_name=None, resource_group_name=None, login=None):
@@ -766,6 +729,8 @@ def iot_hub_configuration_delete(cmd, config_id, hub_name=None, resource_group_n
         raise LookupError("configuration etag not found")
     except errors.CloudError as e:
         raise CLIError(unpack_msrest_error(e))
+    except LookupError as err:
+        raise CLIError(err)
 
 
 def iot_edge_deployment_metric_show(cmd, config_id, metric_id,
@@ -851,10 +816,8 @@ def iot_device_twin_update(cmd, device_id, parameters, hub_name=None, resource_g
         raise LookupError("device twin etag not found")
     except errors.CloudError as e:
         raise CLIError(unpack_msrest_error(e))
-    except AttributeError as att_err:
-        raise CLIError(att_err)
-    except TypeError as val_err:
-        raise CLIError(val_err)
+    except (AttributeError, LookupError, TypeError) as err:
+        raise CLIError(err)
 
 
 def iot_device_twin_replace(cmd, device_id, target_json, hub_name=None, resource_group_name=None, login=None):
@@ -862,9 +825,7 @@ def iot_device_twin_replace(cmd, device_id, target_json, hub_name=None, resource
     service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
 
     try:
-        if exists(target_json):
-            target_json = str(read_file_content(target_json))
-        target_json = shell_safe_json_parse(target_json)
+        target_json = process_json_arg(target_json, argument_name="json")
         device = service_sdk.get_twin(device_id)
         etag = device.get('etag', None)
         if etag:
@@ -872,13 +833,11 @@ def iot_device_twin_replace(cmd, device_id, target_json, hub_name=None, resource
             headers["If-Match"] = '"{}"'.format(etag)
             return service_sdk.replace_twin(device_id, target_json, custom_headers=headers)
         raise LookupError("device twin etag not found")
-    except ValueError as j:
-        raise CLIError('improperly formatted json: {}'.format(j))
     except errors.CloudError as e:
         raise CLIError(unpack_msrest_error(e))
+    except LookupError as err:
+        raise CLIError(err)
 
-
-# Device Method Invoke
 
 def iot_device_method(cmd, device_id, method_name, hub_name=None, method_payload="{}",
                       timeout=60, resource_group_name=None, login=None):
@@ -895,15 +854,10 @@ def iot_device_method(cmd, device_id, method_name, hub_name=None, method_payload
 
     try:
         if method_payload:
-            if exists(method_payload):
-                method_payload = str(read_file_content(method_payload))
-            method_payload = shell_safe_json_parse(method_payload)
+            method_payload = process_json_arg(method_payload, argument_name="method-payload")
 
         method = CloudToDeviceMethod(method_name, timeout, timeout, method_payload)
-
         return service_sdk.invoke_device_method(device_id, method)
-    except ValueError as j:
-        raise CLIError('method_payload json malformed: {}'.format(j))
     except errors.CloudError as e:
         raise CLIError(unpack_msrest_error(e))
 
@@ -922,17 +876,13 @@ def iot_device_module_method(cmd, device_id, module_id, method_name, hub_name=No
         raise CLIError('timeout must not be over {} seconds'.format(METHOD_INVOKE_MIN_TIMEOUT_SEC))
 
     service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
+
     try:
         if method_payload:
-            if exists(method_payload):
-                method_payload = str(read_file_content(method_payload))
-            method_payload = shell_safe_json_parse(method_payload)
+            method_payload = process_json_arg(method_payload, argument_name="method-payload")
 
-        method = CloudToDeviceMethod(method_name, timeout, timeout)
-        method.payload = method_payload
+        method = CloudToDeviceMethod(method_name, timeout, timeout, method_payload)
         return service_sdk.invoke_device_method1(device_id, module_id, method)
-    except ValueError as j:
-        raise CLIError('method_payload json malformed: {}'.format(j))
     except errors.CloudError as e:
         raise CLIError(unpack_msrest_error(e))
 
@@ -1015,16 +965,6 @@ def _build_device_or_module_connection_string(device, key_type='primary', module
                     return template.format(module.get('hub'), module.get('deviceId'), module.get('moduleId'), key)
                 return template.format(device.get('hub'), device.get('deviceId'), key)
     raise CLIError('Unable to form target connection string')
-
-
-# Introducing breaking changes by removing this command as same command exist in core-cli.
-# Only removing the command and keeping command definition for further references.
-def iot_get_hub_connection_string(cmd, hub_name, policy_name='iothubowner', key_type='primary',
-                                  resource_group_name=None):
-    result = {}
-    result['cs'] = get_iot_hub_connection_string(cmd, hub_name, resource_group_name,
-                                                 policy_name, key_type)['cs']
-    return result
 
 
 def iot_get_device_connection_string(cmd, device_id, hub_name=None, key_type='primary',
