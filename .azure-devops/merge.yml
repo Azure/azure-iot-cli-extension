@@ -128,8 +128,9 @@ jobs:
       versionSpec: '3.7.x'
       architecture: 'x64'
 
-  - template: templates/install-azure-cli-released.yml
+  - template: templates/install-azure-cli-edge.yml
   - template: templates/install-azdev.yml
+  - template: templates/setup-ci-machine.yml # Likely temporary fix due to pkg_resources.ContextualVersionConflict from six ver 1.13.0 vs pinned 1.12.0
   - template: templates/download-install-local-azure-iot-cli-extension.yml
 
   - script: 'azdev cli-lint --ci --extensions $(iot_ext_package)'
