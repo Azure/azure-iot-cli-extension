@@ -5,8 +5,9 @@ Release History
 
 0.8.6
 +++++++++++++++
-- Improves json handling for arguments that require json.
+- For IoTHub commands - improves json handling for arguments that require json.
 - Edge deployments support metric definitions at creation time (like device configurations)
+- Fixes issue with `az iot hub invoke-device-method` preventing primitive value payloads.
 
 0.8.5
 +++++++++++++++

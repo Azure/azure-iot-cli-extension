@@ -646,10 +646,10 @@ helps['iot edge deployment create'] = """
         az iot edge deployment create -d {deployment_name} -n {iothub_name} --content ../modules_content.json
         --labels '{"key0":"value0", "key1":"value1"}'
         --target-condition "tags.building=9 and tags.environment='test'" --priority 3
-    - name: Create a deployment with labels (cmd syntax example) that applies for devices tagged with environment 'dev'.
+    - name: Create a deployment with labels (powershell syntax example) that applies for devices tagged with environment 'dev'.
       text: >
         az iot edge deployment create -d {deployment_name} -n {iothub_name} --content ../modules_content.json
-        --labels "{\\"key\\":\\"value\\"}"
+        --labels '{\\"key\\":\\"value\\"}'
         --target-condition "tags.environment='dev'"
     - name: Create a deployment that applies for devices tagged with environment 'dev'
             with user metrics inline (bash syntax example).
