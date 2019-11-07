@@ -62,6 +62,7 @@
     },
     "metrics": {
         "queries": {
+            "mymetrik": "select deviceId from devices where tags.location='US'"
         }
     }
 }

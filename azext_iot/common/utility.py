@@ -10,12 +10,18 @@ utility: Define helper functions for 'common' scripts.
 """
 
 import ast
+import base64
 import contextlib
 import json
 import os
 import sys
+
 from threading import Event, Thread
 from datetime import datetime
+from knack.log import get_logger
+from knack.util import CLIError
+
+logger = get_logger(__name__)
 
 
 @contextlib.contextmanager
@@ -114,6 +120,33 @@ def validate_key_value_pairs(string):
     return result
 
 
+def process_json_arg(content, argument_name, preserve_order=False):
+    """ Primary processor of json input """
+
+    json_from_file = None
+
+    if os.path.exists(content):
+        json_from_file = content
+        content = read_file_content(content)
+
+    try:
+        return shell_safe_json_parse(content, preserve_order)
+    except CLIError as ex:
+        if looks_like_file(content):
+            logger.warning(
+                "The json payload for argument '%s' looks like its intended from a file. "
+                "Please ensure the file path is correct.",
+                argument_name,
+            )
+
+        file_content_error = "from file: '{}' ".format(json_from_file)
+        raise CLIError(
+            "Failed to parse json {}for argument '{}' with exception:\n    {}".format(
+                file_content_error if json_from_file else "", argument_name, ex
+            )
+        )
+
+
 def shell_safe_json_parse(json_or_dict_string, preserve_order=False):
     """ Allows the passing of JSON or Python dictionary strings. This is needed because certain
     JSON strings in CMD shell are not received in main's argv. This allows the user to specify
@@ -126,8 +159,32 @@ def shell_safe_json_parse(json_or_dict_string, preserve_order=False):
     except ValueError as json_ex:
         try:
             return ast.literal_eval(json_or_dict_string)
-        except Exception:
-            raise json_ex
+        except SyntaxError:
+            raise CLIError(json_ex)
+        except ValueError as ex:
+            logger.debug(ex)  # log the exception which could be a python dict parsing error.
+            raise CLIError(json_ex)  # raise json_ex error which is more readable and likely.
+
+
+def read_file_content(file_path, allow_binary=False):
+    from codecs import open as codecs_open
+    # Note, always put 'utf-8-sig' first, so that BOM in WinOS won't cause trouble.
+    for encoding in ['utf-8-sig', 'utf-8', 'utf-16', 'utf-16le', 'utf-16be']:
+        try:
+            with codecs_open(file_path, encoding=encoding) as f:
+                logger.debug("attempting to read file %s as %s", file_path, encoding)
+                return f.read()
+        except (UnicodeError, UnicodeDecodeError):
+            pass
+
+    if allow_binary:
+        try:
+            with open(file_path, 'rb') as input_file:
+                logger.debug("attempting to read file %s as binary", file_path)
+                return base64.b64encode(input_file.read()).decode("utf-8")
+        except Exception:  # pylint: disable=broad-except
+            pass
+    raise CLIError('Failed to decode file {} - unknown decoding'.format(file_path))
 
 
 def trim_from_start(s, substring):
@@ -336,3 +393,28 @@ def dict_clean(d):
     if not isinstance(d, dict):
         return d
     return dict((k, dict_clean(v)) for k, v in d.items() if v is not None)
+
+
+def looks_like_file(element):
+    element = element.lower()
+    return element.endswith(
+        (
+            ".log",
+            ".rtf",
+            ".txt",
+            ".json",
+            ".yaml",
+            ".yml",
+            ".md",
+            ".rst",
+            ".doc",
+            ".docx",
+            ".html",
+            ".htm",
+            ".py",
+            ".java",
+            ".ts",
+            ".js",
+            ".cs"
+        )
+    )

@@ -18,7 +18,7 @@ jobs:
   steps:
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.x'
+      versionSpec: '3.7.x'
       architecture: 'x64'
 
   - template: templates/setup-ci-machine.yml
@@ -31,7 +31,7 @@ jobs:
   steps:
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.x'
+      versionSpec: '3.7.x'
       architecture: 'x64'
 
   - template: templates/setup-ci-machine.yml
@@ -50,7 +50,7 @@ jobs:
   
   - template: templates/run-tests.yml
     parameters:
-      pythonVersion: '3.x'
+      pythonVersion: '3.7.x'
 
 - job: 'Run_Tests_Windows_Azure_CLI_Released_Version'
   dependsOn : [Build_Publish_Azure_CLI_Test_SDK, 'Build_Publish_Azure_IoT_CLI_Extension']
@@ -60,7 +60,7 @@ jobs:
   steps:
   - template: templates/run-tests.yml
     parameters:
-      pythonVersion: '3.x'
+      pythonVersion: '3.7.x'
       runWithAzureCliReleased: 'true'
 
 - job: 'Run_Tests_Ubuntu'
@@ -74,7 +74,7 @@ jobs:
       Python36:
         python.version: '3.6.x'
       Python37:
-        python.version: '3.x'
+        python.version: '3.7.x'
     maxParallel: 3
 
   steps:
@@ -92,7 +92,7 @@ jobs:
   steps:
   - template: templates/run-tests.yml
     parameters:
-      pythonVersion: '3.x'
+      pythonVersion: '3.7.x'
 
 - job: 'Run_Style_Check'
   dependsOn: ['Build_Publish_Azure_CLI_Test_SDK','Build_Publish_Azure_IoT_CLI_Extension']
@@ -102,7 +102,7 @@ jobs:
   steps:
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.x'
+      versionSpec: '3.7.x'
       architecture: 'x64'
 
   - template: templates/install-azure-cli-released.yml
@@ -125,11 +125,12 @@ jobs:
   steps:
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.x'
+      versionSpec: '3.7.x'
       architecture: 'x64'
 
-  - template: templates/install-azure-cli-released.yml
+  - template: templates/install-azure-cli-edge.yml
   - template: templates/install-azdev.yml
+  - template: templates/setup-ci-machine.yml # Likely temporary fix due to pkg_resources.ContextualVersionConflict from six ver 1.13.0 vs pinned 1.12.0
   - template: templates/download-install-local-azure-iot-cli-extension.yml
 
   - script: 'azdev cli-lint --ci --extensions $(iot_ext_package)'

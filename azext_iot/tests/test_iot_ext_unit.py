@@ -16,12 +16,12 @@ from azext_iot.common.utility import (
     validate_min_python_version,
     url_encode_dict,
     validate_key_value_pairs,
+    read_file_content
 )
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.constants import TRACING_PROPERTY
 from azext_iot.tests.generators import create_req_monitor_events
 from knack.util import CLIError
-from azure.cli.core.util import read_file_content
 from .conftest import (
     fixture_cmd,
     build_mock_response,
@@ -443,10 +443,10 @@ class TestDeviceUpdate:
                         "type": "selfSigned",
                     }
                 ),
-                ValueError,
+                CLIError,
             ),
-            (generate_device_show(authentication={"type": "doesnotexist"}), ValueError),
-            (generate_device_show(etag=None), LookupError),
+            (generate_device_show(authentication={"type": "doesnotexist"}), CLIError),
+            (generate_device_show(etag=None), CLIError),
         ],
     )
     def test_device_update_invalid_args(self, serviceclient, req, exp):
@@ -491,7 +491,7 @@ class TestDeviceDelete:
         headers = args[0][1]
         assert headers["If-Match"] == '"{}"'.format(serviceclient.expected_etag)
 
-    @pytest.mark.parametrize("exception", [LookupError])
+    @pytest.mark.parametrize("exception", [CLIError])
     def test_device_delete_invalid_args(
         self, serviceclient_generic_invalid_or_missing_etag, exception
     ):
@@ -744,13 +744,13 @@ class TestDeviceModuleUpdate:
                         "type": "selfSigned",
                     }
                 ),
-                ValueError,
+                CLIError,
             ),
             (
                 generate_device_module_show(authentication={"type": "doesnotexist"}),
-                ValueError,
+                CLIError,
             ),
-            (generate_device_module_show(etag=None), LookupError),
+            (generate_device_module_show(etag=None), CLIError),
         ],
     )
     def test_device_module_update_invalid_args(self, serviceclient, req, exp):
@@ -801,7 +801,7 @@ class TestDeviceModuleDelete:
         assert method == "DELETE"
         assert headers["If-Match"] == '"{}"'.format(serviceclient.expected_etag)
 
-    @pytest.mark.parametrize("exception", [LookupError])
+    @pytest.mark.parametrize("exception", [CLIError])
     def test_device_module_invalid_args(
         self, serviceclient_generic_invalid_or_missing_etag, exception
     ):
@@ -1197,7 +1197,7 @@ class TestConfigUpdate:
         "req", [(generate_device_config(scenario="update", etag=""))]
     )
     def test_config_update_invalid_args(self, serviceclient, req):
-        with pytest.raises(LookupError):
+        with pytest.raises(CLIError):
             subject.iot_hub_configuration_update(
                 fixture_cmd,
                 config_id=config_id,
@@ -1337,7 +1337,7 @@ class TestConfigDelete:
         assert "{}/configurations/{}?".format(mock_target["entity"], config_id) in url
         assert headers["If-Match"] == '"{}"'.format(serviceclient.expected_etag)
 
-    @pytest.mark.parametrize("expected", [LookupError])
+    @pytest.mark.parametrize("expected", [CLIError])
     def test_config_delete_invalid_args(
         self, serviceclient_generic_invalid_or_missing_etag, expected
     ):
@@ -1635,7 +1635,7 @@ class TestDeviceTwinUpdate:
         assert "twins/{}".format(device_id) in args[0][0].url
 
     @pytest.mark.parametrize(
-        "req, exp", [(generate_device_twin_show(etag=None), LookupError)]
+        "req, exp", [(generate_device_twin_show(etag=None), CLIError)]
     )
     def test_device_twin_update_invalid_args(self, serviceclient, req, exp):
         with pytest.raises(exp):
@@ -1701,8 +1701,8 @@ class TestDeviceTwinReplace:
     @pytest.mark.parametrize(
         "req, exp",
         [
-            (generate_device_twin_show(etag=None), LookupError),
-            ({"invalid": "payload"}, LookupError),
+            (generate_device_twin_show(etag=None), CLIError),
+            ({"invalid": "payload"}, CLIError),
         ],
     )
     def test_device_twin_replace_invalid_args(self, serviceclient, req, exp):
@@ -1798,7 +1798,7 @@ class TestDeviceModuleTwinUpdate:
                     properties={"desired": {"key": "value"}},
                     etag=None,
                 ),
-                LookupError,
+                CLIError,
             ),
             (generate_device_twin_show(moduleId=module_id), CLIError),
         ],
@@ -1871,8 +1871,8 @@ class TestDeviceModuleTwinReplace:
     @pytest.mark.parametrize(
         "req, exp",
         [
-            (generate_device_twin_show(moduleId=module_id, etag=None), LookupError),
-            ({"invalid": "payload"}, LookupError),
+            (generate_device_twin_show(moduleId=module_id, etag=None), CLIError),
+            ({"invalid": "payload"}, CLIError),
         ],
     )
     def test_device_module_twin_replace_invalid_args(self, serviceclient, req, exp):
@@ -2863,7 +2863,7 @@ class TestEdgeOffline:
         service_client.side_effect = test_side_effect
         return service_client
 
-    @pytest.mark.parametrize("exp", [LookupError])
+    @pytest.mark.parametrize("exp", [CLIError])
     def test_device_setparent_invalid_etag(self, sc_invalid_etag_setparent, exp):
         with pytest.raises(exp):
             subject.iot_device_set_parent(
@@ -2959,7 +2959,7 @@ class TestEdgeOffline:
         service_client.side_effect = test_side_effect
         return service_client
 
-    @pytest.mark.parametrize("exp", [LookupError])
+    @pytest.mark.parametrize("exp", [CLIError])
     def test_device_addchildren_invalid_etag(self, sc_invalid_etag_setparent, exp):
         with pytest.raises(exp):
             subject.iot_device_children_add(
@@ -3107,7 +3107,7 @@ class TestEdgeOffline:
         service_client.side_effect = test_side_effect
         return service_client
 
-    @pytest.mark.parametrize("exp", [LookupError])
+    @pytest.mark.parametrize("exp", [CLIError])
     def test_device_removechildrenlist_invalid_etag(
         self, sc_invalid_etag_removechildrenlist, exp
     ):
@@ -3231,7 +3231,7 @@ class TestEdgeOffline:
         service_client.side_effect = test_side_effect
         return service_client
 
-    @pytest.mark.parametrize("exp", [LookupError])
+    @pytest.mark.parametrize("exp", [CLIError])
     def test_device_removechildrenall_invalid_etag(
         self, sc_invalid_etag_removechildrenall, exp
     ):

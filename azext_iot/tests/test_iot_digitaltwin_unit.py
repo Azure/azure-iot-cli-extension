@@ -14,8 +14,7 @@ from azext_iot.constants import PNP_ENDPOINT
 from azext_iot.tests.conftest import build_mock_response
 from azext_iot.tests.generators import create_req_monitor_events
 from knack.util import CLIError
-from azure.cli.core.util import read_file_content
-
+from azext_iot.common.utility import read_file_content
 
 _device_digitaltwin_invoke_command_payload = (
     "test_device_digitaltwin_invoke_command.json"

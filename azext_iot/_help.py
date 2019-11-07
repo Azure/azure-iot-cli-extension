@@ -651,6 +651,13 @@ helps['iot edge deployment create'] = """
         az iot edge deployment create -d {deployment_name} -n {iothub_name} --content ../modules_content.json
         --labels "{\\"key\\":\\"value\\"}"
         --target-condition "tags.environment='dev'"
+    - name: Create a deployment that applies for devices tagged with environment 'dev'
+            with user metrics inline (bash syntax example).
+      text: >
+        az iot edge deployment create -d {deployment_name} -n {iothub_name} --content ../modules_content.json
+        --target-condition "tags.environment='dev'"
+        --metrics '{"queries": {"mymetrik": "SELECT deviceId from devices where
+        properties.reported.lastDesiredStatus.code = 200"}}'
 """
 
 helps['iot edge deployment show'] = """

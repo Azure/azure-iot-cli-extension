@@ -9,7 +9,7 @@ import random
 import json
 import pytest
 
-from azure.cli.core.util import read_file_content
+from azext_iot.common.utility import read_file_content
 from . import IoTLiveScenarioTest
 from azext_iot.constants import DEVICE_DEVICESCOPE_PREFIX
 
@@ -1511,13 +1511,14 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
 
         # With connection string and file path
         self.cmd(
-            "iot edge deployment create -d {} --login {} --pri {} --tc \"{}\" --lab {} -k '{}'".format(
+            "iot edge deployment create -d {} --login {} --pri {} --tc \"{}\" --lab {} -k '{}' --metrics '{}'".format(
                 config_ids[0],
                 LIVE_HUB_CS,
                 priority,
                 condition,
                 '"{generic_dict}"',
                 content_path,
+                content_path
             ),
             checks=[
                 self.check("id", config_ids[0]),
@@ -1530,6 +1531,10 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
                         "modulesContent"
                     ],
                 ),
+                self.check(
+                    "metrics.queries",
+                    json.loads(self.kwargs["configuration_payload"])["metrics"]["queries"]
+                )
             ],
         )
 
@@ -1571,6 +1576,10 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
                         "content"
                     ]["modulesContent"],
                 ),
+                self.check(
+                    "metrics.queries",
+                    {}
+                )
             ],
         )
 
