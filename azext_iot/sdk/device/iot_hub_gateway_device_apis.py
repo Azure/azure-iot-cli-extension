@@ -12,7 +12,6 @@
 from msrest.service_client import ServiceClient
 from msrest import Serializer, Deserializer
 from msrestazure import AzureConfiguration
-from .version import VERSION
 from msrest.pipeline import ClientRawResponse
 from msrestazure.azure_exceptions import CloudError
 import uuid
@@ -42,7 +41,8 @@ class IotHubGatewayDeviceAPIsConfiguration(AzureConfiguration):
 
         super(IotHubGatewayDeviceAPIsConfiguration, self).__init__(base_url)
 
-        self.add_user_agent('MicrosoftAzure/IoTPlatformCliExtension/{}'.format(extver))
+        self.add_user_agent('iothubgatewaydeviceapi/{}'.format(BASE_API_VERSION))
+        self.add_user_agent('IoTPlatformCliExtension/{}'.format(extver))
 
         self.credentials = credentials
 
