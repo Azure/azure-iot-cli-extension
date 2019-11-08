@@ -2507,18 +2507,14 @@ class TestDeviceSimulate:
     @pytest.mark.parametrize(
         "rs, mc, mi, protocol, properties",
         [
-            # ("complete", 1, 1, "http", None),
-            # ("reject", 1, 1, "http", None),
-            # ("abandon", 2, 1, "http", "iothub-app-myprop=myvalue;iothub-messageid=1"),
-            # ("complete", 1, 1, "http", "iothub-app-myprop=myvalue;content-type=application/text"),  # override default prop case
+            ("complete", 1, 1, "http", None),
+            ("reject", 1, 1, "http", None),
+            ("abandon", 2, 1, "http", "iothub-app-myprop=myvalue;iothub-messageid=1"),
+            ("complete", 1, 1, "http", "invalidprop;content-encoding=utf-16"),
+            ("complete", 1, 1, "http", "iothub-app-myprop=myvalue;content-type=application/text"),
             ("complete", 3, 1, "mqtt", None),
-            (
-                "complete",
-                2,
-                1,
-                "mqtt",
-                "myprop=myvalue;$.ct=application/json",
-            ),  # override default prop case
+            ("complete", 3, 1, "mqtt", "invalid"),
+            ("complete", 2, 1, "mqtt", "myprop=myvalue;$.ce=utf-16"),
             ("complete", 2, 1, "mqtt", "myinvalidprop;myvalidprop=myvalidpropvalue"),
         ],
     )

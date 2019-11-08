@@ -1169,7 +1169,7 @@ def iot_simulate_device(cmd, device_id, hub_name=None, receive_settle='complete'
         raise CLIError('msg count must be at least {}'.format(MIN_SIM_MSG_COUNT))
 
     properties_to_send = _iot_simulate_get_default_properties(protocol_type)
-    user_properties = (validate_key_value_pairs(properties) or {}) if properties else {}
+    user_properties = validate_key_value_pairs(properties) or {}
     properties_to_send.update(user_properties)
 
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
