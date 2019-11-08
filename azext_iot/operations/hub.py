@@ -18,7 +18,8 @@ from azext_iot.constants import (EXTENSION_ROOT,
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import (DeviceAuthType,
                                      SdkType,
-                                     MetricType)
+                                     MetricType,
+                                     ProtocolType)
 from azext_iot.common._azure import get_iot_hub_connection_string
 from azext_iot.common.utility import (shell_safe_json_parse,
                                       read_file_content,
@@ -1152,11 +1153,11 @@ def iot_simulate_device(cmd, device_id, hub_name=None, receive_settle='complete'
     import uuid
     import datetime
     import json
-    from azext_iot.common.shared import ProtocolType
     from azext_iot.operations._mqtt import mqtt_client_wrap
     from azext_iot.common.utility import execute_onthread
     from azext_iot.constants import MIN_SIM_MSG_INTERVAL, MIN_SIM_MSG_COUNT, SIM_RECEIVE_SLEEP_SEC
 
+    protocol_type = protocol_type.lower()
     if protocol_type == ProtocolType.mqtt.name:
         if receive_settle != 'complete':
             raise CLIError('mqtt protocol only supports settle type of "complete"')
@@ -1167,8 +1168,9 @@ def iot_simulate_device(cmd, device_id, hub_name=None, receive_settle='complete'
     if msg_count < MIN_SIM_MSG_COUNT:
         raise CLIError('msg count must be at least {}'.format(MIN_SIM_MSG_COUNT))
 
-    if properties:
-        properties = validate_key_value_pairs(properties)
+    properties_to_send = _iot_simulate_get_default_properties(protocol_type)
+    user_properties = (validate_key_value_pairs(properties) or {}) if properties else {}
+    properties_to_send.update(user_properties)
 
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     token = None
@@ -1185,12 +1187,17 @@ def iot_simulate_device(cmd, device_id, hub_name=None, receive_settle='complete'
 
     def http_wrap(target, device_id, generator):
         d = generator.generate(False)
-        _iot_device_send_message_http(target, device_id, d, headers=properties)
+        _iot_device_send_message_http(target, device_id, d, headers=properties_to_send)
         six.print_('.', end='', flush=True)
 
     try:
         if protocol_type == ProtocolType.mqtt.name:
-            wrap = mqtt_client_wrap(target, device_id, properties=properties)
+            wrap = mqtt_client_wrap(
+                target=target,
+                device_id=device_id,
+                properties=properties_to_send,
+                sas_duration=(msg_count * msg_interval) + 60  # int type is enforced for msg_count and msg_interval
+            )
             wrap.execute(generator(), publish_delay=msg_interval, msg_count=msg_count)
         else:
             six.print_('Sending and receiving events via https')
@@ -1209,6 +1216,16 @@ def iot_simulate_device(cmd, device_id, hub_name=None, receive_settle='complete'
     finally:
         if token:
             token.set()
+
+
+def _iot_simulate_get_default_properties(protocol):
+    default_properties = {}
+    is_mqtt = protocol == ProtocolType.mqtt.name
+
+    default_properties["$.ct" if is_mqtt else "content-type"] = "application/json"
+    default_properties["$.ce" if is_mqtt else "content-encoding"] = "utf-8"
+
+    return default_properties
 
 
 def _handle_c2d_msg(target, device_id, receive_settle):

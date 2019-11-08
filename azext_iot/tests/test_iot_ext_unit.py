@@ -16,7 +16,7 @@ from azext_iot.common.utility import (
     validate_min_python_version,
     url_encode_dict,
     validate_key_value_pairs,
-    read_file_content
+    read_file_content,
 )
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.constants import TRACING_PROPERTY
@@ -2507,17 +2507,26 @@ class TestDeviceSimulate:
     @pytest.mark.parametrize(
         "rs, mc, mi, protocol, properties",
         [
-            ("complete", 1, 1, "http", None),
-            ("reject", 1, 1, "http", None),
-            ("abandon", 2, 1, "http", "iothub-app-myprop=myvalue;iothub-messageid=1"),
+            # ("complete", 1, 1, "http", None),
+            # ("reject", 1, 1, "http", None),
+            # ("abandon", 2, 1, "http", "iothub-app-myprop=myvalue;iothub-messageid=1"),
+            # ("complete", 1, 1, "http", "iothub-app-myprop=myvalue;content-type=application/text"),  # override default prop case
             ("complete", 3, 1, "mqtt", None),
-            ("complete", 2, 1, "mqtt", "myprop=myvalue;$.ct=application/json"),
-            ("complete", 2, 1, "mqtt", "myprop;$.ct=application/json"),
+            (
+                "complete",
+                2,
+                1,
+                "mqtt",
+                "myprop=myvalue;$.ct=application/json",
+            ),  # override default prop case
+            ("complete", 2, 1, "mqtt", "myinvalidprop;myvalidprop=myvalidpropvalue"),
         ],
     )
     def test_device_simulate(
         self, serviceclient, mqttclient, rs, mc, mi, protocol, properties
     ):
+        from azext_iot.operations.hub import _iot_simulate_get_default_properties
+
         subject.iot_simulate_device(
             fixture_cmd,
             device_id,
@@ -2528,6 +2537,10 @@ class TestDeviceSimulate:
             protocol_type=protocol,
             properties=properties,
         )
+
+        properties_to_send = _iot_simulate_get_default_properties(protocol)
+        properties_to_send.update(validate_key_value_pairs(properties) or {})
+
         if protocol == "http":
             args = serviceclient.call_args_list
             result = []
@@ -2537,9 +2550,8 @@ class TestDeviceSimulate:
                     result.append(c)
             assert len(result) == mc
 
-            if properties:
-                # result[?][1] are the http request headers
-                assert result[0][1] == validate_key_value_pairs(properties)
+            # result[?][1] are the http request headers
+            assert result[0][1] == properties_to_send
 
             # result[?][2] is the http request body (prior to stringify)
             assert json.dumps(result[0][2])
@@ -2547,17 +2559,17 @@ class TestDeviceSimulate:
         if protocol == "mqtt":
             assert mc == mqttclient().publish.call_count
 
-            if properties:
-                assert mqttclient().publish.call_args[0][
-                    0
-                ] == "devices/{}/messages/events/{}".format(
-                    device_id,
-                    url_encode_dict(validate_key_value_pairs(properties))
-                    if properties
-                    else "",
-                )
+            assert mqttclient().publish.call_args[0][
+                0
+            ] == "devices/{}/messages/events/{}".format(
+                device_id, url_encode_dict(properties_to_send)
+            )
 
-            # Body - which is a json string
+            assert mqttclient().username_pw_set.call_args[1][
+                "username"
+            ] == "{}/{}/api-version=2016-11-14".format(mock_target["entity"], device_id)
+
+            # mqtt msg body - which is a json string
             assert json.loads(mqttclient().publish.call_args[0][1])
 
             assert mqttclient().tls_set.call_count == 1
@@ -2635,7 +2647,7 @@ class TestMonitorEvents:
                     repair=True,
                     login=mock_target["cs"],
                 )
-            ),
+            )
         ],
     )
     def test_monitor_events_entrypoint(

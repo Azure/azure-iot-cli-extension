@@ -576,6 +576,9 @@ helps['iot device simulate'] = """
                    and acknowledge cloud-to-device (c2d) messages. For mqtt simulation, all c2d messages will
                    be acknowledged with completion. For http simulation c2d acknowledgement is based on user
                    selection which can be complete, reject or abandon.
+
+                   Note: The command by default will set content-type to application/json and content-encoding
+                   to utf-8. This can be overriden.
     examples:
     - name: Basic usage (mqtt)
       text: az iot device simulate -n {iothub_name} -d {device_id}

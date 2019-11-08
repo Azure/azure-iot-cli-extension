@@ -27,12 +27,12 @@ connection_result = {
 
 
 class mqtt_client_wrap(object):
-    def __init__(self, target, device_id, properties=None):
+    def __init__(self, target, device_id, properties=None, sas_duration=3600):
         self.target = target
         self.device_id = device_id
 
         sas = SasTokenAuthentication(
-            target["entity"], target["policy"], target["primarykey"], time() + 360
+            target["entity"], target["policy"], target["primarykey"], time() + int(sas_duration)
         ).generate_sas_token()
         cwd = EXTENSION_ROOT
         cert_path = os.path.join(cwd, "digicert.pem")
