@@ -8,6 +8,7 @@ Release History
 - For IoTHub commands - improves json handling for arguments that require json.
 - Edge deployments support metric definitions at creation time (like device configurations)
 - Fixes issue with `az iot hub invoke-device-method` preventing primitive value payloads.
+- The `az iot device simulate` command will send default values for content-type and content-encoding. These values can be overriden.
 
 0.8.5
 +++++++++++++++
