@@ -44,7 +44,7 @@ class CustomAPIConfiguration(AzureConfiguration):
         super(CustomAPIConfiguration, self).__init__(base_url)
 
         self.add_user_agent('customclient/{}'.format(VERSION))
-        self.add_user_agent('MicrosoftAzure/IoTPlatformCliExtension/{}'.format(extver))
+        self.add_user_agent('IoTPlatformCliExtension/{}'.format(extver))
 
         self.credentials = credentials
 

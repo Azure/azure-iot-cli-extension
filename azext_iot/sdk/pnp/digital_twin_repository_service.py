@@ -15,6 +15,7 @@ from .version import VERSION
 from msrest.pipeline import ClientRawResponse
 from msrest.exceptions import HttpOperationError
 from . import models
+from azext_iot.constants import VERSION as extver
 
 
 class DigitalTwinRepositoryServiceConfiguration(Configuration):
@@ -32,8 +33,8 @@ class DigitalTwinRepositoryServiceConfiguration(Configuration):
             base_url = 'http://localhost'
 
         super(DigitalTwinRepositoryServiceConfiguration, self).__init__(base_url)
-
         self.add_user_agent('digitaltwinrepositoryservice/{}'.format(VERSION))
+        self.add_user_agent('IoTPlatformCliExtension/{}'.format(extver))
 
 
 class DigitalTwinRepositoryService(SDKClient):
