@@ -293,6 +293,13 @@ def load_arguments(self, _):
                               "Use the following format: '{\"key0\":\"value0\", \"key1\":\"value1\"}'")
         context.argument('top', options_list=['--top'], type=int,
                          help='Maximum number of deployments to return.')
+        context.argument('layered', options_list=['--layered'],
+                         arg_type=get_three_state_flag(),
+                         help='Layered deployments allow you to define desired properties in $edgeAgent, $edgeHub and user '
+                         'modules that will layer on top of a base deployment. For example the routes specified in a layered '
+                         'deployment will merge with routes of the base deployment. Routes with the same name will be '
+                         'overwritten based on deployment priority.'
+                         )
 
     with self.argument_context('iot dps') as context:
         context.argument('dps_name', help='Name of the Azure IoT Hub device provisioning service')

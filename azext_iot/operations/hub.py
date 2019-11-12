@@ -19,7 +19,8 @@ from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import (DeviceAuthType,
                                      SdkType,
                                      MetricType,
-                                     ProtocolType)
+                                     ProtocolType,
+                                     ConfigType)
 from azext_iot.common._azure import get_iot_hub_connection_string
 from azext_iot.common.utility import (shell_safe_json_parse,
                                       read_file_content,
@@ -506,9 +507,9 @@ def iot_edge_set_modules(cmd, device_id, content,
 
     try:
         content = process_json_arg(content, argument_name='content')
-        modules_content = _process_config_content(content)
+        processed_content = _process_config_content(content, config_type=ConfigType.edge)
 
-        content = ConfigurationContent(modules_content=modules_content)
+        content = ConfigurationContent(**processed_content)
         service_sdk.apply_configuration_on_device(device_id, content)
         return iot_device_module_list(cmd, device_id, hub_name=hub_name, login=login)
     except errors.CloudError as e:
@@ -516,11 +517,12 @@ def iot_edge_set_modules(cmd, device_id, content,
 
 
 def iot_edge_deployment_create(cmd, config_id, content, hub_name=None, target_condition="", priority=0,
-                               labels=None, metrics=None, resource_group_name=None, login=None):
+                               labels=None, metrics=None, layered=False, resource_group_name=None, login=None):
+    config_type = ConfigType.layered if layered else ConfigType.edge
     return _iot_hub_configuration_create(cmd=cmd, config_id=config_id, content=content, hub_name=hub_name,
                                          target_condition=target_condition, priority=priority,
                                          labels=labels, metrics=metrics, resource_group_name=resource_group_name,
-                                         login=login, edge=True)
+                                         login=login, config_type=config_type)
 
 
 def iot_hub_configuration_create(cmd, config_id, content, hub_name=None, target_condition="", priority=0,
@@ -528,11 +530,11 @@ def iot_hub_configuration_create(cmd, config_id, content, hub_name=None, target_
     return _iot_hub_configuration_create(cmd=cmd, config_id=config_id, content=content, hub_name=hub_name,
                                          target_condition=target_condition, priority=priority,
                                          labels=labels, metrics=metrics, resource_group_name=resource_group_name,
-                                         login=login)
+                                         login=login, config_type=ConfigType.adm)
 
 
-def _iot_hub_configuration_create(cmd, config_id, content, hub_name=None, target_condition="", priority=0,
-                                  labels=None, metrics=None, edge=False, resource_group_name=None, login=None):
+def _iot_hub_configuration_create(cmd, config_id, content, config_type, hub_name=None, target_condition="", priority=0,
+                                  labels=None, metrics=None, resource_group_name=None, login=None):
     from azext_iot.sdk.service.models.configuration import Configuration
     from azext_iot.sdk.service.models.configuration_content import ConfigurationContent
     from azext_iot.sdk.service.models.configuration_metrics import ConfigurationMetrics
@@ -540,15 +542,17 @@ def _iot_hub_configuration_create(cmd, config_id, content, hub_name=None, target
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
 
-    metrics_key = 'queries'
+    logger.debug("ensuring lowercase configuration Id...")
+    config_id = config_id.lower()
+    metrics_key = "queries"
 
     content = process_json_arg(content, argument_name="content")
-    content = _process_config_content(content, 'module' if edge else 'device')
+    processed_content = _process_config_content(content, config_type)
 
     if metrics:
         metrics = process_json_arg(metrics, argument_name="metrics")
 
-        if 'metrics' in metrics:
+        if "metrics" in metrics:
             metrics = metrics['metrics']
         if metrics_key not in metrics:
             raise CLIError("metrics json must include the '{}' property".format(metrics_key))
@@ -557,94 +561,96 @@ def _iot_hub_configuration_create(cmd, config_id, content, hub_name=None, target
     if labels:
         labels = process_json_arg(labels, argument_name="labels")
 
-    if edge:
-        config_content = ConfigurationContent(modules_content=content)
-    else:
-        config_content = ConfigurationContent(device_content=content)
+    config_content = ConfigurationContent(**processed_content)
 
     config_metrics = ConfigurationMetrics(queries=metrics)
     config = Configuration(id=config_id,
-                           schema_version='2.0',
+                           schema_version="2.0",
                            labels=labels,
                            content=config_content,
                            metrics=config_metrics,
                            target_condition=target_condition,
-                           etag=None,
+                           etag="*",
                            priority=priority,
-                           content_type='assignment')
+                           content_type="assignment")
     try:
         return service_sdk.create_or_update_configuration(config_id, config)
     except errors.CloudError as e:
         raise CLIError(unpack_msrest_error(e))
 
 
-def _process_config_content(content, content_type='module'):
-    content_key = 'modulesContent' if 'module' in content_type else 'deviceContent'
-    legacy_key = 'moduleContent'
+def _process_config_content(content, config_type):
+    from knack.util import to_snake_case
 
-    if 'content' in content:
-        content = content['content']
+    # Supports scenario where configuration payload is contained in 'content' key
+    if "content" in content:
+        content = content["content"]
 
-    if content_key in content:
-        # Schema based validation currently for IoT edge deployment only
-        if content_key == 'modulesContent':
-            _filter_config_content(content)
-            _validate_payload_schema(content)
+    # Create new config dict to remove superflous properties
+    processed_content = {}
+    if config_type == ConfigType.adm:
+        valid_adm_keys = ["deviceContent", "moduleContent"]
+        for key in valid_adm_keys:
+            if key in content:
+                processed_content[to_snake_case(key)] = content[key]
+                return processed_content
 
-        content = content[content_key]
-    elif 'module' in content_type and legacy_key in content:
-        logger.warning("'%s' is deprecated use '%s' instead - request is still processing...", legacy_key, content_key)
-        content = content[legacy_key]
-    else:
-        raise CLIError("content json must include the '{}' property".format(content_key))
+        raise CLIError("Automatic device configuration payloads require property: {}".format(
+            ' or '.join(map(str, valid_adm_keys))
+        ))
 
-    return content
+    if config_type == ConfigType.edge or config_type == ConfigType.layered:
+        valid_edge_key = "modulesContent"
+        legacy_edge_key = "moduleContent"
 
+        if valid_edge_key in content:
+            processed_content[valid_edge_key] = content[valid_edge_key]
+        elif legacy_edge_key in content:
+            logger.warning(
+                "'%s' is deprecated for edge deployments. Use '%s' instead - request is still processing...",
+                legacy_edge_key,
+                valid_edge_key,
+            )
+            processed_content[valid_edge_key] = content[legacy_edge_key]
 
-def _filter_config_content(content):
-    """ Remove common properties from payloads that fail json schema validation.
+        if processed_content:
+            # Schema based validation currently for IoT edge deployment only
+            if config_type == ConfigType.edge:
+                _validate_payload_schema(processed_content)
 
-    This function is not meant to resolve schema validation issues. Instead it reduces
-    usage friction by removing elements that are frequently included - such as the usage of
-    $schema during development.
-    """
+            processed_content[to_snake_case(valid_edge_key)] = processed_content[valid_edge_key]
+            del processed_content[valid_edge_key]
 
-    to_filter = ["$schema"]
+            return processed_content
 
-    for element in to_filter:
-        if element in content:
-            logger.info("{} detected and removed from payload...".format(element))
-            del content["$schema"]
-
-    return
+        raise CLIError("Edge deployment payloads require property: {}".format(valid_edge_key))
 
 
 def _validate_payload_schema(content):
-    from azure.cli.core.extension import get_extension_path
-    from azext_iot.constants import EXTENSION_NAME
-    import pkg_resources
-
-    pkg_resources.working_set.add_entry(get_extension_path(EXTENSION_NAME))
-
-    from jsonschema import validate
-    from jsonschema.exceptions import ValidationError, SchemaError
+    import json
     from azext_iot.constants import EDGE_DEPLOYMENT_SCHEMA_2_PATH as schema_path
+    from azext_iot.models.validators import JsonSchemaType, JsonSchemaValidator
+
+    if not exists(schema_path):
+        logger.info("Invalid schema path %s, skipping validation...", schema_path)
+        return
+
+    logger.info("Validating deployment payload...")
+    schema_content = str(read_file_content(schema_path))
 
     try:
-        if not exists(schema_path):
-            logger.warning("Invalid schema path %s, skipping validation...", schema_path)
-            return
-
-        logger.info("Validating deployment payload...")
-        schema_content = str(read_file_content(schema_path))
         schema_content = shell_safe_json_parse(schema_content)
-
-        validate(instance=content, schema=schema_content)
-    except ValidationError as ve:
-        raise CLIError(ve)
-    except SchemaError:
-        logger.warning("Invalid IoT Edge deployment schema, skipping validation...")
+    except CLIError:
+        logger.info("Issue parsing Edge deployment schema, skipping validation...")
         return
+
+    v = JsonSchemaValidator(schema_content, JsonSchemaType.draft4)
+    errors = v.validate(content)
+    if errors:
+        # Pretty printing schema validation errors
+        raise CLIError(json.dumps({"validationErrors": errors}, separators=(",", ":"), indent=2))
+
+    return
 
 
 def iot_hub_configuration_update(cmd, config_id, parameters, hub_name=None, resource_group_name=None, login=None):
@@ -690,7 +696,7 @@ def iot_hub_configuration_show(cmd, config_id, hub_name=None, resource_group_nam
 def iot_hub_configuration_list(cmd, hub_name=None, top=10, resource_group_name=None, login=None):
     result = _iot_hub_configuration_list(cmd, hub_name=hub_name, top=top,
                                          resource_group_name=resource_group_name, login=login)
-    filtered = [c for c in result if c['content'].get('deviceContent')]
+    filtered = [c for c in result if (c['content'].get('deviceContent') or c['content'].get('moduleContent'))]
     return filtered[:top]
 
 
@@ -698,12 +704,12 @@ def iot_edge_deployment_list(cmd, hub_name=None, top=10, resource_group_name=Non
     result = _iot_hub_configuration_list(cmd, hub_name=hub_name, top=top,
                                          resource_group_name=resource_group_name, login=login)
 
-    filtered = [c for c in result if (c['content'].get('modulesContent') or c['content'].get('moduleContent'))]
+    filtered = [c for c in result if c['content'].get('modulesContent')]
     return filtered[:top]
 
 
 def _iot_hub_configuration_list(cmd, hub_name=None, top=10, resource_group_name=None, login=None):
-    top = _process_top(top, upper_limit=20)
+    top = _process_top(top, upper_limit=100)
 
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
@@ -734,10 +740,10 @@ def iot_hub_configuration_delete(cmd, config_id, hub_name=None, resource_group_n
         raise CLIError(err)
 
 
-def iot_edge_deployment_metric_show(cmd, config_id, metric_id,
+def iot_edge_deployment_metric_show(cmd, config_id, metric_id, metric_type='user',
                                     hub_name=None, resource_group_name=None, login=None):
     return iot_hub_configuration_metric_show(cmd, config_id=config_id, metric_id=metric_id,
-                                             metric_type='system', hub_name=hub_name,
+                                             metric_type=metric_type, hub_name=hub_name,
                                              resource_group_name=resource_group_name, login=login)
 
 
