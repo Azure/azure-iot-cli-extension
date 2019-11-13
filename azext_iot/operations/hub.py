@@ -163,11 +163,43 @@ def _create_self_signed_cert(subject, valid_days, output_path=None):
     return create_self_signed_certificate(subject, valid_days, output_path)
 
 
+def update_iot_device_custom(instance, edge_enabled=None, status=None, status_reason=None,
+                             auth_method=None, primary_thumbprint=None, secondary_thumbprint=None,
+                             primary_key=None, secondary_key=None):
+    if edge_enabled is not None:
+        instance['capabilities']['iotEdge'] = edge_enabled
+    if status is not None:
+        instance['status'] = status
+    if status_reason is not None:
+        instance['statusReason'] = status_reason
+    if auth_method is not None:
+        if auth_method == DeviceAuthType.shared_private_key.name:
+            auth = 'sas'
+            if (primary_key and not secondary_key) or (not primary_key and secondary_key):
+                raise CLIError("primary + secondary Key required with sas auth")
+            instance['authentication']['symmetricKey']['primaryKey'] = primary_key
+            instance['authentication']['symmetricKey']['secondaryKey'] = secondary_key
+        elif auth_method == DeviceAuthType.x509_thumbprint.name:
+            auth = 'selfSigned'
+            if not any([primary_thumbprint, secondary_thumbprint]):
+                raise CLIError("primary + secondary Thumbprint required with selfSigned auth")
+            instance['authentication']['x509Thumbprint']['primaryThumbprint'] = primary_thumbprint
+            instance['authentication']['x509Thumbprint']['secondaryThumbprint'] = secondary_thumbprint
+        elif auth_method == DeviceAuthType.x509_ca.name:
+            auth = 'certificateAuthority'
+        else:
+            raise ValueError('Authorization method {} invalid.'.format(auth_method))
+        instance['authentication']['type'] = auth
+    return instance
+
+
 def iot_device_update(cmd, device_id, parameters, hub_name=None, resource_group_name=None, login=None):
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
     try:
-        updated_device = _handle_device_update_params(parameters)
+        auth, pk, sk = _parse_auth(parameters)
+        updated_device = _assemble_device(parameters['deviceId'], auth, parameters['capabilities']['iotEdge'],
+                                          pk, sk, parameters['status'].lower(), parameters.get('statusReason'))
         etag = parameters.get('etag', None)
         if etag:
             headers = {}
@@ -178,20 +210,6 @@ def iot_device_update(cmd, device_id, parameters, hub_name=None, resource_group_
         raise CLIError(unpack_msrest_error(e))
     except LookupError as err:
         raise CLIError(err)
-
-
-def _handle_device_update_params(parameters):
-    status = parameters['status'].lower()
-    possible_status = ['enabled', 'disabled']
-    if status not in possible_status:
-        raise CLIError("status must be one of {}".format(possible_status))
-
-    edge = parameters.get('capabilities').get('iotEdge')
-    if not isinstance(edge, bool):
-        raise CLIError("capabilities.iotEdge is of type bool")
-
-    auth, pk, sk = _parse_auth(parameters)
-    return _assemble_device(parameters['deviceId'], auth, edge, pk, sk, status, parameters.get('statusReason'))
 
 
 def iot_device_delete(cmd, device_id, hub_name=None, resource_group_name=None, login=None):

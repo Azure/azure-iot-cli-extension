@@ -145,6 +145,12 @@ def load_arguments(self, _):
         context.argument('status_reason', options_list=['--status-reason', '--star'],
                          help='Description for device status.')
 
+    with self.argument_context('iot hub device-identity update') as context:
+        context.argument('primary_key', options_list=['--primary-key', '--pk'],
+                         help='The primary symmetric shared access key stored in base64 format. ')
+        context.argument('secondary_key', options_list=['--secondary-key', '--sk'],
+                         help='The secondary symmetric shared access key stored in base64 format. ')
+
     with self.argument_context('iot hub device-identity create') as context:
         context.argument('force', options_list=['--force', '-f'],
                          help='Overwrites the non-edge device\'s parent device.')
