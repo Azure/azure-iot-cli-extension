@@ -7,13 +7,12 @@
 
 import pytest
 import json
-import os
 from uuid import uuid4
 from random import randint
 from knack.cli import CLIError
 from azext_iot.operations import hub as subject
 from azext_iot.common.utility import read_file_content, evaluate_literal
-from ..conftest import build_mock_response, path_service_client, mock_target
+from ..conftest import build_mock_response, path_service_client, mock_target, get_context_path
 
 config_id = "myconfig-{}".format(str(uuid4()).replace("-", ""))
 
@@ -44,7 +43,7 @@ def sample_config_edge(set_cwd, request):
     elif request.param == "inlineB":
         payload = json.dumps(json.loads(read_file_content(path))["content"])
     elif request.param == "file":
-        payload = os.path.join(os.path.dirname(os.path.abspath(request.fspath)), path)
+        payload = get_context_path(__file__, path)
     elif request.param == "layered":
         payload = json.dumps(json.loads(read_file_content(layered_path)))
     elif request.param == "v1":
@@ -63,7 +62,7 @@ def sample_config_metrics(set_cwd, request):
     elif request.param == "inlineB":
         payload = json.dumps(json.loads(read_file_content(path))["metrics"])
     elif request.param == "file":
-        payload = os.path.join(os.path.dirname(os.path.abspath(request.fspath)), path)
+        payload = get_context_path(__file__, path)
 
     return (request.param, payload)
 
@@ -75,15 +74,11 @@ def sample_config_adm(set_cwd, request):
 
     payload = None
     if request.param == "moduleFile":
-        payload = os.path.join(
-            os.path.dirname(os.path.abspath(request.fspath)), path_module
-        )
+        payload = get_context_path(__file__, path_module)
     elif request.param == "moduleInline":
         payload = json.dumps(json.loads(read_file_content(path_module)))
     elif request.param == "deviceFile":
-        payload = os.path.join(
-            os.path.dirname(os.path.abspath(request.fspath)), path_device
-        )
+        payload = get_context_path(__file__, path_device)
     elif request.param == "deviceInline":
         payload = json.dumps(json.loads(read_file_content(path_device)))
 
@@ -622,9 +617,10 @@ class TestConfigUpdate:
                 parameters=request,
             )
 
-        assert str(exc_label.value) == ("The property \"labels\" must be of <class 'dict'> but is <class 'str'>. "
+        type_name = "class" if "class" in str(type) else "type"
+        assert str(exc_label.value) == ("The property \"labels\" must be of <{0} 'dict'> but is <{0} 'str'>. "
                                         "Input: not a dictionary. Review inline JSON examples here --> "
-                                        "https://github.com/Azure/azure-iot-cli-extension/wiki/Tips")
+                                        "https://github.com/Azure/azure-iot-cli-extension/wiki/Tips".format(type_name))
 
     def test_config_update_error(self, fixture_cmd2, serviceclient_generic_error):
         with pytest.raises(CLIError):
