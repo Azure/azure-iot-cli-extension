@@ -10,6 +10,8 @@ import json
 import os
 
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
+from azure.cli.core.commands import AzCliCommand
+from azure.cli.core.mock import DummyCli
 
 path_iot_hub_service_factory = "azext_iot.common._azure.iot_hub_service_factory"
 path_service_client = "msrest.service_client.ServiceClient.send"
@@ -31,11 +33,35 @@ mock_target["location"] = "westus2"
 mock_target["sku_tier"] = "Standard"
 
 
-@pytest.fixture()
-def set_cwd():
-    from inspect import getsourcefile
+generic_cs_template = "HostName={};SharedAccessKeyName={};SharedAccessKey={}"
 
-    os.chdir(os.path.dirname(os.path.abspath(getsourcefile(lambda: 0))))
+
+def generate_cs(
+    hub=hub_entity,
+    policy=mock_target["policy"],
+    key=mock_target["primarykey"],
+    lower_case=False,
+):
+    result = generic_cs_template.format(hub, policy, key)
+    return result.lower() if lower_case else result
+
+
+@pytest.fixture()
+def fixture_cmd2(mocker):
+    cli = DummyCli()
+    cli.loader = mocker.MagicMock()
+    cli.loader.cli_ctx = cli
+
+    def test_handler1():
+        pass
+
+    return AzCliCommand(cli.loader, 'iot-extension command', test_handler1)
+
+
+# Sets current working directory to the directory of the executing file
+@pytest.fixture()
+def set_cwd(request):
+    os.chdir(os.path.dirname(os.path.abspath(str(request.fspath))))
 
 
 @pytest.fixture()
@@ -115,3 +141,11 @@ def build_mock_response(mocker, status_code=200, payload=None, headers=None, raw
     if headers:
         response.headers = headers
     return response
+
+
+def get_context_path(base_path, *paths):
+    base_path = os.path.dirname(os.path.abspath(base_path))
+    if paths:
+        return os.path.join(base_path, *paths)
+
+    return base_path

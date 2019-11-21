@@ -19,7 +19,7 @@ steps:
 
   - template: setup-ci-machine.yml
 
-  - template: download-install-local-azure-iot-cli-extension.yml
+  - template: download-install-local-azure-iot-cli-extension-with-pip.yml
 
   - ${{ if eq(parameters.runUnitTestsOnly, 'false') }}:
     - script: pytest --junitxml "TEST-results.xml"
@@ -38,6 +38,8 @@ steps:
       displayName: 'Execute IoT PnP unit tests'
     - script: pytest -v azext_iot/tests/test_iot_digitaltwin_unit.py --junitxml "TEST-dt-unit-results.xml"
       displayName: 'Execute IoT DigitalTwin unit tests'
+    - script: pytest -v azext_iot/tests/configurations/test_iot_config_unit.py --junitxml "TEST-config-unit-results.xml"
+      displayName: 'Execute IoT Configuration unit tests'
 
   - task: PublishTestResults@2
     displayName: 'Publish Test Results'

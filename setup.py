@@ -35,7 +35,7 @@ if not PACKAGE_NAME:
 # The following dependencies are needed by the IoT extension.
 # Most of these are leveraged from Az CLI Core.
 # 'msrestazure>=0.4.29,<2.0.0',
-# 'paho-mqtt==1.3.1',
+# 'paho-mqtt==1.5.0',
 # 'jmespath==0.9.3',
 # 'pyyaml==3.13'
 # 'knack>=0.3.1'
@@ -45,7 +45,7 @@ if not PACKAGE_NAME:
 # though that is installed out of band (managed by the extension)
 # for compatibility reasons.
 
-DEPENDENCIES = ["paho-mqtt==1.3.1", "jsonschema==3.0.2", "setuptools"]
+DEPENDENCIES = ["paho-mqtt==1.5.0", "jsonschema==3.0.2", "setuptools"]
 
 
 CLASSIFIERS = [
@@ -78,7 +78,7 @@ setup(
     author_email="iotupx@microsoft.com",  # +@digimaun
     url="https://github.com/azure/azure-iot-cli-extension",
     classifiers=CLASSIFIERS,
-    packages=find_packages(exclude=["*.test", "*.test.*", "test.*", "*tests", "scripts"]),
+    packages=find_packages(exclude=["tests", "*.tests", "*.tests.*", "scripts"]),
     package_data={
         EXTENSION_REF_NAME: [
             "azext_metadata.json",

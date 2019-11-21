@@ -3,12 +3,19 @@
 Release History
 ===============
 
+0.8.7
++++++++++++++++
+- Support IoT Edge layered deployments
+- Support ADM module twin definitions
+- Improved json schema validation error handling
+- Update top maximum for config list to 200
+
 0.8.6
 +++++++++++++++
-- For IoTHub commands - improves json handling for arguments that require json.
+- For IoT Hub commands - improves json handling for arguments that require json.
 - Edge deployments support metric definitions at creation time (like device configurations)
 - Fixes issue with `az iot hub invoke-device-method` preventing primitive value payloads.
-- The `az iot device simulate` command will send default values for content-type and content-encoding. These values can be overriden.
+- The `az iot device simulate` command will send default values for content-type and content-encoding. These values can be overridden.
 
 0.8.5
 +++++++++++++++

@@ -412,15 +412,13 @@ helps['iot hub configuration'] = """
 
 helps['iot hub configuration create'] = """
     type: command
-    short-summary: Create an IoT device configuration in the target IoT Hub.
+    short-summary: Create an IoT device configuration in a target IoT Hub.
     long-summary: |
-                  The configuration content is json and must include a root object containing the "deviceContent" property.
+                  Device configuration content is json and in the form of {"deviceContent":{...}}
+                  or {"content":{"deviceContent":{...}}}.
 
-                  Alternatively "deviceContent" can be nested in a "content" property.
-                  E.g. {"deviceContent":{...}} or {"content":{"deviceContent":{...}}}
-
-                  Device configurations can be created with user provided metrics for on demand evaluation.
-                  User metrics are json and in the form of {"metrics":{"queries":{...}}}
+                  Device configurations can be defined with user provided metrics for on demand evaluation.
+                  User metrics are json and in the form of {"queries":{...}} or {"metrics":{"queries":{...}}}.
     examples:
     - name: Create a device configuration that applies on condition where a device is in 'building 9' and
             the environment is 'test'.
@@ -592,9 +590,9 @@ helps['iot device simulate'] = """
     - name: Choose total message count and interval between messages
       text: az iot device simulate -n {iothub_name} -d {device_id} --msg-count 1000 --msg-interval 5
     - name: Reject c2d messages (http only)
-      text: az iot device simulate -n {iothub_name} -d {device_id} --rs {reject} --protocol http
+      text: az iot device simulate -n {iothub_name} -d {device_id} --rs reject --protocol http
     - name: Abandon c2d messages (http only)
-      text: az iot device simulate -n {iothub_name} -d {device_id} --rs {abandon} --protocol http
+      text: az iot device simulate -n {iothub_name} -d {device_id} --rs abandon --protocol http
 """
 
 helps['iot device upload-file'] = """
@@ -619,10 +617,9 @@ helps['iot edge set-modules'] = """
     type: command
     short-summary: Set edge modules on a single device.
     long-summary: |
-                  The modules content is json and must include a root object containing the "modulesContent" property.
+                  Modules content is json and in the form of {"modulesContent":{...}} or {"content":{"modulesContent":{...}}}.
 
-                  Alternatively "modulesContent" can be nested in a "content" property.
-                  E.g. {"modulesContent":{...}} or {"content":{"modulesContent":{...}}}
+                  Note: Upon execution the command will output the collection of modules applied to the device.
     examples:
     - name: Test edge modules while in development by setting modules on a target device.
       text: >
@@ -636,12 +633,12 @@ helps['iot edge deployment'] = """
 
 helps['iot edge deployment create'] = """
     type: command
-    short-summary: Create an IoT Edge deployment in the target IoT Hub.
+    short-summary: Create an IoT Edge deployment in a target IoT Hub.
     long-summary: |
-                  The deployment content is json and must include a root object containing the "modulesContent" property.
+                  Deployment content is json and in the form of {"modulesContent":{...}} or {"content":{"modulesContent":{...}}}.
 
-                  Alternatively "modulesContent" can be nested in a "content" property.
-                  E.g. {"modulesContent":{...}} or {"content":{"modulesContent":{...}}}
+                  Edge deployments can be created with user defined metrics for on demand evaluation.
+                  User metrics are json and in the form of {"queries":{...}} or {"metrics":{"queries":{...}}}.
     examples:
     - name: Create a deployment with labels (bash syntax example) that applies for devices in 'building 9' and
             the environment is 'test'.
@@ -654,13 +651,20 @@ helps['iot edge deployment create'] = """
         az iot edge deployment create -d {deployment_name} -n {iothub_name} --content ../modules_content.json
         --labels '{\\"key\\":\\"value\\"}'
         --target-condition "tags.environment='dev'"
-    - name: Create a deployment that applies for devices tagged with environment 'dev'
-            with user metrics inline (bash syntax example).
+    - name: Create a layered deployment that applies for devices tagged with environment 'dev'.
+            Both user metrics and modules content defined inline (cmd syntax example).
       text: >
-        az iot edge deployment create -d {deployment_name} -n {iothub_name} --content ../modules_content.json
-        --target-condition "tags.environment='dev'"
-        --metrics '{"queries": {"mymetrik": "SELECT deviceId from devices where
-        properties.reported.lastDesiredStatus.code = 200"}}'
+        az iot edge deployment create -d {deployment_name} -n {iothub_name}
+        --content "{\\"modulesContent\\":{\\"$edgeAgent\\":{\\"properties.desired.modules.mymodule0\\":{ }},\\"$edgeHub\\":{\\"properties.desired.routes.myroute0\\":\\"FROM /messages/* INTO $upstream\\"}}}"
+        --target-condition "tags.environment='dev'" --priority 10
+        --metrics "{\\"queries\\":{\\"mymetrik\\":\\"SELECT deviceId from devices where properties.reported.lastDesiredStatus.code = 200\\"}}"
+        --layered
+    - name: Create a layered deployment that applies for devices in 'building 9' and the environment is 'test'.
+      text: >
+        az iot edge deployment create -d {deployment_name} -n {iothub_name} --content ../layered_modules_content.json
+        --target-condition "tags.building=9 and tags.environment='test'"
+        --metrics ../metrics_content.json
+        --layered
 """
 
 helps['iot edge deployment show'] = """
