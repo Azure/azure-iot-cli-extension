@@ -590,10 +590,11 @@ def _process_config_content(content, config_type):
     processed_content = {}
     if config_type == ConfigType.adm:
         valid_adm_keys = ["deviceContent", "moduleContent"]
-        for key in valid_adm_keys:
-            if key in content:
-                processed_content[to_snake_case(key)] = content[key]
-                return processed_content
+        if not all(key in content for key in valid_adm_keys):
+            for key in valid_adm_keys:
+                if key in content:
+                    processed_content[to_snake_case(key)] = content[key]
+                    return processed_content
 
         raise CLIError("Automatic device configuration payloads require property: {}".format(
             ' or '.join(map(str, valid_adm_keys))

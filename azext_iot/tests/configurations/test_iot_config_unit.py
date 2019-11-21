@@ -451,32 +451,41 @@ class TestConfigCreate:
         self,
         fixture_cmd2,
         serviceclient,
-        sample_config_edge,
         config_id,
         hub_name,
         target_condition,
         priority,
         labels,
     ):
-        # Skip v1 edge deployment type since moduleContent now considered an ADM related entity
-        if sample_config_edge[0] == "v1":
-            return
-
-        with pytest.raises(CLIError) as exc:
+        with pytest.raises(CLIError) as exc1:
             subject.iot_hub_configuration_create(
                 cmd=fixture_cmd2,
                 config_id=config_id,
                 hub_name=hub_name,
-                content=sample_config_edge[1],
+                content=get_context_path(__file__, "test_edge_deployment.json"),
                 target_condition=target_condition,
                 priority=priority,
                 labels=labels,
             )
 
-        assert (
-            str(exc.value)
-            == "Automatic device configuration payloads require property: deviceContent or moduleContent"
-        )
+        # API does not support both deviceContent and moduleContent at the same time.
+        content = json.dumps({"deviceContent": {}, "moduleContent": {}})
+        with pytest.raises(CLIError) as exc2:
+            subject.iot_hub_configuration_create(
+                cmd=fixture_cmd2,
+                config_id=config_id,
+                hub_name=hub_name,
+                content=content,
+                target_condition=target_condition,
+                priority=priority,
+                labels=labels,
+            )
+
+        for exc in [exc1, exc2]:
+            assert (
+                str(exc.value)
+                == "Automatic device configuration payloads require property: deviceContent or moduleContent"
+            )
 
     @pytest.mark.parametrize(
         "config_id, hub_name, target_condition, priority, labels",
