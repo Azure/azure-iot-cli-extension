@@ -129,7 +129,7 @@ class TestCentralHelpers():
 
 class TestDeviceTwinShow():
     def test_device_twin_show_calls_get_twin(self, fixture_iot_token, fixture_bind_sdk, fixture_cmd):
-        result = subject.iot_central_device_show(fixture_cmd, device_id, app_id, 'api-uri)
+        result = subject.iot_central_device_show(fixture_cmd, device_id, app_id, 'api-uri')
 
         # Ensure get_twin is called and result is returned
         assert result is device_twin_result
