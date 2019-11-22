@@ -412,7 +412,7 @@ def load_arguments(self, _):
         context.argument('repair', options_list=['--repair', '-r'],
                          arg_type=get_three_state_flag(),
                          help='Reinstall uamqp dependency compatible with extension version. Default: false')
-        context.argument('central-app-uri', options_list=['--central-app-uri', '-uri'],
+        context.argument('central_api_uri', options_list=['--central-app-uri'],
                          help='IoT Central API override.  For use with environments other than production. Default: api.azureiotcentral.com.')
         context.argument('yes', options_list=['--yes', '-y'],
                          arg_type=get_three_state_flag(),
@@ -425,12 +425,12 @@ def load_arguments(self, _):
 
     with self.argument_context('iot central') as context:
         context.argument('app_id', options_list=['--app-id'], help='Target App.')
+        context.argument('central_api_uri', options_list=['--central-api-uri'],
+                help='IoT Central API override.  For use with environments other than production. Default: api.azureiotcentral.com.')
 
     with self.argument_context('iot central app monitor-events') as context:
         context.argument('timeout', arg_type=event_timeout_type)
         context.argument('properties', arg_type=event_msg_prop_type)
-        context.argument('central-app-uri', options_list=['--central-app-uri', '-uri'],
-                    help='IoT Central API override.  For use with environments other than production. Default: api.azureiotcentral.com.')
 
     with self.argument_context('iot dt') as context:
         context.argument('repo_login', options_list=['--repo-login', '--rl'],
