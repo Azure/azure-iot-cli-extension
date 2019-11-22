@@ -412,7 +412,7 @@ def load_arguments(self, _):
         context.argument('repair', options_list=['--repair', '-r'],
                          arg_type=get_three_state_flag(),
                          help='Reinstall uamqp dependency compatible with extension version. Default: false')
-        context.argument('central_api_uri', options_list=['--central-app-uri'],
+        context.argument('central_api_uri', options_list=['--central-api-uri'],
                          help='IoT Central API override.  For use with environments other than production. Default: api.azureiotcentral.com.')
         context.argument('yes', options_list=['--yes', '-y'],
                          arg_type=get_three_state_flag(),
