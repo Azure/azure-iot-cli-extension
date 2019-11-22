@@ -1,17 +1,17 @@
 # coding=utf-8
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
-# Unpublished works.
+# Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
 from os.path import exists
 from knack.util import CLIError
-from azure.cli.core.util import read_file_content
-from azext_iot._constants import PNP_ENDPOINT
+from azext_iot.constants import PNP_ENDPOINT
 from azext_iot._factory import _bind_sdk
 from azext_iot.common.shared import SdkType, ModelSourceType
 from azext_iot.common._azure import get_iot_hub_connection_string
 from azext_iot.common.utility import (shell_safe_json_parse,
+                                      read_file_content,
                                       unpack_msrest_error)
 from azext_iot.operations.pnp import (iot_pnp_interface_show,
                                       iot_pnp_interface_list,
@@ -114,7 +114,6 @@ def iot_digitaltwin_properties_list(cmd, device_id, source_model, interface=None
     return {'interfaces': result}
 
 
-# pylint: disable=too-many-locals
 def iot_digitaltwin_invoke_command(cmd, interface, device_id, command_name, command_payload=None,
                                    timeout=10, hub_name=None, resource_group_name=None, login=None):
     device_interfaces = _iot_digitaltwin_interface_list(cmd, device_id, hub_name, resource_group_name, login)
@@ -175,38 +174,14 @@ def iot_digitaltwin_property_update(cmd, interface_payload, device_id,
         raise CLIError(unpack_msrest_error(e))
 
 
-def iot_digitaltwin_monitor_events(cmd, device_id, interface, source_model, repo_endpoint=PNP_ENDPOINT, repo_id=None,
-                                   consumer_group='$Default', timeout=300, hub_name=None, resource_group_name=None,
-                                   yes=False, properties=None, repair=False, login=None, repo_login=None):
-    source_model = source_model.lower()
-    pnp_context = {'enabled': True, 'interface': {}}
-    device_interfaces = _iot_digitaltwin_interface_list(cmd, device_id, hub_name, resource_group_name, login)
-    interface_list = _get_device_default_interface_dict(device_interfaces)
-
-    target_interface = next((k for k in interface_list if k['name'] == interface), None)
-    if interface and not target_interface:
-        raise CLIError('Target interface is not implemented by the device!')
-
-    pnp_context['interface'][target_interface['urn_id']] = {}
-    found_telemetry = []
-    if source_model == ModelSourceType.device.value.lower():
-        found_telemetry = _device_interface_elements(cmd, device_id, target_interface['urn_id'], INTERFACE_TELEMETRY,
-                                                     hub_name, resource_group_name, login)
-    else:
-        if source_model == ModelSourceType.private.value.lower():
-            _validate_repository(repo_id, repo_login)
-        found_telemetry = _pnp_interface_elements(cmd, target_interface['urn_id'], INTERFACE_TELEMETRY,
-                                                  repo_endpoint, repo_id, repo_login)
-
-    for telemetry in found_telemetry:
-        telemetry_data = {'display': telemetry.get('displayName'), 'unit': telemetry.get('unit')}
-        pnp_context['interface'][target_interface['urn_id']][telemetry['name']] = telemetry_data
-
-    _iot_hub_monitor_events(cmd=cmd, interface=target_interface['urn_id'], pnp_context=pnp_context,
-                            hub_name=hub_name, device_id=device_id, consumer_group=consumer_group, timeout=timeout,
-                            enqueued_time=None, resource_group_name=resource_group_name,
-                            yes=yes, properties=properties, repair=repair,
-                            login=login)
+def iot_digitaltwin_monitor_events(cmd, hub_name=None, device_id=None, consumer_group='$Default', timeout=300,
+                                   enqueued_time=None, resource_group_name=None, yes=False, properties=None, repair=False,
+                                   login=None, content_type=None, device_query=None, interface=None):
+    _iot_hub_monitor_events(cmd=cmd, hub_name=hub_name, device_id=device_id,
+                            consumer_group=consumer_group, timeout=timeout, enqueued_time=enqueued_time,
+                            resource_group_name=resource_group_name, yes=yes, properties=properties,
+                            repair=repair, login=login, content_type=content_type, device_query=device_query,
+                            interface_name=interface, pnp_context=True)
 
 
 def _iot_digitaltwin_interface_show(cmd, device_id, interface, hub_name=None, resource_group_name=None, login=None):
@@ -273,6 +248,6 @@ def _device_interface_elements(cmd, device_id, interface, target_type, hub_name,
         return interface_elements
     except errors.CloudError as e:
         raise CLIError(unpack_msrest_error(e))
-    except Exception:  # pylint: disable=broad-except
+    except Exception:
         # returning an empty collection to continue
         return []

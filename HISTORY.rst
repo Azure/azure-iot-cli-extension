@@ -3,9 +3,52 @@
 Release History
 ===============
 
+0.8.7
++++++++++++++++
+- Support IoT Edge layered deployments
+- Support ADM module twin definitions
+- Improved json schema validation error handling
+- Update top maximum for config list to 200
+
+0.8.6
++++++++++++++++
+- For IoT Hub commands - improves json handling for arguments that require json.
+- Edge deployments support metric definitions at creation time (like device configurations)
+- Fixes issue with `az iot hub invoke-device-method` preventing primitive value payloads.
+- The `az iot device simulate` command will send default values for content-type and content-encoding. These values can be overridden.
+
+0.8.5
++++++++++++++++
+- Re-adds deprecated parameter --config-id to edge related commands. Note: --deployment-id/-d are the proper parameters to use in place of config-id when using edge deployment related commands.
+
+0.8.4
++++++++++++++++
+- Device simulate now supports sending arbitrary message properties (like in send-d2c-message).
+- The preview dt monitor events command has been simplified. It works the same as vanilla iot hub monitoring but filters dt events and allows filtering by interface.
+- Help content improvements.
+- Remove long since deprecated parameter `--config-id` from edge deployments.
+
+0.8.3
++++++++++++++++
+- Removes long since deprecated command `az iot hub apply-configuration`.
+- Resolve issue #100.
+- Improve help content for `az iot edge deployment update` to explicitly show what can be updated.
+- Fix message annotation used to filter Digital Twin events in `az iot dt monitor-events`.
+
+0.8.2
++++++++++++++++
+* Resolve jsonschema dependency issue.
+
+0.8.1
++++++++++++++++
+* PnP monitor events commands - Adds an option for filtering devices by twin query.
+* PnP monitor events commands - Some existing mandatory parameters are now optional.
+* Added support for iot central commands, monitor-events and device-twin show.
+* Schema validation applies for creation of IoT Edge deployments or when setting modules per device.
+
 0.8.0
 +++++++++++++++
-* Added Azure IoT Plug & Play public preview functionality
+* Added Azure IoT Plug & Play public preview functionality.
 
 0.7.1
 +++++++++++++++

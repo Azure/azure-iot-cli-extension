@@ -3,13 +3,12 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-# pylint: disable=too-many-statements
 
 """
 Load CLI commands
 """
 
-from azext_iot import iothub_ops, iotdps_ops, iotdigitaltwin_ops, iotpnp_ops
+from azext_iot import iothub_ops, iotdps_ops, iotdigitaltwin_ops, iotpnp_ops, iotcentral_ops
 
 
 def load_command_table(self, _):
@@ -21,8 +20,6 @@ def load_command_table(self, _):
         cmd_group.command('invoke-device-method', 'iot_device_method')
         cmd_group.command('invoke-module-method', 'iot_device_module_method')
         cmd_group.command('generate-sas-token', 'iot_get_sas_token')
-        cmd_group.command('apply-configuration', 'iot_edge_set_modules',
-                          deprecate_info='az iot edge set-modules')
         cmd_group.command('monitor-events', 'iot_hub_monitor_events')
         cmd_group.command('monitor-feedback', 'iot_hub_monitor_feedback')
 
@@ -120,6 +117,20 @@ def load_command_table(self, _):
         cmd_group.command('list', 'iot_dps_registration_list')
         cmd_group.command('show', 'iot_dps_registration_get')
         cmd_group.command('delete', 'iot_dps_registration_delete')
+
+    with self.command_group('iotcentral app', command_type=iotcentral_ops) as cmd_group:
+        cmd_group.command('monitor-events', 'iot_central_monitor_events',
+                          deprecate_info='az iot central app monitor-events')
+
+    with self.command_group('iotcentral device-twin', command_type=iotcentral_ops) as cmd_group:
+        cmd_group.command('show', 'iot_central_device_show',
+                          deprecate_info='az iot central device-twin')
+
+    with self.command_group('iot central app', command_type=iotcentral_ops) as cmd_group:
+        cmd_group.command('monitor-events', 'iot_central_monitor_events')
+
+    with self.command_group('iot central device-twin', command_type=iotcentral_ops) as cmd_group:
+        cmd_group.command('show', 'iot_central_device_show')
 
     with self.command_group('iot dt', command_type=iotdigitaltwin_ops, is_preview=True) as cmd_group:
         cmd_group.command('list-interfaces', 'iot_digitaltwin_interface_list')

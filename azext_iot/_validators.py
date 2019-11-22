@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from knack.util import CLIError
-from azext_iot.assets.user_messages import ERROR_NO_HUB_OR_LOGIN_ON_INPUT
+from azext_iot.assets.user_messages import error_no_hub_or_login_on_input
 
 
 def mode2_iot_login_handler(cmd, namespace):
@@ -27,4 +27,4 @@ def mode2_iot_login_handler(cmd, namespace):
                 entity_value = args.get('repo_endpoint')
 
             if not any([login_value, entity_value]):
-                raise CLIError(ERROR_NO_HUB_OR_LOGIN_ON_INPUT(iot_cmd_type))
+                raise CLIError(error_no_hub_or_login_on_input(iot_cmd_type))

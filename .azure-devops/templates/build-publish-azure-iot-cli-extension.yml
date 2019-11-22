@@ -1,0 +1,15 @@
+steps:
+  - script: 'pip install --upgrade .'
+    displayName: 'Install Azure IoT CLI extension'
+    workingDirectory: '.'
+
+  - script: 'python setup.py sdist bdist_wheel'
+    displayName: 'Build wheel for Azure IoT CLI extension'
+    workingDirectory: '.'
+
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Azure IoT CLI extension as build artifact'
+    inputs:
+      pathtoPublish: 'dist' 
+      artifactName: 'azure-cli-iot-ext' 
+      publishLocation: 'Container'

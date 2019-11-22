@@ -16,7 +16,7 @@ from time import time
 try:
     from urllib import (urlencode, quote_plus)
 except ImportError:
-    from urllib.parse import (urlencode, quote_plus)  # pylint: disable=import-error
+    from urllib.parse import (urlencode, quote_plus)
 from msrest.authentication import Authentication
 
 
@@ -73,3 +73,28 @@ class SasTokenAuthentication(Authentication):
             result['skn'] = self.policy
 
         return 'SharedAccessSignature ' + urlencode(result)
+
+
+class BasicSasTokenAuthentication(Authentication):
+    """
+    Basic Shared Access Signature authorization for Azure IoT Hub.
+
+    Args:
+        sas_token (str): sas token to use in authentication.
+    """
+    def __init__(self, sas_token):
+        self.sas_token = sas_token
+
+    def signed_session(self):
+        """
+        Create requests session with SAS auth headers.
+
+        Returns:
+            session (): requests.Session.
+        """
+        session = super(BasicSasTokenAuthentication, self).signed_session()
+        session.headers['Authorization'] = self.sas_token
+        return session
+
+    def set_sas_token(self, new_token):
+        self.sas_token = new_token

@@ -357,19 +357,6 @@ helps['iot hub module-twin replace'] = """
         -m {module_name} -j ../mymodtwin.json
 """
 
-helps['iot hub apply-configuration'] = """
-    type: command
-    short-summary: Apply a deployment manifest to a single device.
-    long-summary: DEPRECATED. Use 'az iot edge set-modules' instead.
-                  Manifest content is json and must have root element of 'content' or 'moduleContent'
-                  e.g. {"content":{...}} or {"moduleContent":{...}}
-    examples:
-    - name: Test modules while in development.
-      text: >
-        az iot hub apply-configuration --hub-name {iothub_name} --device-id {device_id}
-        --content ../mycontent.json
-"""
-
 helps['iot hub generate-sas-token'] = """
     type: command
     short-summary: Generate a SAS token for a target IoT Hub, device or module.
@@ -425,15 +412,13 @@ helps['iot hub configuration'] = """
 
 helps['iot hub configuration create'] = """
     type: command
-    short-summary: Create an IoT device configuration in the target IoT Hub.
+    short-summary: Create an IoT device configuration in a target IoT Hub.
     long-summary: |
-                  The configuration content is json and must include a root object containing the "deviceContent" property.
+                  Device configuration content is json and in the form of {"deviceContent":{...}}
+                  or {"content":{"deviceContent":{...}}}.
 
-                  Alternatively "deviceContent" can be nested in a "content" property.
-                  E.g. {"deviceContent":{...}} or {"content":{"deviceContent":{...}}}
-
-                  Device configurations can be created with user provided metrics for on demand evaluation.
-                  User metrics are json and in the form of {"metrics":{"queries":{...}}}
+                  Device configurations can be defined with user provided metrics for on demand evaluation.
+                  User metrics are json and in the form of {"queries":{...}} or {"metrics":{"queries":{...}}}.
     examples:
     - name: Create a device configuration that applies on condition where a device is in 'building 9' and
             the environment is 'test'.
@@ -568,7 +553,7 @@ helps['iot device c2d-message send'] = """
 helps['iot device send-d2c-message'] = """
     type: command
     short-summary: Send an mqtt device-to-cloud message.
-    long-summary: Supports application and system properties to send with message.
+                   The command supports sending messages with application and system properties.
     examples:
     - name: Basic usage
       text: az iot device send-d2c-message -n {iothub_name} -d {device_id}
@@ -582,22 +567,32 @@ helps['iot device send-d2c-message'] = """
 
 helps['iot device simulate'] = """
     type: command
-    short-summary: Simulate a device in an Azure IoT Hub.
-    long-summary: While the device simulation is running, the device will automatically receive
-                  and acknowledge cloud-to-device (c2d) messages. For mqtt simulation, all c2d messages will
-                  be acknowledged with completion. For http simulation c2d acknowledgement is based on user
-                  selection which can be complete, reject or abandon.
+    short-summary: |
+                   Simulate a device in an Azure IoT Hub.
+
+                   While the device simulation is running, the device will automatically receive
+                   and acknowledge cloud-to-device (c2d) messages. For mqtt simulation, all c2d messages will
+                   be acknowledged with completion. For http simulation c2d acknowledgement is based on user
+                   selection which can be complete, reject or abandon.
+
+                   Note: The command by default will set content-type to application/json and content-encoding
+                   to utf-8. This can be overriden.
     examples:
-    - name: Basic usage (mqtt).
+    - name: Basic usage (mqtt)
       text: az iot device simulate -n {iothub_name} -d {device_id}
-    - name: Basic usage (http).
+    - name: Basic usage (mqtt) with sending mixed properties
+      text: az iot device simulate -n {iothub_name} -d {device_id} --properties "myprop=myvalue;$.ct=application/json"
+    - name: Basic usage (http)
       text: az iot device simulate -n {iothub_name} -d {device_id} --protocol http
-    - name: Choose total message count and interval between messages.
+    - name: Basic usage (http) with sending mixed properties
+      text: az iot device simulate -n {iothub_name} -d {device_id} --protocol http --properties
+            "iothub-app-myprop=myvalue;content-type=application/json;iothub-correlationid=12345"
+    - name: Choose total message count and interval between messages
       text: az iot device simulate -n {iothub_name} -d {device_id} --msg-count 1000 --msg-interval 5
     - name: Reject c2d messages (http only)
-      text: az iot device simulate -n {iothub_name} -d {device_id} --rs {reject}
+      text: az iot device simulate -n {iothub_name} -d {device_id} --rs reject --protocol http
     - name: Abandon c2d messages (http only)
-      text: az iot device simulate -n {iothub_name} -d {device_id} --rs {abandon}
+      text: az iot device simulate -n {iothub_name} -d {device_id} --rs abandon --protocol http
 """
 
 helps['iot device upload-file'] = """
@@ -622,10 +617,9 @@ helps['iot edge set-modules'] = """
     type: command
     short-summary: Set edge modules on a single device.
     long-summary: |
-                  The modules content is json and must include a root object containing the "modulesContent" property.
+                  Modules content is json and in the form of {"modulesContent":{...}} or {"content":{"modulesContent":{...}}}.
 
-                  Alternatively "modulesContent" can be nested in a "content" property.
-                  E.g. {"modulesContent":{...}} or {"content":{"modulesContent":{...}}}
+                  Note: Upon execution the command will output the collection of modules applied to the device.
     examples:
     - name: Test edge modules while in development by setting modules on a target device.
       text: >
@@ -639,12 +633,12 @@ helps['iot edge deployment'] = """
 
 helps['iot edge deployment create'] = """
     type: command
-    short-summary: Create an IoT Edge deployment in the target IoT Hub.
+    short-summary: Create an IoT Edge deployment in a target IoT Hub.
     long-summary: |
-                  The deployment content is json and must include a root object containing the "modulesContent" property.
+                  Deployment content is json and in the form of {"modulesContent":{...}} or {"content":{"modulesContent":{...}}}.
 
-                  Alternatively "modulesContent" can be nested in a "content" property.
-                  E.g. {"modulesContent":{...}} or {"content":{"modulesContent":{...}}}
+                  Edge deployments can be created with user defined metrics for on demand evaluation.
+                  User metrics are json and in the form of {"queries":{...}} or {"metrics":{"queries":{...}}}.
     examples:
     - name: Create a deployment with labels (bash syntax example) that applies for devices in 'building 9' and
             the environment is 'test'.
@@ -652,11 +646,25 @@ helps['iot edge deployment create'] = """
         az iot edge deployment create -d {deployment_name} -n {iothub_name} --content ../modules_content.json
         --labels '{"key0":"value0", "key1":"value1"}'
         --target-condition "tags.building=9 and tags.environment='test'" --priority 3
-    - name: Create a deployment with labels (cmd syntax example) that applies for devices tagged with environment 'dev'.
+    - name: Create a deployment with labels (powershell syntax example) that applies for devices tagged with environment 'dev'.
       text: >
         az iot edge deployment create -d {deployment_name} -n {iothub_name} --content ../modules_content.json
-        --labels "{\\"key\\":\\"value\\"}"
+        --labels '{\\"key\\":\\"value\\"}'
         --target-condition "tags.environment='dev'"
+    - name: Create a layered deployment that applies for devices tagged with environment 'dev'.
+            Both user metrics and modules content defined inline (cmd syntax example).
+      text: >
+        az iot edge deployment create -d {deployment_name} -n {iothub_name}
+        --content "{\\"modulesContent\\":{\\"$edgeAgent\\":{\\"properties.desired.modules.mymodule0\\":{ }},\\"$edgeHub\\":{\\"properties.desired.routes.myroute0\\":\\"FROM /messages/* INTO $upstream\\"}}}"
+        --target-condition "tags.environment='dev'" --priority 10
+        --metrics "{\\"queries\\":{\\"mymetrik\\":\\"SELECT deviceId from devices where properties.reported.lastDesiredStatus.code = 200\\"}}"
+        --layered
+    - name: Create a layered deployment that applies for devices in 'building 9' and the environment is 'test'.
+      text: >
+        az iot edge deployment create -d {deployment_name} -n {iothub_name} --content ../layered_modules_content.json
+        --target-condition "tags.building=9 and tags.environment='test'"
+        --metrics ../metrics_content.json
+        --layered
 """
 
 helps['iot edge deployment show'] = """
@@ -671,9 +679,13 @@ helps['iot edge deployment list'] = """
 
 helps['iot edge deployment update'] = """
     type: command
-    short-summary: Update an IoT Edge deployment with the specified properties.
-    long-summary: Use --set followed by property assignments for updating a deployment.
-                  Leverage properties returned from 'az iot edge deployment show'.
+    short-summary: |
+                  Update specified properties of an IoT Edge deployment.
+
+                  Use --set followed by property assignments for updating a deployment.
+
+                  Note: IoT Edge deployment content is immutable. Deployment properties that can be
+                  updated are 'labels', 'metrics', 'priority' and 'targetCondition'.
     examples:
     - name: Alter the labels and target condition of an existing edge deployment
       text: >
@@ -913,6 +925,108 @@ helps['iot dps registration delete'] = """
     short-summary: Delete a device registration in an Azure IoT Hub Device Provisioning Service.
 """
 
+helps['iotcentral app monitor-events'] = """
+    type: command
+    short-summary: Monitor device telemetry & messages sent to the IoT Hub for an IoT Central app.
+    long-summary: |
+                  EXPERIMENTAL requires Python 3.5+
+                  This command relies on and may install dependent Cython package (uamqp) upon first execution.
+                  https://github.com/Azure/azure-uamqp-python
+
+                  DEPRECATED. Use 'az iot central app monitor-events' instead.
+    examples:
+    - name: Basic usage
+      text: >
+        az iotcentral app monitor-events --app-id {app_id}
+    - name: Basic usage when filtering on target device
+      text: >
+        az iotcentral app monitor-events --app-id {app_id} -d {device_id}
+    - name: Basic usage when filtering targeted devices with a wildcard in the ID
+      text: >
+        az iotcentral app monitor-events --app-id {app_id} -d Device*
+    - name: Filter device and specify an Event Hub consumer group to bind to.
+      text: >
+        az iotcentral app monitor-events --app-id {app_id} -d {device_id} --cg {consumer_group_name}
+    - name: Receive message annotations (message headers)
+      text: >
+        az iotcentral app monitor-events --app-id {app_id} -d {device_id} --properties anno
+    - name: Receive message annotations + system properties. Never time out.
+      text: >
+        az iotcentral app monitor-events --app-id {app_id} -d {device_id} --properties anno sys --timeout 0
+    - name: Receive all message attributes from all device messages
+      text: >
+        az iotcentral app monitor-events --app-id {app_id} --props all
+    - name: Receive all messages and parse message payload as JSON
+      text: >
+        az iotcentral app monitor-events --app-id {app_id} --output json
+  """
+
+helps['iotcentral device-twin'] = """
+    type: group
+    short-summary: Manage IoT Central device twins.
+    long-summary: DEPRECATED. Use 'az iot central device-twin' instead.
+"""
+
+helps['iotcentral device-twin show'] = """
+    type: command
+    short-summary: Get the device twin from IoT Hub.
+    long-summary: DEPRECATED. Use 'az iot central device-twin show' instead.
+"""
+
+helps['iot central'] = """
+    type: group
+    short-summary: Manage Azure IoT Central assets.
+"""
+
+helps['iot central app'] = """
+    type: group
+    short-summary: Manage Azure IoT Central applications.
+"""
+
+helps['iot central app monitor-events'] = """
+    type: command
+    short-summary: Monitor device telemetry & messages sent to the IoT Hub for an IoT Central app.
+    long-summary: |
+                  EXPERIMENTAL requires Python 3.5+
+                  This command relies on and may install dependent Cython package (uamqp) upon first execution.
+                  https://github.com/Azure/azure-uamqp-python
+    examples:
+    - name: Basic usage
+      text: >
+        az iot central app monitor-events --app-id {app_id}
+    - name: Basic usage when filtering on target device
+      text: >
+        az iot central app monitor-events --app-id {app_id} -d {device_id}
+    - name: Basic usage when filtering targeted devices with a wildcard in the ID
+      text: >
+        az iot central app monitor-events --app-id {app_id} -d Device*
+    - name: Filter device and specify an Event Hub consumer group to bind to.
+      text: >
+        az iot central app monitor-events --app-id {app_id} -d {device_id} --cg {consumer_group_name}
+    - name: Receive message annotations (message headers)
+      text: >
+        az iot central app monitor-events --app-id {app_id} -d {device_id} --properties anno
+    - name: Receive message annotations + system properties. Never time out.
+      text: >
+        az iot central app monitor-events --app-id {app_id} -d {device_id} --properties anno sys --timeout 0
+    - name: Receive all message attributes from all device messages
+      text: >
+        az iot central app monitor-events --app-id {app_id} --props all
+    - name: Receive all messages and parse message payload as JSON
+      text: >
+        az iot central app monitor-events --app-id {app_id} --output json
+  """
+
+helps['iot central device-twin'] = """
+    type: group
+    short-summary: Manage IoT Central device twins.
+"""
+
+helps['iot central device-twin show'] = """
+    type: command
+    short-summary: Get the device twin from IoT Hub.
+"""
+
 helps['iot dt'] = """
     type: group
     short-summary: Manage digital twin of an IoT Plug and Play device.
@@ -993,22 +1107,26 @@ helps['iot dt list-commands'] = """
 
 helps['iot dt monitor-events'] = """
     type: command
-    short-summary: Monitor digital twin events.
+    short-summary: Monitor Digital Twin events.
     long-summary: You can leverage az login and provide --hub-name instead of --login for every command.
     examples:
-    - name: Monitor digital twin events of device's interface.
+    - name: Basic usage monitoring events of all devices and all interfaces using the logged in session.
       text: >
-        az iot dt monitor-events --login {iothub_cs} --device-id {device_id} --source device
-        --interface {plug_and_play_interface} --consumer-group {consumer_group_name}
-    - name: Monitor digital twin events of public interface within current session.
+        az iot dt monitor-events -n {iothub_name}
+    - name: Basic usage monitoring events of all devices and all interfaces using an IotHub connection string.
       text: >
-        az iot dt monitor-events --hub-name {iothub_name} --device-id {device_id} --source public
-        --interface {plug_and_play_interface} --consumer-group {consumer_group_name}
-    - name: Monitor digital twin events of device's interface and see all message properties.
+        az iot dt monitor-events --login {iothub_cs}
+    - name: Basic usage when filtering on specific interface events while targeting devices with a wildcard in the ID.
+      text: >
+        az iot dt monitor-events -n {iothub_name} -d Device* -i {plug_and_play_interface}
+    - name: Filter Digital Twin events of a subset of devices using IoT Hub query language.
+      text: >
+        az iot dt monitor-events -n {iothub_name} -q "select * from devices where tags.location.region = 'US'"
+    - name: Filter events on a device with a particular interface. Use a custom consumer group when binding and
+            see all message properties.
       text: >
         az iot dt monitor-events --login {iothub_cs} --device-id {device_id}
-        --interface {plug_and_play_interface} --consumer-group {consumer_group_name}
-        --properties all --source device
+        --interface {plug_and_play_interface} --consumer-group {consumer_group_name} --properties all
 """
 
 helps['iot dt update-property'] = """

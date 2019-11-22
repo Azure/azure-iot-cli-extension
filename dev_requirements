@@ -1,8 +1,10 @@
 pytest
 pytest-mock
-pytest-cov==2.6.0
+pytest-cov
 pytest-env
 pylint
 flake8
-autopep8
+black;python_version>='3.6'
 wheel==0.30.0
+pre-commit
+six==1.12

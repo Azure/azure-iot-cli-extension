@@ -1,0 +1,36 @@
+{
+    "content": {
+        "modulesContent": {
+            "$edgeAgent": {
+                "properties.desired.modules.mymodule0": {
+                    "settings": {
+                        "image": "myimageuri",
+                        "createOptions": "{\"MemorySwap\":0}"
+                    },
+                    "type": "docker",
+                    "env": {
+                        "envvar0": {
+                            "value": "envvarval0"
+                        }
+                    },
+                    "status": "running",
+                    "restartPolicy": "always",
+                    "version": "1.0"
+                }
+            },
+            "$edgeHub": {
+                "properties.desired.routes.route0": "from /messages/* INTO $upstream"
+            },
+            "mymodule0": {
+                "properties.desired.settings": {
+                    "prop0": "val0"
+                }
+            }
+        }
+    },
+    "metrics": {
+        "queries": {
+            "mymetric": "SELECT deviceId FROM devices WHERE properties.reported.lastDesiredStatus.code = 200"
+        }
+    }
+}

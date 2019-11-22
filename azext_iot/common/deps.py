@@ -8,7 +8,7 @@ import sys
 from os import linesep
 import six
 from six.moves import input
-from azext_iot._constants import EVENT_LIB, VERSION
+from azext_iot.constants import EVENT_LIB, VERSION
 from azext_iot.common.utility import test_import
 from azext_iot.common.config import get_uamqp_ext_version, update_uamqp_ext_version
 from azext_iot.common.pip import install

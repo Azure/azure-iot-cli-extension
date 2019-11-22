@@ -1,0 +1,76 @@
+{
+    "content": {
+        "moduleContent": {
+            "$edgeAgent": {
+                "properties.desired": {
+                    "schemaVersion": "1.0",
+                    "runtime": {
+                        "type": "docker",
+                        "settings": {
+                            "minDockerVersion": "v1.25",
+                            "loggingOptions": ""
+                        }
+                    },
+                    "systemModules": {
+                        "edgeAgent": {
+                            "type": "docker",
+                            "settings": {
+                                "image": "microsoft/azureiotedge-agent:1.0-preview",
+                                "createOptions": ""
+                            }
+                        },
+                        "edgeHub": {
+                            "type": "docker",
+                            "status": "running",
+                            "restartPolicy": "always",
+                            "settings": {
+                                "image": "microsoft/azureiotedge-hub:1.0-preview",
+                                "createOptions": ""
+                            }
+                        }
+                    },
+                    "modules": {
+                        "temp-sensor-module": {
+                            "version": "1.0",
+                            "type": "docker",
+                            "status": "running",
+                            "restartPolicy": "always",
+                            "settings": {
+                                "image": "microsoft/azureiotedge-simulated-temperature-sensor",
+                                "createOptions": ""
+                            }
+                        },
+                        "filtermodule": {
+                            "version": "1.0",
+                            "type": "docker",
+                            "status": "running",
+                            "restartPolicy": "always",
+                            "settings": {
+                                "image": "microsoft/filtermodule:0.0.1-amd64",
+                                "createOptions": ""
+                            }
+                        }
+                    }
+                }
+            },
+            "$edgeHub": {
+                "properties.desired": {
+                    "schemaVersion": "1.0",
+                    "routes": {
+                        "sensorToFilter": "FROM /messages/modules/temp-sensor-module/outputs/temperatureOutput INTO BrokeredEndpoint(\"/modules/filtermodule/inputs/input1\")",
+                        "filterToIoTHub": "FROM /messages/modules/filtermodule/outputs/output1 INTO $upstream"
+                    },
+                    "storeAndForwardConfiguration": {
+                        "timeToLiveSecs": 7200
+                    }
+                }
+            },
+            "filtermodule": {
+                "properties.desired": {
+                    "schemaVersion": "1.0",
+                    "TemperatureThreshold": 21
+                }
+            }
+        }
+    }
+}

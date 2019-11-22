@@ -1,4 +1,15 @@
 [pytest]
+addopts =
+    -v
+    -p no:warnings
+
+norecursedirs =
+    dist
+    build
+
+testpaths =
+    tests
+
 env =
     AZURE_TEST_RUN_LIVE=True
     azext_iot_testrg=
@@ -6,3 +17,8 @@ env =
     azext_iot_testhub_cs=
     azext_iot_testdps=
     azext_iot_teststorageuri=
+    azext_pnp_endpoint=
+    azext_pnp_repository=
+    azext_pnp_cs=
+    azext_iot_central_app_id=
+    azext_iot_central_device_id=

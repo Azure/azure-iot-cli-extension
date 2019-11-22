@@ -3,12 +3,30 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-# pylint: disable=too-many-statements
 
 from knack.util import CLIError
 from azext_iot.common.utility import validate_key_value_pairs
 from azext_iot.common.utility import trim_from_start
 from azext_iot._factory import iot_hub_service_factory
+from azure.cli.core._profile import Profile
+
+
+def _get_aad_token(cmd, resource=None):
+    '''
+    get AAD token to access to a specified resource
+    :param resource: Azure resource endpoints. Default to Azure Resource Manager
+    Use 'az cloud show' command for other Azure resources
+    '''
+    resource = (resource or cmd.cli_ctx.cloud.endpoints.active_directory_resource_id)
+    profile = Profile(cli_ctx=cmd.cli_ctx)
+    creds, subscription, tenant = profile.get_raw_token(subscription=None, resource=resource)
+    return {
+        'tokenType': creds[0],
+        'accessToken': creds[1],
+        'expiresOn': creds[2].get('expiresOn', 'N/A'),
+        'subscription': subscription,
+        'tenant': tenant
+    }
 
 
 def _parse_connection_string(cs, validate=None, cstring_type='entity'):
@@ -44,7 +62,6 @@ def parse_iot_device_module_connection_string(cs):
 CONN_STR_TEMPLATE = 'HostName={};SharedAccessKeyName={};SharedAccessKey={}'
 
 
-# pylint: disable=broad-except
 def get_iot_hub_connection_string(
         cmd,
         hub_name,
@@ -154,7 +171,6 @@ def get_iot_hub_connection_string(
     return result
 
 
-# pylint: disable=broad-except
 def get_iot_dps_connection_string(
         client,
         dps_name,
@@ -224,7 +240,29 @@ def get_iot_dps_connection_string(
     return result
 
 
-# pylint: disable=broad-except
+def get_iot_central_tokens(cmd, app_id):
+    def get_event_hub_token(app_id, iotcAccessToken):
+        import requests
+        url = "https://api.azureiotcentral.com/v1-beta/applications/{}/diagnostics/sasTokens".format(app_id)
+        response = requests.post(url, headers={'Authorization': 'Bearer {}'.format(iotcAccessToken)})
+        return response.json()
+
+    aad_token = _get_aad_token(cmd, resource="https://apps.azureiotcentral.com")['accessToken']
+
+    tokens = get_event_hub_token(app_id, aad_token)
+
+    if tokens.get('error'):
+        raise CLIError(
+            'Error {} getting tokens. {}'.format(tokens['error']['code'], tokens['error']['message'])
+        )
+
+    return tokens
+
+
+def get_iot_hub_token_from_central_app_id(cmd, app_id):
+    return get_iot_central_tokens(cmd, app_id)['iothubTenantSasToken']['sasToken']
+
+
 def get_iot_pnp_connection_string(
         cmd,
         endpoint,
@@ -248,10 +286,9 @@ def get_iot_pnp_connection_string(
 
     """
 
-    # pylint: disable=line-too-long
     from azure.cli.command_modules.iot.digitaltwinrepositoryprovisioningservice import DigitalTwinRepositoryProvisioningService
     from azure.cli.command_modules.iot._utils import get_auth_header
-    from azext_iot._constants import PNP_REPO_ENDPOINT
+    from azext_iot.constants import PNP_REPO_ENDPOINT
 
     result = {}
     client = None

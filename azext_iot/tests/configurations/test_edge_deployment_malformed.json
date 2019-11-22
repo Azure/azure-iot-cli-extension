@@ -1,0 +1,59 @@
+{
+    "schemaVersion": "2.0",
+    "content": {
+        "modulesContent": {
+            "$edgeAgent": {
+                "properties.desired": {
+                    "schemaVersion": "1.0",
+                    "systemModules": {
+                        "edgeAgent": {
+                            "type": "docker",
+                            "settings": {
+                                "image": "",
+                                "createOptions": ""
+                            }
+                        },
+                        "edgeHub": {
+                            "type": "docker",
+                            "status": "running",
+                            "restartPolicy": "always",
+                            "settings": {
+                                "image": "",
+                                "createOptions": ""
+                            }
+                        }
+                    },
+                    "modules": {
+                        "mongo-server": {
+                            "version": "1.1",
+                            "type": "docker",
+                            "status": "running",
+                            "restartPolicy": "on-failured",
+                            "settings": {
+                                "image": "mongo:1.5",
+                                "createOptions": ""
+                            }
+                        }
+                    }
+                }
+            },
+            "$edgeHub": {
+                "properties.desired": {
+                    "schemaVersion": "1.0",
+                    "routes": {
+                        "route1": "FROM device messages WHERE $connectedModuleInstanceId=\"adapterglobalconfig\" INTO brokeredEndpoint(\"/modinstances/alertLogic/in\");"
+                    },
+                    "storeAndForwardConfiguration": {
+                        "timeToLiveSecs": 6000
+                    }
+                }
+            },
+            "mongo-server": {
+                "properties.desired": {}
+            }
+        }
+    },
+    "metrics": {
+        "queries": {}
+    }
+}

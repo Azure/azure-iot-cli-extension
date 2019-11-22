@@ -2,8 +2,7 @@
     "@id": "urn:example:interfaces:MXChip:1",
     "@type": "Interface",
     "displayName": "MXChip1",
-    "contents": [
-        {
+    "contents": [{
             "@type": "Property",
             "name": "dieNumber",
             "displayName": "Die Number",
@@ -60,8 +59,7 @@
             "displayName": "Magnetometer",
             "schema": {
                 "@type": "Object",
-                "fields": [
-                    {
+                "fields": [{
                         "name": "x",
                         "schema": "double",
                         "displayUnit": "mgauss"
@@ -85,8 +83,7 @@
             "displayName": "Accelerometer",
             "schema": {
                 "@type": "Object",
-                "fields": [
-                    {
+                "fields": [{
                         "name": "x",
                         "schema": "double",
                         "displayUnit": "mg"
@@ -110,8 +107,7 @@
             "displayName": "Gyroscope",
             "schema": {
                 "@type": "Object",
-                "fields": [
-                    {
+                "fields": [{
                         "name": "x",
                         "schema": "double",
                         "displayUnit": "mdps"
@@ -141,9 +137,8 @@
             "displayName": "Device State",
             "schema": {
                 "@type": "Enum",
-                "valueSchema":"string",
-                "enumValues": [
-                    {
+                "valueSchema": "string",
+                "enumValues": [{
                         "name": "normal",
                         "displayName": "Normal",
                         "enumValue": "NORMAL"
@@ -169,17 +164,15 @@
                 "name": "name1",
                 "schema": {
                     "@type": "Object",
-                    "fields": [
-                        {
-                            "name": "displayedValue",
-                            "displayName": "Value to display",
-                            "schema": "string"
-                        }
-                    ]
+                    "fields": [{
+                        "name": "displayedValue",
+                        "displayName": "Value to display",
+                        "schema": "string"
+                    }]
                 }
             },
             "response": {
-                "name" :  "name2", 
+                "name": "name2",
                 "schema": "string"
             }
         },
@@ -191,20 +184,18 @@
                 "name": "name1",
                 "schema": {
                     "@type": "Object",
-                    "fields": [
-                        {
-                            "name": "countFrom",
-                            "displayName": "Count from",
-                            "schema": "double"
-                        }
-                    ]
+                    "fields": [{
+                        "name": "countFrom",
+                        "displayName": "Count from",
+                        "schema": "double"
+                    }]
                 }
             },
             "response": {
-                "name" :  "name3", 
+                "name": "name3",
                 "schema": "double"
             }
         }
     ],
-    "@context": "http://azureiot.com/v1/contexts/Interface.json"
+    "@context": "http://azureiot.com/v1/contexts/IoTModel.json"
 }

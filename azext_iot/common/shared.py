@@ -12,11 +12,11 @@ shared: Define shared data types(enums); hub and dps connection string functions
 from enum import Enum
 
 
-# pylint: disable=too-few-public-methods
 class SdkType(Enum):
     """
     Target SDK for interop.
     """
+
     device_query_sdk = 0
     modules_sdk = 1
     device_twin_sdk = 2
@@ -28,135 +28,145 @@ class SdkType(Enum):
     pnp_sdk = 8
 
 
-# pylint: disable=too-few-public-methods
 class EntityStatusType(Enum):
     """
     Resource status.
     """
-    disabled = 'disabled'
-    enabled = 'enabled'
+
+    disabled = "disabled"
+    enabled = "enabled"
 
 
-# pylint: disable=too-few-public-methods
 class SettleType(Enum):
     """
     Settlement state of C2D message.
     """
-    complete = 'complete'
-    abandon = 'abandon'
-    reject = 'reject'
+
+    complete = "complete"
+    abandon = "abandon"
+    reject = "reject"
 
 
-# pylint: disable=too-few-public-methods
 class DeviceAuthType(Enum):
     """
     Device Authorization type.
     """
-    shared_private_key = 'shared_private_key'
-    x509_thumbprint = 'x509_thumbprint'
-    x509_ca = 'x509_ca'
+
+    shared_private_key = "shared_private_key"
+    x509_thumbprint = "x509_thumbprint"
+    x509_ca = "x509_ca"
 
 
-# pylint: disable=too-few-public-methods
 class KeyType(Enum):
     """
     Shared private key.
     """
-    primary = 'primary'
-    secondary = 'secondary'
+
+    primary = "primary"
+    secondary = "secondary"
 
 
-# pylint: disable=too-few-public-methods
 class AttestationType(Enum):
     """
     Type of atestation (TMP or certificate based).
     """
-    tpm = 'tpm'
-    x509 = 'x509'
-    symmetricKey = 'symmetricKey'
+
+    tpm = "tpm"
+    x509 = "x509"
+    symmetricKey = "symmetricKey"
 
 
-# pylint: disable=too-few-public-methods
 class ProtocolType(Enum):
     """
     Device message protocol.
     """
-    http = 'http'
-    mqtt = 'mqtt'
+
+    http = "http"
+    mqtt = "mqtt"
 
 
-# pylint: disable=too-few-public-methods
 class AckType(Enum):
     """
     Type of request for acknowledgement of c2d message.
     """
-    positive = 'positive'
-    negative = 'negative'
-    full = 'full'
+
+    positive = "positive"
+    negative = "negative"
+    full = "full"
 
 
-# pylint: disable=too-few-public-methods
 class QueryType(Enum):
     """
-    Type of request for acknowledgement of c2d message.
+    Type of query.
     """
-    twin = 'twin'
-    job = 'job'
+
+    twin = "twin"
+    job = "job"
 
 
-# pylint: disable=too-few-public-methods
 class MetricType(Enum):
     """
-    Type of request for acknowledgement of c2d message.
+    Type of metric for IoT configurations.
     """
-    system = 'system'
-    user = 'user'
+
+    system = "system"
+    user = "user"
 
 
-# pylint: disable=too-few-public-methods
 class ReprovisionType(Enum):
     """
     Type of re-provisioning for device data to different IoT Hub.
     """
-    reprovisionandmigratedata = 'reprovisionandmigratedata'
-    reprovisionandresetdata = 'reprovisionandresetdata'
-    never = 'never'
+
+    reprovisionandmigratedata = "reprovisionandmigratedata"
+    reprovisionandresetdata = "reprovisionandresetdata"
+    never = "never"
 
 
-# pylint: disable=too-few-public-methods
 class AllocationType(Enum):
     """
     Type of allocation for device assigned to the Hub.
     """
-    hashed = 'hashed'
-    geolatency = 'geolatency'
-    static = 'static'
+
+    hashed = "hashed"
+    geolatency = "geolatency"
+    static = "static"
 
 
-# pylint: disable=too-few-public-methods
 class DistributedTracingSamplingModeType(Enum):
     """
     Enable distributed tracing to add correlation IDs to messages.
     """
-    off = 'off'
-    on = 'on'
+
+    off = "off"
+    on = "on"
 
 
-# pylint: disable=too-few-public-methods
 class PnPModelType(Enum):
     """
     Type of PnP Model.
     """
-    any = 'any'
-    interface = 'Interface'
-    capabilityModel = 'capabilityModel'
+
+    any = "any"
+    interface = "Interface"
+    capabilityModel = "capabilityModel"
 
 
-# pylint: disable=too-few-public-methods
 class ModelSourceType(Enum):
     """
     Type of source to get model definition.
     """
-    public = 'public'
-    private = 'private'
-    device = 'device'
+
+    public = "public"
+    private = "private"
+    device = "device"
+
+
+class ConfigType(Enum):
+    """
+    Type of configuration deployment.
+    """
+
+    edge = "edge"
+    layered = "layered"
+    adm = "adm"
