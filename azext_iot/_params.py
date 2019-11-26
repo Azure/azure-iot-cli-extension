@@ -412,6 +412,8 @@ def load_arguments(self, _):
         context.argument('repair', options_list=['--repair', '-r'],
                          arg_type=get_three_state_flag(),
                          help='Reinstall uamqp dependency compatible with extension version. Default: false')
+        context.argument('central_api_uri', options_list=['--central-api-uri'],
+                         help='IoT Central API override.  For use with environments other than production.')
         context.argument('yes', options_list=['--yes', '-y'],
                          arg_type=get_three_state_flag(),
                          help='Skip user prompts. Indicates acceptance of dependency installation (if required). '
@@ -420,9 +422,13 @@ def load_arguments(self, _):
     with self.argument_context('iotcentral device-twin show') as context:
         context.argument('device_id', options_list=['--device-id', '-d'], help='Target Device.')
         context.argument('app_id', options_list=['--app-id'], help='Target App.')
+        context.argument('central_api_uri', options_list=['--central-api-uri'],
+                         help='IoT Central API override.  For use with environments other than production.')
 
     with self.argument_context('iot central') as context:
         context.argument('app_id', options_list=['--app-id'], help='Target App.')
+        context.argument('central_api_uri', options_list=['--central-api-uri'],
+                         help='IoT Central API override.  For use with environments other than production.')
 
     with self.argument_context('iot central app monitor-events') as context:
         context.argument('timeout', arg_type=event_timeout_type)
