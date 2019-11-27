@@ -1,4 +1,4 @@
-exclude: ^(sdk/)
+exclude: azext_iot/sdk/
 repos:
   # Prevent python black hook from executing
   #- repo: https://github.com/psf/black

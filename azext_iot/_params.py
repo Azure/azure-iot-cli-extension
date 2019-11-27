@@ -44,6 +44,17 @@ event_msg_prop_type = CLIArgumentType(
     'sys = system properties, app = application properties, anno = annotations'
 )
 
+# There is a bug in CLI core preventing treating --qos as an integer.
+# Until its resolved, ensure casting of value to integer
+# TODO: azure.cli.core.parser line 180 difflib.get_close_matches
+qos_type = CLIArgumentType(
+    options_list=['--qos'],
+    type=str,
+    nargs="?",
+    choices=["0", "1"],
+    help='Quality of Service. 0 = At most once, 1 = At least once. 2 (Exactly once) is not supported.'
+)
+
 event_timeout_type = CLIArgumentType(
     options_list=['--timeout', '--to', '-t'],
     type=int,
@@ -230,6 +241,7 @@ def load_arguments(self, _):
         context.argument('protocol_type', options_list=['--protocol', '--proto'],
                          arg_type=get_enum_type(ProtocolType),
                          help='Indicates device-to-cloud message protocol')
+        context.argument('qos', arg_type=qos_type)
 
     with self.argument_context('iot device simulate') as context:
         context.argument('properties', options_list=['--properties', '--props', '-p'],
