@@ -10,7 +10,6 @@ import six
 from knack.log import get_logger
 from knack.util import CLIError
 from azext_iot.constants import (EXTENSION_ROOT,
-                                 BASE_API_VERSION,
                                  DEVICE_DEVICESCOPE_PREFIX,
                                  TRACING_PROPERTY,
                                  TRACING_ALLOWED_FOR_LOCATION,
@@ -996,12 +995,19 @@ def iot_get_module_connection_string(cmd, device_id, module_id, hub_name=None, k
 # Messaging
 
 def iot_device_send_message(cmd, device_id, hub_name=None, data='Ping from Az CLI IoT Extension',
-                            properties=None, msg_count=1, resource_group_name=None, login=None):
+                            properties=None, msg_count=1, resource_group_name=None, login=None, qos=1):
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
-    return _iot_device_send_message(target, device_id, data, properties, msg_count)
+    return _iot_device_send_message(
+        target=target,
+        device_id=device_id,
+        data=data,
+        properties=properties,
+        msg_count=msg_count,
+        qos=qos)
 
 
-def _iot_device_send_message(target, device_id, data, properties=None, msg_count=1):
+def _iot_device_send_message(target, device_id, data, properties=None, msg_count=1, qos=1):
+    from azext_iot.operations._mqtt import build_mqtt_device_username
     import paho.mqtt.publish as publish
     from paho.mqtt import client as mqtt
     import ssl
@@ -1014,11 +1020,15 @@ def _iot_device_send_message(target, device_id, data, properties=None, msg_count
     sas = SasTokenAuthentication(target['entity'], target['policy'], target['primarykey'], time() + 360).generate_sas_token()
     cwd = EXTENSION_ROOT
     cert_path = os.path.join(cwd, 'digicert.pem')
-    auth = {'username': '{}/{}/api-version={}'.format(target['entity'], device_id, BASE_API_VERSION), 'password': sas}
+    auth = {
+        "username": build_mqtt_device_username(target["entity"], device_id),
+        "password": sas,
+    }
+
     tls = {'ca_certs': cert_path, 'tls_version': ssl.PROTOCOL_SSLv23}
     topic = 'devices/{}/messages/events/{}'.format(device_id, url_encode_dict(properties) if properties else '')
     for _ in range(msg_count):
-        msgs.append({'topic': topic, 'payload': data})
+        msgs.append({'topic': topic, 'payload': data, 'qos': int(qos)})
     try:
         publish.multiple(msgs, client_id=device_id, hostname=target['entity'],
                          auth=auth, port=8883, protocol=mqtt.MQTTv311, tls=tls)

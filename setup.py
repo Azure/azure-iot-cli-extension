@@ -14,7 +14,9 @@ from setuptools import setup, find_packages
 EXTENSION_REF_NAME = "azext_iot"
 
 # Version extraction inspired from 'requests'
-with open(os.path.join(EXTENSION_REF_NAME, "constants.py"), "r", encoding="utf-8") as fd:
+with open(
+    os.path.join(EXTENSION_REF_NAME, "constants.py"), "r", encoding="utf-8"
+) as fd:
     constants_raw = fd.read()
     VERSION = re.search(
         r'^VERSION\s*=\s*[\'"]([^\'"]*)[\'"]', constants_raw, re.MULTILINE
@@ -40,6 +42,7 @@ if not PACKAGE_NAME:
 # 'pyyaml==3.13'
 # 'knack>=0.3.1'
 # 'jsonschema==3.0.2'
+# 'enum34' (when python_version < 3.4)
 
 # There is also a dependency for uamqp for amqp based commands
 # though that is installed out of band (managed by the extension)
@@ -66,11 +69,13 @@ CLASSIFIERS = [
 with open("HISTORY.rst", "r", encoding="utf-8") as f:
     HISTORY = f.read()
 
+short_description = "The Azure IoT extension for Azure CLI."
+
 setup(
     name=PACKAGE_NAME,
     version=VERSION,
-    description="Provides the data plane command layer for Azure IoT Hub, IoT Edge and IoT Device Provisioning Service",
-    long_description="Authoritative IoT data plane extension for Azure CLI. "
+    description=short_description,
+    long_description="{} Intended for power users and/or automation of IoT solutions at scale.".format(short_description)
     + "\n\n"
     + HISTORY,
     license="MIT",

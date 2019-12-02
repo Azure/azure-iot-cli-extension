@@ -5,10 +5,13 @@ Release History
 
 0.8.7
 +++++++++++++++
-- Support IoT Edge layered deployments
-- Support ADM module twin definitions
-- Improved json schema validation error handling
-- Update top maximum for config list to 200
+- Support IoT Edge layered deployments.
+- Support ADM module twin definitions.
+- Improved json schema validation error handling for edge deployments.
+- Update top maximum for hub config/edge deployment list to 100.
+- Metric evaluation for hub configuration and edge deployment via show-metric works exactly the same.
+- Add user agent to MQTT operations
+- Add QoS argument for `send-d2c-message`
 
 0.8.6
 +++++++++++++++

@@ -12,11 +12,12 @@ from azext_iot.operations import hub as subject
 from azext_iot.common.utility import (
     validate_min_python_version,
     url_encode_dict,
+    url_encode_str,
     validate_key_value_pairs,
     read_file_content,
 )
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
-from azext_iot.constants import TRACING_PROPERTY
+from azext_iot.constants import TRACING_PROPERTY, USER_AGENT, BASE_MQTT_API_VERSION
 from azext_iot.tests.generators import create_req_monitor_events
 from knack.util import CLIError
 from .conftest import (
@@ -1872,7 +1873,12 @@ class TestDeviceSimulate:
 
             assert mqttclient().username_pw_set.call_args[1][
                 "username"
-            ] == "{}/{}/api-version=2016-11-14".format(mock_target["entity"], device_id)
+            ] == "{}/{}/?api-version={}&DeviceClientType={}".format(
+                mock_target["entity"],
+                device_id,
+                BASE_MQTT_API_VERSION,
+                url_encode_str(USER_AGENT),
+            )
 
             # mqtt msg body - which is a json string
             assert json.loads(mqttclient().publish.call_args[0][1])
