@@ -18,7 +18,7 @@ from msrest.pipeline import ClientRawResponse
 from msrestazure import AzureConfiguration
 from . import models
 from .version import VERSION
-from azext_iot.constants import VERSION as extver
+from azext_iot.constants import USER_AGENT
 
 
 class CustomAPIConfiguration(AzureConfiguration):
@@ -44,7 +44,7 @@ class CustomAPIConfiguration(AzureConfiguration):
         super(CustomAPIConfiguration, self).__init__(base_url)
 
         self.add_user_agent('customclient/{}'.format(VERSION))
-        self.add_user_agent('IoTPlatformCliExtension/{}'.format(extver))
+        self.add_user_agent(USER_AGENT)
 
         self.credentials = credentials
 

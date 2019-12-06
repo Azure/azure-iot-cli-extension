@@ -350,6 +350,8 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                     "$.mid=12345;key0=value0;key1=1",
                     1,
                     LIVE_RG,
+                    None,
+                    0
                 ],
                 max_runs=1,
             )
@@ -440,6 +442,8 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 "",
                 1,
                 LIVE_RG,
+                None,
+                1
             ],
             max_runs=1,
         )

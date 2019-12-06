@@ -20,13 +20,17 @@ class ConfigurationContent(Model):
     :param modules_content: Gets or sets Module Configurations
     :type modules_content: dict[str, dict[str, object]]
     """
+    # @digimaun altered modulesContent type from {{object}} to {object}
+    # @digimaun added moduleContent
 
     _attribute_map = {
         'device_content': {'key': 'deviceContent', 'type': '{object}'},
-        'modules_content': {'key': 'modulesContent', 'type': '{{object}}'},
+        'modules_content': {'key': 'modulesContent', 'type': '{object}'},
+        'module_content': {'key': 'moduleContent', 'type': '{object}'}
     }
 
-    def __init__(self, device_content=None, modules_content=None):
+    def __init__(self, device_content=None, modules_content=None, module_content=None):
         super(ConfigurationContent, self).__init__()
         self.device_content = device_content
         self.modules_content = modules_content
+        self.module_content = module_content

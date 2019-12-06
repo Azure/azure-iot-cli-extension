@@ -44,6 +44,17 @@ event_msg_prop_type = CLIArgumentType(
     'sys = system properties, app = application properties, anno = annotations'
 )
 
+# There is a bug in CLI core preventing treating --qos as an integer.
+# Until its resolved, ensure casting of value to integer
+# TODO: azure.cli.core.parser line 180 difflib.get_close_matches
+qos_type = CLIArgumentType(
+    options_list=['--qos'],
+    type=str,
+    nargs="?",
+    choices=["0", "1"],
+    help='Quality of Service. 0 = At most once, 1 = At least once. 2 (Exactly once) is not supported.'
+)
+
 event_timeout_type = CLIArgumentType(
     options_list=['--timeout', '--to', '-t'],
     type=int,
@@ -236,6 +247,7 @@ def load_arguments(self, _):
         context.argument('protocol_type', options_list=['--protocol', '--proto'],
                          arg_type=get_enum_type(ProtocolType),
                          help='Indicates device-to-cloud message protocol')
+        context.argument('qos', arg_type=qos_type)
 
     with self.argument_context('iot device simulate') as context:
         context.argument('properties', options_list=['--properties', '--props', '-p'],
@@ -299,6 +311,13 @@ def load_arguments(self, _):
                               "Use the following format: '{\"key0\":\"value0\", \"key1\":\"value1\"}'")
         context.argument('top', options_list=['--top'], type=int,
                          help='Maximum number of deployments to return.')
+        context.argument('layered', options_list=['--layered'],
+                         arg_type=get_three_state_flag(),
+                         help='Layered deployments allow you to define desired properties in $edgeAgent, $edgeHub and user '
+                         'modules that will layer on top of a base deployment. For example the routes specified in a layered '
+                         'deployment will merge with routes of the base deployment. Routes with the same name will be '
+                         'overwritten based on deployment priority.'
+                         )
 
     with self.argument_context('iot dps') as context:
         context.argument('dps_name', help='Name of the Azure IoT Hub device provisioning service')
@@ -411,6 +430,8 @@ def load_arguments(self, _):
         context.argument('repair', options_list=['--repair', '-r'],
                          arg_type=get_three_state_flag(),
                          help='Reinstall uamqp dependency compatible with extension version. Default: false')
+        context.argument('central_api_uri', options_list=['--central-api-uri'],
+                         help='IoT Central API override.  For use with environments other than production.')
         context.argument('yes', options_list=['--yes', '-y'],
                          arg_type=get_three_state_flag(),
                          help='Skip user prompts. Indicates acceptance of dependency installation (if required). '
@@ -419,9 +440,13 @@ def load_arguments(self, _):
     with self.argument_context('iotcentral device-twin show') as context:
         context.argument('device_id', options_list=['--device-id', '-d'], help='Target Device.')
         context.argument('app_id', options_list=['--app-id'], help='Target App.')
+        context.argument('central_api_uri', options_list=['--central-api-uri'],
+                         help='IoT Central API override.  For use with environments other than production.')
 
     with self.argument_context('iot central') as context:
         context.argument('app_id', options_list=['--app-id'], help='Target App.')
+        context.argument('central_api_uri', options_list=['--central-api-uri'],
+                         help='IoT Central API override.  For use with environments other than production.')
 
     with self.argument_context('iot central app monitor-events') as context:
         context.argument('timeout', arg_type=event_timeout_type)

@@ -11,7 +11,6 @@ utility: Define helper functions for 'common' scripts.
 
 import ast
 import base64
-import contextlib
 import json
 import os
 import sys
@@ -22,21 +21,6 @@ from knack.log import get_logger
 from knack.util import CLIError
 
 logger = get_logger(__name__)
-
-
-@contextlib.contextmanager
-def block_stdout():
-    """
-    This function blocks IoT SDK C output. Non-intrusive due to context.
-    """
-    devnull = open(os.devnull, 'w')
-    orig_stdout_fno = os.dup(sys.stdout.fileno())
-    os.dup2(devnull.fileno(), 1)
-    try:
-        yield
-    finally:
-        os.dup2(orig_stdout_fno, 1)
-        devnull.close()
 
 
 def parse_entity(entity, filter_none=False):
@@ -418,3 +402,16 @@ def looks_like_file(element):
             ".cs"
         )
     )
+
+
+def ensure_pkg_resources_entries():
+    import pkg_resources
+
+    from azure.cli.core.extension import get_extension_path
+    from azext_iot.constants import EXTENSION_NAME
+
+    extension_path = get_extension_path(EXTENSION_NAME)
+    if extension_path not in pkg_resources.working_set.entries:
+        pkg_resources.working_set.add_entry(extension_path)
+
+    return

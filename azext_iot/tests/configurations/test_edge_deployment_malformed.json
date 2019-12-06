@@ -5,13 +5,6 @@
             "$edgeAgent": {
                 "properties.desired": {
                     "schemaVersion": "1.0",
-                    "runtime": {
-                        "type": "docker",
-                        "settings": {
-                            "minDockerVersion": "v1.23",
-                            "loggingOptions": ""
-                        }
-                    },
                     "systemModules": {
                         "edgeAgent": {
                             "type": "docker",
@@ -35,7 +28,7 @@
                             "version": "1.1",
                             "type": "docker",
                             "status": "running",
-                            "restartPolicy": "on-failure",
+                            "restartPolicy": "on-failured",
                             "settings": {
                                 "image": "mongo:1.5",
                                 "createOptions": ""
@@ -61,8 +54,6 @@
         }
     },
     "metrics": {
-        "queries": {
-            "mymetrik": "select deviceId from devices where tags.location='US'"
-        }
+        "queries": {}
     }
 }
