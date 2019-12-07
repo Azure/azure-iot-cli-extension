@@ -256,9 +256,22 @@ def load_arguments(self, _):
                          'Full: IoT Hub generates a feedback message in either case. '
                          'By default, no ack is requested.')
         context.argument('correlation_id', options_list=['--correlation-id', '--cid'],
-                         help='Correlation Id associated with message.')
+                         help='The correlation Id associated with the C2D message.')
+        context.argument('properties', options_list=['--properties', '--props', '-p'],
+                         help=info_param_properties_device(include_mqtt=False))
+        context.argument('expiry_time_utc', options_list=['--expiry-time-utc', '--expiry'], type=int,
+                         help='Units are milliseconds since unix epoch. '
+                         'If no time is indicated the default IoT Hub C2D message TTL is used.')
+        context.argument('message_id', options_list=['--message-id', '--mid'],
+                         help='The C2D message Id. If no message Id is provided a UUID will be generated.')
+        context.argument('user_id', options_list=['--user-id', '--uid'],
+                         help='The C2D message, user Id property.')
         context.argument('lock_timeout', options_list=['--lock-timeout', '--lt'], type=int,
                          help='Specifies the amount of time a message will be invisible to other receive calls.')
+        context.argument('content_type', options_list=['--content-type', '--ct'],
+                         help='The content type associated with the C2D message.')
+        context.argument('content_encoding', options_list=['--content-encoding', '--ce'],
+                         help='The content encoding associated with the C2D message.')
 
     with self.argument_context('iot device c2d-message send') as context:
         context.argument('wait_on_feedback', options_list=['--wait', '-w'],

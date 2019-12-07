@@ -858,13 +858,13 @@ def iot_device_method(cmd, device_id, method_name, hub_name=None, method_payload
         raise CLIError('timeout must be at least {} seconds'.format(METHOD_INVOKE_MIN_TIMEOUT_SEC))
 
     service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
-
+    service_sdk.config.retry_policy.retries = 1
     try:
         if method_payload:
             method_payload = process_json_arg(method_payload, argument_name="method-payload")
 
         method = CloudToDeviceMethod(method_name, timeout, timeout, method_payload)
-        return service_sdk.invoke_device_method(device_id, method)
+        return service_sdk.invoke_device_method(device_id, method, timeout=timeout)
     except errors.CloudError as e:
         raise CLIError(unpack_msrest_error(e))
 
@@ -883,13 +883,13 @@ def iot_device_module_method(cmd, device_id, module_id, method_name, hub_name=No
         raise CLIError('timeout must not be over {} seconds'.format(METHOD_INVOKE_MIN_TIMEOUT_SEC))
 
     service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
-
+    service_sdk.config.retry_policy.retries = 1
     try:
         if method_payload:
             method_payload = process_json_arg(method_payload, argument_name="method-payload")
 
         method = CloudToDeviceMethod(method_name, timeout, timeout, method_payload)
-        return service_sdk.invoke_device_method1(device_id, module_id, method)
+        return service_sdk.invoke_device_method1(device_id, module_id, method, timeout=timeout)
     except errors.CloudError as e:
         raise CLIError(unpack_msrest_error(e))
 
@@ -926,7 +926,7 @@ def _iot_build_sas_token(cmd, hub_name=None, device_id=None, module_id=None, pol
         device = _iot_device_show(target, device_id)
         if module_id:
             module = _iot_device_module_show(target, device_id, module_id)
-            module_cs = _build_device_or_module_connection_string(device=device, key_type=key_type, module=module)
+            module_cs = _build_device_or_module_connection_string(entity=module, key_type=key_type)
             uri = '{}/devices/{}/modules/{}'.format(target['entity'], device_id, module_id)
             try:
                 parsed_module_cs = parse_iot_device_module_connection_string(module_cs)
@@ -936,7 +936,7 @@ def _iot_build_sas_token(cmd, hub_name=None, device_id=None, module_id=None, pol
 
             key = parsed_module_cs['SharedAccessKey']
         else:
-            device_cs = _build_device_or_module_connection_string(device=device, key_type=key_type)
+            device_cs = _build_device_or_module_connection_string(entity=device, key_type=key_type)
             uri = '{}/devices/{}'.format(target['entity'], device_id)
             try:
                 parsed_device_cs = parse_iot_device_connection_string(device_cs)
@@ -953,25 +953,23 @@ def _iot_build_sas_token(cmd, hub_name=None, device_id=None, module_id=None, pol
     return SasTokenAuthentication(uri, policy, key, time() + int(duration))
 
 
-def _build_device_or_module_connection_string(device, key_type='primary', module=None):
-    template = 'HostName={};DeviceId={};ModuleId={};{}' if module else 'HostName={};DeviceId={};{}'
-    auth = module.get('authentication') if module else device.get('authentication')
-    if auth:
-        auth_type = auth.get('type')
-        if auth_type:
-            key = None
-            auth_type = auth_type.lower()
-            if auth_type == 'sas':
-                key = 'SharedAccessKey={}'
-                key = key.format(auth['symmetricKey']['primaryKey'] if key_type == 'primary'
-                                 else auth['symmetricKey']['secondaryKey'])
-            elif auth_type in ['certificateauthority', 'selfsigned']:
-                key = 'x509=true'
-            if key:
-                if module:
-                    return template.format(module.get('hub'), module.get('deviceId'), module.get('moduleId'), key)
-                return template.format(device.get('hub'), device.get('deviceId'), key)
-    raise CLIError('Unable to form target connection string')
+def _build_device_or_module_connection_string(entity, key_type='primary'):
+    is_device = entity.get('moduleId') is None
+    template = 'HostName={};DeviceId={};{}' if is_device else 'HostName={};DeviceId={};ModuleId={};{}'
+    auth = entity['authentication']
+    auth_type = auth["type"].lower()
+    if auth_type == "sas":
+        key = 'SharedAccessKey={}'.format(
+            auth['symmetricKey']['primaryKey'] if key_type == 'primary' else auth['symmetricKey']['secondaryKey'])
+    elif auth_type in ['certificateauthority', 'selfsigned']:
+        key = "x509=true"
+    else:
+        raise CLIError('Unable to form target connection string')
+
+    if is_device:
+        return template.format(entity.get('hub'), entity.get('deviceId'), key)
+    else:
+        return template.format(entity.get('hub'), entity.get('deviceId'), entity.get('moduleId'), key)
 
 
 def iot_get_device_connection_string(cmd, device_id, hub_name=None, key_type='primary',
@@ -988,7 +986,7 @@ def iot_get_module_connection_string(cmd, device_id, module_id, hub_name=None, k
     result = {}
     module = iot_device_module_show(cmd, device_id, module_id,
                                     resource_group_name=resource_group_name, hub_name=hub_name, login=login)
-    result['connectionString'] = _build_device_or_module_connection_string(None, key_type, module)
+    result['connectionString'] = _build_device_or_module_connection_string(module, key_type)
     return result
 
 
@@ -1097,6 +1095,7 @@ def iot_c2d_message_receive(cmd, device_id, hub_name=None, lock_timeout=60, reso
 
 
 def _iot_c2d_message_receive(target, device_id, lock_timeout=60):
+    from azext_iot.constants import MESSAGING_HTTP_C2D_SYSTEM_PROPERTIES
     device_sdk, errors = _bind_sdk(target, SdkType.device_sdk, device_id)
     request_headers = {}
     if lock_timeout:
@@ -1105,21 +1104,32 @@ def _iot_c2d_message_receive(target, device_id, lock_timeout=60):
     try:
         result = device_sdk.receive_device_bound_notification(device_id, custom_headers=request_headers)
         if result and result.status_code == 200:
-            payload = {
-                'ack': result.headers.get('iothub-ack'),
-                'correlationId': result.headers.get('iothub-correlationid'),
-                'data': result.text,
-                'deliveryCount': result.headers.get('iothub-deliverycount'),
-                'enqueuedTime': result.headers.get('iothub-enqueuedtime'),
-                'expiry': result.headers.get('iothub-expiry'),
-                'etag': result.headers.get('ETag'),
-                'messageId': result.headers.get('iothub-messageid'),
-                'sequenceNumber': result.headers.get('iothub-sequencenumber'),
-                'to': result.headers.get('iothub-to'),
-                'userId': result.headers.get('iothub-userid')
-            }
-            if payload.get('etag'):
-                payload['etag'] = payload['etag'].strip('"')
+            payload = {"properties": {}}
+
+            if "etag" in result.headers:
+                payload["etag"] = result.headers["etag"].strip('"')
+
+            app_prop_prefix = 'iothub-app-'
+            app_prop_keys = [header for header in result.headers if header.lower().startswith(app_prop_prefix)]
+
+            app_props = {}
+            for key in app_prop_keys:
+                app_props[key[len(app_prop_prefix):]] = result.headers[key]
+
+            if app_props:
+                payload["properties"]["app"] = app_props
+
+            sys_props = {}
+            for key in MESSAGING_HTTP_C2D_SYSTEM_PROPERTIES:
+                if key in result.headers:
+                    sys_props[key] = result.headers[key]
+
+            if sys_props:
+                payload["properties"]["system"] = sys_props
+
+            if result.text:
+                payload["data"] = result.text if not isinstance(result.text, six.binary_type) else result.text.decode("utf-8")
+
             return payload
         return
     except errors.CloudError as e:
@@ -1127,8 +1137,10 @@ def _iot_c2d_message_receive(target, device_id, lock_timeout=60):
 
 
 def iot_c2d_message_send(cmd, device_id, hub_name=None, data='Ping from Az CLI IoT Extension',
-                         properties=None, correlation_id=None, ack=None, wait_on_feedback=False,
-                         yes=False, repair=False, resource_group_name=None, login=None):
+                         message_id=None, correlation_id=None, user_id=None, content_encoding="utf-8",
+                         content_type=None, expiry_time_utc=None, properties=None, ack=None,
+                         wait_on_feedback=False, yes=False, repair=False, resource_group_name=None, login=None):
+    import importlib
     from azext_iot.common.deps import ensure_uamqp
     from azext_iot.common.utility import validate_min_python_version
 
@@ -1141,24 +1153,21 @@ def iot_c2d_message_send(cmd, device_id, hub_name=None, data='Ping from Az CLI I
     ensure_uamqp(config, yes, repair)
 
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
-    return _iot_c2d_message_send(target=target, device_id=device_id, data=data, properties=properties,
-                                 correlation_id=correlation_id, ack=ack, wait=wait_on_feedback)
-
-
-def _iot_c2d_message_send(target, device_id, data, properties=None,
-                          correlation_id=None, ack=None, wait=None):
-    import importlib
 
     if properties:
         properties = validate_key_value_pairs(properties)
 
     events3 = importlib.import_module('azext_iot.operations.events3._events')
-    msg_id, errors = events3.send_c2d_message(target=target, device_id=device_id, data=data,
-                                              properties=properties, correlation_id=correlation_id, ack=ack)
-    if errors:
-        raise CLIError('Error: {}, use --debug for more details.'.format(errors))
 
-    if wait:
+    msg_id, errors = events3.send_c2d_message(target=target, device_id=device_id, data=data,
+                                              message_id=message_id, correlation_id=correlation_id,
+                                              user_id=user_id, content_encoding=content_encoding,
+                                              content_type=content_type, expiry_time_utc=expiry_time_utc,
+                                              properties=properties, ack=ack)
+    if errors:
+        raise CLIError('C2D message error: {}, use --debug for more details.'.format(errors))
+
+    if wait_on_feedback:
         _iot_hub_monitor_feedback(target=target, device_id=device_id, wait_on_id=msg_id)
 
 

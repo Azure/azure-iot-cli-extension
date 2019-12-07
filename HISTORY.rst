@@ -10,8 +10,11 @@ Release History
 - Improved json schema validation error handling for edge deployments.
 - Update top maximum for hub config/edge deployment list to 100.
 - Metric evaluation for hub configuration and edge deployment via show-metric works exactly the same.
-- Add user agent to MQTT operations
-- Add QoS argument for `send-d2c-message`
+- Add user agent for MQTT & AMQP operations.
+- Add QoS argument for `send-d2c-message`.
+- Breaking Change: New result format for `az iot device c2d-message receive`. The command now shows all properties.
+- `az iot device c2d-message send` supports system properties.
+- Updated uAMQP version range.
 
 0.8.6
 +++++++++++++++

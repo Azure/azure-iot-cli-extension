@@ -1614,37 +1614,31 @@ class TestGetIoTHubConnString:
                 get_iot_hub_connection_string(client, targethub, rg_name, policy_name)
 
 
-sample_c2d_receive = {
-    "iothub-ack": "full",
-    "iothub-correlationid": "",
-    "iothub-deliverycount": "0",
-    "iothub-enqueuedtime": "12/22/2017 12:14:12 AM",
-    "ETag": '"3k28zb44-0d00-4ddd-ade3-6110eb94c476"',
-    "iothub-expiry": "",
-    "iothub-messageid": "13z9ag46-d0z4-4527-36cf-0144d87fe32e",
-    "iothub-sequencenumber": "1",
-    "iothub-to": "/devices/sensor1/messages/deviceBound",
-    "iothub-userid": "",
-}
+class TestCloudToDeviceMessaging:
+    @pytest.fixture(params=["full", "min"])
+    def c2d_receive_scenario(self, mocker, fixture_ghcs, fixture_sas, request):
+        from . generators import create_c2d_receive_response
 
+        if request.param == "full":
+            payload = create_c2d_receive_response()
+        else:
+            payload = create_c2d_receive_response(minimum=True)
 
-class TestDeviceMessaging:
-    data = '{"data": "value"}'
-
-    @pytest.fixture
-    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
         service_client.return_value = build_mock_response(
-            mocker, 200, TestDeviceMessaging.data, sample_c2d_receive, raw=True
+            mocker, 200, payload["body"], payload["headers"], raw=True
         )
-        return service_client
+        return (service_client, payload)
 
-    def test_c2d_receive(self, serviceclient):
+    def test_c2d_receive(self, c2d_receive_scenario):
+        service_client = c2d_receive_scenario[0]
+        sample_c2d_receive = c2d_receive_scenario[1]
+
         timeout = 120
         result = subject.iot_c2d_message_receive(
             fixture_cmd, device_id, mock_target["entity"], timeout
         )
-        args = serviceclient.call_args
+        args = service_client.call_args
         url = args[0][0].url
         method = args[0][0].method
         headers = args[0][1]
@@ -1658,26 +1652,31 @@ class TestDeviceMessaging:
         )
         assert headers["IotHub-MessageLockTimeout"] == str(timeout)
 
-        assert result["ack"] == sample_c2d_receive["iothub-ack"]
-        assert result["correlationId"] == sample_c2d_receive["iothub-correlationid"]
-        assert result["data"] == TestDeviceMessaging.data
-        assert result["deliveryCount"] == sample_c2d_receive["iothub-deliverycount"]
-        assert result["enqueuedTime"] == sample_c2d_receive["iothub-enqueuedtime"]
-        assert result["etag"] == sample_c2d_receive["ETag"].strip('"')
-        assert result["expiry"] == sample_c2d_receive["iothub-expiry"]
-        assert result["messageId"] == sample_c2d_receive["iothub-messageid"]
-        assert result["sequenceNumber"] == sample_c2d_receive["iothub-sequencenumber"]
-        assert result["to"] == sample_c2d_receive["iothub-to"]
-        assert result["userId"] == sample_c2d_receive["iothub-userid"]
+        assert result["properties"]["system"]["iothub-ack"] == sample_c2d_receive["headers"]["iothub-ack"]
+        assert result["properties"]["system"]["iothub-correlationid"] == sample_c2d_receive["headers"]["iothub-correlationid"]
+        assert result["properties"]["system"]["iothub-deliverycount"] == sample_c2d_receive["headers"]["iothub-deliverycount"]
+        assert result["properties"]["system"]["iothub-expiry"] == sample_c2d_receive["headers"]["iothub-expiry"]
+        assert result["properties"]["system"]["iothub-enqueuedtime"] == sample_c2d_receive["headers"]["iothub-enqueuedtime"]
+        assert result["properties"]["system"]["iothub-messageid"] == sample_c2d_receive["headers"]["iothub-messageid"]
+        assert result["properties"]["system"]["iothub-sequencenumber"] == sample_c2d_receive["headers"]["iothub-sequencenumber"]
+        assert result["properties"]["system"]["iothub-userid"] == sample_c2d_receive["headers"]["iothub-userid"]
+        assert result["properties"]["system"]["iothub-to"] == sample_c2d_receive["headers"]["iothub-to"]
 
-    def test_c2d_complete(self, serviceclient):
+        assert result["etag"] == sample_c2d_receive["headers"]["etag"].strip('"')
+
+        if sample_c2d_receive.get("body"):
+            assert result["data"] == sample_c2d_receive["body"]
+
+    def test_c2d_complete(self, fixture_service_client_generic):
+        service_client = fixture_service_client_generic
+
         etag = "3k28zb44-0d00-4ddd-ade3-6110eb94c476"
-        serviceclient.return_value.status_code = 204
+        service_client.return_value.status_code = 204
         result = subject.iot_c2d_message_complete(
             fixture_cmd, device_id, etag, hub_name=mock_target["entity"]
         )
 
-        args = serviceclient.call_args
+        args = service_client.call_args
         url = args[0][0].url
         method = args[0][0].method
 
@@ -1690,14 +1689,16 @@ class TestDeviceMessaging:
             in url
         )
 
-    def test_c2d_reject(self, serviceclient):
+    def test_c2d_reject(self, fixture_service_client_generic):
+        service_client = fixture_service_client_generic
+
         etag = "3k28zb44-0d00-4ddd-ade3-6110eb94c476"
-        serviceclient.return_value.status_code = 204
+        service_client.return_value.status_code = 204
         result = subject.iot_c2d_message_reject(
             fixture_cmd, device_id, etag, hub_name=mock_target["entity"]
         )
 
-        args = serviceclient.call_args
+        args = service_client.call_args
         url = args[0][0].url
         method = args[0][0].method
 
@@ -1711,14 +1712,16 @@ class TestDeviceMessaging:
         )
         assert "reject=" in url
 
-    def test_c2d_abandon(self, serviceclient):
+    def test_c2d_abandon(self, fixture_service_client_generic):
+        service_client = fixture_service_client_generic
+
         etag = "3k28zb44-0d00-4ddd-ade3-6110eb94c476"
-        serviceclient.return_value.status_code = 204
+        service_client.return_value.status_code = 204
         result = subject.iot_c2d_message_abandon(
             fixture_cmd, device_id, etag, hub_name=mock_target["entity"]
         )
 
-        args = serviceclient.call_args
+        args = service_client.call_args
         url = args[0][0].url
         method = args[0][0].method
 
@@ -1731,7 +1734,7 @@ class TestDeviceMessaging:
             in url
         )
 
-    def test_c2d_errors(self, serviceclient_generic_error):
+    def test_c2d_receive_and_ack_errors(self, serviceclient_generic_error):
         with pytest.raises(CLIError):
             subject.iot_c2d_message_receive(
                 fixture_cmd, device_id, hub_name=mock_target["entity"]

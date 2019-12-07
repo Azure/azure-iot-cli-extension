@@ -17,7 +17,7 @@ from msrestazure.azure_exceptions import CloudError
 import uuid
 from . import models
 from azext_iot.constants import USER_AGENT
-from azext_iot.constants import BASE_API_VERSION
+from azext_iot.constants import BASE_MQTT_API_VERSION
 
 
 class IotHubGatewayDeviceAPIsConfiguration(AzureConfiguration):
@@ -41,7 +41,7 @@ class IotHubGatewayDeviceAPIsConfiguration(AzureConfiguration):
 
         super(IotHubGatewayDeviceAPIsConfiguration, self).__init__(base_url)
 
-        self.add_user_agent('iothubgatewaydeviceapi/{}'.format(BASE_API_VERSION))
+        self.add_user_agent('iothubgatewaydeviceapi/{}'.format(BASE_MQTT_API_VERSION))
         self.add_user_agent(USER_AGENT)
 
         self.credentials = credentials
@@ -66,7 +66,7 @@ class IotHubGatewayDeviceAPIs(object):
         self._client = ServiceClient(self.config.credentials, self.config)
 
         client_models = {k: v for k, v in models.__dict__.items() if isinstance(v, type)}
-        self.api_version = BASE_API_VERSION
+        self.api_version = BASE_MQTT_API_VERSION
         self._serialize = Serializer(client_models)
         self._deserialize = Deserializer(client_models)
 
