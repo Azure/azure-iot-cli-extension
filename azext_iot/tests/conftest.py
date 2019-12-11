@@ -72,6 +72,18 @@ def fixture_cmd(mocker):
     return cmd
 
 
+@pytest.fixture()
+def fixture_events_uamqp_sendclient(mocker):
+    from azext_iot.operations.events3._events import uamqp
+    return mocker.patch.object(uamqp, "SendClient", autospec=True)
+
+
+@pytest.fixture()
+def fixture_service_client_generic(mocker, fixture_ghcs, fixture_sas):
+    service_client = mocker.patch(path_service_client)
+    return service_client
+
+
 @pytest.fixture(params=[400, 401, 500])
 def serviceclient_generic_error(mocker, fixture_ghcs, fixture_sas, request):
     service_client = mocker.patch(path_service_client)

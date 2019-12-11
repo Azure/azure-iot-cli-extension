@@ -17,17 +17,21 @@ def error_param_top_out_of_bounds(upper_limit=None):
     return "top must be > 0 {}".format(ul_suffix if upper_limit else "")
 
 
-def info_param_properties_device(include_http=False):
+def info_param_properties_device(include_mqtt=True, include_http=False):
     http_content = (
         "For http messaging - application properties are sent using iothub-app-<name>=value, for instance "
         "iothub-app-myprop=myvalue. System properties are generally prefixed with iothub-<name> like iothub-correlationid "
-        "but there are exceptions such as content-type and content-encoding."
+        "but there are exceptions such as content-type and content-encoding.  "
+    )
+
+    mqtt_content = (
+        "For mqtt messaging - you are able to send system properties using "
+        "$.<name>=value. For instance $.cid=12345 sets the system correlation Id property. "
+        "Other system property identifier examples include $.ct for content type, "
+        "$.mid for message Id and $.ce for content encoding.  "
     )
 
     return (
         "Message property bag in key-value pairs with the following format: a=b;c=d. "
-        "For mqtt messaging - you are able to send system properties using "
-        "$.<name>=value. For instance $.cid=12345 sets the system correlation Id property. "
-        "Other system property identifier examples include $.ct for content type, "
-        "$.mid for message Id and $.ce for content encoding. {}".format(http_content if include_http else "")
+        "{}{}".format(mqtt_content if include_mqtt else "", http_content if include_http else "")
     )
