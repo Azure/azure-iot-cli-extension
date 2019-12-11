@@ -44,7 +44,7 @@ TRACING_ALLOWED_FOR_SKU = "standard"
 USER_AGENT = "IoTPlatformCliExtension/{}".format(VERSION)
 
 # (Lib name, minimum version (including), maximum version (excluding))
-EVENT_LIB = ("uamqp", "1.1.0", "1.2.5")
+EVENT_LIB = ("uamqp", "1.1.0", "1.1.1")
 
 # Config Key's
 CONFIG_KEY_UAMQP_EXT_VERSION = "uamqp_ext_version"

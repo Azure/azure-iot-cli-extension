@@ -9,12 +9,13 @@ Release History
 - Support ADM module twin definitions.
 - Improved json schema validation error handling for edge deployments.
 - Update top maximum for hub config/edge deployment list to 100.
-- Metric evaluation for hub configuration and edge deployment via show-metric works exactly the same.
+- Breaking Change: Metric evaluation between hub configurations and edge deployments via show-metric work exactly the same.
+- Breaking Change: New result format for `az iot device c2d-message receive`. The command now shows all properties.
+- Updated IoT Central commands to allow the API for token collection to be overridden.
+- `az iot device c2d-message send` supports sending all settable system properties per message.
+- Updated uAMQP version range.
 - Add user agent for MQTT & AMQP operations.
 - Add QoS argument for `send-d2c-message`.
-- Breaking Change: New result format for `az iot device c2d-message receive`. The command now shows all properties.
-- `az iot device c2d-message send` supports system properties.
-- Updated uAMQP version range.
 
 0.8.6
 +++++++++++++++
