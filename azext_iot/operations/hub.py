@@ -1157,6 +1157,12 @@ def iot_c2d_message_send(cmd, device_id, hub_name=None, data='Ping from Az CLI I
     if properties:
         properties = validate_key_value_pairs(properties)
 
+    if expiry_time_utc:
+        now_in_milli = int(time() * 1000)
+        user_msg_expiry = int(expiry_time_utc)
+        if user_msg_expiry < now_in_milli:
+            raise CLIError("Message expiry time utc is in the past!")
+
     events3 = importlib.import_module('azext_iot.operations.events3._events')
 
     msg_id, errors = events3.send_c2d_message(target=target, device_id=device_id, data=data,

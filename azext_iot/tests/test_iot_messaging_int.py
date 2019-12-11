@@ -219,6 +219,14 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             expect_failure=True,
         )
 
+        # Error - expiry is in the past.
+        self.cmd(
+            "iot device c2d-message send -d {} --login {} --expiry {}".format(
+                device_ids[0], LIVE_HUB_CS, int(time() * 1000)
+            ),
+            expect_failure=True,
+        )
+
     def test_device_messaging(self):
         device_count = 1
         device_ids = self.generate_device_names(device_count)
