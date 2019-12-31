@@ -45,7 +45,7 @@ def iot_query(cmd, query_command, hub_name=None, top=None, resource_group_name=N
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
     service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
     try:
-        query = QuerySpecification(query_command)
+        query = [QuerySpecification(query_command)]
         query_method = service_sdk.query_iot_hub
 
         return _execute_query(query, query_method, top)
@@ -768,10 +768,10 @@ def iot_hub_configuration_metric_show(cmd, config_id, metric_id, metric_type='us
 
         metric_query = metric_collection[metric_id]
 
-        query = QuerySpecification(metric_query)
+        query_args = [QuerySpecification(metric_query)]
         query_method = service_sdk.query_iot_hub
 
-        metric_result = _execute_query(query, query_method, None)
+        metric_result = _execute_query(query_args, query_method, None)
 
         # 'Flattens' system metrics by putting device Id's in a single list
         if metric_type == MetricType.system.name:
@@ -847,7 +847,7 @@ def iot_device_twin_replace(cmd, device_id, target_json, hub_name=None, resource
 
 
 def iot_device_method(cmd, device_id, method_name, hub_name=None, method_payload="{}",
-                      timeout=60, resource_group_name=None, login=None):
+                      timeout=30, resource_group_name=None, login=None):
     from azext_iot.sdk.service.models.cloud_to_device_method import CloudToDeviceMethod
     from azext_iot.constants import METHOD_INVOKE_MAX_TIMEOUT_SEC, METHOD_INVOKE_MIN_TIMEOUT_SEC
 
@@ -872,7 +872,7 @@ def iot_device_method(cmd, device_id, method_name, hub_name=None, method_payload
 # Device Module Method Invoke
 
 def iot_device_module_method(cmd, device_id, module_id, method_name, hub_name=None, method_payload="{}",
-                             timeout=60, resource_group_name=None, login=None):
+                             timeout=30, resource_group_name=None, login=None):
     from azext_iot.sdk.service.models.cloud_to_device_method import CloudToDeviceMethod
     from azext_iot.constants import METHOD_INVOKE_MAX_TIMEOUT_SEC, METHOD_INVOKE_MIN_TIMEOUT_SEC
 

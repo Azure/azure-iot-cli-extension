@@ -667,6 +667,7 @@ class IotHubGatewayServiceAPIs(object):
 
         deserialized = None
 
+        # @digimaun - Changed from 'QueryResult' to [object]
         if response.status_code == 200:
             deserialized = self._deserialize('[object]', response)
 
@@ -1760,7 +1761,8 @@ class IotHubGatewayServiceAPIs(object):
         deserialized = None
 
         if response.status_code == 200:
-            deserialized = self._deserialize('JobResponse', response)
+            # @digimaun - altered from "JobResponse" to "{object}"
+            deserialized = self._deserialize('{object}', response)
 
         if raw:
             client_raw_response = ClientRawResponse(deserialized, response)
@@ -1823,8 +1825,9 @@ class IotHubGatewayServiceAPIs(object):
 
         deserialized = None
 
+        # @digimaun - changed from "JobResponse" to {object}
         if response.status_code == 200:
-            deserialized = self._deserialize('JobResponse', response)
+            deserialized = self._deserialize('{object}', response)
 
         if raw:
             client_raw_response = ClientRawResponse(deserialized, response)
@@ -1881,8 +1884,9 @@ class IotHubGatewayServiceAPIs(object):
 
         deserialized = None
 
+        # @digimaun - changed from "JobResponse" to {object}
         if response.status_code == 200:
-            deserialized = self._deserialize('JobResponse', response)
+            deserialized = self._deserialize('{object}', response)
 
         if raw:
             client_raw_response = ClientRawResponse(deserialized, response)
@@ -1942,14 +1946,17 @@ class IotHubGatewayServiceAPIs(object):
 
         deserialized = None
 
+        # @digimaun - changed from 'QueryResult' to [object]
         if response.status_code == 200:
-            deserialized = self._deserialize('QueryResult', response)
+            deserialized = self._deserialize('[object]', response)
 
         if raw:
             client_raw_response = ClientRawResponse(deserialized, response)
             return client_raw_response
 
-        return deserialized
+        # @digimaun - Added Custom
+        continuation = response.headers.get('x-ms-continuation')
+        return deserialized, continuation
     query_jobs.metadata = {'url': '/jobs/v2/query'}
 
     def get_modules_on_device(
