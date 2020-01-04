@@ -950,7 +950,7 @@ def _iot_build_sas_token(cmd, hub_name=None, device_id=None, module_id=None, pol
         policy = target['policy']
         key = target['primarykey'] if key_type == 'primary' else target['secondarykey']
 
-    return SasTokenAuthentication(uri, policy, key, time() + int(duration))
+    return SasTokenAuthentication(uri, policy, key, duration)
 
 
 def _build_device_or_module_connection_string(entity, key_type='primary'):
@@ -1015,7 +1015,7 @@ def _iot_device_send_message(target, device_id, data, properties=None, msg_count
     if properties:
         properties = validate_key_value_pairs(properties)
 
-    sas = SasTokenAuthentication(target['entity'], target['policy'], target['primarykey'], time() + 360).generate_sas_token()
+    sas = SasTokenAuthentication(target['entity'], target['policy'], target['primarykey'], 360).generate_sas_token()
     cwd = EXTENSION_ROOT
     cert_path = os.path.join(cwd, 'digicert.pem')
     auth = {

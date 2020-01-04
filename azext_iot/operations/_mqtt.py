@@ -9,7 +9,7 @@ import ssl
 import os
 import six
 
-from time import time, sleep
+from time import sleep
 from paho.mqtt import client as mqtt
 
 from azext_iot.constants import EXTENSION_ROOT, USER_AGENT, BASE_MQTT_API_VERSION
@@ -35,7 +35,7 @@ class mqtt_client_wrap(object):
             target["entity"],
             target["policy"],
             target["primarykey"],
-            time() + int(sas_duration),
+            sas_duration,
         ).generate_sas_token()
         cwd = EXTENSION_ROOT
         cert_path = os.path.join(cwd, "digicert.pem")

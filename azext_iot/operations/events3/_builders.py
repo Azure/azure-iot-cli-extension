@@ -1,6 +1,5 @@
 import asyncio
 import uamqp
-from time import time
 
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.utility import (parse_entity, unicode_binary_map, url_encode_str)
@@ -14,7 +13,7 @@ class AmqpBuilder():
         hub_name = target['entity'].split('.')[0]
         user = "{}@sas.root.{}".format(target['policy'], hub_name)
         sas_token = SasTokenAuthentication(target['entity'], target['policy'],
-                                           target['primarykey'], time() + duration).generate_sas_token()
+                                           target['primarykey'], duration).generate_sas_token()
         return url_encode_str(user) + ":{}@{}".format(url_encode_str(sas_token), target['entity'])
 
 

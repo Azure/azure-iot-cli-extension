@@ -1760,7 +1760,7 @@ class TestSasTokenAuth:
 
         # Action
         sas_auth = SasTokenAuthentication(uri, None, access_key, expiry)
-        token = sas_auth.generate_sas_token()
+        token = sas_auth.generate_sas_token(absolute=True)
 
         # Assertion
         assert "SharedAccessSignature " in token
@@ -1777,7 +1777,7 @@ class TestSasTokenAuth:
 
         # Action
         sas_auth = SasTokenAuthentication(uri, policy_name, access_key, expiry)
-        token = sas_auth.generate_sas_token()
+        token = sas_auth.generate_sas_token(absolute=True)
 
         # Assertion
         assert "SharedAccessSignature " in token
@@ -1791,7 +1791,7 @@ class TestSasTokenAuth:
 
         # Action
         sas_auth = SasTokenAuthentication(uri, policy_name, access_key, expiry)
-        token = sas_auth.generate_sas_token()
+        token = sas_auth.generate_sas_token(absolute=True)
 
         # Assertion
         assert "SharedAccessSignature " in token
