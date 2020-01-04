@@ -40,19 +40,14 @@ def job_create(
     from azext_iot.sdk.service.models.cloud_to_device_method import CloudToDeviceMethod
     from azext_iot.sdk.service.models.job_request import JobRequest
 
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
-    )
-    service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
-
     if (
-        job_type in [JobType.scheduleUpdateTwin.name, JobType.scheduleDeviceMethod.name]
+        job_type in [JobType.scheduleUpdateTwin.value, JobType.scheduleDeviceMethod.value]
         and not query_condition
     ):
         raise CLIError(
             "The query condition is required when job type is {} or {}. "
             "Use query condition '*' if you need to run job on all devices.".format(
-                JobType.scheduleUpdateTwin.name, JobType.scheduleDeviceMethod.name
+                JobType.scheduleUpdateTwin.value, JobType.scheduleDeviceMethod.value
             )
         )
 
@@ -64,11 +59,11 @@ def job_create(
         query_condition=query_condition,
     )
 
-    if job_type == JobType.scheduleUpdateTwin.name:
+    if job_type == JobType.scheduleUpdateTwin.value:
         if not twin_patch:
             raise CLIError(
                 "The {} job type requires --twin-patch.".format(
-                    JobType.scheduleUpdateTwin.name
+                    JobType.scheduleUpdateTwin.value
                 )
             )
 
@@ -83,11 +78,11 @@ def job_create(
         # scheduleUpdateTwin job type is a force update, which only accepts '*' as the Etag.
         twin_patch["etag"] = "*"
         job_request.update_twin = twin_patch
-    elif job_type == JobType.scheduleDeviceMethod.name:
+    elif job_type == JobType.scheduleDeviceMethod.value:
         if not method_name:
             raise CLIError(
                 "The {} job type requires --method-name.".format(
-                    JobType.scheduleDeviceMethod.name
+                    JobType.scheduleDeviceMethod.value
                 )
             )
 
@@ -101,20 +96,26 @@ def job_create(
             payload=method_payload,
         )
 
+    target = get_iot_hub_connection_string(
+        cmd, hub_name, resource_group_name, login=login
+    )
+    service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
+
     try:
         job_result = service_sdk.create_job1(id=job_id, job_request=job_request)
         if wait:
+            logger.info("Waiting for job completion state...")
             while True:
-                # Check prior to sleep rather than after as jobs may be immediately be in failed state after creation.
+                sleep(poll_interval)
+
                 job_result = _job_show(target, job_id)
                 if "status" in job_result:
                     if job_result["status"] in [
-                        JobStatusType.completed.name,
-                        JobStatusType.failed.name,
-                        JobStatusType.cancelled.name,
+                        JobStatusType.completed.value,
+                        JobStatusType.failed.value,
+                        JobStatusType.cancelled.value,
                     ]:
                         break
-                sleep(poll_interval)
 
         return job_result
     except errors.CloudError as e:

@@ -29,6 +29,12 @@ def load_iothub_help():
           text: >
             az iot hub job create --job-id {job_id} --job-type scheduleUpdateTwin -n {iothub_name} -q "*" --twin-patch '{"tags": {"deviceType": "Type1, Type2, Type3"}}'
 
+        examples:
+        - name: Schedule job and block for result of "completed", "failed" or "cancelled". Specify poll interval in seconds.
+          text: >
+            az iot hub job create --job-id {job_id} --job-type scheduleUpdateTwin -n {iothub_name} -q "*" --twin-patch '{"tags": {"deviceType": "Type1, Type2, Type3"}}'
+            --wait --poll-interval 30
+
         - name: Create a job to update a desired twin property on a subset of devices, scheduled to run at an arbitrary future time.
           text: >
             az iot hub job create --job-id {job_name} --job-type scheduleUpdateTwin -n {iothub_name} --twin-patch '{"properties":{"desired": {"temperatureF": 65}}}'
