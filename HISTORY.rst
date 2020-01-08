@@ -3,6 +3,10 @@
 Release History
 ===============
 
+0.8.8
++++++++++++++++
+- Adds Jobs v2 command set.
+
 0.8.7
 +++++++++++++++
 - Support IoT Edge layered deployments.
