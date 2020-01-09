@@ -41,7 +41,7 @@ def iot_dps_device_enrollment_list(client, dps_name, resource_group_name, top=No
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
 
         query_command = "SELECT *"
-        query = QuerySpecification(query_command)
+        query = [QuerySpecification(query_command)]
         return _execute_query(query, m_sdk.device_enrollment.query, top)
     except errors.ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
@@ -210,7 +210,7 @@ def iot_dps_device_enrollment_group_list(client, dps_name, resource_group_name, 
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
 
         query_command = "SELECT *"
-        query1 = QuerySpecification(query_command)
+        query1 = [QuerySpecification(query_command)]
         return _execute_query(query1, m_sdk.device_enrollment_group.query, top)
     except errors.ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)

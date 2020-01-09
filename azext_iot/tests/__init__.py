@@ -16,6 +16,7 @@ PREFIX_EDGE_DEVICE = "test-edge-device-"
 PREFIX_DEVICE_MODULE = "test-module-"
 PREFIX_CONFIG = "test-config-"
 PREFIX_EDGE_CONFIG = "test-edgedeploy-"
+PREFIX_JOB = "test-job-"
 
 
 @contextmanager
@@ -90,6 +91,12 @@ class IoTLiveScenarioTest(LiveScenarioTest):
         ]
         self.config_ids.extend(names)
         return names
+
+    def generate_job_names(self, count=1):
+        return [
+            self.create_random_name(prefix=PREFIX_JOB, length=32)
+            for i in range(count)
+        ]
 
     # TODO: @digimaun - Maybe put a helper like this in the shared lib, when you create it?
     def command_execute_assert(self, command, asserts):

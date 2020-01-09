@@ -40,6 +40,8 @@ steps:
       displayName: 'Execute IoT DigitalTwin unit tests'
     - script: pytest -v azext_iot/tests/configurations/test_iot_config_unit.py --junitxml "TEST-config-unit-results.xml"
       displayName: 'Execute IoT Configuration unit tests'
+    - script: pytest -v azext_iot/tests/jobs/test_iothub_jobs_unit.py --junitxml "TEST-jobs-unit-results.xml"
+      displayName: 'Execute IoT Hub job unit tests'
 
   - task: PublishTestResults@2
     displayName: 'Publish Test Results'

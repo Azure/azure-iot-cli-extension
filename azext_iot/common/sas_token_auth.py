@@ -28,38 +28,55 @@ class SasTokenAuthentication(Authentication):
         uri (str): Uri of target resource.
         shared_access_policy_name (str): Name of shared access policy.
         shared_access_key (str): Shared access key.
-        expiry (int): Expiry of the token to be generated. Input should
-            be seconds since the epoch, in UTC. Default is an hour later from now.
+        expiry (int): Future expiry (in seconds) of the token to be generated.
     """
-    def __init__(self, uri, shared_access_policy_name, shared_access_key, expiry=None):
+    def __init__(self, uri, shared_access_policy_name, shared_access_key, expiry=3600):
         self.uri = uri
         self.policy = shared_access_policy_name
         self.key = shared_access_key
-        if expiry is None:
-            self.expiry = time() + 3600  # Default expiry is an hour later
-        else:
-            self.expiry = expiry
+        self.expiry = int(expiry)
 
-    def signed_session(self):
+    def signed_session(self, session=None):
         """
         Create requests session with SAS auth headers.
+
+        If a session object is provided, configure it directly. Otherwise,
+        create a new session and return it.
 
         Returns:
             session (): requests.Session.
         """
-        session = super(SasTokenAuthentication, self).signed_session()
+
+        return self.refresh_session(session)
+
+    def refresh_session(self, session=None):
+        """
+        Refresh requests session with SAS auth headers.
+
+        If a session object is provided, configure it directly. Otherwise,
+        create a new session and return it.
+
+        Returns:
+            session (): requests.Session.
+        """
+
+        session = session or super(SasTokenAuthentication, self).signed_session()
         session.headers['Authorization'] = self.generate_sas_token()
         return session
 
-    def generate_sas_token(self):
+    def generate_sas_token(self, absolute=False):
         """
-        Create a shared access signiture token as a string literal.
+        Create a shared access signature token as a string literal.
+
+        Args:
+            absolute (bool): In general the sas token ttl is generated relative to 'now' (UTC) + expiry.
+                Set to true to generate a sas token with no relative start.
 
         Returns:
             result (str): SAS token as string literal.
         """
         encoded_uri = quote_plus(self.uri)
-        ttl = int(self.expiry)
+        ttl = int(self.expiry) if absolute else int(time() + self.expiry)
         sign_key = '%s\n%d' % (encoded_uri, ttl)
         signature = b64encode(HMAC(b64decode(self.key), sign_key.encode('utf-8'), sha256).digest())
 

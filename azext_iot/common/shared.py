@@ -170,3 +170,27 @@ class ConfigType(Enum):
     edge = "edge"
     layered = "layered"
     adm = "adm"
+
+
+class JobType(Enum):
+    """
+    Type of IoT Hub job
+    """
+
+    scheduleUpdateTwin = "scheduleUpdateTwin"
+    scheduleDeviceMethod = "scheduleDeviceMethod"
+
+
+class JobStatusType(Enum):
+    """
+    Type of IoT Hub job status.
+    """
+
+    unknown = "unknown"
+    enqueued = "enqueued"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+    cancelled = "cancelled"
+    scheduled = "scheduled"
+    queued = "queued"

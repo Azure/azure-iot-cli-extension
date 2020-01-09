@@ -27,7 +27,9 @@ from azext_iot.common.shared import (
     ReprovisionType,
     AllocationType,
     DistributedTracingSamplingModeType,
-    ModelSourceType
+    ModelSourceType,
+    JobType,
+    JobStatusType
 )
 from azext_iot._validators import mode2_iot_login_handler
 from azext_iot.assets.user_messages import info_param_properties_device
@@ -91,7 +93,11 @@ def load_arguments(self, _):
         context.argument('method_payload', options_list=['--method-payload', '--mp'],
                          help='Json payload to be passed to method. Must be file path or raw json.')
         context.argument('timeout', options_list=['--timeout', '--to'], type=int,
-                         help='Maximum number of seconds to wait for method result.')
+                         help='Maximum number of seconds to wait for device method result.')
+        context.argument('method_connect_timeout', options_list=['--method-connect-timeout', '--mct'], type=int,
+                         help='Maximum number of seconds to wait on device connection.')
+        context.argument('method_response_timeout', options_list=['--method-response-timeout', '--mrt'], type=int,
+                         help='Maximum number of seconds to wait for device method result.')
         context.argument('auth_method', options_list=['--auth-method', '--am'],
                          arg_type=get_enum_type(DeviceAuthType),
                          help='The authorization type an entity is to be created with.')
@@ -137,6 +143,35 @@ def load_arguments(self, _):
         context.argument('output_dir', arg_group='X.509', options_list=['--output-dir', '--od'],
                          help='Generate self-signed cert and use its thumbprint. '
                          'Output to specified target directory')
+
+    with self.argument_context('iot hub job') as context:
+        context.argument('job_id', options_list=['--job-id'],
+                         help='IoT Hub job Id.')
+        context.argument('job_status', options_list=['--job-status', '--js'],
+                         help='The status of a scheduled job.',
+                         arg_type=get_enum_type(JobStatusType))
+        context.argument('job_type', options_list=['--job-type', '--jt'],
+                         help='The type of scheduled job.',
+                         arg_type=get_enum_type(JobType))
+        context.argument('query_condition', options_list=['--query-condition', '-q'],
+                         help='Condition for device query to get devices to execute the job on. '
+                         'Required if job type is scheduleDeviceMethod or scheduleUpdateTwin. '
+                         'Note: The service will prefix "SELECT * FROM devices WHERE " to the input')
+        context.argument('start_time', options_list=['--start-time', '--start'],
+                         help='The scheduled start of the job in ISO 8601 date time format. '
+                         'If no start time is provided, the job is queued for asap execution.')
+        context.argument('ttl', options_list=['--ttl'], type=int,
+                         help='Max execution time in seconds, before job is terminated.')
+        context.argument('twin_patch', options_list=['--twin-patch', '--patch'],
+                         help='The desired twin patch. Provide file path or raw json.')
+        context.argument('wait', options_list=['--wait', '-w'],
+                         arg_type=get_three_state_flag(),
+                         help='Block until the created job is in a completed, failed or cancelled state. '
+                         'Will regularly poll on interval specified by --poll-interval.')
+        context.argument('poll_interval', options_list=['--poll-interval', '--interval'], type=int,
+                         help='Interval in seconds that job status will be checked if --wait flag is passed in.')
+        context.argument('poll_duration', options_list=['--poll-duration', '--duration'], type=int,
+                         help='Total duration in seconds where job status will be checked if --wait flag is passed in.')
 
     with self.argument_context('iot hub monitor-events') as context:
         context.argument('timeout', arg_type=event_timeout_type)
