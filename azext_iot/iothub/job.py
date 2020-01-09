@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from time import sleep
+from datetime import datetime, timedelta
 from knack.log import get_logger
 from knack.util import CLIError
 from azext_iot._factory import _bind_sdk
@@ -31,6 +32,7 @@ def job_create(
     ttl=3600,
     wait=False,
     poll_interval=10,
+    poll_duration=600,
     hub_name=None,
     resource_group_name=None,
     login=None,
@@ -50,6 +52,12 @@ def job_create(
                 JobType.scheduleUpdateTwin.value, JobType.scheduleDeviceMethod.value
             )
         )
+
+    if poll_duration < 1:
+        raise CLIError("--poll-duration must be greater than 0!")
+
+    if poll_interval < 1:
+        raise CLIError("--poll-interval must be greater than 0!")
 
     job_request = JobRequest(
         job_id=job_id,
@@ -104,18 +112,29 @@ def job_create(
     try:
         job_result = service_sdk.create_job1(id=job_id, job_request=job_request)
         if wait:
-            logger.info("Waiting for job completion state...")
-            while True:
-                sleep(poll_interval)
+            logger.info("Waiting for job finished state...")
+            current_datetime = datetime.now()
+            end_datetime = current_datetime + timedelta(seconds=poll_duration)
 
+            while True:
                 job_result = _job_show(target, job_id)
                 if "status" in job_result:
-                    if job_result["status"] in [
+                    refreshed_job_status = job_result["status"]
+                    logger.info("Refreshed job status: '%s'", refreshed_job_status)
+
+                    if refreshed_job_status in [
                         JobStatusType.completed.value,
                         JobStatusType.failed.value,
                         JobStatusType.cancelled.value,
                     ]:
                         break
+
+                if datetime.now() > end_datetime:
+                    logger.info("Job not completed within poll duration....")
+                    break
+
+                logger.info("Waiting %d seconds for next refresh...", poll_interval)
+                sleep(poll_interval)
 
         return job_result
     except errors.CloudError as e:

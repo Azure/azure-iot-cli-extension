@@ -216,7 +216,7 @@ class TestJobCreate:
             assert body["cloudToDeviceMethod"]["connectTimeoutInSeconds"] == mct
 
     @pytest.mark.parametrize(
-        "job_id, job_type, hub_name, start_time, query_condition, payload, ttl, wait, poll_interval",
+        "job_id, job_type, hub_name, start_time, query_condition, payload, ttl, wait, poll_interval, poll_duration",
         [
             (
                 generate_job_id(),
@@ -227,7 +227,8 @@ class TestJobCreate:
                 '{"key1":"value1"}',
                 randint(300, 900),
                 True,
-                1
+                1,
+                5,
             ),
             (
                 generate_job_id(),
@@ -238,8 +239,9 @@ class TestJobCreate:
                 '{"key1":"value1"}',
                 randint(300, 900),
                 None,
-                10
-            )
+                10,
+                5,
+            ),
         ],
     )
     def test_job_create_wait(
@@ -254,7 +256,8 @@ class TestJobCreate:
         payload,
         ttl,
         wait,
-        poll_interval
+        poll_interval,
+        poll_duration,
     ):
         job_create = partial(
             subject.job_create,
@@ -267,6 +270,7 @@ class TestJobCreate:
             ttl=ttl,
             wait=wait,
             poll_interval=poll_interval,
+            poll_duration=poll_duration,
         )
 
         result = None
@@ -279,7 +283,8 @@ class TestJobCreate:
             assert result["status"] == JobStatusType.queued.value
 
     @pytest.mark.parametrize(
-        "job_id, job_type, hub_name, start_time, query_condition, payload, ttl, method_name, mct, mrt, expected_error",
+        "job_id, job_type, hub_name, start_time, query_condition, payload, ttl,"
+        "method_name, mct, mrt, poll_interval, poll_duration, expected_error",
         [
             (
                 generate_job_id(),
@@ -292,6 +297,8 @@ class TestJobCreate:
                 None,
                 None,
                 None,
+                5,
+                10,
                 "The query condition is required",
             ),
             (
@@ -305,6 +312,8 @@ class TestJobCreate:
                 "mymethod",
                 randint(30, 90),
                 randint(30, 90),
+                5,
+                10,
                 "The query condition is required",
             ),
             (
@@ -318,6 +327,8 @@ class TestJobCreate:
                 None,
                 None,
                 None,
+                5,
+                10,
                 "job type requires --twin-patch",
             ),
             (
@@ -331,7 +342,39 @@ class TestJobCreate:
                 None,
                 randint(30, 90),
                 randint(30, 90),
+                5,
+                10,
                 "job type requires --method-name",
+            ),
+            (
+                generate_job_id(),
+                JobType.scheduleDeviceMethod.value,
+                mock_target["entity"],
+                "2020-01-06T23:55:11.538201Z",
+                "*",
+                '{"key1":"value1"}',
+                randint(300, 900),
+                "mymethod",
+                randint(30, 90),
+                randint(30, 90),
+                0,
+                1,
+                "--poll-interval must be greater than 0!",
+            ),
+            (
+                generate_job_id(),
+                JobType.scheduleDeviceMethod.value,
+                mock_target["entity"],
+                "2020-01-06T23:55:11.538201Z",
+                "*",
+                '{"key1":"value1"}',
+                randint(300, 900),
+                "mymethod",
+                randint(30, 90),
+                randint(30, 90),
+                1,
+                0,
+                "--poll-duration must be greater than 0!",
             ),
         ],
     )
@@ -349,6 +392,8 @@ class TestJobCreate:
         method_name,
         mct,
         mrt,
+        poll_interval,
+        poll_duration,
         expected_error,
     ):
         with pytest.raises(CLIError) as exc:
@@ -361,6 +406,8 @@ class TestJobCreate:
                 start_time=start_time,
                 query_condition=query_condition,
                 ttl=ttl,
+                poll_interval=poll_interval,
+                poll_duration=poll_duration,
             )
 
             if job_type == JobType.scheduleUpdateTwin.value:

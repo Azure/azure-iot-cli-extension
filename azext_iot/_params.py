@@ -162,14 +162,16 @@ def load_arguments(self, _):
                          'If no start time is provided, the job is queued for asap execution.')
         context.argument('ttl', options_list=['--ttl'], type=int,
                          help='Max execution time in seconds, before job is terminated.')
-        context.argument('twin_patch', options_list=['--twin-patch'],
+        context.argument('twin_patch', options_list=['--twin-patch', '--patch'],
                          help='The desired twin patch. Provide file path or raw json.')
         context.argument('wait', options_list=['--wait', '-w'],
                          arg_type=get_three_state_flag(),
                          help='Block until the created job is in a completed, failed or cancelled state. '
                          'Will regularly poll on interval specified by --poll-interval.')
-        context.argument('poll_interval', options_list=['--poll-interval'], type=int,
+        context.argument('poll_interval', options_list=['--poll-interval', '--interval'], type=int,
                          help='Interval in seconds that job status will be checked if --wait flag is passed in.')
+        context.argument('poll_duration', options_list=['--poll-duration', '--duration'], type=int,
+                         help='Total duration in seconds where job status will be checked if --wait flag is passed in.')
 
     with self.argument_context('iot hub monitor-events') as context:
         context.argument('timeout', arg_type=event_timeout_type)
