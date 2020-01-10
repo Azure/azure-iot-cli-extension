@@ -29,6 +29,7 @@ from azext_iot.common.shared import (
     DistributedTracingSamplingModeType,
     ModelSourceType,
     JobType,
+    JobCreateType,
     JobStatusType
 )
 from azext_iot._validators import mode2_iot_login_handler
@@ -172,6 +173,11 @@ def load_arguments(self, _):
                          help='Interval in seconds that job status will be checked if --wait flag is passed in.')
         context.argument('poll_duration', options_list=['--poll-duration', '--duration'], type=int,
                          help='Total duration in seconds where job status will be checked if --wait flag is passed in.')
+
+    with self.argument_context('iot hub job create') as context:
+        context.argument('job_type', options_list=['--job-type', '--jt'],
+                         help='The type of scheduled job.',
+                         arg_type=get_enum_type(JobCreateType))
 
     with self.argument_context('iot hub monitor-events') as context:
         context.argument('timeout', arg_type=event_timeout_type)

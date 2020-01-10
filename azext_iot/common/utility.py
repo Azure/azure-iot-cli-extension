@@ -315,9 +315,7 @@ def unpack_msrest_error(e, clouderror=True):
         op_err = None
         try:
             op_err = json.loads(e.response.text)
-        except ValueError:
-            op_err = e.response.text
-        except TypeError:
+        except (ValueError, TypeError):
             op_err = e.response.text
         if not op_err:
             return str(e)

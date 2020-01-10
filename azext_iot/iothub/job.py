@@ -14,6 +14,7 @@ from azext_iot.common._azure import get_iot_hub_connection_string
 from azext_iot.common.utility import unpack_msrest_error, process_json_arg
 from azext_iot.operations.generic import _execute_query, _process_top
 from azext_iot.iothub.mgmt_helpers import ErrorDetailsException, get_mgmt_iothub_client
+from azext_iot.iothub import IoTHubProvider
 
 
 logger = get_logger(__name__)
@@ -42,7 +43,11 @@ def job_create(
     from azext_iot.sdk.service.models.cloud_to_device_method import CloudToDeviceMethod
     from azext_iot.sdk.service.models.job_request import JobRequest
 
-    if job_type in [JobType.scheduleUpdateTwin.value, JobType.scheduleDeviceMethod.value] and not query_condition:
+    if (
+        job_type
+        in [JobType.scheduleUpdateTwin.value, JobType.scheduleDeviceMethod.value]
+        and not query_condition
+    ):
         raise CLIError(
             "The query condition is required when job type is {} or {}. "
             "Use query condition '*' if you need to run job on all devices.".format(
@@ -142,38 +147,8 @@ def job_create(
 
 
 def job_show(cmd, job_id, hub_name=None, resource_group_name=None, login=None):
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
-    )
-    job_result = _job_show(target, job_id)
-    if "status" in job_result and job_result["status"] == JobStatusType.unknown.value:
-        client = get_mgmt_iothub_client(cmd)
-        if client:
-            job_result = _job_show_cp(client, target, job_id)
-
-    return job_result
-
-
-def _job_show(target, job_id):
-    service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
-
-    try:
-        return service_sdk.get_job1(id=job_id)
-    except errors.CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
-
-
-def _job_show_cp(client, target, job_id):
-    try:
-        job_result = client.get_job(
-            resource_group_name=target["resourcegroup"],
-            resource_name=target["entity"].split(".")[0],  # entity is iothub fqdn
-            job_id=job_id,
-        )
-        return job_result
-    except ErrorDetailsException as e:
-        # ErrorDetailsException can be treated like CloudError
-        raise CLIError(unpack_msrest_error(e))
+    jobs = JobProvider(cmd=cmd, hub_name=hub_name, rg=resource_group_name, login=login)
+    return jobs.get(job_id)
 
 
 def job_list(
@@ -185,29 +160,126 @@ def job_list(
     resource_group_name=None,
     login=None,
 ):
-    top = _process_top(top)
-
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
-    )
-    service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
-
-    try:
-        query = [job_type, job_status]
-        query_method = service_sdk.query_jobs
-
-        return _execute_query(query, query_method, top)
-    except errors.CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+    jobs = JobProvider(cmd=cmd, hub_name=hub_name, rg=resource_group_name, login=login)
+    return jobs.list(job_type=job_type, job_status=job_status, top=top)
 
 
 def job_cancel(cmd, job_id, hub_name=None, resource_group_name=None, login=None):
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
-    )
-    service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
+    jobs = JobProvider(cmd=cmd, hub_name=hub_name, rg=resource_group_name, login=login)
+    return jobs.cancel(job_id)
 
-    try:
-        return service_sdk.cancel_job1(id=job_id)
-    except errors.CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+
+class JobProvider(IoTHubProvider):
+    def get(self, job_id):
+        job_result = self._get(job_id)
+        if (
+            "status" in job_result
+            and job_result["status"] == JobStatusType.unknown.value
+        ):
+            # Replace 'unknown' job_result with object from control plane if it exists
+            cp_job_result = self._get_from_cp(job_id)
+            if cp_job_result:
+                job_result = cp_job_result
+
+        return job_result
+
+    def _get(self, job_id):
+        service_sdk, errors = self.get_sdk(SdkType.service_sdk)
+
+        try:
+            return service_sdk.get_job1(id=job_id)
+        except errors.CloudError as e:
+            raise CLIError(unpack_msrest_error(e))
+
+    def _get_from_cp(self, job_id):
+        client = get_mgmt_iothub_client(self.cmd)
+        if not client:
+            return
+
+        try:
+            return client.get_job(
+                resource_group_name=self.target["resourcegroup"],
+                resource_name=self.target["entity"].split(".")[
+                    0
+                ],  # entity is iothub fqdn
+                job_id=job_id,
+            )
+        except ErrorDetailsException as e:
+            # ErrorDetailsException can be treated like CloudError
+            raise CLIError(unpack_msrest_error(e))
+
+    def cancel(self, job_id):
+        job_result = self.get(job_id)
+        if not isinstance(job_result, dict):
+            job_result = job_result.as_dict()
+        job_type = job_result["type"]
+        if job_type in [JobType.exportDevices.value, JobType.importDevices.value]:
+            # v1 Job
+            raise CLIError("You are unable to cancel device import/export jobs!")
+
+        # v2 Job
+        return self._cancel(job_id)
+
+    def _cancel(self, job_id):
+        service_sdk, errors = self.get_sdk(SdkType.service_sdk)
+
+        try:
+            return service_sdk.cancel_job1(id=job_id)
+        except errors.CloudError as e:
+            raise CLIError(unpack_msrest_error(e))
+
+    def list(self, job_type=None, job_status=None, top=None):
+        jobs_collection = []
+
+        if (
+            job_type not in [JobType.exportDevices.value, JobType.importDevices.value]
+            or not job_type
+        ):
+            jobs_collection.extend(
+                self._list(job_type=job_type, job_status=job_status, top=top)
+            )
+
+        if (
+            job_type in [JobType.exportDevices.value, JobType.importDevices.value]
+            or not job_type
+        ):
+            if (top and len(jobs_collection) < top) or not top:
+                jobs_collection.extend(self._list_from_cp(top))
+
+                # Trim based on top, since there is no way to pass a 'top' into the cp API :(
+                jobs_collection = jobs_collection[:top]
+
+        return jobs_collection
+
+    def _list(self, job_type=None, job_status=None, top=None):
+        top = _process_top(top)
+        service_sdk, errors = self.get_sdk(SdkType.service_sdk)
+        jobs_collection = []
+
+        try:
+            query = [job_type, job_status]
+            query_method = service_sdk.query_jobs
+            jobs_collection.extend(_execute_query(query, query_method, top))
+            return jobs_collection
+        except errors.CloudError as e:
+            raise CLIError(unpack_msrest_error(e))
+
+    def _list_from_cp(self, top=None):
+        client = get_mgmt_iothub_client(self.cmd)
+        if not client:
+            return []
+
+        try:
+            return client.list_jobs(
+                resource_group_name=self.target["resourcegroup"],
+                resource_name=self.target["entity"].split(".")[
+                    0
+                ],  # entity is iothub fqdn
+            )
+        except ErrorDetailsException as e:
+            # ErrorDetailsException can be treated like CloudError
+            raise CLIError(unpack_msrest_error(e))
+
+
+    def create(self):
+        pass
