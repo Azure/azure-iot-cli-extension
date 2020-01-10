@@ -9,10 +9,11 @@ from datetime import datetime, timedelta
 from knack.log import get_logger
 from knack.util import CLIError
 from azext_iot._factory import _bind_sdk
-from azext_iot.common.shared import SdkType
+from azext_iot.common.shared import SdkType, JobStatusType, JobType
 from azext_iot.common._azure import get_iot_hub_connection_string
 from azext_iot.common.utility import unpack_msrest_error, process_json_arg
 from azext_iot.operations.generic import _execute_query, _process_top
+from azext_iot.iothub.mgmt_helpers import ErrorDetailsException, get_mgmt_iothub_client
 
 
 logger = get_logger(__name__)
@@ -38,14 +39,10 @@ def job_create(
     login=None,
 ):
     from msrest.exceptions import SerializationError
-    from azext_iot.common.shared import JobType, JobStatusType
     from azext_iot.sdk.service.models.cloud_to_device_method import CloudToDeviceMethod
     from azext_iot.sdk.service.models.job_request import JobRequest
 
-    if (
-        job_type in [JobType.scheduleUpdateTwin.value, JobType.scheduleDeviceMethod.value]
-        and not query_condition
-    ):
+    if job_type in [JobType.scheduleUpdateTwin.value, JobType.scheduleDeviceMethod.value] and not query_condition:
         raise CLIError(
             "The query condition is required when job type is {} or {}. "
             "Use query condition '*' if you need to run job on all devices.".format(
@@ -148,7 +145,13 @@ def job_show(cmd, job_id, hub_name=None, resource_group_name=None, login=None):
     target = get_iot_hub_connection_string(
         cmd, hub_name, resource_group_name, login=login
     )
-    return _job_show(target, job_id)
+    job_result = _job_show(target, job_id)
+    if "status" in job_result and job_result["status"] == JobStatusType.unknown.value:
+        client = get_mgmt_iothub_client(cmd)
+        if client:
+            job_result = _job_show_cp(client, target, job_id)
+
+    return job_result
 
 
 def _job_show(target, job_id):
@@ -157,6 +160,19 @@ def _job_show(target, job_id):
     try:
         return service_sdk.get_job1(id=job_id)
     except errors.CloudError as e:
+        raise CLIError(unpack_msrest_error(e))
+
+
+def _job_show_cp(client, target, job_id):
+    try:
+        job_result = client.get_job(
+            resource_group_name=target["resourcegroup"],
+            resource_name=target["entity"].split(".")[0],  # entity is iothub fqdn
+            job_id=job_id,
+        )
+        return job_result
+    except ErrorDetailsException as e:
+        # ErrorDetailsException can be treated like CloudError
         raise CLIError(unpack_msrest_error(e))
 
 
