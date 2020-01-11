@@ -158,16 +158,12 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             ],
         )
 
-        # Interesting behavior - Show non-existant job
+        # Error - Show non-existant job
         self.cmd(
             "iot hub job show --job-id notarealjobid -n {} -g {}".format(
                 LIVE_HUB, LIVE_RG
             ),
-            checks=[
-                self.check("jobId", "notarealjobid"),
-                self.check("type", "unknown"),
-                self.check("status", "unknown"),
-            ],
+            expect_failure=True,
         )
 
         # Cancel Job test

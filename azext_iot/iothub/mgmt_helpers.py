@@ -26,6 +26,3 @@ def get_mgmt_iothub_client(cmd, raise_if_error=False):
         if raise_if_error:
             raise e
         return None
-
-
-ErrorDetailsException = get_mgmt_iothub_exception()

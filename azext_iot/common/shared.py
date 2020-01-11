@@ -192,6 +192,15 @@ class JobType(Enum):
     scheduleDeviceMethod = "scheduleDeviceMethod"
 
 
+class JobVersionType(Enum):
+    """
+    Type of IoT Hub job
+    """
+
+    v1 = "v1"
+    v2 = "v2"
+
+
 class JobStatusType(Enum):
     """
     Type of IoT Hub job status.

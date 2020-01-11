@@ -376,6 +376,21 @@ class TestJobCreate:
                 0,
                 "--poll-duration must be greater than 0!",
             ),
+            (
+                generate_job_id(),
+                JobType.scheduleUpdateTwin.value,
+                mock_target["entity"],
+                "2020-01-06T23:55:11.538201Z",
+                "*",
+                "100",
+                randint(300, 900),
+                None,
+                randint(30, 90),
+                randint(30, 90),
+                1,
+                5,
+                "Twin patches must be objects. Received type: <class 'int'>",
+            ),
         ],
     )
     def test_job_create_malformed(

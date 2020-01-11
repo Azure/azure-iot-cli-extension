@@ -9,7 +9,7 @@ import pytest
 
 from ..conftest import mock_target
 
-path_ghcs = "azext_iot.iothub.job.get_iot_hub_connection_string"
+path_ghcs = "azext_iot.iothub.get_iot_hub_connection_string"
 
 
 @pytest.fixture()
