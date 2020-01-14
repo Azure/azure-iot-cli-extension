@@ -125,10 +125,7 @@ def job_cancel(cmd, job_id, hub_name=None, resource_group_name=None, login=None)
 class JobProvider(IoTHubProvider):
     def get(self, job_id):
         job_result = self._get(job_id)
-        if (
-            "status" in job_result
-            and job_result["status"] == JobStatusType.unknown.value
-        ):
+        if "status" in job_result and job_result["status"] == JobStatusType.unknown.value:
             # Replace 'unknown' v2 result with v1 result
             job_result = self._get(job_id, JobVersionType.v1)
 
@@ -146,7 +143,7 @@ class JobProvider(IoTHubProvider):
 
     def cancel(self, job_id):
         job_result = self.get(job_id)
-        if job_result["type"] in [JobType.exportDevices.value, JobType.importDevices.value]:
+        if "type" in job_result and job_result["type"] in [JobType.exportDevices.value, JobType.importDevices.value]:
             # v1 Job
             return self._cancel(job_id, JobVersionType.v1)
 
