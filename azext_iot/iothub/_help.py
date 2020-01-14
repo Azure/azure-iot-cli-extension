@@ -29,7 +29,6 @@ def load_iothub_help():
           text: >
             az iot hub job create --job-id {job_id} --job-type scheduleUpdateTwin -n {iothub_name} -q "*" --twin-patch '{"tags": {"deviceType": "Type1, Type2, Type3"}}'
 
-        examples:
         - name: Schedule job and block for result of "completed", "failed" or "cancelled". Specify poll interval in seconds.
           text: >
             az iot hub job create --job-id {job_id} --job-type scheduleUpdateTwin -n {iothub_name} -q "*" --twin-patch '{"tags": {"deviceType": "Type1, Type2, Type3"}}'
@@ -61,18 +60,21 @@ def load_iothub_help():
         short-summary: List the historical jobs of an IoT Hub.
 
         examples:
-        - name: Show all properties of all archived jobs within retention period (max of 30 days).
+        - name: List all archived jobs within retention period (max of 30 days).
           text: >
             az iot hub job list --hub-name {iothub_name}
-        - name: Show all archived jobs filtering on specific properties
+        - name: List all archived jobs projecting specific properties
           text: >
             az iot hub job list --hub-name {iothub_name} --query "[*].[jobId,type,status,startTime,endTime]"
-        - name: Show only update twin type jobs
+        - name: List only update twin type jobs
           text: >
             az iot hub job list --hub-name {iothub_name} --job-type scheduleDeviceMethod
-        - name: Show device method jobs which have status "scheduled"
+        - name: List device method jobs which have status "scheduled"
           text: >
             az iot hub job list --hub-name {iothub_name} --job-type scheduleDeviceMethod --job-status scheduled
+        - name: List device export jobs which have status "completed"
+          text: >
+            az iot hub job list --hub-name {iothub_name} --job-type export --job-status completed
     """
 
     helps['iot hub job cancel'] = """

@@ -172,13 +172,33 @@ class ConfigType(Enum):
     adm = "adm"
 
 
+class JobCreateType(Enum):
+    """
+    Type of creatable IoT Hub job v2
+    """
+
+    scheduleUpdateTwin = "scheduleUpdateTwin"
+    scheduleDeviceMethod = "scheduleDeviceMethod"
+
+
 class JobType(Enum):
     """
     Type of IoT Hub job
     """
 
+    exportDevices = "export"
+    importDevices = "import"
     scheduleUpdateTwin = "scheduleUpdateTwin"
     scheduleDeviceMethod = "scheduleDeviceMethod"
+
+
+class JobVersionType(Enum):
+    """
+    Type of IoT Hub job
+    """
+
+    v1 = "v1"
+    v2 = "v2"
 
 
 class JobStatusType(Enum):

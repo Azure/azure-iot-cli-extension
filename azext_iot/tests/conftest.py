@@ -31,6 +31,7 @@ mock_target["policy"] = "iothubowner"
 mock_target["subscription"] = "5952cff8-bcd1-4235-9554-af2c0348bf23"
 mock_target["location"] = "westus2"
 mock_target["sku_tier"] = "Standard"
+mock_target["resourcegroup"] = "myresourcegroup"
 
 
 generic_cs_template = "HostName={};SharedAccessKeyName={};SharedAccessKey={}"
