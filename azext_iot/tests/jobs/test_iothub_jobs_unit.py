@@ -11,7 +11,7 @@ from random import randint
 from functools import partial
 from uuid import uuid4
 from knack.cli import CLIError
-from azext_iot.iothub import job as subject
+from azext_iot.iothub import job_commands as subject
 from azext_iot.common.shared import JobStatusType, JobType
 from ..conftest import build_mock_response, path_service_client, mock_target
 
@@ -447,7 +447,7 @@ class TestJobCreate:
                 randint(30, 90),
                 1,
                 5,
-                "Twin patches must be objects. Received type: <class 'int'>",
+                "Twin patches must be objects. Received type:",
             ),
         ],
     )
@@ -584,7 +584,9 @@ class TestJobShow:
         elif request.param == "v1":
             service_client.side_effect = [
                 build_mock_response(
-                    mocker, 200, generate_job_status(job_status="unknown")
+                    mocker,
+                    200,
+                    generate_job_status(job_status=JobStatusType.unknown.value),
                 ),
                 build_mock_response(
                     mocker,
@@ -648,7 +650,10 @@ class TestJobCancel:
                 build_mock_response(
                     mocker,
                     200,
-                    generate_job_show(job_status="running", job_version=request.param),
+                    generate_job_show(
+                        job_status=JobStatusType.running.value,
+                        job_version=request.param,
+                    ),
                 ),
                 build_mock_response(
                     mocker,
@@ -666,7 +671,11 @@ class TestJobCancel:
                 build_mock_response(
                     mocker,
                     200,
-                    generate_job_show(job_status="running", job_version=request.param),
+                    generate_job_show(
+                        job_status=JobStatusType.running.value,
+                        job_type=JobType.exportDevices.value,
+                        job_version=request.param,
+                    ),
                 ),
                 build_mock_response(
                     mocker,

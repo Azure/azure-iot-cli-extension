@@ -1097,7 +1097,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
     def test_storage(self):
         device_count = 1
 
-        content_path = os.path.join(CWD, "test_config_modules_content_v1.json")
+        content_path = os.path.join(CWD, "test_generic_replace.json")
         device_ids = self.generate_device_names(device_count)
 
         self.cmd(

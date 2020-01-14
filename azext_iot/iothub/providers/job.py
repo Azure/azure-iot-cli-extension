@@ -11,115 +11,10 @@ from knack.util import CLIError
 from azext_iot.common.shared import SdkType, JobStatusType, JobType, JobVersionType
 from azext_iot.common.utility import unpack_msrest_error, process_json_arg
 from azext_iot.operations.generic import _execute_query, _process_top
-from azext_iot.iothub import IoTHubProvider
+from azext_iot.iothub.providers.base import IoTHubProvider
 
 
 logger = get_logger(__name__)
-
-
-def job_create(
-    cmd,
-    job_id,
-    job_type,
-    start_time=None,
-    query_condition=None,
-    twin_patch=None,
-    method_name=None,
-    method_payload=None,
-    method_connect_timeout=30,
-    method_response_timeout=30,
-    ttl=3600,
-    wait=False,
-    poll_interval=10,
-    poll_duration=600,
-    hub_name=None,
-    resource_group_name=None,
-    login=None,
-):
-    if (
-        job_type
-        in [JobType.scheduleUpdateTwin.value, JobType.scheduleDeviceMethod.value]
-        and not query_condition
-    ):
-        raise CLIError(
-            "The query condition is required when job type is {} or {}. "
-            "Use query condition '*' if you need to run job on all devices.".format(
-                JobType.scheduleUpdateTwin.value, JobType.scheduleDeviceMethod.value
-            )
-        )
-
-    if poll_duration < 1:
-        raise CLIError("--poll-duration must be greater than 0!")
-
-    if poll_interval < 1:
-        raise CLIError("--poll-interval must be greater than 0!")
-
-    if job_type == JobType.scheduleUpdateTwin.value:
-        if not twin_patch:
-            raise CLIError(
-                "The {} job type requires --twin-patch.".format(
-                    JobType.scheduleUpdateTwin.value
-                )
-            )
-
-        twin_patch = process_json_arg(twin_patch, argument_name="twin-patch")
-        if not isinstance(twin_patch, dict):
-            raise CLIError(
-                "Twin patches must be objects. Received type: {}".format(
-                    type(twin_patch)
-                )
-            )
-    elif job_type == JobType.scheduleDeviceMethod.value:
-        if not method_name:
-            raise CLIError(
-                "The {} job type requires --method-name.".format(
-                    JobType.scheduleDeviceMethod.value
-                )
-            )
-
-        method_payload = process_json_arg(
-            method_payload, argument_name="method-payload"
-        )
-
-    jobs = JobProvider(cmd=cmd, hub_name=hub_name, rg=resource_group_name, login=login)
-    return jobs.create(
-        job_id=job_id,
-        job_type=job_type,
-        start_time=start_time,
-        query_condition=query_condition,
-        twin_patch=twin_patch,
-        method_name=method_name,
-        method_payload=method_payload,
-        method_connect_timeout=method_connect_timeout,
-        method_response_timeout=method_response_timeout,
-        ttl=ttl,
-        wait=wait,
-        poll_interval=poll_interval,
-        poll_duration=poll_duration,
-    )
-
-
-def job_show(cmd, job_id, hub_name=None, resource_group_name=None, login=None):
-    jobs = JobProvider(cmd=cmd, hub_name=hub_name, rg=resource_group_name, login=login)
-    return jobs.get(job_id)
-
-
-def job_list(
-    cmd,
-    job_type=None,
-    job_status=None,
-    top=None,
-    hub_name=None,
-    resource_group_name=None,
-    login=None,
-):
-    jobs = JobProvider(cmd=cmd, hub_name=hub_name, rg=resource_group_name, login=login)
-    return jobs.list(job_type=job_type, job_status=job_status, top=top)
-
-
-def job_cancel(cmd, job_id, hub_name=None, resource_group_name=None, login=None):
-    jobs = JobProvider(cmd=cmd, hub_name=hub_name, rg=resource_group_name, login=login)
-    return jobs.cancel(job_id)
 
 
 class JobProvider(IoTHubProvider):
@@ -229,6 +124,51 @@ class JobProvider(IoTHubProvider):
             CloudToDeviceMethod,
         )
         from azext_iot.sdk.service.models.job_request import JobRequest
+
+        if (
+            job_type
+            in [JobType.scheduleUpdateTwin.value, JobType.scheduleDeviceMethod.value]
+            and not query_condition
+        ):
+            raise CLIError(
+                "The query condition is required when job type is {} or {}. "
+                "Use query condition '*' if you need to run job on all devices.".format(
+                    JobType.scheduleUpdateTwin.value, JobType.scheduleDeviceMethod.value
+                )
+            )
+
+        if poll_duration < 1:
+            raise CLIError("--poll-duration must be greater than 0!")
+
+        if poll_interval < 1:
+            raise CLIError("--poll-interval must be greater than 0!")
+
+        if job_type == JobType.scheduleUpdateTwin.value:
+            if not twin_patch:
+                raise CLIError(
+                    "The {} job type requires --twin-patch.".format(
+                        JobType.scheduleUpdateTwin.value
+                    )
+                )
+
+            twin_patch = process_json_arg(twin_patch, argument_name="twin-patch")
+            if not isinstance(twin_patch, dict):
+                raise CLIError(
+                    "Twin patches must be objects. Received type: {}".format(
+                        type(twin_patch)
+                    )
+                )
+        elif job_type == JobType.scheduleDeviceMethod.value:
+            if not method_name:
+                raise CLIError(
+                    "The {} job type requires --method-name.".format(
+                        JobType.scheduleDeviceMethod.value
+                    )
+                )
+
+            method_payload = process_json_arg(
+                method_payload, argument_name="method-payload"
+            )
 
         job_request = JobRequest(
             job_id=job_id,

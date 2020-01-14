@@ -29,7 +29,6 @@ def load_iothub_help():
           text: >
             az iot hub job create --job-id {job_id} --job-type scheduleUpdateTwin -n {iothub_name} -q "*" --twin-patch '{"tags": {"deviceType": "Type1, Type2, Type3"}}'
 
-        examples:
         - name: Schedule job and block for result of "completed", "failed" or "cancelled". Specify poll interval in seconds.
           text: >
             az iot hub job create --job-id {job_id} --job-type scheduleUpdateTwin -n {iothub_name} -q "*" --twin-patch '{"tags": {"deviceType": "Type1, Type2, Type3"}}'
@@ -64,7 +63,7 @@ def load_iothub_help():
         - name: List all archived jobs within retention period (max of 30 days).
           text: >
             az iot hub job list --hub-name {iothub_name}
-        - name: List all archived jobs filtering on specific properties
+        - name: List all archived jobs projecting specific properties
           text: >
             az iot hub job list --hub-name {iothub_name} --query "[*].[jobId,type,status,startTime,endTime]"
         - name: List only update twin type jobs
