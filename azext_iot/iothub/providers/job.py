@@ -56,6 +56,7 @@ class JobProvider(IoTHubProvider):
             raise CLIError(unpack_msrest_error(e))
 
     def list(self, job_type=None, job_status=None, top=None):
+        top = _process_top(top)
         jobs_collection = []
 
         if (
@@ -85,7 +86,6 @@ class JobProvider(IoTHubProvider):
         return jobs_collection
 
     def _list(self, job_type=None, job_status=None, top=None, job_version=JobVersionType.v2):
-        top = _process_top(top)
         service_sdk, errors = self.get_sdk(SdkType.service_sdk)
         jobs_collection = []
 

@@ -207,8 +207,19 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             "iot hub job list -n {} -g {}".format(LIVE_HUB, LIVE_RG)
         ).get_output_in_json()
 
+        self.validate_job_list(jobs_set=job_result_set)
+
+        # List Jobs - with connection string
+        job_result_set_cs = self.cmd(
+            "iot hub job list --login {}".format(LIVE_HUB_CS)
+        ).get_output_in_json()
+
+        self.validate_job_list(jobs_set=job_result_set_cs)
+
+    def validate_job_list(self, jobs_set):
         filtered_job_ids_result = {}
-        for job in job_result_set:
+
+        for job in jobs_set:
             filtered_job_ids_result[job["jobId"]] = True
 
         for job_id in self.job_ids:
