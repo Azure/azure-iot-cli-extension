@@ -7,7 +7,7 @@ The original copyright notice and license, under which Microsoft Corporation rec
 are set out below.  This Third Party Code is licensed to you under their original license terms set forth below.  
 Microsoft Corporation reserves all other rights not expressly granted, whether by implication, estoppel or otherwise.  
 
-Python paho-mqtt v1.3.1, obtained from https://pypi.python.org/pypi/paho-mqtt/1.3.1
+Python paho-mqtt v1.5.0, obtained from https://pypi.python.org/pypi/paho-mqtt/1.5.0
 
 Eclipse Paho™ MQTT Python Client
 Copyright (c) 2009-2012 Roger Light <roger@atchoo.org>
