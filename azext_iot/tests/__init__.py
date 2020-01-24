@@ -65,6 +65,7 @@ class IoTLiveScenarioTest(LiveScenarioTest):
 
         os.environ["AZURE_CORE_COLLECT_TELEMETRY"] = "no"
         super(IoTLiveScenarioTest, self).__init__(test_scenario)
+        self.region = self.get_region()
 
     def generate_device_names(self, count=1, edge=False):
         names = [
@@ -143,6 +144,15 @@ class IoTLiveScenarioTest(LiveScenarioTest):
                     ),
                     checks=self.is_empty(),
                 )
+
+    def get_region(self):
+        result = self.cmd(
+            "iot hub show -n {}".format(self.entity_name)
+        ).get_output_in_json()
+        locations_set = result["properties"]["locations"]
+        for loc in locations_set:
+            if loc["role"] == "primary":
+                return loc["location"]
 
 
 def disable_telemetry(test_function):

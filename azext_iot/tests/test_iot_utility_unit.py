@@ -1,10 +1,11 @@
 import pytest
 import json
 from knack.util import CLIError
+from azure.cli.core.extension import get_extension_path
 from azext_iot.common.utility import validate_min_python_version
 from azext_iot.common.deps import ensure_uamqp
 from azext_iot._validators import mode2_iot_login_handler
-from azext_iot.constants import EVENT_LIB
+from azext_iot.constants import EVENT_LIB, EXTENSION_NAME
 from azext_iot.common.utility import process_json_arg, read_file_content, logger
 
 
@@ -110,12 +111,12 @@ class TestEnsureUamqp(object):
     def test_ensure_uamqp_version(
         self, mocker, uamqp_scenario, case, extra_input, external_input
     ):
+        from functools import partial
+
         if case == "importerror":
             uamqp_scenario["test_import"].return_value = False
         elif case == "compatibility":
             uamqp_scenario["get_uamqp"].return_value = "0.0.0"
-
-        from functools import partial
 
         kwargs = {}
         user_cancelled = True
@@ -138,9 +139,64 @@ class TestEnsureUamqp(object):
         else:
             install_args = uamqp_scenario["installer"].call_args
             assert install_args[0][0] == EVENT_LIB[0]
-            assert install_args[1]["custom_version"] == ">={},<{}".format(
-                EVENT_LIB[1], EVENT_LIB[2]
-            )
+            assert install_args[1]["compatible_version"] == EVENT_LIB[1]
+
+
+class TestInstallPipPackage(object):
+    @pytest.fixture()
+    def subprocess_scenario(self, mocker):
+        return mocker.patch("azext_iot.common.pip.subprocess")
+
+    @pytest.fixture()
+    def subprocess_error(self, mocker):
+        from subprocess import CalledProcessError
+
+        patch_check_output = mocker.patch(
+            "azext_iot.common.pip.subprocess.check_output"
+        )
+        patch_check_output.side_effect = CalledProcessError(
+            returncode=1, cmd="cmd", output=None
+        )
+        return patch_check_output
+
+    @pytest.mark.parametrize(
+        "install_type, package_name, expected",
+        [
+            ({"exact_version": "1.2"}, "uamqp", "uamqp==1.2"),
+            ({"compatible_version": "1.2"}, "uamqp", "uamqp~=1.2"),
+            ({"custom_version": ">=1.2,<1.3"}, "uamqp", "uamqp>=1.2,<1.3"),
+        ],
+    )
+    def test_pip_install(
+        self, subprocess_scenario, install_type, package_name, expected
+    ):
+        from azext_iot.common.pip import install
+        from sys import executable
+
+        install(package_name, **install_type)
+
+        assert subprocess_scenario.check_output.call_count == 1
+
+        call = subprocess_scenario.check_output.call_args[0][0]
+
+        assert call == [
+            executable,
+            "-m",
+            "pip",
+            "--disable-pip-version-check",
+            "--no-cache-dir",
+            "install",
+            "-U",
+            "--target",
+            get_extension_path(EXTENSION_NAME),
+            expected,
+        ]
+
+    def test_pip_error(self, subprocess_error):
+        from azext_iot.common.pip import install
+
+        with pytest.raises(RuntimeError):
+            install("uamqp")
 
 
 class TestProcessJsonArg(object):

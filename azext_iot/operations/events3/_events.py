@@ -18,8 +18,8 @@ from azext_iot.constants import VERSION, USER_AGENT
 from azext_iot.common.utility import parse_entity, unicode_binary_map, process_json_arg
 from azext_iot.operations.events3._builders import AmqpBuilder
 
-
-DEBUG = True
+# To provide amqp frame trace
+DEBUG = False
 logger = get_logger(__name__)
 
 
