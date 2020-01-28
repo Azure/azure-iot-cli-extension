@@ -11,18 +11,19 @@ from azext_iot.assets.user_messages import error_no_hub_or_login_on_input
 def mode2_iot_login_handler(cmd, namespace):
     if cmd.name.startswith('iot'):
         args = vars(namespace)
-        arg_keys = args.keys()
-        if 'login' in arg_keys:
+
+        if 'login' in args:
             login_value = args['login']
             iot_cmd_type = None
             entity_value = None
-            if 'hub_name' in arg_keys:
+
+            if 'hub_name' in args:
                 iot_cmd_type = 'IoT Hub'
                 entity_value = args['hub_name']
-            elif 'dps_name' in arg_keys:
+            elif 'dps_name' in args:
                 iot_cmd_type = 'DPS'
                 entity_value = args['dps_name']
-            elif 'repo_endpoint' in arg_keys:
+            elif 'repo_endpoint' in args:
                 iot_cmd_type = 'PnP'
                 entity_value = args['repo_endpoint']
 

@@ -32,46 +32,49 @@ class TestMinPython(object):
 
 
 class TestMode2Handler(object):
-    @pytest.mark.parametrize(
-        "hub_name, dps_name, login",
-        [
-            ("myhub", "[]", None),
-            ("[]", "mydps", None),
-            (None, None, "mylogin"),
-            ("myhub", "[]", "mylogin"),
-            ("[]", "mydps", "mylogin"),
-            ("[]", "[]", "[]"),
-            ("myhub", "[]", "[]"),
-            ("[]", "mydps", "[]"),
-        ],
+    @pytest.fixture(
+        params=[
+            {"hub_name": "myhub", "login": None},
+            {"hub_name": None, "login": "connection_string"},
+            {"hub_name": "myhub", "login": "connection_string"},
+            {"hub_name": None, "login": None},
+            {"dps_name": "mydps", "login": None},
+            {"dps_name": None, "login": "connection_string"},
+            {"dps_name": "mydps", "login": "connection_string"},
+            {"dps_name": None, "login": None},
+            {"cmd.name": "webapp", "login": None}
+        ]
     )
-    def test_mode2_login(self, mocker, hub_name, dps_name, login):
+    def mode2_scenario(self, mocker, request):
+        from argparse import Namespace
+
+        ns = Namespace()
+        param = request.param
+        for kw in param:
+            setattr(ns, kw, param[kw])
+
         mock_cmd = mocker.MagicMock(name="mock cmd")
-        mock_cmd.name = "iot "
-        mock_ns = mocker.MagicMock(name="mock ns")
-        if login != "[]":
-            mock_ns.login = login
-        if hub_name != "[]":
-            mock_ns.hub_name = hub_name
-        if dps_name != "[]":
-            mock_ns.dps_name = dps_name
+        custom_cmd_name = param.get("cmd.name")
+        mock_cmd.name = custom_cmd_name if custom_cmd_name else "iot "
 
-        mode2_iot_login_handler(mock_cmd, mock_ns)
+        scenario = {"namespace": ns, "cmd": mock_cmd, "param": param}
+        return scenario
 
-    @pytest.mark.parametrize("hub_name, dps_name, login", [(None, None, None)])
-    def test_mode2_login_error(self, mocker, hub_name, dps_name, login):
-        mock_cmd = mocker.MagicMock(name="mock cmd")
-        mock_cmd.name = "iot "
-        mock_ns = mocker.MagicMock(name="mock ns")
-        if login != "[]":
-            mock_ns.login = login
-        if hub_name != "[]":
-            mock_ns.hub_name = hub_name
-        if dps_name != "[]":
-            mock_ns.dps_name = dps_name
-
-        with pytest.raises(CLIError):
-            mode2_iot_login_handler(mock_cmd, mock_ns)
+    def test_mode2_login(self, mode2_scenario):
+        scenario_param = mode2_scenario["param"]
+        if (
+            not any([scenario_param.get("dps_name"), scenario_param.get("hub_name")])
+            and not scenario_param["login"]
+            and mode2_scenario["cmd"].name.startswith("iot")
+        ):
+            with pytest.raises(CLIError):
+                mode2_iot_login_handler(
+                    cmd=mode2_scenario["cmd"], namespace=mode2_scenario["namespace"]
+                )
+        else:
+            mode2_iot_login_handler(
+                cmd=mode2_scenario["cmd"], namespace=mode2_scenario["namespace"]
+            )
 
 
 class TestEnsureUamqp(object):
