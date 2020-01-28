@@ -25,7 +25,13 @@ def iot_hub_service_factory(cli_ctx, *_):
             working with IoT Hub.
     """
     from azure.cli.core.commands.client_factory import get_mgmt_service_client
-    from azure.mgmt.iothub.iot_hub_client import IotHubClient
+
+    # To support newer and older IotHubClient. 0.9.0+ has breaking changes.
+    try:
+        from azure.mgmt.iothub import IotHubClient
+    except:
+        # For <0.9.0
+        from azure.mgmt.iothub.iot_hub_client import IotHubClient
     return get_mgmt_service_client(cli_ctx, IotHubClient).iot_hub_resource
 
 

@@ -7,7 +7,7 @@
 
 import os
 
-VERSION = "0.8.8"
+VERSION = "0.8.9"
 EXTENSION_NAME = "azure-cli-iot-ext"
 EXTENSION_ROOT = os.path.dirname(os.path.abspath(__file__))
 EXTENSION_CONFIG_ROOT_KEY = "iotext"
@@ -44,7 +44,7 @@ TRACING_ALLOWED_FOR_SKU = "standard"
 USER_AGENT = "IoTPlatformCliExtension/{}".format(VERSION)
 
 # (Lib name, minimum version (including), maximum version (excluding))
-EVENT_LIB = ("uamqp", "1.1.0", "1.1.1")
+EVENT_LIB = ("uamqp", "1.2", "1.3")
 
 # Config Key's
 CONFIG_KEY_UAMQP_EXT_VERSION = "uamqp_ext_version"
