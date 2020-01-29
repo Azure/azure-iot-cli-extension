@@ -1318,10 +1318,13 @@ def iot_device_upload_file(cmd, device_id, file_path, content_type, hub_name=Non
 def iot_hub_monitor_events(cmd, hub_name=None, device_id=None, consumer_group='$Default', timeout=300,
                            enqueued_time=None, resource_group_name=None, yes=False, properties=None, repair=False,
                            login=None, content_type=None, device_query=None):
-    _iot_hub_monitor_events(cmd, hub_name=hub_name, device_id=device_id,
-                            consumer_group=consumer_group, timeout=timeout, enqueued_time=enqueued_time,
-                            resource_group_name=resource_group_name, yes=yes, properties=properties,
-                            repair=repair, login=login, content_type=content_type, device_query=device_query)
+    try:
+        _iot_hub_monitor_events(cmd, hub_name=hub_name, device_id=device_id,
+                                consumer_group=consumer_group, timeout=timeout, enqueued_time=enqueued_time,
+                                resource_group_name=resource_group_name, yes=yes, properties=properties,
+                                repair=repair, login=login, content_type=content_type, device_query=device_query)
+    except RuntimeError as e:
+        raise CLIError(e)
 
 
 def iot_hub_monitor_feedback(cmd, hub_name=None, device_id=None, yes=False,

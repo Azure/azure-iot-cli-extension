@@ -3,6 +3,14 @@
 Release History
 ===============
 
+0.8.9
++++++++++++++++
+- Updated uamqp version to ~1.2.
+- Simplified out-of-band dependency installation message.
+- If uamqp installation fails the error is raised on stderr rather than having to use --debug.
+- amqp frame traces are not shown when --debug is passed in to event monitoring.
+- Fixed monitor-events not raising an exception if receiver client runs into an error.
+
 0.8.8
 +++++++++++++++
 - Adds Jobs v2 command set.

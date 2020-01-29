@@ -88,10 +88,10 @@ def executor(
         loop.run_forever()
     finally:
         if result:
-            error = next(res for res in result if result)
-            if error:
-                logger.error(error)
-                raise RuntimeError(error)
+            errors = result[0]
+            if errors and errors[0]:
+                logger.debug(errors)
+                raise RuntimeError(errors[0])
 
 
 async def initiate_event_monitor(
@@ -148,7 +148,7 @@ async def initiate_event_monitor(
                     pnp_context=pnp_context,
                 )
             )
-        await asyncio.gather(*coroutines, return_exceptions=True)
+        return await asyncio.gather(*coroutines, return_exceptions=True)
 
 
 async def monitor_events(
@@ -254,7 +254,7 @@ async def monitor_events(
 
     exp_cancelled = False
     receive_client = uamqp.ReceiveClientAsync(
-        source, auth=auth, timeout=timeout, prefetch=0, debug=DEBUG
+        source, auth=auth, timeout=timeout, prefetch=0, client_name=_get_container_id(), debug=DEBUG
     )
 
     try:
