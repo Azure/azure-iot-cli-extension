@@ -5,7 +5,10 @@
 # --------------------------------------------------------------------------------------------
 
 from azext_iot.common._azure import get_iot_hub_connection_string
-from azext_iot._factory import _bind_sdk
+from azext_iot._factory import SdkResolver
+from msrest.exceptions import HttpOperationError, SerializationError
+
+__all__ = ["HttpOperationError", "SerializationError"]
 
 
 class IoTHubProvider(object):
@@ -19,6 +22,7 @@ class IoTHubProvider(object):
             resource_group_name=self.rg,
             login=login,
         )
+        self.resolver = SdkResolver(self.target)
 
     def get_sdk(self, sdk_type):
-        return _bind_sdk(self.target, sdk_type)
+        return self.resolver.get_sdk(sdk_type)

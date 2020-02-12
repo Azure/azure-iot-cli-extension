@@ -11,7 +11,7 @@ from knack.util import CLIError
 from azext_iot.common.shared import SdkType, JobStatusType, JobType, JobVersionType
 from azext_iot.common.utility import unpack_msrest_error, process_json_arg
 from azext_iot.operations.generic import _execute_query, _process_top
-from azext_iot.iothub.providers.base import IoTHubProvider
+from azext_iot.iothub.providers.base import IoTHubProvider, HttpOperationError, SerializationError
 
 
 logger = get_logger(__name__)
@@ -27,13 +27,13 @@ class JobProvider(IoTHubProvider):
         return job_result
 
     def _get(self, job_id, job_version=JobVersionType.v2):
-        service_sdk, errors = self.get_sdk(SdkType.service_sdk)
+        service_sdk = self.get_sdk(SdkType.service_sdk)
 
         try:
             if job_version == JobVersionType.v2:
-                return service_sdk.get_job1(id=job_id)
-            return self._convert_v1_to_v2(service_sdk.get_job(id=job_id))
-        except errors.CloudError as e:
+                return service_sdk.job_client.get_job(id=job_id, raw=True).response.json()
+            return self._convert_v1_to_v2(service_sdk.job_client.get_import_export_job(id=job_id))
+        except HttpOperationError as e:
             raise CLIError(unpack_msrest_error(e))
 
     def cancel(self, job_id):
@@ -46,13 +46,13 @@ class JobProvider(IoTHubProvider):
         return self._cancel(job_id)
 
     def _cancel(self, job_id, job_version=JobVersionType.v2):
-        service_sdk, errors = self.get_sdk(SdkType.service_sdk)
+        service_sdk = self.get_sdk(SdkType.service_sdk)
 
         try:
             if job_version == JobVersionType.v2:
-                return service_sdk.cancel_job1(id=job_id)
-            return service_sdk.cancel_job(id=job_id)
-        except errors.CloudError as e:
+                return service_sdk.job_client.cancel_job(id=job_id, raw=True).response.json()
+            return service_sdk.job_client.cancel_import_export_job(id=job_id)
+        except HttpOperationError as e:
             raise CLIError(unpack_msrest_error(e))
 
     def list(self, job_type=None, job_status=None, top=None):
@@ -86,20 +86,20 @@ class JobProvider(IoTHubProvider):
         return jobs_collection
 
     def _list(self, job_type=None, job_status=None, top=None, job_version=JobVersionType.v2):
-        service_sdk, errors = self.get_sdk(SdkType.service_sdk)
+        service_sdk = self.get_sdk(SdkType.service_sdk)
         jobs_collection = []
 
         try:
             if job_version == JobVersionType.v2:
                 query = [job_type, job_status]
-                query_method = service_sdk.query_jobs
+                query_method = service_sdk.job_client.query_jobs
                 jobs_collection.extend(_execute_query(query, query_method, top))
             elif job_version == JobVersionType.v1:
-                jobs_collection.extend(service_sdk.get_jobs())
+                jobs_collection.extend(service_sdk.job_client.get_import_export_jobs())
                 jobs_collection = [self._convert_v1_to_v2(job) for job in jobs_collection]
 
             return jobs_collection
-        except errors.CloudError as e:
+        except HttpOperationError as e:
             raise CLIError(unpack_msrest_error(e))
 
     def create(
@@ -118,12 +118,10 @@ class JobProvider(IoTHubProvider):
         poll_interval=10,
         poll_duration=600,
     ):
-
-        from msrest.exceptions import SerializationError
-        from azext_iot.sdk.service.models.cloud_to_device_method import (
+        from azext_iot.sdk.iothub.service.models import (
             CloudToDeviceMethod,
+            JobRequest
         )
-        from azext_iot.sdk.service.models.job_request import JobRequest
 
         if (
             job_type
@@ -190,10 +188,10 @@ class JobProvider(IoTHubProvider):
                 payload=method_payload,
             )
 
-        service_sdk, errors = self.get_sdk(SdkType.service_sdk)
+        service_sdk = self.get_sdk(SdkType.service_sdk)
 
         try:
-            job_result = service_sdk.create_job1(id=job_id, job_request=job_request)
+            job_result = service_sdk.job_client.create_job(id=job_id, job_request=job_request, raw=True).response.json()
             if wait:
                 logger.info("Waiting for job finished state...")
                 current_datetime = datetime.now()
@@ -220,7 +218,7 @@ class JobProvider(IoTHubProvider):
                     sleep(poll_interval)
 
             return job_result
-        except errors.CloudError as e:
+        except HttpOperationError as e:
             raise CLIError(unpack_msrest_error(e))
         except SerializationError as se:
             # ISO8601 parsing is handled by msrest

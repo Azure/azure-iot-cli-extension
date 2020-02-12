@@ -10,6 +10,9 @@ Factory functions for IoT Hub and Device Provisioning Service.
 
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import SdkType
+from msrest.exceptions import HttpOperationError
+
+__all__ = ["HttpOperationError"]
 
 
 def iot_hub_service_factory(cli_ctx, *_):
@@ -52,6 +55,39 @@ def iot_service_provisioning_factory(cli_ctx, *_):
     return get_mgmt_service_client(cli_ctx, IotDpsClient)
 
 
+class SdkResolver(object):
+    def __init__(self, target, device_id=None):
+        self.target = target
+        self.device_id = device_id
+
+        # This initialization will likely need to change to support more variation of SDK
+        self.sas_uri = self.target["entity"]
+        self.endpoint = "https://{}".format(self.sas_uri)
+        if self.device_id:  # IoT Hub base endpoint stays the same
+            self.sas_uri = "{}/devices/{}".format(self.sas_uri, self.device_id)
+
+    def get_sdk(self, sdk_type):
+        sdk_map = self._construct_sdk_map()
+        return sdk_map[sdk_type]
+
+    def _construct_sdk_map(self):
+        return {
+            SdkType.service_sdk: self._get_service_sdk()
+        }
+
+    def _get_device_sdk(self):
+        pass
+
+    def _get_service_sdk(self):
+        from azext_iot.sdk.iothub.service.iot_hub_gateway_service_ap_is import IotHubGatewayServiceAPIs
+        credentials = SasTokenAuthentication(
+            uri=self.sas_uri,
+            shared_access_policy_name=self.target['policy'],
+            shared_access_key=self.target['primarykey'])
+
+        return IotHubGatewayServiceAPIs(credentials=credentials, base_url=self.endpoint)
+
+'''
 def _bind_sdk(target, sdk_type, device_id=None, auth=None):
     from azext_iot.sdk.device.iot_hub_gateway_device_apis import IotHubGatewayDeviceAPIs
     from azext_iot.sdk.service.iot_hub_gateway_service_apis import IotHubGatewayServiceAPIs
@@ -99,7 +135,7 @@ def _bind_sdk(target, sdk_type, device_id=None, auth=None):
         )
 
     return None
-
+'''
 
 def _get_sdk_exception_type(sdk_type):
     from importlib import import_module

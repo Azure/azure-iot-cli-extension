@@ -28,7 +28,7 @@ from azext_iot.common.utility import (shell_safe_json_parse,
                                       unpack_msrest_error,
                                       init_monitoring,
                                       process_json_arg)
-from azext_iot._factory import _bind_sdk
+from azext_iot._factory import SdkResolver, HttpOperationError
 from azext_iot.operations.generic import _execute_query, _process_top
 
 
@@ -38,18 +38,20 @@ logger = get_logger(__name__)
 # Query
 
 def iot_query(cmd, query_command, hub_name=None, top=None, resource_group_name=None, login=None):
+    from azext_iot.sdk.iothub.service.models import QuerySpecification
+
     top = _process_top(top)
-
-    from azext_iot.sdk.service.models import QuerySpecification
-
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
-    service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
+
+    resolver = SdkResolver(target=target)
+    service_sdk = resolver.get_sdk(SdkType.service_sdk)
+
     try:
-        query = [QuerySpecification(query_command)]
-        query_method = service_sdk.query_iot_hub
+        query = [QuerySpecification(query=query_command)]
+        query_method = service_sdk.registry_manager.query_iot_hub
 
         return _execute_query(query, query_method, top)
-    except errors.CloudError as e:
+    except HttpOperationError as e:
         raise CLIError(unpack_msrest_error(e))
 
 
@@ -61,12 +63,14 @@ def iot_device_show(cmd, device_id, hub_name=None, resource_group_name=None, log
 
 
 def _iot_device_show(target, device_id):
-    service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
+    resolver = SdkResolver(target=target)
+    service_sdk = resolver.get_sdk(SdkType.service_sdk)
+
     try:
-        device = service_sdk.get_device(device_id)
+        device = service_sdk.registry_manager.get_device(id=device_id, raw=True).response.json()
         device['hub'] = target.get('entity')
         return device
-    except errors.CloudError as e:
+    except HttpOperationError as e:
         raise CLIError(unpack_msrest_error(e))
 
 
@@ -85,7 +89,9 @@ def iot_device_create(cmd, device_id, hub_name=None, edge_enabled=False,
                       force=False, resource_group_name=None, login=None):
 
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
-    service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
+    resolver = SdkResolver(target=target)
+    service_sdk = resolver.get_sdk(SdkType.service_sdk)
+
     deviceScope = None
     if edge_enabled:
         if auth_method != DeviceAuthType.shared_private_key.name:
@@ -104,15 +110,15 @@ def iot_device_create(cmd, device_id, hub_name=None, edge_enabled=False,
     if any([valid_days, output_dir]):
         valid_days = 365 if not valid_days else int(valid_days)
         if output_dir and not exists(output_dir):
-            raise CLIError('certificate output directory of "{}" does not exist.')
+            raise CLIError("certificate output directory of '{}' does not exist.".format(output_dir))
         cert = _create_self_signed_cert(device_id, valid_days, output_dir)
-        primary_thumbprint = cert['thumbprint']
+        primary_thumbprint = cert["thumbprint"]
 
     try:
         device = _assemble_device(device_id, auth_method, edge_enabled, primary_thumbprint,
                                   secondary_thumbprint, status, status_reason, deviceScope)
-        output = service_sdk.create_or_update_device(device_id, device)
-    except errors.CloudError as e:
+        output = service_sdk.registry_manager.create_or_update_device(id=device_id, device=device)
+    except HttpOperationError as e:
         raise CLIError(unpack_msrest_error(e))
 
     if add_children:
@@ -124,9 +130,11 @@ def iot_device_create(cmd, device_id, hub_name=None, edge_enabled=False,
 
 
 def _assemble_device(device_id, auth_method, edge_enabled, pk=None, sk=None,
-                     status='enabled', status_reason=None, device_scope=None):
-    from azext_iot.sdk.service.models.device_capabilities import DeviceCapabilities
-    from azext_iot.sdk.service.models.device import Device
+                     status="enabled", status_reason=None, device_scope=None):
+    from azext_iot.sdk.iothub.service.models import (
+        DeviceCapabilities,
+        Device
+    )
 
     auth = _assemble_auth(auth_method, pk, sk)
     cap = DeviceCapabilities(edge_enabled)
@@ -137,24 +145,26 @@ def _assemble_device(device_id, auth_method, edge_enabled, pk=None, sk=None,
 
 
 def _assemble_auth(auth_method, pk, sk):
-    from azext_iot.sdk.service.models.authentication_mechanism import AuthenticationMechanism
-    from azext_iot.sdk.service.models.symmetric_key import SymmetricKey
-    from azext_iot.sdk.service.models.x509_thumbprint import X509Thumbprint
+    from azext_iot.sdk.iothub.service.models import (
+        AuthenticationMechanism,
+        SymmetricKey,
+        X509Thumbprint
+    )
 
     auth = None
-    if auth_method in [DeviceAuthType.shared_private_key.name, 'sas']:
+    if auth_method in [DeviceAuthType.shared_private_key.name, "sas"]:
         auth = AuthenticationMechanism(
-            symmetric_key=SymmetricKey(pk, sk), type='sas')
-    elif auth_method in [DeviceAuthType.x509_thumbprint.name, 'selfSigned']:
+            symmetric_key=SymmetricKey(pk, sk), type="sas")
+    elif auth_method in [DeviceAuthType.x509_thumbprint.name, "selfSigned"]:
         if not pk:
-            raise ValueError('primary thumbprint required with selfSigned auth')
+            raise ValueError("primary thumbprint required with selfSigned auth")
         auth = AuthenticationMechanism(x509_thumbprint=X509Thumbprint(
-            pk, sk), type='selfSigned')
-    elif auth_method in [DeviceAuthType.x509_ca.name, 'certificateAuthority']:
-        auth = AuthenticationMechanism(type='certificateAuthority')
+            pk, sk), type="selfSigned")
+    elif auth_method in [DeviceAuthType.x509_ca.name, "certificateAuthority"]:
+        auth = AuthenticationMechanism(type="certificateAuthority")
     else:
         raise ValueError(
-            'Authorization method {} invalid.'.format(auth_method))
+            "Authorization method {} invalid.".format(auth_method))
     return auth
 
 
@@ -165,48 +175,53 @@ def _create_self_signed_cert(subject, valid_days, output_path=None):
 
 def iot_device_update(cmd, device_id, parameters, hub_name=None, resource_group_name=None, login=None):
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
-    service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
+    resolver = SdkResolver(target=target)
+    service_sdk = resolver.get_sdk(SdkType.service_sdk)
+
     try:
         updated_device = _handle_device_update_params(parameters)
-        etag = parameters.get('etag', None)
+        etag = parameters.get("etag", None)
         if etag:
             headers = {}
             headers["If-Match"] = '"{}"'.format(etag)
-            return service_sdk.create_or_update_device(device_id, updated_device, custom_headers=headers)
+            return service_sdk.registry_manager.create_or_update_device(device_id, updated_device, custom_headers=headers)
         raise LookupError("device etag not found.")
-    except errors.CloudError as e:
+    except HttpOperationError as e:
         raise CLIError(unpack_msrest_error(e))
     except LookupError as err:
         raise CLIError(err)
 
 
 def _handle_device_update_params(parameters):
-    status = parameters['status'].lower()
-    possible_status = ['enabled', 'disabled']
+    status = parameters["status"].lower()
+    possible_status = ["enabled", "disabled"]
     if status not in possible_status:
         raise CLIError("status must be one of {}".format(possible_status))
 
-    edge = parameters.get('capabilities').get('iotEdge')
+    edge = parameters["capabilities"].get('iotEdge')
     if not isinstance(edge, bool):
         raise CLIError("capabilities.iotEdge is of type bool")
 
     auth, pk, sk = _parse_auth(parameters)
-    return _assemble_device(parameters['deviceId'], auth, edge, pk, sk, status, parameters.get('statusReason'))
+    return _assemble_device(parameters["deviceId"], auth, edge, pk, sk, status, parameters.get("statusReason"))
 
 
 def iot_device_delete(cmd, device_id, hub_name=None, resource_group_name=None, login=None):
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
-    service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
+    resolver = SdkResolver(target=target)
+    service_sdk = resolver.get_sdk(SdkType.service_sdk)
+
     try:
-        device = service_sdk.get_device(device_id)
-        etag = device.get('etag', None)
+        device = _iot_device_show(target=target, device_id=device_id)
+        etag = device.get("etag")
+
         if etag:
             headers = {}
             headers["If-Match"] = '"{}"'.format(etag)
-            service_sdk.delete_device(device_id, custom_headers=headers)
+            service_sdk.registry_manager.delete_device(id=device_id, custom_headers=headers)
             return
         raise LookupError("device etag not found")
-    except errors.CloudError as e:
+    except HttpOperationError as e:
         raise CLIError(unpack_msrest_error(e))
     except LookupError as err:
         raise CLIError(err)
@@ -295,17 +310,23 @@ def _iot_device_children_list(cmd, device_id, hub_name=None, resource_group_name
 
 
 def _update_nonedge_devicescope(target, nonedge_device, deviceScope=''):
-    service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
+    resolver = SdkResolver(target=target)
+    service_sdk = resolver.get_sdk(SdkType.service_sdk)
+
     try:
         nonedge_device['deviceScope'] = deviceScope
         etag = nonedge_device.get('etag', None)
         if etag:
             headers = {}
             headers["If-Match"] = '"{}"'.format(etag)
-            service_sdk.create_or_update_device(nonedge_device['deviceId'], nonedge_device, custom_headers=headers)
+            service_sdk.registry_manager.create_or_update_device(
+                id=nonedge_device['deviceId'],
+                device=nonedge_device,
+                custom_headers=headers
+            )
             return
         raise LookupError("device etag not found.")
-    except errors.CloudError as e:
+    except HttpOperationError as e:
         raise CLIError(unpack_msrest_error(e))
     except LookupError as err:
         raise CLIError(err)
@@ -345,21 +366,29 @@ def iot_device_module_create(cmd, device_id, module_id, hub_name=None, auth_meth
     if any([valid_days, output_dir]):
         valid_days = 365 if not valid_days else int(valid_days)
         if output_dir and not exists(output_dir):
-            raise CLIError('certificate output directory of "{}" does not exist.')
+            raise CLIError("certificate output directory of '{}' does not exist.".format(output_dir))
         cert = _create_self_signed_cert(module_id, valid_days, output_dir)
-        primary_thumbprint = cert['thumbprint']
+        primary_thumbprint = cert["thumbprint"]
 
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
-    service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
+    resolver = SdkResolver(target=target)
+    service_sdk = resolver.get_sdk(SdkType.service_sdk)
+
     try:
-        module = _assemble_module(device_id, module_id, auth_method, primary_thumbprint, secondary_thumbprint)
-        return service_sdk.create_or_update_module(device_id, module_id, module)
-    except errors.CloudError as e:
+        module = _assemble_module(
+            device_id=device_id,
+            module_id=module_id,
+            auth_method=auth_method,
+            pk=primary_thumbprint,
+            sk=secondary_thumbprint
+        )
+        return service_sdk.registry_manager.create_or_update_module(id=device_id, mid=module_id, module=module)
+    except HttpOperationError as e:
         raise CLIError(unpack_msrest_error(e))
 
 
 def _assemble_module(device_id, module_id, auth_method, pk=None, sk=None):
-    from azext_iot.sdk.service.models.module import Module
+    from azext_iot.sdk.iothub.service.models import Module
 
     auth = _assemble_auth(auth_method, pk, sk)
     module = Module(module_id=module_id, device_id=device_id, authentication=auth)
@@ -369,16 +398,23 @@ def _assemble_module(device_id, module_id, auth_method, pk=None, sk=None):
 def iot_device_module_update(cmd, device_id, module_id, parameters,
                              hub_name=None, resource_group_name=None, login=None):
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
-    service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
+    resolver = SdkResolver(target=target)
+    service_sdk = resolver.get_sdk(SdkType.service_sdk)
+
     try:
         updated_module = _handle_module_update_params(parameters)
-        etag = parameters.get('etag', None)
+        etag = parameters.get("etag")
         if etag:
             headers = {}
             headers["If-Match"] = '"{}"'.format(etag)
-            return service_sdk.create_or_update_module(device_id, module_id, updated_module, custom_headers=headers)
+            return service_sdk.registry_manager.create_or_update_module(
+                id=device_id,
+                mid=module_id,
+                module=updated_module,
+                custom_headers=headers
+            )
         raise LookupError("module etag not found.")
-    except errors.CloudError as e:
+    except HttpOperationError as e:
         raise CLIError(unpack_msrest_error(e))
     except LookupError as err:
         raise CLIError(err)
@@ -386,21 +422,27 @@ def iot_device_module_update(cmd, device_id, module_id, parameters,
 
 def _handle_module_update_params(parameters):
     auth, pk, sk = _parse_auth(parameters)
-    return _assemble_module(parameters['deviceId'], parameters['moduleId'], auth, pk, sk)
+    return _assemble_module(
+        device_id=parameters["deviceId"],
+        module_id=parameters["moduleId"],
+        auth_method=auth,
+        pk=pk,
+        sk=sk
+    )
 
 
 def _parse_auth(parameters):
-    valid_auth = ['sas', 'selfSigned', 'certificateAuthority']
-    auth = parameters.get('authentication').get('type')
+    valid_auth = ["sas", "selfSigned", "certificateAuthority"]
+    auth = parameters['authentication'].get('type')
     if auth not in valid_auth:
         raise CLIError("authentication.type must be one of {}".format(valid_auth))
     pk = sk = None
-    if auth == 'sas':
-        pk = parameters.get('authentication').get('symmetricKey').get('primaryKey')
-        sk = parameters.get('authentication').get('symmetricKey').get('secondaryKey')
-    elif auth == 'selfSigned':
-        pk = parameters.get('authentication').get('x509Thumbprint').get('primaryThumbprint')
-        sk = parameters.get('authentication').get('x509Thumbprint').get('secondaryThumbprint')
+    if auth == "sas":
+        pk = parameters["authentication"]["symmetricKey"]["primaryKey"]
+        sk = parameters["authentication"]["symmetricKey"]["secondaryKey"]
+    elif auth == "selfSigned":
+        pk = parameters["authentication"]["x509Thumbprint"]["primaryThumbprint"]
+        sk = parameters["authentication"]["x509Thumbprint"]["secondaryThumbprint"]
         if not any([pk, sk]):
             raise CLIError("primary + secondary Thumbprint required with selfSigned auth")
     return auth, pk, sk
@@ -408,10 +450,12 @@ def _parse_auth(parameters):
 
 def iot_device_module_list(cmd, device_id, hub_name=None, top=1000, resource_group_name=None, login=None):
     target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name, login=login)
-    service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
+    resolver = SdkResolver(target=target)
+    service_sdk = resolver.get_sdk(SdkType.service_sdk)
+
     try:
-        return service_sdk.get_modules_on_device(device_id)[:top]
-    except errors.CloudError as e:
+        return service_sdk.registry_manager.get_modules_on_device(device_id)[:top]
+    except HttpOperationError as e:
         raise CLIError(unpack_msrest_error(e))
 
 
