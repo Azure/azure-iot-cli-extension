@@ -4,7 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-
+import re
+import responses
 import pytest
 import json
 import os
@@ -140,19 +141,37 @@ def fixture_monitor_events_entrypoint(mocker):
     return mocker.patch(path_iot_hub_monitor_events_entrypoint)
 
 
-def build_mock_response(mocker, status_code=200, payload=None, headers=None, raw=False):
-    response = mocker.MagicMock(name="response")
+# TODO: To be deprecated asap. Leverage mocked_response fixture for this functionality.
+def build_mock_response(mocker=None, status_code=200, payload=None, headers=None, **kwargs):
+    try:
+        from unittest.mock import MagicMock
+    except:
+        from mock import MagicMock
+
+    response = mocker.MagicMock(name="response") if mocker else MagicMock(name="response")
     response.status_code = status_code
     del response.context
     del response._attribute_map
+    del response.body
 
-    if raw:
-        response.text = payload
+    # This is a cludge. Supports {} or [] payload.
+    if payload is not None:
+        _payload_str = json.dumps(payload) if not isinstance(payload, str) else payload
+        response.text.return_value = _payload_str
+        response.text = _payload_str
+        response.internal_response.json.return_value = json.loads(_payload_str)
     else:
-        response.text.return_value = json.dumps(payload)
+        response.text.return_value = ''
+        response.text = ''
 
-    if headers:
-        response.headers = headers
+    headers_get_side_effect = kwargs.get("headers_get_side_effect")
+    if headers_get_side_effect:
+        response.headers.get.side_effect = headers_get_side_effect
+        response.internal_response.headers.get.side_effect = headers_get_side_effect
+    else:
+        response.headers = headers if headers else {}
+        response.internal_response.headers = headers if headers else {}
+
     return response
 
 
@@ -162,3 +181,24 @@ def get_context_path(base_path, *paths):
         return os.path.join(base_path, *paths)
 
     return base_path
+
+
+@pytest.fixture
+def mocked_response():
+    with responses.RequestsMock() as rsps:
+        yield rsps
+
+
+@pytest.fixture(params=[400, 401, 500])
+def service_client_generic_errors(mocked_response, fixture_ghcs, request):
+    def error_callback(_):
+        return (request.param, {'Content-Type': "application/json; charset=utf-8"}, json.dumps({"error": "something failed"}))
+
+    any_endpoint = r"^https:\/\/.+"
+    with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
+        rsps.add_callback(callback=error_callback, method=responses.GET, url=re.compile(any_endpoint))
+        rsps.add_callback(callback=error_callback, method=responses.PUT, url=re.compile(any_endpoint))
+        rsps.add_callback(callback=error_callback, method=responses.POST, url=re.compile(any_endpoint))
+        rsps.add_callback(callback=error_callback, method=responses.DELETE, url=re.compile(any_endpoint))
+        rsps.add_callback(callback=error_callback, method=responses.PATCH, url=re.compile(any_endpoint))
+        yield rsps

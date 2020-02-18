@@ -66,3 +66,7 @@ def create_c2d_receive_response(minimum=False):
         baseline["body"] = str(uuid4())
 
     return baseline
+
+
+def generate_generic_id():
+    return str(uuid4()).replace("-", "")

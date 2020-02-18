@@ -11,7 +11,7 @@ from knack.util import CLIError
 from azext_iot.common.shared import SdkType, JobStatusType, JobType, JobVersionType
 from azext_iot.common.utility import unpack_msrest_error, process_json_arg
 from azext_iot.operations.generic import _execute_query, _process_top
-from azext_iot.iothub.providers.base import IoTHubProvider, HttpOperationError, SerializationError
+from azext_iot.iothub.providers.base import IoTHubProvider, CloudError, SerializationError
 
 
 logger = get_logger(__name__)
@@ -33,7 +33,7 @@ class JobProvider(IoTHubProvider):
             if job_version == JobVersionType.v2:
                 return service_sdk.job_client.get_job(id=job_id, raw=True).response.json()
             return self._convert_v1_to_v2(service_sdk.job_client.get_import_export_job(id=job_id))
-        except HttpOperationError as e:
+        except CloudError as e:
             raise CLIError(unpack_msrest_error(e))
 
     def cancel(self, job_id):
@@ -52,7 +52,7 @@ class JobProvider(IoTHubProvider):
             if job_version == JobVersionType.v2:
                 return service_sdk.job_client.cancel_job(id=job_id, raw=True).response.json()
             return service_sdk.job_client.cancel_import_export_job(id=job_id)
-        except HttpOperationError as e:
+        except CloudError as e:
             raise CLIError(unpack_msrest_error(e))
 
     def list(self, job_type=None, job_status=None, top=None):
@@ -99,7 +99,7 @@ class JobProvider(IoTHubProvider):
                 jobs_collection = [self._convert_v1_to_v2(job) for job in jobs_collection]
 
             return jobs_collection
-        except HttpOperationError as e:
+        except CloudError as e:
             raise CLIError(unpack_msrest_error(e))
 
     def create(
@@ -218,7 +218,7 @@ class JobProvider(IoTHubProvider):
                     sleep(poll_interval)
 
             return job_result
-        except HttpOperationError as e:
+        except CloudError as e:
             raise CLIError(unpack_msrest_error(e))
         except SerializationError as se:
             # ISO8601 parsing is handled by msrest
@@ -235,6 +235,7 @@ class JobProvider(IoTHubProvider):
         v2_result["status"] = job_v1.status
         v2_result["type"] = job_v1.type
         v2_result["progress"] = job_v1.progress
+        v2_result["excludeKeysInExport"] = job_v1.exclude_keys_in_export
 
         if job_v1.failure_reason:
             v2_result["failureReason"] = job_v1.failure_reason

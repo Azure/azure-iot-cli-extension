@@ -6,9 +6,11 @@
 
 from azext_iot.common._azure import get_iot_hub_connection_string
 from azext_iot._factory import SdkResolver
-from msrest.exceptions import HttpOperationError, SerializationError
+from msrest.exceptions import SerializationError
+from msrestazure.azure_exceptions import CloudError
 
-__all__ = ["HttpOperationError", "SerializationError"]
+
+__all__ = ["CloudError", "SerializationError"]
 
 
 class IoTHubProvider(object):

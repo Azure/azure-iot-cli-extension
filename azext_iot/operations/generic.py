@@ -16,7 +16,7 @@ def _execute_query(query_args, query_method, top=None):
         headers["x-ms-max-item-count"] = str(top)
 
     result = query_method(*query_args, custom_headers=headers, raw=True)
-    token = result.headers.get("x-ms-continuation")
+    token = result.response.headers.get("x-ms-continuation")
 
     payload.extend(result.response.json())
     while token:
@@ -29,8 +29,8 @@ def _execute_query(query_args, query_method, top=None):
             else:
                 break
         headers["x-ms-continuation"] = token
-        result = query_method(*query_args, custom_headers=headers)
-        token = result.headers.get("x-ms-continuation")
+        result = query_method(*query_args, custom_headers=headers, raw=True)
+        token = result.response.headers.get("x-ms-continuation")
         payload.extend(result.response.json())
     return payload[:top] if top else payload
 
