@@ -4,7 +4,7 @@ steps:
     inputs:
       buildType: 'current'
       downloadType: 'single'
-      artifactName: 'azure-cli-iot-ext'
+      artifactName: 'azure-iot'
       downloadPath: '$(System.ArtifactsDirectory)/extension'
 
   - task: PowerShell@2

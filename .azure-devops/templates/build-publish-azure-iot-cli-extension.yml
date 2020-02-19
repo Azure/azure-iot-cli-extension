@@ -11,5 +11,5 @@ steps:
     displayName: 'Publish Azure IoT CLI extension as build artifact'
     inputs:
       pathtoPublish: 'dist' 
-      artifactName: 'azure-cli-iot-ext' 
+      artifactName: 'azure-iot' 
       publishLocation: 'Container'
