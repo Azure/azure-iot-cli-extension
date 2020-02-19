@@ -8,7 +8,7 @@
 Load CLI commands
 """
 
-from azext_iot import iothub_ops_job
+from azext_iot import iothub_ops_job, iothub_ops_device
 
 
 def load_iothub_commands(self, _):
@@ -20,3 +20,6 @@ def load_iothub_commands(self, _):
         cmd_group.command("show", "job_show")
         cmd_group.command("list", "job_list")
         cmd_group.command("cancel", "job_cancel")
+
+    with self.command_group("iot hub device-identity", command_type=iothub_ops_device) as cmd_group:
+        pass

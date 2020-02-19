@@ -19,6 +19,10 @@ iothub_ops_job = CliCommandType(
     operations_tmpl='azext_iot.iothub.job_commands#{}'
 )
 
+iothub_ops_device = CliCommandType(
+    operations_tmpl='azext_iot.iothub.device_commands#{}'
+)
+
 iotdps_ops = CliCommandType(
     operations_tmpl='azext_iot.operations.dps#{}',
     client_factory=iot_service_provisioning_factory

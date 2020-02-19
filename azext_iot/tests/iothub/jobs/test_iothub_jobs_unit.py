@@ -13,7 +13,7 @@ from uuid import uuid4
 from knack.cli import CLIError
 from azext_iot.iothub import job_commands as subject
 from azext_iot.common.shared import JobStatusType, JobType
-from ..conftest import build_mock_response, path_service_client, mock_target
+from ...conftest import build_mock_response, path_service_client, mock_target
 
 
 def generate_job_id():

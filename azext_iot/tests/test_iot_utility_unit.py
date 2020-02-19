@@ -226,7 +226,7 @@ class TestProcessJsonArg(object):
         )
 
     @pytest.mark.parametrize(
-        "content, argname", [("configurations/test_adm_device_content.json", "myarg0")]
+        "content, argname", [("iothub/configurations/test_adm_device_content.json", "myarg0")]
     )
     def test_file_json(self, content, argname, set_cwd):
         result = process_json_arg(content, argument_name=argname)
