@@ -422,6 +422,8 @@ helps['iot hub configuration create'] = """
 
                   Configurations can be defined with user provided metrics for on demand evaluation.
                   User metrics are json and in the form of {"queries":{...}} or {"metrics":{"queries":{...}}}.
+
+                  Note: Target condition for modules must start with "from devices.modules where".
     examples:
     - name: Create a device configuration with a priority of 3 that applies on condition when a device is
             tagged in building 9 and the environment is 'test'.
@@ -436,13 +438,13 @@ helps['iot hub configuration create'] = """
     - name: Create a module configuration with labels and provide user metrics inline (cmd syntax example)
       text: >
         az iot hub configuration create -c {config_name} -n {iothub_name} --content module_content.json
-        --target-condition "tags.building=9" --labels "{\\"key0\\":\\"value0\\", \\"key1\\":\\"value1\\"}"
+        --target-condition "from devices.modules where tags.building=9" --labels "{\\"key0\\":\\"value0\\", \\"key1\\":\\"value1\\"}"
         --metrics "{\\"metrics\\": {\\"queries\\": {\\"mymetric\\": \\"select deviceId from devices where tags.location='US'\\"}}}"
     - name: Create a module configuration with content and user metrics inline (powershell syntax example)
       text: >
         az iot hub configuration create -c {config_name} -n {iothub_name}
         --content '{\\"moduleContent\\": {\\"properties.desired.chillerWaterSettings\\": {\\"temperature\\": 38, \\"pressure\\": 78}}}'
-        --target-condition "tags.building=9" --priority 1
+        --target-condition "from devices.modules where tags.building=9" --priority 1
         --metrics '{\\"metrics\\": {\\"queries\\": {\\"mymetric\\":\\"select deviceId from devices where tags.location=''US''\\"}}}'
 """
 

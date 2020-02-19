@@ -6,6 +6,7 @@
 
 
 import pytest
+import responses
 import json
 from uuid import uuid4
 from random import randint
@@ -86,18 +87,31 @@ def sample_config_adm(set_cwd, request):
 
 
 class TestConfigMetricShow:
-    @pytest.fixture(params=[200])
-    def serviceclient(
-        self, mocker, fixture_ghcs, fixture_sas, request, sample_config_show
+    @pytest.fixture
+    def service_client(
+        self, mocked_response, fixture_ghcs, request, sample_config_show
     ):
-        service_client = mocker.patch(path_service_client)
-        service_client.side_effect = [
-            build_mock_response(mocker, payload=sample_config_show),
-            build_mock_response(
-                mocker, payload=[], headers={"x-ms-continuation": None}
-            ),
-        ]
-        return service_client
+        mocked_response.add(
+            method=responses.GET,
+            url="https://{}/configurations/{}".format(mock_target["entity"], config_id),
+            body=json.dumps(sample_config_show),
+            headers={},
+            status=200,
+            content_type="application/json",
+            match_querystring=False
+        )
+
+        mocked_response.add(
+            method=responses.POST,
+            url="https://{}/devices/query".format(mock_target["entity"]),
+            body="[]",
+            headers={"x-ms-continuation": ""},
+            status=200,
+            content_type="application/json",
+            match_querystring=False
+        )
+
+        yield mocked_response
 
     @pytest.mark.parametrize(
         "metric_id, content_type, metric_type",
@@ -113,7 +127,7 @@ class TestConfigMetricShow:
     def test_config_metric_show(
         self,
         fixture_cmd2,
-        serviceclient,
+        service_client,
         metric_id,
         content_type,
         metric_type,
@@ -139,8 +153,9 @@ class TestConfigMetricShow:
         assert result["metric"] == metric_id
         assert result["query"] == expected[metric_type_key]["queries"][metric_id]
 
-        query_args = serviceclient.call_args_list[1]
-        query_body = query_args[0][2]
+        assert len(service_client.calls) == 2
+        query_request = service_client.calls[1].request
+        query_body = json.loads(query_request.body)
 
         assert query_body["query"] == expected[metric_type_key]["queries"][metric_id]
 
@@ -159,9 +174,10 @@ class TestConfigMetricShow:
         ],
     )
     def test_config_metric_show_invalid_args(
-        self, fixture_cmd2, serviceclient, metric_id, content_type, metric_type
+        self, fixture_cmd2, service_client, metric_id, content_type, metric_type
     ):
         from functools import partial
+        service_client.assert_all_requests_are_fired = False
 
         with pytest.raises(CLIError):
             target_method = (
@@ -264,7 +280,7 @@ class TestConfigCreate:
         args = serviceclient.call_args
         url = args[0][0].url
         method = args[0][0].method
-        body = args[0][2]
+        body = json.loads(args[0][0].body)
 
         assert "{}/configurations/{}?".format(hub_name, config_id.lower()) in url
         assert method == "PUT"
@@ -386,7 +402,7 @@ class TestConfigCreate:
         args = serviceclient.call_args
         url = args[0][0].url
         method = args[0][0].method
-        body = args[0][2]
+        body = json.loads(args[0][0].body)
 
         assert "{}/configurations/{}?".format(hub_name, config_id.lower()) in url
         assert method == "PUT"
@@ -542,7 +558,7 @@ class TestConfigDelete:
         args = serviceclient.call_args
         url = args[0][0].url
         method = args[0][0].method
-        headers = args[0][1]
+        headers = args[0][0].headers
 
         assert method == "DELETE"
         assert "{}/configurations/{}?".format(mock_target["entity"], config_id) in url
@@ -584,8 +600,8 @@ class TestConfigUpdate:
         args = serviceclient.call_args
         url = args[0][0].url
         method = args[0][0].method
-        body = args[0][2]
-        headers = args[0][1]
+        body = json.loads(args[0][0].body)
+        headers = args[0][0].headers
 
         assert "{}/configurations/{}?".format(mock_target["entity"], config_id) in url
         assert method == "PUT"
@@ -642,82 +658,73 @@ class TestConfigUpdate:
 
 
 class TestConfigList:
-    @pytest.fixture(params=[(200, 10), (200, 0), (200, 20)])
-    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
-        service_client = mocker.patch(path_service_client)
+    @pytest.fixture(params=[10, 0, 20])
+    def service_client(self, mocked_response, fixture_ghcs, request):
         result = []
-        size = request.param[1]
+        size = request.param
 
         # Create mock edge deployments and ADM device and module configurations
         for i in range(size):
-            result.append(
-                {
-                    "id": "edgeDeployment{}".format(i),
-                    "content": {"modulesContent": {"key": "value"}},
-                }
-            )
-            result.append(
-                {
-                    "id": "moduleConfiguration{}".format(i),
-                    "content": {"moduleContent": {"key": "value"}},
-                }
-            )
-            result.append(
-                {
-                    "id": "deviceConfiguration{}".format(i),
-                    "content": {"deviceContent": {"key": "value"}},
-                }
-            )
+            result.append({
+                "id": "edgeDeployment{}".format(i),
+                "content": {"modulesContent": {"key": {}}},
+            })
+            result.append({
+                "id": "moduleConfiguration{}".format(i),
+                "content": {"moduleContent": {"key": {}}},
+            })
+            result.append({
+                "id": "deviceConfiguration{}".format(i),
+                "content": {"deviceContent": {"key": {}}},
+            })
 
-        service_client.expected_size = size
-        service_client.return_value = build_mock_response(
-            mocker, request.param[0], result, {"x-ms-continuation": None}
+        mocked_response.add(
+            method=responses.GET,
+            url="https://{}/configurations".format(mock_target["entity"]),
+            body=json.dumps(result),
+            headers={"x-ms-continuation": ""},
+            status=200,
+            content_type="application/json",
+            match_querystring=False
         )
-        return service_client
+
+        mocked_response.expected_size = size
+        yield mocked_response
 
     @pytest.mark.parametrize("top", [1, 100])
-    def test_config_list(self, fixture_cmd2, serviceclient, top):
+    def test_config_list(self, fixture_cmd2, service_client, top):
         result = subject.iot_hub_configuration_list(
             cmd=fixture_cmd2, hub_name=mock_target["entity"], top=top
         )
-        args = serviceclient.call_args
-        url = args[0][0].url
-        method = args[0][0].method
-
-        assert method == "GET"
         assert json.dumps(result)
 
         # Total configurations are double for ADM in this scenario
-        assert len(result) == top or len(result) == serviceclient.expected_size * 2
+        assert len(result) == top or len(result) == service_client.expected_size * 2
 
-        assert "{}/configurations?".format(mock_target["entity"]) in url
-        assert "top={}".format(top) in url
+        list_request = service_client.calls[0].request
+        assert "top={}".format(top) in list_request.url
 
     @pytest.mark.parametrize("top", [1, 10])
-    def test_deployment_list(self, fixture_cmd2, serviceclient, top):
+    def test_deployment_list(self, fixture_cmd2, service_client, top):
         result = subject.iot_edge_deployment_list(
             cmd=fixture_cmd2, hub_name=mock_target["entity"], top=top
         )
-        args = serviceclient.call_args
-        url = args[0][0].url
-        method = args[0][0].method
-
-        assert method == "GET"
         assert json.dumps(result)
 
-        assert len(result) == top or len(result) == serviceclient.expected_size
+        assert len(result) == top or len(result) == service_client.expected_size
 
-        assert "{}/configurations?".format(mock_target["entity"]) in url
-        assert "top={}".format(top) in url
+        list_request = service_client.calls[0].request
+        assert "top={}".format(top) in list_request.url
 
     @pytest.mark.parametrize("top", [-1, 0, 101])
-    def test_config_list_invalid_args(self, fixture_cmd2, serviceclient, top):
+    def test_config_list_invalid_args(self, fixture_cmd2, top):
         with pytest.raises(CLIError):
             subject.iot_hub_configuration_list(
                 cmd=fixture_cmd2, hub_name=mock_target["entity"], top=top
             )
 
-    def test_config_list_error(self, fixture_cmd2, serviceclient_generic_error):
+    def test_config_list_error(self, fixture_cmd2, service_client_generic_errors):
+        service_client_generic_errors.assert_all_requests_are_fired = False
         with pytest.raises(CLIError):
             subject.iot_hub_configuration_list(
                 cmd=fixture_cmd2, hub_name=mock_target["entity"]
@@ -755,7 +762,7 @@ class TestConfigApply:
         args = serviceclient.call_args_list[0]
         url = args[0][0].url
         method = args[0][0].method
-        body = args[0][2]
+        body = json.loads(args[0][0].body)
 
         assert method == "POST"
         assert (

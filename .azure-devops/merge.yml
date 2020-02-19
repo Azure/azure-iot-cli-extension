@@ -7,7 +7,7 @@ pr:
 - master
 
 variables:
-  iot_ext_package: azure-cli-iot-ext  
+  iot_ext_package: azure-iot
 
 jobs:
 

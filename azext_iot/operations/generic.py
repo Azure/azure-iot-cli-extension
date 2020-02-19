@@ -14,8 +14,11 @@ def _execute_query(query_args, query_method, top=None):
 
     if top:
         headers["x-ms-max-item-count"] = str(top)
-    result, token = query_method(*query_args, custom_headers=headers)
-    payload.extend(result)
+
+    result = query_method(*query_args, custom_headers=headers, raw=True)
+    token = result.response.headers.get("x-ms-continuation")
+
+    payload.extend(result.response.json())
     while token:
         # In case requested count is > service max page size
         if top:
@@ -26,8 +29,9 @@ def _execute_query(query_args, query_method, top=None):
             else:
                 break
         headers["x-ms-continuation"] = token
-        result, token = query_method(*query_args, custom_headers=headers)
-        payload.extend(result)
+        result = query_method(*query_args, custom_headers=headers, raw=True)
+        token = result.response.headers.get("x-ms-continuation")
+        payload.extend(result.response.json())
     return payload[:top] if top else payload
 
 
