@@ -6,8 +6,8 @@
 
 import json
 from datetime import datetime, timedelta
-from .. import IoTLiveScenarioTest
-from ..settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC
+from ... import IoTLiveScenarioTest
+from ...settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC
 
 
 settings = DynamoSettings(ENV_SET_TEST_IOTHUB_BASIC)

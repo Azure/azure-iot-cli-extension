@@ -72,7 +72,7 @@ class SdkResolver(object):
 
     def _construct_sdk_map(self):
         return {
-            SdkType.service_sdk: self._get_iothub_service_sdk,  # Don't need to instantiate here
+            SdkType.service_sdk: self._get_iothub_service_sdk,  # Don't need to call here
             SdkType.device_sdk: self._get_iothub_device_sdk
         }
 
