@@ -12,7 +12,14 @@ from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import SdkType
 from msrestazure.azure_exceptions import CloudError
 
-__all__ = ["CloudError"]
+__all__ = [
+    "CloudError",
+    "iot_hub_service_factory",
+    "iot_service_provisioning_factory",
+    "SdkResolver",
+    "_bind_sdk",
+    "_get_sdk_exception_type"
+]
 
 
 def iot_hub_service_factory(cli_ctx, *_):

@@ -10,7 +10,7 @@ from msrest.exceptions import SerializationError
 from msrestazure.azure_exceptions import CloudError
 
 
-__all__ = ["CloudError", "SerializationError"]
+__all__ = ["IoTHubProvider", "CloudError", "SerializationError"]
 
 
 class IoTHubProvider(object):
