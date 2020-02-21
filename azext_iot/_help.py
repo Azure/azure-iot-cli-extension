@@ -439,13 +439,13 @@ helps['iot hub configuration create'] = """
       text: >
         az iot hub configuration create -c {config_name} -n {iothub_name} --content module_content.json
         --target-condition "from devices.modules where tags.building=9" --labels "{\\"key0\\":\\"value0\\", \\"key1\\":\\"value1\\"}"
-        --metrics "{\\"metrics\\": {\\"queries\\": {\\"mymetric\\": \\"select deviceId from devices where tags.location='US'\\"}}}"
+        --metrics "{\\"metrics\\": {\\"queries\\": {\\"mymetric\\": \\"select moduleId from devices.modules where tags.location='US'\\"}}}"
     - name: Create a module configuration with content and user metrics inline (powershell syntax example)
       text: >
         az iot hub configuration create -c {config_name} -n {iothub_name}
         --content '{\\"moduleContent\\": {\\"properties.desired.chillerWaterSettings\\": {\\"temperature\\": 38, \\"pressure\\": 78}}}'
         --target-condition "from devices.modules where tags.building=9" --priority 1
-        --metrics '{\\"metrics\\": {\\"queries\\": {\\"mymetric\\":\\"select deviceId from devices where tags.location=''US''\\"}}}'
+        --metrics '{\\"metrics\\": {\\"queries\\": {\\"mymetric\\":\\"select moduleId from devices.modules where tags.location=''US''\\"}}}'
 """
 
 helps['iot hub configuration show'] = """

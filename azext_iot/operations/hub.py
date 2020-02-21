@@ -627,12 +627,17 @@ def _iot_hub_configuration_create(cmd, config_id, content, config_type, hub_name
 
     content = process_json_arg(content, argument_name="content")
     processed_content = _process_config_content(content, config_type)
+    if "module_content" in processed_content:
+        required_target_prefix = "from devices.modules where"
+        lower_target_condition = target_condition.lower()
+        if not lower_target_condition.startswith(required_target_prefix):
+            raise CLIError("The target condition for a module configuration must start with '{}'".format(required_target_prefix))
 
     if metrics:
         metrics = process_json_arg(metrics, argument_name="metrics")
 
         if "metrics" in metrics:
-            metrics = metrics['metrics']
+            metrics = metrics["metrics"]
         if metrics_key not in metrics:
             raise CLIError("metrics json must include the '{}' property".format(metrics_key))
         metrics = metrics[metrics_key]

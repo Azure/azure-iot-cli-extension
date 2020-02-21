@@ -7,6 +7,9 @@ Release History
 +++++++++++++++
 * Breaking change: Evaluating an edge deployment/hub configuration SYSTEM metric (via show-metric) will return non-manipulated query output.
   This means the result is always a collection of objects.
+* Breaking change: (second attempt) Remove long since deprecated parameter `--config-id` from edge deployments.
+  Use `--deployment-id` or `-d` instead.
+* When creating ADM module configurations, the target condition starting with 'from devices.modules where' is enforced.
 * SDK refresh. IoT Hub service calls (except for 'az iot dt' commands) point to api-version 2019-10-01.
 * Extension package name has been changed to 'azure-iot'.
 * Help text for ADM module configurations has been updated with proper target condition syntax for module criteria.

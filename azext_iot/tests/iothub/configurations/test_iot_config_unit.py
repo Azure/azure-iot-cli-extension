@@ -388,6 +388,17 @@ class TestConfigCreate:
         priority,
         labels,
     ):
+
+        contentKey = (
+            "moduleContent"
+            if sample_config_adm[0].startswith("module")
+            else "deviceContent"
+        )
+
+        if contentKey == "moduleContent":
+            # Enforce the query prefix for success the case
+            target_condition = "FROM devices.modules WHERE {}".format(target_condition)
+
         subject.iot_hub_configuration_create(
             cmd=fixture_cmd2,
             config_id=config_id,
@@ -411,12 +422,6 @@ class TestConfigCreate:
         assert body.get("targetCondition") == target_condition
         assert body.get("priority") == priority
         assert body.get("labels") == evaluate_literal(labels, dict)
-
-        contentKey = (
-            "moduleContent"
-            if sample_config_adm[0].startswith("module")
-            else "deviceContent"
-        )
 
         if sample_config_adm[0].endswith("Inline"):
             assert (
@@ -502,6 +507,24 @@ class TestConfigCreate:
                 str(exc.value)
                 == "Automatic device configuration payloads require property: deviceContent or moduleContent"
             )
+
+        # Module configurations target condition needs to start with 'from devices.modules where'
+        content = json.dumps({"moduleContent": {"key": "value"}})
+        with pytest.raises(CLIError) as exc3:
+            subject.iot_hub_configuration_create(
+                cmd=fixture_cmd2,
+                config_id=config_id,
+                hub_name=hub_name,
+                content=content,
+                target_condition=target_condition,
+                priority=priority,
+                labels=labels,
+            )
+
+        assert (
+            str(exc3.value)
+            == "The target condition for a module configuration must start with 'from devices.modules where'"
+        )
 
     @pytest.mark.parametrize(
         "config_id, hub_name, target_condition, priority, labels",
