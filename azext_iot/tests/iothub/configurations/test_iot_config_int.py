@@ -108,7 +108,7 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
         # Content inline
         # Note: $schema is included as a nested property in the sample content.
         self.cmd(
-            """iot edge deployment create --config-id {} --hub-name {} --resource-group {} --priority {}
+            """iot edge deployment create --deployment-id {} --hub-name {} --resource-group {} --priority {}
             --target-condition \"{}\" --labels '{}' --content '{}'""".format(
                 config_ids[0],
                 LIVE_HUB,
@@ -192,7 +192,7 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
 
         # Content inline - Edge v1 format
         self.cmd(
-            """iot edge deployment create --config-id {} --hub-name {} --resource-group {} --priority {}
+            """iot edge deployment create --deployment-id {} --hub-name {} --resource-group {} --priority {}
             --target-condition \"{}\" --labels '{}' --content '{}' --metrics '{}'""".format(
                 config_ids[3],
                 LIVE_HUB,
@@ -462,12 +462,13 @@ class TestIoTHubConfigurations(IoTLiveScenarioTest):
 
         # Using connection string - module content + metrics from file. Configurations must be lowercase and will be lower()'ed.
         # Note: $schema is included as a nested property in the sample content.
+        module_condition = "{} {}".format("FROM devices.modules WHERE", condition)
         self.cmd(
             "iot hub configuration create -c {} --login {} --pri {} --tc \"{}\" --lab '{}' -k '{}' --metrics '{}'".format(
                 config_ids[1].upper(),
                 LIVE_HUB_CS,
                 priority,
-                condition,
+                module_condition,
                 "{labels}",
                 adm_content_module_path,
                 adm_content_module_path,
@@ -475,7 +476,7 @@ class TestIoTHubConfigurations(IoTLiveScenarioTest):
             checks=[
                 self.check("id", config_ids[1].lower()),
                 self.check("priority", priority),
-                self.check("targetCondition", condition),
+                self.check("targetCondition", module_condition),
                 self.check("labels", json.loads(self.kwargs["labels"])),
                 self.check(
                     "content.moduleContent",
@@ -533,6 +534,17 @@ class TestIoTHubConfigurations(IoTLiveScenarioTest):
             expect_failure=True,
         )
 
+        # Error validation - Module configuration target condition must start with 'from devices.modules where'
+        module_condition = "{} {}".format("FROM devices.modules WHERE", condition)
+        self.cmd(
+            "iot hub configuration create -c {} --login {} -k '{}'".format(
+                config_ids[1].upper(),
+                LIVE_HUB_CS,
+                adm_content_module_path,
+            ),
+            expect_failure=True,
+        )
+
         # Show ADM configuration
         self.cmd(
             "iot hub configuration show --config-id {} --hub-name {} --resource-group {}".format(
@@ -554,7 +566,7 @@ class TestIoTHubConfigurations(IoTLiveScenarioTest):
             checks=[
                 self.check("id", config_ids[1]),
                 self.check("priority", priority),
-                self.check("targetCondition", condition),
+                self.check("targetCondition", module_condition),
                 self.check("labels", json.loads(self.kwargs["labels"])),
             ],
         )
