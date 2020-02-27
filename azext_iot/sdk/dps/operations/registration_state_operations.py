@@ -28,7 +28,7 @@ class RegistrationStateOperations(object):
         self._client = client
         self._serialize = serializer
         self._deserialize = deserializer
-        self.api_version = "2018-09-01-preview"
+        self.api_version = "2019-03-31"
 
         self.config = config
 
