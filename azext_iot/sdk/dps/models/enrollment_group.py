@@ -19,6 +19,9 @@ class EnrollmentGroup(Model):
     :param attestation: Attestation method used by the device.
     :type attestation:
      ~microsoft.azure.management.provisioningservices.models.AttestationMechanism
+    :param capabilities: Capabilities of the device
+    :type capabilities:
+     ~microsoft.azure.management.provisioningservices.models.DeviceCapabilities
     :param iot_hub_host_name: The Iot Hub host name.
     :type iot_hub_host_name: str
     :param initial_twin: Initial device twin.
@@ -72,6 +75,7 @@ class EnrollmentGroup(Model):
     }
 
     _attribute_map = {
+        'capabilities': {'key': 'capabilities', 'type': 'DeviceCapabilities'},  # @digimaun - added capabilities custom
         'enrollment_group_id': {'key': 'enrollmentGroupId', 'type': 'str'},
         'attestation': {'key': 'attestation', 'type': 'AttestationMechanism'},
         'iot_hub_host_name': {'key': 'iotHubHostName', 'type': 'str'},
@@ -86,8 +90,9 @@ class EnrollmentGroup(Model):
         'custom_allocation_definition': {'key': 'customAllocationDefinition', 'type': 'CustomAllocationDefinition'},
     }
 
-    def __init__(self, enrollment_group_id, attestation, iot_hub_host_name=None, initial_twin=None, etag=None, provisioning_status="enabled", reprovision_policy=None, allocation_policy=None, iot_hubs=None, custom_allocation_definition=None):
+    def __init__(self, enrollment_group_id, attestation, capabilities=None, iot_hub_host_name=None, initial_twin=None, etag=None, provisioning_status="enabled", reprovision_policy=None, allocation_policy=None, iot_hubs=None, custom_allocation_definition=None):
         super(EnrollmentGroup, self).__init__()
+        self.capabilities = capabilities  # @digmaun - added capabilities custom
         self.enrollment_group_id = enrollment_group_id
         self.attestation = attestation
         self.iot_hub_host_name = iot_hub_host_name

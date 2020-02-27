@@ -124,6 +124,9 @@ def load_arguments(self, _):
         context.argument('content_type', options_list=['--content-type', '--ct'],
                          help='Specify the Content-Type of the message payload to automatically format the output to that type.')
         context.argument('device_query', options_list=['--device-query', '-q'], help='Specify a custom query to filter devices.')
+        context.argument('edge_enabled', options_list=['--edge-enabled', '--ee'],
+                         arg_type=get_three_state_flag(),
+                         help='Flag indicating edge enablement.')
 
     with self.argument_context('iot hub') as context:
         context.argument('target_json', options_list=['--json', '-j'],
@@ -188,9 +191,6 @@ def load_arguments(self, _):
                          help='Feedback monitor will block until a message with specific id (uuid) is received.')
 
     with self.argument_context('iot hub device-identity') as context:
-        context.argument('edge_enabled', options_list=['--edge-enabled', '--ee'],
-                         arg_type=get_three_state_flag(),
-                         help='Flag indicating edge enablement.')
         context.argument('status', options_list=['--status', '--sta'],
                          arg_type=get_enum_type(EntityStatusType),
                          help='Set device status upon creation.')
