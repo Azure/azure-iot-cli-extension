@@ -16,6 +16,7 @@ from azext_iot.common.certops import open_certificate
 from azext_iot.operations.generic import _execute_query
 from azext_iot._factory import _bind_sdk
 from azext_iot.sdk.dps.models.individual_enrollment import IndividualEnrollment
+from azext_iot.sdk.dps.models.device_capabilities import DeviceCapabilities
 from azext_iot.sdk.dps.models.attestation_mechanism import AttestationMechanism
 from azext_iot.sdk.dps.models.tpm_attestation import TpmAttestation
 from azext_iot.sdk.dps.models.symmetric_key_attestation import SymmetricKeyAttestation
@@ -68,6 +69,7 @@ def iot_dps_device_enrollment_create(client,
                                      secondary_key=None,
                                      device_id=None,
                                      iot_hub_host_name=None,
+                                     iot_edge_enabled=False,
                                      initial_twin_tags=None,
                                      initial_twin_properties=None,
                                      provisioning_status=None,
@@ -96,9 +98,11 @@ def iot_dps_device_enrollment_create(client,
             allocation_policy = AllocationType.static.value
             iot_hub_list = iot_hub_host_name.split()
 
+        device_capabilities = DeviceCapabilities(iot_edge_enabled)
+
         enrollment = IndividualEnrollment(enrollment_id,
                                           attestation,
-                                          None,
+                                          device_capabilities,
                                           device_id,
                                           None,
                                           initial_twin,
