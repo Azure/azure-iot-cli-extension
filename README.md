@@ -12,7 +12,7 @@ Please refer to the official `az iot` page on [Microsoft Docs](https://docs.micr
 ## Installation
 
 1. Install the [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli)
-    - You must have at least `v2.0.24`, which you can verify with `az --version`
+    - You must have at least `v2.0.70`, which you can verify with `az --version`
 1. Add, Update or Remove the IoT extension with the following commands:
     - Add: `az extension add --name azure-iot`
     - Update: `az extension update --name azure-iot`
