@@ -4,7 +4,7 @@
 
 Install the extension from the official Microsoft Azure CLI Extension Index
 
-`az extension add --name azure-cli-iot-ext`
+`az extension add --name azure-iot`
 
 ### Tips
 
