@@ -4,7 +4,7 @@
 
 Before installation ensure that your Azure CLI version meets the following criteria. The criteria differs based on OS and method of installation. Use `az --version` to determine the CLI version.
 
-In all cases your CLI needs to be at least `v2.0.24`.
+In all cases your CLI needs to be at least `v2.0.70`.
 
 | CLI Install Method  | NOT compatible with |
 | ------------- | ------------- |
@@ -13,7 +13,7 @@ In all cases your CLI needs to be at least `v2.0.24`.
 
 ## Problem
 
-After installing Azure CLI in my supported Linux environment, I try to install the extension via `az extension add --name azure-cli-iot-ext` but I get an error that looks like:
+After installing Azure CLI in my supported Linux environment, I try to install the extension via `az extension add --name azure-iot` but I get an error that looks like:
 
 ```diff
 - ImportError: libffi.so.5: cannot open shared object file: No such file or directory

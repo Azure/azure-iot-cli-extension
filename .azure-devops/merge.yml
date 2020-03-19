@@ -7,7 +7,7 @@ pr:
 - master
 
 variables:
-  iot_ext_package: azure-cli-iot-ext  
+  iot_ext_package: azure-iot
 
 jobs:
 
@@ -50,7 +50,7 @@ jobs:
   
   - template: templates/run-tests.yml
     parameters:
-      pythonVersion: '3.7.x'
+      pythonVersion: '3.x'
 
 - job: 'Run_Tests_Windows_Azure_CLI_Released_Version'
   dependsOn : [Build_Publish_Azure_CLI_Test_SDK, 'Build_Publish_Azure_IoT_CLI_Extension']
@@ -60,8 +60,8 @@ jobs:
   steps:
   - template: templates/run-tests.yml
     parameters:
-      pythonVersion: '3.7.x'
-      runWithAzureCliReleased: 'true'
+      pythonVersion: '3.x'
+      runWithAzureCliReleased: 'false'
 
 - job: 'Run_Tests_Ubuntu'
   dependsOn: ['Build_Publish_Azure_CLI_Test_SDK','Build_Publish_Azure_IoT_CLI_Extension']
@@ -75,7 +75,9 @@ jobs:
         python.version: '3.6.x'
       Python37:
         python.version: '3.7.x'
-    maxParallel: 3
+      Python38:
+        python.version: '3.8.x'
+    maxParallel: 4
 
   steps:
   - bash: sudo rm -R -f /usr/local/lib/azureExtensionDir
@@ -87,12 +89,12 @@ jobs:
 - job: 'Run_Tests_Mac'
   dependsOn: ['Build_Publish_Azure_CLI_Test_SDK','Build_Publish_Azure_IoT_CLI_Extension']
   pool:
-    vmImage: 'macOS-10.13'
+    vmImage: 'macOS-10.14'
 
   steps:
   - template: templates/run-tests.yml
     parameters:
-      pythonVersion: '3.7.x'
+      pythonVersion: '3.x'
 
 - job: 'Run_Style_Check'
   dependsOn: ['Build_Publish_Azure_CLI_Test_SDK','Build_Publish_Azure_IoT_CLI_Extension']
@@ -102,7 +104,7 @@ jobs:
   steps:
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.7.x'
+      versionSpec: '3.x'
       architecture: 'x64'
 
   - template: templates/install-azure-cli-released.yml
@@ -125,7 +127,7 @@ jobs:
   steps:
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.7.x'
+      versionSpec: '3.x'
       architecture: 'x64'
 
   - template: templates/install-azure-cli-released.yml

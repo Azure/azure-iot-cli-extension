@@ -3,6 +3,8 @@ pytest-mock
 pytest-cov
 pytest-env
 pylint
+mock;python_version<'3.3'
+responses
 flake8
 black;python_version>='3.6'
 wheel==0.30.0

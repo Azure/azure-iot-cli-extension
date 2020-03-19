@@ -174,12 +174,12 @@ class IoTDpsTest(LiveScenarioTest):
                         ' -g {} --dps-name {} --pk {} --sk {}'
                         ' --provisioning-status {} --device-id {}'
                         ' --initial-twin-tags {} --initial-twin-properties {}'
-                        ' --allocation-policy {} --rp {}'
+                        ' --allocation-policy {} --rp {} --edge-enabled'
                         .format(enrollment_id, attestation_type, rg, dps, primary_key,
                                 secondary_key, self.provisioning_status, device_id,
                                 '"{generic_dict}"', '"{generic_dict}"',
                                 AllocationType.geolatency.value,
-                                reprovisionPolicy_reprovisionandresetdata),
+                                reprovisionPolicy_reprovisionandresetdata,),
                         checks=[
                             self.check('attestation.type', attestation_type),
                             self.check('registrationId', enrollment_id),
@@ -194,7 +194,8 @@ class IoTDpsTest(LiveScenarioTest):
                                        self.kwargs['generic_dict']),
                             self.exists('reprovisionPolicy'),
                             self.check('reprovisionPolicy.migrateDeviceData', False),
-                            self.check('reprovisionPolicy.updateHubAssignment', True)
+                            self.check('reprovisionPolicy.updateHubAssignment', True),
+                            self.check('capabilities.iotEdge', True)
                         ]).get_output_in_json()['etag']
 
         self.cmd('iot dps enrollment list -g {} --dps-name {}'.format(rg, dps),
@@ -207,7 +208,7 @@ class IoTDpsTest(LiveScenarioTest):
                  checks=[self.check('registrationId', enrollment_id)])
 
         self.cmd('iot dps enrollment update -g {} --dps-name {} --enrollment-id {}'
-                 ' --provisioning-status {} --etag {} --rc'
+                 ' --provisioning-status {} --etag {} --rc --edge-enabled False'
                  .format(rg, dps, enrollment_id, self.provisioning_status_new, etag),
                  checks=[
                      self.check('attestation.type', attestation_type),
@@ -219,7 +220,8 @@ class IoTDpsTest(LiveScenarioTest):
                      self.check('iotHubHostName', hub_host_name),
                      self.exists('initialTwin.tags'),
                      self.exists('initialTwin.properties.desired'),
-                     self.check('attestation.symmetric_key.primary_key', primary_key)
+                     self.check('attestation.symmetric_key.primary_key', primary_key),
+                     self.check('capabilities.iotEdge', False)
                  ])
 
         self.cmd('iot dps enrollment delete -g {} --dps-name {} --enrollment-id {}'
@@ -231,7 +233,7 @@ class IoTDpsTest(LiveScenarioTest):
         hub_host_name = '{}.azure-devices.net'.format(hub)
         etag = self.cmd('iot dps enrollment-group create --enrollment-id {} -g {} --dps-name {}'
                         ' --cp {} --scp {} --provisioning-status {} --allocation-policy {}'
-                        ' --iot-hubs {}'
+                        ' --iot-hubs {} --edge-enabled'
                         .format(enrollment_id, rg, dps, cert_path, cert_path,
                                 self.provisioning_status, AllocationType.geolatency.value,
                                 hub_host_name),
@@ -243,7 +245,8 @@ class IoTDpsTest(LiveScenarioTest):
                             self.check('allocationPolicy', AllocationType.geolatency.value),
                             self.check('iotHubs', hub_host_name.split()),
                             self.check('reprovisionPolicy.migrateDeviceData', True),
-                            self.check('reprovisionPolicy.updateHubAssignment', True)
+                            self.check('reprovisionPolicy.updateHubAssignment', True),
+                            self.check('capabilities.iotEdge', True)
                         ]).get_output_in_json()['etag']
 
         self.cmd('iot dps enrollment-group list -g {} --dps-name {}'.format(rg, dps), checks=[
@@ -257,6 +260,7 @@ class IoTDpsTest(LiveScenarioTest):
 
         self.cmd('iot dps enrollment-group update -g {} --dps-name {} --enrollment-id {}'
                  ' --provisioning-status {} --rsc --etag {} --rp {} --allocation-policy {}'
+                 '--edge-enabled False'
                  .format(rg, dps, enrollment_id, self.provisioning_status_new, etag,
                          reprovisionPolicy_never, AllocationType.hashed.value),
                  checks=[
@@ -268,7 +272,8 @@ class IoTDpsTest(LiveScenarioTest):
                      self.check('allocationPolicy', AllocationType.hashed.value),
                      self.check('iotHubs', hub_host_name.split()),
                      self.check('reprovisionPolicy.migrateDeviceData', False),
-                     self.check('reprovisionPolicy.updateHubAssignment', False)
+                     self.check('reprovisionPolicy.updateHubAssignment', False),
+                     self.check('capabilities.iotEdge', False)
                  ])
 
         self.cmd('iot dps registration list -g {} --dps-name {} --enrollment-id {}'

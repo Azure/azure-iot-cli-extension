@@ -1,4 +1,5 @@
 [pytest]
+junit_family = xunit1
 addopts =
     -v
     -p no:warnings
@@ -8,7 +9,7 @@ norecursedirs =
     build
 
 testpaths =
-    tests
+    azext_iot/tests
 
 env =
     AZURE_TEST_RUN_LIVE=True

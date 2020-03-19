@@ -9,12 +9,12 @@ import ssl
 import os
 import six
 
-from time import time, sleep
+from time import sleep
 from paho.mqtt import client as mqtt
 
-from azext_iot.constants import EXTENSION_ROOT
+from azext_iot.constants import EXTENSION_ROOT, USER_AGENT, BASE_MQTT_API_VERSION
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
-from azext_iot.common.utility import url_encode_dict
+from azext_iot.common.utility import url_encode_dict, url_encode_str
 
 connection_result = {
     0: "success",
@@ -32,16 +32,13 @@ class mqtt_client_wrap(object):
         self.device_id = device_id
 
         sas = SasTokenAuthentication(
-            target["entity"], target["policy"], target["primarykey"], time() + int(sas_duration)
+            target["entity"],
+            target["policy"],
+            target["primarykey"],
+            sas_duration,
         ).generate_sas_token()
         cwd = EXTENSION_ROOT
         cert_path = os.path.join(cwd, "digicert.pem")
-        auth = {
-            "username": "{}/{}/api-version=2016-11-14".format(
-                target["entity"], device_id
-            ),
-            "password": sas,
-        }
         tls = {"ca_certs": cert_path, "tls_version": ssl.PROTOCOL_SSLv23}
         self.topic_publish = "devices/{}/messages/events/{}".format(
             device_id, url_encode_dict(properties) if properties else ""
@@ -54,7 +51,7 @@ class mqtt_client_wrap(object):
         self.client.on_message = self.on_message
         self.client.on_publish = self.on_publish
         self.client.tls_set(ca_certs=tls["ca_certs"], tls_version=tls["tls_version"])
-        self.client.username_pw_set(username=auth["username"], password=sas)
+        self.client.username_pw_set(username=build_mqtt_device_username(target["entity"], device_id), password=sas)
         self.client.connect(host=self.target["entity"], port=8883)
 
     def on_connect(self, client, userdata, flags, rc):
@@ -94,3 +91,9 @@ class mqtt_client_wrap(object):
             raise x
         finally:
             self.client.loop_stop()
+
+
+def build_mqtt_device_username(entity, device_id):
+    return "{}/{}/?api-version={}&DeviceClientType={}".format(
+        entity, device_id, BASE_MQTT_API_VERSION, url_encode_str(USER_AGENT)
+    )

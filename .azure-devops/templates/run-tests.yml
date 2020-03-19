@@ -19,32 +19,37 @@ steps:
 
   - template: setup-ci-machine.yml
 
-  - template: download-install-local-azure-iot-cli-extension-with-pip.yml
+  - template: download-install-local-azure-iot-cli-extension.yml
+
+  - template: set-pythonpath.yml
 
   - ${{ if eq(parameters.runUnitTestsOnly, 'false') }}:
     - script: pytest --junitxml "TEST-results.xml"
       displayName: 'Execute all Tests'
-  
+
   - ${{ if eq(parameters.runUnitTestsOnly, 'true') }}:
-    - script: pytest -v azext_iot/tests/test_iot_ext_unit.py --junitxml "TEST-iothub-unit-results.xml"
+    - script: pytest -v azext_iot/tests/test_iot_ext_unit.py --junitxml=junit/test-iothub-unit-results.xml
       displayName: 'Execute IoT Hub unit tests'
-    - script: pytest -v azext_iot/tests/test_iot_dps_unit.py --junitxml "TEST-dps-unit-results.xml"
+    - script: pytest -v azext_iot/tests/test_iot_dps_unit.py --junitxml=junit/test-dps-unit-results.xml
       displayName: 'Execute DPS unit tests'
-    - script: pytest -v azext_iot/tests/test_iot_utility_unit.py --junitxml "TEST-utility-unit-results.xml"
+    - script: pytest -v azext_iot/tests/test_iot_utility_unit.py --junitxml=junit/test-utility-unit-results.xml
       displayName: 'Execute Utility unit tests'
-    - script: pytest -v azext_iot/tests/test_iot_central_unit.py --junitxml "TEST-central-unit-results.xml"
+    - script: pytest -v azext_iot/tests/test_iot_central_unit.py --junitxml=junit/test-central-unit-results.xml
       displayName: 'Execute IoT Central unit tests'
-    - script: pytest -v azext_iot/tests/test_iot_pnp_unit.py --junitxml "TEST-pnp-unit-results.xml"
+    - script: pytest -v azext_iot/tests/test_iot_pnp_unit.py --junitxml=junit/test-pnp-unit-results.xml
       displayName: 'Execute IoT PnP unit tests'
-    - script: pytest -v azext_iot/tests/test_iot_digitaltwin_unit.py --junitxml "TEST-dt-unit-results.xml"
+    - script: pytest -v azext_iot/tests/test_iot_digitaltwin_unit.py --junitxml=junit/test-dt-unit-results.xml
       displayName: 'Execute IoT DigitalTwin unit tests'
-    - script: pytest -v azext_iot/tests/configurations/test_iot_config_unit.py --junitxml "TEST-config-unit-results.xml"
+    - script: pytest -v azext_iot/tests/iothub/configurations/test_iot_config_unit.py --junitxml=junit/test-config-unit-results.xml
       displayName: 'Execute IoT Configuration unit tests'
+    - script: pytest -v azext_iot/tests/iothub/jobs/test_iothub_jobs_unit.py --junitxml=junit/test-jobs-unit-results.xml
+      displayName: 'Execute IoT Hub job unit tests'
 
   - task: PublishTestResults@2
+    condition: succeededOrFailed()
     displayName: 'Publish Test Results'
     inputs:
       testResultsFormat: 'JUnit'
-      testResultsFiles: '**TEST-*.xml'
+      testResultsFiles: '**/test-*.xml'
+      testRunTitle: 'Publish test results for Python ${{ parameters.pythonVersion }} on OS $(Agent.OS)'
       searchFolder: '$(System.DefaultWorkingDirectory)'
-    condition: succeededOrFailed()

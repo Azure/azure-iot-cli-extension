@@ -27,7 +27,10 @@ from azext_iot.common.shared import (
     ReprovisionType,
     AllocationType,
     DistributedTracingSamplingModeType,
-    ModelSourceType
+    ModelSourceType,
+    JobType,
+    JobCreateType,
+    JobStatusType
 )
 from azext_iot._validators import mode2_iot_login_handler
 from azext_iot.assets.user_messages import info_param_properties_device
@@ -42,6 +45,17 @@ event_msg_prop_type = CLIArgumentType(
     choices=CaseInsensitiveList(['sys', 'app', 'anno', 'all']),
     help='Indicate key message properties to output. '
     'sys = system properties, app = application properties, anno = annotations'
+)
+
+# There is a bug in CLI core preventing treating --qos as an integer.
+# Until its resolved, ensure casting of value to integer
+# TODO: azure.cli.core.parser line 180 difflib.get_close_matches
+qos_type = CLIArgumentType(
+    options_list=['--qos'],
+    type=str,
+    nargs="?",
+    choices=["0", "1"],
+    help='Quality of Service. 0 = At most once, 1 = At least once. 2 (Exactly once) is not supported.'
 )
 
 event_timeout_type = CLIArgumentType(
@@ -80,7 +94,11 @@ def load_arguments(self, _):
         context.argument('method_payload', options_list=['--method-payload', '--mp'],
                          help='Json payload to be passed to method. Must be file path or raw json.')
         context.argument('timeout', options_list=['--timeout', '--to'], type=int,
-                         help='Maximum number of seconds to wait for method result.')
+                         help='Maximum number of seconds to wait for device method result.')
+        context.argument('method_connect_timeout', options_list=['--method-connect-timeout', '--mct'], type=int,
+                         help='Maximum number of seconds to wait on device connection.')
+        context.argument('method_response_timeout', options_list=['--method-response-timeout', '--mrt'], type=int,
+                         help='Maximum number of seconds to wait for device method result.')
         context.argument('auth_method', options_list=['--auth-method', '--am'],
                          arg_type=get_enum_type(DeviceAuthType),
                          help='The authorization type an entity is to be created with.')
@@ -106,6 +124,9 @@ def load_arguments(self, _):
         context.argument('content_type', options_list=['--content-type', '--ct'],
                          help='Specify the Content-Type of the message payload to automatically format the output to that type.')
         context.argument('device_query', options_list=['--device-query', '-q'], help='Specify a custom query to filter devices.')
+        context.argument('edge_enabled', options_list=['--edge-enabled', '--ee'],
+                         arg_type=get_three_state_flag(),
+                         help='Flag indicating edge enablement.')
 
     with self.argument_context('iot hub') as context:
         context.argument('target_json', options_list=['--json', '-j'],
@@ -127,6 +148,40 @@ def load_arguments(self, _):
                          help='Generate self-signed cert and use its thumbprint. '
                          'Output to specified target directory')
 
+    with self.argument_context('iot hub job') as context:
+        context.argument('job_id', options_list=['--job-id'],
+                         help='IoT Hub job Id.')
+        context.argument('job_status', options_list=['--job-status', '--js'],
+                         help='The status of a scheduled job.',
+                         arg_type=get_enum_type(JobStatusType))
+        context.argument('job_type', options_list=['--job-type', '--jt'],
+                         help='The type of scheduled job.',
+                         arg_type=get_enum_type(JobType))
+        context.argument('query_condition', options_list=['--query-condition', '-q'],
+                         help='Condition for device query to get devices to execute the job on. '
+                         'Required if job type is scheduleDeviceMethod or scheduleUpdateTwin. '
+                         'Note: The service will prefix "SELECT * FROM devices WHERE " to the input')
+        context.argument('start_time', options_list=['--start-time', '--start'],
+                         help='The scheduled start of the job in ISO 8601 date time format. '
+                         'If no start time is provided, the job is queued for asap execution.')
+        context.argument('ttl', options_list=['--ttl'], type=int,
+                         help='Max execution time in seconds, before job is terminated.')
+        context.argument('twin_patch', options_list=['--twin-patch', '--patch'],
+                         help='The desired twin patch. Provide file path or raw json.')
+        context.argument('wait', options_list=['--wait', '-w'],
+                         arg_type=get_three_state_flag(),
+                         help='Block until the created job is in a completed, failed or cancelled state. '
+                         'Will regularly poll on interval specified by --poll-interval.')
+        context.argument('poll_interval', options_list=['--poll-interval', '--interval'], type=int,
+                         help='Interval in seconds that job status will be checked if --wait flag is passed in.')
+        context.argument('poll_duration', options_list=['--poll-duration', '--duration'], type=int,
+                         help='Total duration in seconds where job status will be checked if --wait flag is passed in.')
+
+    with self.argument_context('iot hub job create') as context:
+        context.argument('job_type', options_list=['--job-type', '--jt'],
+                         help='The type of scheduled job.',
+                         arg_type=get_enum_type(JobCreateType))
+
     with self.argument_context('iot hub monitor-events') as context:
         context.argument('timeout', arg_type=event_timeout_type)
         context.argument('properties', arg_type=event_msg_prop_type)
@@ -136,9 +191,6 @@ def load_arguments(self, _):
                          help='Feedback monitor will block until a message with specific id (uuid) is received.')
 
     with self.argument_context('iot hub device-identity') as context:
-        context.argument('edge_enabled', options_list=['--edge-enabled', '--ee'],
-                         arg_type=get_three_state_flag(),
-                         help='Flag indicating edge enablement.')
         context.argument('status', options_list=['--status', '--sta'],
                          arg_type=get_enum_type(EntityStatusType),
                          help='Set device status upon creation.')
@@ -230,6 +282,7 @@ def load_arguments(self, _):
         context.argument('protocol_type', options_list=['--protocol', '--proto'],
                          arg_type=get_enum_type(ProtocolType),
                          help='Indicates device-to-cloud message protocol')
+        context.argument('qos', arg_type=qos_type)
 
     with self.argument_context('iot device simulate') as context:
         context.argument('properties', options_list=['--properties', '--props', '-p'],
@@ -244,9 +297,22 @@ def load_arguments(self, _):
                          'Full: IoT Hub generates a feedback message in either case. '
                          'By default, no ack is requested.')
         context.argument('correlation_id', options_list=['--correlation-id', '--cid'],
-                         help='Correlation Id associated with message.')
+                         help='The correlation Id associated with the C2D message.')
+        context.argument('properties', options_list=['--properties', '--props', '-p'],
+                         help=info_param_properties_device(include_mqtt=False))
+        context.argument('expiry_time_utc', options_list=['--expiry-time-utc', '--expiry'], type=int,
+                         help='Units are milliseconds since unix epoch. '
+                         'If no time is indicated the default IoT Hub C2D message TTL is used.')
+        context.argument('message_id', options_list=['--message-id', '--mid'],
+                         help='The C2D message Id. If no message Id is provided a UUID will be generated.')
+        context.argument('user_id', options_list=['--user-id', '--uid'],
+                         help='The C2D message, user Id property.')
         context.argument('lock_timeout', options_list=['--lock-timeout', '--lt'], type=int,
                          help='Specifies the amount of time a message will be invisible to other receive calls.')
+        context.argument('content_type', options_list=['--content-type', '--ct'],
+                         help='The content type associated with the C2D message.')
+        context.argument('content_encoding', options_list=['--content-encoding', '--ce'],
+                         help='The content encoding associated with the C2D message.')
 
     with self.argument_context('iot device c2d-message send') as context:
         context.argument('wait_on_feedback', options_list=['--wait', '-w'],
@@ -277,9 +343,8 @@ def load_arguments(self, _):
                          help='Maximum number of configurations to return.')
 
     with self.argument_context('iot edge') as context:
-        context.argument('config_id', options_list=['--deployment-id', '-d', '--config-id', '-c'],
-                         help="Target deployment name. Option '--config-id' has been deprecated and will be "
-                         "removed in a future release. Use '--deployment-id' instead.")
+        context.argument('config_id', options_list=['--deployment-id', '-d'],
+                         help='Target deployment name.')
         context.argument('target_condition', options_list=['--target-condition', '--tc', '-t'],
                          help='Target condition in which an Edge deployment applies to.')
         context.argument('priority', options_list=['--priority', '--pri'],
@@ -412,6 +477,8 @@ def load_arguments(self, _):
         context.argument('repair', options_list=['--repair', '-r'],
                          arg_type=get_three_state_flag(),
                          help='Reinstall uamqp dependency compatible with extension version. Default: false')
+        context.argument('central_api_uri', options_list=['--central-api-uri'],
+                         help='IoT Central API override.  For use with environments other than production.')
         context.argument('yes', options_list=['--yes', '-y'],
                          arg_type=get_three_state_flag(),
                          help='Skip user prompts. Indicates acceptance of dependency installation (if required). '
@@ -420,9 +487,13 @@ def load_arguments(self, _):
     with self.argument_context('iotcentral device-twin show') as context:
         context.argument('device_id', options_list=['--device-id', '-d'], help='Target Device.')
         context.argument('app_id', options_list=['--app-id'], help='Target App.')
+        context.argument('central_api_uri', options_list=['--central-api-uri'],
+                         help='IoT Central API override.  For use with environments other than production.')
 
     with self.argument_context('iot central') as context:
         context.argument('app_id', options_list=['--app-id'], help='Target App.')
+        context.argument('central_api_uri', options_list=['--central-api-uri'],
+                         help='IoT Central API override.  For use with environments other than production.')
 
     with self.argument_context('iot central app monitor-events') as context:
         context.argument('timeout', arg_type=event_timeout_type)

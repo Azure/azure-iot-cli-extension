@@ -4,6 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from uuid import uuid4
+
 
 def create_req_monitor_events(
     device_id=None,
@@ -35,3 +37,36 @@ def create_req_monitor_events(
         "repair": repair,
         "login": login,
     }
+
+
+def create_c2d_receive_response(minimum=False):
+    baseline = {
+        "headers": {
+            "iothub-ack": "none",
+            "iothub-correlationid": "",
+            "iothub-deliverycount": "0",
+            "iothub-enqueuedtime": "12/09/2019 12:00:00 PM",
+            "etag": '"{}"'.format(str(uuid4())),
+            "iothub-expiry": "",
+            "iothub-messageid": "{}".format(str(uuid4())),
+            "iothub-sequencenumber": "1",
+            "iothub-to": "/devices/sensor1/messages/deviceBound",
+            "iothub-userid": "",
+        },
+        "body": None,
+    }
+
+    if not minimum:
+        baseline["headers"]["iothub-ack"] = "full"
+        baseline["headers"]["iothub-app-propKey0"] = str(uuid4())
+        baseline["headers"]["iothub-app-propKey1"] = str(uuid4())
+        baseline["headers"]["iothub-correlationid"] = str(uuid4())
+        baseline["headers"]["iothub-expiry"] = "12/09/2019 12:10:00 PM"
+        baseline["headers"]["iothub-userid"] = str(uuid4())
+        baseline["body"] = str(uuid4())
+
+    return baseline
+
+
+def generate_generic_id():
+    return str(uuid4()).replace("-", "")

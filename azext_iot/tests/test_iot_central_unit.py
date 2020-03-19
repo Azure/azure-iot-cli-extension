@@ -103,7 +103,7 @@ class TestCentralHelpers():
         from azext_iot.common._azure import get_iot_central_tokens
 
         # Test to ensure get_iot_central_tokens calls requests.post and tokens are returned
-        assert get_iot_central_tokens({}, 'app_id').value() == 'fixture_requests_post value'
+        assert get_iot_central_tokens({}, 'app_id', 'api-uri').value() == 'fixture_requests_post value'
 
     def test_get_aad_token(self, fixture_azure_profile):
         from azext_iot.common._azure import _get_aad_token
@@ -124,12 +124,12 @@ class TestCentralHelpers():
         from azext_iot.common._azure import get_iot_hub_token_from_central_app_id
 
         # Test to ensure get_iot_hub_token_from_central_app_id returns iothubTenantSasToken
-        assert get_iot_hub_token_from_central_app_id({}, 'app_id') == 'iothubTenantSasToken'
+        assert get_iot_hub_token_from_central_app_id({}, 'app_id', 'api-uri') == 'iothubTenantSasToken'
 
 
 class TestDeviceTwinShow():
     def test_device_twin_show_calls_get_twin(self, fixture_iot_token, fixture_bind_sdk, fixture_cmd):
-        result = subject.iot_central_device_show(fixture_cmd, device_id, app_id)
+        result = subject.iot_central_device_show(fixture_cmd, device_id, app_id, 'api-uri')
 
         # Ensure get_twin is called and result is returned
         assert result is device_twin_result

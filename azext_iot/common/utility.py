@@ -309,20 +309,17 @@ def unpack_pnp_http_error(e):
     return error
 
 
-def unpack_msrest_error(e, clouderror=True):
+def unpack_msrest_error(e):
     """ Obtains full response text from an msrest error """
-    if clouderror:
-        op_err = None
-        try:
-            op_err = json.loads(e.response.text)
-        except ValueError:
-            op_err = e.response.text
-        except TypeError:
-            op_err = e.response.text
-        if not op_err:
-            return str(e)
-        return op_err
-    return e
+
+    op_err = None
+    try:
+        op_err = json.loads(e.response.text)
+    except (ValueError, TypeError):
+        op_err = e.response.text
+    if not op_err:
+        return str(e)
+    return op_err
 
 
 def dict_transform_lower_case_key(d):

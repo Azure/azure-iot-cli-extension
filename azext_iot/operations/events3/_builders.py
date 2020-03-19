@@ -1,11 +1,11 @@
 import asyncio
 import uamqp
-from time import time
 
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.utility import (parse_entity, unicode_binary_map, url_encode_str)
 
-DEBUG = True
+# To provide amqp frame trace
+DEBUG = False
 
 
 class AmqpBuilder():
@@ -14,7 +14,7 @@ class AmqpBuilder():
         hub_name = target['entity'].split('.')[0]
         user = "{}@sas.root.{}".format(target['policy'], hub_name)
         sas_token = SasTokenAuthentication(target['entity'], target['policy'],
-                                           target['primarykey'], time() + duration).generate_sas_token()
+                                           target['primarykey'], duration).generate_sas_token()
         return url_encode_str(user) + ":{}@{}".format(url_encode_str(sas_token), target['entity'])
 
 
@@ -27,8 +27,8 @@ class EventTargetBuilder():
     def build_iot_hub_target(self, target):
         return self.eventLoop.run_until_complete(self._build_iot_hub_target_async(target))
 
-    def build_central_event_hub_target(self, cmd, app_id):
-        return self.eventLoop.run_until_complete(self._build_central_event_hub_target_async(cmd, app_id))
+    def build_central_event_hub_target(self, cmd, app_id, central_api_uri):
+        return self.eventLoop.run_until_complete(self._build_central_event_hub_target_async(cmd, app_id, central_api_uri))
 
     def _build_auth_container(self, target):
         sas_uri = 'sb://{}/{}'.format(target['events']['endpoint'], target['events']['path'])
@@ -76,10 +76,10 @@ class EventTargetBuilder():
         finally:
             await receive_client.close_async()
 
-    async def _build_central_event_hub_target_async(self, cmd, app_id):
+    async def _build_central_event_hub_target_async(self, cmd, app_id, central_api_uri):
         from azext_iot.common._azure import get_iot_central_tokens
 
-        tokens = get_iot_central_tokens(cmd, app_id)
+        tokens = get_iot_central_tokens(cmd, app_id, central_api_uri)
         eventHubToken = tokens['eventhubSasToken']
         hostnameWithoutPrefix = eventHubToken['hostname'].split("/")[2]
         endpoint = hostnameWithoutPrefix

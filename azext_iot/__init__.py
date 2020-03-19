@@ -15,6 +15,14 @@ iothub_ops = CliCommandType(
     operations_tmpl='azext_iot.operations.hub#{}'
 )
 
+iothub_ops_job = CliCommandType(
+    operations_tmpl='azext_iot.iothub.job_commands#{}'
+)
+
+iothub_ops_device = CliCommandType(
+    operations_tmpl='azext_iot.iothub.device_commands#{}'
+)
+
 iotdps_ops = CliCommandType(
     operations_tmpl='azext_iot.operations.dps#{}',
     client_factory=iot_service_provisioning_factory
@@ -41,6 +49,8 @@ class IoTExtCommandsLoader(AzCommandsLoader):
     def load_command_table(self, args):
         from azext_iot.commands import load_command_table
         load_command_table(self, args)
+        from azext_iot.iothub.command_bindings import load_iothub_commands
+        load_iothub_commands(self, args)
         return self.command_table
 
     def load_arguments(self, command):

@@ -29,7 +29,7 @@
     set EXTENSION_PATH=%USERPROFILE%\.azure\devcliextensions\
     mkdir %EXTENSION_PATH%
     set AZURE_EXTENSION_DIR=%EXTENSION_PATH%
-    set PYTHONPATH=%PYTHONPATH%;%EXTENSION_PATH%azure-cli-iot-ext;%CD%
+    set PYTHONPATH=%PYTHONPATH%;%EXTENSION_PATH%azure-iot;%CD%
     ```
     **Linux:**
 
@@ -37,7 +37,7 @@
     export EXTENSION_PATH=~/.azure/devcliextensions/
     mkdir -p $EXTENSION_PATH
     echo $"export AZURE_EXTENSION_DIR=$EXTENSION_PATH" >> ~/.bash_profile
-    echo $"export PYTHONPATH=$PYTHONPATH:${EXTENSION_PATH}azure-cli-iot-ext:$(pwd)" >> ~/.bash_profile
+    echo $"export PYTHONPATH=$PYTHONPATH:${EXTENSION_PATH}azure-iot:$(pwd)" >> ~/.bash_profile
     ```
 
 1. Install Extension
@@ -52,12 +52,12 @@
 
     **Windows:**
     ```
-    pip install -U --target %AZURE_EXTENSION_DIR%/azure-cli-iot-ext .
+    pip install -U --target %AZURE_EXTENSION_DIR%/azure-iot .
     ```
 
     **Linux:**
     ```
-    pip install -U --target $AZURE_EXTENSION_DIR/azure-cli-iot-ext .
+    pip install -U --target $AZURE_EXTENSION_DIR/azure-iot .
     ```
 
 1. Verify Setup
@@ -66,11 +66,11 @@
 
     `az --debug`
 
-    That will output which directory is being used to load extensions and it will show that the `azure-cli-iot-ext` extension has been loaded.
+    That will output which directory is being used to load extensions and it will show that the `azure-iot` extension has been loaded.
 
     ```
     Extensions directory: '...\.azure\devcliextensions\'
-    Found 1 extensions: ['azure-cli-iot-ext']
+    Found 1 extensions: ['azure-iot']
     ```
 
 Please use `az --debug` if you run into any issues, or file an issue in this GitHub repo.

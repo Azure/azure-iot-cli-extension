@@ -407,52 +407,66 @@ helps['iot hub query'] = """
 
 helps['iot hub configuration'] = """
     type: group
-    short-summary: Manage IoT device configurations at scale
+    short-summary: Manage IoT automatic device management configuration at scale.
 """
 
 helps['iot hub configuration create'] = """
     type: command
-    short-summary: Create an IoT device configuration in a target IoT Hub.
+    short-summary: Create an IoT automatic device management configuration in a target IoT Hub.
     long-summary: |
-                  Device configuration content is json and in the form of {"deviceContent":{...}}
-                  or {"content":{"deviceContent":{...}}}.
+                  Configuration content is json and slighty varies based on device or module intent.
 
-                  Device configurations can be defined with user provided metrics for on demand evaluation.
+                  Device configurations are in the form of {"deviceContent":{...}} or {"content":{"deviceContent":{...}}}
+
+                  Module configurations are in the form of {"moduleContent":{...}} or {"content":{"moduleContent":{...}}}
+
+                  Configurations can be defined with user provided metrics for on demand evaluation.
                   User metrics are json and in the form of {"queries":{...}} or {"metrics":{"queries":{...}}}.
+
+                  Note: Target condition for modules must start with "from devices.modules where".
     examples:
-    - name: Create a device configuration that applies on condition where a device is in 'building 9' and
-            the environment is 'test'.
+    - name: Create a device configuration with a priority of 3 that applies on condition when a device is
+            tagged in building 9 and the environment is 'test'.
       text: >
-        az iot hub configuration create -c {config_name} -n {iothub_name} --content ../device_content.json
-        --target-condition "tags.building=9 and tags.environment='test'"
+        az iot hub configuration create -c {config_name} -n {iothub_name} --content device_content.json
+        --target-condition "tags.building=9 and tags.environment='test'" --priority 3
     - name: Create a device configuration with labels and provide user metrics inline (bash syntax example)
       text: >
-        az iot hub configuration create -c {config_name} -n {iothub_name} --content ../device_content.json
-        --target-condition "tags.building=9" --labels '{"key0":"value0", "key1":"value1"}'
-        --metrics '{"metrics": {"queries": {"mymetrik": "select deviceId from devices where tags.location='US'"}}}'
-    - name: Create a device configuration with labels and provide user metrics inline (cmd syntax example)
+        az iot hub configuration create -c {config_name} -n {iothub_name} --content device_content.json
+        --target-condition "tags.building=9" --labels '{"key0":"value0", "key1":"value1"}' --priority 10
+        --metrics '{"metrics": {"queries": {"mymetric": "select deviceId from devices where tags.location='US'"}}}'
+    - name: Create a module configuration with labels and provide user metrics inline (cmd syntax example)
       text: >
-        az iot hub configuration create -c {config_name} -n {iothub_name} --content ../device_content.json
-        --target-condition "tags.building=9" --labels "{\\"key0\\":\\"value0\\", \\"key1\\":\\"value1\\"}"
-        --metrics "{\\"metrics\\": {\\"queries\\": {\\"mymetrik\\":
-        \\"select deviceId from devices where tags.location='US'\\"}}}"
+        az iot hub configuration create -c {config_name} -n {iothub_name} --content module_content.json
+        --target-condition "from devices.modules where tags.building=9" --labels "{\\"key0\\":\\"value0\\", \\"key1\\":\\"value1\\"}"
+        --metrics "{\\"metrics\\": {\\"queries\\": {\\"mymetric\\": \\"select moduleId from devices.modules where tags.location='US'\\"}}}"
+    - name: Create a module configuration with content and user metrics inline (powershell syntax example)
+      text: >
+        az iot hub configuration create -c {config_name} -n {iothub_name}
+        --content '{\\"moduleContent\\": {\\"properties.desired.chillerWaterSettings\\": {\\"temperature\\": 38, \\"pressure\\": 78}}}'
+        --target-condition "from devices.modules where tags.building=9" --priority 1
+        --metrics '{\\"metrics\\": {\\"queries\\": {\\"mymetric\\":\\"select moduleId from devices.modules where tags.location=''US''\\"}}}'
 """
 
 helps['iot hub configuration show'] = """
     type: command
-    short-summary: Get the details of an IoT device configuration.
+    short-summary: Get the details of an IoT automatic device management configuration.
 """
 
 helps['iot hub configuration list'] = """
     type: command
-    short-summary: List IoT device configurations in an IoT Hub.
+    short-summary: List IoT automatic device management configurations in an IoT Hub.
 """
 
 helps['iot hub configuration update'] = """
     type: command
-    short-summary: Update an IoT device configuration with the specified properties.
-    long-summary: Use --set followed by property assignments for updating a configuration.
-                  Leverage properties returned from 'az iot hub configuration show'.
+    short-summary: |
+                  Update specified properties of an IoT automatic device management configuration.
+
+                  Use --set followed by property assignments for updating a configuration.
+
+                  Note: Configuration content is immutable. Configuration properties that can be
+                  updated are 'labels', 'metrics', 'priority' and 'targetCondition'.
     examples:
     - name: Alter the priority of a device configuration and update its target condition
       text: >
@@ -547,7 +561,7 @@ helps['iot device c2d-message send'] = """
         az iot device c2d-message send -d {device_id} -n {iothub_name} --data 'Hello World' --props 'key0=value0;key1=value1'
     - name: Send a C2D message and wait for device acknowledgement
       text: >
-        az iot device c2d-message send -d {device_id} -n {iothub_name} --wait
+        az iot device c2d-message send -d {device_id} -n {iothub_name} --ack full --wait
 """
 
 helps['iot device send-d2c-message'] = """
@@ -643,12 +657,12 @@ helps['iot edge deployment create'] = """
     - name: Create a deployment with labels (bash syntax example) that applies for devices in 'building 9' and
             the environment is 'test'.
       text: >
-        az iot edge deployment create -d {deployment_name} -n {iothub_name} --content ../modules_content.json
+        az iot edge deployment create -d {deployment_name} -n {iothub_name} --content modules_content.json
         --labels '{"key0":"value0", "key1":"value1"}'
         --target-condition "tags.building=9 and tags.environment='test'" --priority 3
     - name: Create a deployment with labels (powershell syntax example) that applies for devices tagged with environment 'dev'.
       text: >
-        az iot edge deployment create -d {deployment_name} -n {iothub_name} --content ../modules_content.json
+        az iot edge deployment create -d {deployment_name} -n {iothub_name} --content modules_content.json
         --labels '{\\"key\\":\\"value\\"}'
         --target-condition "tags.environment='dev'"
     - name: Create a layered deployment that applies for devices tagged with environment 'dev'.
@@ -661,9 +675,9 @@ helps['iot edge deployment create'] = """
         --layered
     - name: Create a layered deployment that applies for devices in 'building 9' and the environment is 'test'.
       text: >
-        az iot edge deployment create -d {deployment_name} -n {iothub_name} --content ../layered_modules_content.json
+        az iot edge deployment create -d {deployment_name} -n {iothub_name} --content layered_modules_content.json
         --target-condition "tags.building=9 and tags.environment='test'"
-        --metrics ../metrics_content.json
+        --metrics metrics_content.json
         --layered
 """
 

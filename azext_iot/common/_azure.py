@@ -240,10 +240,10 @@ def get_iot_dps_connection_string(
     return result
 
 
-def get_iot_central_tokens(cmd, app_id):
+def get_iot_central_tokens(cmd, app_id, central_api_uri):
     def get_event_hub_token(app_id, iotcAccessToken):
         import requests
-        url = "https://api.azureiotcentral.com/v1-beta/applications/{}/diagnostics/sasTokens".format(app_id)
+        url = "https://{}/v1-beta/applications/{}/diagnostics/sasTokens".format(central_api_uri, app_id)
         response = requests.post(url, headers={'Authorization': 'Bearer {}'.format(iotcAccessToken)})
         return response.json()
 
@@ -259,8 +259,8 @@ def get_iot_central_tokens(cmd, app_id):
     return tokens
 
 
-def get_iot_hub_token_from_central_app_id(cmd, app_id):
-    return get_iot_central_tokens(cmd, app_id)['iothubTenantSasToken']['sasToken']
+def get_iot_hub_token_from_central_app_id(cmd, app_id, central_api_uri):
+    return get_iot_central_tokens(cmd, app_id, central_api_uri)['iothubTenantSasToken']['sasToken']
 
 
 def get_iot_pnp_connection_string(

@@ -8,20 +8,19 @@ import asyncio
 import json
 import re
 import sys
-from uuid import uuid4
 import six
-
-import uamqp
 import yaml
+import uamqp
 
-from azext_iot.constants import VERSION
-from azext_iot.common.utility import parse_entity, unicode_binary_map
+from uuid import uuid4
 from knack.log import get_logger
+from azext_iot.constants import VERSION, USER_AGENT
+from azext_iot.common.utility import parse_entity, unicode_binary_map, process_json_arg
 from azext_iot.operations.events3._builders import AmqpBuilder
 
+# To provide amqp frame trace
+DEBUG = False
 logger = get_logger(__name__)
-
-DEBUG = True
 
 
 def executor(
@@ -89,10 +88,10 @@ def executor(
         loop.run_forever()
     finally:
         if result:
-            error = next(res for res in result if result)
-            if error:
-                logger.error(error)
-                raise RuntimeError(error)
+            errors = result[0]
+            if errors and errors[0]:
+                logger.debug(errors)
+                raise RuntimeError(errors[0])
 
 
 async def initiate_event_monitor(
@@ -110,7 +109,7 @@ async def initiate_event_monitor(
 ):
     def _get_conn_props():
         properties = {}
-        properties["product"] = "az.cli.iot.extension"
+        properties["product"] = USER_AGENT
         properties["version"] = VERSION
         properties["framework"] = "Python {}.{}.{}".format(*sys.version_info[0:3])
         properties["platform"] = sys.platform
@@ -126,7 +125,7 @@ async def initiate_event_monitor(
         target["endpoint"],
         sasl=target["auth"],
         debug=DEBUG,
-        container_id=str(uuid4()),
+        container_id=_get_container_id(),
         properties=_get_conn_props(),
     ) as conn:
         for p in target["partitions"]:
@@ -149,7 +148,7 @@ async def initiate_event_monitor(
                     pnp_context=pnp_context,
                 )
             )
-        await asyncio.gather(*coroutines, return_exceptions=True)
+        return await asyncio.gather(*coroutines, return_exceptions=True)
 
 
 async def monitor_events(
@@ -255,7 +254,7 @@ async def monitor_events(
 
     exp_cancelled = False
     receive_client = uamqp.ReceiveClientAsync(
-        source, auth=auth, timeout=timeout, prefetch=0, debug=DEBUG
+        source, auth=auth, timeout=timeout, prefetch=0, client_name=_get_container_id(), debug=DEBUG
     )
 
     try:
@@ -284,7 +283,17 @@ async def monitor_events(
 
 
 def send_c2d_message(
-    target, device_id, data, properties=None, correlation_id=None, ack=None
+    target,
+    device_id,
+    data,
+    message_id=None,
+    correlation_id=None,
+    ack=None,
+    content_type=None,
+    user_id=None,
+    content_encoding="utf-8",
+    expiry_time_utc=None,
+    properties=None,
 ):
     app_props = {}
     if properties:
@@ -294,26 +303,46 @@ def send_c2d_message(
 
     msg_props = uamqp.message.MessageProperties()
     msg_props.to = "/devices/{}/messages/devicebound".format(device_id)
-    msg_id = str(uuid4())
-    msg_props.message_id = msg_id
+
+    target_msg_id = message_id if message_id else str(uuid4())
+    msg_props.message_id = target_msg_id
 
     if correlation_id:
         msg_props.correlation_id = correlation_id
 
-    msg_content = str.encode(data)
+    if user_id:
+        msg_props.user_id = user_id
+
+    if content_type:
+        msg_props.content_type = content_type
+
+        # Ensures valid json when content_type is application/json
+        content_type = content_type.lower()
+        if content_type == "application/json":
+            data = json.dumps(process_json_arg(data, "data"))
+
+    if content_encoding:
+        msg_props.content_encoding = content_encoding
+
+    if expiry_time_utc:
+        msg_props.absolute_expiry_time = int(expiry_time_utc)
+
+    msg_body = str.encode(data)
 
     message = uamqp.Message(
-        msg_content, properties=msg_props, application_properties=app_props
+        body=msg_body, properties=msg_props, application_properties=app_props
     )
 
     operation = "/messages/devicebound"
     endpoint = AmqpBuilder.build_iothub_amqp_endpoint_from_target(target)
-    endpoint = endpoint + operation
-    client = uamqp.SendClient("amqps://" + endpoint, debug=DEBUG)
+    endpoint_with_op = endpoint + operation
+    client = uamqp.SendClient(
+        target="amqps://" + endpoint_with_op, client_name=_get_container_id(), debug=DEBUG
+    )
     client.queue_message(message)
     result = client.send_all_messages()
     errors = [m for m in result if m == uamqp.constants.MessageState.SendFailed]
-    return msg_id, errors
+    return target_msg_id, errors
 
 
 def monitor_feedback(target, device_id, wait_on_id=None, token_duration=3600):
@@ -354,15 +383,21 @@ def monitor_feedback(target, device_id, wait_on_id=None, token_duration=3600):
     )
 
     try:
-        client = uamqp.ReceiveClient("amqps://" + endpoint, debug=DEBUG)
+        client = uamqp.ReceiveClient(
+            "amqps://" + endpoint, client_name=_get_container_id(), debug=DEBUG
+        )
         message_generator = client.receive_messages_iter()
         for msg in message_generator:
             match = handle_msg(msg)
             if match:
-                logger.info("requested msg id has been matched...")
+                logger.info("Requested message Id has been matched...")
                 msg.accept()
                 return match
     except uamqp.errors.AMQPConnectionError:
-        logger.debug("amqp connection has expired...")
+        logger.debug("AMQPS connection has expired...")
     finally:
         client.close()
+
+
+def _get_container_id():
+    return "{}/{}".format(USER_AGENT, str(uuid4()))

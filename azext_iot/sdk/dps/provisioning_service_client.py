@@ -13,7 +13,7 @@ from .operations.device_enrollment_operations import DeviceEnrollmentOperations
 from .operations.device_enrollment_group_operations import DeviceEnrollmentGroupOperations
 from .operations.registration_state_operations import RegistrationStateOperations
 from . import models
-from azext_iot.constants import VERSION as extver
+from azext_iot.constants import USER_AGENT
 
 
 class ProvisioningServiceClientConfiguration(AzureConfiguration):
@@ -37,7 +37,7 @@ class ProvisioningServiceClientConfiguration(AzureConfiguration):
 
         super(ProvisioningServiceClientConfiguration, self).__init__(base_url)
         self.add_user_agent('provisioningserviceclient/{}'.format(VERSION))
-        self.add_user_agent('IoTPlatformCliExtension/{}'.format(extver))
+        self.add_user_agent(USER_AGENT)
 
         self.credentials = credentials
 
@@ -68,7 +68,7 @@ class ProvisioningServiceClient(object):
         self._client = ServiceClient(self.config.credentials, self.config)
 
         client_models = {k: v for k, v in models.__dict__.items() if isinstance(v, type)}
-        self.api_version = '2018-09-01-preview'
+        self.api_version = '2019-03-31'  # @digimaun
         self._serialize = Serializer(client_models)
         self._deserialize = Deserializer(client_models)
 

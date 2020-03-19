@@ -28,6 +28,7 @@ from azext_iot.sdk.dps.models.initial_twin_properties import InitialTwinProperti
 from azext_iot.sdk.dps.models.enrollment_group import EnrollmentGroup
 from azext_iot.sdk.dps.models.x509_ca_references import X509CAReferences
 from azext_iot.sdk.dps.models.reprovision_policy import ReprovisionPolicy
+from azext_iot.sdk.dps.models import DeviceCapabilities
 
 logger = get_logger(__name__)
 
@@ -41,7 +42,7 @@ def iot_dps_device_enrollment_list(client, dps_name, resource_group_name, top=No
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
 
         query_command = "SELECT *"
-        query = QuerySpecification(query_command)
+        query = [QuerySpecification(query_command)]
         return _execute_query(query, m_sdk.device_enrollment.query, top)
     except errors.ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
@@ -73,7 +74,8 @@ def iot_dps_device_enrollment_create(client,
                                      provisioning_status=None,
                                      reprovision_policy=None,
                                      allocation_policy=None,
-                                     iot_hubs=None):
+                                     iot_hubs=None,
+                                     edge_enabled=False):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
@@ -96,9 +98,10 @@ def iot_dps_device_enrollment_create(client,
             allocation_policy = AllocationType.static.value
             iot_hub_list = iot_hub_host_name.split()
 
+        capabilities = DeviceCapabilities(iot_edge=edge_enabled)
         enrollment = IndividualEnrollment(enrollment_id,
                                           attestation,
-                                          None,
+                                          capabilities,
                                           device_id,
                                           None,
                                           initial_twin,
@@ -131,7 +134,8 @@ def iot_dps_device_enrollment_update(client,
                                      provisioning_status=None,
                                      reprovision_policy=None,
                                      allocation_policy=None,
-                                     iot_hubs=None):
+                                     iot_hubs=None,
+                                     edge_enabled=None):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
@@ -187,6 +191,10 @@ def iot_dps_device_enrollment_update(client,
             enrollment_record.allocation_policy = allocation_policy
             enrollment_record.iot_hubs = iot_hub_list
             enrollment_record.iot_hub_host_name = None
+
+        if edge_enabled is not None:
+            enrollment_record.capabilities = DeviceCapabilities(iot_edge=edge_enabled)
+
         return m_sdk.device_enrollment.create_or_update(enrollment_id, enrollment_record, etag)
     except errors.ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
@@ -210,7 +218,7 @@ def iot_dps_device_enrollment_group_list(client, dps_name, resource_group_name, 
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
 
         query_command = "SELECT *"
-        query1 = QuerySpecification(query_command)
+        query1 = [QuerySpecification(query_command)]
         return _execute_query(query1, m_sdk.device_enrollment_group.query, top)
     except errors.ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
@@ -241,7 +249,8 @@ def iot_dps_device_enrollment_group_create(client,
                                            provisioning_status=None,
                                            reprovision_policy=None,
                                            allocation_policy=None,
-                                           iot_hubs=None):
+                                           iot_hubs=None,
+                                           edge_enabled=False):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
@@ -266,8 +275,11 @@ def iot_dps_device_enrollment_group_create(client,
         if iot_hub_host_name and allocation_policy is None:
             allocation_policy = AllocationType.static.value
             iot_hub_list = iot_hub_host_name.split()
+
+        capabilities = DeviceCapabilities(iot_edge=edge_enabled)
         group_enrollment = EnrollmentGroup(enrollment_id,
                                            attestation,
+                                           capabilities,
                                            None,
                                            initial_twin,
                                            None,
@@ -299,7 +311,8 @@ def iot_dps_device_enrollment_group_update(client,
                                            provisioning_status=None,
                                            reprovision_policy=None,
                                            allocation_policy=None,
-                                           iot_hubs=None):
+                                           iot_hubs=None,
+                                           edge_enabled=None):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
@@ -363,6 +376,8 @@ def iot_dps_device_enrollment_group_update(client,
             enrollment_record.allocation_policy = allocation_policy
             enrollment_record.iot_hubs = iot_hub_list
             enrollment_record.iot_hub_host_name = None
+        if edge_enabled is not None:
+            enrollment_record.capabilities = DeviceCapabilities(iot_edge=edge_enabled)
         return m_sdk.device_enrollment_group.create_or_update(enrollment_id, enrollment_record, etag)
     except errors.ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)

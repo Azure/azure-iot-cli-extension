@@ -6,27 +6,26 @@
 
 import os
 import pytest
+import warnings
 
 from azext_iot.common.utility import read_file_content
 from . import IoTLiveScenarioTest
+from .settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC
 from azext_iot.constants import DEVICE_DEVICESCOPE_PREFIX
 
+opt_env_set = ["azext_iot_teststorageuri"]
 
-# Set these to the proper IoT Hub, IoT Hub Cstring and Resource Group for Live Integration Tests.
-LIVE_HUB = os.environ.get("azext_iot_testhub")
-LIVE_RG = os.environ.get("azext_iot_testrg")
-LIVE_HUB_CS = os.environ.get("azext_iot_testhub_cs")
+settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_BASIC, opt_env_set=opt_env_set)
+
+LIVE_HUB = settings.env.azext_iot_testhub
+LIVE_RG = settings.env.azext_iot_testrg
+LIVE_HUB_CS = settings.env.azext_iot_testhub_cs
 LIVE_HUB_MIXED_CASE_CS = LIVE_HUB_CS.replace("HostName", "hostname", 1)
 
 # Set this environment variable to your empty blob container sas uri to test device export and enable file upload test.
 # For file upload, you will need to have configured your IoT Hub before running.
-LIVE_STORAGE = os.environ.get("azext_iot_teststorageuri")
+LIVE_STORAGE = settings.env.azext_iot_teststorageuri
 LIVE_CONSUMER_GROUPS = ["test1", "test2", "test3"]
-
-if not all([LIVE_HUB, LIVE_HUB_CS, LIVE_RG]):
-    raise ValueError(
-        "Set azext_iot_testhub, azext_iot_testhub_cs and azext_iot_testrg to run IoT Hub integration tests."
-    )
 
 CWD = os.path.dirname(os.path.abspath(__file__))
 
@@ -606,23 +605,26 @@ class TestIoTHubDeviceTwins(IoTLiveScenarioTest):
             ],
         )
 
-        # TODO move distributed tracing tests
-        self.cmd(
-            "iot hub distributed-tracing show -d {} -n {} -g {}".format(
-                device_ids[2], LIVE_HUB, LIVE_RG
-            ),
-            checks=self.is_empty(),
-        )
-
-        result = self.cmd(
-            "iot hub distributed-tracing update -d {} -n {} -g {} --sm on --sr 50".format(
-                device_ids[2], LIVE_HUB, LIVE_RG
+        # Region specific test
+        if self.region not in ["West US 2", "North Europe", "Southeast Asia"]:
+            warnings.warn("Skipping distributed-tracing tests. IoT Hub not in supported region!")
+        else:
+            self.cmd(
+                "iot hub distributed-tracing show -d {} -n {} -g {}".format(
+                    device_ids[2], LIVE_HUB, LIVE_RG
+                ),
+                checks=self.is_empty(),
             )
-        ).get_output_in_json()
-        assert result["deviceId"] == device_ids[2]
-        assert result["samplingMode"] == "enabled"
-        assert result["samplingRate"] == "50%"
-        assert not result["isSynced"]
+
+            result = self.cmd(
+                "iot hub distributed-tracing update -d {} -n {} -g {} --sm on --sr 50".format(
+                    device_ids[2], LIVE_HUB, LIVE_RG
+                )
+            ).get_output_in_json()
+            assert result["deviceId"] == device_ids[2]
+            assert result["samplingMode"] == "enabled"
+            assert result["samplingRate"] == "50%"
+            assert not result["isSynced"]
 
 
 class TestIoTHubModules(IoTLiveScenarioTest):
@@ -1097,7 +1099,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
     def test_storage(self):
         device_count = 1
 
-        content_path = os.path.join(CWD, "test_config_modules_content_v1.json")
+        content_path = os.path.join(CWD, "test_generic_replace.json")
         device_ids = self.generate_device_names(device_count)
 
         self.cmd(

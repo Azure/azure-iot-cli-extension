@@ -3,37 +3,68 @@
 Release History
 ===============
 
+0.9.0
++++++++++++++++
+* Breaking change: Evaluating an edge deployment/hub configuration SYSTEM metric (via show-metric) will return non-manipulated query output.
+  This means the result is always a collection of objects.
+* Breaking change: (second attempt) Remove long since deprecated parameter `--config-id` from edge deployments.
+  Use `--deployment-id` or `-d` instead.
+* When creating ADM module configurations, the target condition starting with 'from devices.modules where' is enforced.
+* SDK refresh. IoT Hub service calls (except for 'az iot dt' commands) point to api-version 2019-10-01.
+* Extension package name has been changed to 'azure-iot'.
+* Help text for ADM module configurations has been updated with proper target condition syntax for module criteria.
+
+
+0.8.9
++++++++++++++++
+* Updated uamqp version to ~1.2.
+* Simplified out-of-band dependency installation message.
+* If uamqp installation fails the error is raised on stderr rather than having to use --debug.
+* amqp frame traces are not shown when --debug is passed in to event monitoring.
+* Fixed monitor-events not raising an exception if receiver client runs into an error.
+
+0.8.8
++++++++++++++++
+* Adds Jobs v2 command set.
+
 0.8.7
 +++++++++++++++
-- Support IoT Edge layered deployments
-- Support ADM module twin definitions
-- Improved json schema validation error handling
-- Update top maximum for config list to 200
+* Support IoT Edge layered deployments.
+* Support ADM module twin definitions.
+* Improved json schema validation error handling for edge deployments.
+* Update top maximum for hub config/edge deployment list to 100.
+* Breaking Change: Metric evaluation between hub configurations and edge deployments via show-metric work exactly the same.
+* Breaking Change: New result format for `az iot device c2d-message receive`. The command now shows all properties.
+* Updated IoT Central commands to allow the API for token collection to be overridden.
+* `az iot device c2d-message send` supports sending all settable system properties per message.
+* Updated uAMQP version range.
+* Add user agent for MQTT & AMQP operations.
+* Add QoS argument for `send-d2c-message`.
 
 0.8.6
 +++++++++++++++
-- For IoT Hub commands - improves json handling for arguments that require json.
-- Edge deployments support metric definitions at creation time (like device configurations)
-- Fixes issue with `az iot hub invoke-device-method` preventing primitive value payloads.
-- The `az iot device simulate` command will send default values for content-type and content-encoding. These values can be overridden.
+* For IoT Hub commands - improves json handling for arguments that require json.
+* Edge deployments support metric definitions at creation time (like device configurations)
+* Fixes issue with `az iot hub invoke-device-method` preventing primitive value payloads.
+* The `az iot device simulate` command will send default values for content-type and content-encoding. These values can be overridden.
 
 0.8.5
 +++++++++++++++
-- Re-adds deprecated parameter --config-id to edge related commands. Note: --deployment-id/-d are the proper parameters to use in place of config-id when using edge deployment related commands.
+* Re-adds deprecated parameter --config-id to edge related commands. Note: --deployment-id/-d are the proper parameters to use in place of config-id when using edge deployment related commands.
 
 0.8.4
 +++++++++++++++
-- Device simulate now supports sending arbitrary message properties (like in send-d2c-message).
-- The preview dt monitor events command has been simplified. It works the same as vanilla iot hub monitoring but filters dt events and allows filtering by interface.
-- Help content improvements.
-- Remove long since deprecated parameter `--config-id` from edge deployments.
+* Device simulate now supports sending arbitrary message properties (like in send-d2c-message).
+* The preview dt monitor events command has been simplified. It works the same as vanilla iot hub monitoring but filters dt events and allows filtering by interface.
+* Help content improvements.
+* Remove long since deprecated parameter `--config-id` from edge deployments.
 
 0.8.3
 +++++++++++++++
-- Removes long since deprecated command `az iot hub apply-configuration`.
-- Resolve issue #100.
-- Improve help content for `az iot edge deployment update` to explicitly show what can be updated.
-- Fix message annotation used to filter Digital Twin events in `az iot dt monitor-events`.
+* Removes long since deprecated command `az iot hub apply-configuration`.
+* Resolve issue #100.
+* Improve help content for `az iot edge deployment update` to explicitly show what can be updated.
+* Fix message annotation used to filter Digital Twin events in `az iot dt monitor-events`.
 
 0.8.2
 +++++++++++++++
