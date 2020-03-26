@@ -239,9 +239,9 @@ def get_iot_dps_connection_string(
 
     return result
 
+
 def get_iot_central_tokens(cmd, app_uri):
     def formatUrl(url):
-        import re
         finalUrl = url
         if not finalUrl.startswith('https://'):
             finalUrl = 'https://{}'.format(finalUrl)
