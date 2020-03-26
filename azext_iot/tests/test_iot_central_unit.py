@@ -13,16 +13,9 @@ from knack.util import CLIError
 from azext_iot.common.utility import validate_min_python_version
 
 device_id = 'mydevice'
-app_id = 'myapp'
+app_uri = 'myapp'
 device_twin_result = '{device twin result}'
 resource = 'shared_resource'
-
-
-@pytest.fixture()
-def fixture_iot_token(mocker):
-    sas = mocker.patch('azext_iot.operations.central.get_iot_hub_token_from_central_app_id')
-    sas.return_value = 'SharedAccessSignature sr={}&sig=signature&se=expiry&skn=service'.format(resource)
-    return sas
 
 
 @pytest.fixture()
@@ -86,14 +79,16 @@ def fixture_get_iot_central_tokens(mocker):
     mock = mocker.patch('azext_iot.common._azure.get_iot_central_tokens')
 
     mock.return_value = {
-        'eventhubSasToken': {
-            'hostname': 'part1/part2/part3',
-            'entityPath': 'entityPath',
-            'sasToken': 'sasToken'
-        },
-        'expiry': '0000',
-        'iothubTenantSasToken': {
-            'sasToken': 'iothubTenantSasToken'
+        'hubId': {
+            'eventhubSasToken': {
+                'hostname': 'part1/part2/part3',
+                'entityPath': 'entityPath',
+                'sasToken': 'SharedAccessSignature sr='+resource+'&sig=456'
+            },
+            'expiry': '0000',
+            'iothubTenantSasToken': {
+                'sasToken': 'SharedAccessSignature sr='+resource+'&sig=456'
+            }
         }
     }
 
@@ -103,7 +98,7 @@ class TestCentralHelpers():
         from azext_iot.common._azure import get_iot_central_tokens
 
         # Test to ensure get_iot_central_tokens calls requests.post and tokens are returned
-        assert get_iot_central_tokens({}, 'app_id', 'api-uri').value() == 'fixture_requests_post value'
+        assert get_iot_central_tokens({}, 'app_uri').value() == 'fixture_requests_post value'
 
     def test_get_aad_token(self, fixture_azure_profile):
         from azext_iot.common._azure import _get_aad_token
@@ -120,16 +115,9 @@ class TestCentralHelpers():
             'tokenType': 'raw token 0 - A'
         }
 
-    def test_get_iot_hub_token_from_central_app_id(self, fixture_get_iot_central_tokens):
-        from azext_iot.common._azure import get_iot_hub_token_from_central_app_id
-
-        # Test to ensure get_iot_hub_token_from_central_app_id returns iothubTenantSasToken
-        assert get_iot_hub_token_from_central_app_id({}, 'app_id', 'api-uri') == 'iothubTenantSasToken'
-
-
 class TestDeviceTwinShow():
-    def test_device_twin_show_calls_get_twin(self, fixture_iot_token, fixture_bind_sdk, fixture_cmd):
-        result = subject.iot_central_device_show(fixture_cmd, device_id, app_id, 'api-uri')
+    def test_device_twin_show_calls_get_twin(self, fixture_get_iot_central_tokens, fixture_bind_sdk, fixture_cmd):
+        result = subject.iot_central_device_show(fixture_cmd, device_id, 'api_uri')
 
         # Ensure get_twin is called and result is returned
         assert result is device_twin_result
@@ -147,4 +135,4 @@ class TestMonitorEvents():
     ])
     def test_monitor_events_invalid_args(self, timeout, exception, fixture_cmd):
         with pytest.raises(exception):
-            subject.iot_central_monitor_events(fixture_cmd, app_id, timeout=timeout)
+            subject.iot_central_monitor_events(fixture_cmd, app_uri, timeout=timeout)

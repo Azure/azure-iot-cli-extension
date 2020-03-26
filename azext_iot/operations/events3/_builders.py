@@ -27,8 +27,8 @@ class EventTargetBuilder():
     def build_iot_hub_target(self, target):
         return self.eventLoop.run_until_complete(self._build_iot_hub_target_async(target))
 
-    def build_central_event_hub_target(self, cmd, app_id, central_api_uri):
-        return self.eventLoop.run_until_complete(self._build_central_event_hub_target_async(cmd, app_id, central_api_uri))
+    def build_central_event_hub_targets(self, cmd, app_uri):
+        return self.eventLoop.run_until_complete(self._build_central_event_hub_targets_async(cmd, app_uri))
 
     def _build_auth_container(self, target):
         sas_uri = 'sb://{}/{}'.format(target['events']['endpoint'], target['events']['path'])
@@ -76,33 +76,39 @@ class EventTargetBuilder():
         finally:
             await receive_client.close_async()
 
-    async def _build_central_event_hub_target_async(self, cmd, app_id, central_api_uri):
+    async def _build_central_event_hub_targets_async(self, cmd, app_uri):
         from azext_iot.common._azure import get_iot_central_tokens
 
-        tokens = get_iot_central_tokens(cmd, app_id, central_api_uri)
-        eventHubToken = tokens['eventhubSasToken']
-        hostnameWithoutPrefix = eventHubToken['hostname'].split("/")[2]
-        endpoint = hostnameWithoutPrefix
-        path = eventHubToken["entityPath"]
-        tokenExpiry = tokens['expiry']
-        auth = self._build_auth_container_from_token(endpoint, path, eventHubToken['sasToken'], tokenExpiry)
-        address = "amqps://{}/{}/$management".format(hostnameWithoutPrefix, eventHubToken["entityPath"])
-        meta_data = await self._query_meta_data(address, path, auth)
-        partition_count = meta_data[b'partition_count']
-        partition_ids = []
-        for i in range(int(partition_count)):
-            partition_ids.append(str(i))
-        partitions = partition_ids
-        auth = self._build_auth_container_from_token(endpoint, path, eventHubToken['sasToken'], tokenExpiry)
+        allTokens = get_iot_central_tokens(cmd, app_uri)
+        targets = []
+        # create target for each event hub
+        for key in allTokens:
+            tokens = allTokens[key]
+            eventHubToken = tokens['eventhubSasToken']
+            hostnameWithoutPrefix = eventHubToken['hostname'].split("/")[2]
+            endpoint = hostnameWithoutPrefix
+            path = eventHubToken["entityPath"]
+            tokenExpiry = tokens['expiry']
+            auth = self._build_auth_container_from_token(endpoint, path, eventHubToken['sasToken'], tokenExpiry)
+            address = "amqps://{}/{}/$management".format(hostnameWithoutPrefix, eventHubToken["entityPath"])
+            meta_data = await self._query_meta_data(address, path, auth)
+            partition_count = meta_data[b'partition_count']
+            partition_ids = []
+            for i in range(int(partition_count)):
+                partition_ids.append(str(i))
+            partitions = partition_ids
+            auth = self._build_auth_container_from_token(endpoint, path, eventHubToken['sasToken'], tokenExpiry)
 
-        eventHubTarget = {
-            'endpoint': endpoint,
-            'path': path,
-            'auth': auth,
-            'partitions': partitions
-        }
+            eventHubTarget = {
+                'endpoint': endpoint,
+                'path': path,
+                'auth': auth,
+                'partitions': partitions
+            }
 
-        return eventHubTarget
+            targets.append(eventHubTarget)
+
+        return targets
 
     async def _build_iot_hub_target_async(self, target):
         if 'events' not in target:

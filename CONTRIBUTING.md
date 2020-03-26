@@ -99,6 +99,9 @@ _Hub:_
 _DPS:_  
 `pytest azext_iot/tests/test_iot_dps_unit.py`
 
+_IoT Central_:_  
+`pytest azext_iot/tests/test_iot_central_unit.py`
+
 #### Integration Tests
 
 Integration tests are run against Azure resources and depend on environment variables.

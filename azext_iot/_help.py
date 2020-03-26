@@ -951,28 +951,28 @@ helps['iotcentral app monitor-events'] = """
     examples:
     - name: Basic usage
       text: >
-        az iotcentral app monitor-events --app-id {app_id}
+        az iotcentral app monitor-events --app-uri {app_uri}
     - name: Basic usage when filtering on target device
       text: >
-        az iotcentral app monitor-events --app-id {app_id} -d {device_id}
+        az iotcentral app monitor-events --app-uri {app_uri} -d {device_id}
     - name: Basic usage when filtering targeted devices with a wildcard in the ID
       text: >
-        az iotcentral app monitor-events --app-id {app_id} -d Device*
+        az iotcentral app monitor-events --app-uri {app_uri} -d Device*
     - name: Filter device and specify an Event Hub consumer group to bind to.
       text: >
-        az iotcentral app monitor-events --app-id {app_id} -d {device_id} --cg {consumer_group_name}
+        az iotcentral app monitor-events --app-uri {app_uri} -d {device_id} --cg {consumer_group_name}
     - name: Receive message annotations (message headers)
       text: >
-        az iotcentral app monitor-events --app-id {app_id} -d {device_id} --properties anno
+        az iotcentral app monitor-events --app-uri {app_uri} -d {device_id} --properties anno
     - name: Receive message annotations + system properties. Never time out.
       text: >
-        az iotcentral app monitor-events --app-id {app_id} -d {device_id} --properties anno sys --timeout 0
+        az iotcentral app monitor-events --app-uri {app_uri} -d {device_id} --properties anno sys --timeout 0
     - name: Receive all message attributes from all device messages
       text: >
-        az iotcentral app monitor-events --app-id {app_id} --props all
+        az iotcentral app monitor-events --app-uri {app_uri} --props all
     - name: Receive all messages and parse message payload as JSON
       text: >
-        az iotcentral app monitor-events --app-id {app_id} --output json
+        az iotcentral app monitor-events --app-uri {app_uri} --output json
   """
 
 helps['iotcentral device-twin'] = """
@@ -1007,28 +1007,28 @@ helps['iot central app monitor-events'] = """
     examples:
     - name: Basic usage
       text: >
-        az iot central app monitor-events --app-id {app_id}
+        az iot central app monitor-events --app-uri {app_uri}
     - name: Basic usage when filtering on target device
       text: >
-        az iot central app monitor-events --app-id {app_id} -d {device_id}
+        az iot central app monitor-events --app-uri {app_uri} -d {device_id}
     - name: Basic usage when filtering targeted devices with a wildcard in the ID
       text: >
-        az iot central app monitor-events --app-id {app_id} -d Device*
+        az iot central app monitor-events --app-uri {app_uri} -d Device*
     - name: Filter device and specify an Event Hub consumer group to bind to.
       text: >
-        az iot central app monitor-events --app-id {app_id} -d {device_id} --cg {consumer_group_name}
+        az iot central app monitor-events --app-uri {app_uri} -d {device_id} --cg {consumer_group_name}
     - name: Receive message annotations (message headers)
       text: >
-        az iot central app monitor-events --app-id {app_id} -d {device_id} --properties anno
+        az iot central app monitor-events --app-uri {app_uri} -d {device_id} --properties anno
     - name: Receive message annotations + system properties. Never time out.
       text: >
-        az iot central app monitor-events --app-id {app_id} -d {device_id} --properties anno sys --timeout 0
+        az iot central app monitor-events --app-uri {app_uri} -d {device_id} --properties anno sys --timeout 0
     - name: Receive all message attributes from all device messages
       text: >
-        az iot central app monitor-events --app-id {app_id} --props all
+        az iot central app monitor-events --app-uri {app_uri} --props all
     - name: Receive all messages and parse message payload as JSON
       text: >
-        az iot central app monitor-events --app-id {app_id} --output json
+        az iot central app monitor-events --app-uri {app_uri} --output json
   """
 
 helps['iot central device-twin'] = """

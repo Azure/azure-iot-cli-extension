@@ -239,17 +239,25 @@ def get_iot_dps_connection_string(
 
     return result
 
+def get_iot_central_tokens(cmd, app_uri):
+    def formatUrl(url):
+        import re
+        finalUrl = url
+        if not finalUrl.startswith('https://'):
+            finalUrl = 'https://{}'.format(finalUrl)
+        if not finalUrl.endswith('/'):
+            finalUrl = '{}/'.format(finalUrl)
+        return finalUrl
 
-def get_iot_central_tokens(cmd, app_id, central_api_uri):
-    def get_event_hub_token(app_id, iotcAccessToken):
+    def get_event_hub_tokens(app_uri, iotcAccessToken):
         import requests
-        url = "https://{}/v1-beta/applications/{}/diagnostics/sasTokens".format(central_api_uri, app_id)
+        url = "{}system/iothubs/generateSasTokens".format(formatUrl(app_uri))
         response = requests.post(url, headers={'Authorization': 'Bearer {}'.format(iotcAccessToken)})
         return response.json()
 
     aad_token = _get_aad_token(cmd, resource="https://apps.azureiotcentral.com")['accessToken']
 
-    tokens = get_event_hub_token(app_id, aad_token)
+    tokens = get_event_hub_tokens(app_uri, aad_token)
 
     if tokens.get('error'):
         raise CLIError(
@@ -257,11 +265,6 @@ def get_iot_central_tokens(cmd, app_id, central_api_uri):
         )
 
     return tokens
-
-
-def get_iot_hub_token_from_central_app_id(cmd, app_id, central_api_uri):
-    return get_iot_central_tokens(cmd, app_id, central_api_uri)['iothubTenantSasToken']['sasToken']
-
 
 def get_iot_pnp_connection_string(
         cmd,
