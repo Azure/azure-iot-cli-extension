@@ -119,7 +119,7 @@ def load_command_table(self, _):
         cmd_group.command('delete', 'iot_dps_registration_delete')
 
     with self.command_group('iotcentral', command_type=iotcentral_ops,
-                            deprecate_info=self.deprecate(redirect='iot central app')) as cmd_group:
+                            deprecate_info=self.deprecate(redirect='iot central', hide=True)) as cmd_group:
         pass
 
     with self.command_group('iotcentral app', command_type=iotcentral_ops) as cmd_group:
