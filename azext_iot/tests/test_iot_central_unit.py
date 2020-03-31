@@ -83,11 +83,11 @@ def fixture_get_iot_central_tokens(mocker):
             'eventhubSasToken': {
                 'hostname': 'part1/part2/part3',
                 'entityPath': 'entityPath',
-                'sasToken': 'SharedAccessSignature sr='+resource+'&sig=456'
+                'sasToken': 'SharedAccessSignature sr=' + resource + '&sig=456'
             },
             'expiry': '0000',
             'iothubTenantSasToken': {
-                'sasToken': 'SharedAccessSignature sr='+resource+'&sig=456'
+                'sasToken': 'SharedAccessSignature sr=' + resource + '&sig=456'
             }
         }
     }

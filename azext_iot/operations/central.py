@@ -15,7 +15,7 @@ def find_between(s, start, end):
     return (s.split(start))[1].split(end)[0]
 
 
-def iot_central_device_show(cmd, device_id, app_uri):    
+def iot_central_device_show(cmd, device_id, app_uri):
     from azext_iot.common._azure import get_iot_central_tokens
 
     tokens = get_iot_central_tokens(cmd, app_uri)
@@ -30,9 +30,9 @@ def iot_central_device_show(cmd, device_id, app_uri):
         try:
             return service_sdk.get_twin(device_id)
         except errors.CloudError as e:
-            if(exception == None):
+            if(exception is None):
                 exception = CLIError(unpack_msrest_error(e))
-    
+
     raise exception
 
 
@@ -54,8 +54,8 @@ def iot_central_monitor_events(cmd, app_uri, device_id=None, consumer_group='$De
         executorTargets.append(events3.executorData(target, consumer_group))
 
     events3.nExecutor(executorTargets,
-                     enqueued_time=enqueued_time,
-                     properties=properties,
-                     timeout=timeout,
-                     device_id=device_id,
-                     output=output)
+                      enqueued_time=enqueued_time,
+                      properties=properties,
+                      timeout=timeout,
+                      device_id=device_id,
+                      output=output)

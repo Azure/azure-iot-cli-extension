@@ -266,6 +266,7 @@ def get_iot_central_tokens(cmd, app_uri):
 
     return tokens
 
+
 def get_iot_pnp_connection_string(
         cmd,
         endpoint,
