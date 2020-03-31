@@ -115,6 +115,7 @@ class TestCentralHelpers():
             'tokenType': 'raw token 0 - A'
         }
 
+
 class TestDeviceTwinShow():
     def test_device_twin_show_calls_get_twin(self, fixture_get_iot_central_tokens, fixture_bind_sdk, fixture_cmd):
         result = subject.iot_central_device_show(fixture_cmd, device_id, 'api_uri')
