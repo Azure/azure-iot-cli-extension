@@ -29,15 +29,15 @@ def iot_central_device_show(cmd, device_id, app_id, central_api_uri='api.azureio
 
 
 def iot_central_monitor_events(cmd, app_id, device_id=None, consumer_group='$Default', timeout=300, enqueued_time=None,
-                               repair=False, properties=None, yes=False, central_api_uri='api.azureiotcentral.com'):
+                               repair=False, properties=None, yes=False, validate_message=False, central_api_uri='api.azureiotcentral.com'):
 
     (enqueued_time, properties, timeout, output) = init_monitoring(cmd, timeout, properties, enqueued_time, repair, yes)
 
     import importlib
 
     events3 = importlib.import_module('azext_iot.operations.events3._events')
-    builders = importlib.import_module('azext_iot.operations.events3._builders')
-
+    builders = importlib.import_module('azext_iot.operations.events3._builders')  
+   
     eventHubTarget = builders.EventTargetBuilder().build_central_event_hub_target(cmd, app_id, central_api_uri)
     events3.executor(eventHubTarget,
                      consumer_group=consumer_group,
@@ -45,4 +45,5 @@ def iot_central_monitor_events(cmd, app_id, device_id=None, consumer_group='$Def
                      properties=properties,
                      timeout=timeout,
                      device_id=device_id,
-                     output=output)
+                     output=output,
+                     validate_message=validate_message)

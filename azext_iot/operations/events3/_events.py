@@ -21,7 +21,37 @@ from azext_iot.operations.events3._builders import AmqpBuilder
 # To provide amqp frame trace
 DEBUG = False
 logger = get_logger(__name__)
+def info(output):
+    print("[Info] {}".format(output))
 
+def warning(output):
+    print("[Warning] {}".format(output))
+
+def Error(output):
+    print("[Error] {}".format(output))
+
+def messageValidator(msg,payload):
+    system_props = unicode_binary_map(parse_entity(msg.properties, True)) 
+
+    ce = system_props["content_encoding"] if "content_encoding" in system_props else ""
+
+    ct = system_props["content_type"] if "content_type" in system_props else ""
+
+    if ct and "application/json" in ct.lower():
+        try:
+            payload = json.loads(
+                re.compile(r"(\\r\\n)+|\\r+|\\n+").sub("", payload)
+            )
+        except Exception:
+            Error("Invalid JSON format. Raw payload {}".format(payload))                
+            pass
+    else:
+        warning("Message contains custom headers. Custom headers are not supported and will be dropped from the message")
+
+    if ce and "utf-8" not in ce.lower():
+        warning("Encoding other than UTF-8 is being used.UTF-8 encoding is only supported")
+ 
+    info("Payload  {}".format(payload))
 
 def executor(
     target,
@@ -35,6 +65,7 @@ def executor(
     devices=None,
     interface_name=None,
     pnp_context=None,
+    validate_message=None,
 ):
 
     coroutines = []
@@ -51,9 +82,10 @@ def executor(
             devices,
             interface_name,
             pnp_context,
+            validate_message
         )
     )
-
+    
     loop = asyncio.get_event_loop()
     if loop.is_closed():
         loop = asyncio.new_event_loop()
@@ -106,6 +138,7 @@ async def initiate_event_monitor(
     devices=None,
     interface_name=None,
     pnp_context=None,
+    validate_message=None,
 ):
     def _get_conn_props():
         properties = {}
@@ -146,6 +179,7 @@ async def initiate_event_monitor(
                     devices=devices,
                     interface_name=interface_name,
                     pnp_context=pnp_context,
+                    validate_message=validate_message,
                 )
             )
         return await asyncio.gather(*coroutines, return_exceptions=True)
@@ -167,6 +201,7 @@ async def monitor_events(
     devices=None,
     interface_name=None,
     pnp_context=None,
+    validate_message=None,
 ):
     source = uamqp.address.Source(
         "amqps://{}/{}/ConsumerGroups/{}/Partitions/{}".format(
@@ -176,7 +211,7 @@ async def monitor_events(
     source.set_filter(
         bytes("amqp.annotation.x-opt-enqueuedtimeutc > " + str(enqueuedtimeutc), "utf8")
     )
-
+   
     def _output_msg_kpi(msg):
         origin = str(msg.annotations.get(b"iothub-connection-device-id"), "utf8")
         if device_id and device_id != origin:
@@ -208,11 +243,14 @@ async def monitor_events(
 
             event_source["event"]["interface"] = msg_interface_name
 
-        data = msg.get_data()
+        data = msg.get_data()      
         if data:
             payload = str(next(data), "utf8")
-
-        system_props = unicode_binary_map(parse_entity(msg.properties, True))
+        
+        if validate_message:
+            messageValidator(msg, payload)
+        
+        system_props = unicode_binary_map(parse_entity(msg.properties, True)) 
 
         ct = content_type
         if not ct:
@@ -250,7 +288,7 @@ async def monitor_events(
             dump = json.dumps(event_source, indent=4)
         else:
             dump = yaml.safe_dump(event_source, default_flow_style=False)
-        six.print_(dump, flush=True)
+        six.print_(dump, flush=True)        
 
     exp_cancelled = False
     receive_client = uamqp.ReceiveClientAsync(

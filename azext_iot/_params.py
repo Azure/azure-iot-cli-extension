@@ -483,6 +483,9 @@ def load_arguments(self, _):
                          arg_type=get_three_state_flag(),
                          help='Skip user prompts. Indicates acceptance of dependency installation (if required). '
                          'Used primarily for automation scenarios. Default: false')
+        context.argument('validate_message', options_list=['--validate-message', '--vm'],
+                         arg_type=get_three_state_flag(),
+                         help='Validate messages. Performs format and data checks on message payload. Default: false')
 
     with self.argument_context('iotcentral device-twin show') as context:
         context.argument('device_id', options_list=['--device-id', '-d'], help='Target Device.')
