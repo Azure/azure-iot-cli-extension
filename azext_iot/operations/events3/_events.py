@@ -17,6 +17,7 @@ from knack.log import get_logger
 from azext_iot.constants import VERSION, USER_AGENT
 from azext_iot.common.utility import parse_entity, unicode_binary_map, process_json_arg
 from azext_iot.operations.events3._builders import AmqpBuilder
+from azext_iot.operations.central import MessageValidator
 
 # To provide amqp frame trace
 DEBUG = False
@@ -25,10 +26,10 @@ def info(output):
     print("[Info] {}".format(output))
 
 def warning(output):
-    print("[Warning] {}".format(output))
+    logger.warning("[Warning] %s", output)
 
 def Error(output):
-    print("[Error] {}".format(output))
+    logger.error("[Error] %s", output)
 
 def messageValidator(msg,payload):
     system_props = unicode_binary_map(parse_entity(msg.properties, True)) 
@@ -65,7 +66,6 @@ def executor(
     devices=None,
     interface_name=None,
     pnp_context=None,
-    validate_message=None,
 ):
 
     coroutines = []
@@ -82,7 +82,6 @@ def executor(
             devices,
             interface_name,
             pnp_context,
-            validate_message
         )
     )
     
@@ -138,7 +137,6 @@ async def initiate_event_monitor(
     devices=None,
     interface_name=None,
     pnp_context=None,
-    validate_message=None,
 ):
     def _get_conn_props():
         properties = {}
@@ -179,7 +177,6 @@ async def initiate_event_monitor(
                     devices=devices,
                     interface_name=interface_name,
                     pnp_context=pnp_context,
-                    validate_message=validate_message,
                 )
             )
         return await asyncio.gather(*coroutines, return_exceptions=True)
@@ -201,7 +198,6 @@ async def monitor_events(
     devices=None,
     interface_name=None,
     pnp_context=None,
-    validate_message=None,
 ):
     source = uamqp.address.Source(
         "amqps://{}/{}/ConsumerGroups/{}/Partitions/{}".format(
@@ -247,7 +243,7 @@ async def monitor_events(
         if data:
             payload = str(next(data), "utf8")
         
-        if validate_message:
+        if MessageValidator.messageValdationEnabled:
             messageValidator(msg, payload)
         
         system_props = unicode_binary_map(parse_entity(msg.properties, True)) 

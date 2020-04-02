@@ -1031,6 +1031,28 @@ helps['iot central app monitor-events'] = """
         az iot central app monitor-events --app-id {app_id} --output json
   """
 
+helps['iot central app validate-messages'] = """
+    type: command
+    short-summary: Validate messages sent to the IoT Hub for an IoT Central app.
+    long-summary: |
+                  EXPERIMENTAL requires Python 3.5+
+                  This command relies on and may install dependent Cython package (uamqp) upon first execution.
+                  https://github.com/Azure/azure-uamqp-python
+    examples:
+    - name: Basic usage
+      text: >
+        az iot central app validate-messages --app-id {app_id}
+    - name: Basic usage when filtering on target device
+      text: >
+        az iot central app validate-messages --app-id {app_id} -d {device_id}
+    - name: Basic usage when filtering targeted devices with a wildcard in the ID
+      text: >
+        az iot central app validate-messages --app-id {app_id} -d Device*
+    - name: Filter device and specify an Event Hub consumer group to bind to.
+      text: >
+        az iot central app monitor-events --app-id {app_id} -d {device_id} --cg {consumer_group_name}
+  """
+
 helps['iot central device-twin'] = """
     type: group
     short-summary: Manage IoT Central device twins.
