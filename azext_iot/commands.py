@@ -130,8 +130,6 @@ def load_command_table(self, _):
 
     with self.command_group('iot central app', command_type=iotcentral_ops) as cmd_group:
         cmd_group.command('monitor-events', 'iot_central_monitor_events')
-
-    with self.command_group('iot central app', command_type=iotcentral_ops) as cmd_group:
         cmd_group.command('validate-messages', 'iot_central_validate_messages')
 
     with self.command_group('iot central device-twin', command_type=iotcentral_ops) as cmd_group:

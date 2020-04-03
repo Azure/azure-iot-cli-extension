@@ -1050,7 +1050,7 @@ helps['iot central app validate-messages'] = """
         az iot central app validate-messages --app-id {app_id} -d Device*
     - name: Filter device and specify an Event Hub consumer group to bind to.
       text: >
-        az iot central app monitor-events --app-id {app_id} -d {device_id} --cg {consumer_group_name}
+        az iot central app validate-messages --app-id {app_id} -d {device_id} --cg {consumer_group_name}
   """
 
 helps['iot central device-twin'] = """

@@ -11,13 +11,14 @@ from azext_iot.common.shared import SdkType
 from azext_iot.common.utility import (unpack_msrest_error, init_monitoring)
 from azext_iot.common.sas_token_auth import BasicSasTokenAuthentication
 
+
 class MessageValidator:
     messageValdationEnabled = False
-    
-    def __init__(self):
-        self.messageValdationEnabled = False       
 
-    
+    def __init__(self):
+        self.messageValdationEnabled = False
+
+
 def find_between(s, start, end):
     return (s.split(start))[1].split(end)[0]
 
@@ -35,7 +36,7 @@ def iot_central_device_show(cmd, device_id, app_id, central_api_uri='api.azureio
 
 
 def iot_central_validate_messages(cmd, app_id, device_id=None, consumer_group='$Default', timeout=300, enqueued_time=None,
-                               repair=False, properties=None, yes=False, central_api_uri='api.azureiotcentral.com'):
+                                  repair=False, properties=None, yes=False, central_api_uri='api.azureiotcentral.com'):
 
     MessageValidator.messageValdationEnabled = True
 
@@ -50,8 +51,8 @@ def iot_central_monitor_events(cmd, app_id, device_id=None, consumer_group='$Def
     import importlib
 
     events3 = importlib.import_module('azext_iot.operations.events3._events')
-    builders = importlib.import_module('azext_iot.operations.events3._builders')  
-   
+    builders = importlib.import_module('azext_iot.operations.events3._builders')
+
     eventHubTarget = builders.EventTargetBuilder().build_central_event_hub_target(cmd, app_id, central_api_uri)
     events3.executor(eventHubTarget,
                      consumer_group=consumer_group,
@@ -59,5 +60,4 @@ def iot_central_monitor_events(cmd, app_id, device_id=None, consumer_group='$Def
                      properties=properties,
                      timeout=timeout,
                      device_id=device_id,
-                     output=output,
-                     )
+                     output=output)
