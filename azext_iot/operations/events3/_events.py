@@ -6,6 +6,7 @@
 
 import asyncio
 import json
+import random
 import re
 import sys
 import six
@@ -17,42 +18,12 @@ from knack.log import get_logger
 from azext_iot.constants import VERSION, USER_AGENT
 from azext_iot.common.utility import parse_entity, unicode_binary_map, process_json_arg
 from azext_iot.operations.events3._builders import AmqpBuilder
-from azext_iot.operations.central import MessageValidator
 
 # To provide amqp frame trace
 DEBUG = False
 logger = get_logger(__name__)
-def info(output):
-    print("[Info] {}".format(output))
+random.seed(0)
 
-def warning(output):
-    logger.warning("[Warning] %s", output)
-
-def Error(output):
-    logger.error("[Error] %s", output)
-
-def messageValidator(msg,payload):
-    system_props = unicode_binary_map(parse_entity(msg.properties, True)) 
-
-    ce = system_props["content_encoding"] if "content_encoding" in system_props else ""
-
-    ct = system_props["content_type"] if "content_type" in system_props else ""
-
-    if ct and "application/json" in ct.lower():
-        try:
-            payload = json.loads(
-                re.compile(r"(\\r\\n)+|\\r+|\\n+").sub("", payload)
-            )
-        except Exception:
-            Error("Invalid JSON format. Raw payload {}".format(payload))                
-            pass
-    else:
-        warning("Message contains custom headers. Custom headers are not supported and will be dropped from the message")
-
-    if ce and "utf-8" not in ce.lower():
-        warning("Encoding other than UTF-8 is being used.UTF-8 encoding is only supported")
- 
-    info("Payload  {}".format(payload))
 
 def executor(
     target,
@@ -66,6 +37,8 @@ def executor(
     devices=None,
     interface_name=None,
     pnp_context=None,
+    log_level="warn",
+    validate_messages=False,
 ):
 
     coroutines = []
@@ -82,9 +55,10 @@ def executor(
             devices,
             interface_name,
             pnp_context,
+            validate_messages,
         )
     )
-    
+
     loop = asyncio.get_event_loop()
     if loop.is_closed():
         loop = asyncio.new_event_loop()
@@ -137,6 +111,7 @@ async def initiate_event_monitor(
     devices=None,
     interface_name=None,
     pnp_context=None,
+    validate_messages=False,
 ):
     def _get_conn_props():
         properties = {}
@@ -177,6 +152,7 @@ async def initiate_event_monitor(
                     devices=devices,
                     interface_name=interface_name,
                     pnp_context=pnp_context,
+                    validate_messages=validate_messages,
                 )
             )
         return await asyncio.gather(*coroutines, return_exceptions=True)
@@ -198,6 +174,7 @@ async def monitor_events(
     devices=None,
     interface_name=None,
     pnp_context=None,
+    validate_messages=False,
 ):
     source = uamqp.address.Source(
         "amqps://{}/{}/ConsumerGroups/{}/Partitions/{}".format(
@@ -207,88 +184,15 @@ async def monitor_events(
     source.set_filter(
         bytes("amqp.annotation.x-opt-enqueuedtimeutc > " + str(enqueuedtimeutc), "utf8")
     )
-   
-    def _output_msg_kpi(msg):
-        origin = str(msg.annotations.get(b"iothub-connection-device-id"), "utf8")
-        if device_id and device_id != origin:
-            if "*" in device_id or "?" in device_id:
-                regex = (
-                    re.escape(device_id).replace("\\*", ".*").replace("\\?", ".") + "$"
-                )
-                if not re.match(regex, origin):
-                    return
-            else:
-                return
-        if devices and origin not in devices:
-            return
-
-        event_source = {"event": {}}
-        event_source["event"]["origin"] = origin
-        payload = ""
-
-        if pnp_context:
-            msg_interface_name = str(
-                msg.annotations.get(b"iothub-interface-name"), "utf8"
-            )
-            if not msg_interface_name:
-                return
-
-            if interface_name:
-                if msg_interface_name != interface_name:
-                    return
-
-            event_source["event"]["interface"] = msg_interface_name
-
-        data = msg.get_data()      
-        if data:
-            payload = str(next(data), "utf8")
-        
-        if MessageValidator.messageValdationEnabled:
-            messageValidator(msg, payload)
-        
-        system_props = unicode_binary_map(parse_entity(msg.properties, True)) 
-
-        ct = content_type
-        if not ct:
-            ct = system_props["content_type"] if "content_type" in system_props else ""
-
-        if ct and "application/json" in ct.lower():
-            try:
-                payload = json.loads(
-                    re.compile(r"(\\r\\n)+|\\r+|\\n+").sub("", payload)
-                )
-            except Exception:
-                # We don't want to crash the monitor if JSON parsing fails
-                pass
-
-        event_source["event"]["payload"] = payload
-
-        if "anno" in properties or "all" in properties:
-            event_source["event"]["annotations"] = unicode_binary_map(msg.annotations)
-        if "sys" in properties or "all" in properties:
-            if not event_source["event"].get("properties"):
-                event_source["event"]["properties"] = {}
-            event_source["event"]["properties"]["system"] = system_props
-        if "app" in properties or "all" in properties:
-            if not event_source["event"].get("properties"):
-                event_source["event"]["properties"] = {}
-            app_prop = (
-                msg.application_properties if msg.application_properties else None
-            )
-
-            if app_prop:
-                event_source["event"]["properties"]["application"] = unicode_binary_map(
-                    app_prop
-                )
-        if output.lower() == "json":
-            dump = json.dumps(event_source, indent=4)
-        else:
-            dump = yaml.safe_dump(event_source, default_flow_style=False)
-        six.print_(dump, flush=True)        
 
     exp_cancelled = False
     receive_client = uamqp.ReceiveClientAsync(
-        source, auth=auth, timeout=timeout, prefetch=0, client_name=_get_container_id(), debug=DEBUG
+        source,
+        auth=auth,
+        timeout=timeout,
+        prefetch=0,
+        client_name=_get_container_id(),
+        debug=DEBUG,
     )
 
     try:
@@ -296,7 +200,17 @@ async def monitor_events(
             await receive_client.open_async(connection=connection)
 
         async for msg in receive_client.receive_messages_iter_async():
-            _output_msg_kpi(msg)
+            _output_msg_kpi(
+                msg,
+                device_id,
+                devices,
+                pnp_context,
+                interface_name,
+                content_type,
+                properties,
+                output,
+                validate_messages=validate_messages,
+            )
 
     except asyncio.CancelledError:
         exp_cancelled = True
@@ -371,7 +285,9 @@ def send_c2d_message(
     endpoint = AmqpBuilder.build_iothub_amqp_endpoint_from_target(target)
     endpoint_with_op = endpoint + operation
     client = uamqp.SendClient(
-        target="amqps://" + endpoint_with_op, client_name=_get_container_id(), debug=DEBUG
+        target="amqps://" + endpoint_with_op,
+        client_name=_get_container_id(),
+        debug=DEBUG,
     )
     client.queue_message(message)
     result = client.send_all_messages()
@@ -435,3 +351,123 @@ def monitor_feedback(target, device_id, wait_on_id=None, token_duration=3600):
 
 def _get_container_id():
     return "{}/{}".format(USER_AGENT, str(uuid4()))
+
+
+def _output_msg_kpi(
+    msg,
+    device_id,
+    devices,
+    pnp_context,
+    interface_name,
+    content_type,
+    properties,
+    output,
+    validate_messages=False,
+):
+    origin_device_id = str(msg.annotations.get(b"iothub-connection-device-id"), "utf8")
+
+    if not _should_process_device(origin_device_id, device_id, devices):
+        return
+
+    event_source = {"event": {}}
+    event_source["event"]["origin"] = origin_device_id
+
+    if pnp_context:
+        msg_interface_name = str(msg.annotations.get(b"iothub-interface-name"), "utf8")
+        if not msg_interface_name:
+            return
+
+        if interface_name:
+            if msg_interface_name != interface_name:
+                return
+
+        event_source["event"]["interface"] = msg_interface_name
+
+    system_props = unicode_binary_map(parse_entity(msg.properties, True))
+    payload = _get_and_validate_payload(
+        origin_device_id, msg, content_type, system_props, validate_messages,
+    )
+
+    event_source["event"]["payload"] = payload
+
+    if "anno" in properties or "all" in properties:
+        event_source["event"]["annotations"] = unicode_binary_map(msg.annotations)
+    if "sys" in properties or "all" in properties:
+        if not event_source["event"].get("properties"):
+            event_source["event"]["properties"] = {}
+        event_source["event"]["properties"]["system"] = system_props
+    if "app" in properties or "all" in properties:
+        if not event_source["event"].get("properties"):
+            event_source["event"]["properties"] = {}
+        app_prop = msg.application_properties if msg.application_properties else None
+
+        if app_prop:
+            event_source["event"]["properties"]["application"] = unicode_binary_map(
+                app_prop
+            )
+    if output.lower() == "json":
+        dump = json.dumps(event_source, indent=4)
+    else:
+        dump = yaml.safe_dump(event_source, default_flow_style=False)
+
+    if not validate_messages:
+        six.print_(dump, flush=True)
+
+
+def _should_process_device(origin_device_id, device_id, devices):
+    if device_id and device_id != origin_device_id:
+        if "*" in device_id or "?" in device_id:
+            regex = re.escape(device_id).replace("\\*", ".*").replace("\\?", ".") + "$"
+            if not re.match(regex, origin_device_id):
+                return False
+        else:
+            return False
+    if devices and origin_device_id not in devices:
+        return False
+
+    return True
+
+
+def _get_and_validate_payload(
+    origin_device_id, msg, content_type, system_props, validate_messages
+):
+    payload = ""
+    data = msg.get_data()
+
+    ce = system_props["content_encoding"]
+    if ce and "utf-8" not in ce.lower():
+        logger.warning(
+            "[Warning] Encoding other than UTF-8 is being used. UTF-8 encoding is only supported"
+        )
+
+    if data:
+        payload = str(next(data), "utf8")
+
+    ct = content_type
+    if not ct:
+        ct = system_props["content_type"] if "content_type" in system_props else ""
+
+    # simulate error and warning
+    # random_int = random.randint(0, 2)
+    # if random_int == 1:
+    #     # simulate an error
+    #     payload = "aoisdjioasjdoia"
+    # if random_int == 2:
+    #     ct = "oaisjdiosadj"
+
+    if ct and "application/json" in ct.lower():
+        try:
+            payload = json.loads(re.compile(r"(\\r\\n)+|\\r+|\\n+").sub("", payload))
+        except Exception:
+            if validate_messages:
+                logger.error(
+                    f"[Error] Invalid JSON format. DeviceId: {origin_device_id}, Raw payload {payload}"
+                )
+            return ""
+    else:
+        if validate_messages:
+            logger.warning(
+                "[Warning] Message contains custom headers. Custom headers are not supported and will be dropped from the message"
+            )
+
+    return payload
