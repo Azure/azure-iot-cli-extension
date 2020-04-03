@@ -228,7 +228,7 @@ Execute the following command to run both Unit and Integration tests and output 
     ],
     ```
 
-    5. You should now be able to place breakpoints in VSCode and see execution halt as the code hits them.
+5. You should now be able to place breakpoints in VSCode and see execution halt as the code hits them.
 
 ### Python debugging
 
