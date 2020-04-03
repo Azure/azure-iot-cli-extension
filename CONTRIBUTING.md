@@ -31,7 +31,9 @@ After following the videos, ensure you have:
 
 #### Environment Variables
 
-It is recommended that you set the following environment variables in a way such that they are persisted through machine restarts
+It is recommended that you set the following environment variables in a way such that they are persisted through machine restarts.
+
+You can run this setup in `bash` or `cmd` environments, this documentation just show the `powershell` flavor.
 
 1. Set `PYTHONPATH` to the following. Order matters here so be careful.
 
@@ -89,10 +91,10 @@ If this works, then you should now be able to make changes to the extension and 
 
 #### Unit Tests
 
-You may need to install the dev_requirements.txt for this
+You may need to install the dev_requirements for this
 
 ```powershell
-pip install -r path/to/source/dev_requirements.txt
+pip install -r path/to/source/dev_requirements
 ```
 
 _Hub:_  
