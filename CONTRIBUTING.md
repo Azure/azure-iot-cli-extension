@@ -2,18 +2,14 @@
 
 ## Dev Setup
 
-1. IDE: VSCode https://code.visualstudio.com/
-2. Python version 3: https://www.python.org/downloads/
-
-VSCode Extension(s): 
-
-1. Python
+1. Get Python 3: https://www.python.org/downloads/
 
 #### Required Repositories
 
 You must fork the repositories below. Follow the videos found [here](https://github.com/Azure/azure-cli-dev-tools#setting-up-your-development-environment).
 
 1. https://github.com/Azure/azure-cli
+
 2. https://github.com/Azure/azure-iot-cli-extension
 
 > IMPORTANT: When cloning the repositories and environments, ensure they are all siblings to each other. This makes things much easier down the line.
@@ -27,6 +23,12 @@ source-directory/
 
 > IMPORTANT: Ensure you keep the Python virtual environment you created above. It is required for development.
 
+After following the videos, ensure you have:
+
+1. Python virtual environment
+
+2. Functional development az cli
+
 #### Environment Variables
 
 It is recommended that you set the following environment variables in a way such that they are persisted through machine restarts
@@ -39,7 +41,7 @@ It is recommended that you set the following environment variables in a way such
 
 2. Create a directory for your development extensions to live in
 
-    ```
+    ```powershell
     mkdir path/to/source/extensions/azure-iot
     ```
 
@@ -87,6 +89,12 @@ If this works, then you should now be able to make changes to the extension and 
 
 #### Unit Tests
 
+You may need to install the dev_requirements.txt for this
+
+```powershell
+pip install -r path/to/source/dev_requirements.txt
+```
+
 _Hub:_  
 `pytest azext_iot/tests/test_iot_ext_unit.py`
 
@@ -100,10 +108,14 @@ Integration tests are run against Azure resources and depend on environment vari
 ##### Azure Resource Setup
 
 1. Create IoT Hub
-> IMPORTANT: Your IoT Hub must be created specifically for integration tests and must not contain any devices when the tests are run.
-1. Create Files Storage - In IoT Hub, click Files, create a new Storage Account and link to an empty Container.
-1. Create IoT Hub Device Provisioning Service (DPS)
-1. Link IoT Hub to DPS - From DPS, click "Linked IoT Hub" and link the IoT Hub you just created.
+
+    > IMPORTANT: Your IoT Hub must be created specifically for integration tests and must not contain any devices when the tests are run.
+
+2. Create Files Storage - In IoT Hub, click Files, create a new Storage Account and link to an empty Container.
+
+3. Create IoT Hub Device Provisioning Service (DPS)
+
+4. Link IoT Hub to DPS - From DPS, click "Linked IoT Hub" and link the IoT Hub you just created.
 
 ##### Environment Variables
 You can either manually set the environment variables or use the `pytest.ini.example` file in the root of the extension repo. To use that file, rename it to `pytest.ini`, open it and set the variables as indicated below.
@@ -144,8 +156,10 @@ Execute the following command to run both Unit and Integration tests and output 
 #### VSCode setup
 
 1. Install VSCode
+
 2. Install the required extensions 
     * ([ms-python.python](https://marketplace.visualstudio.com/items?itemName=ms-python.python) is recommended)
+
 3. Set up `settings.json`
 
     ```json
@@ -213,6 +227,8 @@ Execute the following command to run both Unit and Integration tests and output 
         "--a value --b value"
     ],
     ```
+
+    5. You should now be able to place breakpoints in VSCode and see execution halt as the code hits them.
 
 ### Python debugging
 
