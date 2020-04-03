@@ -151,6 +151,14 @@ Execute the following command to run both Unit and Integration tests and output 
 
 `pytest -v . --cov=azext_iot --cov-config .coveragerc`
 
+#### Formatting and Linting
+
+We use our flake8 and pylint rules. We recommend you set up your IDE as per the VSCode setup below for best compliance.
+
+We are also starting to use `python black`. To set this up on VSCode, see the following blog post
+
+https://medium.com/@marcobelo/setting-up-python-black-on-visual-studio-code-5318eba4cd00
+
 ## Optional
 
 #### VSCode setup
@@ -228,7 +236,9 @@ Execute the following command to run both Unit and Integration tests and output 
     ],
     ```
 
-5. You should now be able to place breakpoints in VSCode and see execution halt as the code hits them.
+5. Set up python black.
+
+6. You should now be able to place breakpoints in VSCode and see execution halt as the code hits them.
 
 ### Python debugging
 
