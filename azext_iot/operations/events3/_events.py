@@ -453,7 +453,8 @@ def _get_and_validate_payload(
     ce = system_props["content_encoding"]
     if ce and "utf-8" not in ce.lower():
         logger.warning(
-            "[Warning] Encoding other than UTF-8 is being used. UTF-8 encoding is only supported"
+            "[Warning] Encoding other than UTF-8 is being used. UTF-8 encoding is only supported. "
+            f"DeviceId: {origin_device_id}"
         )
 
     if data:
@@ -477,13 +478,16 @@ def _get_and_validate_payload(
         except Exception:
             if validate_messages:
                 logger.error(
-                    f"[Error] Invalid JSON format. DeviceId: {origin_device_id}, Raw payload {payload}"
+                    "[Error] Invalid JSON format. "
+                    f"DeviceId: {origin_device_id}, Raw payload {payload}"
                 )
             return ""
     else:
         if validate_messages:
             logger.warning(
-                "[Warning] Message contains custom headers. Custom headers are not supported and will be dropped from the message"
+                "[Warning] Message contains custom headers. "
+                "Custom headers are not supported and will be dropped from the message. "
+                f"DeviceId: {origin_device_id}"
             )
 
     return payload
