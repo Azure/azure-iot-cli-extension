@@ -37,8 +37,8 @@ def executor(
     devices=None,
     interface_name=None,
     pnp_context=None,
-    log_level="warn",
     validate_messages=False,
+    simulate_errors=False,
 ):
 
     coroutines = []
@@ -56,6 +56,7 @@ def executor(
             interface_name,
             pnp_context,
             validate_messages,
+            simulate_errors,
         )
     )
 
@@ -112,6 +113,7 @@ async def initiate_event_monitor(
     interface_name=None,
     pnp_context=None,
     validate_messages=False,
+    simulate_errors=False,
 ):
     def _get_conn_props():
         properties = {}
@@ -153,6 +155,7 @@ async def initiate_event_monitor(
                     interface_name=interface_name,
                     pnp_context=pnp_context,
                     validate_messages=validate_messages,
+                    simulate_errors=simulate_errors,
                 )
             )
         return await asyncio.gather(*coroutines, return_exceptions=True)
@@ -175,6 +178,7 @@ async def monitor_events(
     interface_name=None,
     pnp_context=None,
     validate_messages=False,
+    simulate_errors=False,
 ):
     source = uamqp.address.Source(
         "amqps://{}/{}/ConsumerGroups/{}/Partitions/{}".format(
@@ -209,7 +213,8 @@ async def monitor_events(
                 content_type,
                 properties,
                 output,
-                validate_messages=validate_messages,
+                validate_messages,
+                simulate_errors,
             )
 
     except asyncio.CancelledError:
@@ -362,7 +367,8 @@ def _output_msg_kpi(
     content_type,
     properties,
     output,
-    validate_messages=False,
+    validate_messages,
+    simulate_errors,
 ):
     origin_device_id = str(msg.annotations.get(b"iothub-connection-device-id"), "utf8")
 
@@ -385,7 +391,12 @@ def _output_msg_kpi(
 
     system_props = unicode_binary_map(parse_entity(msg.properties, True))
     payload = _get_and_validate_payload(
-        origin_device_id, msg, content_type, system_props, validate_messages,
+        origin_device_id,
+        msg,
+        content_type,
+        system_props,
+        validate_messages,
+        simulate_errors,
     )
 
     event_source["event"]["payload"] = payload
@@ -429,7 +440,12 @@ def _should_process_device(origin_device_id, device_id, devices):
 
 
 def _get_and_validate_payload(
-    origin_device_id, msg, content_type, system_props, validate_messages
+    origin_device_id,
+    msg,
+    content_type,
+    system_props,
+    validate_messages,
+    simulate_errors,
 ):
     payload = ""
     data = msg.get_data()
@@ -448,12 +464,12 @@ def _get_and_validate_payload(
         ct = system_props["content_type"] if "content_type" in system_props else ""
 
     # simulate error and warning
-    # random_int = random.randint(0, 2)
-    # if random_int == 1:
-    #     # simulate an error
-    #     payload = "aoisdjioasjdoia"
-    # if random_int == 2:
-    #     ct = "oaisjdiosadj"
+    random_int = random.randint(0, 2)
+    if simulate_errors and random_int == 1:
+        # simulate an error
+        payload = "aoisdjioasjdoia"
+    if simulate_errors and random_int == 2:
+        ct = "oaisjdiosadj"
 
     if ct and "application/json" in ct.lower():
         try:

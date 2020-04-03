@@ -900,11 +900,10 @@ def load_arguments(self, _):
         )
         context.argument("app_id", options_list=["--app-id"], help="Target App.")
         context.argument(
-            "log_level",
-            options_list=["--log-level"],
-            help="Level of logging."
-            "Valid options: 'info', 'warn', 'error'"
-            "Default: 'info'",
+            "simulate_errors",
+            arg_type=get_three_state_flag(),
+            options_list=["--simulate-errors"],
+            help="Simulate errors.",
         )
         context.argument(
             "timeout",
