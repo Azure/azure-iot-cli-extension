@@ -1,95 +1,89 @@
 # Contributing
 
-## Development Machine Setup
+## Dev Setup
 
-1. Setup Azure CLI Development Environment
+1. IDE: VSCode https://code.visualstudio.com/
+2. Python version 3: https://www.python.org/downloads/
 
-    - Follow the [Azure CLI: Setting up your development environment](https://github.com/Azure/azure-cli/blob/master/doc/configuring_your_machine.md) steps to setup your machine for general Azure CLI development.
-    - Move on to the next step when you can successfully run `azdev` and see the help message.
+VSCode Extension(s): 
 
-    > Make sure you keep the virtual environment you created above activated while completing following steps.
+1. Python
 
-1. Update AZURE_EXTENSION_DIR and PYTHONPATH Environment Variables
+#### Required Repositories
 
-    By default, CLI extensions are installed to the `~/.azure/cliextensions` directory.  For extension development, you'll want to update the AZURE_EXTENSION_DIR environment variable to `~/.azure/devcliextensions`, so your development extensions don't collide with your production extensions.
+You must fork the repositories below. Follow the videos found [here](https://github.com/Azure/azure-cli-dev-tools#setting-up-your-development-environment).
 
-    You will also need to add both the project root and and devcliextensions directory to PYTHONPATH.
+1. https://github.com/Azure/azure-cli
+2. https://github.com/Azure/azure-iot-cli-extension
 
-    1. Navigate to the root of this repo on your local machine:
+> IMPORTANT: When cloning the repositories and environments, ensure they are all siblings to each other. This makes things much easier down the line.
 
-    ```
-    cd << clone root >>
-    ```
+```
+source-directory/
+|-- azure-cli/
+|-- azure-iot-cli-extension/
+|-- .env3/
+```
 
-    1. Run the following script to set the environment variables.
+> IMPORTANT: Ensure you keep the Python virtual environment you created above. It is required for development.
 
-    **Windows:**
+#### Environment Variables
 
-    ```
-    set EXTENSION_PATH=%USERPROFILE%\.azure\devcliextensions\
-    mkdir %EXTENSION_PATH%
-    set AZURE_EXTENSION_DIR=%EXTENSION_PATH%
-    set PYTHONPATH=%PYTHONPATH%;%EXTENSION_PATH%azure-iot;%CD%
-    ```
-    **Linux:**
+It is recommended that you set the following environment variables in a way such that they are persisted through machine restarts
 
-    ```
-    export EXTENSION_PATH=~/.azure/devcliextensions/
-    mkdir -p $EXTENSION_PATH
-    echo $"export AZURE_EXTENSION_DIR=$EXTENSION_PATH" >> ~/.bash_profile
-    echo $"export PYTHONPATH=$PYTHONPATH:${EXTENSION_PATH}azure-iot:$(pwd)" >> ~/.bash_profile
+1. Set `PYTHONPATH` to the following. Order matters here so be careful.
+
+    ```powershell
+    $env:PYTHONPATH="path/to/source/azure-iot-cli-extension;path/to/source/azure-cli;path/to/source/env3/Scripts"
     ```
 
-1. Install Extension
-
-    1. Navigate to the root of this repo on your local machine:
+2. Create a directory for your development extensions to live in
 
     ```
-    cd << clone root >>
+    mkdir path/to/source/extensions/azure-iot
     ```
 
-    1. Install the Extension
+3. Set `AZURE_EXTENSION_DIR` to the following
 
-    **Windows:**
-    ```
-    pip install -U --target %AZURE_EXTENSION_DIR%/azure-iot .
-    ```
-
-    **Linux:**
-    ```
-    pip install -U --target $AZURE_EXTENSION_DIR/azure-iot .
+    ```powershell
+    $env:AZURE_EXTENSION_DIR="path/to/source/extensions"
     ```
 
-1. Verify Setup
+Restart any PowerShell windows you may have open and reactivate your python environment. Check that the environment variables created above have persisted.
 
-    Run the following command to view installed extensions:
+#### azdev Steps
 
-    `az --debug`
+Similar to the video, just execute the following command.
 
-    That will output which directory is being used to load extensions and it will show that the `azure-iot` extension has been loaded.
+```powershell
+azdev setup -c -r path/to/source/azure-iot-cli-extension
+```
 
+#### Install dev extension
+
+1. Change directories 
+
+    ```powershell
+    cd path/to/source/azure-iot-cli-extension
     ```
-    Extensions directory: '...\.azure\devcliextensions\'
-    Found 1 extensions: ['azure-iot']
+
+2. Install the extension (should only be needed once)
+
+    ```powershell
+    pip install -U --target path/to/source/extensions/azure-iot .
     ```
 
-Please use `az --debug` if you run into any issues, or file an issue in this GitHub repo.
+#### Verify environment is setup correctly
 
-Please refer to the [Azure CLI Extension Guide](https://github.com/Azure/azure-cli/tree/master/doc/extensions) for further information and help developing extensions.
+Run a command that is present in the iot extension space
 
-### Running Tests
+```powershell
+az iot central app -h
+```
 
-1. Install Dependencies
+If this works, then you should now be able to make changes to the extension and have them reflected immediately in your az cli.
 
-    This project utilizes the following: [pytest](https://docs.pytest.org/en/latest/), [unittest](https://docs.python.org/3.6/library/unittest.html), `pytest-mock`, and `pytest-cov`.
-
-    Run the following to install them:
-
-    `pip install -r dev_requirements`
-
-1. Activate Virtual Environment
-
-    Ensure that the virtual environment you created while setting up your machine for general Azure CLI development is activated and the dev_setup.py script has been run.
+## Unit and Integration Testing
 
 #### Unit Tests
 
@@ -145,7 +139,91 @@ Execute the following command to run both Unit and Integration tests and output 
 
 `pytest -v . --cov=azext_iot --cov-config .coveragerc`
 
-#### Microsoft CLA
+## Optional
+
+#### VSCode setup
+
+1. Install VSCode
+2. Install the required extensions 
+    * ([ms-python.python](https://marketplace.visualstudio.com/items?itemName=ms-python.python) is recommended)
+3. Set up `settings.json`
+
+    ```json
+    {
+        "python.pythonPath": "path/to/source/env3/Scripts/python.exe",
+        "python.venvPath": "path/to/source/",
+        "python.linting.pylintEnabled": true,
+        "python.autoComplete.extraPaths": [
+            "path/to/source/env3/Lib/site-packages"
+        ],
+        "python.linting.flake8Enabled": true,
+        "python.linting.flake8Args": [
+            "--config=setup.cfg"
+        ],
+        "files.associations": {
+            "*/.azure-devops/.yml": "azure-pipelines"
+        }
+    }
+    ```
+
+4. Set up `launch.json`
+    
+    ```json
+    {
+        "version": "0.2.0",
+        "configurations": [
+            {
+                "name": "Azure CLI Debug (Integrated Console)",
+                "type": "python",
+                "request": "launch",
+                "pythonPath": "${config:python.pythonPath}",
+                "program": "${workspaceRoot}/../azure-cli/src/azure-cli/azure/cli/__main__.py",
+                "cwd": "${workspaceRoot}",
+                "args": [
+                    "--help"
+                ],
+                "console": "integratedTerminal",
+                "debugOptions": [
+                    "WaitOnAbnormalExit",
+                    "WaitOnNormalExit",
+                    "RedirectOutput"
+                ],
+                "justMyCode": false
+            }
+        ]
+    }
+    ```
+    
+    * launch.json was derived from [this](https://raw.githubusercontent.com/Azure/azure-cli/dev/.vscode/launch.json) file
+
+    * Note: your "program" path might be different if you did not set up the folder structure as siblings as recommended above
+
+    * Note: when passing args, ensure they are all comma separated.
+
+    Correct: 
+    ```
+    "args": [
+        "--a", "value", "--b", "value"
+    ],
+    ```
+
+    Incorrect: 
+    ```
+    "args": [
+        "--a value --b value"
+    ],
+    ```
+
+### Python debugging
+
+https://docs.python.org/3/library/pdb.html
+
+
+1. `pip install pdb`
+2. If you need a breakpoint, put `import pdb; pdb.set_trace()` in your code
+3. Run your command, it should break execution wherever you put the breakpoint.
+
+# Microsoft CLA
 
 This project welcomes contributions and suggestions.  Most contributions require you to agree to a
 Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
