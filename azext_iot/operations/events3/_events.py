@@ -18,6 +18,7 @@ from knack.log import get_logger
 from azext_iot.constants import VERSION, USER_AGENT
 from azext_iot.common.utility import parse_entity, unicode_binary_map, process_json_arg
 from azext_iot.operations.events3._builders import AmqpBuilder
+from azext_iot.models.parsers import Event3Parser
 
 # To provide amqp frame trace
 DEBUG = False
@@ -370,7 +371,8 @@ def _output_msg_kpi(
     validate_messages,
     simulate_errors,
 ):
-    origin_device_id = str(msg.annotations.get(b"iothub-connection-device-id"), "utf8")
+    parser = Event3Parser()
+    origin_device_id = parser.parse_device_id(msg)
 
     if not _should_process_device(origin_device_id, device_id, devices):
         return
