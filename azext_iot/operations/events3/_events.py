@@ -16,7 +16,7 @@ import uamqp
 from uuid import uuid4
 from knack.log import get_logger
 from azext_iot.constants import VERSION, USER_AGENT
-from azext_iot.common.utility import parse_entity, unicode_binary_map, process_json_arg
+from azext_iot.common.utility import process_json_arg
 from azext_iot.operations.events3._builders import AmqpBuilder
 from azext_iot.models.parsers import Event3Parser
 
@@ -377,51 +377,19 @@ def _output_msg_kpi(
     if not _should_process_device(origin_device_id, device_id, devices):
         return
 
-    event_source = {"event": {}}
-    event_source["event"]["origin"] = origin_device_id
-
-    if pnp_context:
-        msg_interface_name = str(msg.annotations.get(b"iothub-interface-name"), "utf8")
-        if not msg_interface_name:
-            return
-
-        if interface_name:
-            if msg_interface_name != interface_name:
-                return
-
-        event_source["event"]["interface"] = msg_interface_name
-
-    system_props = unicode_binary_map(parse_entity(msg.properties, True))
-    payload = _get_and_validate_payload(
-        origin_device_id,
-        msg,
-        content_type,
-        system_props,
-        validate_messages,
-        simulate_errors,
+    parsed_msg = parser.parse_msg(
+        msg, pnp_context, interface_name, properties, content_type, simulate_errors
     )
 
-    event_source["event"]["payload"] = payload
-
-    if "anno" in properties or "all" in properties:
-        event_source["event"]["annotations"] = unicode_binary_map(msg.annotations)
-    if "sys" in properties or "all" in properties:
-        if not event_source["event"].get("properties"):
-            event_source["event"]["properties"] = {}
-        event_source["event"]["properties"]["system"] = system_props
-    if "app" in properties or "all" in properties:
-        if not event_source["event"].get("properties"):
-            event_source["event"]["properties"] = {}
-        app_prop = msg.application_properties if msg.application_properties else None
-
-        if app_prop:
-            event_source["event"]["properties"]["application"] = unicode_binary_map(
-                app_prop
-            )
     if output.lower() == "json":
-        dump = json.dumps(event_source, indent=4)
+        dump = json.dumps(parsed_msg, indent=4)
     else:
-        dump = yaml.safe_dump(event_source, default_flow_style=False)
+        dump = yaml.safe_dump(parsed_msg, default_flow_style=False)
+
+    if validate_messages or not parsed_msg:
+        parser.log_info()
+        parser.log_warnings()
+        parser.log_errors()
 
     if not validate_messages:
         six.print_(dump, flush=True)
@@ -439,57 +407,3 @@ def _should_process_device(origin_device_id, device_id, devices):
         return False
 
     return True
-
-
-def _get_and_validate_payload(
-    origin_device_id,
-    msg,
-    content_type,
-    system_props,
-    validate_messages,
-    simulate_errors,
-):
-    payload = ""
-    data = msg.get_data()
-
-    ce = system_props["content_encoding"]
-    if ce and "utf-8" not in ce.lower():
-        logger.warning(
-            "[Warning] Encoding other than UTF-8 is being used. UTF-8 encoding is only supported. "
-            f"DeviceId: {origin_device_id}"
-        )
-
-    if data:
-        payload = str(next(data), "utf8")
-
-    ct = content_type
-    if not ct:
-        ct = system_props["content_type"] if "content_type" in system_props else ""
-
-    # simulate error and warning
-    random_int = random.randint(0, 2)
-    if simulate_errors and random_int == 1:
-        # simulate an error
-        payload = "aoisdjioasjdoia"
-    if simulate_errors and random_int == 2:
-        ct = "oaisjdiosadj"
-
-    if ct and "application/json" in ct.lower():
-        try:
-            payload = json.loads(re.compile(r"(\\r\\n)+|\\r+|\\n+").sub("", payload))
-        except Exception:
-            if validate_messages:
-                logger.error(
-                    "[Error] Invalid JSON format. "
-                    f"DeviceId: {origin_device_id}, Raw payload {payload}"
-                )
-            return ""
-    else:
-        if validate_messages:
-            logger.warning(
-                "[Warning] Message contains custom headers. "
-                "Custom headers are not supported and will be dropped from the message. "
-                f"DeviceId: {origin_device_id}"
-            )
-
-    return payload
