@@ -6,7 +6,7 @@
 
 #### Required Repositories
 
-You must fork the repositories below. Follow the videos found [here](https://github.com/Azure/azure-cli-dev-tools#setting-up-your-development-environment).
+You must fork and clone the repositories below. Follow the videos and instructions found [here](https://github.com/Azure/azure-cli-dev-tools#setting-up-your-development-environment).
 
 1. https://github.com/Azure/azure-cli
 
@@ -35,22 +35,22 @@ It is recommended that you set the following environment variables in a way such
 
 You can run this setup in `bash` or `cmd` environments, this documentation just show the `powershell` flavor.
 
-1. Set `PYTHONPATH` to the following. Order matters here so be careful.
-
-    ```powershell
-    $env:PYTHONPATH="path/to/source/azure-iot-cli-extension;path/to/source/azure-cli;path/to/source/env3/Scripts"
-    ```
-
-2. Create a directory for your development extensions to live in
+1. Create a directory for your development extensions to live in
 
     ```powershell
     mkdir path/to/source/extensions/azure-iot
     ```
 
-3. Set `AZURE_EXTENSION_DIR` to the following
+2. Set `AZURE_EXTENSION_DIR` to the following
 
     ```powershell
     $env:AZURE_EXTENSION_DIR="path/to/source/extensions"
+    ```
+
+3. Set `PYTHONPATH` to the following. Order matters here so be careful.
+
+    ```powershell
+    $env:PYTHONPATH="path/to/source/azure-iot-cli-extension;path/to/source/extensions/azure-iot"
     ```
 
 Restart any PowerShell windows you may have open and reactivate your python environment. Check that the environment variables created above have persisted.
@@ -60,7 +60,7 @@ Restart any PowerShell windows you may have open and reactivate your python envi
 Similar to the video, just execute the following command.
 
 ```powershell
-azdev setup -c -r path/to/source/azure-iot-cli-extension
+azdev setup -c path/to/source/azure-cli
 ```
 
 #### Install dev extension
