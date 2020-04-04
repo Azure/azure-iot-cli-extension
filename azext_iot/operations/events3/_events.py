@@ -6,7 +6,6 @@
 
 import asyncio
 import json
-import random
 import re
 import sys
 import six
@@ -23,7 +22,6 @@ from azext_iot.models.parsers import Event3Parser
 # To provide amqp frame trace
 DEBUG = False
 logger = get_logger(__name__)
-random.seed(0)
 
 
 def executor(
