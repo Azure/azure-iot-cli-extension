@@ -204,8 +204,9 @@ class Event3Parser(object):
             return content_type
 
         self._warnings.append(
-            "Message contains custom headers. "
-            "Custom headers are not supported and will be dropped from the message. "
+            "Content type not supported. "
+            f"Content type found: {content_type}. "
+            "Content type expected: application/json. "
             f"DeviceId: {origin_device_id}"
         )
 

@@ -233,11 +233,9 @@ class TestEvents3Parser:
         assert len(parser._info) == 0
 
         warning = parser._warnings[0]
-        assert "Message contains custom headers." in warning
-        assert (
-            "Custom headers are not supported and will be dropped from the message"
-            in warning
-        )
+        assert "Content type not supported." in warning
+        assert self.bad_content_type in warning
+        assert "application/json" in warning
         assert device_id in warning
 
     def test_parse_message_bad_encoding_should_fail(self):
