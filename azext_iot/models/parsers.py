@@ -3,9 +3,12 @@ import re
 import json
 
 from knack.log import get_logger
+from uamqp.message import Message
 from azext_iot.common.utility import parse_entity, unicode_binary_map
 
-supported_encodings = ["utf-8"]
+SUPPORTED_ENCODINGS = ["utf-8"]
+DEVICE_ID_IDENTIFIER = b"iothub-connection-device-id"
+INTERFACE_NAME_IDENTIFIER = b"iothub-interface-name"
 random.seed(0)
 
 
@@ -15,7 +18,9 @@ class Event3Parser(object):
     _errors = []
     _logger = get_logger(__name__)
 
-    def __init__(self):
+    def __init__(self, logger=None):
+        if logger:
+            self._logger = logger
         pass
 
     def parse_msg(
@@ -32,6 +37,9 @@ class Event3Parser(object):
         create_custom_header_warning = False
         create_payload_error = False
 
+        if not properties:
+            properties = {}  # guard against None being passed in
+
         i = random.randint(1, 3)
         if simulate_errors and i == 1:
             create_encoding_error = True
@@ -40,10 +48,10 @@ class Event3Parser(object):
         if simulate_errors and i == 3:
             create_payload_error = True
 
-        system_props = self._parse_system_props(msg)
+        system_properties = self._parse_system_properties(msg)
 
         content_encoding = self._parse_content_encoding(
-            system_props, msg, create_encoding_error
+            system_properties, msg, create_encoding_error
         )
 
         if not content_encoding:
@@ -56,7 +64,7 @@ class Event3Parser(object):
 
         self._parse_content_type(
             content_type_hint,
-            system_props,
+            system_properties,
             origin_device_id,
             create_custom_header_warning,
         )
@@ -71,15 +79,15 @@ class Event3Parser(object):
 
             event["interface"] = msg_interface_name
 
-        annotations = self._parse_annotations(msg)
-        if annotations and ("anno" in properties or "all" in properties):
+        if "anno" in properties or "all" in properties:
+            annotations = self._parse_annotations(msg)
             event["annotations"] = annotations
 
-        if system_props and ("sys" in properties or "all" in properties):
-            event["properties"]["system"] = system_props
+        if system_properties and ("sys" in properties or "all" in properties):
+            event["properties"]["system"] = system_properties
 
-        application_properties = self._parse_application_properties(msg)
-        if application_properties and ("app" in properties or "all" in properties):
+        if "app" in properties or "all" in properties:
+            application_properties = self._parse_application_properties(msg)
             event["properties"]["application"] = application_properties
 
         payload = self._parse_payload(msg, origin_device_id, create_payload_error)
@@ -93,7 +101,10 @@ class Event3Parser(object):
         return event_source
 
     def parse_device_id(self, msg) -> str:
-        return str(msg.annotations.get(b"iothub-connection-device-id"), "utf8")
+        try:
+            return str(msg.annotations.get(DEVICE_ID_IDENTIFIER), "utf8")
+        except Exception:
+            self._errors.append(f"Device id not found in message: {msg}")
 
     def log_errors(self) -> None:
         for error in self._errors:
@@ -115,7 +126,15 @@ class Event3Parser(object):
     def _parse_interface_name(
         self, msg, pnp_context, interface_name, origin_device_id
     ) -> str:
-        msg_interface_name = str(msg.annotations.get(b"iothub-interface-name"), "utf8")
+        msg_interface_name = None
+
+        try:
+            msg_interface_name = str(
+                msg.annotations.get(INTERFACE_NAME_IDENTIFIER), "utf8"
+            )
+        except Exception:
+            pass
+
         if not msg_interface_name:
             self._errors.append(
                 f"Unable to parse interface_name given a pnp_device. {origin_device_id}. "
@@ -132,14 +151,20 @@ class Event3Parser(object):
 
         return msg_interface_name
 
-    def _parse_system_props(self, msg):
+    def _parse_system_properties(self, msg):
         try:
             return unicode_binary_map(parse_entity(msg.properties, True))
         except Exception:
             self._errors.append(f"Failed to parse system_properties for msg {msg}.")
 
-    def _parse_content_encoding(self, system_props, msg, create_encoding_error) -> str:
-        content_encoding = system_props["content_encoding"]
+    def _parse_content_encoding(
+        self, system_properties, msg, create_encoding_error
+    ) -> str:
+        if "content_encoding" not in system_properties:
+            self._errors.append(f"No content encoding found for {msg}.")
+            return None
+
+        content_encoding = system_properties["content_encoding"]
 
         if create_encoding_error:
             content_encoding = "Some Random Encoding"
@@ -150,8 +175,8 @@ class Event3Parser(object):
         if content_encoding and "utf-8" not in content_encoding.lower():
             self._errors.append(
                 f"Detected encoding {content_encoding}. "
-                f"The currently supported encodings are: {supported_encodings}. "
-                f"system_props: {system_props}."
+                f"The currently supported encodings are: {SUPPORTED_ENCODINGS}. "
+                f"system_properties: {system_properties}."
             )
             return None
 
@@ -160,15 +185,15 @@ class Event3Parser(object):
     def _parse_content_type(
         self,
         content_type_hint,
-        system_props,
+        system_properties,
         origin_device_id,
         create_custom_header_warning,
     ) -> str:
         content_type = ""
         if content_type_hint:
             content_type = content_type_hint
-        elif "content_type" in system_props:
-            content_type = system_props["content_type"]
+        elif "content_type" in system_properties:
+            content_type = system_properties["content_type"]
 
         if create_custom_header_warning:
             content_type = "Some Random Custom Header"
@@ -184,7 +209,7 @@ class Event3Parser(object):
 
         return content_type
 
-    def _parse_payload(self, msg, origin_device_id, create_payload_error):
+    def _parse_payload(self, msg: Message, origin_device_id, create_payload_error):
         payload = ""
         data = msg.get_data()
 
