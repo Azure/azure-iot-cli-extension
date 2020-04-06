@@ -23,9 +23,9 @@ class Event3Parser(object):
             self._logger = logger
         pass
 
-    def parse_msg(
+    def parse_message(
         self,
-        msg,
+        message: Message,
         pnp_context,
         interface_name,
         properties,
@@ -48,10 +48,10 @@ class Event3Parser(object):
         if simulate_errors and i == 3:
             create_payload_error = True
 
-        system_properties = self._parse_system_properties(msg)
+        system_properties = self._parse_system_properties(message)
 
         content_encoding = self._parse_content_encoding(
-            system_properties, msg, create_encoding_error
+            message, system_properties, create_encoding_error
         )
 
         if not content_encoding:
@@ -59,7 +59,7 @@ class Event3Parser(object):
 
         event = {"properties": {}}
 
-        origin_device_id = self.parse_device_id(msg)
+        origin_device_id = self.parse_device_id(message)
         event["origin"] = origin_device_id
 
         self._parse_content_type(
@@ -70,27 +70,27 @@ class Event3Parser(object):
         )
 
         if pnp_context:
-            msg_interface_name = self._parse_interface_name(
-                msg, pnp_context, interface_name, origin_device_id
+            message_interface_name = self._parse_interface_name(
+                message, pnp_context, interface_name, origin_device_id
             )
 
-            if not msg_interface_name:
+            if not message_interface_name:
                 return {}
 
-            event["interface"] = msg_interface_name
+            event["interface"] = message_interface_name
 
         if "anno" in properties or "all" in properties:
-            annotations = self._parse_annotations(msg)
+            annotations = self._parse_annotations(message)
             event["annotations"] = annotations
 
         if system_properties and ("sys" in properties or "all" in properties):
             event["properties"]["system"] = system_properties
 
         if "app" in properties or "all" in properties:
-            application_properties = self._parse_application_properties(msg)
+            application_properties = self._parse_application_properties(message)
             event["properties"]["application"] = application_properties
 
-        payload = self._parse_payload(msg, origin_device_id, create_payload_error)
+        payload = self._parse_payload(message, origin_device_id, create_payload_error)
         if not payload:
             return {}
 
@@ -100,11 +100,11 @@ class Event3Parser(object):
 
         return event_source
 
-    def parse_device_id(self, msg) -> str:
+    def parse_device_id(self, message: Message) -> str:
         try:
-            return str(msg.annotations.get(DEVICE_ID_IDENTIFIER), "utf8")
+            return str(message.annotations.get(DEVICE_ID_IDENTIFIER), "utf8")
         except Exception:
-            self._errors.append(f"Device id not found in message: {msg}")
+            self._errors.append(f"Device id not found in message: {message}")
 
     def log_errors(self) -> None:
         for error in self._errors:
@@ -124,44 +124,46 @@ class Event3Parser(object):
         self._errors = []
 
     def _parse_interface_name(
-        self, msg, pnp_context, interface_name, origin_device_id
+        self, message: Message, pnp_context, interface_name, origin_device_id
     ) -> str:
-        msg_interface_name = None
+        message_interface_name = None
 
         try:
-            msg_interface_name = str(
-                msg.annotations.get(INTERFACE_NAME_IDENTIFIER), "utf8"
+            message_interface_name = str(
+                message.annotations.get(INTERFACE_NAME_IDENTIFIER), "utf8"
             )
         except Exception:
             pass
 
-        if not msg_interface_name:
+        if not message_interface_name:
             self._errors.append(
                 f"Unable to parse interface_name given a pnp_device. {origin_device_id}. "
-                f"msg: {msg}"
+                f"message: {message}"
             )
             return None
 
-        if interface_name != msg_interface_name:
+        if interface_name != message_interface_name:
             self._errors.append(
                 f"Inteface name mismatch. {origin_device_id}. "
-                f"Expected: {interface_name}, Actual: {msg_interface_name}"
+                f"Expected: {interface_name}, Actual: {message_interface_name}"
             )
             return None
 
-        return msg_interface_name
+        return message_interface_name
 
-    def _parse_system_properties(self, msg):
+    def _parse_system_properties(self, message: Message):
         try:
-            return unicode_binary_map(parse_entity(msg.properties, True))
+            return unicode_binary_map(parse_entity(message.properties, True))
         except Exception:
-            self._errors.append(f"Failed to parse system_properties for msg {msg}.")
+            self._errors.append(
+                f"Failed to parse system_properties for message {message}."
+            )
 
     def _parse_content_encoding(
-        self, system_properties, msg, create_encoding_error
+        self, message: Message, system_properties, create_encoding_error
     ) -> str:
         if "content_encoding" not in system_properties:
-            self._errors.append(f"No content encoding found for {msg}.")
+            self._errors.append(f"No content encoding found for {message}.")
             return None
 
         content_encoding = system_properties["content_encoding"]
@@ -170,7 +172,7 @@ class Event3Parser(object):
             content_encoding = "Some Random Encoding"
 
         if not content_encoding:
-            self._errors.append(f"No encoding found for msg: {msg}")
+            self._errors.append(f"No encoding found for message: {message}")
             return None
         if content_encoding and "utf-8" not in content_encoding.lower():
             self._errors.append(
@@ -209,9 +211,9 @@ class Event3Parser(object):
 
         return content_type
 
-    def _parse_payload(self, msg: Message, origin_device_id, create_payload_error):
+    def _parse_payload(self, message: Message, origin_device_id, create_payload_error):
         payload = ""
-        data = msg.get_data()
+        data = message.get_data()
 
         if data:
             payload = str(next(data), "utf8")
@@ -230,20 +232,20 @@ class Event3Parser(object):
 
         return payload
 
-    def _parse_annotations(self, msg):
+    def _parse_annotations(self, message: Message):
         try:
-            return unicode_binary_map(msg.annotations)
+            return unicode_binary_map(message.annotations)
         except Exception:
             self._warnings.append(
-                f"Unable to decode msg.annotations: {msg.annotations}"
+                f"Unable to decode message.annotations: {message.annotations}"
             )
             pass
 
-    def _parse_application_properties(self, msg):
+    def _parse_application_properties(self, message: Message):
         try:
-            return unicode_binary_map(msg.application_properties)
+            return unicode_binary_map(message.application_properties)
         except Exception:
             self._warnings.append(
-                f"Unable to decode msg.application_properties: {msg.application_properties}"
+                f"Unable to decode message.application_properties: {message.application_properties}"
             )
             pass

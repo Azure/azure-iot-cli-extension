@@ -375,7 +375,7 @@ def _output_msg_kpi(
     if not _should_process_device(origin_device_id, device_id, devices):
         return
 
-    parsed_msg = parser.parse_msg(
+    parsed_msg = parser.parse_message(
         msg, pnp_context, interface_name, properties, content_type, simulate_errors
     )
 

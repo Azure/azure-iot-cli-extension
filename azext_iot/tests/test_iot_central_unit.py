@@ -200,7 +200,7 @@ class TestEvents3Parser:
         parser = parsers.Event3Parser()
 
         # act
-        parsed_msg = parser.parse_msg(message, None, None, None, None, False)
+        parsed_msg = parser.parse_message(message, None, None, None, None, False)
 
         # verify
         assert parsed_msg["event"]["payload"] == self.payload
@@ -209,6 +209,36 @@ class TestEvents3Parser:
         assert len(parser._errors) == 0
         assert len(parser._warnings) == 0
         assert len(parser._info) == 0
+
+    def test_parse_message_bad_content_type_should_warn(self):
+        # setup
+        properties = MessageProperties(
+            content_encoding=self.encoding, content_type=self.bad_content_type
+        )
+        message = Message(
+            body=json.dumps(self.payload).encode(),
+            properties=properties,
+            annotations={parsers.DEVICE_ID_IDENTIFIER: device_id.encode()},
+        )
+        parser = parsers.Event3Parser()
+
+        # act
+        parsed_msg = parser.parse_message(message, None, None, None, None, False)
+
+        # verify
+        assert parsed_msg["event"]["payload"] == self.payload
+
+        assert len(parser._errors) == 0
+        assert len(parser._warnings) == 1
+        assert len(parser._info) == 0
+
+        warning = parser._warnings[0]
+        assert "Message contains custom headers." in warning
+        assert (
+            "Custom headers are not supported and will be dropped from the message"
+            in warning
+        )
+        assert device_id in warning
 
     def test_parse_message_bad_encoding_should_fail(self):
         # setup
@@ -223,7 +253,7 @@ class TestEvents3Parser:
         parser = parsers.Event3Parser()
 
         # act
-        parsed_msg = parser.parse_msg(message, None, None, None, None, False)
+        parsed_msg = parser.parse_message(message, None, None, None, None, False)
 
         # verify
         assert parsed_msg == {}
@@ -248,7 +278,7 @@ class TestEvents3Parser:
         parser = parsers.Event3Parser()
 
         # act
-        parsed_msg = parser.parse_msg(message, None, None, None, None, False)
+        parsed_msg = parser.parse_message(message, None, None, None, None, False)
 
         # verify
         assert parsed_msg == {}
@@ -261,33 +291,3 @@ class TestEvents3Parser:
         assert f"Invalid JSON format." in errors
         assert device_id in errors
         assert self.bad_payload in errors
-
-    def test_parse_message_bad_content_type_should_warn(self):
-        # setup
-        properties = MessageProperties(
-            content_encoding=self.encoding, content_type=self.bad_content_type
-        )
-        message = Message(
-            body=json.dumps(self.payload).encode(),
-            properties=properties,
-            annotations={parsers.DEVICE_ID_IDENTIFIER: device_id.encode()},
-        )
-        parser = parsers.Event3Parser()
-
-        # act
-        parsed_msg = parser.parse_msg(message, None, None, None, None, False)
-
-        # verify
-        assert parsed_msg["event"]["payload"] == self.payload
-
-        assert len(parser._errors) == 0
-        assert len(parser._warnings) == 1
-        assert len(parser._info) == 0
-
-        warning = parser._warnings[0]
-        assert "Message contains custom headers." in warning
-        assert (
-            "Custom headers are not supported and will be dropped from the message"
-            in warning
-        )
-        assert device_id in warning
