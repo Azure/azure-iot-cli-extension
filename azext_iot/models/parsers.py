@@ -174,9 +174,9 @@ class Event3Parser(object):
             return None
         if content_encoding and "utf-8" not in content_encoding.lower():
             self._errors.append(
-                f"Detected encoding {content_encoding}. "
+                f"Unsupported encoding detected: '{content_encoding}'. "
                 f"The currently supported encodings are: {SUPPORTED_ENCODINGS}. "
-                f"system_properties: {system_properties}."
+                f"System_properties: {system_properties}."
             )
             return None
 

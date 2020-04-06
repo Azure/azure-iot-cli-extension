@@ -179,15 +179,21 @@ class TestMonitorEvents:
     reason="minimum python version not satisfied",
 )
 class TestEvents3Parser:
-    def test_events_parser_basic_message(self):
+    payload = {"someProperty": "someValue"}
+    encoding = "UTF-8"
+    content_type = "application/json"
+
+    bad_encoding = "bad-encoding"
+    bad_payload = "bad-payload"
+    bad_content_type = "bad-content-type"
+
+    def test_parse_message_should_succeed(self):
         # setup
-        device_id = "some-device-id"
-        payload = {"someProperty": "someValue"}
         properties = MessageProperties(
-            content_encoding="UTF-8", content_type="application/json"
+            content_encoding=self.encoding, content_type=self.content_type
         )
         message = Message(
-            body=json.dumps(payload).encode(),
+            body=json.dumps(self.payload).encode(),
             properties=properties,
             annotations={parsers.DEVICE_ID_IDENTIFIER: device_id.encode()},
         )
@@ -197,12 +203,91 @@ class TestEvents3Parser:
         parsed_msg = parser.parse_msg(message, None, None, None, None, False)
 
         # verify
-        assert parsed_msg["event"]["payload"] == payload
+        assert parsed_msg["event"]["payload"] == self.payload
         assert parsed_msg["event"]["origin"] == device_id
 
-        assert len(parser._warnings) == 0
         assert len(parser._errors) == 0
+        assert len(parser._warnings) == 0
         assert len(parser._info) == 0
 
-        # print(body)
-        print(parsed_msg)
+    def test_parse_message_bad_encoding_should_fail(self):
+        # setup
+        properties = MessageProperties(
+            content_encoding=self.bad_encoding, content_type=self.content_type
+        )
+        message = Message(
+            body=json.dumps(self.payload).encode(),
+            properties=properties,
+            annotations={parsers.DEVICE_ID_IDENTIFIER: device_id.encode()},
+        )
+        parser = parsers.Event3Parser()
+
+        # act
+        parsed_msg = parser.parse_msg(message, None, None, None, None, False)
+
+        # verify
+        assert parsed_msg == {}
+
+        assert len(parser._errors) == 1
+        assert len(parser._warnings) == 0
+        assert len(parser._info) == 0
+
+        errors = parser._errors[0]
+        assert f"Unsupported encoding detected: '{self.bad_encoding}'" in errors
+
+    def test_parse_message_bad_json_should_fail(self):
+        # setup
+        properties = MessageProperties(
+            content_encoding=self.encoding, content_type=self.content_type
+        )
+        message = Message(
+            body=self.bad_payload.encode(),
+            properties=properties,
+            annotations={parsers.DEVICE_ID_IDENTIFIER: device_id.encode()},
+        )
+        parser = parsers.Event3Parser()
+
+        # act
+        parsed_msg = parser.parse_msg(message, None, None, None, None, False)
+
+        # verify
+        assert parsed_msg == {}
+
+        assert len(parser._errors) == 1
+        assert len(parser._warnings) == 0
+        assert len(parser._info) == 0
+
+        errors = parser._errors[0]
+        assert f"Invalid JSON format." in errors
+        assert device_id in errors
+        assert self.bad_payload in errors
+
+    def test_parse_message_bad_content_type_should_warn(self):
+        # setup
+        properties = MessageProperties(
+            content_encoding=self.encoding, content_type=self.bad_content_type
+        )
+        message = Message(
+            body=json.dumps(self.payload).encode(),
+            properties=properties,
+            annotations={parsers.DEVICE_ID_IDENTIFIER: device_id.encode()},
+        )
+        parser = parsers.Event3Parser()
+
+        # act
+        parsed_msg = parser.parse_msg(message, None, None, None, None, False)
+
+        # verify
+        assert parsed_msg["event"]["payload"] == self.payload
+
+        assert len(parser._errors) == 0
+        assert len(parser._warnings) == 1
+        assert len(parser._info) == 0
+
+        warning = parser._warnings[0]
+        assert "Message contains custom headers." in warning
+        assert (
+            "Custom headers are not supported and will be dropped from the message"
+            in warning
+        )
+        assert device_id in warning
