@@ -160,29 +160,26 @@ def load_command_table(self, _):
         cmd_group.command("show", "iot_dps_registration_get")
         cmd_group.command("delete", "iot_dps_registration_delete")
 
-    with self.command_group(
-        "iotcentral",
-        command_type=iotcentral_ops,
-        deprecate_info=self.deprecate(redirect="iot central", hide=True),
-    ) as cmd_group:
-        pass
-
     with self.command_group("iotcentral app", command_type=iotcentral_ops) as cmd_group:
-        cmd_group.command("monitor-events", "iot_central_monitor_events")
+        cmd_group.command(
+            "monitor-events",
+            "iot_central_monitor_events",
+            deprecate_info="az iot central app monitor-events",
+        )
 
     with self.command_group(
         "iotcentral device-twin", command_type=iotcentral_ops
     ) as cmd_group:
-        cmd_group.command("show", "iot_central_device_show")
+        cmd_group.command(
+            "show",
+            "iot_central_device_show",
+            deprecate_info="az iot central device-twin",
+        )
 
     with self.command_group(
         "iot central app", command_type=iotcentral_ops
     ) as cmd_group:
         cmd_group.command("monitor-events", "iot_central_monitor_events")
-
-    with self.command_group(
-        "iot central app", command_type=iotcentral_ops
-    ) as cmd_group:
         cmd_group.command("validate-messages", "iot_central_validate_messages")
 
     with self.command_group(
