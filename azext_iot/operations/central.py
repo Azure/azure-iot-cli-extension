@@ -43,7 +43,7 @@ def iot_central_validate_messages(
     yes=False,
     central_api_uri="api.azureiotcentral.com",
 ):
-    iot_central_monitor_events(
+    _events3_runner(
         cmd,
         app_id,
         device_id,
@@ -55,6 +55,7 @@ def iot_central_validate_messages(
         repair,
         properties,
         yes,
+        central_api_uri,
     )
 
 
@@ -62,8 +63,6 @@ def iot_central_monitor_events(
     cmd,
     app_id,
     device_id=None,
-    validate_messages=False,
-    simulate_errors=False,
     consumer_group="$Default",
     timeout=300,
     enqueued_time=None,
@@ -72,7 +71,36 @@ def iot_central_monitor_events(
     yes=False,
     central_api_uri="api.azureiotcentral.com",
 ):
+    _events3_runner(
+        cmd,
+        app_id,
+        device_id,
+        False,
+        False,
+        consumer_group,
+        timeout,
+        enqueued_time,
+        repair,
+        properties,
+        yes,
+        central_api_uri,
+    )
 
+
+def _events3_runner(
+    cmd,
+    app_id,
+    device_id,
+    validate_messages,
+    simulate_errors,
+    consumer_group,
+    timeout,
+    enqueued_time,
+    repair,
+    properties,
+    yes,
+    central_api_uri,
+):
     (enqueued_time, properties, timeout, output) = init_monitoring(
         cmd, timeout, properties, enqueued_time, repair, yes
     )

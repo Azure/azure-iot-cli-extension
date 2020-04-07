@@ -1207,10 +1207,8 @@ helps[
     - name: Receive all messages and parse message payload as JSON
       text: >
         az iot central app monitor-events --app-id {app_id} --output json
-    - name: Will randomly convert a recieved message into an error so you can see what sample errors might look like.
-      text: >
-        az iot central app monitor-events --simulate-errors
   """
+
 
 helps[
     "iot central app validate-messages"
@@ -1236,7 +1234,7 @@ helps[
         az iot central app validate-messages --app-id {app_id} -d {device_id} --cg {consumer_group_name}
     - name: Will randomly convert a recieved message into an error so you can see what sample errors might look like.
       text: >
-        az iot central app validate-messages --simulate-errors
+        az iot central app validate-messages --app-id {app_id} --simulate-errors
   """
 
 helps[
