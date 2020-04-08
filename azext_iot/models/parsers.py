@@ -1,3 +1,9 @@
+# coding=utf-8
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See License.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+
 import random
 import re
 import json
@@ -21,7 +27,6 @@ class Event3Parser(object):
     def __init__(self, logger=None):
         if logger:
             self._logger = logger
-        pass
 
     def parse_message(
         self,
@@ -57,7 +62,7 @@ class Event3Parser(object):
         if not content_encoding:
             return {}
 
-        event = {"properties": {}}
+        event = {}
 
         origin_device_id = self.parse_device_id(message)
         event["origin"] = origin_device_id
@@ -79,9 +84,12 @@ class Event3Parser(object):
 
             event["interface"] = message_interface_name
 
+        if properties:
+            event["properties"] = {}
+
         if "anno" in properties or "all" in properties:
             annotations = self._parse_annotations(message)
-            event["annotations"] = annotations
+            event["properties"]["annotations"] = annotations
 
         if system_properties and ("sys" in properties or "all" in properties):
             event["properties"]["system"] = system_properties
