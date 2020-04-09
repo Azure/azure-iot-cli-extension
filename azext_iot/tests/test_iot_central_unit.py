@@ -183,7 +183,7 @@ class TestEvents3Parser:
     encoding = "UTF-8"
     content_type = "application/json"
 
-    bad_encoding = "bad-encoding"
+    bad_encoding = "ascii"
     bad_payload = "bad-payload"
     bad_content_type = "bad-content-type"
 
@@ -244,17 +244,14 @@ class TestEvents3Parser:
             content_encoding=self.bad_encoding, content_type=self.content_type
         )
         message = Message(
-            body=json.dumps(self.payload).encode(),
+            body=json.dumps(self.payload).encode(self.bad_encoding),
             properties=properties,
             annotations={parsers.DEVICE_ID_IDENTIFIER: device_id.encode()},
         )
         parser = parsers.Event3Parser()
 
         # act
-        parsed_msg = parser.parse_message(message, None, None, None, None, False)
-
-        # verify
-        assert parsed_msg == {}
+        parser.parse_message(message, None, None, None, None, False)
 
         assert len(parser._errors) == 1
         assert len(parser._warnings) == 0

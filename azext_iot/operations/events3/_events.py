@@ -384,10 +384,8 @@ def _output_msg_kpi(
     else:
         dump = yaml.safe_dump(parsed_msg, default_flow_style=False)
 
-    if validate_messages and not parsed_msg:
-        parser.log_info()
-        parser.log_warnings()
-        parser.log_errors()
+    if validate_messages:
+        parser.log_issues()
 
     if not validate_messages:
         six.print_(dump, flush=True)

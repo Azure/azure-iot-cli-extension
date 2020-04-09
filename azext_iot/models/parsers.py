@@ -55,12 +55,7 @@ class Event3Parser(object):
 
         system_properties = self._parse_system_properties(message)
 
-        content_encoding = self._parse_content_encoding(
-            message, system_properties, create_encoding_error
-        )
-
-        if not content_encoding:
-            return {}
+        self._parse_content_encoding(message, system_properties, create_encoding_error)
 
         event = {}
 
@@ -78,9 +73,6 @@ class Event3Parser(object):
             message_interface_name = self._parse_interface_name(
                 message, pnp_context, interface_name, origin_device_id
             )
-
-            if not message_interface_name:
-                return {}
 
             event["interface"] = message_interface_name
 
@@ -114,15 +106,13 @@ class Event3Parser(object):
         except Exception:
             self._errors.append(f"Device id not found in message: {message}")
 
-    def log_errors(self) -> None:
+    def log_issues(self) -> None:
         for error in self._errors:
             self._logger.error("[Error] " + error)
 
-    def log_warnings(self) -> None:
         for warning in self._warnings:
             self._logger.warn("[Warning] " + warning)
 
-    def log_info(self) -> None:
         for info in self._info:
             self._logger.info("[Info] " + info)
 
@@ -134,28 +124,23 @@ class Event3Parser(object):
     def _parse_interface_name(
         self, message: Message, pnp_context, interface_name, origin_device_id
     ) -> str:
-        message_interface_name = None
+        message_interface_name = ""
 
         try:
             message_interface_name = str(
                 message.annotations.get(INTERFACE_NAME_IDENTIFIER), "utf8"
             )
         except Exception:
-            pass
-
-        if not message_interface_name:
             self._errors.append(
                 f"Unable to parse interface_name given a pnp_device. {origin_device_id}. "
                 f"message: {message}"
             )
-            return None
 
         if interface_name != message_interface_name:
             self._errors.append(
                 f"Inteface name mismatch. {origin_device_id}. "
                 f"Expected: {interface_name}, Actual: {message_interface_name}"
             )
-            return None
 
         return message_interface_name
 
@@ -166,23 +151,24 @@ class Event3Parser(object):
             self._errors.append(
                 f"Failed to parse system_properties for message {message}."
             )
+            return {}
 
     def _parse_content_encoding(
         self, message: Message, system_properties, create_encoding_error
     ) -> str:
-        if "content_encoding" not in system_properties:
-            self._errors.append(f"No content encoding found for {message}.")
-            return None
+        content_encoding = ""
 
-        content_encoding = system_properties["content_encoding"]
-
-        if create_encoding_error:
-            content_encoding = "Some Random Encoding"
+        if "content_encoding" in system_properties:
+            content_encoding = system_properties["content_encoding"]
 
         if not content_encoding:
             self._errors.append(f"No encoding found for message: {message}")
             return None
-        if content_encoding and "utf-8" not in content_encoding.lower():
+
+        if create_encoding_error:
+            content_encoding = "Some Random Encoding"
+
+        if "utf-8" not in content_encoding.lower():
             self._errors.append(
                 f"Unsupported encoding detected: '{content_encoding}'. "
                 f"The currently supported encodings are: {SUPPORTED_ENCODINGS}. "
@@ -208,15 +194,19 @@ class Event3Parser(object):
         if create_custom_header_warning:
             content_type = "Some Random Custom Header"
 
-        if content_type and "application/json" in content_type.lower():
-            return content_type
+        if not content_type:
+            self._warnings.append(
+                "Content type not found in system_properties. "
+                f"System_properties: {system_properties}"
+            )
 
-        self._warnings.append(
-            "Content type not supported. "
-            f"Content type found: {content_type}. "
-            "Content type expected: application/json. "
-            f"DeviceId: {origin_device_id}"
-        )
+        if "application/json" not in content_type.lower():
+            self._warnings.append(
+                "Content type not supported. "
+                f"Content type found: {content_type}. "
+                "Content type expected: application/json. "
+                f"DeviceId: {origin_device_id}"
+            )
 
         return content_type
 
@@ -248,7 +238,6 @@ class Event3Parser(object):
             self._warnings.append(
                 f"Unable to decode message.annotations: {message.annotations}"
             )
-            pass
 
     def _parse_application_properties(self, message: Message):
         try:
@@ -257,4 +246,3 @@ class Event3Parser(object):
             self._warnings.append(
                 f"Unable to decode message.application_properties: {message.application_properties}"
             )
-            pass
