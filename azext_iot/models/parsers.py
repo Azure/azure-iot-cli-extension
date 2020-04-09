@@ -106,7 +106,7 @@ class Event3Parser(object):
         except Exception:
             self._errors.append(f"Device id not found in message: {message}")
 
-    def log_issues(self) -> None:
+    def write_logs(self) -> None:
         for error in self._errors:
             self._logger.error("[Error] " + error)
 
