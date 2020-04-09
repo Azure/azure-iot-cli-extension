@@ -1856,7 +1856,6 @@ def iot_c2d_message_send(
     resource_group_name=None,
     login=None,
 ):
-    import importlib
     from azext_iot.common.deps import ensure_uamqp
     from azext_iot.common.utility import validate_min_python_version
 
@@ -1882,8 +1881,6 @@ def iot_c2d_message_send(
         user_msg_expiry = int(expiry_time_utc)
         if user_msg_expiry < now_in_milli:
             raise CLIError("Message expiry time utc is in the past!")
-
-    events3 = importlib.import_module("azext_iot.operations.events3._events")
 
     msg_id, errors = events3.send_c2d_message(
         target=target,
@@ -2267,9 +2264,6 @@ def iot_hub_distributed_tracing_update(
 
 
 def _iot_hub_monitor_feedback(target, device_id, wait_on_id):
-    import importlib
-
-    events3 = importlib.import_module("azext_iot.operations.events3._events")
     events3.monitor_feedback(
         target=target, device_id=device_id, wait_on_id=wait_on_id, token_duration=3600
     )
