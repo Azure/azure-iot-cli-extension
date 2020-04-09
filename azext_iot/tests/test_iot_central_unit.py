@@ -14,7 +14,7 @@ from azext_iot.operations import central as subject
 from azext_iot.common.shared import SdkType
 from azure.cli.core.mock import DummyCli
 from azext_iot.common.utility import validate_min_python_version
-from azext_iot.models import parsers
+from azext_iot.operations.events3 import _parser
 
 
 device_id = "mydevice"
@@ -195,9 +195,9 @@ class TestEvents3Parser:
         message = Message(
             body=json.dumps(self.payload).encode(),
             properties=properties,
-            annotations={parsers.DEVICE_ID_IDENTIFIER: device_id.encode()},
+            annotations={_parser.DEVICE_ID_IDENTIFIER: device_id.encode()},
         )
-        parser = parsers.Event3Parser()
+        parser = _parser.Event3Parser()
 
         # act
         parsed_msg = parser.parse_message(message, None, None, None, None, False)
@@ -218,9 +218,9 @@ class TestEvents3Parser:
         message = Message(
             body=json.dumps(self.payload).encode(),
             properties=properties,
-            annotations={parsers.DEVICE_ID_IDENTIFIER: device_id.encode()},
+            annotations={_parser.DEVICE_ID_IDENTIFIER: device_id.encode()},
         )
-        parser = parsers.Event3Parser()
+        parser = _parser.Event3Parser()
 
         # act
         parsed_msg = parser.parse_message(message, None, None, None, None, False)
@@ -246,9 +246,9 @@ class TestEvents3Parser:
         message = Message(
             body=json.dumps(self.payload).encode(self.bad_encoding),
             properties=properties,
-            annotations={parsers.DEVICE_ID_IDENTIFIER: device_id.encode()},
+            annotations={_parser.DEVICE_ID_IDENTIFIER: device_id.encode()},
         )
-        parser = parsers.Event3Parser()
+        parser = _parser.Event3Parser()
 
         # act
         parser.parse_message(message, None, None, None, None, False)
@@ -258,7 +258,7 @@ class TestEvents3Parser:
         assert len(parser._info) == 0
 
         errors = parser._errors[0]
-        assert f"Unsupported encoding detected: '{self.bad_encoding}'" in errors
+        assert "Unsupported encoding detected: '{}'".format(self.bad_encoding) in errors
 
     def test_parse_message_bad_json_should_fail(self):
         # setup
@@ -268,9 +268,9 @@ class TestEvents3Parser:
         message = Message(
             body=self.bad_payload.encode(),
             properties=properties,
-            annotations={parsers.DEVICE_ID_IDENTIFIER: device_id.encode()},
+            annotations={_parser.DEVICE_ID_IDENTIFIER: device_id.encode()},
         )
-        parser = parsers.Event3Parser()
+        parser = _parser.Event3Parser()
 
         # act
         parsed_msg = parser.parse_message(message, None, None, None, None, False)
@@ -283,6 +283,6 @@ class TestEvents3Parser:
         assert len(parser._info) == 0
 
         errors = parser._errors[0]
-        assert f"Invalid JSON format." in errors
+        assert "Invalid JSON format." in errors
         assert device_id in errors
         assert self.bad_payload in errors

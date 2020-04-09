@@ -10,6 +10,7 @@ from azext_iot.common._azure import get_iot_hub_token_from_central_app_id
 from azext_iot.common.shared import SdkType
 from azext_iot.common.utility import unpack_msrest_error, init_monitoring
 from azext_iot.common.sas_token_auth import BasicSasTokenAuthentication
+from azext_iot.operations import events3
 
 
 def find_between(s, start, end):
@@ -105,14 +106,10 @@ def _events3_runner(
         cmd, timeout, properties, enqueued_time, repair, yes
     )
 
-    import importlib
-
-    events3 = importlib.import_module("azext_iot.operations.events3._events")
-    builders = importlib.import_module("azext_iot.operations.events3._builders")
-
-    eventHubTarget = builders.EventTargetBuilder().build_central_event_hub_target(
+    eventHubTarget = events3.EventTargetBuilder().build_central_event_hub_target(
         cmd, app_id, central_api_uri
     )
+
     events3.executor(
         eventHubTarget,
         consumer_group=consumer_group,

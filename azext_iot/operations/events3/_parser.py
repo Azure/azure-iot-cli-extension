@@ -104,7 +104,7 @@ class Event3Parser(object):
         try:
             return str(message.annotations.get(DEVICE_ID_IDENTIFIER), "utf8")
         except Exception:
-            self._errors.append(f"Device id not found in message: {message}")
+            self._errors.append("Device id not found in message: {}".format(message))
 
     def write_logs(self) -> None:
         for error in self._errors:
@@ -132,14 +132,16 @@ class Event3Parser(object):
             )
         except Exception:
             self._errors.append(
-                f"Unable to parse interface_name given a pnp_device. {origin_device_id}. "
-                f"message: {message}"
+                "Unable to parse interface_name given a pnp_device. {}. "
+                "message: {}".format(origin_device_id, message)
             )
 
         if interface_name != message_interface_name:
             self._errors.append(
-                f"Inteface name mismatch. {origin_device_id}. "
-                f"Expected: {interface_name}, Actual: {message_interface_name}"
+                "Inteface name mismatch. {}. "
+                "Expected: {}, Actual: {}".format(
+                    origin_device_id, interface_name, message_interface_name
+                )
             )
 
         return message_interface_name
@@ -149,7 +151,9 @@ class Event3Parser(object):
             return unicode_binary_map(parse_entity(message.properties, True))
         except Exception:
             self._errors.append(
-                f"Failed to parse system_properties for message {message}."
+                "Failed to parse system_properties for message {message}.".format(
+                    message
+                )
             )
             return {}
 
@@ -162,7 +166,7 @@ class Event3Parser(object):
             content_encoding = system_properties["content_encoding"]
 
         if not content_encoding:
-            self._errors.append(f"No encoding found for message: {message}")
+            self._errors.append("No encoding found for message: {}".format(message))
             return None
 
         if create_encoding_error:
@@ -170,9 +174,11 @@ class Event3Parser(object):
 
         if "utf-8" not in content_encoding.lower():
             self._errors.append(
-                f"Unsupported encoding detected: '{content_encoding}'. "
-                f"The currently supported encodings are: {SUPPORTED_ENCODINGS}. "
-                f"System_properties: {system_properties}."
+                "Unsupported encoding detected: '{}'. "
+                "The currently supported encodings are: {}. "
+                "System_properties: {}.".format(
+                    content_encoding, SUPPORTED_ENCODINGS, system_properties
+                )
             )
             return None
 
@@ -197,15 +203,15 @@ class Event3Parser(object):
         if not content_type:
             self._warnings.append(
                 "Content type not found in system_properties. "
-                f"System_properties: {system_properties}"
+                "System_properties: {}".format(system_properties)
             )
 
         if "application/json" not in content_type.lower():
             self._warnings.append(
                 "Content type not supported. "
-                f"Content type found: {content_type}. "
+                "Content type found: {}. "
                 "Content type expected: application/json. "
-                f"DeviceId: {origin_device_id}"
+                "DeviceId: {}".format(content_type, origin_device_id)
             )
 
         return content_type
@@ -225,7 +231,7 @@ class Event3Parser(object):
         except Exception:
             self._errors.append(
                 "Invalid JSON format. "
-                f"DeviceId: {origin_device_id}, Raw payload {payload}"
+                "DeviceId: {}, Raw payload {}".format(origin_device_id, payload)
             )
             return ""
 
@@ -236,7 +242,7 @@ class Event3Parser(object):
             return unicode_binary_map(message.annotations)
         except Exception:
             self._warnings.append(
-                f"Unable to decode message.annotations: {message.annotations}"
+                "Unable to decode message.annotations: {}".format(message.annotations)
             )
 
     def _parse_application_properties(self, message: Message):
@@ -244,5 +250,7 @@ class Event3Parser(object):
             return unicode_binary_map(message.application_properties)
         except Exception:
             self._warnings.append(
-                f"Unable to decode message.application_properties: {message.application_properties}"
+                "Unable to decode message.application_properties: {}".format(
+                    message.application_properties
+                )
             )

@@ -17,7 +17,7 @@ from knack.log import get_logger
 from azext_iot.constants import VERSION, USER_AGENT
 from azext_iot.common.utility import process_json_arg
 from azext_iot.operations.events3._builders import AmqpBuilder
-from azext_iot.models.parsers import Event3Parser
+from azext_iot.operations.events3._parser import Event3Parser
 
 # To provide amqp frame trace
 DEBUG = False
