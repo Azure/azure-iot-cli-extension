@@ -3,6 +3,7 @@ pytest-mock
 pytest-cov
 pytest-env
 pylint
+uamqp~=1.2
 mock;python_version<'3.3'
 responses
 flake8

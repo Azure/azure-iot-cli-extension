@@ -10,7 +10,9 @@ Help definitions for CLI.
 from knack.help_files import helps
 
 
-helps['iot'] = """
+helps[
+    "iot"
+] = """
     type: group
     short-summary: Manage Internet of Things (IoT) assets.
                    Augmented with the IoT extension.
@@ -19,12 +21,16 @@ helps['iot'] = """
                   https://github.com/Azure/azure-iot-cli-extension/wiki/Tips
 """
 
-helps['iot hub'] = """
+helps[
+    "iot hub"
+] = """
     type: group
     short-summary: Manage entities in an Azure IoT Hub.
 """
 
-helps['iot hub monitor-events'] = """
+helps[
+    "iot hub monitor-events"
+] = """
     type: command
     short-summary: Monitor device telemetry & messages sent to an IoT Hub.
     long-summary: |
@@ -65,7 +71,9 @@ helps['iot hub monitor-events'] = """
         az iot hub monitor-events -n {iothub_name} --content-type application/json
 """
 
-helps['iot hub monitor-feedback'] = """
+helps[
+    "iot hub monitor-feedback"
+] = """
     type: command
     short-summary: Monitor feedback sent by devices to acknowledge cloud-to-device (C2D) messages.
     long-summary: |
@@ -88,12 +96,16 @@ helps['iot hub monitor-feedback'] = """
         az iot hub monitor-feedback -n {iothub_name} -d {device_id} -w {message_id}
 """
 
-helps['iot hub device-identity'] = """
+helps[
+    "iot hub device-identity"
+] = """
     type: group
     short-summary: Manage IoT devices.
 """
 
-helps['iot hub device-identity create'] = """
+helps[
+    "iot hub device-identity create"
+] = """
     type: command
     short-summary: Create a device in an IoT Hub.
     examples:
@@ -129,17 +141,23 @@ helps['iot hub device-identity create'] = """
         --status disabled --status-reason 'for reasons'
 """
 
-helps['iot hub device-identity show'] = """
+helps[
+    "iot hub device-identity show"
+] = """
     type: command
     short-summary: Get the details of an IoT Hub device.
 """
 
-helps['iot hub device-identity list'] = """
+helps[
+    "iot hub device-identity list"
+] = """
     type: command
     short-summary: List devices in an IoT Hub.
 """
 
-helps['iot hub device-identity update'] = """
+helps[
+    "iot hub device-identity update"
+] = """
     type: command
     short-summary: Update an IoT Hub device.
     long-summary: Use --set followed by property assignments for updating a device.
@@ -158,31 +176,41 @@ helps['iot hub device-identity update'] = """
         --set status=disabled capabilities.iotEdge=true
 """
 
-helps['iot hub device-identity delete'] = """
+helps[
+    "iot hub device-identity delete"
+] = """
     type: command
     short-summary: Delete an IoT Hub device.
 """
 
-helps['iot hub device-identity show-connection-string'] = """
+helps[
+    "iot hub device-identity show-connection-string"
+] = """
     type: command
     short-summary: Show a given IoT Hub device connection string.
 """
 
-helps['iot hub device-identity export'] = """
+helps[
+    "iot hub device-identity export"
+] = """
     type: command
     short-summary: Export all device identities from an IoT Hub to an Azure Storage blob container.
     long-summary: For more information, see
                   https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
 """
 
-helps['iot hub device-identity import'] = """
+helps[
+    "iot hub device-identity import"
+] = """
     type: command
     short-summary: Import device identities to an IoT Hub from a blob.
     long-summary: For more information, see
                   https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
 """
 
-helps['iot hub device-identity get-parent'] = """
+helps[
+    "iot hub device-identity get-parent"
+] = """
     type: command
     short-summary: Get the parent device of the specified device.
     examples:
@@ -191,7 +219,9 @@ helps['iot hub device-identity get-parent'] = """
         az iot hub device-identity get-parent -d {non_edge_device_id} -n {iothub_name}
 """
 
-helps['iot hub device-identity set-parent'] = """
+helps[
+    "iot hub device-identity set-parent"
+] = """
     type: command
     short-summary: Set the parent device of the specified non-edge device.
     examples:
@@ -204,7 +234,9 @@ helps['iot hub device-identity set-parent'] = """
         az iot hub device-identity set-parent -d {non_edge_device_id} --pd {edge_device_id} --force -n {iothub_name}
 """
 
-helps['iot hub device-identity add-children'] = """
+helps[
+    "iot hub device-identity add-children"
+] = """
     type: command
     short-summary: Add specified comma-separated list of non edge device ids as children of specified edge device.
     examples:
@@ -219,7 +251,9 @@ helps['iot hub device-identity add-children'] = """
         -n {iothub_name} -f
 """
 
-helps['iot hub device-identity list-children'] = """
+helps[
+    "iot hub device-identity list-children"
+] = """
     type: command
     short-summary: Print comma-separated list of assigned child devices.
     examples:
@@ -228,7 +262,9 @@ helps['iot hub device-identity list-children'] = """
         az iot hub device-identity list-children -d {edge_device_id} -n {iothub_name}
 """
 
-helps['iot hub device-identity remove-children'] = """
+helps[
+    "iot hub device-identity remove-children"
+] = """
     type: command
     short-summary: Remove non edge devices as children from specified edge device.
     examples:
@@ -241,17 +277,23 @@ helps['iot hub device-identity remove-children'] = """
         az iot hub device-identity remove-children -d {edge_device_id} --remove-all
 """
 
-helps['iot hub device-twin'] = """
+helps[
+    "iot hub device-twin"
+] = """
     type: group
     short-summary: Manage IoT device twin configuration.
 """
 
-helps['iot hub device-twin show'] = """
+helps[
+    "iot hub device-twin show"
+] = """
     type: command
     short-summary: Get a device twin definition.
 """
 
-helps['iot hub device-twin update'] = """
+helps[
+    "iot hub device-twin update"
+] = """
     type: command
     short-summary: Update device twin definition.
     long-summary: Use --set followed by property assignments for updating a device twin.
@@ -267,7 +309,9 @@ helps['iot hub device-twin update'] = """
         --set tags.location.region='null'
 """
 
-helps['iot hub device-twin replace'] = """
+helps[
+    "iot hub device-twin replace"
+] = """
     type: command
     short-summary: Replace device twin definition with target json.
     long-summary: Input json directly or use a file path.
@@ -277,32 +321,44 @@ helps['iot hub device-twin replace'] = """
         az iot hub device-twin replace -d {device_id} -n {iothub_name} -j ../mydevicetwin.json
 """
 
-helps['iot hub module-identity'] = """
+helps[
+    "iot hub module-identity"
+] = """
     type: group
     short-summary: Manage IoT device modules.
 """
 
-helps['iot hub module-identity show-connection-string'] = """
+helps[
+    "iot hub module-identity show-connection-string"
+] = """
     type: command
     short-summary: Show a target IoT device module connection string.
 """
 
-helps['iot hub module-identity create'] = """
+helps[
+    "iot hub module-identity create"
+] = """
     type: command
     short-summary: Create a module on a target IoT device in an IoT Hub.
 """
 
-helps['iot hub module-identity show'] = """
+helps[
+    "iot hub module-identity show"
+] = """
     type: command
     short-summary: Get the details of an IoT device module in an IoT Hub.
 """
 
-helps['iot hub module-identity list'] = """
+helps[
+    "iot hub module-identity list"
+] = """
     type: command
     short-summary: List modules located on an IoT device in an IoT Hub.
 """
 
-helps['iot hub module-identity update'] = """
+helps[
+    "iot hub module-identity update"
+] = """
     type: command
     short-summary: Update an IoT Hub device module.
     long-summary: Use --set followed by property assignments for updating a module.
@@ -315,22 +371,30 @@ helps['iot hub module-identity update'] = """
         authentication.symmetricKey.secondaryKey=""
 """
 
-helps['iot hub module-identity delete'] = """
+helps[
+    "iot hub module-identity delete"
+] = """
     type: command
     short-summary: Delete a device in an IoT Hub.
 """
 
-helps['iot hub module-twin'] = """
+helps[
+    "iot hub module-twin"
+] = """
     type: group
     short-summary: Manage IoT device module twin configuration.
 """
 
-helps['iot hub module-twin show'] = """
+helps[
+    "iot hub module-twin show"
+] = """
     type: command
     short-summary: Show a module twin definition.
 """
 
-helps['iot hub module-twin update'] = """
+helps[
+    "iot hub module-twin update"
+] = """
     type: command
     short-summary: Update module twin definition.
     long-summary: Use --set followed by property assignments for updating a module.
@@ -346,7 +410,9 @@ helps['iot hub module-twin update'] = """
         properties.desired.condition.temperature.critical='null'
 """
 
-helps['iot hub module-twin replace'] = """
+helps[
+    "iot hub module-twin replace"
+] = """
     type: command
     short-summary: Replace a module twin definition with target json.
     long-summary: Input json directly or use a file path.
@@ -357,7 +423,9 @@ helps['iot hub module-twin replace'] = """
         -m {module_name} -j ../mymodtwin.json
 """
 
-helps['iot hub generate-sas-token'] = """
+helps[
+    "iot hub generate-sas-token"
+] = """
     type: command
     short-summary: Generate a SAS token for a target IoT Hub, device or module.
     long-summary: For device SAS tokens, the policy parameter is used to
@@ -379,17 +447,23 @@ helps['iot hub generate-sas-token'] = """
         --login 'HostName=myhub.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey=12345'
 """
 
-helps['iot hub invoke-module-method'] = """
+helps[
+    "iot hub invoke-module-method"
+] = """
     type: command
     short-summary: Invoke an Edge module method.
 """
 
-helps['iot hub invoke-device-method'] = """
+helps[
+    "iot hub invoke-device-method"
+] = """
     type: command
     short-summary: Invoke a device method.
 """
 
-helps['iot hub query'] = """
+helps[
+    "iot hub query"
+] = """
     type: command
     short-summary: Query an IoT Hub using a powerful SQL-like language.
     long-summary: Query an IoT Hub using a powerful SQL-like language to retrieve information
@@ -405,12 +479,16 @@ helps['iot hub query'] = """
         az iot hub query -n {iothub_name} -q "select * from devices.modules where devices.deviceId = '{device_id}'"
 """
 
-helps['iot hub configuration'] = """
+helps[
+    "iot hub configuration"
+] = """
     type: group
     short-summary: Manage IoT automatic device management configuration at scale.
 """
 
-helps['iot hub configuration create'] = """
+helps[
+    "iot hub configuration create"
+] = """
     type: command
     short-summary: Create an IoT automatic device management configuration in a target IoT Hub.
     long-summary: |
@@ -448,17 +526,23 @@ helps['iot hub configuration create'] = """
         --metrics '{\\"metrics\\": {\\"queries\\": {\\"mymetric\\":\\"select moduleId from devices.modules where tags.location=''US''\\"}}}'
 """
 
-helps['iot hub configuration show'] = """
+helps[
+    "iot hub configuration show"
+] = """
     type: command
     short-summary: Get the details of an IoT automatic device management configuration.
 """
 
-helps['iot hub configuration list'] = """
+helps[
+    "iot hub configuration list"
+] = """
     type: command
     short-summary: List IoT automatic device management configurations in an IoT Hub.
 """
 
-helps['iot hub configuration update'] = """
+helps[
+    "iot hub configuration update"
+] = """
     type: command
     short-summary: |
                   Update specified properties of an IoT automatic device management configuration.
@@ -474,12 +558,16 @@ helps['iot hub configuration update'] = """
         targetCondition="tags.building=43 and tags.environment='dev'"
 """
 
-helps['iot hub configuration delete'] = """
+helps[
+    "iot hub configuration delete"
+] = """
     type: command
     short-summary: Delete an IoT device configuration.
 """
 
-helps['iot hub configuration show-metric'] = """
+helps[
+    "iot hub configuration show-metric"
+] = """
     type: command
     short-summary: Evaluate a target user or system metric defined in an IoT device configuration
     examples:
@@ -492,12 +580,16 @@ helps['iot hub configuration show-metric'] = """
         --metric-type system
 """
 
-helps['iot hub distributed-tracing'] = """
+helps[
+    "iot hub distributed-tracing"
+] = """
     type: group
     short-summary: Manage distributed settings per-device.
 """
 
-helps['iot hub distributed-tracing show'] = """
+helps[
+    "iot hub distributed-tracing show"
+] = """
     type: command
     short-summary: Get the distributed tracing settings for a device.
     examples:
@@ -506,7 +598,9 @@ helps['iot hub distributed-tracing show'] = """
         az iot hub distributed-tracing show -d {device_id} -n {iothub_name}
 """
 
-helps['iot hub distributed-tracing update'] = """
+helps[
+    "iot hub distributed-tracing update"
+] = """
     type: command
     short-summary: Update the distributed tracing options for a device.
     examples:
@@ -515,37 +609,51 @@ helps['iot hub distributed-tracing update'] = """
         az iot hub distributed-tracing update -d {device_id} --sm on --sr 50 -n {iothub_name}
 """
 
-helps['iot device'] = """
+helps[
+    "iot device"
+] = """
     type: group
     short-summary: Leverage device-to-cloud and cloud-to-device messaging capabilities.
 """
 
-helps['iot device c2d-message'] = """
+helps[
+    "iot device c2d-message"
+] = """
     type: group
     short-summary: Cloud-to-device messaging commands.
 """
 
-helps['iot device c2d-message abandon'] = """
+helps[
+    "iot device c2d-message abandon"
+] = """
     type: command
     short-summary: Abandon a cloud-to-device message.
 """
 
-helps['iot device c2d-message complete'] = """
+helps[
+    "iot device c2d-message complete"
+] = """
     type: command
     short-summary: Complete a cloud-to-device message.
 """
 
-helps['iot device c2d-message receive'] = """
+helps[
+    "iot device c2d-message receive"
+] = """
     type: command
     short-summary: Receive a cloud-to-device message.
 """
 
-helps['iot device c2d-message reject'] = """
+helps[
+    "iot device c2d-message reject"
+] = """
     type: command
     short-summary: Reject or deadletter a cloud-to-device message.
 """
 
-helps['iot device c2d-message send'] = """
+helps[
+    "iot device c2d-message send"
+] = """
     type: command
     short-summary: Send a cloud-to-device message.
     long-summary: |
@@ -564,7 +672,9 @@ helps['iot device c2d-message send'] = """
         az iot device c2d-message send -d {device_id} -n {iothub_name} --ack full --wait
 """
 
-helps['iot device send-d2c-message'] = """
+helps[
+    "iot device send-d2c-message"
+] = """
     type: command
     short-summary: Send an mqtt device-to-cloud message.
                    The command supports sending messages with application and system properties.
@@ -579,7 +689,9 @@ helps['iot device send-d2c-message'] = """
       text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --props '$.mid=<id>;$.cid=<id>'
 """
 
-helps['iot device simulate'] = """
+helps[
+    "iot device simulate"
+] = """
     type: command
     short-summary: |
                    Simulate a device in an Azure IoT Hub.
@@ -609,12 +721,16 @@ helps['iot device simulate'] = """
       text: az iot device simulate -n {iothub_name} -d {device_id} --rs abandon --protocol http
 """
 
-helps['iot device upload-file'] = """
+helps[
+    "iot device upload-file"
+] = """
     type: command
     short-summary: Upload a local file as a device to a pre-configured blob storage container.
 """
 
-helps['iot edge'] = """
+helps[
+    "iot edge"
+] = """
     type: group
     short-summary: Manage IoT solutions on the Edge.
     long-summmary: |
@@ -627,7 +743,9 @@ helps['iot edge'] = """
                    https://docs.microsoft.com/en-us/azure/iot-edge/
 """
 
-helps['iot edge set-modules'] = """
+helps[
+    "iot edge set-modules"
+] = """
     type: command
     short-summary: Set edge modules on a single device.
     long-summary: |
@@ -640,12 +758,16 @@ helps['iot edge set-modules'] = """
         az iot edge set-modules --hub-name {iothub_name} --device-id {device_id} --content ../modules_content.json
 """
 
-helps['iot edge deployment'] = """
+helps[
+    "iot edge deployment"
+] = """
     type: group
     short-summary: Manage IoT Edge deployments at scale.
 """
 
-helps['iot edge deployment create'] = """
+helps[
+    "iot edge deployment create"
+] = """
     type: command
     short-summary: Create an IoT Edge deployment in a target IoT Hub.
     long-summary: |
@@ -681,17 +803,23 @@ helps['iot edge deployment create'] = """
         --layered
 """
 
-helps['iot edge deployment show'] = """
+helps[
+    "iot edge deployment show"
+] = """
     type: command
     short-summary: Get the details of an IoT Edge deployment.
 """
 
-helps['iot edge deployment list'] = """
+helps[
+    "iot edge deployment list"
+] = """
     type: command
     short-summary: List IoT Edge deployments in an IoT Hub.
 """
 
-helps['iot edge deployment update'] = """
+helps[
+    "iot edge deployment update"
+] = """
     type: command
     short-summary: |
                   Update specified properties of an IoT Edge deployment.
@@ -707,12 +835,16 @@ helps['iot edge deployment update'] = """
         --set labels='{"purpose":"dev", "owners":"IoTEngineering"}' targetCondition='tags.building=9'
 """
 
-helps['iot edge deployment delete'] = """
+helps[
+    "iot edge deployment delete"
+] = """
     type: command
     short-summary: Delete an IoT Edge deployment.
 """
 
-helps['iot edge deployment show-metric'] = """
+helps[
+    "iot edge deployment show-metric"
+] = """
     type: command
     short-summary: Evaluate a target system metric defined in an IoT Edge deployment.
     examples:
@@ -721,28 +853,38 @@ helps['iot edge deployment show-metric'] = """
         az iot edge deployment show-metric -m appliedCount -d {deployment_name} -n {iothub_name}
 """
 
-helps['iot dps'] = """
+helps[
+    "iot dps"
+] = """
     type: group
     short-summary: Manage entities in an Azure IoT Hub Device Provisioning Service.
                    Augmented with the IoT extension.
 """
 
-helps['iot dps enrollment'] = """
+helps[
+    "iot dps enrollment"
+] = """
     type: group
     short-summary: Manage enrollments in an Azure IoT Hub Device Provisioning Service.
 """
 
-helps['iot dps enrollment list'] = """
+helps[
+    "iot dps enrollment list"
+] = """
     type: command
     short-summary: List device enrollments in an Azure IoT Hub Device Provisioning Service.
 """
 
-helps['iot dps enrollment show'] = """
+helps[
+    "iot dps enrollment show"
+] = """
     type: command
     short-summary: Get device enrollment details in an Azure IoT Hub Device Provisioning Service.
 """
 
-helps['iot dps enrollment create'] = """
+helps[
+    "iot dps enrollment create"
+] = """
     type: command
     short-summary: Create a device enrollment in an Azure IoT Hub Device Provisioning Service.
     examples:
@@ -795,7 +937,9 @@ helps['iot dps enrollment create'] = """
         --endorsement-key 14963E8F3BA5B3984110B3C1CA8E8B89 --iot-hubs "{iot_hub_host_name1} {iot_hub_host_name2}"
 """
 
-helps['iot dps enrollment update'] = """
+helps[
+    "iot dps enrollment update"
+] = """
     type: command
     short-summary: Update a device enrollment in an Azure IoT Hub Device Provisioning Service.
     examples:
@@ -831,27 +975,37 @@ helps['iot dps enrollment update'] = """
         --etag AAAAAAAAAAA= --iot-hubs "{iot_hub_host_name1} {iot_hub_host_name2} {iot_hub_host_name3}"
 """
 
-helps['iot dps enrollment delete'] = """
+helps[
+    "iot dps enrollment delete"
+] = """
     type: command
     short-summary: Delete a device enrollment in an Azure IoT Hub Device Provisioning Service.
 """
 
-helps['iot dps enrollment-group'] = """
+helps[
+    "iot dps enrollment-group"
+] = """
     type: group
     short-summary: Manage Azure IoT Hub Device Provisioning Service.
 """
 
-helps['iot dps enrollment-group list'] = """
+helps[
+    "iot dps enrollment-group list"
+] = """
     type: command
     short-summary: List enrollments groups in an Azure IoT Hub Device Provisioning Service.
 """
 
-helps['iot dps enrollment-group show'] = """
+helps[
+    "iot dps enrollment-group show"
+] = """
     type: command
     short-summary: Get the details of an enrollment group in an Azure IoT Hub Device Provisioning Service.
 """
 
-helps['iot dps enrollment-group create'] = """
+helps[
+    "iot dps enrollment-group create"
+] = """
     type: command
     short-summary: Create an enrollment group in an Azure IoT Hub Device Provisioning Service.
     examples:
@@ -883,7 +1037,9 @@ helps['iot dps enrollment-group create'] = """
 
 """
 
-helps['iot dps enrollment-group update'] = """
+helps[
+    "iot dps enrollment-group update"
+] = """
     type: command
     short-summary: Update an enrollment group in an Azure IoT Hub Device Provisioning Service.
     examples:
@@ -913,33 +1069,45 @@ helps['iot dps enrollment-group update'] = """
         --enrollment-id {enrollment_id} --primary-key {new_primary_key} --etag AAAAAAAAAAA=
 """
 
-helps['iot dps enrollment-group delete'] = """
+helps[
+    "iot dps enrollment-group delete"
+] = """
     type: command
     short-summary: Delete an enrollment group in an Azure IoT Hub Device Provisioning Service.
 """
 
-helps['iot dps registration'] = """
+helps[
+    "iot dps registration"
+] = """
     type: group
     short-summary: Manage Azure IoT Hub Device Provisioning Service registrations.
 """
 
-helps['iot dps registration list'] = """
+helps[
+    "iot dps registration list"
+] = """
     type: command
     short-summary: List device registration state in an Azure IoT Hub Device Provisioning
         Service enrollment group.
 """
 
-helps['iot dps registration show'] = """
+helps[
+    "iot dps registration show"
+] = """
     type: command
     short-summary: Get the device registration state in an Azure IoT Hub Device Provisioning Service.
 """
 
-helps['iot dps registration delete'] = """
+helps[
+    "iot dps registration delete"
+] = """
     type: command
     short-summary: Delete a device registration in an Azure IoT Hub Device Provisioning Service.
 """
 
-helps['iotcentral app monitor-events'] = """
+helps[
+    "iotcentral app monitor-events"
+] = """
     type: command
     short-summary: Monitor device telemetry & messages sent to the IoT Hub for an IoT Central app.
     long-summary: |
@@ -975,29 +1143,39 @@ helps['iotcentral app monitor-events'] = """
         az iotcentral app monitor-events --app-id {app_id} --output json
   """
 
-helps['iotcentral device-twin'] = """
+helps[
+    "iotcentral device-twin"
+] = """
     type: group
     short-summary: Manage IoT Central device twins.
     long-summary: DEPRECATED. Use 'az iot central device-twin' instead.
 """
 
-helps['iotcentral device-twin show'] = """
+helps[
+    "iotcentral device-twin show"
+] = """
     type: command
     short-summary: Get the device twin from IoT Hub.
     long-summary: DEPRECATED. Use 'az iot central device-twin show' instead.
 """
 
-helps['iot central'] = """
+helps[
+    "iot central"
+] = """
     type: group
     short-summary: Manage Azure IoT Central assets.
 """
 
-helps['iot central app'] = """
+helps[
+    "iot central app"
+] = """
     type: group
     short-summary: Manage Azure IoT Central applications.
 """
 
-helps['iot central app monitor-events'] = """
+helps[
+    "iot central app monitor-events"
+] = """
     type: command
     short-summary: Monitor device telemetry & messages sent to the IoT Hub for an IoT Central app.
     long-summary: |
@@ -1031,22 +1209,58 @@ helps['iot central app monitor-events'] = """
         az iot central app monitor-events --app-id {app_id} --output json
   """
 
-helps['iot central device-twin'] = """
+
+helps[
+    "iot central app validate-messages"
+] = """
+    type: command
+    short-summary: Validate messages sent to the IoT Hub for an IoT Central app.
+    long-summary: |
+                  EXPERIMENTAL requires Python 3.5+
+                  This command relies on and may install dependent Cython package (uamqp) upon first execution.
+                  https://github.com/Azure/azure-uamqp-python
+    examples:
+    - name: Basic usage
+      text: >
+        az iot central app validate-messages --app-id {app_id}
+    - name: Basic usage when filtering on target device
+      text: >
+        az iot central app validate-messages --app-id {app_id} -d {device_id}
+    - name: Basic usage when filtering targeted devices with a wildcard in the ID
+      text: >
+        az iot central app validate-messages --app-id {app_id} -d Device*
+    - name: Filter device and specify an Event Hub consumer group to bind to.
+      text: >
+        az iot central app validate-messages --app-id {app_id} -d {device_id} --cg {consumer_group_name}
+    - name: Will randomly convert a recieved message into an error so you can see what sample errors might look like.
+      text: >
+        az iot central app validate-messages --app-id {app_id} --simulate-errors
+  """
+
+helps[
+    "iot central device-twin"
+] = """
     type: group
     short-summary: Manage IoT Central device twins.
 """
 
-helps['iot central device-twin show'] = """
+helps[
+    "iot central device-twin show"
+] = """
     type: command
     short-summary: Get the device twin from IoT Hub.
 """
 
-helps['iot dt'] = """
+helps[
+    "iot dt"
+] = """
     type: group
     short-summary: Manage digital twin of an IoT Plug and Play device.
 """
 
-helps['iot dt invoke-command'] = """
+helps[
+    "iot dt invoke-command"
+] = """
     type: command
     short-summary: Executes a command on an IoT Plug and Play device.
     long-summary: You can leverage az login and provide --hub-name instead of --login for every command.
@@ -1063,7 +1277,9 @@ helps['iot dt invoke-command'] = """
         --command-name {command_name} --command-payload {payload}
 """
 
-helps['iot dt list-interfaces'] = """
+helps[
+    "iot dt list-interfaces"
+] = """
     type: command
     short-summary: List interfaces of a target IoT Plug and Play device.
     long-summary: You can leverage az login and provide --hub-name instead of --login for every command.
@@ -1077,7 +1293,9 @@ helps['iot dt list-interfaces'] = """
         az iot dt list-interfaces --hub-name {iothub_name} --device-id {device_id}
 """
 
-helps['iot dt list-properties'] = """
+helps[
+    "iot dt list-properties"
+] = """
     type: command
     short-summary: List properties of a target IoT Plug and Play device interface(s).
     long-summary: You can leverage az login and provide --hub-name instead of --login for every command.
@@ -1095,7 +1313,9 @@ helps['iot dt list-properties'] = """
         --device-id {device_id} --interface {plug_and_play_interface}
 """
 
-helps['iot dt list-commands'] = """
+helps[
+    "iot dt list-commands"
+] = """
     type: command
     short-summary: List commands of an IoT Plug and Play devices interface(s).
     long-summary: You can leverage az login and provide --hub-name instead of --login for every command.
@@ -1119,7 +1339,9 @@ helps['iot dt list-commands'] = """
         --device-id {device_id} --interface {plug_and_play_interface}
 """
 
-helps['iot dt monitor-events'] = """
+helps[
+    "iot dt monitor-events"
+] = """
     type: command
     short-summary: Monitor Digital Twin events.
     long-summary: You can leverage az login and provide --hub-name instead of --login for every command.
@@ -1143,7 +1365,9 @@ helps['iot dt monitor-events'] = """
         --interface {plug_and_play_interface} --consumer-group {consumer_group_name} --properties all
 """
 
-helps['iot dt update-property'] = """
+helps[
+    "iot dt update-property"
+] = """
     type: command
     short-summary: Update an IoT Plug and Play device interfaces writable property.
     examples:
@@ -1157,17 +1381,23 @@ helps['iot dt update-property'] = """
         --interface-payload {payload}
 """
 
-helps['iot pnp'] = """
+helps[
+    "iot pnp"
+] = """
     type: group
     short-summary: Manage entities of an IoT Plug and Play model repository.
 """
 
-helps['iot pnp interface'] = """
+helps[
+    "iot pnp interface"
+] = """
     type: group
     short-summary: Manage interfaces in an IoT Plug and Play model repository.
 """
 
-helps['iot pnp interface publish'] = """
+helps[
+    "iot pnp interface publish"
+] = """
     type: command
     short-summary: Publish an interface to public repository.
     examples:
@@ -1176,7 +1406,9 @@ helps['iot pnp interface publish'] = """
         az iot pnp interface publish -r {pnp_repository} --interface {plug_and_play_interface_id}
 """
 
-helps['iot pnp interface create'] = """
+helps[
+    "iot pnp interface create"
+] = """
     type: command
     short-summary: Create an interface in the company repository.
     examples:
@@ -1185,7 +1417,9 @@ helps['iot pnp interface create'] = """
         az iot pnp interface create --def {plug_and_play_interface_file_path} -r {pnp_repository}
 """
 
-helps['iot pnp interface update'] = """
+helps[
+    "iot pnp interface update"
+] = """
     type: command
     short-summary: Update an interface in the company repository.
     examples:
@@ -1194,7 +1428,9 @@ helps['iot pnp interface update'] = """
         az iot pnp interface update --def {updated_plug_and_play_interface_file_path} -r {pnp_repository}
 """
 
-helps['iot pnp interface list'] = """
+helps[
+    "iot pnp interface list"
+] = """
     type: command
     short-summary: List all interfaces.
     examples:
@@ -1206,7 +1442,9 @@ helps['iot pnp interface list'] = """
         az iot pnp interface list
 """
 
-helps['iot pnp interface show'] = """
+helps[
+    "iot pnp interface show"
+] = """
     type: command
     short-summary: Get the details of an interface.
     examples:
@@ -1218,7 +1456,9 @@ helps['iot pnp interface show'] = """
         az iot pnp interface show --interface {plug_and_play_interface_id}
 """
 
-helps['iot pnp interface delete'] = """
+helps[
+    "iot pnp interface delete"
+] = """
     type: command
     short-summary: Delete an interface in the company repository.
     examples:
@@ -1227,12 +1467,16 @@ helps['iot pnp interface delete'] = """
         az iot pnp interface delete -r {pnp_repository} --interface {plug_and_play_interface_id}
 """
 
-helps['iot pnp capability-model'] = """
+helps[
+    "iot pnp capability-model"
+] = """
     type: group
     short-summary: Manage device capability models in an IoT Plug and Play model repository.
 """
 
-helps['iot pnp capability-model list'] = """
+helps[
+    "iot pnp capability-model list"
+] = """
     type: command
     short-summary: List all capability-model.
     examples:
@@ -1244,7 +1488,9 @@ helps['iot pnp capability-model list'] = """
         az iot pnp capability-model list
 """
 
-helps['iot pnp capability-model show'] = """
+helps[
+    "iot pnp capability-model show"
+] = """
     type: command
     short-summary: Get the details of a capability-model.
     examples:
@@ -1256,7 +1502,9 @@ helps['iot pnp capability-model show'] = """
         az iot pnp capability-model show --model {plug_and_play_capability_model_id}
 """
 
-helps['iot pnp capability-model create'] = """
+helps[
+    "iot pnp capability-model create"
+] = """
     type: command
     short-summary: Create a capability-model in the company repository.
     examples:
@@ -1265,7 +1513,9 @@ helps['iot pnp capability-model create'] = """
         az iot pnp capability-model create --def {plug_and_play_capability_model_file_path} -r {pnp_repository}
 """
 
-helps['iot pnp capability-model publish'] = """
+helps[
+    "iot pnp capability-model publish"
+] = """
     type: command
     short-summary: Publish the capability-model to public repository.
     examples:
@@ -1275,7 +1525,9 @@ helps['iot pnp capability-model publish'] = """
         --model {plug_and_play_capability_model_id}
 """
 
-helps['iot pnp capability-model delete'] = """
+helps[
+    "iot pnp capability-model delete"
+] = """
     type: command
     short-summary: Delete the capability-model in the company repository.
     examples:
@@ -1285,7 +1537,9 @@ helps['iot pnp capability-model delete'] = """
         --model {plug_and_play_capability_model_id}
 """
 
-helps['iot pnp capability-model update'] = """
+helps[
+    "iot pnp capability-model update"
+] = """
     type: command
     short-summary: Update the capability-model in the company repository.
     examples:
