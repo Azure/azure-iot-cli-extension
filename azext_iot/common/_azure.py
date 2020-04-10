@@ -289,7 +289,11 @@ def get_iot_central_device_api_tokens(cmd, app_id, device_id):
 
 def show_iot_central_device_provisioning_information(id_scope, primary_key, device_id):
     provisioning_status = get_iot_central_device_provisioning_information(id_scope, primary_key, device_id)
-    print("provisioning information : {}".format(provisioning_status))
+    print("provisioning information :\n")
+    for k, v in provisioning_status.items():
+        print("{} : {}\n".format(k, v))
+
+
 
 
 def get_iot_central_device_provisioning_information(id_scope, primary_key, device_id):
