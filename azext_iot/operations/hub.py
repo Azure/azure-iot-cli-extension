@@ -29,7 +29,6 @@ from azext_iot.common.utility import (
     process_json_arg,
 )
 from azext_iot._factory import SdkResolver, CloudError
-from azext_iot.operations import events3
 from azext_iot.operations.generic import _execute_query, _process_top
 
 
@@ -1858,6 +1857,7 @@ def iot_c2d_message_send(
 ):
     from azext_iot.common.deps import ensure_uamqp
     from azext_iot.common.utility import validate_min_python_version
+    from azext_iot.operations.events3 import _events
 
     validate_min_python_version(3, 4)
 
@@ -1882,7 +1882,7 @@ def iot_c2d_message_send(
         if user_msg_expiry < now_in_milli:
             raise CLIError("Message expiry time utc is in the past!")
 
-    msg_id, errors = events3.send_c2d_message(
+    msg_id, errors = _events.send_c2d_message(
         target=target,
         device_id=device_id,
         data=data,
@@ -2203,6 +2203,8 @@ def _iot_hub_monitor_events(
     content_type=None,
     device_query=None,
 ):
+    from azext_iot.operations.events3 import _builders, _events
+
     (enqueued_time, properties, timeout, output) = init_monitoring(
         cmd, timeout, properties, enqueued_time, repair, yes
     )
@@ -2220,9 +2222,9 @@ def _iot_hub_monitor_events(
         cmd, hub_name, resource_group_name, include_events=True, login=login
     )
 
-    eventHubTarget = events3.EventTargetBuilder().build_iot_hub_target(target)
+    eventHubTarget = _builders.EventTargetBuilder().build_iot_hub_target(target)
 
-    events3.executor(
+    _events.executor(
         eventHubTarget,
         consumer_group=consumer_group,
         enqueued_time=enqueued_time,
@@ -2264,7 +2266,9 @@ def iot_hub_distributed_tracing_update(
 
 
 def _iot_hub_monitor_feedback(target, device_id, wait_on_id):
-    events3.monitor_feedback(
+    from azext_iot.operations.events3 import _events
+
+    _events.monitor_feedback(
         target=target, device_id=device_id, wait_on_id=wait_on_id, token_duration=3600
     )
 
