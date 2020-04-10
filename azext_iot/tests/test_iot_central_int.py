@@ -41,8 +41,7 @@ class TestIotCentral(LiveScenarioTest):
         self.cmd(
             'az iotcentral device-twin show --app-id "{}" --device-id "{}"'.format(
                 APP_ID, DEVICE_ID
-            ),
-            expect_failure=False,
+            )
         )
 
     def test_central_monitor_events(self):
@@ -53,10 +52,7 @@ class TestIotCentral(LiveScenarioTest):
         )
         # Ensure no failure
         # We cannot verify that the result is correct, as the Azure CLI for IoT Central does not support adding devices
-        self.cmd(
-            "iotcentral app monitor-events --app-id {}".format(APP_ID),
-            expect_failure=False,
-        )
+        self.cmd("iotcentral app monitor-events --app-id {}".format(APP_ID))
 
     def test_central_validate_messages(self):
         # Test with invalid app-id
@@ -66,7 +62,4 @@ class TestIotCentral(LiveScenarioTest):
         )
         # Ensure no failure
         # We cannot verify that the result is correct, as the Azure CLI for IoT Central does not support adding devices
-        self.cmd(
-            "iotcentral app validate-messages --app-id {}".format(APP_ID),
-            expect_failure=False,
-        )
+        self.cmd("iotcentral app validate-messages --app-id {}".format(APP_ID))
