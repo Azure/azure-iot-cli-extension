@@ -1857,7 +1857,7 @@ def iot_c2d_message_send(
 ):
     from azext_iot.common.deps import ensure_uamqp
     from azext_iot.common.utility import validate_min_python_version
-    from azext_iot.operations.events3 import _builders, _events
+    from azext_iot.operations.events3 import _events
 
     validate_min_python_version(3, 4)
 
@@ -2266,7 +2266,7 @@ def iot_hub_distributed_tracing_update(
 
 
 def _iot_hub_monitor_feedback(target, device_id, wait_on_id):
-    from azext_iot.operations.events3 import _builders, _events
+    from azext_iot.operations.events3 import _events
 
     _events.monitor_feedback(
         target=target, device_id=device_id, wait_on_id=wait_on_id, token_duration=3600
