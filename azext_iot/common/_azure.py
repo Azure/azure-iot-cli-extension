@@ -287,12 +287,12 @@ def get_iot_central_device_api_tokens(cmd, app_id, device_id):
     return validate_response_payload(response)
 
 
-def show_iot_central_device_provisioning_status(id_scope, primary_key, device_id):
-    provisioning_status = get_iot_central_device_provisioning_status(id_scope, primary_key, device_id)
-    print("provisioning status : {}".format(provisioning_status))
+def show_iot_central_device_provisioning_information(id_scope, primary_key, device_id):
+    provisioning_status = get_iot_central_device_provisioning_information(id_scope, primary_key, device_id)
+    print("provisioning information : {}".format(provisioning_status))
 
 
-def get_iot_central_device_provisioning_status(id_scope, primary_key, device_id):
+def get_iot_central_device_provisioning_information(id_scope, primary_key, device_id):
     import requests
     authToken = _get_sas_auth_header(id_scope, device_id, primary_key)
 

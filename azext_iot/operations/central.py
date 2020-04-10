@@ -11,17 +11,18 @@ from azext_iot.common.shared import SdkType
 from azext_iot.common.utility import unpack_msrest_error, init_monitoring
 from azext_iot.common.sas_token_auth import BasicSasTokenAuthentication
 from azext_iot.common._azure import get_iot_central_device_api_tokens
-from azext_iot.common._azure import show_iot_central_device_provisioning_status
+from azext_iot.common._azure import show_iot_central_device_provisioning_information
 
 
 def find_between(s, start, end):
     return (s.split(start))[1].split(end)[0]
 
 
-def iot_cental_device_show_provisioning_status(cmd, device_id, app_id, central_api_uri='api.azureiotcentral.com'):
+def iot_cental_device_show_provisioning_information(cmd, device_id, app_id, central_api_uri='api.azureiotcentral.com'):
     deviceCredentialData = get_iot_central_device_api_tokens(cmd, app_id, device_id)
-    show_iot_central_device_provisioning_status(deviceCredentialData['idScope'],
-                    deviceCredentialData['symmetricKey']['primaryKey'], device_id)
+    show_iot_central_device_provisioning_information(deviceCredentialData['idScope'],
+                                                        deviceCredentialData['symmetricKey']['primaryKey'], device_id)
+
 
 def iot_central_device_show(
     cmd, device_id, app_id, central_api_uri="api.azureiotcentral.com"

@@ -1256,9 +1256,9 @@ helps['iot central device'] = """
     short-summary: Manage IoT Central device .
 """
 
-helps['iot central device show-provisioning-status'] = """
+helps['iot central device show-provisioning-info'] = """
     type: command
-    short-summary: Show provisioning status of the device.
+    short-summary: Show provisioning information of the device.
 """
 
 
