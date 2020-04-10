@@ -189,6 +189,8 @@ class TestEvents3Parser:
 
     def test_parse_message_should_succeed(self):
         # setup
+        app_prop_type = "some_app_prop"
+        app_prop_value = "some_app_value"
         properties = MessageProperties(
             content_encoding=self.encoding, content_type=self.content_type
         )
@@ -196,15 +198,65 @@ class TestEvents3Parser:
             body=json.dumps(self.payload).encode(),
             properties=properties,
             annotations={_parser.DEVICE_ID_IDENTIFIER: device_id.encode()},
+            application_properties={app_prop_type.encode(): app_prop_value.encode()},
         )
         parser = _parser.Event3Parser()
 
         # act
-        parsed_msg = parser.parse_message(message, None, None, None, None, False)
+        parsed_msg = parser.parse_message(
+            message=message,
+            pnp_context=False,
+            interface_name=None,
+            properties={"all"},
+            content_type_hint=None,
+            simulate_errors=False,
+        )
 
         # verify
         assert parsed_msg["event"]["payload"] == self.payload
         assert parsed_msg["event"]["origin"] == device_id
+
+        properties = parsed_msg["event"]["properties"]
+        device_identifier = str(_parser.DEVICE_ID_IDENTIFIER, "utf8")
+        assert properties["system"]["content_encoding"] == self.encoding
+        assert properties["system"]["content_type"] == self.content_type
+        assert properties["annotations"][device_identifier] == device_id
+        assert properties["application"][app_prop_type] == app_prop_value
+
+        assert len(parser._errors) == 0
+        assert len(parser._warnings) == 0
+        assert len(parser._info) == 0
+
+    def test_parse_message_pnp_should_succeed(self):
+        # setup
+        interface_name = "interface_name"
+        properties = MessageProperties(
+            content_encoding=self.encoding, content_type=self.content_type
+        )
+        message = Message(
+            body=json.dumps(self.payload).encode(),
+            properties=properties,
+            annotations={
+                _parser.DEVICE_ID_IDENTIFIER: device_id.encode(),
+                _parser.INTERFACE_NAME_IDENTIFIER: interface_name.encode(),
+            },
+        )
+        parser = _parser.Event3Parser()
+
+        # act
+        parsed_msg = parser.parse_message(
+            message=message,
+            pnp_context=True,
+            interface_name=interface_name,
+            properties=None,
+            content_type_hint=None,
+            simulate_errors=False,
+        )
+
+        # verify
+        assert parsed_msg["event"]["payload"] == self.payload
+        assert parsed_msg["event"]["origin"] == device_id
+        assert parsed_msg["event"]["interface"] == interface_name
 
         assert len(parser._errors) == 0
         assert len(parser._warnings) == 0
@@ -289,3 +341,46 @@ class TestEvents3Parser:
         assert "Invalid JSON format." in errors
         assert device_id in errors
         assert self.bad_payload in errors
+
+    def test_parse_message_pnp_should_fail(self):
+        # setup
+        actual_interface_name = "actual_interface_name"
+        expected_interface_name = "expected_interface_name"
+        properties = MessageProperties(
+            content_encoding=self.encoding, content_type=self.content_type
+        )
+        message = Message(
+            body=json.dumps(self.payload).encode(),
+            properties=properties,
+            annotations={
+                _parser.DEVICE_ID_IDENTIFIER: device_id.encode(),
+                _parser.INTERFACE_NAME_IDENTIFIER: actual_interface_name.encode(),
+            },
+        )
+        parser = _parser.Event3Parser()
+
+        # act
+        parsed_msg = parser.parse_message(
+            message=message,
+            pnp_context=True,
+            interface_name=expected_interface_name,
+            properties=None,
+            content_type_hint=None,
+            simulate_errors=False,
+        )
+
+        # verify
+        # all the items should still be parsed and available, but we should have an error
+        assert parsed_msg["event"]["payload"] == self.payload
+        assert parsed_msg["event"]["origin"] == device_id
+        assert parsed_msg["event"]["interface"] == actual_interface_name
+
+        assert len(parser._errors) == 1
+        assert len(parser._warnings) == 0
+        assert len(parser._info) == 0
+
+        actual_error = parser._errors[0]
+        expected_error = "Inteface name mismatch. {}. Expected: {}, Actual: {}".format(
+            device_id, expected_interface_name, actual_interface_name
+        )
+        assert actual_error == expected_error

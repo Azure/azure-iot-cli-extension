@@ -31,11 +31,11 @@ class Event3Parser(object):
     def parse_message(
         self,
         message: Message,
-        pnp_context,
-        interface_name,
-        properties,
-        content_type_hint,
-        simulate_errors,
+        pnp_context: bool,
+        interface_name: str,
+        properties: dict,
+        content_type_hint: str,
+        simulate_errors: bool,
     ) -> dict:
         self._reset_issues()
         create_encoding_error = False
