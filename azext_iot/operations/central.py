@@ -101,11 +101,11 @@ def _events3_runner(
     yes,
     central_api_uri,
 ):
-    from azext_iot.operations.events3 import _builders, _events
-
     (enqueued_time, properties, timeout, output) = init_monitoring(
         cmd, timeout, properties, enqueued_time, repair, yes
     )
+
+    from azext_iot.operations.events3 import _builders, _events
 
     eventHubTarget = _builders.EventTargetBuilder().build_central_event_hub_target(
         cmd, app_id, central_api_uri
