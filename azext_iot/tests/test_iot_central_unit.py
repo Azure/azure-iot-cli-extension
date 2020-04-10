@@ -212,11 +212,12 @@ class TestEvents3Parser:
 
     def test_parse_message_bad_content_type_should_warn(self):
         # setup
+        encoded_payload = json.dumps(self.payload).encode()
         properties = MessageProperties(
             content_encoding=self.encoding, content_type=self.bad_content_type
         )
         message = Message(
-            body=json.dumps(self.payload).encode(),
+            body=encoded_payload,
             properties=properties,
             annotations={_parser.DEVICE_ID_IDENTIFIER: device_id.encode()},
         )
@@ -226,7 +227,8 @@ class TestEvents3Parser:
         parsed_msg = parser.parse_message(message, None, None, None, None, False)
 
         # verify
-        assert parsed_msg["event"]["payload"] == self.payload
+        # since the content_encoding header is not present, just dump the raw payload
+        assert parsed_msg["event"]["payload"] == str(encoded_payload, "utf8")
 
         assert len(parser._errors) == 0
         assert len(parser._warnings) == 1
@@ -276,7 +278,8 @@ class TestEvents3Parser:
         parsed_msg = parser.parse_message(message, None, None, None, None, False)
 
         # verify
-        assert parsed_msg == {}
+        # parsing should attempt to place raw payload into result even if parsing fails
+        assert parsed_msg["event"]["payload"] == self.bad_payload
 
         assert len(parser._errors) == 1
         assert len(parser._warnings) == 0

@@ -62,7 +62,7 @@ class Event3Parser(object):
         origin_device_id = self.parse_device_id(message)
         event["origin"] = origin_device_id
 
-        self._parse_content_type(
+        content_type = self._parse_content_type(
             content_type_hint,
             system_properties,
             origin_device_id,
@@ -90,9 +90,9 @@ class Event3Parser(object):
             application_properties = self._parse_application_properties(message)
             event["properties"]["application"] = application_properties
 
-        payload = self._parse_payload(message, origin_device_id, create_payload_error)
-        if not payload:
-            return {}
+        payload = self._parse_payload(
+            message, origin_device_id, content_type, create_payload_error
+        )
 
         event["payload"] = payload
 
@@ -206,17 +206,11 @@ class Event3Parser(object):
                 "System_properties: {}".format(system_properties)
             )
 
-        if "application/json" not in content_type.lower():
-            self._warnings.append(
-                "Content type not supported. "
-                "Content type found: {}. "
-                "Content type expected: application/json. "
-                "DeviceId: {}".format(content_type, origin_device_id)
-            )
-
         return content_type
 
-    def _parse_payload(self, message: Message, origin_device_id, create_payload_error):
+    def _parse_payload(
+        self, message: Message, origin_device_id, content_type, create_payload_error
+    ):
         payload = ""
         data = message.get_data()
 
@@ -226,14 +220,23 @@ class Event3Parser(object):
         if create_payload_error:
             payload = "Some Random Payload"
 
-        try:
-            payload = json.loads(re.compile(r"(\\r\\n)+|\\r+|\\n+").sub("", payload))
-        except Exception:
-            self._errors.append(
-                "Invalid JSON format. "
-                "DeviceId: {}, Raw payload {}".format(origin_device_id, payload)
+        if "application/json" not in content_type.lower():
+            self._warnings.append(
+                "Content type not supported. "
+                "Content type found: {}. "
+                "Content type expected: application/json. "
+                "DeviceId: {}".format(content_type, origin_device_id)
             )
-            return ""
+        else:
+            try:
+                payload = json.loads(
+                    re.compile(r"(\\r\\n)+|\\r+|\\n+").sub("", payload)
+                )
+            except Exception:
+                self._errors.append(
+                    "Invalid JSON format. "
+                    "DeviceId: {}, Raw payload {}".format(origin_device_id, payload)
+                )
 
         return payload
 
