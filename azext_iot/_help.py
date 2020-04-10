@@ -1251,6 +1251,17 @@ helps[
     short-summary: Get the device twin from IoT Hub.
 """
 
+helps['iot central device'] = """
+    type: group
+    short-summary: Manage IoT Central device .
+"""
+
+helps['iot central device show-provisioning-status'] = """
+    type: command
+    short-summary: Show provisioning status of the device.
+"""
+
+
 helps[
     "iot dt"
 ] = """

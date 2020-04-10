@@ -9,7 +9,7 @@ from azext_iot.common.utility import validate_key_value_pairs
 from azext_iot.common.utility import trim_from_start
 from azext_iot._factory import iot_hub_service_factory
 from azure.cli.core._profile import Profile
-
+from msrestazure.azure_exceptions import CloudError
 
 def _get_aad_token(cmd, resource=None):
     '''
@@ -238,6 +238,71 @@ def get_iot_dps_connection_string(
     result['subscription'] = client.config.subscription_id
 
     return result
+
+
+def _get_sas_auth_header(
+    scope_id, device_id, key,
+):
+    import time
+    import base64
+    import hmac
+    import hashlib
+    import urllib
+
+    sr = f"{scope_id}%2Fregistrations%2F{device_id}"
+    expires = int(time.time() + 21600)
+    registration_id = f"{sr}\n{str(expires)}"
+    secret = base64.b64decode(key)
+    signature = base64.b64encode(
+        hmac.new(
+            secret, msg=registration_id.encode("utf8"), digestmod=hashlib.sha256
+        ).digest()
+    )
+    quote_signature = urllib.parse.quote(signature, "~()*!.'")
+    token = f"SharedAccessSignature sr={sr}&sig={quote_signature}&se={str(expires)}&skn=registration"
+    return token
+
+
+def validate_response_payload(response):
+    if response.status_code in [200, 201]:
+        return response.json()
+    exp = CloudError(response)
+    exp.request_id = response.headers.get('x-ms-request-id')
+    raise exp
+
+
+def get_iot_central_device_api_tokens(cmd, app_id, device_id):
+    import requests
+
+    aad_token = _get_aad_token(cmd, resource="https://apps.azureiotcentral.com")['accessToken']
+
+    def get_app_host(app_id, token):
+        url = "https://apps.azureiotcentral.com/api/preview/applications/{}".format(app_id)
+        response = requests.get(url, headers={'Authorization': 'Bearer {}'.format(token)})
+        return validate_response_payload(response)
+
+    host = get_app_host(app_id, aad_token)['host']
+    url = "https://{}/api/preview/devices/{}/credentials".format(host, device_id)
+    response = requests.get(url, headers={'Authorization': 'Bearer {}'.format(aad_token)})
+    return validate_response_payload(response)
+
+
+def show_iot_central_device_provisioning_status(id_scope, primary_key, device_id):
+    provisioning_status = get_iot_central_device_provisioning_status(id_scope, primary_key, device_id)
+    print("provisioning status : {}".format(provisioning_status))
+
+
+def get_iot_central_device_provisioning_status(id_scope, primary_key, device_id):
+    import requests
+    authToken = _get_sas_auth_header(id_scope, device_id, primary_key)
+
+    url = "https://global.azure-devices-provisioning.net/{}/registrations/{}?api-version=2019-03-31".format(id_scope, device_id)
+    header_parameters = {}
+    header_parameters['Content-Type'] = 'application/json'
+    header_parameters['Authorization'] = '{}'.format(authToken)
+    body = {"registrationId": "{}".format(device_id)}
+    response = requests.post(url, headers=header_parameters, json=body)
+    return validate_response_payload(response)
 
 
 def get_iot_central_tokens(cmd, app_id, central_api_uri):
