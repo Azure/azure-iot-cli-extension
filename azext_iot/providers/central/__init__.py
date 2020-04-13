@@ -4,7 +4,6 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from .device import CentralDeviceClient
-from .device_template import CentralDeviceTemplateClient
+from .device_provider import CentralDeviceProvider
 
-__all__ = ["CentralDeviceClient", "CentralDeviceTemplateClient"]
+__all__ = ["CentralDeviceProvider"]

@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from azext_iot.service.central import CentralDeviceClient, CentralDeviceTemplateClient
+from azext_iot.services import central
 
 
 class CentralDeviceProvider:
@@ -12,8 +12,6 @@ class CentralDeviceProvider:
     _devices = {}
 
     def __init__(self):
-        self._device_template_client = CentralDeviceTemplateClient()
-        self._device_client = CentralDeviceClient()
         pass
 
     def get_device_template(
@@ -38,7 +36,7 @@ class CentralDeviceProvider:
         ):
             self._device_templates[
                 device_template_urn
-            ] = self._device_template_client.get_device_template(
+            ] = central.device_template.get_device_template(
                 cmd, device_template_urn, app_name, token, central_dns_suffix
             )
 
@@ -62,7 +60,7 @@ class CentralDeviceProvider:
             raise ValueError("Device id must be specified.")
 
         if device_id not in self._devices or not self._devices.get(device_id):
-            self._devices[device_id] = self._device_client.get_device(
+            self._devices[device_id] = central.device.get_device(
                 cmd, device_id, app_name, token, central_dns_suffix
             )
 

@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from . import central
+from . import device, device_template
 
-__all__ = ["central"]
+
+__all__ = ["device", "device_template"]

@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 # Nothing in this file should be used outside of service/central
 
-from azext_iot.service import auth
+from azext_iot.services import auth
 
 
 def get_token(token, cmd):

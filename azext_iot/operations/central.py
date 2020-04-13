@@ -12,7 +12,7 @@ from azext_iot.common._azure import get_iot_hub_token_from_central_app_id
 from azext_iot.common.shared import SdkType
 from azext_iot.common.utility import unpack_msrest_error, init_monitoring
 from azext_iot.common.sas_token_auth import BasicSasTokenAuthentication
-from azext_iot.providers import CentralDeviceProvider
+from azext_iot.providers.central import CentralDeviceProvider
 
 
 def find_between(s, start, end):
