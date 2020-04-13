@@ -15,9 +15,10 @@ import uamqp
 from uuid import uuid4
 from knack.log import get_logger
 from azext_iot.constants import VERSION, USER_AGENT
+
 from azext_iot.common.utility import process_json_arg
 from azext_iot.operations.events3._builders import AmqpBuilder
-from azext_iot.models.parsers import Event3Parser
+from azext_iot.operations.events3._parser import Event3Parser
 
 # To provide amqp frame trace
 DEBUG = False
@@ -188,8 +189,10 @@ async def monitor_events(
         bytes("amqp.annotation.x-opt-enqueuedtimeutc > " + str(enqueuedtimeutc), "utf8")
     )
 
+
     exp_cancelled = False
     receive_client = uamqp.ReceiveClientAsync(
+
         source,
         auth=auth,
         timeout=timeout,
@@ -203,6 +206,7 @@ async def monitor_events(
             await receive_client.open_async(connection=connection)
 
         async for msg in receive_client.receive_messages_iter_async():
+
             _output_msg_kpi(
                 msg,
                 device_id,
@@ -289,6 +293,7 @@ def send_c2d_message(
     endpoint = AmqpBuilder.build_iothub_amqp_endpoint_from_target(target)
     endpoint_with_op = endpoint + operation
     client = uamqp.SendClient(
+
         target="amqps://" + endpoint_with_op,
         client_name=_get_container_id(),
         debug=DEBUG,

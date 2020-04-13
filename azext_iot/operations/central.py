@@ -18,6 +18,7 @@ def find_between(s, start, end):
     return (s.split(start))[1].split(end)[0]
 
 
+
 def iot_cental_device_show_provisioning_information(cmd, device_id, app_id, central_api_uri='api.azureiotcentral.com'):
     deviceCredentialData = get_iot_central_device_api_tokens(cmd, app_id, device_id)
     show_iot_central_device_provisioning_information(deviceCredentialData['idScope'],
@@ -28,6 +29,7 @@ def iot_central_device_show(
     cmd, device_id, app_id, central_api_uri="api.azureiotcentral.com"
 ):
     sasToken = get_iot_hub_token_from_central_app_id(cmd, app_id, central_api_uri)
+
     endpoint = find_between(sasToken, "SharedAccessSignature sr=", "&sig=")
     target = {"entity": endpoint}
     auth = BasicSasTokenAuthentication(sas_token=sasToken)
@@ -36,6 +38,7 @@ def iot_central_device_show(
         return service_sdk.get_twin(device_id)
     except errors.CloudError as e:
         raise CLIError(unpack_msrest_error(e))
+
 
 
 def iot_central_validate_messages(
@@ -65,8 +68,6 @@ def iot_central_validate_messages(
         yes,
         central_api_uri,
     )
-
-
 def iot_central_monitor_events(
     cmd,
     app_id,
@@ -95,6 +96,7 @@ def iot_central_monitor_events(
     )
 
 
+
 def _events3_runner(
     cmd,
     app_id,
@@ -113,15 +115,13 @@ def _events3_runner(
         cmd, timeout, properties, enqueued_time, repair, yes
     )
 
-    import importlib
+    from azext_iot.operations.events3 import _builders, _events
 
-    events3 = importlib.import_module("azext_iot.operations.events3._events")
-    builders = importlib.import_module("azext_iot.operations.events3._builders")
-
-    eventHubTarget = builders.EventTargetBuilder().build_central_event_hub_target(
+    eventHubTarget = _builders.EventTargetBuilder().build_central_event_hub_target(
         cmd, app_id, central_api_uri
     )
-    events3.executor(
+
+    _events.executor(
         eventHubTarget,
         consumer_group=consumer_group,
         enqueued_time=enqueued_time,

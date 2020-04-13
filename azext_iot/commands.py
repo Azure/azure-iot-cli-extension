@@ -8,6 +8,7 @@
 Load CLI commands
 """
 
+
 from azext_iot import (
     iothub_ops,
     iotdps_ops,
@@ -62,6 +63,7 @@ def load_command_table(self, _):
             setter_name="iot_device_module_update",
         )
 
+
         cmd_group.command("show-connection-string", "iot_get_module_connection_string")
 
     with self.command_group(
@@ -86,6 +88,7 @@ def load_command_table(self, _):
             setter_name="iot_device_twin_update",
         )
 
+
     with self.command_group(
         "iot hub configuration", command_type=iothub_ops
     ) as cmd_group:
@@ -100,11 +103,13 @@ def load_command_table(self, _):
             setter_name="iot_hub_configuration_update",
         )
 
+
     with self.command_group(
         "iot hub distributed-tracing", command_type=iothub_ops, is_preview=True
     ) as cmd_group:
         cmd_group.command("show", "iot_hub_distributed_tracing_show")
         cmd_group.command("update", "iot_hub_distributed_tracing_update")
+
 
     with self.command_group("iot edge", command_type=iothub_ops) as cmd_group:
         cmd_group.command("set-modules", "iot_edge_set_modules")
@@ -123,6 +128,7 @@ def load_command_table(self, _):
             setter_name="iot_hub_configuration_update",
         )
 
+
     with self.command_group("iot device", command_type=iothub_ops) as cmd_group:
         cmd_group.command("send-d2c-message", "iot_device_send_message")
         cmd_group.command("simulate", "iot_simulate_device")
@@ -137,12 +143,14 @@ def load_command_table(self, _):
         cmd_group.command("receive", "iot_c2d_message_receive")
         cmd_group.command("send", "iot_c2d_message_send")
 
+
     with self.command_group("iot dps enrollment", command_type=iotdps_ops) as cmd_group:
         cmd_group.command("create", "iot_dps_device_enrollment_create")
         cmd_group.command("list", "iot_dps_device_enrollment_list")
         cmd_group.command("show", "iot_dps_device_enrollment_get")
         cmd_group.command("update", "iot_dps_device_enrollment_update")
         cmd_group.command("delete", "iot_dps_device_enrollment_delete")
+
 
     with self.command_group(
         "iot dps enrollment-group", command_type=iotdps_ops
@@ -153,6 +161,7 @@ def load_command_table(self, _):
         cmd_group.command("update", "iot_dps_device_enrollment_group_update")
         cmd_group.command("delete", "iot_dps_device_enrollment_group_delete")
 
+
     with self.command_group(
         "iot dps registration", command_type=iotdps_ops
     ) as cmd_group:
@@ -160,12 +169,14 @@ def load_command_table(self, _):
         cmd_group.command("show", "iot_dps_registration_get")
         cmd_group.command("delete", "iot_dps_registration_delete")
 
+
     with self.command_group("iotcentral app", command_type=iotcentral_ops) as cmd_group:
         cmd_group.command(
             "monitor-events",
             "iot_central_monitor_events",
             deprecate_info="az iot central app monitor-events",
         )
+
 
     with self.command_group(
         "iotcentral device-twin", command_type=iotcentral_ops
@@ -182,13 +193,16 @@ def load_command_table(self, _):
         cmd_group.command("monitor-events", "iot_central_monitor_events")
         cmd_group.command("validate-messages", "iot_central_validate_messages")
 
+
     with self.command_group(
         "iot central device-twin", command_type=iotcentral_ops
     ) as cmd_group:
         cmd_group.command("show", "iot_central_device_show")
 
+
     with self.command_group('iot central device', command_type=iotcentral_ops) as cmd_group:
         cmd_group.command('show-provisioning-info', 'iot_cental_device_show_provisioning_information')
+
 
     with self.command_group(
         "iot dt", command_type=iotdigitaltwin_ops, is_preview=True
@@ -199,6 +213,7 @@ def load_command_table(self, _):
         cmd_group.command("invoke-command", "iot_digitaltwin_invoke_command")
         cmd_group.command("monitor-events", "iot_digitaltwin_monitor_events")
         cmd_group.command("list-commands", "iot_digitaltwin_command_list")
+
 
     with self.command_group(
         "iot pnp interface", command_type=iotpnp_ops, is_preview=True

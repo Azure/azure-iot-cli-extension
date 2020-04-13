@@ -4,17 +4,14 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import json
 import mock
 import pytest
 
 from knack.util import CLIError
-from uamqp.message import Message, MessageProperties
 from azext_iot.operations import central as subject
 from azext_iot.common.shared import SdkType
 from azure.cli.core.mock import DummyCli
 from azext_iot.common.utility import validate_min_python_version
-from azext_iot.models import parsers
 
 
 device_id = "mydevice"
@@ -172,117 +169,3 @@ class TestMonitorEvents:
     def test_monitor_events_invalid_args(self, timeout, exception, fixture_cmd):
         with pytest.raises(exception):
             subject.iot_central_monitor_events(fixture_cmd, app_id, timeout=timeout)
-
-
-@pytest.mark.skipif(
-    not validate_min_python_version(3, 5, exit_on_fail=False),
-    reason="minimum python version not satisfied",
-)
-class TestEvents3Parser:
-    payload = {"someProperty": "someValue"}
-    encoding = "UTF-8"
-    content_type = "application/json"
-
-    bad_encoding = "ascii"
-    bad_payload = "bad-payload"
-    bad_content_type = "bad-content-type"
-
-    def test_parse_message_should_succeed(self):
-        # setup
-        properties = MessageProperties(
-            content_encoding=self.encoding, content_type=self.content_type
-        )
-        message = Message(
-            body=json.dumps(self.payload).encode(),
-            properties=properties,
-            annotations={parsers.DEVICE_ID_IDENTIFIER: device_id.encode()},
-        )
-        parser = parsers.Event3Parser()
-
-        # act
-        parsed_msg = parser.parse_message(message, None, None, None, None, False)
-
-        # verify
-        assert parsed_msg["event"]["payload"] == self.payload
-        assert parsed_msg["event"]["origin"] == device_id
-
-        assert len(parser._errors) == 0
-        assert len(parser._warnings) == 0
-        assert len(parser._info) == 0
-
-    def test_parse_message_bad_content_type_should_warn(self):
-        # setup
-        properties = MessageProperties(
-            content_encoding=self.encoding, content_type=self.bad_content_type
-        )
-        message = Message(
-            body=json.dumps(self.payload).encode(),
-            properties=properties,
-            annotations={parsers.DEVICE_ID_IDENTIFIER: device_id.encode()},
-        )
-        parser = parsers.Event3Parser()
-
-        # act
-        parsed_msg = parser.parse_message(message, None, None, None, None, False)
-
-        # verify
-        assert parsed_msg["event"]["payload"] == self.payload
-
-        assert len(parser._errors) == 0
-        assert len(parser._warnings) == 1
-        assert len(parser._info) == 0
-
-        warning = parser._warnings[0]
-        assert "Content type not supported." in warning
-        assert self.bad_content_type in warning
-        assert "application/json" in warning
-        assert device_id in warning
-
-    def test_parse_message_bad_encoding_should_fail(self):
-        # setup
-        properties = MessageProperties(
-            content_encoding=self.bad_encoding, content_type=self.content_type
-        )
-        message = Message(
-            body=json.dumps(self.payload).encode(self.bad_encoding),
-            properties=properties,
-            annotations={parsers.DEVICE_ID_IDENTIFIER: device_id.encode()},
-        )
-        parser = parsers.Event3Parser()
-
-        # act
-        parser.parse_message(message, None, None, None, None, False)
-
-        assert len(parser._errors) == 1
-        assert len(parser._warnings) == 0
-        assert len(parser._info) == 0
-
-        errors = parser._errors[0]
-        assert f"Unsupported encoding detected: '{self.bad_encoding}'" in errors
-
-    def test_parse_message_bad_json_should_fail(self):
-        # setup
-        properties = MessageProperties(
-            content_encoding=self.encoding, content_type=self.content_type
-        )
-        message = Message(
-            body=self.bad_payload.encode(),
-            properties=properties,
-            annotations={parsers.DEVICE_ID_IDENTIFIER: device_id.encode()},
-        )
-        parser = parsers.Event3Parser()
-
-        # act
-        parsed_msg = parser.parse_message(message, None, None, None, None, False)
-
-        # verify
-        assert parsed_msg == {}
-
-        assert len(parser._errors) == 1
-        assert len(parser._warnings) == 0
-        assert len(parser._info) == 0
-
-        errors = parser._errors[0]
-        assert f"Invalid JSON format." in errors
-        assert device_id in errors
-        assert self.bad_payload in errors

@@ -1,12 +1,14 @@
 import pytest
 import json
 from knack.util import CLIError
+from uamqp.message import Message, MessageProperties
 from azure.cli.core.extension import get_extension_path
 from azext_iot.common.utility import validate_min_python_version
 from azext_iot.common.deps import ensure_uamqp
 from azext_iot._validators import mode2_iot_login_handler
 from azext_iot.constants import EVENT_LIB, EXTENSION_NAME
 from azext_iot.common.utility import process_json_arg, read_file_content, logger
+from azext_iot.operations.events3 import _parser
 
 
 class TestMinPython(object):
@@ -42,7 +44,7 @@ class TestMode2Handler(object):
             {"dps_name": None, "login": "connection_string"},
             {"dps_name": "mydps", "login": "connection_string"},
             {"dps_name": None, "login": None},
-            {"cmd.name": "webapp", "login": None}
+            {"cmd.name": "webapp", "login": None},
         ]
     )
     def mode2_scenario(self, mocker, request):
@@ -226,7 +228,8 @@ class TestProcessJsonArg(object):
         )
 
     @pytest.mark.parametrize(
-        "content, argname", [("iothub/configurations/test_adm_device_content.json", "myarg0")]
+        "content, argname",
+        [("iothub/configurations/test_adm_device_content.json", "myarg0")],
     )
     def test_file_json(self, content, argname, set_cwd):
         result = process_json_arg(content, argument_name=argname)
@@ -264,3 +267,216 @@ class TestProcessJsonArg(object):
             )
         )
         assert mocked_util_logger.call_count == 0
+
+
+@pytest.mark.skipif(
+    not validate_min_python_version(3, 5, exit_on_fail=False),
+    reason="minimum python version not satisfied",
+)
+class TestEvents3Parser:
+    device_id = "some-device-id"
+    payload = {"someProperty": "someValue"}
+    encoding = "UTF-8"
+    content_type = "application/json"
+
+    bad_encoding = "ascii"
+    bad_payload = "bad-payload"
+    bad_content_type = "bad-content-type"
+
+    def test_parse_message_should_succeed(self):
+        # setup
+        app_prop_type = "some_app_prop"
+        app_prop_value = "some_app_value"
+        properties = MessageProperties(
+            content_encoding=self.encoding, content_type=self.content_type
+        )
+        message = Message(
+            body=json.dumps(self.payload).encode(),
+            properties=properties,
+            annotations={_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
+            application_properties={app_prop_type.encode(): app_prop_value.encode()},
+        )
+        parser = _parser.Event3Parser()
+
+        # act
+        parsed_msg = parser.parse_message(
+            message=message,
+            pnp_context=False,
+            interface_name=None,
+            properties={"all"},
+            content_type_hint=None,
+            simulate_errors=False,
+        )
+
+        # verify
+        assert parsed_msg["event"]["payload"] == self.payload
+        assert parsed_msg["event"]["origin"] == self.device_id
+
+        properties = parsed_msg["event"]["properties"]
+        device_identifier = str(_parser.DEVICE_ID_IDENTIFIER, "utf8")
+        assert properties["system"]["content_encoding"] == self.encoding
+        assert properties["system"]["content_type"] == self.content_type
+        assert properties["annotations"][device_identifier] == self.device_id
+        assert properties["application"][app_prop_type] == app_prop_value
+
+        assert len(parser._errors) == 0
+        assert len(parser._warnings) == 0
+        assert len(parser._info) == 0
+
+    def test_parse_message_pnp_should_succeed(self):
+        # setup
+        interface_name = "interface_name"
+        properties = MessageProperties(
+            content_encoding=self.encoding, content_type=self.content_type
+        )
+        message = Message(
+            body=json.dumps(self.payload).encode(),
+            properties=properties,
+            annotations={
+                _parser.DEVICE_ID_IDENTIFIER: self.device_id.encode(),
+                _parser.INTERFACE_NAME_IDENTIFIER: interface_name.encode(),
+            },
+        )
+        parser = _parser.Event3Parser()
+
+        # act
+        parsed_msg = parser.parse_message(
+            message=message,
+            pnp_context=True,
+            interface_name=interface_name,
+            properties=None,
+            content_type_hint=None,
+            simulate_errors=False,
+        )
+
+        # verify
+        assert parsed_msg["event"]["payload"] == self.payload
+        assert parsed_msg["event"]["origin"] == self.device_id
+        assert parsed_msg["event"]["interface"] == interface_name
+
+        assert len(parser._errors) == 0
+        assert len(parser._warnings) == 0
+        assert len(parser._info) == 0
+
+    def test_parse_message_bad_content_type_should_warn(self):
+        # setup
+        encoded_payload = json.dumps(self.payload).encode()
+        properties = MessageProperties(
+            content_encoding=self.encoding, content_type=self.bad_content_type
+        )
+        message = Message(
+            body=encoded_payload,
+            properties=properties,
+            annotations={_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
+        )
+        parser = _parser.Event3Parser()
+
+        # act
+        parsed_msg = parser.parse_message(message, None, None, None, None, False)
+
+        # verify
+        # since the content_encoding header is not present, just dump the raw payload
+        assert parsed_msg["event"]["payload"] == str(encoded_payload, "utf8")
+
+        assert len(parser._errors) == 0
+        assert len(parser._warnings) == 1
+        assert len(parser._info) == 0
+
+        warning = parser._warnings[0]
+        assert "Content type not supported." in warning
+        assert self.bad_content_type in warning
+        assert "application/json" in warning
+        assert self.device_id in warning
+
+    def test_parse_message_bad_encoding_should_fail(self):
+        # setup
+        properties = MessageProperties(
+            content_encoding=self.bad_encoding, content_type=self.content_type
+        )
+        message = Message(
+            body=json.dumps(self.payload).encode(self.bad_encoding),
+            properties=properties,
+            annotations={_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
+        )
+        parser = _parser.Event3Parser()
+
+        # act
+        parser.parse_message(message, None, None, None, None, False)
+
+        assert len(parser._errors) == 1
+        assert len(parser._warnings) == 0
+        assert len(parser._info) == 0
+
+        errors = parser._errors[0]
+        assert "Unsupported encoding detected: '{}'".format(self.bad_encoding) in errors
+
+    def test_parse_message_bad_json_should_fail(self):
+        # setup
+        properties = MessageProperties(
+            content_encoding=self.encoding, content_type=self.content_type
+        )
+        message = Message(
+            body=self.bad_payload.encode(),
+            properties=properties,
+            annotations={_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
+        )
+        parser = _parser.Event3Parser()
+
+        # act
+        parsed_msg = parser.parse_message(message, None, None, None, None, False)
+
+        # verify
+        # parsing should attempt to place raw payload into result even if parsing fails
+        assert parsed_msg["event"]["payload"] == self.bad_payload
+
+        assert len(parser._errors) == 1
+        assert len(parser._warnings) == 0
+        assert len(parser._info) == 0
+
+        errors = parser._errors[0]
+        assert "Invalid JSON format." in errors
+        assert self.device_id in errors
+        assert self.bad_payload in errors
+
+    def test_parse_message_pnp_should_fail(self):
+        # setup
+        actual_interface_name = "actual_interface_name"
+        expected_interface_name = "expected_interface_name"
+        properties = MessageProperties(
+            content_encoding=self.encoding, content_type=self.content_type
+        )
+        message = Message(
+            body=json.dumps(self.payload).encode(),
+            properties=properties,
+            annotations={
+                _parser.DEVICE_ID_IDENTIFIER: self.device_id.encode(),
+                _parser.INTERFACE_NAME_IDENTIFIER: actual_interface_name.encode(),
+            },
+        )
+        parser = _parser.Event3Parser()
+
+        # act
+        parsed_msg = parser.parse_message(
+            message=message,
+            pnp_context=True,
+            interface_name=expected_interface_name,
+            properties=None,
+            content_type_hint=None,
+            simulate_errors=False,
+        )
+
+        # verify
+        # all the items should still be parsed and available, but we should have an error
+        assert parsed_msg["event"]["payload"] == self.payload
+        assert parsed_msg["event"]["origin"] == self.device_id
+        assert parsed_msg["event"]["interface"] == actual_interface_name
+
+        assert len(parser._errors) == 1
+        assert len(parser._warnings) == 0
+        assert len(parser._info) == 0
+
+        actual_error = parser._errors[0]
+        expected_error = "Inteface name mismatch. {}. Expected: {}, Actual: {}".format(
+            self.device_id, expected_interface_name, actual_interface_name
+        )
+        assert actual_error == expected_error
