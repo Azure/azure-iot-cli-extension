@@ -4,12 +4,15 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import six
+
 from knack.util import CLIError
 from azext_iot._factory import _bind_sdk
 from azext_iot.common._azure import get_iot_hub_token_from_central_app_id
 from azext_iot.common.shared import SdkType
 from azext_iot.common.utility import unpack_msrest_error, init_monitoring
 from azext_iot.common.sas_token_auth import BasicSasTokenAuthentication
+from azext_iot.providers import CentralDeviceProvider
 
 
 def find_between(s, start, end):
@@ -28,6 +31,14 @@ def iot_central_device_show(
         return service_sdk.get_twin(device_id)
     except errors.CloudError as e:
         raise CLIError(unpack_msrest_error(e))
+
+
+def iot_central_device_capability_model_get(
+    cmd, device_id, app_name, central_api_uri="api.azureiotcentral.com"
+):
+    provider = CentralDeviceProvider()
+    device_template = provider.get_device_template(cmd, device_id, app_name)
+    six.print_(device_template)
 
 
 def iot_central_validate_messages(
