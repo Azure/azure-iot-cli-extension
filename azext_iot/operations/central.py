@@ -34,10 +34,10 @@ def iot_central_device_show(
 
 
 def iot_central_device_capability_model_get(
-    cmd, device_id, app_name, central_api_uri="api.azureiotcentral.com"
+    cmd, device_id, app_id, central_api_uri="api.azureiotcentral.com"
 ):
     provider = CentralDeviceProvider()
-    device_template = provider.get_device_template(cmd, device_id, app_name)
+    device_template = provider.get_device_template(cmd, device_id, app_id)
     six.print_(device_template)
 
 

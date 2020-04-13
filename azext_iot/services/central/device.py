@@ -13,7 +13,7 @@ from ._utility import get_token
 def get_device(
     cmd,
     device_id: str,
-    app_name: str,
+    app_id: str,
     token: str,
     central_dns_suffix="azureiotcentral.com",
 ) -> str:
@@ -23,7 +23,7 @@ def get_device(
     Args:
         cmd: command passed into az
         device_id: unique case-sensitive device id,
-        app_name: name of app (used for forming request URL)
+        app_id: name of app (used for forming request URL)
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
         central_dns_suffix: {centralDnsSuffixInPath} as found in docs
@@ -36,7 +36,7 @@ def get_device(
         token = get_token(token, cmd)
 
     url = "https://{}.{}/api/preview/devices/{}".format(
-        app_name, central_dns_suffix, device_id
+        app_id, central_dns_suffix, device_id
     )
     headers = {"Authorization": token}
 

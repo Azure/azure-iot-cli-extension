@@ -18,11 +18,11 @@ class CentralDeviceProvider:
         self,
         cmd,
         device_id,
-        app_name,
+        app_id,
         token=None,
         central_dns_suffix="azureiotcentral.com",
     ):
-        device = self.get_device(cmd, device_id, app_name, token, central_dns_suffix)
+        device = self.get_device(cmd, device_id, app_id, token, central_dns_suffix)
         device_template_urn = device["instanceOf"]
 
         if not device_template_urn:
@@ -37,7 +37,7 @@ class CentralDeviceProvider:
             self._device_templates[
                 device_template_urn
             ] = central.device_template.get_device_template(
-                cmd, device_template_urn, app_name, token, central_dns_suffix
+                cmd, device_template_urn, app_id, token, central_dns_suffix
             )
 
         device_template = self._device_templates.get(device_template_urn)
@@ -52,7 +52,7 @@ class CentralDeviceProvider:
         self,
         cmd,
         device_id,
-        app_name,
+        app_id,
         token=None,
         central_dns_suffix="azureiotcentral.com",
     ):
@@ -61,7 +61,7 @@ class CentralDeviceProvider:
 
         if device_id not in self._devices or not self._devices.get(device_id):
             self._devices[device_id] = central.device.get_device(
-                cmd, device_id, app_name, token, central_dns_suffix
+                cmd, device_id, app_id, token, central_dns_suffix
             )
 
         device = self._devices.get(device_id)
