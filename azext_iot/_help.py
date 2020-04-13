@@ -295,18 +295,23 @@ helps[
     "iot hub device-twin update"
 ] = """
     type: command
-    short-summary: Update device twin definition.
-    long-summary: Use --set followed by property assignments for updating a device twin.
-                  Leverage properties returned from 'iot hub device-twin show'.
+    short-summary: Update device twin desired properties and tags.
+    long-summary: Provide --desired or --tags arguments for PATCH behavior.
+                  Usage of generic update args (i.e. --set) will reflect PUT behavior
+                  and are deprecated.
     examples:
-    - name: Add nested tags to device twin.
+    - name: Patch device twin desired properties.
       text: >
-        az iot hub device-twin update --device-id {device_id} --hub-name {iothub_name}
-        --set tags='{"location":{"region":"US"}}'
-    - name: Remove the 'region' property from parent 'location' property
+        az iot hub device-twin update -n {iothub_name} -d {device_id}
+        --desired '{"conditions":{"temperature":{"warning":70, "critical":100}}}'
+    - name: Patch device twin tags.
       text: >
-        az iot hub device-twin update --device-id {device_id} --hub-name {iothub_name}
-        --set tags.location.region='null'
+        az iot hub device-twin update -n {iothub_name} -d {device_id}
+        --tags '{"country": "USA"}}'
+    - name: Patch removal of 'critical' desired property from parent 'temperature'
+      text: >
+        az iot hub device-twin update -n {iothub_name} -d {device_id}
+        --desired '{"condition":{"temperature":{"critical": null}}}'
 """
 
 helps[
@@ -396,18 +401,23 @@ helps[
     "iot hub module-twin update"
 ] = """
     type: command
-    short-summary: Update module twin definition.
-    long-summary: Use --set followed by property assignments for updating a module.
-                  Leverage properties returned from 'iot hub module-twin show'.
+    short-summary: Update module twin desired properties and tags.
+    long-summary: Provide --desired or --tags arguments for PATCH behavior.
+                  Usage of generic update args (i.e. --set) will reflect PUT behavior
+                  and are deprecated.
     examples:
-    - name: Add desired properties to module twin.
+    - name: Patch module twin desired properties.
       text: >
-        az iot hub module-twin update -d {device_id} -n {iothub_name} -m {module_name} --set
-        properties.desired='{"conditions":{"temperature":{"warning":70, "critical":100}}}'
-    - name: Remove 'critical' property from parent 'temperature'
+        az iot hub module-twin update -n {iothub_name} -d {device_id} -m {module_id}
+        --desired '{"conditions":{"temperature":{"warning":70, "critical":100}}}'
+    - name: Patch module twin tags.
       text: >
-        az iot hub module-twin update -d mydevice -n myhub -m mymod --set
-        properties.desired.condition.temperature.critical='null'
+        az iot hub module-twin update -n {iothub_name} -d {device_id} -m {module_id}
+        --tags '{"country": "USA"}}'
+    - name: Patch removal of 'critical' desired property from parent 'temperature'
+      text: >
+        az iot hub module-twin update -n {iothub_name} -d {device_id} -m {module_id}
+        --desired '{"condition":{"temperature":{"critical": null}}}'
 """
 
 helps[

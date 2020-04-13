@@ -4,7 +4,7 @@
 
 1. Get Python 3: https://www.python.org/downloads/
 
-#### Required Repositories
+### Required Repositories
 
 You must fork and clone the repositories below. Follow the videos and instructions found [here](https://github.com/Azure/azure-cli-dev-tools#setting-up-your-development-environment).
 
@@ -65,7 +65,7 @@ azdev setup -c path/to/source/azure-cli
 
 #### Install dev extension
 
-1. Change directories 
+1. Change directories
 
     ```powershell
     cd path/to/source/azure-iot-cli-extension
@@ -89,7 +89,7 @@ If this works, then you should now be able to make changes to the extension and 
 
 ## Unit and Integration Testing
 
-#### Unit Tests
+### Unit Tests
 
 You may need to install the dev_requirements for this
 
@@ -103,11 +103,11 @@ _Hub:_
 _DPS:_  
 `pytest azext_iot/tests/test_iot_dps_unit.py`
 
-#### Integration Tests
+### Integration Tests
 
 Integration tests are run against Azure resources and depend on environment variables.
 
-##### Azure Resource Setup
+#### Azure Resource Setup
 
 1. Create IoT Hub
 
@@ -119,7 +119,8 @@ Integration tests are run against Azure resources and depend on environment vari
 
 4. Link IoT Hub to DPS - From DPS, click "Linked IoT Hub" and link the IoT Hub you just created.
 
-##### Environment Variables
+#### Integration Test Environment Variables
+
 You can either manually set the environment variables or use the `pytest.ini.example` file in the root of the extension repo. To use that file, rename it to `pytest.ini`, open it and set the variables as indicated below.
 
 ```
@@ -133,13 +134,11 @@ You can either manually set the environment variables or use the `pytest.ini.exa
 
 `azext_iot_teststorageuri` is optional and only required when you want to test device export and file upload functionality. You can generate a SAS Uri for your Blob container using the [Azure Storage Explorer](https://azure.microsoft.com/en-us/features/storage-explorer/).  You must also configure your IoT Hub's File Upload storage container via the Azure Portal for this test to pass.
 
-
 ##### IoT Hub
 
 Execute the following command to run the IoT Hub integration tests:
 
 `pytest azext_iot/tests/test_iot_ext_int.py`
-
 
 ##### Device Provisioning Service
 
@@ -163,11 +162,11 @@ https://medium.com/@marcobelo/setting-up-python-black-on-visual-studio-code-5318
 
 ## Optional
 
-#### VSCode setup
+### VSCode setup
 
 1. Install VSCode
 
-2. Install the required extensions 
+2. Install the required extensions
     * ([ms-python.python](https://marketplace.visualstudio.com/items?itemName=ms-python.python) is recommended)
 
 3. Set up `settings.json`
@@ -191,7 +190,7 @@ https://medium.com/@marcobelo/setting-up-python-black-on-visual-studio-code-5318
     ```
 
 4. Set up `launch.json`
-    
+
     ```json
     {
         "version": "0.2.0",
@@ -217,22 +216,24 @@ https://medium.com/@marcobelo/setting-up-python-black-on-visual-studio-code-5318
         ]
     }
     ```
-    
+
     * launch.json was derived from [this](https://raw.githubusercontent.com/Azure/azure-cli/dev/.vscode/launch.json) file
 
     * Note: your "program" path might be different if you did not set up the folder structure as siblings as recommended above
 
     * Note: when passing args, ensure they are all comma separated.
 
-    Correct: 
-    ```
+    Correct:
+
+    ```json
     "args": [
         "--a", "value", "--b", "value"
     ],
     ```
 
-    Incorrect: 
-    ```
+    Incorrect:
+
+    ```json
     "args": [
         "--a value --b value"
     ],
@@ -246,12 +247,11 @@ https://medium.com/@marcobelo/setting-up-python-black-on-visual-studio-code-5318
 
 https://docs.python.org/3/library/pdb.html
 
-
 1. `pip install pdb`
 2. If you need a breakpoint, put `import pdb; pdb.set_trace()` in your code
 3. Run your command, it should break execution wherever you put the breakpoint.
 
-# Microsoft CLA
+## Microsoft CLA
 
 This project welcomes contributions and suggestions.  Most contributions require you to agree to a
 Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us

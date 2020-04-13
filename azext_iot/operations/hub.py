@@ -740,27 +740,24 @@ def iot_device_module_twin_update(
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
     try:
-        etag = parameters.get("etag")
-        if etag:
-            headers = {}
-            headers["If-Match"] = '"{}"'.format(etag)
-            verify = {"properties.desired": dict}
-
-            if parameters.get("tags"):
-                verify["tags"] = dict
-
-            verify_transform(parameters, verify)
-
-            return service_sdk.twin.update_module_twin(
-                id=device_id,
-                mid=module_id,
-                device_twin_info=parameters,
-                custom_headers=headers,
-            )
-        raise LookupError("module twin etag not found")
+        headers = {}
+        headers["If-Match"] = '"*"'
+        verify = {}
+        if parameters.get("properties"):
+            if parameters["properties"].get("desired"):
+                verify = {"properties.desired": dict}
+        if parameters.get("tags"):
+            verify["tags"] = dict
+        verify_transform(parameters, verify)
+        return service_sdk.twin.update_module_twin(
+            id=device_id,
+            mid=module_id,
+            device_twin_info=parameters,
+            custom_headers=headers,
+        )
     except CloudError as e:
         raise CLIError(unpack_msrest_error(e))
-    except (AttributeError, LookupError, TypeError) as err:
+    except (AttributeError, TypeError) as err:
         raise CLIError(err)
 
 
@@ -1270,6 +1267,20 @@ def _iot_device_twin_show(target, device_id):
         raise CLIError(unpack_msrest_error(e))
 
 
+def iot_twin_update_custom(instance, desired=None, tags=None):
+    payload = {}
+    is_patch = False
+    if desired:
+        is_patch = True
+        payload["properties"] = {"desired": process_json_arg(desired, "desired")}
+
+    if tags:
+        is_patch = True
+        payload["tags"] = process_json_arg(tags, "tags")
+
+    return payload if is_patch else instance
+
+
 def iot_device_twin_update(
     cmd, device_id, parameters, hub_name=None, resource_group_name=None, login=None
 ):
@@ -1282,21 +1293,21 @@ def iot_device_twin_update(
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
     try:
-        etag = parameters.get("etag")
-        if etag:
-            headers = {}
-            headers["If-Match"] = '"{}"'.format(etag)
-            verify = {"properties.desired": dict}
-            if parameters.get("tags", None):
-                verify["tags"] = dict
-            verify_transform(parameters, verify)
-            return service_sdk.twin.update_device_twin(
-                id=device_id, device_twin_info=parameters, custom_headers=headers
-            )
-        raise LookupError("device twin etag not found")
+        headers = {}
+        headers["If-Match"] = '"*"'
+        verify = {}
+        if parameters.get("properties"):
+            if parameters["properties"].get("desired"):
+                verify = {"properties.desired": dict}
+        if parameters.get("tags"):
+            verify["tags"] = dict
+        verify_transform(parameters, verify)
+        return service_sdk.twin.update_device_twin(
+            id=device_id, device_twin_info=parameters, custom_headers=headers
+        )
     except CloudError as e:
         raise CLIError(unpack_msrest_error(e))
-    except (AttributeError, LookupError, TypeError) as err:
+    except (AttributeError, TypeError) as err:
         raise CLIError(err)
 
 
