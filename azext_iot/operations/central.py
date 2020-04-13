@@ -68,6 +68,7 @@ def iot_central_validate_messages(
         yes,
         central_api_uri,
     )
+
 def iot_central_monitor_events(
     cmd,
     app_id,
@@ -94,8 +95,6 @@ def iot_central_monitor_events(
         yes,
         central_api_uri,
     )
-
-
 
 def _events3_runner(
     cmd,

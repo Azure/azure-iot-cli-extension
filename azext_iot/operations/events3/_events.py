@@ -189,7 +189,6 @@ async def monitor_events(
         bytes("amqp.annotation.x-opt-enqueuedtimeutc > " + str(enqueuedtimeutc), "utf8")
     )
 
-
     exp_cancelled = False
     receive_client = uamqp.ReceiveClientAsync(
 

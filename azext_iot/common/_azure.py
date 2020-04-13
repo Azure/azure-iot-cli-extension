@@ -11,6 +11,7 @@ from azext_iot._factory import iot_hub_service_factory
 from azure.cli.core._profile import Profile
 from msrestazure.azure_exceptions import CloudError
 
+
 def _get_aad_token(cmd, resource=None):
     '''
     get AAD token to access to a specified resource
@@ -292,7 +293,6 @@ def show_iot_central_device_provisioning_information(id_scope, primary_key, devi
     print("provisioning information :\n")
     for k, v in provisioning_status.items():
         print("{} : {}\n".format(k, v))
-
 
 
 def get_iot_central_device_provisioning_information(id_scope, primary_key, device_id):
