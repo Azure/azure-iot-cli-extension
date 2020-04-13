@@ -295,7 +295,6 @@ def show_iot_central_device_provisioning_information(id_scope, primary_key, devi
 
 
 
-
 def get_iot_central_device_provisioning_information(id_scope, primary_key, device_id):
     import requests
     authToken = _get_sas_auth_header(id_scope, device_id, primary_key)
