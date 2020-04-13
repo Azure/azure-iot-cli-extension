@@ -18,11 +18,10 @@ def find_between(s, start, end):
     return (s.split(start))[1].split(end)[0]
 
 
-
-def iot_cental_device_show_provisioning_information(cmd, device_id, app_id, central_api_uri='api.azureiotcentral.com'):
+def iot_cental_show_provisioning_information(cmd, device_id, app_id, central_api_uri='api.azureiotcentral.com'):
     deviceCredentialData = get_iot_central_device_api_tokens(cmd, app_id, device_id)
     show_iot_central_device_provisioning_information(deviceCredentialData['idScope'],
-                                                        deviceCredentialData['symmetricKey']['primaryKey'], device_id)
+                                                     deviceCredentialData['symmetricKey']['primaryKey'], device_id)
 
 
 def iot_central_device_show(
@@ -38,7 +37,6 @@ def iot_central_device_show(
         return service_sdk.get_twin(device_id)
     except errors.CloudError as e:
         raise CLIError(unpack_msrest_error(e))
-
 
 
 def iot_central_validate_messages(
@@ -69,6 +67,7 @@ def iot_central_validate_messages(
         central_api_uri,
     )
 
+
 def iot_central_monitor_events(
     cmd,
     app_id,
@@ -95,6 +94,7 @@ def iot_central_monitor_events(
         yes,
         central_api_uri,
     )
+
 
 def _events3_runner(
     cmd,

@@ -1237,6 +1237,15 @@ helps[
         az iot central app validate-messages --app-id {app_id} --simulate-errors
   """
 
+helps['iot central app show-provisioning-info'] = """
+    type: group
+    short-summary: Provisioning information for devices under a given app
+    examples:
+        az iot central app validate-messages --app-id {app_id} -d {device_id}
+    - name: Get provisioning information for a specified device.
+      text: >
+"""
+
 helps[
     "iot central device-twin"
 ] = """
@@ -1249,16 +1258,6 @@ helps[
 ] = """
     type: command
     short-summary: Get the device twin from IoT Hub.
-"""
-
-helps['iot central device'] = """
-    type: group
-    short-summary: Manage IoT Central device .
-"""
-
-helps['iot central device show-provisioning-info'] = """
-    type: command
-    short-summary: Show provisioning information of the device.
 """
 
 
