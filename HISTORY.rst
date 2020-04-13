@@ -3,6 +3,16 @@
 Release History
 ===============
 
+0.9.2
++++++++++++++++
+* Device and module twin update operations provide explicit patch arguments (--desired, --tags).
+* Adds command "az iot central app validate-messages"
+* Remove Py 2.7 remnants from setup manifest.
+
+0.9.1
++++++++++++++++
+* Adds edge configuration argument for creating or updating enrollment[groups]
+
 0.9.0
 +++++++++++++++
 * Breaking change: Evaluating an edge deployment/hub configuration SYSTEM metric (via show-metric) will return non-manipulated query output.
@@ -13,7 +23,6 @@ Release History
 * SDK refresh. IoT Hub service calls (except for 'az iot dt' commands) point to api-version 2019-10-01.
 * Extension package name has been changed to 'azure-iot'.
 * Help text for ADM module configurations has been updated with proper target condition syntax for module criteria.
-
 
 0.8.9
 +++++++++++++++

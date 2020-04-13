@@ -311,12 +311,12 @@ class TestEvents3Parser:
         # verify
         assert parsed_msg["event"]["payload"] == self.payload
         assert parsed_msg["event"]["origin"] == self.device_id
+        device_identifier = str(_parser.DEVICE_ID_IDENTIFIER, "utf8")
+        assert parsed_msg["event"]["annotations"][device_identifier] == self.device_id
 
         properties = parsed_msg["event"]["properties"]
-        device_identifier = str(_parser.DEVICE_ID_IDENTIFIER, "utf8")
         assert properties["system"]["content_encoding"] == self.encoding
         assert properties["system"]["content_type"] == self.content_type
-        assert properties["annotations"][device_identifier] == self.device_id
         assert properties["application"][app_prop_type] == app_prop_value
 
         assert len(parser._errors) == 0
@@ -362,7 +362,7 @@ class TestEvents3Parser:
         # setup
         encoded_payload = json.dumps(self.payload).encode()
         properties = MessageProperties(
-            content_encoding=self.encoding, content_type=self.bad_content_type
+            content_type=self.bad_content_type
         )
         message = Message(
             body=encoded_payload,
@@ -378,7 +378,7 @@ class TestEvents3Parser:
         # since the content_encoding header is not present, just dump the raw payload
         assert parsed_msg["event"]["payload"] == str(encoded_payload, "utf8")
 
-        assert len(parser._errors) == 0
+        assert len(parser._errors) == 1
         assert len(parser._warnings) == 1
         assert len(parser._info) == 0
 
@@ -387,6 +387,9 @@ class TestEvents3Parser:
         assert self.bad_content_type in warning
         assert "application/json" in warning
         assert self.device_id in warning
+
+        error = parser._errors[0]
+        assert "No encoding found for message" in error
 
     def test_parse_message_bad_encoding_should_fail(self):
         # setup

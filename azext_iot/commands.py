@@ -73,6 +73,8 @@ def load_command_table(self, _):
             "update",
             getter_name="iot_device_module_twin_show",
             setter_name="iot_device_module_twin_update",
+            custom_func_name="iot_twin_update_custom",
+            custom_func_type=iothub_ops,
         )
 
     with self.command_group(
@@ -84,6 +86,8 @@ def load_command_table(self, _):
             "update",
             getter_name="iot_device_twin_show",
             setter_name="iot_device_twin_update",
+            custom_func_name="iot_twin_update_custom",
+            custom_func_type=iothub_ops,
         )
 
     with self.command_group(

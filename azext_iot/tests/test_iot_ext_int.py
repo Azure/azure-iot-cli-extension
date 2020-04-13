@@ -15,7 +15,9 @@ from azext_iot.constants import DEVICE_DEVICESCOPE_PREFIX
 
 opt_env_set = ["azext_iot_teststorageuri"]
 
-settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_BASIC, opt_env_set=opt_env_set)
+settings = DynamoSettings(
+    req_env_set=ENV_SET_TEST_IOTHUB_BASIC, opt_env_set=opt_env_set
+)
 
 LIVE_HUB = settings.env.azext_iot_testhub
 LIVE_RG = settings.env.azext_iot_testrg
@@ -492,6 +494,8 @@ class TestIoTHubDeviceTwins(IoTLiveScenarioTest):
     def test_hub_device_twins(self):
         self.kwargs["generic_dict"] = {"key": "value"}
         self.kwargs["bad_format"] = "{'key: 'value'}"
+        self.kwargs["patch_desired"] = {"patchScenario": {"desiredKey": "desiredValue"}}
+        self.kwargs["patch_tags"] = {"patchScenario": {"tagkey": "tagValue"}}
 
         device_count = 3
         device_ids = self.generate_device_names(device_count)
@@ -529,6 +533,58 @@ class TestIoTHubDeviceTwins(IoTLiveScenarioTest):
             ],
         )
 
+        # Patch based twin update of desired props
+        self.cmd(
+            "iot hub device-twin update -d {} -n {} -g {} --desired {}".format(
+                device_ids[2],
+                LIVE_HUB,
+                LIVE_RG,
+                '"{patch_desired}"',
+            ),
+            checks=[
+                self.check("deviceId", device_ids[2]),
+                self.check(
+                    "properties.desired.patchScenario",
+                    self.kwargs["patch_desired"]["patchScenario"],
+                ),
+            ],
+        )
+
+        # Patch based twin update of tags with connection string
+        self.cmd(
+            "iot hub device-twin update -d {} --login {} --tags {}".format(
+                device_ids[2], LIVE_HUB_CS, '"{patch_tags}"'
+            ),
+            checks=[
+                self.check("deviceId", device_ids[2]),
+                self.check(
+                    "tags.patchScenario", self.kwargs["patch_tags"]["patchScenario"]
+                ),
+            ],
+        )
+
+        # Patch based twin update of desired + tags
+        self.cmd(
+            "iot hub device-twin update -d {} -n {} --desired {} --tags {}".format(
+                device_ids[2],
+                LIVE_HUB,
+                '"{patch_desired}"',
+                '"{patch_tags}"',
+            ),
+            checks=[
+                self.check("deviceId", device_ids[2]),
+                self.check(
+                    "properties.desired.patchScenario",
+                    self.kwargs["patch_desired"]["patchScenario"],
+                ),
+                self.check(
+                    "tags.patchScenario",
+                    self.kwargs["patch_tags"]["patchScenario"]
+                ),
+            ],
+        )
+
+        # Deprecated generic update
         result = self.cmd(
             "iot hub device-twin update -d {} -n {} -g {} --set properties.desired.special={}".format(
                 device_ids[0], LIVE_HUB, LIVE_RG, '"{generic_dict}"'
@@ -607,7 +663,9 @@ class TestIoTHubDeviceTwins(IoTLiveScenarioTest):
 
         # Region specific test
         if self.region not in ["West US 2", "North Europe", "Southeast Asia"]:
-            warnings.warn("Skipping distributed-tracing tests. IoT Hub not in supported region!")
+            warnings.warn(
+                "Skipping distributed-tracing tests. IoT Hub not in supported region!"
+            )
         else:
             self.cmd(
                 "iot hub distributed-tracing show -d {} -n {} -g {}".format(
@@ -925,6 +983,8 @@ class TestIoTHubModuleTwins(IoTLiveScenarioTest):
     def test_hub_module_twins(self):
         self.kwargs["generic_dict"] = {"key": "value"}
         self.kwargs["bad_format"] = "{'key: 'value'}"
+        self.kwargs["patch_desired"] = {"patchScenario": {"desiredKey": "desiredValue"}}
+        self.kwargs["patch_tags"] = {"patchScenario": {"tagkey": "tagValue"}}
 
         edge_device_count = 1
         device_count = 1
@@ -997,6 +1057,63 @@ class TestIoTHubModuleTwins(IoTLiveScenarioTest):
             ],
         )
 
+        # Patch based twin update of desired props
+        self.cmd(
+            "iot hub module-twin update -d {} -n {} -g {} -m {} --desired {}".format(
+                edge_device_ids[0],
+                LIVE_HUB,
+                LIVE_RG,
+                module_ids[0],
+                '"{patch_desired}"',
+            ),
+            checks=[
+                self.check("deviceId", edge_device_ids[0]),
+                self.check("moduleId", module_ids[0]),
+                self.check(
+                    "properties.desired.patchScenario",
+                    self.kwargs["patch_desired"]["patchScenario"],
+                ),
+            ],
+        )
+
+        # Patch based twin update of tags with connection string
+        self.cmd(
+            "iot hub module-twin update -d {} --login {} -m {} --tags {}".format(
+                edge_device_ids[0], LIVE_HUB_CS, module_ids[0], '"{patch_tags}"'
+            ),
+            checks=[
+                self.check("deviceId", edge_device_ids[0]),
+                self.check("moduleId", module_ids[0]),
+                self.check(
+                    "tags.patchScenario", self.kwargs["patch_tags"]["patchScenario"]
+                ),
+            ],
+        )
+
+        # Patch based twin update of desired + tags
+        self.cmd(
+            "iot hub module-twin update -d {} -n {} -m {} --desired {} --tags {}".format(
+                device_ids[0],
+                LIVE_HUB,
+                module_ids[0],
+                '"{patch_desired}"',
+                '"{patch_tags}"',
+            ),
+            checks=[
+                self.check("deviceId", device_ids[0]),
+                self.check("moduleId", module_ids[0]),
+                self.check(
+                    "properties.desired.patchScenario",
+                    self.kwargs["patch_desired"]["patchScenario"],
+                ),
+                self.check(
+                    "tags.patchScenario",
+                    self.kwargs["patch_tags"]["patchScenario"]
+                ),
+            ],
+        )
+
+        # Deprecated twin update style
         self.cmd(
             "iot hub module-twin update -d {} -n {} -g {} -m {} --set properties.desired.special={}".format(
                 edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0], '"{generic_dict}"'

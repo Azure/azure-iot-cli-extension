@@ -950,25 +950,13 @@ class TestDeviceTwinUpdate:
         assert "twins/{}".format(device_id) in args[0][0].url
 
     @pytest.mark.parametrize(
-        "req, exp", [(generate_device_twin_show(etag=None), CLIError)]
-    )
-    def test_device_twin_update_invalid_args(self, serviceclient, req, exp):
-        with pytest.raises(exp):
-            subject.iot_device_twin_update(
-                fixture_cmd,
-                req["deviceId"],
-                hub_name=mock_target["entity"],
-                parameters=req,
-            )
-
-    @pytest.mark.parametrize(
-        "req", [(generate_device_twin_show()), (generate_device_twin_show(tags=""))]
+        "req", [generate_device_twin_show()]
     )
     def test_device_twin_update_error(self, serviceclient_generic_error, req):
         with pytest.raises(CLIError):
             subject.iot_device_twin_update(
                 fixture_cmd,
-                req["deviceId"],
+                device_id=req["deviceId"],
                 hub_name=mock_target["entity"],
                 parameters=req,
             )
@@ -1063,7 +1051,7 @@ class TestDeviceModuleTwinShow:
         with pytest.raises(CLIError):
             subject.iot_device_module_twin_show(
                 fixture_cmd,
-                device_id,
+                device_id=device_id,
                 hub_name=mock_target["entity"],
                 module_id=module_id,
             )
@@ -1104,36 +1092,12 @@ class TestDeviceModuleTwinUpdate:
             "twins/{}/modules/{}?".format(req["deviceId"], module_id) in args[0][0].url
         )
 
-    @pytest.mark.parametrize(
-        "req, exp",
-        [
-            (
-                generate_device_twin_show(
-                    moduleId=module_id,
-                    properties={"desired": {"key": "value"}},
-                    etag=None,
-                ),
-                CLIError,
-            ),
-            (generate_device_twin_show(moduleId=module_id), CLIError),
-        ],
-    )
-    def test_device_module_twin_update_invalid_args(self, serviceclient, req, exp):
-        with pytest.raises(exp):
-            subject.iot_device_module_twin_update(
-                fixture_cmd,
-                req["deviceId"],
-                hub_name=mock_target["entity"],
-                module_id=module_id,
-                parameters=req,
-            )
-
     @pytest.mark.parametrize("req", [(generate_device_twin_show(moduleId=module_id))])
     def test_device_module_twin_update_error(self, serviceclient_generic_error, req):
         with pytest.raises(CLIError):
             subject.iot_device_module_twin_update(
                 fixture_cmd,
-                req["deviceId"],
+                device_id=req["deviceId"],
                 hub_name=mock_target["entity"],
                 module_id=module_id,
                 parameters=req,
