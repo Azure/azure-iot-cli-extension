@@ -272,19 +272,42 @@ def validate_response_payload(response):
     raise exp
 
 
-def get_iot_central_device_api_tokens(cmd, app_id, device_id):
+def get_iot_central_device_list(app_id, token):
     import requests
+    host = get_app_host(app_id, token)['host']
+    url = "https://{}/api/preview/devices".format(host)
+    response = requests.get(url, headers={'Authorization': 'Bearer {}'.format(token)})
+    return validate_response_payload(response)
 
+
+def get_app_host(app_id, token):
+    import requests
+    url = "https://apps.azureiotcentral.com/api/preview/applications/{}".format(app_id)
+    response = requests.get(url, headers={'Authorization': 'Bearer {}'.format(token)})
+    return validate_response_payload(response)
+
+
+def show_iot_central_provisioing_information(cmd, app_id, device_id):
     aad_token = _get_aad_token(cmd, resource="https://apps.azureiotcentral.com")['accessToken']
+    if device_id is None :
+        device_list = get_iot_central_device_list(app_id, aad_token)
+        print("Device Provisioning Summary: \n")
+        for item in device_list.get('value'):
+            print("\n")
+            data = ({i : item[i] for i in ['id', 'displayName', 'provisioned', 'approved']})
+            print("{}".format(data))      
+    else :            
+        deviceCredentialData = get_iot_central_device_api_tokens(cmd, app_id, device_id, aad_token)
+        show_iot_central_device_provisioning_information(deviceCredentialData['idScope'],
+                                                     deviceCredentialData['symmetricKey']['primaryKey'], device_id)
 
-    def get_app_host(app_id, token):
-        url = "https://apps.azureiotcentral.com/api/preview/applications/{}".format(app_id)
-        response = requests.get(url, headers={'Authorization': 'Bearer {}'.format(token)})
-        return validate_response_payload(response)
 
-    host = get_app_host(app_id, aad_token)['host']
+def get_iot_central_device_api_tok
+ens(cmd, app_id, device_id, token):
+    import requests
+    host = get_app_host(app_id, token)['host']
     url = "https://{}/api/preview/devices/{}/credentials".format(host, device_id)
-    response = requests.get(url, headers={'Authorization': 'Bearer {}'.format(aad_token)})
+    response = requests.get(url, headers={'Authorization': 'Bearer {}'.format(token)})
     return validate_response_payload(response)
 
 

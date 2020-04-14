@@ -1241,7 +1241,10 @@ helps['iot central app show-provisioning-info'] = """
     type: group
     short-summary: Provisioning information for devices under a given app
     examples:
-        az iot central app validate-messages --app-id {app_id} -d {device_id}
+      az iot central app show-provisioning-info --app-id {app_id}
+    - name: Get provisioning status of all the devices under the app
+      text: >
+        az iot central app show-provisioning-info --app-id {app_id} -d {device_id}
     - name: Get provisioning information for a specified device.
       text: >
 """
