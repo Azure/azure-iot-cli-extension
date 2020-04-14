@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import json
 import six
 
 from knack.util import CLIError
@@ -38,7 +39,8 @@ def iot_central_device_capability_model_get(
 ):
     provider = CentralDeviceProvider()
     device_template = provider.get_device_template(cmd, device_id, app_id)
-    six.print_(device_template)
+    output = json.dumps(device_template, indent=4)
+    six.print_(output)
 
 
 def iot_central_validate_messages(
