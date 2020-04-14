@@ -265,10 +265,6 @@ def get_iot_central_tokens(cmd, app_id, central_api_uri):
     return tokens
 
 
-def get_iot_hub_token_from_central_app_id(cmd, app_id, central_api_uri):
-    return get_iot_central_tokens(cmd, app_id, central_api_uri)['iothubTenantSasToken']['sasToken']
-
-
 def get_iot_pnp_connection_string(
         cmd,
         endpoint,
