@@ -307,7 +307,7 @@ helps[
     - name: Patch device twin tags.
       text: >
         az iot hub device-twin update -n {iothub_name} -d {device_id}
-        --tags '{"country": "USA"}}'
+        --tags '{"country": "USA"}'
     - name: Patch removal of 'critical' desired property from parent 'temperature'
       text: >
         az iot hub device-twin update -n {iothub_name} -d {device_id}
@@ -413,7 +413,7 @@ helps[
     - name: Patch module twin tags.
       text: >
         az iot hub module-twin update -n {iothub_name} -d {device_id} -m {module_id}
-        --tags '{"country": "USA"}}'
+        --tags '{"country": "USA"}'
     - name: Patch removal of 'critical' desired property from parent 'temperature'
       text: >
         az iot hub module-twin update -n {iothub_name} -d {device_id} -m {module_id}
