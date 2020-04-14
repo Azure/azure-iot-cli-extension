@@ -299,11 +299,10 @@ def show_iot_central_provisioing_information(cmd, app_id, device_id):
     else :            
         deviceCredentialData = get_iot_central_device_api_tokens(cmd, app_id, device_id, aad_token)
         show_iot_central_device_provisioning_information(deviceCredentialData['idScope'],
-                                                     deviceCredentialData['symmetricKey']['primaryKey'], device_id)
+                                                         deviceCredentialData['symmetricKey']['primaryKey'], device_id)
 
 
-def get_iot_central_device_api_tok
-ens(cmd, app_id, device_id, token):
+def get_iot_central_device_api_tokens(cmd, app_id, device_id, token):
     import requests
     host = get_app_host(app_id, token)['host']
     url = "https://{}/api/preview/devices/{}/credentials".format(host, device_id)
