@@ -182,7 +182,9 @@ def load_command_table(self, _):
     ) as cmd_group:
         cmd_group.command("monitor-events", "iot_central_monitor_events")
         cmd_group.command("validate-messages", "iot_central_validate_messages")
-        cmd_group.command('show-provisioning-info', 'iot_cental_show_provisioning_information')
+        cmd_group.command(
+            "show-provisioning-info", "iot_cental_show_provisioning_information"
+        )
 
     with self.command_group(
         "iot central device-twin", command_type=iotcentral_ops
