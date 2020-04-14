@@ -92,7 +92,7 @@ def fixture_get_iot_central_tokens(mocker):
                 "sasToken": "sasToken",
             },
             "expiry": "0000",
-            "iothubTenantSasToken": {"sasToken": "SharedAccessSignature sr=iorhubresource&sig="},
+            "iothubTenantSasToken": {"sasToken": "SharedAccessSignature sr=shared_resource&sig="},
         }
     }
 
@@ -131,13 +131,13 @@ class TestDeviceTwinShow:
             fixture_cmd, device_id, app_id
         )
 
-        # # Ensure get_twin is called and result is returned
-        # assert result is device_twin_result
+        # Ensure get_twin is called and result is returned
+        assert result is device_twin_result
 
-        # # Ensure _bind_sdk is called with correct parameters
-        # assert fixture_bind_sdk.called is True
-        # args = fixture_bind_sdk.call_args
-        # assert args[0] == ({"entity": resource}, SdkType.service_sdk)
+        # Ensure _bind_sdk is called with correct parameters
+        assert fixture_bind_sdk.called is True
+        args = fixture_bind_sdk.call_args
+        assert args[0] == ({"entity": resource}, SdkType.service_sdk)
 
 
 @pytest.mark.skipif(
