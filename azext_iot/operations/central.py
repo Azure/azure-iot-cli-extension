@@ -37,8 +37,8 @@ def iot_central_device_show(
 def iot_central_device_capability_model_get(
     cmd, device_id, app_id, central_api_uri="api.azureiotcentral.com"
 ):
-    provider = CentralDeviceProvider()
-    device_template = provider.get_device_template(cmd, device_id, app_id)
+    provider = CentralDeviceProvider(cmd, app_id)
+    device_template = provider.get_device_template(device_id)
     output = json.dumps(device_template, indent=4)
     six.print_(output)
 
@@ -56,19 +56,21 @@ def iot_central_validate_messages(
     yes=False,
     central_api_uri="api.azureiotcentral.com",
 ):
+    provider = CentralDeviceProvider(cmd, app_id)
     _events3_runner(
-        cmd,
-        app_id,
-        device_id,
-        True,
-        simulate_errors,
-        consumer_group,
-        timeout,
-        enqueued_time,
-        repair,
-        properties,
-        yes,
-        central_api_uri,
+        cmd=cmd,
+        app_id=app_id,
+        device_id=device_id,
+        validate_messages=True,
+        simulate_errors=simulate_errors,
+        consumer_group=consumer_group,
+        timeout=timeout,
+        enqueued_time=enqueued_time,
+        repair=repair,
+        properties=properties,
+        yes=yes,
+        central_api_uri=central_api_uri,
+        central_device_provider=provider,
     )
 
 
@@ -85,18 +87,19 @@ def iot_central_monitor_events(
     central_api_uri="api.azureiotcentral.com",
 ):
     _events3_runner(
-        cmd,
-        app_id,
-        device_id,
-        False,
-        False,
-        consumer_group,
-        timeout,
-        enqueued_time,
-        repair,
-        properties,
-        yes,
-        central_api_uri,
+        cmd=cmd,
+        app_id=app_id,
+        device_id=device_id,
+        validate_messages=False,
+        simulate_errors=False,
+        consumer_group=consumer_group,
+        timeout=timeout,
+        enqueued_time=enqueued_time,
+        repair=repair,
+        properties=properties,
+        yes=yes,
+        central_api_uri=central_api_uri,
+        central_device_provider=None,
     )
 
 
@@ -113,6 +116,7 @@ def _events3_runner(
     properties,
     yes,
     central_api_uri,
+    central_device_provider,
 ):
     (enqueued_time, properties, timeout, output) = init_monitoring(
         cmd, timeout, properties, enqueued_time, repair, yes
@@ -134,4 +138,5 @@ def _events3_runner(
         output=output,
         validate_messages=validate_messages,
         simulate_errors=simulate_errors,
+        central_device_provider=central_device_provider,
     )

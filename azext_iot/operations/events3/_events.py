@@ -38,6 +38,7 @@ def executor(
     pnp_context=None,
     validate_messages=False,
     simulate_errors=False,
+    central_device_provider=None,
 ):
 
     coroutines = []
@@ -56,6 +57,7 @@ def executor(
             pnp_context,
             validate_messages,
             simulate_errors,
+            central_device_provider,
         )
     )
 
@@ -113,6 +115,7 @@ async def initiate_event_monitor(
     pnp_context=None,
     validate_messages=False,
     simulate_errors=False,
+    central_device_provider=None,
 ):
     def _get_conn_props():
         properties = {}
@@ -155,6 +158,7 @@ async def initiate_event_monitor(
                     pnp_context=pnp_context,
                     validate_messages=validate_messages,
                     simulate_errors=simulate_errors,
+                    central_device_provider=central_device_provider,
                 )
             )
         return await asyncio.gather(*coroutines, return_exceptions=True)
@@ -178,6 +182,7 @@ async def monitor_events(
     pnp_context=None,
     validate_messages=False,
     simulate_errors=False,
+    central_device_provider=None,
 ):
     source = uamqp.address.Source(
         "amqps://{}/{}/ConsumerGroups/{}/Partitions/{}".format(
@@ -214,6 +219,7 @@ async def monitor_events(
                 output,
                 validate_messages,
                 simulate_errors,
+                central_device_provider,
             )
 
     except asyncio.CancelledError:
@@ -368,6 +374,7 @@ def _output_msg_kpi(
     output,
     validate_messages,
     simulate_errors,
+    central_device_provider,
 ):
     parser = Event3Parser()
     origin_device_id = parser.parse_device_id(msg)
@@ -376,7 +383,13 @@ def _output_msg_kpi(
         return
 
     parsed_msg = parser.parse_message(
-        msg, pnp_context, interface_name, properties, content_type, simulate_errors
+        msg,
+        pnp_context,
+        interface_name,
+        properties,
+        content_type,
+        simulate_errors,
+        central_device_provider,
     )
 
     if output.lower() == "json":
