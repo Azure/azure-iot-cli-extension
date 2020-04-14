@@ -24,6 +24,14 @@ DEBUG = False
 logger = get_logger(__name__)
 
 
+class executorData:
+    def __init__(self,
+                 target,
+                 consumer_group):
+        self.target = target
+        self.consumer_group = consumer_group
+
+
 def executor(
     target,
     consumer_group,
@@ -39,25 +47,54 @@ def executor(
     validate_messages=False,
     simulate_errors=False,
 ):
+    executor = executorData(target, consumer_group)
 
+    return nExecutor([executor], enqueued_time,
+                     properties,
+                     timeout,
+                     device_id,
+                     output,
+                     content_type,
+                     devices,
+                     interface_name,
+                     pnp_context,
+                     validate_messages,
+                     simulate_errors)
+
+
+def nExecutor(
+    executorTargets,
+    enqueued_time,
+    properties=None,
+    timeout=0,
+    device_id=None,
+    output=None,
+    content_type=None,
+    devices=None,
+    interface_name=None,
+    pnp_context=None,
+    validate_messages=False,
+    simulate_errors=False,
+):
     coroutines = []
-    coroutines.append(
-        initiate_event_monitor(
-            target,
-            consumer_group,
-            enqueued_time,
-            device_id,
-            properties,
-            timeout,
-            output,
-            content_type,
-            devices,
-            interface_name,
-            pnp_context,
-            validate_messages,
-            simulate_errors,
+    for executor in executorTargets:
+        coroutines.append(
+            initiate_event_monitor(
+                executor.target,
+                executor.consumer_group,
+                enqueued_time,
+                device_id,
+                properties,
+                timeout,
+                output,
+                content_type,
+                devices,
+                interface_name,
+                pnp_context,
+                validate_messages,
+                simulate_errors
+            )
         )
-    )
 
     loop = asyncio.get_event_loop()
     if loop.is_closed():

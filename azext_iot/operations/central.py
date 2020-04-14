@@ -16,18 +16,26 @@ def find_between(s, start, end):
     return (s.split(start))[1].split(end)[0]
 
 
-def iot_central_device_show(
-    cmd, device_id, app_id, central_api_uri="api.azureiotcentral.com"
-):
-    sasToken = get_iot_hub_token_from_central_app_id(cmd, app_id, central_api_uri)
-    endpoint = find_between(sasToken, "SharedAccessSignature sr=", "&sig=")
-    target = {"entity": endpoint}
-    auth = BasicSasTokenAuthentication(sas_token=sasToken)
-    service_sdk, errors = _bind_sdk(target, SdkType.service_sdk, auth=auth)
-    try:
-        return service_sdk.get_twin(device_id)
-    except errors.CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+def iot_central_device_show(cmd, device_id, app_id, central_api_uri='azureiotcentral.com'):
+    from azext_iot.common._azure import get_iot_central_tokens
+
+    tokens = get_iot_central_tokens(cmd, app_id, central_api_uri)
+    exception = None
+
+    # try all hubs, return first exception if none succeed
+    for key in tokens:
+        sasToken = tokens[key]['iothubTenantSasToken']['sasToken']
+        endpoint = find_between(sasToken, 'SharedAccessSignature sr=', '&sig=')
+        target = {'entity': endpoint}
+        auth = BasicSasTokenAuthentication(sas_token=sasToken)
+        service_sdk, errors = _bind_sdk(target, SdkType.service_sdk, auth=auth)
+        try:
+            return service_sdk.get_twin(device_id)
+        except errors.CloudError as e:
+            if(exception is None):
+                exception = CLIError(unpack_msrest_error(e))
+
+    raise exception
 
 
 def iot_central_validate_messages(
@@ -41,7 +49,7 @@ def iot_central_validate_messages(
     repair=False,
     properties=None,
     yes=False,
-    central_api_uri="api.azureiotcentral.com",
+    central_api_uri="azureiotcentral.com",
 ):
     _events3_runner(
         cmd,
@@ -69,7 +77,7 @@ def iot_central_monitor_events(
     repair=False,
     properties=None,
     yes=False,
-    central_api_uri="api.azureiotcentral.com",
+    central_api_uri="azureiotcentral.com",
 ):
     _events3_runner(
         cmd,
@@ -107,18 +115,15 @@ def _events3_runner(
 
     from azext_iot.operations.events3 import _builders, _events
 
-    eventHubTarget = _builders.EventTargetBuilder().build_central_event_hub_target(
-        cmd, app_id, central_api_uri
-    )
+    eventHubTargets = _builders.EventTargetBuilder().build_central_event_hub_target(cmd, app_id, central_api_uri)
+    executorTargets = []
 
-    _events.executor(
-        eventHubTarget,
-        consumer_group=consumer_group,
-        enqueued_time=enqueued_time,
-        properties=properties,
-        timeout=timeout,
-        device_id=device_id,
-        output=output,
-        validate_messages=validate_messages,
-        simulate_errors=simulate_errors,
-    )
+    for target in eventHubTargets:
+        executorTargets.append(_events.executorData(target, consumer_group))
+
+    _events.nExecutor(executorTargets,
+                      enqueued_time=enqueued_time,
+                      properties=properties,
+                      timeout=timeout,
+                      device_id=device_id,
+                      output=output)
