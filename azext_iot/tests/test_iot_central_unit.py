@@ -15,7 +15,7 @@ from azext_iot.common.utility import validate_min_python_version
 from azext_iot.central.providers import CentralDeviceProvider
 
 from .helpers import load_json
-from .constants import FileNames
+from .test_constants import FileNames
 
 
 device_id = "mydevice"
