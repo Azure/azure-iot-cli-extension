@@ -7,7 +7,7 @@ The **Azure IoT extension for Azure CLI** aims to accelerate the development, ma
 
 ## Commands
 
-Please refer to the official `az iot` page on [Microsoft Docs](https://docs.microsoft.com/en-us/cli/azure/ext/azure-cli-iot-ext) for a complete list of supported commands.  You can also find IoT CLI usage tips on the [wiki](https://github.com/Azure/azure-iot-cli-extension/wiki/Tips).
+Please refer to the official `az iot` reference on [Microsoft Docs](https://docs.microsoft.com/en-us/cli/azure/ext/azure-iot/iot?view=azure-cli-latest) for a complete list of supported commands.  You can also find IoT CLI usage tips on the [wiki](https://github.com/Azure/azure-iot-cli-extension/wiki/Tips).
 
 ## Installation
 

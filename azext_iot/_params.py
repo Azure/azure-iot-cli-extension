@@ -252,6 +252,18 @@ def load_arguments(self, _):
             help="Generate self-signed cert and use its thumbprint. "
             "Output to specified target directory",
         )
+        context.argument(
+            "tags",
+            arg_group="Twin Patch",
+            options_list=["--tags"],
+            help="Twin tags."
+        )
+        context.argument(
+            "desired",
+            arg_group="Twin Patch",
+            options_list=["--desired"],
+            help="Twin desired properties."
+        )
 
     with self.argument_context("iot hub job") as context:
         context.argument("job_id", options_list=["--job-id"], help="IoT Hub job Id.")

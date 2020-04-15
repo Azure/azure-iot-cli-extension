@@ -81,7 +81,7 @@ class Event3Parser(object):
 
         if "anno" in properties or "all" in properties:
             annotations = self._parse_annotations(message)
-            event["properties"]["annotations"] = annotations
+            event["annotations"] = annotations
 
         if system_properties and ("sys" in properties or "all" in properties):
             event["properties"]["system"] = system_properties
