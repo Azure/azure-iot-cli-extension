@@ -7,6 +7,7 @@
 
 import requests
 
+from knack.util import CLIError
 from ._utility import get_token
 
 
@@ -45,6 +46,6 @@ def get_device(
     body = response.json()
 
     if "error" in body:
-        raise Exception(body["error"])
+        raise CLIError(body["error"])
 
     return body

@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from knack.util import CLIError
 from azext_iot.central import services as central_services
 
 
@@ -33,7 +34,7 @@ class CentralDeviceProvider:
         device_template_urn = device["instanceOf"]
 
         if not device_template_urn:
-            raise ValueError(
+            raise CLIError(
                 "No device template urn found for device '{}'".format(device_id)
             )
 
@@ -54,7 +55,7 @@ class CentralDeviceProvider:
 
         device_template = self._device_templates.get(device_template_urn)
         if not device_template:
-            raise UnboundLocalError(
+            raise CLIError(
                 "No device template for device with id: '{}'.".format(device_id)
             )
 
@@ -64,7 +65,7 @@ class CentralDeviceProvider:
         self, device_id, central_dns_suffix="azureiotcentral.com",
     ):
         if not device_id:
-            raise ValueError("Device id must be specified.")
+            raise CLIError("Device id must be specified.")
 
         # get or add to cache
         if device_id not in self._devices or not self._devices.get(device_id):
@@ -74,6 +75,6 @@ class CentralDeviceProvider:
 
         device = self._devices.get(device_id)
         if not device:
-            raise UnboundLocalError("No device found with id: '{}'.".format(device_id))
+            raise CLIError("No device found with id: '{}'.".format(device_id))
 
         return device
