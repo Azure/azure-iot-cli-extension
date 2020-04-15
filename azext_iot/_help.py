@@ -1237,17 +1237,24 @@ helps[
         az iot central app validate-messages --app-id {app_id} --simulate-errors
   """
 
-helps['iot central app show-provisioning-info'] = """
-    type: group
-    short-summary: Provisioning information for devices under a given app
+helps[
+    "iot central app show-provisioning-info"
+] = """
+    type: command
+    short-summary: get provisioning information of the devices associated with the app.
+    long-summary: |
+                  EXPERIMENTAL requires Python 3.5+
+                  This command relies on and may install dependent Cython package (uamqp) upon first execution.
+                  https://github.com/Azure/azure-uamqp-python
     examples:
-      az iot central app show-provisioning-info --app-id {app_id}
-    - name: Get provisioning status of all the devices under the app
+    - name: Basic usage
+      text: >
+        az iot central app show-provisioning-info --app-id {app_id}
+    - name: Display provisioning information for all the devices
       text: >
         az iot central app show-provisioning-info --app-id {app_id} -d {device_id}
-    - name: Get provisioning information for a specified device.
-      text: >
-"""
+    - name: Display detailed provisioning informaiton for a given device
+  """
 
 helps[
     "iot central device-twin"

@@ -897,6 +897,12 @@ def load_arguments(self, _):
     with self.argument_context("iot central app") as context:
         context.argument("properties", arg_type=event_msg_prop_type)
 
+    with self.argument_context("iot central app show-provisioning-info") as context:
+        context.argument("app_id", options_list=["--app-id"], help="Target App.")
+        context.argument(
+            "device_id", options_list=["--device-id", "-d"], help="Target Device."
+        )
+
     with self.argument_context("iot central app validate-messages") as context:
         context.argument(
             "simulate_errors",
