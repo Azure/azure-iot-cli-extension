@@ -8,12 +8,6 @@ from azext_iot.central import services as central_services
 
 
 class CentralDeviceProvider:
-    _device_templates = {}
-    _devices = {}
-    _cmd = ""
-    _app_id = ""
-    _token = ""
-
     def __init__(self, cmd, app_id, token=None):
         """
         Provider for device/device_template APIs
@@ -29,7 +23,8 @@ class CentralDeviceProvider:
         self._cmd = cmd
         self._app_id = app_id
         self._token = token
-        pass
+        self._device_templates = {}
+        self._devices = {}
 
     def get_device_template(
         self, device_id, central_dns_suffix="azureiotcentral.com",
@@ -42,6 +37,7 @@ class CentralDeviceProvider:
                 "No device template urn found for device '{}'".format(device_id)
             )
 
+        # get or add to cache
         if (
             device_template_urn not in self._device_templates
             or not self._device_templates.get(device_template_urn)
@@ -70,6 +66,7 @@ class CentralDeviceProvider:
         if not device_id:
             raise ValueError("Device id must be specified.")
 
+        # get or add to cache
         if device_id not in self._devices or not self._devices.get(device_id):
             self._devices[device_id] = central_services.device.get_device(
                 self._cmd, device_id, self._app_id, self._token, central_dns_suffix

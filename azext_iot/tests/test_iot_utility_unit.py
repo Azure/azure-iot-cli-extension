@@ -7,7 +7,6 @@
 import json
 import mock
 import pytest
-import os
 
 from knack.util import CLIError
 from uamqp.message import Message, MessageProperties
@@ -23,15 +22,8 @@ from azext_iot.common.deps import ensure_uamqp
 from azext_iot.constants import EVENT_LIB, EXTENSION_NAME
 from azext_iot.operations.events3 import _parser
 from azext_iot._validators import mode2_iot_login_handler
-
-_central_device_template_file = "central/json/device_template.json"
-
-
-def load_json(filename):
-    from inspect import getsourcefile
-
-    os.chdir(os.path.dirname(os.path.abspath(getsourcefile(lambda: 0))))
-    return json.loads(read_file_content(filename))
+from .helpers import load_json
+from .constants import FileNames
 
 
 class TestMinPython(object):
@@ -319,7 +311,7 @@ class TestEvents3Parser:
         )
         parser = _parser.Event3Parser()
 
-        device_template = load_json(_central_device_template_file)
+        device_template = load_json(FileNames.central_device_template_file)
         provider = CentralDeviceProvider(cmd=None, app_id=None)
         provider.get_device_template = mock.MagicMock(return_value=device_template)
 
@@ -549,7 +541,7 @@ class TestEvents3Parser:
         )
         parser = _parser.Event3Parser()
 
-        device_template = load_json(_central_device_template_file)
+        device_template = load_json(FileNames.central_device_template_file)
         provider = CentralDeviceProvider(cmd=None, app_id=None)
         provider.get_device_template = mock.MagicMock(return_value=device_template)
 
