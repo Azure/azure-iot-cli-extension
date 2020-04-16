@@ -26,7 +26,7 @@ class CentralDeviceProvider:
         self._token = token
         self._devices = {}
 
-    def show_device(
+    def get_device(
         self, device_id, central_dns_suffix="azureiotcentral.com",
     ):
         if not device_id:
@@ -54,3 +54,36 @@ class CentralDeviceProvider:
             self._devices[device["id"]] = device
 
         return self._devices
+
+    def add_device(
+        self,
+        device_id,
+        device_name=None,
+        instance_of=None,
+        simulated=False,
+        central_dns_suffix="azureiotcentral.com",
+    ):
+        if not device_id:
+            raise CLIError("Device id must be specified.")
+
+        if device_id in self._devices:
+            raise CLIError("Device already exists")
+
+        # get or add to cache
+        if device_id not in self._devices or not self._devices.get(device_id):
+            self._devices[device_id] = central_services.device.add_device(
+                cmd=self._cmd,
+                token=self._token,
+                app_id=self._app_id,
+                device_id=device_id,
+                device_name=device_name,
+                instance_of=instance_of,
+                simulated=simulated,
+                central_dns_suffix=central_dns_suffix,
+            )
+
+        device = self._devices[device_id]
+        if not device:
+            raise CLIError("No device found with id: '{}'.".format(device_id))
+
+        return device

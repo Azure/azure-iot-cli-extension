@@ -8,14 +8,28 @@
 CLI parameter definitions.
 """
 
+from azure.cli.core.commands.parameters import get_three_state_flag
 
-def load_digitaltwins_arguments(self, _):
+
+def load_central_arguments(self, _):
     """
     Load CLI Args for Knack parser
     """
-    with self.argument_context("iot central") as context:
+    with self.argument_context("iot central app") as context:
         context.argument(
-            "model_id",
-            options_list=["--model-id"],
-            help="ADT Model Id. Example: urn:contosocom:DigitalTwins:Space:1",
+            "instance_of",
+            options_list=["--instance-of"],
+            help="Central model id. Example: urn:ojpkindbz:modelDefinition:iild3tm_uo",
+        )
+        context.argument(
+            "device_name",
+            options_list=["--device-name"],
+            help="Human readable device name. Example: Fridge",
+        )
+        context.argument(
+            "simulated",
+            options_list=["--simulated"],
+            arg_type=get_three_state_flag(),
+            help="Add this flag if you would like IoT Central to set this up as a simulated device. "
+            "--instance-of is required if this is true",
         )
