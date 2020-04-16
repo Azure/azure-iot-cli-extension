@@ -576,3 +576,45 @@ class TestEvents3Parser:
             list(self.bad_dcm_payload)[0]
         )
         assert expected_error in actual_error
+
+    def test_validate_against_bad_template_should_not_throw(self):
+        # setup
+        app_prop_type = "some_property"
+        app_prop_value = "some_value"
+        properties = MessageProperties(
+            content_encoding=self.encoding, content_type=self.content_type
+        )
+        message = Message(
+            body=json.dumps(self.bad_dcm_payload).encode(),
+            properties=properties,
+            annotations={_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
+            application_properties={app_prop_type.encode(): app_prop_value.encode()},
+        )
+        parser = _parser.Event3Parser()
+
+        provider = CentralDeviceProvider(cmd=None, app_id=None)
+        provider.get_device_template = mock.MagicMock(
+            return_value="an_unparseable_template"
+        )
+
+        # act
+        parsed_msg = parser.parse_message(
+            message=message,
+            pnp_context=False,
+            interface_name=None,
+            properties={"all"},
+            content_type_hint=None,
+            simulate_errors=False,
+            central_device_provider=provider,
+        )
+
+        # verify
+        assert parsed_msg["event"]["payload"] == self.bad_dcm_payload
+        assert parsed_msg["event"]["origin"] == self.device_id
+
+        assert len(parser._errors) == 1
+        assert len(parser._warnings) == 0
+        assert len(parser._info) == 0
+
+        actual_error = parser._errors[0]
+        assert "Unable to extract device schema for device" in actual_error

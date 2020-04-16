@@ -53,7 +53,7 @@ class CentralDeviceProvider:
                 central_dns_suffix,
             )
 
-        device_template = self._device_templates.get(device_template_urn)
+        device_template = self._device_templates[device_template_urn]
         if not device_template:
             raise CLIError(
                 "No device template for device with id: '{}'.".format(device_id)
@@ -73,7 +73,7 @@ class CentralDeviceProvider:
                 self._cmd, device_id, self._app_id, self._token, central_dns_suffix
             )
 
-        device = self._devices.get(device_id)
+        device = self._devices[device_id]
         if not device:
             raise CLIError("No device found with id: '{}'.".format(device_id))
 

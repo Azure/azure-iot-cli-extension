@@ -5,12 +5,13 @@
 # --------------------------------------------------------------------------------------------
 # Nothing in this file should be used outside of service/central
 
+from azext_iot import constants
 from azext_iot.common import auth
 
 
-def get_token(token, cmd):
+def get_headers(token, cmd):
     if not token:
-        token = auth.get_aad_token(cmd, resource="https://apps.azureiotcentral.com")
-        return "Bearer {}".format(token["accessToken"])
+        aad_token = auth.get_aad_token(cmd, resource="https://apps.azureiotcentral.com")
+        token = "Bearer {}".format(aad_token["accessToken"])
 
-    return token
+    return {"Authorization": token, "User-Agent": constants.USER_AGENT}

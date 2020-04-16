@@ -294,8 +294,15 @@ class Event3Parser(object):
             )
             return
 
-        all_schema = self._extract_schema_from_template(template)
-        all_names = [schema["name"] for schema in all_schema]
+        try:
+            all_schema = self._extract_schema_from_template(template)
+            all_names = [schema["name"] for schema in all_schema]
+        except Exception:
+            self._errors.append(
+                "Unable to extract device schema for device: {}."
+                "Template: {}".format(origin_device_id, template)
+            )
+            return
 
         for telemetry_name in payload.keys():
             if create_payload_name_error or telemetry_name not in all_names:

@@ -4,9 +4,6 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import json
-import six
-
 from knack.util import CLIError
 from azext_iot._factory import _bind_sdk
 from azext_iot.common._azure import get_iot_hub_token_from_central_app_id
@@ -34,7 +31,7 @@ def iot_central_device_show(
         raise CLIError(unpack_msrest_error(e))
 
 
-def iot_central_device_capability_model_get(
+def iot_central_device_capability_model_show(
     cmd, device_id, app_id, central_api_uri="api.azureiotcentral.com"
 ):
     provider = CentralDeviceProvider(cmd, app_id)

@@ -192,7 +192,7 @@ def load_command_table(self, _):
         "iot central app capability-model", command_type=iotcentral_ops
     ) as cmd_group:
         cmd_group.command(
-            "get", "iot_central_device_capability_model_get", is_preview=True
+            "show", "iot_central_device_capability_model_show", is_preview=True
         )
 
     with self.command_group(

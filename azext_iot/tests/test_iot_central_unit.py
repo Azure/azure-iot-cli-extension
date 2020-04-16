@@ -11,7 +11,6 @@ from knack.util import CLIError
 from azure.cli.core.mock import DummyCli
 from azext_iot.operations import central as subject
 from azext_iot.common.shared import SdkType
-from azext_iot.common.utility import validate_min_python_version
 from azext_iot.central.providers import CentralDeviceProvider
 
 from .helpers import load_json
@@ -164,10 +163,6 @@ class TestDeviceTwinShow:
         assert args[0] == ({"entity": resource}, SdkType.service_sdk)
 
 
-@pytest.mark.skipif(
-    not validate_min_python_version(3, 5, exit_on_fail=False),
-    reason="minimum python version not satisfied",
-)
 class TestMonitorEvents:
     @pytest.mark.parametrize("timeout, exception", [(-1, CLIError)])
     def test_monitor_events_invalid_args(self, timeout, exception, fixture_cmd):
@@ -175,10 +170,6 @@ class TestMonitorEvents:
             subject.iot_central_monitor_events(fixture_cmd, app_id, timeout=timeout)
 
 
-@pytest.mark.skipif(
-    not validate_min_python_version(3, 5, exit_on_fail=False),
-    reason="minimum python version not satisfied",
-)
 class TestCentralDeviceProvider:
     _device = load_json(FileNames.central_device_file)
     _device_template = load_json(FileNames.central_device_template_file)

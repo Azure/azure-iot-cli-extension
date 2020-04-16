@@ -3,12 +3,12 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-# This is largely derived from https://docs.microsoft.com/en-us/rest/api/iotcentral/devices
+# This is largely derived from https://docs.microsoft.com/en-us/rest/api/iotcentral/devicetemplates
 
 import requests
 
 from knack.util import CLIError
-from ._utility import get_token
+from . import _utility as utility
 
 
 def get_device_template(
@@ -17,7 +17,7 @@ def get_device_template(
     app_id: str,
     token: str,
     central_dns_suffix="azureiotcentral.com",
-) -> str:
+) -> dict:
     """
     Get device template given a device id
 
@@ -32,14 +32,10 @@ def get_device_template(
     Returns:
         device: dict
     """
-
-    if not token:
-        token = get_token(token, cmd)
-
     url = "https://{}.{}/api/preview/deviceTemplates/{}".format(
         app_id, central_dns_suffix, device_template_urn
     )
-    headers = {"Authorization": token}
+    headers = utility.get_headers(token, cmd)
 
     response = requests.get(url, headers=headers)
 

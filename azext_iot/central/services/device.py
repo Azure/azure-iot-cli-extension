@@ -8,7 +8,7 @@
 import requests
 
 from knack.util import CLIError
-from ._utility import get_token
+from . import _utility as utility
 
 
 def get_device(
@@ -17,7 +17,7 @@ def get_device(
     app_id: str,
     token: str,
     central_dns_suffix="azureiotcentral.com",
-) -> str:
+) -> dict:
     """
     Get device info given a device id
 
@@ -33,13 +33,10 @@ def get_device(
         device: dict
     """
 
-    if not token:
-        token = get_token(token, cmd)
-
     url = "https://{}.{}/api/preview/devices/{}".format(
         app_id, central_dns_suffix, device_id
     )
-    headers = {"Authorization": token}
+    headers = utility.get_headers(token, cmd)
 
     response = requests.get(url, headers=headers)
 
