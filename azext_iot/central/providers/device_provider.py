@@ -24,44 +24,9 @@ class CentralDeviceProvider:
         self._cmd = cmd
         self._app_id = app_id
         self._token = token
-        self._device_templates = {}
         self._devices = {}
 
-    def get_device_template(
-        self, device_id, central_dns_suffix="azureiotcentral.com",
-    ):
-        device = self.get_device(device_id, central_dns_suffix)
-        device_template_urn = device["instanceOf"]
-
-        if not device_template_urn:
-            raise CLIError(
-                "No device template urn found for device '{}'".format(device_id)
-            )
-
-        # get or add to cache
-        if (
-            device_template_urn not in self._device_templates
-            or not self._device_templates.get(device_template_urn)
-        ):
-            self._device_templates[
-                device_template_urn
-            ] = central_services.device_template.get_device_template(
-                self._cmd,
-                device_template_urn,
-                self._app_id,
-                self._token,
-                central_dns_suffix,
-            )
-
-        device_template = self._device_templates[device_template_urn]
-        if not device_template:
-            raise CLIError(
-                "No device template for device with id: '{}'.".format(device_id)
-            )
-
-        return device_template
-
-    def get_device(
+    def show_device(
         self, device_id, central_dns_suffix="azureiotcentral.com",
     ):
         if not device_id:
@@ -78,3 +43,14 @@ class CentralDeviceProvider:
             raise CLIError("No device found with id: '{}'.".format(device_id))
 
         return device
+
+    def list_devices(
+        self, central_dns_suffix="azureiotcentral.com",
+    ):
+        devices = central_services.device.list_devices(
+            cmd=self._cmd, app_id=self._app_id, token=self._token
+        )
+        for device in devices:
+            self._devices[device["id"]] = device
+
+        return self._devices

@@ -10,6 +10,8 @@ import requests
 from knack.util import CLIError
 from . import _utility as utility
 
+BASE_PATH = "api/preview/devices"
+
 
 def get_device(
     cmd,
@@ -33,9 +35,7 @@ def get_device(
         device: dict
     """
 
-    url = "https://{}.{}/api/preview/devices/{}".format(
-        app_id, central_dns_suffix, device_id
-    )
+    url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, device_id)
     headers = utility.get_headers(token, cmd)
 
     response = requests.get(url, headers=headers)
@@ -46,3 +46,37 @@ def get_device(
         raise CLIError(body["error"])
 
     return body
+
+
+def list_devices(
+    cmd, app_id: str, token: str, central_dns_suffix="azureiotcentral.com",
+) -> list:
+    """
+    Get device info given a device id
+
+    Args:
+        cmd: command passed into az
+        device_id: unique case-sensitive device id,
+        app_id: name of app (used for forming request URL)
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        device: dict
+    """
+
+    url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
+    headers = utility.get_headers(token, cmd)
+
+    response = requests.get(url, headers=headers)
+
+    body = response.json()
+
+    if "error" in body:
+        raise CLIError(body["error"])
+
+    if "value" not in body:
+        raise CLIError("Value is not present in body: {}".format(body))
+
+    return body["value"]

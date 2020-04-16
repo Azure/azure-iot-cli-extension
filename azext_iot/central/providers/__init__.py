@@ -5,5 +5,6 @@
 # --------------------------------------------------------------------------------------------
 
 from .device_provider import CentralDeviceProvider
+from .device_template_provider import CentralDeviceTemplateProvider
 
-__all__ = ["CentralDeviceProvider"]
+__all__ = ["CentralDeviceProvider", "CentralDeviceTemplateProvider"]
