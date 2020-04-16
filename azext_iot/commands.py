@@ -189,6 +189,13 @@ def load_command_table(self, _):
         )
 
     with self.command_group(
+        "iot central app capability-model", command_type=iotcentral_ops
+    ) as cmd_group:
+        cmd_group.command(
+            "show", "iot_central_device_capability_model_show", is_preview=True
+        )
+
+    with self.command_group(
         "iot central device-twin", command_type=iotcentral_ops
     ) as cmd_group:
         cmd_group.command("show", "iot_central_device_show")

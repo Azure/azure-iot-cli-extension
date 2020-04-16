@@ -1,36 +1,51 @@
-import pytest
+# coding=utf-8
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See License.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+
 import json
+import mock
+import pytest
+
 from knack.util import CLIError
 from uamqp.message import Message, MessageProperties
 from azure.cli.core.extension import get_extension_path
-from azext_iot.common.utility import validate_min_python_version
+from azext_iot.central.providers import CentralDeviceProvider
+from azext_iot.common.utility import (
+    validate_min_python_version,
+    process_json_arg,
+    read_file_content,
+    logger,
+)
 from azext_iot.common.deps import ensure_uamqp
-from azext_iot._validators import mode2_iot_login_handler
 from azext_iot.constants import EVENT_LIB, EXTENSION_NAME
-from azext_iot.common.utility import process_json_arg, read_file_content, logger
 from azext_iot.operations.events3 import _parser
+from azext_iot._validators import mode2_iot_login_handler
+from .helpers import load_json
+from .test_constants import FileNames
 
 
 class TestMinPython(object):
     @pytest.mark.parametrize("pymajor, pyminor", [(3, 6), (3, 4), (2, 7)])
-    def test_min_python(self, mocker, pymajor, pyminor):
-        version_mock = mocker.patch("azext_iot.common.utility.sys.version_info")
-        version_mock.major = pymajor
-        version_mock.minor = pyminor
+    def test_min_python(self, pymajor, pyminor):
+        with mock.patch("azext_iot.common.utility.sys.version_info") as version_mock:
+            version_mock.major = pymajor
+            version_mock.minor = pyminor
 
-        assert validate_min_python_version(2, 7)
+            assert validate_min_python_version(2, 7)
 
     @pytest.mark.parametrize(
         "pymajor, pyminor, exception",
         [(3, 6, SystemExit), (3, 4, SystemExit), (2, 7, SystemExit)],
     )
-    def test_min_python_error(self, mocker, pymajor, pyminor, exception):
-        version_mock = mocker.patch("azext_iot.common.utility.sys.version_info")
-        version_mock.major = 2
-        version_mock.minor = 6
+    def test_min_python_error(self, pymajor, pyminor, exception):
+        with mock.patch("azext_iot.common.utility.sys.version_info") as version_mock:
+            version_mock.major = 2
+            version_mock.minor = 6
 
-        with pytest.raises(exception):
-            validate_min_python_version(pymajor, pyminor)
+            with pytest.raises(exception):
+                validate_min_python_version(pymajor, pyminor)
 
 
 class TestMode2Handler(object):
@@ -269,13 +284,9 @@ class TestProcessJsonArg(object):
         assert mocked_util_logger.call_count == 0
 
 
-@pytest.mark.skipif(
-    not validate_min_python_version(3, 5, exit_on_fail=False),
-    reason="minimum python version not satisfied",
-)
 class TestEvents3Parser:
     device_id = "some-device-id"
-    payload = {"someProperty": "someValue"}
+    payload = {"String": "someValue"}
     encoding = "UTF-8"
     content_type = "application/json"
 
@@ -283,10 +294,12 @@ class TestEvents3Parser:
     bad_payload = "bad-payload"
     bad_content_type = "bad-content-type"
 
+    bad_dcm_payload = {"temperature": "someValue"}
+
     def test_parse_message_should_succeed(self):
         # setup
-        app_prop_type = "some_app_prop"
-        app_prop_value = "some_app_value"
+        app_prop_type = "some_property"
+        app_prop_value = "some_value"
         properties = MessageProperties(
             content_encoding=self.encoding, content_type=self.content_type
         )
@@ -298,6 +311,10 @@ class TestEvents3Parser:
         )
         parser = _parser.Event3Parser()
 
+        device_template = load_json(FileNames.central_device_template_file)
+        provider = CentralDeviceProvider(cmd=None, app_id=None)
+        provider.get_device_template = mock.MagicMock(return_value=device_template)
+
         # act
         parsed_msg = parser.parse_message(
             message=message,
@@ -306,6 +323,7 @@ class TestEvents3Parser:
             properties={"all"},
             content_type_hint=None,
             simulate_errors=False,
+            central_device_provider=provider,
         )
 
         # verify
@@ -347,6 +365,7 @@ class TestEvents3Parser:
             properties=None,
             content_type_hint=None,
             simulate_errors=False,
+            central_device_provider=None,
         )
 
         # verify
@@ -361,9 +380,7 @@ class TestEvents3Parser:
     def test_parse_message_bad_content_type_should_warn(self):
         # setup
         encoded_payload = json.dumps(self.payload).encode()
-        properties = MessageProperties(
-            content_type=self.bad_content_type
-        )
+        properties = MessageProperties(content_type=self.bad_content_type)
         message = Message(
             body=encoded_payload,
             properties=properties,
@@ -372,7 +389,15 @@ class TestEvents3Parser:
         parser = _parser.Event3Parser()
 
         # act
-        parsed_msg = parser.parse_message(message, None, None, None, None, False)
+        parsed_msg = parser.parse_message(
+            message=message,
+            pnp_context=False,
+            interface_name=None,
+            properties=None,
+            content_type_hint=None,
+            simulate_errors=False,
+            central_device_provider=None,
+        )
 
         # verify
         # since the content_encoding header is not present, just dump the raw payload
@@ -404,7 +429,15 @@ class TestEvents3Parser:
         parser = _parser.Event3Parser()
 
         # act
-        parser.parse_message(message, None, None, None, None, False)
+        parser.parse_message(
+            message=message,
+            pnp_context=False,
+            interface_name=None,
+            properties=None,
+            content_type_hint=None,
+            simulate_errors=False,
+            central_device_provider=None,
+        )
 
         assert len(parser._errors) == 1
         assert len(parser._warnings) == 0
@@ -426,7 +459,15 @@ class TestEvents3Parser:
         parser = _parser.Event3Parser()
 
         # act
-        parsed_msg = parser.parse_message(message, None, None, None, None, False)
+        parsed_msg = parser.parse_message(
+            message=message,
+            pnp_context=False,
+            interface_name=None,
+            properties=None,
+            content_type_hint=None,
+            simulate_errors=False,
+            central_device_provider=None,
+        )
 
         # verify
         # parsing should attempt to place raw payload into result even if parsing fails
@@ -466,6 +507,7 @@ class TestEvents3Parser:
             properties=None,
             content_type_hint=None,
             simulate_errors=False,
+            central_device_provider=None,
         )
 
         # verify
@@ -483,3 +525,96 @@ class TestEvents3Parser:
             self.device_id, expected_interface_name, actual_interface_name
         )
         assert actual_error == expected_error
+
+    def test_validate_against_template_should_fail(self):
+        # setup
+        app_prop_type = "some_property"
+        app_prop_value = "some_value"
+        properties = MessageProperties(
+            content_encoding=self.encoding, content_type=self.content_type
+        )
+        message = Message(
+            body=json.dumps(self.bad_dcm_payload).encode(),
+            properties=properties,
+            annotations={_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
+            application_properties={app_prop_type.encode(): app_prop_value.encode()},
+        )
+        parser = _parser.Event3Parser()
+
+        device_template = load_json(FileNames.central_device_template_file)
+        provider = CentralDeviceProvider(cmd=None, app_id=None)
+        provider.get_device_template = mock.MagicMock(return_value=device_template)
+
+        # act
+        parsed_msg = parser.parse_message(
+            message=message,
+            pnp_context=False,
+            interface_name=None,
+            properties={"all"},
+            content_type_hint=None,
+            simulate_errors=False,
+            central_device_provider=provider,
+        )
+
+        # verify
+        assert parsed_msg["event"]["payload"] == self.bad_dcm_payload
+        assert parsed_msg["event"]["origin"] == self.device_id
+        device_identifier = str(_parser.DEVICE_ID_IDENTIFIER, "utf8")
+        assert parsed_msg["event"]["annotations"][device_identifier] == self.device_id
+
+        properties = parsed_msg["event"]["properties"]
+        assert properties["system"]["content_encoding"] == self.encoding
+        assert properties["system"]["content_type"] == self.content_type
+        assert properties["application"][app_prop_type] == app_prop_value
+
+        assert len(parser._errors) == 1
+        assert len(parser._warnings) == 0
+        assert len(parser._info) == 0
+
+        actual_error = parser._errors[0]
+        expected_error = "Telemetry item '{}' is not present in DCM.".format(
+            list(self.bad_dcm_payload)[0]
+        )
+        assert expected_error in actual_error
+
+    def test_validate_against_bad_template_should_not_throw(self):
+        # setup
+        app_prop_type = "some_property"
+        app_prop_value = "some_value"
+        properties = MessageProperties(
+            content_encoding=self.encoding, content_type=self.content_type
+        )
+        message = Message(
+            body=json.dumps(self.bad_dcm_payload).encode(),
+            properties=properties,
+            annotations={_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
+            application_properties={app_prop_type.encode(): app_prop_value.encode()},
+        )
+        parser = _parser.Event3Parser()
+
+        provider = CentralDeviceProvider(cmd=None, app_id=None)
+        provider.get_device_template = mock.MagicMock(
+            return_value="an_unparseable_template"
+        )
+
+        # act
+        parsed_msg = parser.parse_message(
+            message=message,
+            pnp_context=False,
+            interface_name=None,
+            properties={"all"},
+            content_type_hint=None,
+            simulate_errors=False,
+            central_device_provider=provider,
+        )
+
+        # verify
+        assert parsed_msg["event"]["payload"] == self.bad_dcm_payload
+        assert parsed_msg["event"]["origin"] == self.device_id
+
+        assert len(parser._errors) == 1
+        assert len(parser._warnings) == 0
+        assert len(parser._info) == 0
+
+        actual_error = parser._errors[0]
+        assert "Unable to extract device schema for device" in actual_error

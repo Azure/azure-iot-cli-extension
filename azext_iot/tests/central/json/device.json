@@ -1,0 +1,9 @@
+{
+    "id": "device-id",
+    "etag": "some-etag",
+    "displayName": "device-id",
+    "instanceOf": "urn:d9cltbeus:tvj4oal1a0",
+    "simulated": false,
+    "provisioned": true,
+    "approved": true
+}

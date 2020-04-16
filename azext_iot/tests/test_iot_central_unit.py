@@ -8,10 +8,13 @@ import mock
 import pytest
 
 from knack.util import CLIError
+from azure.cli.core.mock import DummyCli
 from azext_iot.operations import central as subject
 from azext_iot.common.shared import SdkType
-from azure.cli.core.mock import DummyCli
-from azext_iot.common.utility import validate_min_python_version
+from azext_iot.central.providers import CentralDeviceProvider
+
+from .helpers import load_json
+from .test_constants import FileNames
 
 
 device_id = "mydevice"
@@ -160,12 +163,57 @@ class TestDeviceTwinShow:
         assert args[0] == ({"entity": resource}, SdkType.service_sdk)
 
 
-@pytest.mark.skipif(
-    not validate_min_python_version(3, 5, exit_on_fail=False),
-    reason="minimum python version not satisfied",
-)
 class TestMonitorEvents:
     @pytest.mark.parametrize("timeout, exception", [(-1, CLIError)])
     def test_monitor_events_invalid_args(self, timeout, exception, fixture_cmd):
         with pytest.raises(exception):
             subject.iot_central_monitor_events(fixture_cmd, app_id, timeout=timeout)
+
+
+class TestCentralDeviceProvider:
+    _device = load_json(FileNames.central_device_file)
+    _device_template = load_json(FileNames.central_device_template_file)
+
+    @mock.patch("azext_iot.central.services.device_template")
+    @mock.patch("azext_iot.central.services.device")
+    def test_should_return_device(self, mock_device_svc, mock_device_template_svc):
+        # setup
+        provider = CentralDeviceProvider(cmd=None, app_id=app_id)
+        mock_device_svc.get_device.return_value = self._device
+        mock_device_template_svc.get_device_template.return_value = (
+            self._device_template
+        )
+
+        # act
+        device = provider.get_device("someDeviceId")
+        # check that caching is working
+        device = provider.get_device("someDeviceId")
+
+        # verify
+        # call counts should be at most 1 since the provider has a cache
+        assert mock_device_svc.get_device.call_count == 1
+        assert mock_device_svc.get_device_template.call_count == 0
+        assert device == self._device
+
+    @mock.patch("azext_iot.central.services.device_template")
+    @mock.patch("azext_iot.central.services.device")
+    def test_should_return_device_template(
+        self, mock_device_svc, mock_device_template_svc
+    ):
+        # setup
+        provider = CentralDeviceProvider(cmd=None, app_id=app_id)
+        mock_device_svc.get_device.return_value = self._device
+        mock_device_template_svc.get_device_template.return_value = (
+            self._device_template
+        )
+
+        # act
+        template = provider.get_device_template("someDeviceId")
+        # check that caching is working
+        template = provider.get_device_template("someDeviceId")
+
+        # verify
+        # call counts should be at most 1 since the provider has a cache
+        assert mock_device_svc.get_device.call_count == 1
+        assert mock_device_template_svc.get_device_template.call_count == 1
+        assert template == self._device_template

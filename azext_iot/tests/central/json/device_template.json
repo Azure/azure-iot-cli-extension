@@ -1,0 +1,287 @@
+{
+    "id": "urn:d9cltbeus:tvj4oal1a0",
+    "etag": "\"~WgqHZmg+d95gTA53P8AnqBsDLGgj2wa0msOL7xozC9Y=\"",
+    "types": [
+        "DeviceModel"
+    ],
+    "displayName": "duplicate-field-name",
+    "capabilityModel": {
+        "@id": "urn:sampleApp:modelOne_bz:2",
+        "@type": [
+            "CapabilityModel"
+        ],
+        "implements": [
+            {
+                "@id": "urn:sampleApp:modelOne_bz:_rpgcmdpo:1",
+                "@type": [
+                    "InterfaceInstance"
+                ],
+                "displayName": "Interface",
+                "name": "modelOne_g4",
+                "schema": {
+                    "@id": "urn:sampleApp:modelOne_g4:1",
+                    "@type": [
+                        "Interface"
+                    ],
+                    "displayName": "Interface",
+                    "contents": [
+                        {
+                            "@id": "urn:sampleApp:modelOne_g4:Bool:1",
+                            "@type": [
+                                "Telemetry"
+                            ],
+                            "displayName": "Bool",
+                            "name": "Bool",
+                            "schema": "boolean"
+                        },
+                        {
+                            "@id": "urn:sampleApp:modelOne_g4:Date:1",
+                            "@type": [
+                                "Telemetry"
+                            ],
+                            "displayName": "Date",
+                            "name": "Date",
+                            "schema": "date"
+                        },
+                        {
+                            "@id": "urn:sampleApp:modelOne_g4:DateTime:1",
+                            "@type": [
+                                "Telemetry"
+                            ],
+                            "displayName": "DateTime",
+                            "name": "DateTime",
+                            "schema": "dateTime"
+                        },
+                        {
+                            "@id": "urn:sampleApp:modelOne_g4:Double:1",
+                            "@type": [
+                                "Telemetry"
+                            ],
+                            "displayName": "Double",
+                            "name": "Double",
+                            "schema": "double"
+                        },
+                        {
+                            "@id": "urn:sampleApp:modelOne_g4:Duration:1",
+                            "@type": [
+                                "Telemetry"
+                            ],
+                            "displayName": "Duration",
+                            "name": "Duration",
+                            "schema": "duration"
+                        },
+                        {
+                            "@id": "urn:sampleApp:modelOne_g4:IntEnum:1",
+                            "@type": [
+                                "Telemetry"
+                            ],
+                            "displayName": "IntEnum",
+                            "name": "IntEnum",
+                            "schema": {
+                                "@id": "urn:sampleApp:modelOne_g4:IntEnum:pgkbdhard:1",
+                                "@type": [
+                                    "Enum"
+                                ],
+                                "displayName": "Enum",
+                                "valueSchema": "integer",
+                                "enumValues": [
+                                    {
+                                        "@id": "urn:sampleApp:modelOne_g4:IntEnum:pgkbdhard:Enum1:1",
+                                        "@type": [
+                                            "EnumValue"
+                                        ],
+                                        "displayName": "Enum1",
+                                        "enumValue": 1,
+                                        "name": "Enum1"
+                                    },
+                                    {
+                                        "@id": "urn:sampleApp:modelOne_g4:IntEnum:pgkbdhard:Enum2:1",
+                                        "@type": [
+                                            "EnumValue"
+                                        ],
+                                        "displayName": "Enum2",
+                                        "enumValue": 2,
+                                        "name": "Enum2"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "@id": "urn:sampleApp:modelOne_g4:StringEnum:1",
+                            "@type": [
+                                "Telemetry"
+                            ],
+                            "displayName": "StringEnum",
+                            "name": "StringEnum",
+                            "schema": {
+                                "@id": "urn:sampleApp:modelOne_g4:StringEnum:kyesuinpsx:1",
+                                "@type": [
+                                    "Enum"
+                                ],
+                                "displayName": "Enum",
+                                "valueSchema": "string",
+                                "enumValues": [
+                                    {
+                                        "@id": "urn:sampleApp:modelOne_g4:StringEnum:kyesuinpsx:EnumA:1",
+                                        "@type": [
+                                            "EnumValue"
+                                        ],
+                                        "displayName": "EnumA",
+                                        "enumValue": "A",
+                                        "name": "EnumA"
+                                    },
+                                    {
+                                        "@id": "urn:sampleApp:modelOne_g4:StringEnum:kyesuinpsx:EnumB:1",
+                                        "@type": [
+                                            "EnumValue"
+                                        ],
+                                        "displayName": "EnumB",
+                                        "enumValue": "B",
+                                        "name": "EnumB"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "@id": "urn:sampleApp:modelOne_g4:Float:1",
+                            "@type": [
+                                "Telemetry"
+                            ],
+                            "displayName": "Float",
+                            "name": "Float",
+                            "schema": "float"
+                        },
+                        {
+                            "@id": "urn:sampleApp:modelOne_g4:Geopoint:1",
+                            "@type": [
+                                "Telemetry"
+                            ],
+                            "displayName": "Geopoint",
+                            "name": "Geopoint",
+                            "schema": "geopoint"
+                        },
+                        {
+                            "@id": "urn:sampleApp:modelOne_g4:Int:1",
+                            "@type": [
+                                "Telemetry"
+                            ],
+                            "displayName": "Int",
+                            "name": "Int",
+                            "schema": "integer"
+                        },
+                        {
+                            "@id": "urn:sampleApp:modelOne_g4:Long:1",
+                            "@type": [
+                                "Telemetry"
+                            ],
+                            "displayName": "Long",
+                            "name": "Long",
+                            "schema": "long"
+                        },
+                        {
+                            "@id": "urn:sampleApp:modelOne_g4:Object:1",
+                            "@type": [
+                                "Telemetry"
+                            ],
+                            "displayName": "Object",
+                            "name": "Object",
+                            "schema": {
+                                "@id": "urn:sampleApp:modelOne_g4:Object:8ot2x5whp8:1",
+                                "@type": [
+                                    "Object"
+                                ],
+                                "displayName": "Object",
+                                "fields": [
+                                    {
+                                        "@id": "urn:sampleApp:modelOne_g4:Object:8ot2x5whp8:Double:1",
+                                        "@type": [
+                                            "SchemaField"
+                                        ],
+                                        "displayName": "Double",
+                                        "name": "Double",
+                                        "schema": "double"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "@id": "urn:sampleApp:modelOne_g4:String:1",
+                            "@type": [
+                                "Telemetry"
+                            ],
+                            "displayName": "String",
+                            "name": "String",
+                            "schema": "string"
+                        },
+                        {
+                            "@id": "urn:sampleApp:modelOne_g4:Time:1",
+                            "@type": [
+                                "Telemetry"
+                            ],
+                            "displayName": "Time",
+                            "name": "Time",
+                            "schema": "time"
+                        },
+                        {
+                            "@id": "urn:sampleApp:modelOne_g4:Vector:1",
+                            "@type": [
+                                "Telemetry"
+                            ],
+                            "displayName": "Vector",
+                            "name": "Vector",
+                            "schema": "vector"
+                        }
+                    ]
+                }
+            },
+            {
+                "@id": "urn:sampleApp:modelOne_bz:myxqftpsr:2",
+                "@type": [
+                    "InterfaceInstance"
+                ],
+                "displayName": "Interface",
+                "name": "modelTwo_ed",
+                "schema": {
+                    "@id": "urn:sampleApp:modelTwo_ed:1",
+                    "@type": [
+                        "Interface"
+                    ],
+                    "displayName": "Interface",
+                    "contents": [
+                        {
+                            "@id": "urn:sampleApp:modelTwo_ed:Bool:1",
+                            "@type": [
+                                "Telemetry"
+                            ],
+                            "displayName": "Bool",
+                            "name": "Bool",
+                            "schema": "boolean"
+                        },
+                        {
+                            "@id": "urn:sampleApp:modelTwo_ed:bool:1",
+                            "@type": [
+                                "Telemetry"
+                            ],
+                            "displayName": "bool",
+                            "name": "bool",
+                            "schema": "boolean"
+                        }
+                    ]
+                }
+            }
+        ],
+        "displayName": "larger-telemetry-device",
+        "@context": [
+            "http://azureiot.com/v1/contexts/IoTModel.json"
+        ]
+    },
+    "solutionModel": {
+        "@id": "urn:d9cltbeus:lz1tl4a_jz",
+        "@type": [
+            "SolutionModel"
+        ],
+        "cloudProperties": [],
+        "initialValues": [],
+        "overrides": []
+    }
+}
