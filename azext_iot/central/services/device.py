@@ -112,15 +112,15 @@ def add_device(
 
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, device_id)
     headers = utility.get_headers(token, cmd, has_json_payload=True)
-    body = {
+    payload = {
         "displayName": device_name,
-        "simualted": simulated,
+        "simulated": simulated,
         "approved": True,
     }
     if instance_of:
-        body["instanceOf"] = instance_of
+        payload["instanceOf"] = instance_of
 
-    response = requests.put(url, headers=headers, json=body)
+    response = requests.put(url, headers=headers, json=payload)
 
     body = response.json()
 

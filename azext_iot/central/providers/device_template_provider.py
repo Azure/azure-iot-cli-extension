@@ -4,10 +4,12 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import json
+import os
+
 from knack.util import CLIError
 from azext_iot.central import services as central_services
-
-from .device_provider import CentralDeviceProvider
+from azext_iot.common import utility
 
 
 class CentralDeviceTemplateProvider:
@@ -39,11 +41,11 @@ class CentralDeviceTemplateProvider:
             self._device_templates[
                 device_template_id
             ] = central_services.device_template.get_device_template(
-                self._cmd,
-                device_template_id,
-                self._app_id,
-                self._token,
-                central_dns_suffix,
+                cmd=self._cmd,
+                app_id=self._app_id,
+                device_template_id=device_template_id,
+                token=self._token,
+                central_dns_suffix=central_dns_suffix,
             )
 
         device_template = self._device_templates[device_template_id]
@@ -66,3 +68,39 @@ class CentralDeviceTemplateProvider:
             self._device_templates[template["id"]] = template
 
         return self._device_templates
+
+    def map_device_templates(
+        self, central_dns_suffix="azureiotcentral.com",
+    ):
+        templates = central_services.device_template.list_device_templates(
+            cmd=self._cmd, app_id=self._app_id, token=self._token
+        )
+        return {template["displayName"]: template["id"] for template in templates}
+
+    def add_device_template(
+        self,
+        device_template_id: str,
+        file_path: str,
+        central_dns_suffix="azureiotcentral.com",
+    ):
+        if not os.path.exists(file_path):
+            raise CLIError('File path "{}" does not exist!'.format(file_path))
+
+        content = utility.read_file_content(file_path)
+        try:
+            payload = json.loads(content)
+        except Exception:
+            raise CLIError("File must be json format")
+
+        template = central_services.device_template.add_device_template(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_template_id=device_template_id,
+            payload=payload,
+            token=self._token,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+        self._device_templates[template["id"]] = template
+
+        return template

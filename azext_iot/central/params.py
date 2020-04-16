@@ -33,3 +33,13 @@ def load_central_arguments(self, _):
             help="Add this flag if you would like IoT Central to set this up as a simulated device. "
             "--instance-of is required if this is true",
         )
+        context.argument(
+            "device_template_id",
+            options_list=["--device-template-id"],
+            help="Device template id. Example: somedevicetemplate",
+        )
+        context.argument(
+            "file_path",
+            options_list=["--file-path", "--fp"],
+            help="Path to file containing the device template to be added to IoT Central. Example: ./path/to/template.json",
+        )

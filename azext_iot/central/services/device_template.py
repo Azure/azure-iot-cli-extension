@@ -8,15 +8,18 @@
 import requests
 
 from knack.util import CLIError
+from knack.log import get_logger
 from . import _utility as utility
+
+logger = get_logger(__name__)
 
 BASE_PATH = "api/preview/deviceTemplates"
 
 
 def get_device_template(
     cmd,
-    device_template_urn: str,
     app_id: str,
+    device_template_id: str,
     token: str,
     central_dns_suffix="azureiotcentral.com",
 ) -> dict:
@@ -25,7 +28,7 @@ def get_device_template(
 
     Args:
         cmd: command passed into az
-        device_template_urn: case sensitive device template urn,
+        device_template_id: case sensitive device template urn,
         app_id: name of app (used for forming request URL)
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
@@ -35,7 +38,7 @@ def get_device_template(
         device: dict
     """
     url = "https://{}.{}/{}/{}".format(
-        app_id, central_dns_suffix, BASE_PATH, device_template_urn
+        app_id, central_dns_suffix, BASE_PATH, device_template_id
     )
     headers = utility.get_headers(token, cmd)
 
@@ -81,3 +84,41 @@ def list_device_templates(
         raise CLIError("Value is not present in body: {}".format(body))
 
     return body["value"]
+
+
+def add_device_template(
+    cmd,
+    app_id: str,
+    device_template_id: str,
+    payload: dict,
+    token: str,
+    central_dns_suffix="azureiotcentral.com",
+) -> list:
+    """
+    Get device info given a device id
+
+    Args:
+        cmd: command passed into az
+        device_id: unique case-sensitive device id,
+        app_id: name of app (used for forming request URL)
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        device: dict
+    """
+
+    url = "https://{}.{}/{}/{}".format(
+        app_id, central_dns_suffix, BASE_PATH, device_template_id
+    )
+    headers = utility.get_headers(token, cmd, has_json_payload=True)
+
+    response = requests.put(url, headers=headers, json=payload)
+
+    body = response.json()
+
+    if "error" in body:
+        raise CLIError(body["error"])
+
+    return body
