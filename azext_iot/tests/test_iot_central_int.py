@@ -9,17 +9,18 @@ from azure.cli.testsdk import LiveScenarioTest
 
 APP_ID = os.environ.get("azext_iot_central_app_id")
 DEVICE_ID = os.environ.get("azext_iot_central_device_id")
+DEVICE_TEMPLATE_ID = os.environ.get("azext_iot_central_device_template_id")
 
-if not all([APP_ID, DEVICE_ID]):
+if not all([APP_ID, DEVICE_ID, DEVICE_TEMPLATE_ID]):
     raise ValueError(
-        "Set azext_iot_central_app_id "
-        "and azext_iot_central_device_id to run central integration tests. "
+        "Set azext_iot_central_app_id, azext_iot_central_device_id "
+        "and azext_iot_central_device_template_id to run central integration tests. "
     )
 
 
 class TestIotCentral(LiveScenarioTest):
-    def __init__(self, test_method):
-        super(TestIotCentral, self).__init__("test_central_device_show")
+    def __init__(self, test_case):
+        super(TestIotCentral, self).__init__(test_case)
 
     def test_central_device_show(self):
         # Verify incorrect app-id throws error
@@ -63,3 +64,65 @@ class TestIotCentral(LiveScenarioTest):
         # Ensure no failure
         # We cannot verify that the result is correct, as the Azure CLI for IoT Central does not support adding devices
         self.cmd("iot central app validate-messages --app-id {} --to 1".format(APP_ID))
+
+    def test_central_device_methods_CRLD(self):
+        # currently: create, show, list, delete
+        self.cmd(
+            "iot central app device create --app-id {} -d {}".format(APP_ID, DEVICE_ID),
+            checks=[
+                self.check("approved", True),
+                self.check("displayName", DEVICE_ID),
+                self.check("id", DEVICE_ID),
+                self.check("simulated", False),
+            ],
+        )
+
+        self.cmd(
+            "iot central app device show --app-id {} -d {}".format(APP_ID, DEVICE_ID),
+            checks=[
+                self.check("approved", True),
+                self.check("displayName", DEVICE_ID),
+                self.check("id", DEVICE_ID),
+                self.check("simulated", False),
+            ],
+        )
+
+        list_output = self.cmd("iot central app device list --app-id {}".format(APP_ID))
+
+        self.cmd(
+            "iot central app device delete --app-id {} -d {}".format(APP_ID, DEVICE_ID),
+            checks=[self.check("result", "success")],
+        )
+
+        assert DEVICE_ID in list_output.get_output_in_json()
+
+    def test_central_device_template_methods_CRLD(self):
+        # currently: create, show, list, delete
+        self.cmd(
+            "iot central app device create --app-id {} -d {}".format(APP_ID, DEVICE_ID),
+            checks=[
+                self.check("approved", True),
+                self.check("displayName", DEVICE_ID),
+                self.check("id", DEVICE_ID),
+                self.check("simulated", False),
+            ],
+        )
+
+        self.cmd(
+            "iot central app device show --app-id {} -d {}".format(APP_ID, DEVICE_ID),
+            checks=[
+                self.check("approved", True),
+                self.check("displayName", DEVICE_ID),
+                self.check("id", DEVICE_ID),
+                self.check("simulated", False),
+            ],
+        )
+
+        list_output = self.cmd("iot central app device list --app-id {}".format(APP_ID))
+
+        self.cmd(
+            "iot central app device delete --app-id {} -d {}".format(APP_ID, DEVICE_ID),
+            checks=[self.check("result", "success")],
+        )
+
+        assert DEVICE_ID in list_output.get_output_in_json()

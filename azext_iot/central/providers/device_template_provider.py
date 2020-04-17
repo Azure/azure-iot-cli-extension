@@ -92,7 +92,7 @@ class CentralDeviceTemplateProvider:
         except Exception:
             raise CLIError("File must be json format")
 
-        template = central_services.device_template.add_device_template(
+        template = central_services.device_template.create_device_template(
             cmd=self._cmd,
             app_id=self._app_id,
             device_template_id=device_template_id,
@@ -104,3 +104,20 @@ class CentralDeviceTemplateProvider:
         self._device_templates[template["id"]] = template
 
         return template
+
+    def delete_device_template(
+        self, device_template_id, central_dns_suffix="azureiotcentral.com",
+    ):
+        if not device_template_id:
+            raise CLIError("Device template id must be specified.")
+
+        # get or add to cache
+        result = central_services.device_template.delete_device_template(
+            cmd=self._cmd,
+            token=self._token,
+            app_id=self._app_id,
+            device_template_id=device_template_id,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+        return result

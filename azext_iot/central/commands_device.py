@@ -21,7 +21,7 @@ def show_device(
     return provider.get_device(device_id)
 
 
-def add_device(
+def create_device(
     cmd,
     app_id: str,
     device_id: str,
@@ -35,10 +35,17 @@ def add_device(
             "Error: if you supply --simulated you must also specify --instance-of"
         )
     provider = CentralDeviceProvider(cmd, app_id)
-    return provider.add_device(
+    return provider.create_device(
         device_id=device_id,
         device_name=device_name,
         instance_of=instance_of,
         simulated=simulated,
         central_dns_suffix=central_dns_suffix,
     )
+
+
+def delete_device(
+    cmd, app_id: str, device_id: str, central_dns_suffix="azureiotcentral.com"
+):
+    provider = CentralDeviceProvider(cmd, app_id)
+    return provider.delete_device(device_id)

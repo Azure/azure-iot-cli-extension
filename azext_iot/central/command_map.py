@@ -28,7 +28,8 @@ def load_central_commands(self, _):
     ) as cmd_group:
         cmd_group.command("list", "list_devices")
         cmd_group.command("show", "show_device")
-        cmd_group.command("add", "add_device")
+        cmd_group.command("create", "create_device")
+        cmd_group.command("delete", "delete_device")
 
     with self.command_group(
         "iot central app device-template",
@@ -38,4 +39,5 @@ def load_central_commands(self, _):
         cmd_group.command("list", "list_device_templates")
         cmd_group.command("map", "map_device_templates")
         cmd_group.command("show", "show_device_template")
-        cmd_group.command("add", "add_device_template")
+        cmd_group.command("create", "create_device_template")
+        cmd_group.command("delete", "delete_device_template")

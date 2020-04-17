@@ -43,13 +43,7 @@ def get_device_template(
     headers = utility.get_headers(token, cmd)
 
     response = requests.get(url, headers=headers)
-
-    body = response.json()
-
-    if "error" in body:
-        raise CLIError(body["error"])
-
-    return body
+    return utility.try_extract_result(response)
 
 
 def list_device_templates(
@@ -75,18 +69,15 @@ def list_device_templates(
 
     response = requests.get(url, headers=headers)
 
-    body = response.json()
+    result = utility.try_extract_result(response)
 
-    if "error" in body:
-        raise CLIError(body["error"])
+    if "value" not in result:
+        raise CLIError("Value is not present in body: {}".format(result))
 
-    if "value" not in body:
-        raise CLIError("Value is not present in body: {}".format(body))
-
-    return body["value"]
+    return result["value"]
 
 
-def add_device_template(
+def create_device_template(
     cmd,
     app_id: str,
     device_template_id: str,
@@ -115,10 +106,34 @@ def add_device_template(
     headers = utility.get_headers(token, cmd, has_json_payload=True)
 
     response = requests.put(url, headers=headers, json=payload)
+    return utility.try_extract_result(response)
 
-    body = response.json()
 
-    if "error" in body:
-        raise CLIError(body["error"])
+def delete_device_template(
+    cmd,
+    token: str,
+    app_id: str,
+    device_template_id: str,
+    central_dns_suffix="azureiotcentral.com",
+) -> dict:
+    """
+    Get device info given a device id
 
-    return body
+    Args:
+        cmd: command passed into az
+        device_id: unique case-sensitive device id,
+        app_id: name of app (used for forming request URL)
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        device: dict
+    """
+    url = "https://{}.{}/{}/{}".format(
+        app_id, central_dns_suffix, BASE_PATH, device_template_id
+    )
+    headers = utility.get_headers(token, cmd)
+
+    response = requests.delete(url, headers=headers)
+    return utility.try_extract_result(response)

@@ -27,7 +27,7 @@ def map_device_templates(cmd, app_id: str, central_dns_suffix="azureiotcentral.c
     return provider.map_device_templates(central_dns_suffix=central_dns_suffix)
 
 
-def add_device_template(
+def create_device_template(
     cmd,
     app_id: str,
     device_template_id: str,
@@ -39,4 +39,13 @@ def add_device_template(
         device_template_id=device_template_id,
         file_path=file_path,
         central_dns_suffix=central_dns_suffix,
+    )
+
+
+def delete_device_template(
+    cmd, app_id: str, device_template_id: str, central_dns_suffix="azureiotcentral.com"
+):
+    provider = CentralDeviceTemplateProvider(cmd, app_id)
+    return provider.delete_device_template(
+        device_template_id=device_template_id, central_dns_suffix=central_dns_suffix
     )

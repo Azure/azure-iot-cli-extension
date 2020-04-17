@@ -55,7 +55,7 @@ class CentralDeviceProvider:
 
         return self._devices
 
-    def add_device(
+    def create_device(
         self,
         device_id,
         device_name=None,
@@ -71,7 +71,7 @@ class CentralDeviceProvider:
 
         # get or add to cache
         if device_id not in self._devices or not self._devices.get(device_id):
-            self._devices[device_id] = central_services.device.add_device(
+            self._devices[device_id] = central_services.device.create_device(
                 cmd=self._cmd,
                 token=self._token,
                 app_id=self._app_id,
@@ -87,3 +87,20 @@ class CentralDeviceProvider:
             raise CLIError("No device found with id: '{}'.".format(device_id))
 
         return device
+
+    def delete_device(
+        self, device_id, central_dns_suffix="azureiotcentral.com",
+    ):
+        if not device_id:
+            raise CLIError("Device id must be specified.")
+
+        # get or add to cache
+        result = central_services.device.delete_device(
+            cmd=self._cmd,
+            token=self._token,
+            app_id=self._app_id,
+            device_id=device_id,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+        return result
