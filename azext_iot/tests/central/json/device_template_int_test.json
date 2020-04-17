@@ -2,7 +2,7 @@
     "types": [
         "DeviceModel"
     ],
-    "displayName": "create-device-template-payload",
+    "displayName": "int-test-device-template",
     "capabilityModel": {
         "@id": "urn:sampleApp:modelOne_bz:2",
         "@type": [

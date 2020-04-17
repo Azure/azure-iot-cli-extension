@@ -5,6 +5,9 @@
 # --------------------------------------------------------------------------------------------
 # Dev note - think of this as a controller
 
+from knack.util import CLIError
+
+from azext_iot.common import utility
 from .providers import CentralDeviceTemplateProvider
 
 
@@ -31,13 +34,18 @@ def create_device_template(
     cmd,
     app_id: str,
     device_template_id: str,
-    file_path: str,
+    content: str,
     central_dns_suffix="azureiotcentral.com",
 ):
+    if not type(content) == str:
+        raise CLIError("content must be a string: {}".format(content))
+
+    payload = utility.process_json_arg(content, argument_name="content")
+
     provider = CentralDeviceTemplateProvider(cmd, app_id)
-    return provider.add_device_template(
+    return provider.create_device_template(
         device_template_id=device_template_id,
-        file_path=file_path,
+        payload=payload,
         central_dns_suffix=central_dns_suffix,
     )
 

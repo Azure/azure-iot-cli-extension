@@ -4,12 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import json
-import os
-
 from knack.util import CLIError
 from azext_iot.central import services as central_services
-from azext_iot.common import utility
 
 
 class CentralDeviceTemplateProvider:
@@ -77,21 +73,12 @@ class CentralDeviceTemplateProvider:
         )
         return {template["displayName"]: template["id"] for template in templates}
 
-    def add_device_template(
+    def create_device_template(
         self,
         device_template_id: str,
-        file_path: str,
+        payload: str,
         central_dns_suffix="azureiotcentral.com",
     ):
-        if not os.path.exists(file_path):
-            raise CLIError('File path "{}" does not exist!'.format(file_path))
-
-        content = utility.read_file_content(file_path)
-        try:
-            payload = json.loads(content)
-        except Exception:
-            raise CLIError("File must be json format")
-
         template = central_services.device_template.create_device_template(
             cmd=self._cmd,
             app_id=self._app_id,

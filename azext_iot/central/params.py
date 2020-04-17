@@ -39,7 +39,10 @@ def load_central_arguments(self, _):
             help="Device template id. Example: somedevicetemplate",
         )
         context.argument(
-            "file_path",
-            options_list=["--file-path", "--fp"],
-            help="Path to file containing the device template to be added to IoT Central. Example: ./path/to/template.json",
+            "content",
+            options_list=["--content", "-k"],
+            help="Configuration for request. "
+            "Provide path to JSON file or raw stringified JSON. "
+            "[File Path Example: ./path/to/file.json] "
+            "[Stringified JSON Example: {'a': 'b'}] ",
         )
