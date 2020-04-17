@@ -11,7 +11,7 @@ from azext_iot.central import services as central_services
 class CentralDeviceTemplateProvider:
     def __init__(self, cmd, app_id, token=None):
         """
-        Provider for device/device_template APIs
+        Provider for device_template APIs
 
         Args:
             cmd: command passed into az
@@ -30,21 +30,17 @@ class CentralDeviceTemplateProvider:
         self, device_template_id, central_dns_suffix="azureiotcentral.com",
     ):
         # get or add to cache
-        if (
-            device_template_id not in self._device_templates
-            or not self._device_templates.get(device_template_id)
-        ):
-            self._device_templates[
-                device_template_id
-            ] = central_services.device_template.get_device_template(
+        device_template = self._device_templates.get(device_template_id)
+        if not device_template:
+            device_template = central_services.device_template.get_device_template(
                 cmd=self._cmd,
                 app_id=self._app_id,
                 device_template_id=device_template_id,
                 token=self._token,
                 central_dns_suffix=central_dns_suffix,
             )
+            self._device_templates[device_template_id] = device_template
 
-        device_template = self._device_templates[device_template_id]
         if not device_template:
             raise CLIError(
                 "No device template for device template with id: '{}'.".format(
@@ -60,14 +56,19 @@ class CentralDeviceTemplateProvider:
         templates = central_services.device_template.list_device_templates(
             cmd=self._cmd, app_id=self._app_id, token=self._token
         )
-        for template in templates:
-            self._device_templates[template["id"]] = template
+
+        self._device_templates.update(
+            {template["id"]: template for template in templates}
+        )
 
         return self._device_templates
 
     def map_device_templates(
         self, central_dns_suffix="azureiotcentral.com",
     ):
+        """
+        Maps each template name to the corresponding template id
+        """
         templates = central_services.device_template.list_device_templates(
             cmd=self._cmd, app_id=self._app_id, token=self._token
         )
@@ -98,7 +99,6 @@ class CentralDeviceTemplateProvider:
         if not device_template_id:
             raise CLIError("Device template id must be specified.")
 
-        # get or add to cache
         result = central_services.device_template.delete_device_template(
             cmd=self._cmd,
             token=self._token,
@@ -106,5 +106,9 @@ class CentralDeviceTemplateProvider:
             device_template_id=device_template_id,
             central_dns_suffix=central_dns_suffix,
         )
+
+        # remove from cache
+        # pop "miss" raises a KeyError if None is not provided
+        self._device_templates.pop(device_template_id, None)
 
         return result

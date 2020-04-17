@@ -24,11 +24,11 @@ def get_device_template(
     central_dns_suffix="azureiotcentral.com",
 ) -> dict:
     """
-    Get device template given a device id
+    Get a specific device template from IoTC
 
     Args:
         cmd: command passed into az
-        device_template_id: case sensitive device template urn,
+        device_template_id: case sensitive device template id,
         app_id: name of app (used for forming request URL)
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
@@ -50,11 +50,10 @@ def list_device_templates(
     cmd, app_id: str, token: str, central_dns_suffix="azureiotcentral.com",
 ) -> list:
     """
-    Get device info given a device id
+    Get a list of all device templates in IoTC
 
     Args:
         cmd: command passed into az
-        device_id: unique case-sensitive device id,
         app_id: name of app (used for forming request URL)
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
@@ -86,12 +85,16 @@ def create_device_template(
     central_dns_suffix="azureiotcentral.com",
 ) -> list:
     """
-    Get device info given a device id
+    Create a device template in IoTC
 
     Args:
         cmd: command passed into az
-        device_id: unique case-sensitive device id,
         app_id: name of app (used for forming request URL)
+        device_template_id: case sensitive device template id,
+        payload: see example payload available in
+            <repo-root>/azext_iot/tests/central/json/device_template_int_test.json
+            or check here for more information
+            https://docs.microsoft.com/en-us/rest/api/iotcentral/devicetemplates
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
         central_dns_suffix: {centralDnsSuffixInPath} as found in docs
@@ -111,18 +114,18 @@ def create_device_template(
 
 def delete_device_template(
     cmd,
-    token: str,
     app_id: str,
     device_template_id: str,
+    token: str,
     central_dns_suffix="azureiotcentral.com",
 ) -> dict:
     """
-    Get device info given a device id
+    Delete a device template from IoTC
 
     Args:
         cmd: command passed into az
-        device_id: unique case-sensitive device id,
         app_id: name of app (used for forming request URL)
+        device_template_id: case sensitive device template id,
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
         central_dns_suffix: {centralDnsSuffixInPath} as found in docs

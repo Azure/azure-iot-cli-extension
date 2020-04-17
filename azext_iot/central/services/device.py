@@ -15,8 +15,8 @@ BASE_PATH = "api/preview/devices"
 
 def get_device(
     cmd,
-    device_id: str,
     app_id: str,
+    device_id: str,
     token: str,
     central_dns_suffix="azureiotcentral.com",
 ) -> dict:
@@ -46,18 +46,17 @@ def list_devices(
     cmd, app_id: str, token: str, central_dns_suffix="azureiotcentral.com",
 ) -> list:
     """
-    Get device info given a device id
+    Get a list of all devices in IoTC app
 
     Args:
         cmd: command passed into az
-        device_id: unique case-sensitive device id,
         app_id: name of app (used for forming request URL)
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
         central_dns_suffix: {centralDnsSuffixInPath} as found in docs
 
     Returns:
-        device: dict
+        list of devices
     """
 
     url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
@@ -75,21 +74,25 @@ def list_devices(
 
 def create_device(
     cmd,
-    token: str,
     app_id: str,
     device_id: str,
     device_name: str,
     instance_of: str,
     simulated: bool,
+    token: str,
     central_dns_suffix="azureiotcentral.com",
 ) -> dict:
     """
-    Get device info given a device id
+    Create a device in IoTC
 
     Args:
         cmd: command passed into az
-        device_id: unique case-sensitive device id,
         app_id: name of app (used for forming request URL)
+        device_id: unique case-sensitive device id
+        device_name: (non-unique) human readable name for the device
+        instance_of: (optional) string that maps to the device_template_id
+            of the device template that this device is to be an instance of
+        simulated: if IoTC is to simulate data for this device
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
         central_dns_suffix: {centralDnsSuffixInPath} as found in docs
@@ -117,24 +120,25 @@ def create_device(
 
 def delete_device(
     cmd,
-    token: str,
     app_id: str,
     device_id: str,
+    token: str,
     central_dns_suffix="azureiotcentral.com",
 ) -> dict:
     """
-    Get device info given a device id
+    Delete a device from IoTC
 
     Args:
         cmd: command passed into az
-        device_id: unique case-sensitive device id,
         app_id: name of app (used for forming request URL)
+        device_id: unique case-sensitive device id,
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
         central_dns_suffix: {centralDnsSuffixInPath} as found in docs
 
     Returns:
-        device: dict
+        {"result": "success"} on success
+        Raises error on failure
     """
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, device_id)
     headers = utility.get_headers(token, cmd)

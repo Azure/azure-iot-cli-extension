@@ -10,9 +10,9 @@ from .device_template_provider import CentralDeviceTemplateProvider
 
 
 class CentralDeviceProvider:
-    def __init__(self, cmd, app_id, token=None):
+    def __init__(self, cmd, app_id: str, token=None):
         """
-        Provider for device/device_template APIs
+        Provider for device APIs
 
         Args:
             cmd: command passed into az
@@ -35,12 +35,17 @@ class CentralDeviceProvider:
             raise CLIError("Device id must be specified.")
 
         # get or add to cache
-        if device_id not in self._devices or not self._devices.get(device_id):
-            self._devices[device_id] = central_services.device.get_device(
-                self._cmd, device_id, self._app_id, self._token, central_dns_suffix
+        device = self._devices.get(device_id)
+        if not device:
+            device = central_services.device.get_device(
+                cmd=self._cmd,
+                app_id=self._app_id,
+                device_id=device_id,
+                token=self._token,
+                central_dns_suffix=central_dns_suffix,
             )
+            self._devices[device_id] = device
 
-        device = self._devices[device_id]
         if not device:
             raise CLIError("No device found with id: '{}'.".format(device_id))
 
@@ -53,11 +58,17 @@ class CentralDeviceProvider:
             raise CLIError("Device id must be specified.")
 
         device = self.get_device(device_id, central_dns_suffix)
-        device_template_id = device["instanceOf"]
+        instance_of = device.get("instanceOf")
+        if not instance_of:
+            raise CLIError(
+                "Device '{}' does not have a corresponding device template.".format(
+                    device_id
+                )
+            )
 
         template = CentralDeviceTemplateProvider.get_device_template(
             self=self,
-            device_template_id=device_template_id,
+            device_template_id=instance_of,
             central_dns_suffix=central_dns_suffix,
         )
         return template
@@ -68,8 +79,9 @@ class CentralDeviceProvider:
         devices = central_services.device.list_devices(
             cmd=self._cmd, app_id=self._app_id, token=self._token
         )
-        for device in devices:
-            self._devices[device["id"]] = device
+
+        # add to cache
+        self._devices.update({device["id"]: device for device in devices})
 
         return self._devices
 
@@ -87,22 +99,22 @@ class CentralDeviceProvider:
         if device_id in self._devices:
             raise CLIError("Device already exists")
 
-        # get or add to cache
-        if device_id not in self._devices or not self._devices.get(device_id):
-            self._devices[device_id] = central_services.device.create_device(
-                cmd=self._cmd,
-                token=self._token,
-                app_id=self._app_id,
-                device_id=device_id,
-                device_name=device_name,
-                instance_of=instance_of,
-                simulated=simulated,
-                central_dns_suffix=central_dns_suffix,
-            )
+        device = central_services.device.create_device(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            device_name=device_name,
+            instance_of=instance_of,
+            simulated=simulated,
+            token=self._token,
+            central_dns_suffix=central_dns_suffix,
+        )
 
-        device = self._devices[device_id]
         if not device:
             raise CLIError("No device found with id: '{}'.".format(device_id))
+
+        # add to cache
+        self._devices[device["id"]] = device
 
         return device
 
@@ -115,10 +127,14 @@ class CentralDeviceProvider:
         # get or add to cache
         result = central_services.device.delete_device(
             cmd=self._cmd,
-            token=self._token,
             app_id=self._app_id,
             device_id=device_id,
+            token=self._token,
             central_dns_suffix=central_dns_suffix,
         )
+
+        # remove from cache
+        # pop "miss" raises a KeyError if None is not provided
+        self._devices.pop(device_id, None)
 
         return result
