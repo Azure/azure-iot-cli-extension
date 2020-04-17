@@ -6,6 +6,7 @@
 
 from knack.util import CLIError
 from azext_iot.central import services as central_services
+from .device_template_provider import CentralDeviceTemplateProvider
 
 
 class CentralDeviceProvider:
@@ -25,6 +26,7 @@ class CentralDeviceProvider:
         self._app_id = app_id
         self._token = token
         self._devices = {}
+        self._device_templates = {}
 
     def get_device(
         self, device_id, central_dns_suffix="azureiotcentral.com",
@@ -43,6 +45,22 @@ class CentralDeviceProvider:
             raise CLIError("No device found with id: '{}'.".format(device_id))
 
         return device
+
+    def get_device_template_by_device_id(
+        self, device_id, central_dns_suffix="azureiotcentral.com",
+    ):
+        if not device_id:
+            raise CLIError("Device id must be specified.")
+
+        device = self.get_device(device_id, central_dns_suffix)
+        device_template_id = device["instanceOf"]
+
+        template = CentralDeviceTemplateProvider.get_device_template(
+            self=self,
+            device_template_id=device_template_id,
+            central_dns_suffix=central_dns_suffix,
+        )
+        return template
 
     def list_devices(
         self, central_dns_suffix="azureiotcentral.com",

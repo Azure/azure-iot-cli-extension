@@ -20,12 +20,10 @@ random.seed(0)
 
 
 class Event3Parser(object):
-    _info = []
-    _warnings = []
-    _errors = []
     _logger = get_logger(__name__)
 
     def __init__(self, logger=None):
+        self._reset_issues()
         if logger:
             self._logger = logger
 
@@ -286,7 +284,9 @@ class Event3Parser(object):
             return
 
         try:
-            template = central_device_provider.get_device_template(origin_device_id)
+            template = central_device_provider.get_device_template_by_device_id(
+                origin_device_id
+            )
         except Exception as e:
             self._errors.append(
                 "Unable to get DCM for device: {}."

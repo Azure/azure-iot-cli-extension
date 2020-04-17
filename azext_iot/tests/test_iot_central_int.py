@@ -68,23 +68,27 @@ class TestIotCentral(LiveScenarioTest):
         self.cmd("iot central app validate-messages --app-id {} --to 1".format(APP_ID))
 
     def test_central_device_methods_CRLD(self):
+        device_id = self.create_random_name(prefix="aztest", length=24)
+        device_name = self.create_random_name(prefix="aztest", length=24)
         # currently: create, show, list, delete
         self.cmd(
-            "iot central app device create --app-id {} -d {}".format(APP_ID, DEVICE_ID),
+            "iot central app device create --app-id {} -d {} --device-name {}".format(
+                APP_ID, device_id, device_name
+            ),
             checks=[
                 self.check("approved", True),
-                self.check("displayName", DEVICE_ID),
-                self.check("id", DEVICE_ID),
+                self.check("displayName", device_name),
+                self.check("id", device_id),
                 self.check("simulated", False),
             ],
         )
 
         self.cmd(
-            "iot central app device show --app-id {} -d {}".format(APP_ID, DEVICE_ID),
+            "iot central app device show --app-id {} -d {}".format(APP_ID, device_id),
             checks=[
                 self.check("approved", True),
-                self.check("displayName", DEVICE_ID),
-                self.check("id", DEVICE_ID),
+                self.check("displayName", device_name),
+                self.check("id", device_id),
                 self.check("simulated", False),
             ],
         )
@@ -92,11 +96,11 @@ class TestIotCentral(LiveScenarioTest):
         list_output = self.cmd("iot central app device list --app-id {}".format(APP_ID))
 
         self.cmd(
-            "iot central app device delete --app-id {} -d {}".format(APP_ID, DEVICE_ID),
+            "iot central app device delete --app-id {} -d {}".format(APP_ID, device_id),
             checks=[self.check("result", "success")],
         )
 
-        assert DEVICE_ID in list_output.get_output_in_json()
+        assert device_id in list_output.get_output_in_json()
 
     def test_central_device_template_methods_CRLD(self):
         # currently: create, show, list, delete

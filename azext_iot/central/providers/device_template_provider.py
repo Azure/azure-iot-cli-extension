@@ -26,7 +26,7 @@ class CentralDeviceTemplateProvider:
         self._token = token
         self._device_templates = {}
 
-    def show_device_template(
+    def get_device_template(
         self, device_template_id, central_dns_suffix="azureiotcentral.com",
     ):
         # get or add to cache

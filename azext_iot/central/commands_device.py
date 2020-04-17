@@ -14,7 +14,7 @@ def list_devices(cmd, app_id: str, central_dns_suffix="azureiotcentral.com"):
     return provider.list_devices()
 
 
-def show_device(
+def get_device(
     cmd, app_id: str, device_id: str, central_dns_suffix="azureiotcentral.com"
 ):
     provider = CentralDeviceProvider(cmd, app_id)

@@ -11,11 +11,11 @@ from azext_iot.common import utility
 from .providers import CentralDeviceTemplateProvider
 
 
-def show_device_template(
+def get_device_template(
     cmd, app_id: str, device_template_id: str, central_dns_suffix="azureiotcentral.com"
 ):
     provider = CentralDeviceTemplateProvider(cmd, app_id)
-    return provider.show_device_template(
+    return provider.get_device_template(
         device_template_id=device_template_id, central_dns_suffix=central_dns_suffix
     )
 

@@ -11,7 +11,10 @@ from knack.util import CLIError
 from azure.cli.core.mock import DummyCli
 from azext_iot.operations import central as subject
 from azext_iot.common.shared import SdkType
-from azext_iot.central.providers import CentralDeviceProvider
+from azext_iot.central.providers import (
+    CentralDeviceProvider,
+    CentralDeviceTemplateProvider,
+)
 
 from .helpers import load_json
 from .test_constants import FileNames
@@ -201,19 +204,18 @@ class TestCentralDeviceProvider:
         self, mock_device_svc, mock_device_template_svc
     ):
         # setup
-        provider = CentralDeviceProvider(cmd=None, app_id=app_id)
+        provider = CentralDeviceTemplateProvider(cmd=None, app_id=app_id)
         mock_device_svc.get_device.return_value = self._device
         mock_device_template_svc.get_device_template.return_value = (
             self._device_template
         )
 
         # act
-        template = provider.get_device_template("someDeviceId")
+        template = provider.get_device_template("someDeviceTemplate")
         # check that caching is working
-        template = provider.get_device_template("someDeviceId")
+        template = provider.get_device_template("someDeviceTemplate")
 
         # verify
         # call counts should be at most 1 since the provider has a cache
-        assert mock_device_svc.get_device.call_count == 1
         assert mock_device_template_svc.get_device_template.call_count == 1
         assert template == self._device_template
