@@ -11,6 +11,7 @@ import json
 from knack.log import get_logger
 from uamqp.message import Message
 from azext_iot.common.utility import parse_entity, unicode_binary_map
+from azext_iot.central.providers import CentralDeviceProvider
 
 SUPPORTED_ENCODINGS = ["utf-8"]
 DEVICE_ID_IDENTIFIER = b"iothub-connection-device-id"
@@ -36,22 +37,26 @@ class Event3Parser(object):
         properties: dict,
         content_type_hint: str,
         simulate_errors: bool,
+        central_device_provider: CentralDeviceProvider,
     ) -> dict:
         self._reset_issues()
         create_encoding_error = False
         create_custom_header_warning = False
         create_payload_error = False
+        create_payload_name_error = False
 
         if not properties:
             properties = {}  # guard against None being passed in
 
-        i = random.randint(1, 3)
+        i = random.randint(1, 4)
         if simulate_errors and i == 1:
             create_encoding_error = True
         if simulate_errors and i == 2:
             create_custom_header_warning = True
         if simulate_errors and i == 3:
             create_payload_error = True
+        if simulate_errors and i == 4:
+            create_payload_name_error = True
 
         system_properties = self._parse_system_properties(message)
 
@@ -92,6 +97,13 @@ class Event3Parser(object):
 
         payload = self._parse_payload(
             message, origin_device_id, content_type, create_payload_error
+        )
+
+        self._validate_payload_against_dcm(
+            origin_device_id,
+            payload,
+            central_device_provider,
+            create_payload_name_error,
         )
 
         event["payload"] = payload
@@ -208,6 +220,24 @@ class Event3Parser(object):
 
         return content_type
 
+    def _parse_annotations(self, message: Message):
+        try:
+            return unicode_binary_map(message.annotations)
+        except Exception:
+            self._warnings.append(
+                "Unable to decode message.annotations: {}".format(message.annotations)
+            )
+
+    def _parse_application_properties(self, message: Message):
+        try:
+            return unicode_binary_map(message.application_properties)
+        except Exception:
+            self._warnings.append(
+                "Unable to decode message.application_properties: {}".format(
+                    message.application_properties
+                )
+            )
+
     def _parse_payload(
         self, message: Message, origin_device_id, content_type, create_payload_error
     ):
@@ -240,20 +270,57 @@ class Event3Parser(object):
 
         return payload
 
-    def _parse_annotations(self, message: Message):
-        try:
-            return unicode_binary_map(message.annotations)
-        except Exception:
-            self._warnings.append(
-                "Unable to decode message.annotations: {}".format(message.annotations)
-            )
+    def _validate_payload_against_dcm(
+        self,
+        origin_device_id: str,
+        payload: str,
+        central_device_provider: CentralDeviceProvider,
+        create_payload_name_error=False,
+    ):
+        if not central_device_provider:
+            return
 
-    def _parse_application_properties(self, message: Message):
+        if not hasattr(payload, "keys"):
+            # some error happend while parsing
+            # should be captured by _parse_payload method above
+            return
+
         try:
-            return unicode_binary_map(message.application_properties)
-        except Exception:
-            self._warnings.append(
-                "Unable to decode message.application_properties: {}".format(
-                    message.application_properties
-                )
+            template = central_device_provider.get_device_template(origin_device_id)
+        except Exception as e:
+            self._errors.append(
+                "Unable to get DCM for device: {}."
+                "Inner exception: {}".format(origin_device_id, e)
             )
+            return
+
+        try:
+            all_schema = self._extract_schema_from_template(template)
+            all_names = [schema["name"] for schema in all_schema]
+        except Exception:
+            self._errors.append(
+                "Unable to extract device schema for device: {}."
+                "Template: {}".format(origin_device_id, template)
+            )
+            return
+
+        for telemetry_name in payload.keys():
+            if create_payload_name_error or telemetry_name not in all_names:
+                self._errors.append(
+                    "Telemetry item '{}' is not present in DCM. "
+                    "Device ID: {}. "
+                    "List of allowed telemetry values for this type of device: {}. "
+                    "NOTE: telemetry names are CASE-SENSITIVE".format(
+                        telemetry_name, origin_device_id, all_names
+                    )
+                )
+
+    def _extract_schema_from_template(self, template):
+        all_schema = []
+        dcm = template["capabilityModel"]
+        implements = dcm["implements"]
+        for implementation in implements:
+            contents = implementation["schema"]["contents"]
+            all_schema.extend(contents)
+
+        return all_schema
