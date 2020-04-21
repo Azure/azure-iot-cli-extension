@@ -97,16 +97,16 @@ class EventTargetBuilder:
             await receive_client.close_async()
 
     async def create_single_iotc_eventhub_target_async(self, tokens):
-        eventHubToken = tokens["eventhubSasToken"]
-        hostnameWithoutPrefix = eventHubToken["hostname"].split("/")[2]
-        endpoint = hostnameWithoutPrefix
-        path = eventHubToken["entityPath"]
-        tokenExpiry = tokens["expiry"]
+        event_hub_token = tokens["eventhubSasToken"]
+        hostname_without_prefix = event_hub_token["hostname"].split("/")[2]
+        endpoint = hostname_without_prefix
+        path = event_hub_token["entityPath"]
+        token_expiry = tokens["expiry"]
         auth = self._build_auth_container_from_token(
-            endpoint, path, eventHubToken["sasToken"], tokenExpiry
+            endpoint, path, event_hub_token["sasToken"], token_expiry
         )
         address = "amqps://{}/{}/$management".format(
-            hostnameWithoutPrefix, eventHubToken["entityPath"]
+            hostname_without_prefix, event_hub_token["entityPath"]
         )
         meta_data = await self._query_meta_data(address, path, auth)
         partition_count = meta_data[b"partition_count"]
@@ -115,26 +115,26 @@ class EventTargetBuilder:
             partition_ids.append(str(i))
         partitions = partition_ids
         auth = self._build_auth_container_from_token(
-            endpoint, path, eventHubToken["sasToken"], tokenExpiry
+            endpoint, path, event_hub_token["sasToken"], token_expiry
         )
 
-        eventHubTarget = {
+        event_hub_target = {
             "endpoint": endpoint,
             "path": path,
             "auth": auth,
             "partitions": partitions,
         }
 
-        return eventHubTarget
+        return event_hub_target
 
     async def _build_central_event_hub_target_async(self, cmd, app_id, central_api_uri):
         from azext_iot.common._azure import get_iot_central_tokens
 
         all_tokens = get_iot_central_tokens(cmd, app_id, central_api_uri)
-        targets = []
-        # create target for each event hub
-        for tokens in all_tokens.values():
-            targets.append(await self.create_single_iotc_eventhub_target_async(tokens))
+        targets = [
+            await self.create_single_iotc_eventhub_target_async(tokens)
+            for tokens in all_tokens.values()
+        ]
 
         return targets
 
