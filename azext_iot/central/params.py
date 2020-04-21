@@ -46,3 +46,10 @@ def load_central_arguments(self, _):
             "[File Path Example: ./path/to/file.json] "
             "[Stringified JSON Example: {'a': 'b'}] ",
         )
+        context.argument(
+            "token",
+            options_list=["--token"],
+            help="Authorization token for request. "
+            "MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...'). "
+            "Example: 'Bearer {BearerToken}'",
+        )
