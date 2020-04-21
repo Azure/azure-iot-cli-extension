@@ -313,7 +313,9 @@ class TestEvents3Parser:
 
         device_template = load_json(FileNames.central_device_template_file)
         provider = CentralDeviceProvider(cmd=None, app_id=None)
-        provider.get_device_template = mock.MagicMock(return_value=device_template)
+        provider.get_device_template_by_device_id = mock.MagicMock(
+            return_value=device_template
+        )
 
         # act
         parsed_msg = parser.parse_message(
@@ -543,7 +545,9 @@ class TestEvents3Parser:
 
         device_template = load_json(FileNames.central_device_template_file)
         provider = CentralDeviceProvider(cmd=None, app_id=None)
-        provider.get_device_template = mock.MagicMock(return_value=device_template)
+        provider.get_device_template_by_device_id = mock.MagicMock(
+            return_value=device_template
+        )
 
         # act
         parsed_msg = parser.parse_message(
@@ -593,7 +597,7 @@ class TestEvents3Parser:
         parser = _parser.Event3Parser()
 
         provider = CentralDeviceProvider(cmd=None, app_id=None)
-        provider.get_device_template = mock.MagicMock(
+        provider.get_device_template_by_device_id = mock.MagicMock(
             return_value="an_unparseable_template"
         )
 

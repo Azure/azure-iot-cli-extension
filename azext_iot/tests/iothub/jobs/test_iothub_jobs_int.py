@@ -168,7 +168,7 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
 
         # Cancel Job test
         # Create job to be cancelled - scheduled +7 days from now.
-        scheduled_time_iso = (datetime.utcnow() + timedelta(days=7)).isoformat()
+        scheduled_time_iso = (datetime.utcnow() + timedelta(days=6)).isoformat()
 
         self.cmd(
             "iot hub job create --job-id {} --job-type {} -q \"{}\" --twin-patch '{}' --start '{}' -n {} -g {}".format(

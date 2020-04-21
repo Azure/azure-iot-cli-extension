@@ -23,3 +23,4 @@ env =
     azext_pnp_cs=
     azext_iot_central_app_id=
     azext_iot_central_device_id=
+    azext_iot_central_device_template_path=./azext_iot/tests/central/json/device_template_int_test.json
