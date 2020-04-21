@@ -145,3 +145,33 @@ def delete_device(
 
     response = requests.delete(url, headers=headers)
     return _utility.try_extract_result(response)
+
+
+def get_device_credentials(
+    cmd,
+    app_id: str,
+    device_id: str,
+    token: str,
+    central_dns_suffix="azureiotcentral.com",
+):
+    """
+    Get device credentials from IoTC
+
+    Args:
+        cmd: command passed into az
+        app_id: name of app (used for forming request URL)
+        device_id: unique case-sensitive device id,
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        device_credentials: dict
+    """
+    url = "https://{}.{}/{}/{}/credentials".format(
+        app_id, central_dns_suffix, BASE_PATH, device_id
+    )
+    headers = _utility.get_headers(token, cmd)
+
+    response = requests.get(url, headers=headers)
+    return _utility.try_extract_result(response)
