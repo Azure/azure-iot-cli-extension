@@ -8,7 +8,7 @@
 import requests
 
 from knack.util import CLIError
-from . import _utility as utility
+from azext_iot.central.services import _utility
 
 BASE_PATH = "api/preview/devices"
 
@@ -36,10 +36,10 @@ def get_device(
     """
 
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, device_id)
-    headers = utility.get_headers(token, cmd)
+    headers = _utility.get_headers(token, cmd)
 
     response = requests.get(url, headers=headers)
-    return utility.try_extract_result(response)
+    return _utility.try_extract_result(response)
 
 
 def list_devices(
@@ -60,11 +60,11 @@ def list_devices(
     """
 
     url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
-    headers = utility.get_headers(token, cmd)
+    headers = _utility.get_headers(token, cmd)
 
     response = requests.get(url, headers=headers)
 
-    result = utility.try_extract_result(response)
+    result = _utility.try_extract_result(response)
 
     if "value" not in result:
         raise CLIError("Value is not present in body: {}".format(result))
@@ -105,7 +105,7 @@ def create_device(
         device_name = device_id
 
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, device_id)
-    headers = utility.get_headers(token, cmd, has_json_payload=True)
+    headers = _utility.get_headers(token, cmd, has_json_payload=True)
     payload = {
         "displayName": device_name,
         "simulated": simulated,
@@ -115,7 +115,7 @@ def create_device(
         payload["instanceOf"] = instance_of
 
     response = requests.put(url, headers=headers, json=payload)
-    return utility.try_extract_result(response)
+    return _utility.try_extract_result(response)
 
 
 def delete_device(
@@ -141,7 +141,7 @@ def delete_device(
         Raises error on failure
     """
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, device_id)
-    headers = utility.get_headers(token, cmd)
+    headers = _utility.get_headers(token, cmd)
 
     response = requests.delete(url, headers=headers)
-    return utility.try_extract_result(response)
+    return _utility.try_extract_result(response)

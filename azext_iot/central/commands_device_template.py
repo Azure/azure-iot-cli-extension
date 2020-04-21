@@ -8,7 +8,7 @@
 from knack.util import CLIError
 
 from azext_iot.common import utility
-from .providers import CentralDeviceTemplateProvider
+from azext_iot.central.providers import CentralDeviceTemplateProvider
 
 
 def get_device_template(
@@ -37,7 +37,7 @@ def create_device_template(
     content: str,
     central_dns_suffix="azureiotcentral.com",
 ):
-    if not type(content) == str:
+    if not isinstance(content, str):
         raise CLIError("content must be a string: {}".format(content))
 
     payload = utility.process_json_arg(content, argument_name="content")

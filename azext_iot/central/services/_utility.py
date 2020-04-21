@@ -28,6 +28,8 @@ def get_headers(token, cmd, has_json_payload=False):
 
 
 def try_extract_result(response: Response):
+    # 201 and 204 response codes indicate success
+    # with no content, hence attempting to retrieve content will fail
     if response.status_code in [201, 204]:
         return {"result": "success"}
 

@@ -9,7 +9,7 @@ import requests
 
 from knack.util import CLIError
 from knack.log import get_logger
-from . import _utility as utility
+from azext_iot.central.services import _utility
 
 logger = get_logger(__name__)
 
@@ -40,10 +40,10 @@ def get_device_template(
     url = "https://{}.{}/{}/{}".format(
         app_id, central_dns_suffix, BASE_PATH, device_template_id
     )
-    headers = utility.get_headers(token, cmd)
+    headers = _utility.get_headers(token, cmd)
 
     response = requests.get(url, headers=headers)
-    return utility.try_extract_result(response)
+    return _utility.try_extract_result(response)
 
 
 def list_device_templates(
@@ -64,11 +64,11 @@ def list_device_templates(
     """
 
     url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
-    headers = utility.get_headers(token, cmd)
+    headers = _utility.get_headers(token, cmd)
 
     response = requests.get(url, headers=headers)
 
-    result = utility.try_extract_result(response)
+    result = _utility.try_extract_result(response)
 
     if "value" not in result:
         raise CLIError("Value is not present in body: {}".format(result))
@@ -106,10 +106,10 @@ def create_device_template(
     url = "https://{}.{}/{}/{}".format(
         app_id, central_dns_suffix, BASE_PATH, device_template_id
     )
-    headers = utility.get_headers(token, cmd, has_json_payload=True)
+    headers = _utility.get_headers(token, cmd, has_json_payload=True)
 
     response = requests.put(url, headers=headers, json=payload)
-    return utility.try_extract_result(response)
+    return _utility.try_extract_result(response)
 
 
 def delete_device_template(
@@ -136,7 +136,7 @@ def delete_device_template(
     url = "https://{}.{}/{}/{}".format(
         app_id, central_dns_suffix, BASE_PATH, device_template_id
     )
-    headers = utility.get_headers(token, cmd)
+    headers = _utility.get_headers(token, cmd)
 
     response = requests.delete(url, headers=headers)
-    return utility.try_extract_result(response)
+    return _utility.try_extract_result(response)

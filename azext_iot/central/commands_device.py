@@ -6,7 +6,7 @@
 # Dev note - think of this as a controller
 
 from knack.util import CLIError
-from .providers import CentralDeviceProvider
+from azext_iot.central.providers import CentralDeviceProvider
 
 
 def list_devices(cmd, app_id: str, central_dns_suffix="azureiotcentral.com"):

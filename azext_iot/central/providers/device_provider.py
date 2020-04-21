@@ -6,7 +6,6 @@
 
 from knack.util import CLIError
 from azext_iot.central import services as central_services
-from .device_template_provider import CentralDeviceTemplateProvider
 
 
 class CentralDeviceProvider:
@@ -54,6 +53,8 @@ class CentralDeviceProvider:
     def get_device_template_by_device_id(
         self, device_id, central_dns_suffix="azureiotcentral.com",
     ):
+        from azext_iot.central.providers import CentralDeviceTemplateProvider
+
         if not device_id:
             raise CLIError("Device id must be specified.")
 

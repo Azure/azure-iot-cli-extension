@@ -4,6 +4,6 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from ._help import load_central_help
+from azext_iot.central._help import load_central_help
 
 load_central_help()
