@@ -195,6 +195,7 @@ class CentralDeviceProvider:
         return info
 
     def get_all_registration_info(self, central_dns_suffix="azureiotcentral.com"):
+        logger.warning("This command may take a long time to complete execution.")
         devices = self.list_devices(central_dns_suffix=central_dns_suffix)
         real_devices = [
             device for device in devices.values() if not device["simulated"]
