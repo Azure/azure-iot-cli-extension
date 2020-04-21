@@ -16,23 +16,26 @@ def find_between(s, start, end):
     return (s.split(start))[1].split(end)[0]
 
 
-def iot_central_device_show(cmd, device_id, app_id, central_api_uri='azureiotcentral.com'):
+def iot_central_device_show(
+    cmd, device_id, app_id, central_api_uri="azureiotcentral.com"
+):
     from azext_iot.common._azure import get_iot_central_tokens
 
     tokens = get_iot_central_tokens(cmd, app_id, central_api_uri)
     exception = None
 
-    # try all hubs, return first exception if none succeed
-    for key in tokens:
-        sasToken = tokens[key]['iothubTenantSasToken']['sasToken']
-        endpoint = find_between(sasToken, 'SharedAccessSignature sr=', '&sig=')
-        target = {'entity': endpoint}
-        auth = BasicSasTokenAuthentication(sas_token=sasToken)
+    # The device could be in any hub associated with the given app.
+    # We must search through each IoT Hub until device is found.
+    for token_group in tokens.values():
+        sas_token = token_group["iothubTenantSasToken"]["sasToken"]
+        endpoint = find_between(sas_token, "SharedAccessSignature sr=", "&sig=")
+        target = {"entity": endpoint}
+        auth = BasicSasTokenAuthentication(sas_token=sas_token)
         service_sdk, errors = _bind_sdk(target, SdkType.service_sdk, auth=auth)
         try:
             return service_sdk.get_twin(device_id)
         except errors.CloudError as e:
-            if(exception is None):
+            if exception is None:
                 exception = CLIError(unpack_msrest_error(e))
 
     raise exception
@@ -126,18 +129,22 @@ def _events3_runner(
 
     from azext_iot.operations.events3 import _builders, _events
 
-    eventHubTargets = _builders.EventTargetBuilder().build_central_event_hub_target(cmd, app_id, central_api_uri)
+    eventHubTargets = _builders.EventTargetBuilder().build_central_event_hub_target(
+        cmd, app_id, central_api_uri
+    )
     executorTargets = []
 
     for target in eventHubTargets:
         executorTargets.append(_events.executorData(target, consumer_group))
 
-    _events.nExecutor(executorTargets,
-                      enqueued_time=enqueued_time,
-                      properties=properties,
-                      timeout=timeout,
-                      device_id=device_id,
-                      output=output,
-                      validate_messages=validate_messages,
-                      simulate_errors=simulate_errors,
-                      central_device_provider=central_device_provider)
+    _events.nExecutor(
+        executorTargets,
+        enqueued_time=enqueued_time,
+        properties=properties,
+        timeout=timeout,
+        device_id=device_id,
+        output=output,
+        validate_messages=validate_messages,
+        simulate_errors=simulate_errors,
+        central_device_provider=central_device_provider,
+    )

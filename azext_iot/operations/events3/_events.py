@@ -25,9 +25,7 @@ logger = get_logger(__name__)
 
 
 class executorData:
-    def __init__(self,
-                 target,
-                 consumer_group):
+    def __init__(self, target, consumer_group):
         self.target = target
         self.consumer_group = consumer_group
 
@@ -50,18 +48,21 @@ def executor(
 ):
     executor = executorData(target, consumer_group)
 
-    return nExecutor([executor], enqueued_time,
-                     properties,
-                     timeout,
-                     device_id,
-                     output,
-                     content_type,
-                     devices,
-                     interface_name,
-                     pnp_context,
-                     validate_messages,
-                     simulate_errors,
-                     central_device_provider)
+    return nExecutor(
+        [executor],
+        enqueued_time,
+        properties,
+        timeout,
+        device_id,
+        output,
+        content_type,
+        devices,
+        interface_name,
+        pnp_context,
+        validate_messages,
+        simulate_errors,
+        central_device_provider,
+    )
 
 
 def nExecutor(
@@ -77,7 +78,7 @@ def nExecutor(
     pnp_context=None,
     validate_messages=False,
     simulate_errors=False,
-    central_device_provider=None
+    central_device_provider=None,
 ):
     coroutines = []
 
@@ -97,7 +98,7 @@ def nExecutor(
                 pnp_context,
                 validate_messages,
                 simulate_errors,
-                central_device_provider
+                central_device_provider,
             )
         )
 

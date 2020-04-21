@@ -95,7 +95,9 @@ def fixture_get_iot_central_tokens(mocker):
                 "sasToken": "sasToken",
             },
             "expiry": "0000",
-            "iothubTenantSasToken": {"sasToken": "SharedAccessSignature sr=shared_resource&sig="},
+            "iothubTenantSasToken": {
+                "sasToken": "SharedAccessSignature sr=shared_resource&sig="
+            },
         }
     }
 
@@ -130,9 +132,7 @@ class TestDeviceTwinShow:
     def test_device_twin_show_calls_get_twin(
         self, fixture_bind_sdk, fixture_cmd, fixture_get_iot_central_tokens
     ):
-        result = subject.iot_central_device_show(
-            fixture_cmd, device_id, app_id
-        )
+        result = subject.iot_central_device_show(fixture_cmd, device_id, app_id)
 
         # Ensure get_twin is called and result is returned
         assert result is device_twin_result

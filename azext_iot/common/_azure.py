@@ -241,21 +241,12 @@ def get_iot_dps_connection_string(
 
 
 def get_iot_central_tokens(cmd, app_id, central_api_uri):
-    def formatUrl(url):
-        finalUrl = url
-        if not finalUrl.startswith('https://'):
-            finalUrl = 'https://{}'.format(finalUrl)
-        return finalUrl
-
-    def get_tokens(app_id, iotcAccessToken, central_api_uri):
-        import requests
-        url = "{}.{}/system/iothubs/generateSasTokens".format(formatUrl(app_id), central_api_uri)
-        response = requests.post(url, headers={'Authorization': 'Bearer {}'.format(iotcAccessToken)})
-        return response.json()
-
+    import requests
     aad_token = _get_aad_token(cmd, resource="https://apps.azureiotcentral.com")['accessToken']
 
-    tokens = get_tokens(app_id, aad_token, central_api_uri)
+    url = "https://{}.{}/system/iothubs/generateSasTokens".format(app_id, central_api_uri)
+    response = requests.post(url, headers={'Authorization': 'Bearer {}'.format(aad_token)})
+    tokens = response.json()
 
     if tokens.get('error'):
         raise CLIError(
