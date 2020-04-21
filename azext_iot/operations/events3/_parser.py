@@ -104,6 +104,8 @@ class Event3Parser(object):
             create_payload_name_error,
         )
 
+        self._validate_field_names(origin_device_id, payload)
+
         event["payload"] = payload
 
         event_source = {"event": event}
@@ -324,3 +326,27 @@ class Event3Parser(object):
             all_schema.extend(contents)
 
         return all_schema
+
+    def _validate_field_names(self, origin_device_id: str, payload: dict):
+        # if its not a dictionary, something else went wrong with parsing
+        if not isinstance(payload, dict):
+            return
+
+        # source:
+        # https://github.com/Azure/IoTPlugandPlay/tree/master/DTDL
+        regex = "^[a-zA-Z_][a-zA-Z0-9_]*$"
+
+        # if a field name does not match the above regex, it is an invalid field name
+        invalid_field_names = [
+            field_name
+            for field_name in payload.keys()
+            if not re.search(regex, field_name)
+        ]
+        if invalid_field_names:
+            self._errors.append(
+                "The following field names are not allowed: '{}'. "
+                "Payload: '{}'. "
+                "Message origin: '{}'.".format(
+                    invalid_field_names, payload, origin_device_id
+                )
+            )
