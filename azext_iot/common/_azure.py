@@ -284,7 +284,7 @@ def get_iot_central_tokens(cmd, app_id, central_api_uri):
     if tokens.get("error"):
         error_message = tokens["error"]["message"]
         if tokens["error"]["code"].startswith("403.043.004."):
-            error_message = "{} Please ensure that the user is logged through the `az login` command, has the correct tenant set (the users home tenant) and has access to the application through the http://apps.azureiotcentral.com".format(
+            error_message = "{} Please ensure that the user is logged through the `az login` command, has the correct tenant set (the users home tenant) and has access to the application through http://apps.azureiotcentral.com".format(
                 error_message
             )
 
