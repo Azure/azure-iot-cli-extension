@@ -5,6 +5,8 @@
 # --------------------------------------------------------------------------------------------
 
 import os
+import time
+
 from azure.cli.testsdk import LiveScenarioTest
 
 from azext_iot.common import utility
@@ -148,3 +150,38 @@ class TestIotCentral(LiveScenarioTest):
 
         map_json = map_output.get_output_in_json()
         assert map_json[template_name] == template_id
+
+    def test_central_device_registration_info(self):
+        device_id = self.create_random_name(prefix="aztest", length=24)
+        device_name = self.create_random_name(prefix="aztest", length=24)
+        # currently: create, show, list, delete
+        self.cmd(
+            "iot central app device create --app-id {} -d {} --device-name {}".format(
+                APP_ID, device_id, device_name
+            ),
+            checks=[
+                self.check("approved", True),
+                self.check("displayName", device_name),
+                self.check("id", device_id),
+                self.check("simulated", False),
+            ],
+        )
+
+        result = self.cmd(
+            "iot central app device registration-info --app-id {} -d {}".format(
+                APP_ID, device_id
+            )
+        )
+
+        self.cmd(
+            "iot central app device delete --app-id {} -d {}".format(APP_ID, device_id),
+            checks=[self.check("result", "success")],
+        )
+
+        json_result = result.get_output_in_json()
+        assert json_result["@device_id"] == device_id
+
+        # since time taken for provisioning to complete is not known
+        # we can only assert that the payload is populated, not anything specific beyond that
+        assert json_result["central_info"] is not None
+        assert json_result["dps_state"] is not None

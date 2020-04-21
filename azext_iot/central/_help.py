@@ -90,6 +90,28 @@ def _load_central_devices_help():
             --device-id {deviceid}
     """
 
+    helps[
+        "iot central app device registration-info"
+    ] = """
+        type: command
+        short-summary: Get registration info on device(s) from IoTC
+        long-summary: |
+            Note: This command can take a significant amount of time to return
+            if no device id is specified and your app contains a lot of devices
+
+        examples:
+        - name: Get registration info on all devices. This command may take a long time to complete execution.
+          text: >
+            az iot central app device registration-info
+            --app-id {appid}
+
+        - name: Get registration info on specified device
+          text: >
+            az iot central app device registration-info
+            --app-id {appid}
+            --device-id {deviceid}
+    """
+
 
 def _load_central_device_templates_help():
     helps[
@@ -166,9 +188,8 @@ def _load_central_device_templates_help():
     ] = """
         type: command
         short-summary: Delete a device template from IoTC
-        long-summary:
-            Note: this is expected to fail
-            if any devices are still registered to this template.
+        long-summary: |
+            Note: this is expected to fail if any devices are still registered to this template.
 
         examples:
         - name: Get a device

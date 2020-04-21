@@ -46,3 +46,11 @@ def load_central_arguments(self, _):
             "[File Path Example: ./path/to/file.json] "
             "[Stringified JSON Example: {'a': 'b'}] ",
         )
+        context.argument(
+            "token",
+            options_list=["--token"],
+            help="Authorization token for request. "
+            "More info available here: https://docs.microsoft.com/en-us/learn/modules/manage-iot-central-apps-with-rest-api/ "
+            "MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...'). "
+            "Example: 'Bearer someBearerTokenHere'",
+        )
