@@ -1173,7 +1173,7 @@ helps[
     "iot central"
 ] = """
     type: group
-    short-summary: Manage Azure IoT Central assets.
+    short-summary: Manage Azure IoT Central assets. To use this command group, the user must be logged through the `az login` command, have the correct tenant set (the users home tenant) and have access to the application through the http://apps.azureiotcentral.com"
 """
 
 helps[
