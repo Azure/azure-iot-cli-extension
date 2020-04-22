@@ -85,7 +85,7 @@ def _load_central_devices_help():
         examples:
         - name: Get a device
           text: >
-            az iot central app device list
+            az iot central app device delete
             --app-id {appid}
             --device-id {deviceid}
     """
@@ -128,16 +128,16 @@ def _load_central_device_templates_help():
         short-summary: Create a device template in IoTC
 
         examples:
-        - name: Create a device with payload read from a file
+        - name: Create a device template with payload read from a file
           text: >
-            az iot central app device create
+            az iot central app device-template create
             --app-id {appid}
             --content {pathtofile}
             --device-template-id {devicetemplateid}
 
-        - name: Create a device with payload read from raw json
+        - name: Create a device template with payload read from raw json
           text: >
-            az iot central app device create
+            az iot central app device-template create
             --app-id {appid}
             --content {json}
             --device-template-id {devicetemplateid}
@@ -150,9 +150,9 @@ def _load_central_device_templates_help():
         short-summary: Get a device template from IoTC
 
         examples:
-        - name: Get a device
+        - name: Get a device template
           text: >
-            az iot central app device show
+            az iot central app device-template show
             --app-id {appid}
             --device-template-id {devicetemplateid}
     """
@@ -192,8 +192,9 @@ def _load_central_device_templates_help():
             Note: this is expected to fail if any devices are still registered to this template.
 
         examples:
-        - name: Get a device
+        - name: Delete a device template from IoTC
           text: >
-            az iot central app device-template list
+            az iot central app device-template delete
             --app-id {appid}
+            --device-template-id {devicetemplateid}
     """
