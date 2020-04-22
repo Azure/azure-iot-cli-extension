@@ -70,7 +70,7 @@ def _load_central_devices_help():
         short-summary: List all devices in IoTC
 
         examples:
-        - name: Get a device
+        - name: List all devices in IoTC
           text: >
             az iot central app device list
             --app-id {appid}
@@ -83,7 +83,7 @@ def _load_central_devices_help():
         short-summary: Delete a device from IoTC
 
         examples:
-        - name: Get a device
+        - name: Delete a device
           text: >
             az iot central app device delete
             --app-id {appid}
@@ -164,7 +164,7 @@ def _load_central_device_templates_help():
         short-summary: List all device templates in IoTC
 
         examples:
-        - name: Get a device
+        - name: List all device templates
           text: >
             az iot central app device-template list
             --app-id {appid}
