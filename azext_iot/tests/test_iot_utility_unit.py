@@ -292,6 +292,7 @@ class TestEvents3Parser:
 
     bad_encoding = "ascii"
     bad_payload = "bad-payload"
+    bad_field_name = {"violates-regex": "someValue"}
     bad_content_type = "bad-content-type"
 
     bad_dcm_payload = {"temperature": "someValue"}
@@ -483,6 +484,43 @@ class TestEvents3Parser:
         assert "Invalid JSON format." in errors
         assert self.device_id in errors
         assert self.bad_payload in errors
+
+    def test_parse_message_bad_field_name_should_fail(self):
+        # setup
+        properties = MessageProperties(
+            content_encoding=self.encoding, content_type=self.content_type
+        )
+        message = Message(
+            body=json.dumps(self.bad_field_name).encode(),
+            properties=properties,
+            annotations={_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
+        )
+        parser = _parser.Event3Parser()
+
+        # act
+        parsed_msg = parser.parse_message(
+            message=message,
+            pnp_context=False,
+            interface_name=None,
+            properties=None,
+            content_type_hint=None,
+            simulate_errors=False,
+            central_device_provider=None,
+        )
+
+        # verify
+        # parsing should attempt to place raw payload into result even if parsing fails
+        assert parsed_msg["event"]["payload"] == self.bad_field_name
+
+        assert len(parser._errors) == 1
+        assert len(parser._warnings) == 0
+        assert len(parser._info) == 0
+
+        errors = parser._errors[0]
+        assert "The following field names are not allowed" in errors
+        assert "{}".format(next(iter(self.bad_field_name))) in errors
+        assert str(self.bad_field_name) in errors
+        assert self.device_id in errors
 
     def test_parse_message_pnp_should_fail(self):
         # setup

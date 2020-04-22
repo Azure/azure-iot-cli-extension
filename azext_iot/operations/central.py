@@ -31,13 +31,6 @@ def iot_central_device_show(
         raise CLIError(unpack_msrest_error(e))
 
 
-def iot_central_device_capability_model_show(
-    cmd, device_id, app_id, central_dns_suffix="azureiotcentral.com"
-):
-    device_provider = CentralDeviceProvider(cmd, app_id)
-    return device_provider.get_device_template_by_device_id(device_id)
-
-
 def iot_central_validate_messages(
     cmd,
     app_id,

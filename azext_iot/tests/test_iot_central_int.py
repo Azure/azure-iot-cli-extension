@@ -5,7 +5,6 @@
 # --------------------------------------------------------------------------------------------
 
 import os
-import time
 
 from azure.cli.testsdk import LiveScenarioTest
 
