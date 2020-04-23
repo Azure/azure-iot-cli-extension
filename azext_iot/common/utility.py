@@ -13,6 +13,7 @@ import ast
 import base64
 import json
 import os
+import re
 import sys
 
 from threading import Event, Thread
@@ -34,13 +35,13 @@ def parse_entity(entity, filter_none=False):
         result (dict): a dictionary of attributes from the function input.
     """
     result = {}
-    attributes = [attr for attr in dir(entity) if not attr.startswith('_')]
+    attributes = [attr for attr in dir(entity) if not attr.startswith("_")]
     for attribute in attributes:
         value = getattr(entity, attribute, None)
         if filter_none and not value:
             continue
         value_behavior = dir(value)
-        if '__call__' not in value_behavior:
+        if "__call__" not in value_behavior:
             result[attribute] = value
     return result
 
@@ -73,19 +74,25 @@ def verify_transform(subject, mapping):
     verifies that subject[k] is of type mapping[k]
     """
     import jmespath
+
     for k in mapping.keys():
         result = jmespath.search(k, subject)
 
         if result is None:
             raise AttributeError('The property "{}" is required'.format(k))
         if not isinstance(result, mapping[k]):
-            supplemental_info = ''
+            supplemental_info = ""
             if mapping[k] == dict:
-                wiki_link = 'https://github.com/Azure/azure-iot-cli-extension/wiki/Tips'
-                supplemental_info = 'Review inline JSON examples here --> {}'.format(wiki_link)
+                wiki_link = "https://github.com/Azure/azure-iot-cli-extension/wiki/Tips"
+                supplemental_info = "Review inline JSON examples here --> {}".format(
+                    wiki_link
+                )
 
-            raise TypeError('The property "{}" must be of {} but is {}. Input: {}. {}'.format(
-                k, str(mapping[k]), str(type(result)), result, supplemental_info))
+            raise TypeError(
+                'The property "{}" must be of {} but is {}. Input: {}. {}'.format(
+                    k, str(mapping[k]), str(type(result)), result, supplemental_info
+                )
+            )
 
 
 def validate_key_value_pairs(string):
@@ -99,8 +106,8 @@ def validate_key_value_pairs(string):
     """
     result = None
     if string:
-        kv_list = [x for x in string.split(';') if '=' in x]     # key-value pairs
-        result = dict(x.split('=', 1) for x in kv_list)
+        kv_list = [x for x in string.split(";") if "=" in x]  # key-value pairs
+        result = dict(x.split("=", 1) for x in kv_list)
     return result
 
 
@@ -139,6 +146,7 @@ def shell_safe_json_parse(json_or_dict_string, preserve_order=False):
         if not preserve_order:
             return json.loads(json_or_dict_string)
         from collections import OrderedDict
+
         return json.loads(json_or_dict_string, object_pairs_hook=OrderedDict)
     except ValueError as json_ex:
         try:
@@ -146,14 +154,19 @@ def shell_safe_json_parse(json_or_dict_string, preserve_order=False):
         except SyntaxError:
             raise CLIError(json_ex)
         except ValueError as ex:
-            logger.debug(ex)  # log the exception which could be a python dict parsing error.
-            raise CLIError(json_ex)  # raise json_ex error which is more readable and likely.
+            logger.debug(
+                ex
+            )  # log the exception which could be a python dict parsing error.
+            raise CLIError(
+                json_ex
+            )  # raise json_ex error which is more readable and likely.
 
 
 def read_file_content(file_path, allow_binary=False):
     from codecs import open as codecs_open
+
     # Note, always put 'utf-8-sig' first, so that BOM in WinOS won't cause trouble.
-    for encoding in ['utf-8-sig', 'utf-8', 'utf-16', 'utf-16le', 'utf-16be']:
+    for encoding in ["utf-8-sig", "utf-8", "utf-16", "utf-16le", "utf-16be"]:
         try:
             with codecs_open(file_path, encoding=encoding) as f:
                 logger.debug("attempting to read file %s as %s", file_path, encoding)
@@ -163,19 +176,19 @@ def read_file_content(file_path, allow_binary=False):
 
     if allow_binary:
         try:
-            with open(file_path, 'rb') as input_file:
+            with open(file_path, "rb") as input_file:
                 logger.debug("attempting to read file %s as binary", file_path)
                 return base64.b64encode(input_file.read()).decode("utf-8")
         except Exception:  # pylint: disable=broad-except
             pass
-    raise CLIError('Failed to decode file {} - unknown decoding'.format(file_path))
+    raise CLIError("Failed to decode file {} - unknown decoding".format(file_path))
 
 
 def trim_from_start(s, substring):
     """ Trims a substring from the target string (if it exists) returning the trimmed string.
     Otherwise returns original target string. """
     if s.startswith(substring):
-        s = s[len(substring):]
+        s = s[len(substring) :]
     return s
 
 
@@ -186,12 +199,17 @@ def validate_min_python_version(major, minor, error_msg=None, exit_on_fail=True)
     if version.major > major:
         return True
     if major == version.major:
-        result = (version.minor >= minor)
+        result = version.minor >= minor
 
     if not result:
         if exit_on_fail:
-            msg = error_msg if error_msg else 'Python version {}.{} or higher required for this functionality.'.format(
-                major, minor)
+            msg = (
+                error_msg
+                if error_msg
+                else "Python version {}.{} or higher required for this functionality.".format(
+                    major, minor
+                )
+            )
             sys.exit(msg)
 
     return result
@@ -205,10 +223,10 @@ def unicode_binary_map(target):
     for k in target:
         key = k
         if isinstance(k, bytes):
-            key = str(k, 'utf8')
+            key = str(k, "utf8")
 
         if isinstance(target[k], bytes):
-            result[key] = str(target[k], 'utf8')
+            result[key] = str(target[k], "utf8")
         else:
             result[key] = target[k]
 
@@ -232,11 +250,11 @@ def execute_onthread(**kwargs):
         Event(), Thread(): Event object to set the cancellation flag, Executing Thread object
     """
 
-    interval = kwargs.get('interval')
-    method = kwargs.get('method')
-    method_args = kwargs.get('args')
-    max_runs = kwargs.get('max_runs')
-    handle = kwargs.get('return_handle')
+    interval = kwargs.get("interval")
+    method = kwargs.get("method")
+    method_args = kwargs.get("args")
+    max_runs = kwargs.get("max_runs")
+    handle = kwargs.get("return_handle")
 
     if not interval:
         interval = 2
@@ -292,6 +310,7 @@ def url_encode_str(s, plus=False):
 def test_import(package):
     """ Used to determine if a dependency is loading correctly """
     import importlib
+
     try:
         importlib.import_module(package)
     except ImportError:
@@ -302,10 +321,10 @@ def test_import(package):
 def unpack_pnp_http_error(e):
     error = unpack_msrest_error(e)
     if isinstance(error, dict):
-        if error.get('error'):
-            error = error['error']
-        if error.get('stackTrace'):
-            error.pop('stackTrace')
+        if error.get("error"):
+            error = error["error"]
+        if error.get("stackTrace"):
+            error.pop("stackTrace")
     return error
 
 
@@ -340,13 +359,13 @@ def init_monitoring(cmd, timeout, properties, enqueued_time, repair, yes):
     validate_min_python_version(3, 5)
 
     if timeout < 0:
-        raise CLIError('Monitoring timeout must be 0 (inf) or greater.')
-    timeout = (timeout * 1000)
+        raise CLIError("Monitoring timeout must be 0 (inf) or greater.")
+    timeout = timeout * 1000
 
     config = cmd.cli_ctx.config
     output = cmd.cli_ctx.invocation.data.get("output", None)
     if not output:
-        output = 'json'
+        output = "json"
     ensure_uamqp(config, yes, repair)
 
     if not properties:
@@ -359,14 +378,19 @@ def init_monitoring(cmd, timeout, properties, enqueued_time, repair, yes):
 
 
 def get_sas_token(target):
-    from azext_iot.common.digitaltwin_sas_token_auth import DigitalTwinSasTokenAuthentication
-    token = ''
-    if target.get('repository_id'):
-        token = DigitalTwinSasTokenAuthentication(target["repository_id"],
-                                                  target["entity"],
-                                                  target["policy"],
-                                                  target["primarykey"]).generate_sas_token()
-    return {'Authorization': '{}'.format(token)}
+    from azext_iot.common.digitaltwin_sas_token_auth import (
+        DigitalTwinSasTokenAuthentication,
+    )
+
+    token = ""
+    if target.get("repository_id"):
+        token = DigitalTwinSasTokenAuthentication(
+            target["repository_id"],
+            target["entity"],
+            target["policy"],
+            target["primarykey"],
+        ).generate_sas_token()
+    return {"Authorization": "{}".format(token)}
 
 
 def dict_clean(d):
@@ -396,7 +420,7 @@ def looks_like_file(element):
             ".java",
             ".ts",
             ".js",
-            ".cs"
+            ".cs",
         )
     )
 
@@ -412,3 +436,29 @@ def ensure_pkg_resources_entries():
         pkg_resources.working_set.add_entry(extension_path)
 
     return
+
+
+class ISO8601Validator:
+    # lifted from https://www.phpliveregex.com/learn/dates-and-times/how-to-match-iso8601-date-time/
+    DATE_RE = r"^(([12]\d{3})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01]))$"
+
+    # lifted from https://www.myintervals.com/blog/2009/05/20/iso-8601-date-validation-that-doesnt-suck/
+    DATETIME_RE = r"^([\+-]?\d{4}(?!\d{2}\b))((-?)((0[1-9]|1[0-2])(\3([12]\d|0[1-9]|3[01]))?|W([0-4]\d|5[0-2])(-?[1-7])?|(00[1-9]|0[1-9]\d|[12]\d{2}|3([0-5]\d|6[1-6])))([T\s]((([01]\d|2[0-3])((:?)[0-5]\d)?|24\:?00)([\.,]\d+(?!:))?)?(\17[0-5]\d([\.,]\d+)?)?([zZ]|([\+-])([01]\d|2[0-3]):?([0-5]\d)?)?)?)?$"
+
+    # lifted from https://stackoverflow.com/questions/32044846/regex-for-iso-8601-durations
+    DURATION_RE = r"^P(?!$)(\d+(?:\.\d+)?Y)?(\d+(?:\.\d+)?M)?(\d+(?:\.\d+)?W)?(\d+(?:\.\d+)?D)?(T(?=\d)(\d+(?:\.\d+)?H)?(\d+(?:\.\d+)?M)?(\d+(?:\.\d+)?S)?)?$"
+
+    # lifted from https://stackoverflow.com/questions/3143070/javascript-regex-iso-datetime
+    TIME_RE = r"^([0-2]\d:[0-5]\d:[0-5]\d\.\d+([+-][0-2]\d:[0-5]\d|Z))|([0-2]\d:[0-5]\d:[0-5]\d([+-][0-2]\d:[0-5]\d|Z))$"
+
+    def is_iso8601_date(self, to_validate) -> bool:
+        return bool(re.search(self.DATE_RE, str(to_validate)))
+
+    def is_iso8601_datetime(self, to_validate: str) -> bool:
+        return bool(re.search(self.DATETIME_RE, str(to_validate)))
+
+    def is_iso8601_duration(self, to_validate: str) -> bool:
+        return bool(re.search(self.DURATION_RE, str(to_validate)))
+
+    def is_iso8601_time(self, to_validate: str) -> bool:
+        return bool(re.search(self.TIME_RE, str(to_validate)))

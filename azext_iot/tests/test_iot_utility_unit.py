@@ -17,6 +17,7 @@ from azext_iot.common.utility import (
     process_json_arg,
     read_file_content,
     logger,
+    ISO8601Validator,
 )
 from azext_iot.common.deps import ensure_uamqp
 from azext_iot.constants import EVENT_LIB, EXTENSION_NAME
@@ -284,6 +285,73 @@ class TestProcessJsonArg(object):
         assert mocked_util_logger.call_count == 0
 
 
+# none of these are valid anything in ISO 8601
+BAD_ARRAY = ["asd", "", 123.4, 123, True, False]
+
+
+class TestISO8601Validator:
+    validator = ISO8601Validator()
+
+    # Success suite
+    @pytest.mark.parametrize("to_validate", ["2020-01-01"])
+    def test_is_iso8601_date_pass(self, to_validate):
+        result = self.validator.is_iso8601_date(to_validate)
+        assert result
+
+    @pytest.mark.parametrize(
+        "to_validate",
+        [
+            "20200101",
+            "2020-01-01",
+            "2020-01-01T00:00:00",
+            "20200101T00:00:00",
+            "20200101T000000",
+            "2020-01-01T00:00:00Z",
+            "2020-01-01T00:00:00.00",
+            "2020-01-01T00:00:00.00Z",
+            "2020-01-01T00:00:00.00+08:30",
+        ],
+    )
+    def test_is_iso8601_datetime_pass(self, to_validate):
+        result = self.validator.is_iso8601_datetime(to_validate)
+        assert result
+
+    @pytest.mark.parametrize("to_validate", ["P32DT7.592380349524318S", "P32DT7S"])
+    def test_is_iso8601_duration_pass(self, to_validate):
+        result = self.validator.is_iso8601_duration(to_validate)
+        assert result
+
+    @pytest.mark.parametrize(
+        "to_validate", ["00:00:00+08:30", "00:00:00Z", "00:00:00.123Z"]
+    )
+    def test_is_iso8601_time_pass(self, to_validate):
+        result = self.validator.is_iso8601_time(to_validate)
+        assert result
+
+    # Failure suite
+    @pytest.mark.parametrize(
+        "to_validate", ["2020-01", "2020-01-01Z", "2020-13-35", *BAD_ARRAY],
+    )
+    def test_is_iso8601_date_fail(self, to_validate):
+        result = self.validator.is_iso8601_date(to_validate)
+        assert result == False
+
+    @pytest.mark.parametrize("to_validate", ["2020-13-35", "2020-00-00T", *BAD_ARRAY])
+    def test_is_iso8601_datetime_fail(self, to_validate):
+        result = self.validator.is_iso8601_datetime(to_validate)
+        assert result == False
+
+    @pytest.mark.parametrize("to_validate", ["2020-01", *BAD_ARRAY])
+    def test_is_iso8601_duration_fail(self, to_validate):
+        result = self.validator.is_iso8601_duration(to_validate)
+        assert result == False
+
+    @pytest.mark.parametrize("to_validate", ["00:00:00", *BAD_ARRAY])
+    def test_is_iso8601_time_fail(self, to_validate):
+        result = self.validator.is_iso8601_time(to_validate)
+        assert result == False
+
+
 class TestEvents3Parser:
     device_id = "some-device-id"
     payload = {"String": "someValue"}
@@ -296,6 +364,7 @@ class TestEvents3Parser:
     bad_content_type = "bad-content-type"
 
     bad_dcm_payload = {"temperature": "someValue"}
+    type_mismatch_payload = {"Bool": "someValue"}
 
     def test_parse_message_should_succeed(self):
         # setup
@@ -660,3 +729,55 @@ class TestEvents3Parser:
 
         actual_error = parser._errors[0]
         assert "Unable to extract device schema for device" in actual_error
+
+    def test_type_mismatch_should_error(self):
+        # setup
+        app_prop_type = "some_property"
+        app_prop_value = "some_value"
+        properties = MessageProperties(
+            content_encoding=self.encoding, content_type=self.content_type
+        )
+        message = Message(
+            body=json.dumps(self.type_mismatch_payload).encode(),
+            properties=properties,
+            annotations={_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
+            application_properties={app_prop_type.encode(): app_prop_value.encode()},
+        )
+        parser = _parser.Event3Parser()
+
+        provider = CentralDeviceProvider(cmd=None, app_id=None)
+        device_template = load_json(FileNames.central_device_template_file)
+        provider.get_device_template_by_device_id = mock.MagicMock(
+            return_value=device_template
+        )
+
+        # act
+        parsed_msg = parser.parse_message(
+            message=message,
+            pnp_context=False,
+            interface_name=None,
+            properties={"all"},
+            content_type_hint=None,
+            simulate_errors=False,
+            central_device_provider=provider,
+        )
+
+        # verify
+        assert parsed_msg["event"]["payload"] == self.type_mismatch_payload
+        assert parsed_msg["event"]["origin"] == self.device_id
+
+        assert len(parser._errors) == 1
+        assert len(parser._warnings) == 0
+        assert len(parser._info) == 0
+
+        actual_error = parser._errors[0]
+        assert "Type mismatch" in actual_error
+        assert "Type mismatch" in actual_error
+        assert "Value received" in actual_error
+        assert "Device ID" in actual_error
+        assert (
+            "All dates/times/datetimes/durations must be ISO 8601 compliant."
+            in actual_error
+        )
+        assert list(self.type_mismatch_payload.values())[0] in actual_error
+        assert list(self.type_mismatch_payload.keys())[0] in actual_error
