@@ -334,22 +334,22 @@ class TestISO8601Validator:
     )
     def test_is_iso8601_date_fail(self, to_validate):
         result = self.validator.is_iso8601_date(to_validate)
-        assert result == False
+        assert not result
 
     @pytest.mark.parametrize("to_validate", ["2020-13-35", "2020-00-00T", *BAD_ARRAY])
     def test_is_iso8601_datetime_fail(self, to_validate):
         result = self.validator.is_iso8601_datetime(to_validate)
-        assert result == False
+        assert not result
 
     @pytest.mark.parametrize("to_validate", ["2020-01", *BAD_ARRAY])
     def test_is_iso8601_duration_fail(self, to_validate):
         result = self.validator.is_iso8601_duration(to_validate)
-        assert result == False
+        assert not result
 
     @pytest.mark.parametrize("to_validate", ["00:00:00", *BAD_ARRAY])
     def test_is_iso8601_time_fail(self, to_validate):
         result = self.validator.is_iso8601_time(to_validate)
-        assert result == False
+        assert not result
 
 
 class TestEvents3Parser:
