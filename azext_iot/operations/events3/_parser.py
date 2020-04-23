@@ -402,7 +402,7 @@ class Event3Parser(object):
                     "Value received: '{}'. "
                     "Telemetry identifier: {}. "
                     "Device ID: {}. "
-                    "All dates/times/durations must be ISO 8601 compliant.".format(
+                    "All dates/times/datetimes/durations must be ISO 8601 compliant.".format(
                         expected_type, value, name, origin_device_id
                     )
                 )
