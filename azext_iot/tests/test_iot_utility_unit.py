@@ -293,7 +293,9 @@ class TestISO8601Validator:
     validator = ISO8601Validator()
 
     # Success suite
-    @pytest.mark.parametrize("to_validate", ["2020-01-01"])
+    @pytest.mark.parametrize(
+        "to_validate", ["20200101", "20200101Z", "2020-01-01", "2020-01-01Z"]
+    )
     def test_is_iso8601_date_pass(self, to_validate):
         result = self.validator.is_iso8601_date(to_validate)
         assert result
@@ -301,11 +303,9 @@ class TestISO8601Validator:
     @pytest.mark.parametrize(
         "to_validate",
         [
-            "20200101",
-            "2020-01-01",
-            "2020-01-01T00:00:00",
             "20200101T00:00:00",
             "20200101T000000",
+            "2020-01-01T00:00:00",
             "2020-01-01T00:00:00Z",
             "2020-01-01T00:00:00.00",
             "2020-01-01T00:00:00.00Z",
@@ -330,7 +330,7 @@ class TestISO8601Validator:
 
     # Failure suite
     @pytest.mark.parametrize(
-        "to_validate", ["2020-01", "2020-01-01Z", "2020-13-35", *BAD_ARRAY],
+        "to_validate", ["2020-13-35", *BAD_ARRAY],
     )
     def test_is_iso8601_date_fail(self, to_validate):
         result = self.validator.is_iso8601_date(to_validate)
@@ -346,7 +346,7 @@ class TestISO8601Validator:
         result = self.validator.is_iso8601_duration(to_validate)
         assert not result
 
-    @pytest.mark.parametrize("to_validate", ["00:00:00", *BAD_ARRAY])
+    @pytest.mark.parametrize("to_validate", [*BAD_ARRAY])
     def test_is_iso8601_time_fail(self, to_validate):
         result = self.validator.is_iso8601_time(to_validate)
         assert not result

@@ -168,9 +168,7 @@ class Event3Parser(object):
             return unicode_binary_map(parse_entity(message.properties, True))
         except Exception:
             self._errors.append(
-                "Failed to parse system_properties for message {message}.".format(
-                    message
-                )
+                "Failed to parse system_properties for message {}.".format(message)
             )
             return {}
 

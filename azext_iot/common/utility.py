@@ -11,9 +11,9 @@ utility: Define helper functions for 'common' scripts.
 
 import ast
 import base64
+import isodate
 import json
 import os
-import re
 import sys
 
 from threading import Event, Thread
@@ -439,26 +439,26 @@ def ensure_pkg_resources_entries():
 
 
 class ISO8601Validator:
-    # lifted from https://www.phpliveregex.com/learn/dates-and-times/how-to-match-iso8601-date-time/
-    DATE_RE = r"^(([12]\d{3})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01]))$"
-
-    # lifted from https://www.myintervals.com/blog/2009/05/20/iso-8601-date-validation-that-doesnt-suck/
-    DATETIME_RE = r"^([\+-]?\d{4}(?!\d{2}\b))((-?)((0[1-9]|1[0-2])(\3([12]\d|0[1-9]|3[01]))?|W([0-4]\d|5[0-2])(-?[1-7])?|(00[1-9]|0[1-9]\d|[12]\d{2}|3([0-5]\d|6[1-6])))([T\s]((([01]\d|2[0-3])((:?)[0-5]\d)?|24\:?00)([\.,]\d+(?!:))?)?(\17[0-5]\d([\.,]\d+)?)?([zZ]|([\+-])([01]\d|2[0-3]):?([0-5]\d)?)?)?)?$"
-
-    # lifted from https://stackoverflow.com/questions/32044846/regex-for-iso-8601-durations
-    DURATION_RE = r"^P(?!$)(\d+(?:\.\d+)?Y)?(\d+(?:\.\d+)?M)?(\d+(?:\.\d+)?W)?(\d+(?:\.\d+)?D)?(T(?=\d)(\d+(?:\.\d+)?H)?(\d+(?:\.\d+)?M)?(\d+(?:\.\d+)?S)?)?$"
-
-    # lifted from https://stackoverflow.com/questions/3143070/javascript-regex-iso-datetime
-    TIME_RE = r"^([0-2]\d:[0-5]\d:[0-5]\d\.\d+([+-][0-2]\d:[0-5]\d|Z))|([0-2]\d:[0-5]\d:[0-5]\d([+-][0-2]\d:[0-5]\d|Z))$"
-
     def is_iso8601_date(self, to_validate) -> bool:
-        return bool(re.search(self.DATE_RE, str(to_validate)))
+        try:
+            return bool(isodate.parse_date(to_validate))
+        except Exception:
+            return False
 
     def is_iso8601_datetime(self, to_validate: str) -> bool:
-        return bool(re.search(self.DATETIME_RE, str(to_validate)))
+        try:
+            return bool(isodate.parse_datetime(to_validate))
+        except Exception:
+            return False
 
     def is_iso8601_duration(self, to_validate: str) -> bool:
-        return bool(re.search(self.DURATION_RE, str(to_validate)))
+        try:
+            return bool(isodate.parse_duration(to_validate))
+        except Exception:
+            return False
 
     def is_iso8601_time(self, to_validate: str) -> bool:
-        return bool(re.search(self.TIME_RE, str(to_validate)))
+        try:
+            return bool(isodate.parse_time(to_validate))
+        except Exception:
+            return False
