@@ -7,6 +7,7 @@
 
 from knack.util import CLIError
 from azext_iot.central.providers import CentralDeviceProvider
+from azext_iot.common.shared import DeviceStatus
 
 
 def list_devices(
@@ -68,10 +69,15 @@ def registration_info(
     device_id=None,
     token=None,
     central_dns_suffix="azureiotcentral.com",
+    device_status=DeviceStatus.unknown,
 ):
-    provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token)
+    provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token,)
     if not device_id:
-        return provider.get_all_registration_info(central_dns_suffix=central_dns_suffix)
+        return provider.get_all_registration_info(
+            central_dns_suffix=central_dns_suffix, device_status=device_status
+        )
     return provider.get_device_registration_info(
-        device_id=device_id, central_dns_suffix=central_dns_suffix
+        device_id=device_id,
+        central_dns_suffix=central_dns_suffix,
+        device_status=device_status,
     )

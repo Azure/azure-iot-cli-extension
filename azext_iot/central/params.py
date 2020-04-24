@@ -8,7 +8,8 @@
 CLI parameter definitions.
 """
 
-from azure.cli.core.commands.parameters import get_three_state_flag
+from azure.cli.core.commands.parameters import get_three_state_flag, get_enum_type
+from azext_iot.common.shared import DeviceStatus
 
 
 def load_central_arguments(self, _):
@@ -53,4 +54,10 @@ def load_central_arguments(self, _):
             "More info available here: https://docs.microsoft.com/en-us/learn/modules/manage-iot-central-apps-with-rest-api/ "
             "MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...'). "
             "Example: 'Bearer someBearerTokenHere'",
+        )
+        context.argument(
+            "device_status",
+            options_list=["--devicestatus", "--ds"],
+            arg_type=get_enum_type(DeviceStatus),
+            help="Indicates filter option for device status",
         )

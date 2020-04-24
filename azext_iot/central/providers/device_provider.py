@@ -8,6 +8,7 @@ from knack.util import CLIError
 from knack.log import get_logger
 from azext_iot.central import services as central_services
 from azext_iot.dps.services import global_service as dps_global_service
+from azext_iot.common.shared import DeviceStatus
 
 logger = get_logger(__name__)
 
@@ -170,7 +171,7 @@ class CentralDeviceProvider:
         return credentials
 
     def get_device_registration_info(
-        self, device_id, central_dns_suffix="azureiotcentral.com",
+        self, device_id, device_status, central_dns_suffix="azureiotcentral.com"
     ):
         info = self._device_registration_info.get(device_id)
 
@@ -194,12 +195,73 @@ class CentralDeviceProvider:
 
         return info
 
-    def get_all_registration_info(self, central_dns_suffix="azureiotcentral.com"):
+    def filter_provisioned_devices(self, device_status_value, devices, value):
+        filtered_device_list = []
+        for device in devices:
+            if device["provisioned"] is value and device["approved"] is True:
+                updated_device = self.device_status_update(device, device_status_value)
+                filtered_device_list.append(updated_device)
+        return filtered_device_list
+
+    def device_status_update(self, device, value):
+        del device["provisioned"]
+        del device["approved"]
+        device.update({"DeviceStatus": value})
+        return device
+
+    def filter_blocked_devices(self, device_status_value, devices):
+        filtered_device_list = []
+        for device in devices:
+            if device["approved"] is False:
+                updated_device = self.device_status_update(device, device_status_value)
+                filtered_device_list.append(updated_device)
+        return filtered_device_list
+
+    def update_all_device_status(self, devices):
+        filtered_device_list = []
+        for device in devices:
+            if device["approved"] is False:
+                updated_device = self.device_status_update(
+                    device, DeviceStatus.blocked.value
+                )
+            else:
+                if device["provisioned"] is False:
+                    updated_device = self.device_status_update(
+                        device, DeviceStatus.registered.value
+                    )
+                else:
+                    updated_device = self.device_status_update(
+                        device, DeviceStatus.provisioned.value
+                    )
+            filtered_device_list.append(updated_device)
+        return filtered_device_list
+
+    def filter_device_list(self, devices, device_status):
+        if device_status is DeviceStatus.provisioned.value:
+            return self.filter_provisioned_devices(
+                DeviceStatus.provisioned.value, devices, True
+            )
+        elif device_status is DeviceStatus.registered.value:
+            return self.filter_provisioned_devices(
+                DeviceStatus.registered.value, devices, False
+            )
+        elif device_status is DeviceStatus.blocked.value:
+            return self.filter_blocked_devices(DeviceStatus.blocked.value, devices)
+        else:
+            return self.update_all_device_status(devices)
+
+    def get_all_registration_info(
+        self, device_status, central_dns_suffix="azureiotcentral.com"
+    ):
+
         logger.warning("This command may take a long time to complete execution.")
         devices = self.list_devices(central_dns_suffix=central_dns_suffix)
         real_devices = [
             device for device in devices.values() if not device["simulated"]
         ]
+
+        real_devices = self.filter_device_list(real_devices, device_status)
+
         if len(devices) != len(real_devices):
             logger.warning(
                 "Getting registration info for following devices. "
@@ -207,7 +269,8 @@ class CentralDeviceProvider:
                 "{}".format([device["id"] for device in real_devices])
             )
         result = [
-            self.get_device_registration_info(device["id"]) for device in real_devices
+            self.get_device_registration_info(device["id"], device_status)
+            for device in real_devices
         ]
 
         return result
