@@ -45,7 +45,7 @@ def iot_central_validate_messages(
     central_api_uri="api.azureiotcentral.com",
 ):
     provider = CentralDeviceProvider(cmd, app_id)
-    _events3_runner(
+    return _events3_runner(
         cmd=cmd,
         app_id=app_id,
         device_id=device_id,
@@ -74,21 +74,25 @@ def iot_central_monitor_events(
     yes=False,
     central_api_uri="api.azureiotcentral.com",
 ):
-    _events3_runner(
-        cmd=cmd,
-        app_id=app_id,
-        device_id=device_id,
-        validate_messages=False,
-        simulate_errors=False,
-        consumer_group=consumer_group,
-        timeout=timeout,
-        enqueued_time=enqueued_time,
-        repair=repair,
-        properties=properties,
-        yes=yes,
-        central_api_uri=central_api_uri,
-        central_device_provider=None,
-    )
+    try:
+        return _events3_runner(
+            cmd=cmd,
+            app_id=app_id,
+            device_id=device_id,
+            validate_messages=False,
+            simulate_errors=False,
+            consumer_group=consumer_group,
+            timeout=timeout,
+            enqueued_time=enqueued_time,
+            repair=repair,
+            properties=properties,
+            yes=yes,
+            central_api_uri=central_api_uri,
+            central_device_provider=None,
+        )
+    except BaseException as e:
+        print(e)
+        pass
 
 
 def _events3_runner(
@@ -114,12 +118,16 @@ def _events3_runner(
     from azext_iot.monitor.target import build_central_event_hub_target
 
     target = build_central_event_hub_target(cmd, app_id, central_api_uri)
+    results = []
 
-    initiate_monitor_sync(
+    results = initiate_monitor_sync(
         target=target,
         enqueued_time=enqueued_time,
         consumer_group=consumer_group,
-        timeout=timeout,
         device_id=device_id,
         properties=properties,
+        timeout=0,
+        max_messages=10,
     )
+
+    return results
