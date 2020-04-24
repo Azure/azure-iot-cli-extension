@@ -41,13 +41,6 @@ def iot_central_device_show(
     raise exception
 
 
-def iot_central_device_capability_model_show(
-    cmd, device_id, app_id, central_api_uri="api.azureiotcentral.com"
-):
-    provider = CentralDeviceProvider(cmd, app_id)
-    return provider.get_device_template(device_id)
-
-
 def iot_central_validate_messages(
     cmd,
     app_id,

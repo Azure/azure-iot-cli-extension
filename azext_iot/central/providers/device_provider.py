@@ -5,13 +5,17 @@
 # --------------------------------------------------------------------------------------------
 
 from knack.util import CLIError
+from knack.log import get_logger
 from azext_iot.central import services as central_services
+from azext_iot.dps.services import global_service as dps_global_service
+
+logger = get_logger(__name__)
 
 
 class CentralDeviceProvider:
-    def __init__(self, cmd, app_id, token=None):
+    def __init__(self, cmd, app_id: str, token=None):
         """
-        Provider for device/device_template APIs
+        Provider for device APIs
 
         Args:
             cmd: command passed into az
@@ -24,57 +28,186 @@ class CentralDeviceProvider:
         self._cmd = cmd
         self._app_id = app_id
         self._token = token
-        self._device_templates = {}
         self._devices = {}
-
-    def get_device_template(
-        self, device_id, central_dns_suffix="azureiotcentral.com",
-    ):
-        device = self.get_device(device_id, central_dns_suffix)
-        device_template_urn = device["instanceOf"]
-
-        if not device_template_urn:
-            raise CLIError(
-                "No device template urn found for device '{}'".format(device_id)
-            )
-
-        # get or add to cache
-        if (
-            device_template_urn not in self._device_templates
-            or not self._device_templates.get(device_template_urn)
-        ):
-            self._device_templates[
-                device_template_urn
-            ] = central_services.device_template.get_device_template(
-                self._cmd,
-                device_template_urn,
-                self._app_id,
-                self._token,
-                central_dns_suffix,
-            )
-
-        device_template = self._device_templates[device_template_urn]
-        if not device_template:
-            raise CLIError(
-                "No device template for device with id: '{}'.".format(device_id)
-            )
-
-        return device_template
+        self._device_templates = {}
+        self._device_credentials = {}
+        self._device_registration_info = {}
 
     def get_device(
         self, device_id, central_dns_suffix="azureiotcentral.com",
     ):
         if not device_id:
             raise CLIError("Device id must be specified.")
-
         # get or add to cache
-        if device_id not in self._devices or not self._devices.get(device_id):
-            self._devices[device_id] = central_services.device.get_device(
-                self._cmd, device_id, self._app_id, self._token, central_dns_suffix
+        device = self._devices.get(device_id)
+        if not device:
+            device = central_services.device.get_device(
+                cmd=self._cmd,
+                app_id=self._app_id,
+                device_id=device_id,
+                token=self._token,
+                central_dns_suffix=central_dns_suffix,
             )
+            self._devices[device_id] = device
 
-        device = self._devices[device_id]
         if not device:
             raise CLIError("No device found with id: '{}'.".format(device_id))
 
         return device
+
+    def get_device_template_by_device_id(
+        self, device_id, central_dns_suffix="azureiotcentral.com",
+    ):
+        from azext_iot.central.providers import CentralDeviceTemplateProvider
+
+        if not device_id:
+            raise CLIError("Device id must be specified.")
+
+        device = self.get_device(device_id, central_dns_suffix)
+        instance_of = device.get("instanceOf")
+        if not instance_of:
+            raise CLIError(
+                "Device '{}' does not have a corresponding device template.".format(
+                    device_id
+                )
+            )
+
+        template = CentralDeviceTemplateProvider.get_device_template(
+            self=self,
+            device_template_id=instance_of,
+            central_dns_suffix=central_dns_suffix,
+        )
+        return template
+
+    def list_devices(
+        self, central_dns_suffix="azureiotcentral.com",
+    ):
+        devices = central_services.device.list_devices(
+            cmd=self._cmd, app_id=self._app_id, token=self._token
+        )
+
+        # add to cache
+        self._devices.update({device["id"]: device for device in devices})
+
+        return self._devices
+
+    def create_device(
+        self,
+        device_id,
+        device_name=None,
+        instance_of=None,
+        simulated=False,
+        central_dns_suffix="azureiotcentral.com",
+    ):
+        if not device_id:
+            raise CLIError("Device id must be specified.")
+
+        if device_id in self._devices:
+            raise CLIError("Device already exists")
+
+        device = central_services.device.create_device(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            device_name=device_name,
+            instance_of=instance_of,
+            simulated=simulated,
+            token=self._token,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+        if not device:
+            raise CLIError("No device found with id: '{}'.".format(device_id))
+
+        # add to cache
+        self._devices[device["id"]] = device
+
+        return device
+
+    def delete_device(
+        self, device_id, central_dns_suffix="azureiotcentral.com",
+    ):
+        if not device_id:
+            raise CLIError("Device id must be specified.")
+
+        # get or add to cache
+        result = central_services.device.delete_device(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            token=self._token,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+        # remove from cache
+        # pop "miss" raises a KeyError if None is not provided
+        self._devices.pop(device_id, None)
+        self._device_credentials.pop(device_id, None)
+
+        return result
+
+    def get_device_credentials(
+        self, device_id, central_dns_suffix="azureiotcentral.com",
+    ):
+        credentials = self._device_credentials.get(device_id)
+
+        if not credentials:
+            credentials = central_services.device.get_device_credentials(
+                cmd=self._cmd,
+                app_id=self._app_id,
+                device_id=device_id,
+                token=self._token,
+            )
+
+        if not credentials:
+            raise CLIError(
+                "Could not find device credentials for device '{}'".format(device_id)
+            )
+
+        # add to cache
+        self._device_credentials[device_id] = credentials
+
+        return credentials
+
+    def get_device_registration_info(
+        self, device_id, central_dns_suffix="azureiotcentral.com",
+    ):
+        info = self._device_registration_info.get(device_id)
+
+        if not info:
+            credentials = self.get_device_credentials(
+                device_id=device_id, central_dns_suffix=central_dns_suffix
+            )
+            id_scope = credentials["idScope"]
+            key = credentials["symmetricKey"]["primaryKey"]
+            dps_state = dps_global_service.get_registration_state(
+                id_scope=id_scope, key=key, device_id=device_id
+            )
+            central_info = self.get_device(device_id)
+            info = {
+                "@device_id": device_id,
+                "dps_state": dps_state,
+                "central_info": central_info,
+            }
+
+        self._device_registration_info[device_id] = info
+
+        return info
+
+    def get_all_registration_info(self, central_dns_suffix="azureiotcentral.com"):
+        logger.warning("This command may take a long time to complete execution.")
+        devices = self.list_devices(central_dns_suffix=central_dns_suffix)
+        real_devices = [
+            device for device in devices.values() if not device["simulated"]
+        ]
+        if len(devices) != len(real_devices):
+            logger.warning(
+                "Getting registration info for following devices. "
+                "All other devices are simulated. "
+                "{}".format([device["id"] for device in real_devices])
+            )
+        result = [
+            self.get_device_registration_info(device["id"]) for device in real_devices
+        ]
+
+        return result

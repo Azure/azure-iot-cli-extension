@@ -20,12 +20,10 @@ random.seed(0)
 
 
 class Event3Parser(object):
-    _info = []
-    _warnings = []
-    _errors = []
     _logger = get_logger(__name__)
 
     def __init__(self, logger=None):
+        self._reset_issues()
         if logger:
             self._logger = logger
 
@@ -105,6 +103,8 @@ class Event3Parser(object):
             central_device_provider,
             create_payload_name_error,
         )
+
+        self._validate_field_names(origin_device_id, payload)
 
         event["payload"] = payload
 
@@ -286,7 +286,9 @@ class Event3Parser(object):
             return
 
         try:
-            template = central_device_provider.get_device_template(origin_device_id)
+            template = central_device_provider.get_device_template_by_device_id(
+                origin_device_id
+            )
         except Exception as e:
             self._errors.append(
                 "Unable to get DCM for device: {}."
@@ -324,3 +326,27 @@ class Event3Parser(object):
             all_schema.extend(contents)
 
         return all_schema
+
+    def _validate_field_names(self, origin_device_id: str, payload: dict):
+        # if its not a dictionary, something else went wrong with parsing
+        if not isinstance(payload, dict):
+            return
+
+        # source:
+        # https://github.com/Azure/IoTPlugandPlay/tree/master/DTDL
+        regex = "^[a-zA-Z_][a-zA-Z0-9_]*$"
+
+        # if a field name does not match the above regex, it is an invalid field name
+        invalid_field_names = [
+            field_name
+            for field_name in payload.keys()
+            if not re.search(regex, field_name)
+        ]
+        if invalid_field_names:
+            self._errors.append(
+                "The following field names are not allowed: '{}'. "
+                "Payload: '{}'. "
+                "Message origin: '{}'.".format(
+                    invalid_field_names, payload, origin_device_id
+                )
+            )
