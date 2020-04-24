@@ -67,12 +67,12 @@ class Runner:
 
     async def _timeout(self, timeout=0):
         await asyncio.sleep(timeout)
-        print("Exiting due to timeout")
+        print("Read messages timed out, no longer reading messages.")
         self.stop()
 
     async def _max_messages(self, max_messages=0):
         while True:
             await asyncio.sleep(self.polling_interval_seconds)
-            if len(self.messages) > max_messages:
-                print("Exiting due to messages")
+            if len(self.messages) >= max_messages:
+                print("Max message count received, no longer reading messages.")
                 self.stop()

@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import json
 import re
 import sys
 
@@ -19,8 +20,9 @@ DEBUG = False
 logger = get_logger(__name__)
 
 
-def initiate_monitor_sync(
+def initiate_monitor(
     target: Target,
+    continuous_output: bool,
     enqueued_time: int,
     consumer_group="$Default",
     device_id="",
@@ -33,6 +35,7 @@ def initiate_monitor_sync(
     coroutine = generate_monitor_coroutines(
         runner=runner,
         target=target,
+        continuous_output=continuous_output,
         enqueued_time=enqueued_time,
         consumer_group=consumer_group,
         timeout=timeout,
@@ -46,6 +49,10 @@ def initiate_monitor_sync(
             timeout, max_messages
         )
     )
+    if continuous_output:
+        print("Messages will be output as they are received.")
+    else:
+        print("Messages will be output at the end of execution.")
     runner.start()
     messages = runner.get_messages()
     return messages
@@ -54,6 +61,7 @@ def initiate_monitor_sync(
 async def generate_monitor_coroutines(
     runner: Runner,
     target: Target,
+    continuous_output: bool,
     enqueued_time: int,
     consumer_group: str,
     timeout: int,
@@ -78,6 +86,7 @@ async def generate_monitor_coroutines(
         runner.add_coroutine(
             lambda messages: process_single_partition(
                 target=target,
+                continuous_output=continuous_output,
                 enqueued_time=enqueued_time,
                 consumer_group=consumer_group,
                 partition=partition,
@@ -92,6 +101,7 @@ async def generate_monitor_coroutines(
 
 async def process_single_partition(
     target: Target,
+    continuous_output: bool,
     enqueued_time: int,
     consumer_group: str,
     partition: str,
@@ -127,6 +137,9 @@ async def process_single_partition(
             message = _output_msg_kpi(msg, device_id, properties)
             if message:
                 messages.append(message)
+                if continuous_output:
+                    dumps = json.dumps(message, indent=4)
+                    print(dumps)
     finally:
         await receive_client.close_async()
         logger.info("Closed monitor on partition %s", partition)

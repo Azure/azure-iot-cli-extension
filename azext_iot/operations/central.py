@@ -114,14 +114,16 @@ def _events3_runner(
         cmd, timeout, properties, enqueued_time, repair, yes
     )
 
-    from azext_iot.monitor.monitor import initiate_monitor_sync
+    from azext_iot.monitor.monitor import initiate_monitor
     from azext_iot.monitor.target import build_central_event_hub_target
 
     target = build_central_event_hub_target(cmd, app_id, central_api_uri)
     results = []
 
-    results = initiate_monitor_sync(
+    continuous_output = False
+    results = initiate_monitor(
         target=target,
+        continuous_output=continuous_output,
         enqueued_time=enqueued_time,
         consumer_group=consumer_group,
         device_id=device_id,
@@ -129,5 +131,8 @@ def _events3_runner(
         timeout=0,
         max_messages=10,
     )
+
+    if continuous_output:
+        return
 
     return results
