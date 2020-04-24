@@ -110,21 +110,16 @@ def _events3_runner(
         cmd, timeout, properties, enqueued_time, repair, yes
     )
 
-    from azext_iot.operations.events3 import _builders, _events
+    from azext_iot.monitor.monitor import initiate_monitor_sync
+    from azext_iot.monitor.target import build_central_event_hub_target
 
-    eventHubTarget = _builders.EventTargetBuilder().build_central_event_hub_target(
-        cmd, app_id, central_api_uri
-    )
+    target = build_central_event_hub_target(cmd, app_id, central_api_uri)
 
-    _events.executor(
-        eventHubTarget,
-        consumer_group=consumer_group,
+    initiate_monitor_sync(
+        target=target,
         enqueued_time=enqueued_time,
-        properties=properties,
+        consumer_group=consumer_group,
         timeout=timeout,
         device_id=device_id,
-        output=output,
-        validate_messages=validate_messages,
-        simulate_errors=simulate_errors,
-        central_device_provider=central_device_provider,
+        properties=properties,
     )
