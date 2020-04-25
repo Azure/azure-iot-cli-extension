@@ -220,7 +220,8 @@ class DeviceStatus(Enum):
     """
     Type of Device status.
     """
-    unknown = "unknown"
+
     provisioned = "provisioned"
     registered = "registered"
     blocked = "blocked"
+    unassociated = "unassociated"

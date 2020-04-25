@@ -176,6 +176,10 @@ class CentralDeviceProvider:
         info = self._device_registration_info.get(device_id)
 
         if not info:
+            central_info = self.get_device(device_id)
+            central_info = self.update_device_info_filter_status(
+                central_info, device_status
+            )
             credentials = self.get_device_credentials(
                 device_id=device_id, central_dns_suffix=central_dns_suffix
             )
@@ -184,7 +188,9 @@ class CentralDeviceProvider:
             dps_state = dps_global_service.get_registration_state(
                 id_scope=id_scope, key=key, device_id=device_id
             )
-            central_info = self.get_device(device_id)
+            dps_state = self.filter_dps_info(
+                dps_state, central_info.get("deviceStatus")
+            )
             info = {
                 "@device_id": device_id,
                 "dps_state": dps_state,
@@ -195,60 +201,70 @@ class CentralDeviceProvider:
 
         return info
 
-    def filter_provisioned_devices(self, device_status_value, devices, value):
-        filtered_device_list = []
-        for device in devices:
-            if device["provisioned"] is value and device["approved"] is True:
-                updated_device = self.device_status_update(device, device_status_value)
-                filtered_device_list.append(updated_device)
-        return filtered_device_list
+    def filter_dps_info(self, dps_info, device_status):
+        error = {
+            "provisioned": "None",
+            "registered": "Device it not yet provisioned.",
+            "blocked": "Device is blocked by admin",
+            "unassociated": "Device does not have a valid template associated with it",
+        }
 
-    def device_status_update(self, device, value):
-        del device["provisioned"]
-        del device["approved"]
-        device.update({"DeviceStatus": value})
-        return device
+        filtered_dps_info = {
+            "status": dps_info.get("status"),
+        }
 
-    def filter_blocked_devices(self, device_status_value, devices):
-        filtered_device_list = []
-        for device in devices:
-            if device["approved"] is False:
-                updated_device = self.device_status_update(device, device_status_value)
-                filtered_device_list.append(updated_device)
-        return filtered_device_list
+        filtered_dps_info.update({"error": error.get(device_status)})
+        return filtered_dps_info
+
+    def update_device_info_filter_status(self, device, value):
+        if value is None:
+            return self.update_device_status(device)
+        updated_device_data = {
+            "id": device["id"],
+            "displayName": device.get("displayName"),
+            "instanceOf": device.get("instanceOf"),
+            "simulated": device.get("simulated"),
+            "deviceStatus": value,
+        }
+        return updated_device_data
+
+    def update_device_status(self, device):
+        if device["approved"] is False:
+            updated_device = self.update_device_info_filter_status(
+                device, DeviceStatus.blocked.value
+            )
+        else:
+            if device.get("instanceOf") is None:
+                updated_device = self.update_device_info_filter_status(
+                    device, DeviceStatus.unassociated.value
+                )
+            else:
+                if device["provisioned"] is False:
+                    updated_device = self.update_device_info_filter_status(
+                        device, DeviceStatus.registered.value
+                    )
+                else:
+                    updated_device = self.update_device_info_filter_status(
+                        device, DeviceStatus.provisioned.value
+                    )
+        return updated_device
 
     def update_all_device_status(self, devices):
         filtered_device_list = []
         for device in devices:
-            if device["approved"] is False:
-                updated_device = self.device_status_update(
-                    device, DeviceStatus.blocked.value
-                )
-            else:
-                if device["provisioned"] is False:
-                    updated_device = self.device_status_update(
-                        device, DeviceStatus.registered.value
-                    )
-                else:
-                    updated_device = self.device_status_update(
-                        device, DeviceStatus.provisioned.value
-                    )
-            filtered_device_list.append(updated_device)
+            filtered_device_list.append(self.update_device_status(device))
         return filtered_device_list
 
     def filter_device_list(self, devices, device_status):
-        if device_status is DeviceStatus.provisioned.value:
-            return self.filter_provisioned_devices(
-                DeviceStatus.provisioned.value, devices, True
-            )
-        elif device_status is DeviceStatus.registered.value:
-            return self.filter_provisioned_devices(
-                DeviceStatus.registered.value, devices, False
-            )
-        elif device_status is DeviceStatus.blocked.value:
-            return self.filter_blocked_devices(DeviceStatus.blocked.value, devices)
-        else:
-            return self.update_all_device_status(devices)
+        filtered_device_list = []
+        updated_device_list = self.update_all_device_status(devices)
+        if device_status is None:
+            return updated_device_list
+
+        for device in updated_device_list:
+            if device.get("deviceStatus") is device_status:
+                filtered_device_list.append(device)
+        return filtered_device_list
 
     def get_all_registration_info(
         self, device_status, central_dns_suffix="azureiotcentral.com"
@@ -260,17 +276,17 @@ class CentralDeviceProvider:
             device for device in devices.values() if not device["simulated"]
         ]
 
-        real_devices = self.filter_device_list(real_devices, device_status)
+        filtered_devices = self.filter_device_list(real_devices, device_status)
 
-        if len(devices) != len(real_devices):
+        if len(devices) != len(filtered_devices):
             logger.warning(
                 "Getting registration info for following devices. "
                 "All other devices are simulated. "
-                "{}".format([device["id"] for device in real_devices])
+                "{}".format([device["id"] for device in filtered_devices])
             )
         result = [
-            self.get_device_registration_info(device["id"], device_status)
-            for device in real_devices
+            self.get_device_registration_info(device["id"], device["deviceStatus"])
+            for device in filtered_devices
         ]
 
         return result

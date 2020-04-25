@@ -69,13 +69,14 @@ def registration_info(
     device_id=None,
     token=None,
     central_dns_suffix="azureiotcentral.com",
-    device_status=DeviceStatus.unknown,
+    device_status=None,
 ):
     provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token,)
     if not device_id:
         return provider.get_all_registration_info(
             central_dns_suffix=central_dns_suffix, device_status=device_status
         )
+    
     return provider.get_device_registration_info(
         device_id=device_id,
         central_dns_suffix=central_dns_suffix,
