@@ -174,8 +174,3 @@ class MessageParser(object):
                 pass
 
         return payload
-
-
-class MessageParser2:
-    def parse_message(self, msg, **kwargs):
-        pass

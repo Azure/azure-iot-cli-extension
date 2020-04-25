@@ -32,12 +32,17 @@ class Runner:
         )
         result = None
         try:
-            self.loop.run_until_complete(future)
-        except BaseException:
+            future.add_done_callback(lambda future: self._stop_and_suppress_eloop())
+            result = self.loop.run_forever()
+        except KeyboardInterrupt:
+            print("Stopping event monitor...")
             self.stop()
+            self.loop.run_forever()
         finally:
-            if result and result[0] and result[0][0]:
-                print(result)
+            if result:
+                errors = result[0]
+                if errors and errors[0]:
+                    raise RuntimeError(errors[0])
 
     def stop(self):
         for t in asyncio.Task.all_tasks():
@@ -76,3 +81,9 @@ class Runner:
             if len(self.messages) >= max_messages:
                 print("Max message count received, no longer reading messages.")
                 self.stop()
+
+    def _stop_and_suppress_eloop(self):
+        try:
+            self.stop()
+        except Exception:
+            pass

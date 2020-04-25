@@ -115,6 +115,7 @@ def _events3_runner(
     )
 
     from azext_iot.monitor.monitor import initiate_monitor
+    from azext_iot.monitor.handler import parse_message
     from azext_iot.monitor.target import build_central_event_hub_target
 
     target = build_central_event_hub_target(cmd, app_id, central_api_uri)
@@ -123,13 +124,13 @@ def _events3_runner(
     continuous_output = False
     results = initiate_monitor(
         target=target,
-        continuous_output=continuous_output,
         enqueued_time=enqueued_time,
         consumer_group=consumer_group,
-        device_id=device_id,
-        properties=properties,
         timeout=0,
         max_messages=10,
+        parse_message=lambda message: parse_message(
+            message, device_id, properties, continuous_output
+        ),
     )
 
     if continuous_output:
