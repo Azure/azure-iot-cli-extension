@@ -9,6 +9,7 @@
 
 import requests
 
+from azext_iot import constants
 from azext_iot.dps.services import auth
 
 
@@ -33,9 +34,11 @@ def get_registration_state(id_scope: str, key: str, device_id: str):
     url = "https://global.azure-devices-provisioning.net/{}/registrations/{}?api-version=2019-03-31".format(
         id_scope, device_id
     )
-    header_parameters = {}
-    header_parameters["Content-Type"] = "application/json"
-    header_parameters["Authorization"] = "{}".format(authToken)
+    header_parameters = {
+        "Content-Type": "application/json",
+        "User-Agent": constants.USER_AGENT,
+        "Authorization": authToken,
+    }
     body = {"registrationId": "{}".format(device_id)}
     response = requests.post(url, headers=header_parameters, json=body)
 

@@ -154,9 +154,23 @@ Execute the following command to run both Unit and Integration tests and output 
 
 #### Formatting and Linting
 
+The repo uses the linter in `azdev`.
+
+To install the required version of azdev, run this command:
+
+```powershell
+pip install -e "git+https://github.com/Azure/azure-cli@dev#egg=azure-cli-dev-tools&subdirectory=tools"
+```
+
+To run the linter, run this command:
+
+```powershell
+azdev cli-lint --ci --extensions azure-iot
+```
+
 We use our flake8 and pylint rules. We recommend you set up your IDE as per the VSCode setup below for best compliance.
 
-We are also starting to use `python black`. To set this up on VSCode, see the following blog post
+We are also starting to use `python black`. To set this up on VSCode, see the following blog post.
 
 https://medium.com/@marcobelo/setting-up-python-black-on-visual-studio-code-5318eba4cd00
 

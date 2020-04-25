@@ -56,6 +56,12 @@ def load_central_arguments(self, _):
             "Example: 'Bearer someBearerTokenHere'",
         )
         context.argument(
+            "central_dns_suffix",
+            options_list=["--central-dns-suffix"],
+            help="Central dns suffix. "
+            "This enables running cli commands against non public/prod environments",
+        )
+        context.argument(
             "device_status",
             options_list=["--devicestatus", "-ds"],
             arg_type=get_enum_type(DeviceStatus),

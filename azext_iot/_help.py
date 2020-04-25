@@ -1248,17 +1248,6 @@ helps[
   """
 
 helps[
-    "iot central app capability-model show"
-] = """
-    type: command
-    short-summary: Get the device model from IoT central.
-    examples:
-    - name: Basic usage
-      text: >
-        az iot central app capability-model show --app-id {app_id} -d {device_id}
-  """
-
-helps[
     "iot central device-twin"
 ] = """
     type: group
