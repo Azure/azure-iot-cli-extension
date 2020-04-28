@@ -1183,8 +1183,8 @@ helps[
     short-summary: |
                   Manage Azure IoT Central applications.
 
-                  To use this command group, the user must be logged through the `az login` command, 
-                  have the correct tenant set (the users home tenant) and 
+                  To use this command group, the user must be logged through the `az login` command,
+                  have the correct tenant set (the users home tenant) and
                   have access to the application through http://apps.azureiotcentral.com"
 """
 
