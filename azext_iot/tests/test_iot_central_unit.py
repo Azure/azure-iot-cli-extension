@@ -100,7 +100,7 @@ def fixture_get_iot_central_tokens(mocker):
 
 
 class TestCentralHelpers:
-    def test_get_iot_central_tokens(self, fixture_requests_post):
+    def test_get_iot_central_tokens(self, fixture_requests_post, fixture_azure_profile):
         from azext_iot.common._azure import get_iot_central_tokens
 
         class Cmd:
