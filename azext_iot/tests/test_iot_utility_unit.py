@@ -683,7 +683,7 @@ class TestEvents3Parser:
         assert len(parser._info) == 0
 
         actual_error = parser._errors[0]
-        expected_error = "Telemetry item '{}' is not present in DCM.".format(
+        expected_error = "Telemetry item '{}' is not present in capability model.".format(
             list(self.bad_dcm_payload)[0]
         )
         assert expected_error in actual_error

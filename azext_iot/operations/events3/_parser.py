@@ -351,7 +351,7 @@ class Event3Parser(object):
             )
         except Exception as e:
             self._errors.append(
-                "Unable to get DCM for device: {}."
+                "Unable to retrieve template for device: {}."
                 "Inner exception: {}".format(origin_device_id, e)
             )
 
@@ -383,7 +383,7 @@ class Event3Parser(object):
             schema = template_schemas.get(name)
             if not schema:
                 self._errors.append(
-                    "Telemetry item '{}' is not present in DCM. "
+                    "Telemetry item '{}' is not present in capability model. "
                     "Device ID: {}. "
                     "List of allowed telemetry values for this type of device: {}. "
                     "NOTE: telemetry names are CASE-SENSITIVE".format(
