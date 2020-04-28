@@ -112,6 +112,21 @@ class TestCentralHelpers:
             == "fixture_requests_post value"
         )
 
+    def test_get_aad_token(self, fixture_azure_profile):
+        from azext_iot.common.auth import get_aad_token
+
+        class Cmd:
+            cli_ctx = ""
+
+        # Test to ensure _get_aad_token is called and returns the right values based on profile.get_raw_tokens
+        assert get_aad_token(Cmd(), "resource") == {
+            "accessToken": "raw token 0 -b",
+            "expiresOn": "value",
+            "subscription": "raw token 1",
+            "tenant": "raw token 2",
+            "tokenType": "raw token 0 - A",
+        }
+
 
 class TestDeviceTwinShow:
     def test_device_twin_show_calls_get_twin(
