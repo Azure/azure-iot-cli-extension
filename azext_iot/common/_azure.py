@@ -8,8 +8,8 @@ from knack.util import CLIError
 from azext_iot.common.utility import validate_key_value_pairs
 from azext_iot.common.utility import trim_from_start
 from azext_iot._factory import iot_hub_service_factory
-from azure.cli.core._profile import Profile
 from azext_iot.common.auth import get_aad_token
+
 
 def _parse_connection_string(cs, validate=None, cstring_type="entity"):
     decomposed = validate_key_value_pairs(cs)
