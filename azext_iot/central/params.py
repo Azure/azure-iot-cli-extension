@@ -9,7 +9,7 @@ CLI parameter definitions.
 """
 
 from azure.cli.core.commands.parameters import get_three_state_flag, get_enum_type
-from azext_iot.common.shared import DeviceStatus
+from azext_iot.central.models.enum import DeviceStatus
 
 
 def load_central_arguments(self, _):
@@ -63,7 +63,7 @@ def load_central_arguments(self, _):
         )
         context.argument(
             "device_status",
-            options_list=["--devicestatus", "-ds"],
+            options_list=["--devicestatus", "-s"],
             arg_type=get_enum_type(DeviceStatus),
             help="Indicates filter option for device status",
         )

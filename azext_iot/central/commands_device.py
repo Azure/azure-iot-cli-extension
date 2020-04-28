@@ -7,7 +7,6 @@
 
 from knack.util import CLIError
 from azext_iot.central.providers import CentralDeviceProvider
-from azext_iot.common.shared import DeviceStatus
 
 
 def list_devices(
@@ -76,7 +75,7 @@ def registration_info(
         return provider.get_all_registration_info(
             central_dns_suffix=central_dns_suffix, device_status=device_status
         )
-    
+
     return provider.get_device_registration_info(
         device_id=device_id,
         central_dns_suffix=central_dns_suffix,

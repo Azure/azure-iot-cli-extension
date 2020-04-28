@@ -8,7 +8,7 @@ from knack.util import CLIError
 from knack.log import get_logger
 from azext_iot.central import services as central_services
 from azext_iot.dps.services import global_service as dps_global_service
-from azext_iot.common.shared import DeviceStatus
+from azext_iot.central.models.enum import DeviceStatus
 
 logger = get_logger(__name__)
 
@@ -171,14 +171,17 @@ class CentralDeviceProvider:
         return credentials
 
     def get_device_registration_info(
-        self, device_id, device_status, central_dns_suffix="azureiotcentral.com"
+        self,
+        device_id,
+        device_status: DeviceStatus,
+        central_dns_suffix="azureiotcentral.com",
     ):
         info = self._device_registration_info.get(device_id)
 
         if not info:
-            central_info = self.get_device(device_id)
-            central_info = self.update_device_info_filter_status(
-                central_info, device_status
+            device_info = self.get_device(device_id)
+            device_essential_info = self.device_populate_essential_info(
+                device_info, device_status
             )
             credentials = self.get_device_credentials(
                 device_id=device_id, central_dns_suffix=central_dns_suffix
@@ -188,20 +191,20 @@ class CentralDeviceProvider:
             dps_state = dps_global_service.get_registration_state(
                 id_scope=id_scope, key=key, device_id=device_id
             )
-            dps_state = self.filter_dps_info(
-                dps_state, central_info.get("deviceStatus")
+            dps_state = self.dps_populate_essential_info(
+                dps_state, device_essential_info.get("deviceStatus")
             )
             info = {
                 "@device_id": device_id,
                 "dps_state": dps_state,
-                "central_info": central_info,
+                "device_info": device_essential_info,
             }
 
         self._device_registration_info[device_id] = info
 
         return info
 
-    def filter_dps_info(self, dps_info, device_status):
+    def dps_populate_essential_info(self, dps_info, device_status):
         error = {
             "provisioned": "None",
             "registered": "Device it not yet provisioned.",
@@ -211,13 +214,12 @@ class CentralDeviceProvider:
 
         filtered_dps_info = {
             "status": dps_info.get("status"),
+            "error": error.get(device_status),
         }
-
-        filtered_dps_info.update({"error": error.get(device_status)})
         return filtered_dps_info
 
-    def update_device_info_filter_status(self, device, value):
-        if value is None:
+    def device_populate_essential_info(self, device, value):
+        if not value:
             return self.update_device_status(device)
         updated_device_data = {
             "id": device["id"],
@@ -228,25 +230,24 @@ class CentralDeviceProvider:
         }
         return updated_device_data
 
-    def update_device_status(self, device):
+    def determine_device_status(self, device):
         if device["approved"] is False:
-            updated_device = self.update_device_info_filter_status(
-                device, DeviceStatus.blocked.value
-            )
+            return DeviceStatus.blocked.value
         else:
-            if device.get("instanceOf") is None:
-                updated_device = self.update_device_info_filter_status(
-                    device, DeviceStatus.unassociated.value
-                )
+            if not device.get("instanceOf"):
+                return DeviceStatus.unassociated.value
+
             else:
                 if device["provisioned"] is False:
-                    updated_device = self.update_device_info_filter_status(
-                        device, DeviceStatus.registered.value
-                    )
+                    return DeviceStatus.registered.value
+
                 else:
-                    updated_device = self.update_device_info_filter_status(
-                        device, DeviceStatus.provisioned.value
-                    )
+                    return DeviceStatus.provisioned.value
+
+    def update_device_status(self, device):
+        updated_device = self.device_populate_essential_info(
+            device, self.determine_device_status(device)
+        )
         return updated_device
 
     def update_all_device_status(self, devices):
@@ -280,8 +281,7 @@ class CentralDeviceProvider:
 
         if len(devices) != len(filtered_devices):
             logger.warning(
-                "Getting registration info for following devices. "
-                "All other devices are simulated. "
+                "Getting registration info for real devices. "
                 "{}".format([device["id"] for device in filtered_devices])
             )
         result = [

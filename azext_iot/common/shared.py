@@ -214,14 +214,3 @@ class JobStatusType(Enum):
     cancelled = "cancelled"
     scheduled = "scheduled"
     queued = "queued"
-
-
-class DeviceStatus(Enum):
-    """
-    Type of Device status.
-    """
-
-    provisioned = "provisioned"
-    registered = "registered"
-    blocked = "blocked"
-    unassociated = "unassociated"
