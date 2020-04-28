@@ -81,12 +81,6 @@ def fixture_azure_profile(mocker):
 
 
 @pytest.fixture()
-def fixture_get_aad_token(mocker):
-    mock = mocker.patch("azext_iot.common.auth.get_aad_token")
-    mock.return_value = {"accessToken": "token"}
-
-
-@pytest.fixture()
 def fixture_get_iot_central_tokens(mocker):
     mock = mocker.patch("azext_iot.common._azure.get_iot_central_tokens")
 
@@ -106,12 +100,15 @@ def fixture_get_iot_central_tokens(mocker):
 
 
 class TestCentralHelpers:
-    def test_get_iot_central_tokens(self, fixture_requests_post, fixture_get_aad_token):
+    def test_get_iot_central_tokens(self, fixture_requests_post):
         from azext_iot.common._azure import get_iot_central_tokens
+
+        class Cmd:
+            cli_ctx = ""
 
         # Test to ensure get_iot_central_tokens calls requests.post and tokens are returned
         assert (
-            get_iot_central_tokens({}, "app_id", "api-uri").value()
+            get_iot_central_tokens(Cmd(), "app_id", "api-uri").value()
             == "fixture_requests_post value"
         )
 
