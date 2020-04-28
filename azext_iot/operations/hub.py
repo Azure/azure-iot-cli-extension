@@ -1410,19 +1410,24 @@ def _handle_c2d_msg(target, device_id, receive_settle):
     return False
 
 
-def iot_device_export(cmd, hub_name, blob_container_uri, include_keys=False, resource_group_name=None):
+def iot_device_export(cmd, hub_name, blob_container_uri, storage_authentication_type=None, include_keys=False, resource_group_name=None):
     from azext_iot._factory import iot_hub_service_factory
+    from azure.mgmt.iothub.models import ExportDevicesRequest
     client = iot_hub_service_factory(cmd.cli_ctx)
     target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
-    return client.export_devices(target['resourcegroup'], hub_name, blob_container_uri, not include_keys)
+    export_request = ExportDevicesRequest(export_blob_container_uri=blob_container_uri, exclude_keys=not include_keys, export_blob_name=None, 
+                                          authentication_type=storage_authentication_type)
+    return client.export_devices(target['resourcegroup'], hub_name, export_request)
 
 
-def iot_device_import(cmd, hub_name, input_blob_container_uri, output_blob_container_uri, resource_group_name=None):
+def iot_device_import(cmd, hub_name, input_blob_container_uri, output_blob_container_uri, storage_authentication_type=None, resource_group_name=None):
     from azext_iot._factory import iot_hub_service_factory
+    from azure.mgmt.iothub.models import ImportDevicesRequest
     client = iot_hub_service_factory(cmd.cli_ctx)
     target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
-    return client.import_devices(target['resourcegroup'], hub_name,
-                                 input_blob_container_uri, output_blob_container_uri)
+    import_request = ImportDevicesRequest(input_blob_container_uri=input_blob_container_uri, output_blob_container_uri=output_blob_container_uri,
+                                          input_blob_name=None, output_blob_name=None, authentication_type=storage_authentication_type)
+    return client.import_devices(target['resourcegroup'], hub_name, import_request)
 
 
 def iot_device_upload_file(cmd, device_id, file_path, content_type, hub_name=None, resource_group_name=None, login=None):
@@ -1592,3 +1597,4 @@ def _customize_device_tracing_output(device_id, desired, reported):
                 desired_tracing.get('sampling_rate') == reported_tracing.get('sampling_rate').get('value', None)):
             output['isSynced'] = True
     return output
+    

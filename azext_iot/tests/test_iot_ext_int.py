@@ -1136,6 +1136,19 @@ class TestIoTStorage(IoTLiveScenarioTest):
             ],
         )
 
+        # With identityBased authentication
+        self.cmd(
+            'iot hub device-identity export -n {} --bcu "{}" --auth-type {}'.format(
+                LIVE_HUB, LIVE_STORAGE, 'identityBased'
+            ),
+            checks=[
+                self.check("outputBlobContainerUri", LIVE_STORAGE),
+                self.check("failureReason", None),
+                self.check("type", "export"),
+                self.exists("jobId"),
+            ],
+        )
+
 
 class TestIoTEdgeOffline(IoTLiveScenarioTest):
     def __init__(self, test_case):
