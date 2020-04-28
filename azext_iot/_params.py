@@ -898,6 +898,17 @@ def load_arguments(self, _):
             help="IoT Central API override.  For use with environments other than production.",
         )
 
+    with self.argument_context("iotcentral app device-twin show") as context:
+        context.argument(
+            "device_id", options_list=["--device-id", "-d"], help="Target Device."
+        )
+        context.argument("app_id", options_list=["--app-id"], help="Target App.")
+        context.argument(
+            "central_api_uri",
+            options_list=["--central-api-uri"],
+            help="IoT Central API override.  For use with environments other than production.",
+        )
+
     with self.argument_context("iot central") as context:
         context.argument("app_id", options_list=["--app-id"], help="Target App.")
         context.argument(

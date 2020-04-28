@@ -122,12 +122,12 @@ def _events3_runner(
 
     from azext_iot.operations.events3 import _builders, _events
 
-    eventHubTargets = _builders.EventTargetBuilder().build_central_event_hub_target(
+    event_hub_targets = _builders.EventTargetBuilder().build_central_event_hub_target(
         cmd, app_id, central_api_uri
     )
     executorTargets = []
 
-    for target in eventHubTargets:
+    for target in event_hub_targets:
         executorTargets.append(_events.executorData(target, consumer_group))
 
     _events.nExecutor(
