@@ -82,7 +82,7 @@ def fixture_azure_profile(mocker):
 
 @pytest.fixture()
 def fixture_get_aad_token(mocker):
-    mock = mocker.patch("azext_iot.common._azure._get_aad_token")
+    mock = mocker.patch("azext_iot.common.auth.get_aad_token")
     mock.return_value = {"accessToken": "token"}
 
 
@@ -114,21 +114,6 @@ class TestCentralHelpers:
             get_iot_central_tokens({}, "app_id", "api-uri").value()
             == "fixture_requests_post value"
         )
-
-    def test_get_aad_token(self, fixture_azure_profile):
-        from azext_iot.common._azure import _get_aad_token
-
-        class Cmd:
-            cli_ctx = "test"
-
-        # Test to ensure _get_aad_token is called and returns the right values based on profile.get_raw_tokens
-        assert _get_aad_token(Cmd(), "resource") == {
-            "accessToken": "raw token 0 -b",
-            "expiresOn": "value",
-            "subscription": "raw token 1",
-            "tenant": "raw token 2",
-            "tokenType": "raw token 0 - A",
-        }
 
 
 class TestDeviceTwinShow:

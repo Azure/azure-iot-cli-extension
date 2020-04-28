@@ -253,16 +253,13 @@ def load_arguments(self, _):
             "Output to specified target directory",
         )
         context.argument(
-            "tags",
-            arg_group="Twin Patch",
-            options_list=["--tags"],
-            help="Twin tags."
+            "tags", arg_group="Twin Patch", options_list=["--tags"], help="Twin tags."
         )
         context.argument(
             "desired",
             arg_group="Twin Patch",
             options_list=["--desired"],
-            help="Twin desired properties."
+            help="Twin desired properties.",
         )
 
     with self.argument_context("iot hub job") as context:
@@ -888,17 +885,6 @@ def load_arguments(self, _):
         )
 
     with self.argument_context("iotcentral device-twin show") as context:
-        context.argument(
-            "device_id", options_list=["--device-id", "-d"], help="Target Device."
-        )
-        context.argument("app_id", options_list=["--app-id"], help="Target App.")
-        context.argument(
-            "central_api_uri",
-            options_list=["--central-api-uri"],
-            help="IoT Central API override.  For use with environments other than production.",
-        )
-
-    with self.argument_context("iotcentral app device-twin show") as context:
         context.argument(
             "device_id", options_list=["--device-id", "-d"], help="Target Device."
         )
