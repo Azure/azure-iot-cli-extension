@@ -20,7 +20,7 @@ from azext_iot.common.utility import (
 )
 from azext_iot.common.deps import ensure_uamqp
 from azext_iot.constants import EVENT_LIB, EXTENSION_NAME
-from azext_iot.operations.events3 import _parser
+from azext_iot.monitor.handlers import _parser
 from azext_iot._validators import mode2_iot_login_handler
 from .helpers import load_json
 from .test_constants import FileNames

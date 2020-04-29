@@ -120,24 +120,26 @@ def _events3_runner(
         cmd, timeout, properties, enqueued_time, repair, yes
     )
 
-    from azext_iot.operations.events3 import _builders, _events
+    from azext_iot.monitor import runner
+    from azext_iot.monitor.builders import central_target_builder
+    from azext_iot.monitor.models.runner import ExecutorData
+    from azext_iot.monitor.handlers.handler import CommonHandler
 
-    event_hub_targets = _builders.EventTargetBuilder().build_central_event_hub_target(
+    event_hub_targets = central_target_builder.build_central_event_hub_targets(
         cmd, app_id, central_api_uri
     )
-    executorTargets = []
+    executors = [ExecutorData(target, consumer_group) for target in event_hub_targets]
 
-    for target in event_hub_targets:
-        executorTargets.append(_events.executorData(target, consumer_group))
+    handler = CommonHandler(device_id=device_id, properties=properties, output=output)
 
-    _events.nExecutor(
-        executorTargets,
-        enqueued_time=enqueued_time,
-        properties=properties,
+    on_start_string = runner.generate_on_start_string(
+        device_id=device_id, pnp_context=None
+    )
+
+    runner.n_executor(
+        executors=executors,
+        enqueued_time_utc=enqueued_time,
+        on_start_string=on_start_string,
+        on_message_received=handler.parse_message,
         timeout=timeout,
-        device_id=device_id,
-        output=output,
-        validate_messages=validate_messages,
-        simulate_errors=simulate_errors,
-        central_device_provider=central_device_provider,
     )
