@@ -202,7 +202,7 @@ def update_device_status(device):
 
 def device_populate_essential_info(device, value):
     if not value:
-        return device.update_device_status(device)
+        return update_device_status(device)
     updated_device_data = {
         "id": device["id"],
         "displayName": device.get("displayName"),

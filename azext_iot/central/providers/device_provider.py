@@ -223,30 +223,30 @@ class CentralDeviceProvider:
         }
         return filtered_dps_info
 
-    def filter_device_list(self, devices, device_status):
-        filtered_device_list = []
-        updated_device_list = [
-            central_services.device.update_device_status(device) for device in devices
-        ]
-        if device_status is None:
-            return updated_device_list
-
-        for device in updated_device_list:
-            if device.get("deviceStatus") is device_status:
-                filtered_device_list.append(device)
-        return filtered_device_list
-
     def get_all_registration_info(
         self, device_status, central_dns_suffix="azureiotcentral.com"
     ):
 
         logger.warning("This command may take a long time to complete execution.")
         devices = self.list_devices(central_dns_suffix=central_dns_suffix)
+
         real_devices = [
             device for device in devices.values() if not device["simulated"]
         ]
 
-        filtered_devices = self.filter_device_list(real_devices, device_status)
+        real_devices_with_status = [
+            central_services.device.update_device_status(device)
+            for device in real_devices
+        ]
+
+        filtered_devices = real_devices_with_status
+
+        if device_status:
+            filtered_devices = [
+                device
+                for device in real_devices_with_status
+                if device.get("deviceStatus") is device_status
+            ]
 
         if len(devices) != len(filtered_devices):
             logger.warning(
