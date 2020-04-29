@@ -63,7 +63,7 @@ def load_central_arguments(self, _):
         )
         context.argument(
             "device_status",
-            options_list=["--devicestatus", "-ds"],
+            options_list=["--devicestatus", "--ds"],
             arg_type=get_enum_type(DeviceStatus),
             help="Indicates filter option for device status",
         )
