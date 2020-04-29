@@ -6,7 +6,6 @@
 
 from knack.util import CLIError
 from azext_iot._factory import _bind_sdk
-from azext_iot.common._azure import get_iot_hub_token_from_central_app_id
 from azext_iot.common.shared import SdkType
 from azext_iot.common.utility import unpack_msrest_error, init_monitoring
 from azext_iot.common.sas_token_auth import BasicSasTokenAuthentication
@@ -18,17 +17,28 @@ def find_between(s, start, end):
 
 
 def iot_central_device_show(
-    cmd, device_id, app_id, central_api_uri="api.azureiotcentral.com"
+    cmd, device_id, app_id, central_api_uri="azureiotcentral.com"
 ):
-    sasToken = get_iot_hub_token_from_central_app_id(cmd, app_id, central_api_uri)
-    endpoint = find_between(sasToken, "SharedAccessSignature sr=", "&sig=")
-    target = {"entity": endpoint}
-    auth = BasicSasTokenAuthentication(sas_token=sasToken)
-    service_sdk, errors = _bind_sdk(target, SdkType.service_sdk, auth=auth)
-    try:
-        return service_sdk.get_twin(device_id)
-    except errors.CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+    from azext_iot.common._azure import get_iot_central_tokens
+
+    tokens = get_iot_central_tokens(cmd, app_id, central_api_uri)
+    exception = None
+
+    # The device could be in any hub associated with the given app.
+    # We must search through each IoT Hub until device is found.
+    for token_group in tokens.values():
+        sas_token = token_group["iothubTenantSasToken"]["sasToken"]
+        endpoint = find_between(sas_token, "SharedAccessSignature sr=", "&sig=")
+        target = {"entity": endpoint}
+        auth = BasicSasTokenAuthentication(sas_token=sas_token)
+        service_sdk, errors = _bind_sdk(target, SdkType.service_sdk, auth=auth)
+        try:
+            return service_sdk.get_twin(device_id)
+        except errors.CloudError as e:
+            if exception is None:
+                exception = CLIError(unpack_msrest_error(e))
+
+    raise exception
 
 
 def iot_central_validate_messages(
@@ -42,7 +52,7 @@ def iot_central_validate_messages(
     repair=False,
     properties=None,
     yes=False,
-    central_api_uri="api.azureiotcentral.com",
+    central_api_uri="azureiotcentral.com",
 ):
     provider = CentralDeviceProvider(cmd, app_id)
     _events3_runner(
@@ -72,7 +82,7 @@ def iot_central_monitor_events(
     repair=False,
     properties=None,
     yes=False,
-    central_api_uri="api.azureiotcentral.com",
+    central_api_uri="azureiotcentral.com",
 ):
     _events3_runner(
         cmd=cmd,
@@ -112,13 +122,16 @@ def _events3_runner(
 
     from azext_iot.operations.events3 import _builders, _events
 
-    eventHubTarget = _builders.EventTargetBuilder().build_central_event_hub_target(
+    event_hub_targets = _builders.EventTargetBuilder().build_central_event_hub_target(
         cmd, app_id, central_api_uri
     )
+    executorTargets = []
 
-    _events.executor(
-        eventHubTarget,
-        consumer_group=consumer_group,
+    for target in event_hub_targets:
+        executorTargets.append(_events.executorData(target, consumer_group))
+
+    _events.nExecutor(
+        executorTargets,
         enqueued_time=enqueued_time,
         properties=properties,
         timeout=timeout,

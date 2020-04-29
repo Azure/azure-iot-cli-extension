@@ -1180,7 +1180,12 @@ helps[
     "iot central app"
 ] = """
     type: group
-    short-summary: Manage Azure IoT Central applications.
+    short-summary: |
+                  Manage Azure IoT Central applications.
+
+                  To use this command group, the user must be logged through the `az login` command,
+                  have the correct tenant set (the users home tenant) and
+                  have access to the application through http://apps.azureiotcentral.com"
 """
 
 helps[
@@ -1256,6 +1261,20 @@ helps[
 
 helps[
     "iot central device-twin show"
+] = """
+    type: command
+    short-summary: Get the device twin from IoT Hub.
+"""
+
+helps[
+    "iot central app device-twin"
+] = """
+    type: group
+    short-summary: Manage IoT Central device twins.
+"""
+
+helps[
+    "iot central app device-twin show"
 ] = """
     type: command
     short-summary: Get the device twin from IoT Hub.

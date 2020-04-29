@@ -253,16 +253,13 @@ def load_arguments(self, _):
             "Output to specified target directory",
         )
         context.argument(
-            "tags",
-            arg_group="Twin Patch",
-            options_list=["--tags"],
-            help="Twin tags."
+            "tags", arg_group="Twin Patch", options_list=["--tags"], help="Twin tags."
         )
         context.argument(
             "desired",
             arg_group="Twin Patch",
             options_list=["--desired"],
-            help="Twin desired properties."
+            help="Twin desired properties.",
         )
 
     with self.argument_context("iot hub job") as context:
