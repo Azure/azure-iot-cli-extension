@@ -48,6 +48,28 @@ class TestIotCentral(LiveScenarioTest):
             )
         )
 
+        # Verify incorrect app-id throws error
+        self.cmd(
+            'iot central app device-twin show --app-id incorrect-app --device-id "{}"'.format(
+                DEVICE_ID
+            ),
+            expect_failure=True,
+        )
+        # Verify incorrect device-id throws error
+        self.cmd(
+            'iot central app device-twin show --app-id "{}" --device-id incorrect-device'.format(
+                APP_ID
+            ),
+            expect_failure=True,
+        )
+        # Verify that no errors are thrown when device shown
+        # We cannot verify that the result is correct, as the Azure CLI for IoT Central does not support adding devices
+        self.cmd(
+            'iot central app device-twin show --app-id "{}" --device-id "{}"'.format(
+                APP_ID, DEVICE_ID
+            )
+        )
+
     def test_central_monitor_events(self):
         # Test with invalid app-id
         self.cmd(
