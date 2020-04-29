@@ -4,19 +4,22 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import json
 import random
 import re
-import json
 
 from knack.log import get_logger
 from uamqp.message import Message
-from azext_iot.common.utility import parse_entity, unicode_binary_map
+
+from azext_iot.common.utility import parse_entity, unicode_binary_map, ISO8601Validator
 from azext_iot.central.providers import CentralDeviceProvider
 
 SUPPORTED_ENCODINGS = ["utf-8"]
 DEVICE_ID_IDENTIFIER = b"iothub-connection-device-id"
 INTERFACE_NAME_IDENTIFIER = b"iothub-interface-name"
 random.seed(0)
+
+ios_validator = ISO8601Validator()
 
 
 class Event3Parser(object):
@@ -97,14 +100,16 @@ class Event3Parser(object):
             message, origin_device_id, content_type, create_payload_error
         )
 
-        self._validate_payload_against_dcm(
-            origin_device_id,
-            payload,
-            central_device_provider,
-            create_payload_name_error,
+        self._perform_static_validations(
+            origin_device_id=origin_device_id, payload=payload
         )
 
-        self._validate_field_names(origin_device_id, payload)
+        self._perform_dynamic_validations(
+            origin_device_id=origin_device_id,
+            payload=payload,
+            central_device_provider=central_device_provider,
+            create_payload_name_error=create_payload_name_error,
+        )
 
         event["payload"] = payload
 
@@ -163,9 +168,7 @@ class Event3Parser(object):
             return unicode_binary_map(parse_entity(message.properties, True))
         except Exception:
             self._errors.append(
-                "Failed to parse system_properties for message {message}.".format(
-                    message
-                )
+                "Failed to parse system_properties for message {}.".format(message)
             )
             return {}
 
@@ -270,68 +273,16 @@ class Event3Parser(object):
 
         return payload
 
-    def _validate_payload_against_dcm(
-        self,
-        origin_device_id: str,
-        payload: str,
-        central_device_provider: CentralDeviceProvider,
-        create_payload_name_error=False,
-    ):
-        if not central_device_provider:
-            return
-
-        if not hasattr(payload, "keys"):
-            # some error happend while parsing
-            # should be captured by _parse_payload method above
-            return
-
-        try:
-            template = central_device_provider.get_device_template_by_device_id(
-                origin_device_id
-            )
-        except Exception as e:
-            self._errors.append(
-                "Unable to get DCM for device: {}."
-                "Inner exception: {}".format(origin_device_id, e)
-            )
-            return
-
-        try:
-            all_schema = self._extract_schema_from_template(template)
-            all_names = [schema["name"] for schema in all_schema]
-        except Exception:
-            self._errors.append(
-                "Unable to extract device schema for device: {}."
-                "Template: {}".format(origin_device_id, template)
-            )
-            return
-
-        for telemetry_name in payload.keys():
-            if create_payload_name_error or telemetry_name not in all_names:
-                self._errors.append(
-                    "Telemetry item '{}' is not present in DCM. "
-                    "Device ID: {}. "
-                    "List of allowed telemetry values for this type of device: {}. "
-                    "NOTE: telemetry names are CASE-SENSITIVE".format(
-                        telemetry_name, origin_device_id, all_names
-                    )
-                )
-
-    def _extract_schema_from_template(self, template):
-        all_schema = []
-        dcm = template["capabilityModel"]
-        implements = dcm["implements"]
-        for implementation in implements:
-            contents = implementation["schema"]["contents"]
-            all_schema.extend(contents)
-
-        return all_schema
-
-    def _validate_field_names(self, origin_device_id: str, payload: dict):
+    # Static validations should only need information present in the payload
+    # i.e. there should be no need for network calls
+    def _perform_static_validations(self, origin_device_id: str, payload: dict):
         # if its not a dictionary, something else went wrong with parsing
         if not isinstance(payload, dict):
             return
 
+        self._validate_field_names(origin_device_id=origin_device_id, payload=payload)
+
+    def _validate_field_names(self, origin_device_id: str, payload: dict):
         # source:
         # https://github.com/Azure/IoTPlugandPlay/tree/master/DTDL
         regex = "^[a-zA-Z_][a-zA-Z0-9_]*$"
@@ -350,3 +301,137 @@ class Event3Parser(object):
                     invalid_field_names, payload, origin_device_id
                 )
             )
+
+    # Dynamic validations should need data external to the payload
+    # e.g. device template
+    def _perform_dynamic_validations(
+        self,
+        origin_device_id: str,
+        payload: dict,
+        central_device_provider: CentralDeviceProvider,
+        create_payload_name_error=False,
+    ):
+        # if the payload is not a dictionary some other parsing error occurred
+        if not isinstance(payload, dict):
+            return
+
+        # device provider was not passed in, no way to get the device template
+        if not isinstance(central_device_provider, CentralDeviceProvider):
+            return
+
+        template = self._get_device_template(
+            origin_device_id=origin_device_id,
+            central_device_provider=central_device_provider,
+        )
+
+        # _get_device_template should log error if there was an issue
+        if not template:
+            return
+
+        template_schemas = self._extract_template_schemas_from_template(
+            origin_device_id=origin_device_id, template=template
+        )
+
+        # _extract_template_schemas_from_template should log error if there was an issue
+        if not isinstance(template_schemas, dict):
+            return
+
+        self._validate_payload_against_schema(
+            origin_device_id=origin_device_id,
+            payload=payload,
+            template_schemas=template_schemas,
+        )
+
+    def _get_device_template(
+        self, origin_device_id: str, central_device_provider: CentralDeviceProvider,
+    ):
+        try:
+            return central_device_provider.get_device_template_by_device_id(
+                origin_device_id
+            )
+        except Exception as e:
+            self._errors.append(
+                "Unable to retrieve template for device: {}."
+                "Inner exception: {}".format(origin_device_id, e)
+            )
+
+    def _extract_template_schemas_from_template(
+        self, origin_device_id: str, template: dict
+    ):
+        try:
+            schemas = []
+            dcm = template["capabilityModel"]
+            implements = dcm["implements"]
+            for implementation in implements:
+                contents = implementation["schema"]["contents"]
+                schemas.extend(contents)
+            return {schema["name"]: schema for schema in schemas}
+        except Exception:
+            self._errors.append(
+                "Unable to extract device schema for device: {}."
+                "Template: {}".format(origin_device_id, template)
+            )
+
+    # currently validates:
+    # 1) primitive types match (e.g. boolean is indeed bool etc)
+    # 2) names match (i.e. Humidity vs humidity etc)
+    def _validate_payload_against_schema(
+        self, origin_device_id: str, payload: dict, template_schemas: dict,
+    ):
+        template_schema_names = template_schemas.keys()
+        for name, value in payload.items():
+            schema = template_schemas.get(name)
+            if not schema:
+                self._errors.append(
+                    "Telemetry item '{}' is not present in capability model. "
+                    "Device ID: {}. "
+                    "List of allowed telemetry values for this type of device: {}. "
+                    "NOTE: telemetry names are CASE-SENSITIVE".format(
+                        name, origin_device_id, template_schema_names
+                    )
+                )
+
+            is_dict = isinstance(schema, dict)
+            if is_dict and not self._validate_types_match(value, schema):
+                expected_type = str(schema.get("schema"))
+                self._errors.append(
+                    "Type mismatch. "
+                    "Expected type: '{}'. "
+                    "Value received: '{}'. "
+                    "Telemetry identifier: {}. "
+                    "Device ID: {}. "
+                    "All dates/times/datetimes/durations must be ISO 8601 compliant.".format(
+                        expected_type, value, name, origin_device_id
+                    )
+                )
+
+    def _validate_types_match(self, value, schema: dict) -> bool:
+        # suppress error if there is no "schema" in schema
+        # means something else went wrong
+        schema_type = schema.get("schema")
+        if not schema_type:
+            return True
+
+        if schema_type == "boolean":
+            return isinstance(value, bool)
+        elif schema_type == "double":
+            return isinstance(value, (float, int))
+        elif schema_type == "float":
+            return isinstance(value, (float, int))
+        elif schema_type == "integer":
+            return isinstance(value, int)
+        elif schema_type == "long":
+            return isinstance(value, (float, int))
+        elif schema_type == "string":
+            return isinstance(value, str)
+        elif schema_type == "time":
+            return ios_validator.is_iso8601_time(value)
+        elif schema_type == "date":
+            return ios_validator.is_iso8601_date(value)
+        elif schema_type == "dateTime":
+            return ios_validator.is_iso8601_datetime(value)
+        elif schema_type == "duration":
+            return ios_validator.is_iso8601_duration(value)
+
+        # if the schema_type is not found above, suppress error
+        return True
