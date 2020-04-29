@@ -245,7 +245,7 @@ class CentralDeviceProvider:
             filtered_devices = [
                 device
                 for device in real_devices_with_status
-                if device.get("deviceStatus") is device_status
+                if device.get("deviceStatus") == device_status
             ]
 
         if len(devices) != len(filtered_devices):

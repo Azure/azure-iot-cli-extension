@@ -182,5 +182,5 @@ class TestIotCentral(LiveScenarioTest):
 
         # since time taken for provisioning to complete is not known
         # we can only assert that the payload is populated, not anything specific beyond that
-        assert json_result["central_info"] is not None
+        assert json_result["device_info"] is not None
         assert json_result["dps_state"] is not None
