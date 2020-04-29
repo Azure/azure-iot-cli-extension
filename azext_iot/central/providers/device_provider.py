@@ -176,21 +176,26 @@ class CentralDeviceProvider:
         device_status: DeviceStatus,
         central_dns_suffix="azureiotcentral.com",
     ):
+        dps_state = {}
         info = self._device_registration_info.get(device_id)
 
         if not info:
             device_info = self.get_device(device_id)
-            device_essential_info = self.device_populate_essential_info(
+            device_essential_info = central_services.device.device_populate_essential_info(
                 device_info, device_status
             )
-            credentials = self.get_device_credentials(
-                device_id=device_id, central_dns_suffix=central_dns_suffix
-            )
-            id_scope = credentials["idScope"]
-            key = credentials["symmetricKey"]["primaryKey"]
-            dps_state = dps_global_service.get_registration_state(
-                id_scope=id_scope, key=key, device_id=device_id
-            )
+            if (
+                device_essential_info.get("deviceStatus")
+                is DeviceStatus.provisioned.value
+            ):
+                credentials = self.get_device_credentials(
+                    device_id=device_id, central_dns_suffix=central_dns_suffix
+                )
+                id_scope = credentials["idScope"]
+                key = credentials["symmetricKey"]["primaryKey"]
+                dps_state = dps_global_service.get_registration_state(
+                    id_scope=id_scope, key=key, device_id=device_id
+                )
             dps_state = self.dps_populate_essential_info(
                 dps_state, device_essential_info.get("deviceStatus")
             )
@@ -218,47 +223,11 @@ class CentralDeviceProvider:
         }
         return filtered_dps_info
 
-    def device_populate_essential_info(self, device, value):
-        if not value:
-            return self.update_device_status(device)
-        updated_device_data = {
-            "id": device["id"],
-            "displayName": device.get("displayName"),
-            "instanceOf": device.get("instanceOf"),
-            "simulated": device.get("simulated"),
-            "deviceStatus": value,
-        }
-        return updated_device_data
-
-    def determine_device_status(self, device):
-        if device["approved"] is False:
-            return DeviceStatus.blocked.value
-        else:
-            if not device.get("instanceOf"):
-                return DeviceStatus.unassociated.value
-
-            else:
-                if device["provisioned"] is False:
-                    return DeviceStatus.registered.value
-
-                else:
-                    return DeviceStatus.provisioned.value
-
-    def update_device_status(self, device):
-        updated_device = self.device_populate_essential_info(
-            device, self.determine_device_status(device)
-        )
-        return updated_device
-
-    def update_all_device_status(self, devices):
-        filtered_device_list = []
-        for device in devices:
-            filtered_device_list.append(self.update_device_status(device))
-        return filtered_device_list
-
     def filter_device_list(self, devices, device_status):
         filtered_device_list = []
-        updated_device_list = self.update_all_device_status(devices)
+        updated_device_list = [
+            central_services.device.update_device_status(device) for device in devices
+        ]
         if device_status is None:
             return updated_device_list
 
