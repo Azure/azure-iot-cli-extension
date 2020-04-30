@@ -1,3 +1,8 @@
+# coding=utf-8
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See License.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
 
 import asyncio
 import sys
@@ -7,15 +12,14 @@ from uuid import uuid4
 from knack.log import get_logger
 from typing import List
 from azext_iot.constants import VERSION, USER_AGENT
-from azext_iot.monitor.models.runner import Target, ExecutorData
+from azext_iot.monitor.models.target import Target
 
 logger = get_logger(__name__)
 DEBUG = False
 
 
-def executor(
+def start_single_monitor(
     target: Target,
-    consumer_group: str,
     enqueued_time_utc,
     on_start_string: str,
     on_message_received,
@@ -26,10 +30,8 @@ def executor(
         A callback to process messages as they arrive from the service. 
         It takes a single argument, a ~uamqp.message.Message object.
     """
-    executor = ExecutorData(target, consumer_group)
-
-    return n_executor(
-        executors=[executor],
+    return start_multiple_monitors(
+        targets=[target],
         enqueued_time_utc=enqueued_time_utc,
         on_start_string=on_start_string,
         on_message_received=on_message_received,
@@ -37,26 +39,26 @@ def executor(
     )
 
 
-def n_executor(
-    executors: List[ExecutorData],
+def start_multiple_monitors(
+    targets: List[Target],
     on_start_string: str,
     enqueued_time_utc,
     on_message_received,
     timeout=0,
 ):
     """
-    :param on_message_received: 
-        A callback to process messages as they arrive from the service. 
+    :param on_message_received:
+        A callback to process messages as they arrive from the service.
         It takes a single argument, a ~uamqp.message.Message object.
     """
     coroutines = [
         _initiate_event_monitor(
-            executor=executor,
+            target=target,
             enqueued_time_utc=enqueued_time_utc,
             on_message_received=on_message_received,
             timeout=timeout,
         )
-        for executor in executors
+        for target in targets
     ]
 
     loop = asyncio.get_event_loop()
@@ -85,11 +87,8 @@ def n_executor(
 
 
 async def _initiate_event_monitor(
-    executor: ExecutorData, enqueued_time_utc, on_message_received, timeout=0
+    target: Target, enqueued_time_utc, on_message_received, timeout=0
 ):
-    target = executor.target
-    consumer_group = executor.consumer_group
-
     if not target.partitions:
         logger.debug("No Event Hub partitions found to listen on.")
         return
@@ -109,7 +108,6 @@ async def _initiate_event_monitor(
                     target=target,
                     connection=conn,
                     partition=p,
-                    consumer_group=consumer_group,
                     enqueued_time_utc=enqueued_time_utc,
                     on_message_received=on_message_received,
                     timeout=timeout,
@@ -122,14 +120,13 @@ async def _monitor_events(
     target: Target,
     connection,
     partition,
-    consumer_group,
     enqueued_time_utc,
     on_message_received,
     timeout=0,
 ):
     source = uamqp.address.Source(
         "amqps://{}/{}/ConsumerGroups/{}/Partitions/{}".format(
-            target.hostname, target.path, consumer_group, partition
+            target.hostname, target.path, target.consumer_group, partition
         )
     )
     source.set_filter(
@@ -191,14 +188,3 @@ def _get_conn_props():
 
 def _get_container_id():
     return "{}/{}".format(USER_AGENT, str(uuid4()))
-
-
-def generate_on_start_string(device_id, pnp_context):
-    device_filter_txt = None
-    if device_id:
-        device_filter_txt = " filtering on device: {},".format(device_id)
-
-    return "Starting {}event monitor,{} use ctrl-c to stop...".format(
-        "Digital Twin " if pnp_context else "",
-        device_filter_txt if device_filter_txt else "",
-    )

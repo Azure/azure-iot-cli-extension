@@ -8,7 +8,7 @@ import asyncio
 from typing import List
 
 from azext_iot.common._azure import get_iot_central_tokens
-from azext_iot.monitor.models.runner import Target
+from azext_iot.monitor.models.target import Target
 from azext_iot.monitor.builders._common import convert_token_to_target
 
 

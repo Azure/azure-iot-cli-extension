@@ -10,7 +10,7 @@ import uamqp
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.utility import parse_entity, unicode_binary_map, url_encode_str
 from azext_iot.monitor.builders._common import query_meta_data
-from azext_iot.monitor.models.runner import Target
+from azext_iot.monitor.models.target import Target
 
 # To provide amqp frame trace
 DEBUG = False

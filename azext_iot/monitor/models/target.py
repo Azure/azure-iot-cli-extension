@@ -17,9 +17,7 @@ class Target:
         self.path = path
         self.auth = auth
         self.partitions = partitions
+        self.consumer_group = None
 
-
-class ExecutorData:
-    def __init__(self, target: Target, consumer_group: str):
-        self.target = target
+    def add_consumer_group(self, consumer_group: str):
         self.consumer_group = consumer_group

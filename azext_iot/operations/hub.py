@@ -1892,9 +1892,9 @@ def iot_c2d_message_send(
         if user_msg_expiry < now_in_milli:
             raise CLIError("Message expiry time utc is in the past!")
 
-    from azext_iot.monitor import _events
+    from azext_iot.monitor import event
 
-    msg_id, errors = _events.send_c2d_message(
+    msg_id, errors = event.send_c2d_message(
         target=target,
         device_id=device_id,
         data=data,
@@ -2232,10 +2232,18 @@ def _iot_hub_monitor_events(
         cmd, hub_name, resource_group_name, include_events=True, login=login
     )
 
-    from azext_iot.monitor import _builders, runner
-    from azext_iot.monitor.handlers.handler import CommonHandler
+    from azext_iot.monitor.builders import hub_target_builder
+    from azext_iot.monitor.handlers import CommonHandler
+    from azext_iot.monitor.telemetry import start_single_monitor
+    from azext_iot.monitor.utility import generate_on_start_string
 
-    target = _builders.EventTargetBuilder().build_iot_hub_target(target)
+    target = hub_target_builder.EventTargetBuilder().build_iot_hub_target(target)
+    target.add_consumer_group(consumer_group)
+
+    on_start_string = generate_on_start_string(
+        device_id=device_id, pnp_context=pnp_context
+    )
+
     handler = CommonHandler(
         device_id=device_id,
         devices=device_ids,
@@ -2246,13 +2254,8 @@ def _iot_hub_monitor_events(
         output=output,
     )
 
-    on_start_string = runner.generate_on_start_string(
-        device_id=device_id, pnp_context=pnp_context
-    )
-
-    runner.executor(
+    start_single_monitor(
         target=target,
-        consumer_group=consumer_group,
         enqueued_time_utc=enqueued_time,
         on_start_string=on_start_string,
         on_message_received=handler.parse_message,
@@ -2287,9 +2290,9 @@ def iot_hub_distributed_tracing_update(
 
 
 def _iot_hub_monitor_feedback(target, device_id, wait_on_id):
-    from azext_iot.monitor import _events
+    from azext_iot.monitor import event
 
-    _events.monitor_feedback(
+    event.monitor_feedback(
         target=target, device_id=device_id, wait_on_id=wait_on_id, token_duration=3600
     )
 

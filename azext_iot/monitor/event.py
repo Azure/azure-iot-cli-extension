@@ -4,21 +4,15 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import asyncio
 import json
-import re
-import sys
-import six
-import yaml
 import uamqp
+import yaml
 
 from uuid import uuid4
 from knack.log import get_logger
-from azext_iot.constants import VERSION, USER_AGENT
+from azext_iot.constants import USER_AGENT
 from azext_iot.common.utility import process_json_arg
-from azext_iot.monitor._builders import AmqpBuilder
-from azext_iot.monitor.handlers._parser import Event3Parser
-from azext_iot.monitor.models.runner import Target, ExecutorData
+from azext_iot.monitor.builders.hub_target_builder import AmqpBuilder
 
 # To provide amqp frame trace
 DEBUG = False
@@ -38,6 +32,7 @@ def send_c2d_message(
     expiry_time_utc=None,
     properties=None,
 ):
+
     app_props = {}
     if properties:
         app_props.update(properties)

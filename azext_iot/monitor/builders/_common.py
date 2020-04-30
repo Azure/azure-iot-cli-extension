@@ -7,7 +7,7 @@
 import uamqp
 import urllib
 
-from azext_iot.monitor.models.runner import Target
+from azext_iot.monitor.models.target import Target
 
 DEBUG = False
 
@@ -52,8 +52,6 @@ async def query_meta_data(address, path, auth):
         )
         test = response.get_data()
         return test
-    except e:
-        print(e)
     finally:
         await receive_client.close_async()
 
