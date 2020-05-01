@@ -9,6 +9,7 @@ import requests
 
 from knack.util import CLIError
 from azext_iot.central.services import _utility
+from azext_iot.central.models.enum import DeviceStatus
 
 BASE_PATH = "api/preview/devices"
 
@@ -175,3 +176,38 @@ def get_device_credentials(
 
     response = requests.get(url, headers=headers)
     return _utility.try_extract_result(response)
+
+
+def determine_device_status(device):
+    if device["approved"] is False:
+        return DeviceStatus.blocked.value
+    else:
+        if not device.get("instanceOf"):
+            return DeviceStatus.unassociated.value
+
+        else:
+            if device["provisioned"] is False:
+                return DeviceStatus.registered.value
+
+            else:
+                return DeviceStatus.provisioned.value
+
+
+def update_device_status(device):
+    updated_device = device_populate_essential_info(
+        device, determine_device_status(device)
+    )
+    return updated_device
+
+
+def device_populate_essential_info(device, value):
+    if not value:
+        return update_device_status(device)
+    updated_device_data = {
+        "id": device["id"],
+        "displayName": device.get("displayName"),
+        "instanceOf": device.get("instanceOf"),
+        "simulated": device.get("simulated"),
+        "deviceStatus": value,
+    }
+    return updated_device_data
