@@ -204,5 +204,41 @@ class TestIotCentral(LiveScenarioTest):
 
         # since time taken for provisioning to complete is not known
         # we can only assert that the payload is populated, not anything specific beyond that
-        assert json_result["central_info"] is not None
+        assert json_result["device_info"] is not None
         assert json_result["dps_state"] is not None
+
+    def test_central_device_registration_info_filter(self):
+        device_id = self.create_random_name(prefix="aztest", length=24)
+        device_name = self.create_random_name(prefix="aztest", length=24)
+        device_status_expected = "unassociated"
+
+        self.cmd(
+            "iot central app device create --app-id {} -d {} --device-name {}".format(
+                APP_ID, device_id, device_name
+            ),
+            checks=[
+                self.check("approved", True),
+                self.check("displayName", device_name),
+                self.check("id", device_id),
+                self.check("simulated", False),
+            ],
+        )
+
+        result = self.cmd(
+            "iot central app device registration-info --app-id {} --ds {}".format(
+                APP_ID, device_status_expected
+            )
+        )
+
+        self.cmd(
+            "iot central app device delete --app-id {} -d {}".format(APP_ID, device_id),
+            checks=[self.check("result", "success")],
+        )
+        json_result = []
+        device_info_results = []
+        json_result = result.get_output_in_json()
+        for device in json_result:
+            device_info_results.append(device.get("device_info"))
+
+        for device in device_info_results:
+            assert device.get("deviceStatus") == device_status_expected

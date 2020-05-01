@@ -8,7 +8,8 @@
 CLI parameter definitions.
 """
 
-from azure.cli.core.commands.parameters import get_three_state_flag
+from azure.cli.core.commands.parameters import get_three_state_flag, get_enum_type
+from azext_iot.central.models.enum import DeviceStatus
 
 
 def load_central_arguments(self, _):
@@ -59,4 +60,10 @@ def load_central_arguments(self, _):
             options_list=["--central-dns-suffix"],
             help="Central dns suffix. "
             "This enables running cli commands against non public/prod environments",
+        )
+        context.argument(
+            "device_status",
+            options_list=["--devicestatus", "--ds"],
+            arg_type=get_enum_type(DeviceStatus),
+            help="Indicates filter option for device status",
         )
