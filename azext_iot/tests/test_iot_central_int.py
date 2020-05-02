@@ -207,7 +207,7 @@ class TestIotCentral(LiveScenarioTest):
         assert json_result["device_info"] is not None
         assert json_result["dps_state"] is not None
 
-    def test_central_device_registration_info_filter(self):
+    def test_central_device_registration_info_filter_unassociated(self):
         device_id = self.create_random_name(prefix="aztest", length=24)
         device_name = self.create_random_name(prefix="aztest", length=24)
         device_status_expected = "unassociated"
@@ -234,6 +234,66 @@ class TestIotCentral(LiveScenarioTest):
             "iot central app device delete --app-id {} -d {}".format(APP_ID, device_id),
             checks=[self.check("result", "success")],
         )
+        json_result = []
+        device_info_results = []
+        json_result = result.get_output_in_json()
+        for device in json_result:
+            device_info_results.append(device.get("device_info"))
+
+        for device in device_info_results:
+            assert device.get("deviceStatus") == device_status_expected
+
+    def test_central_device_registration_info_filter_registered(self):
+        template = utility.process_json_arg(
+            DEVICE_TEMPLATE_PATH, argument_name="DEVICE_TEMPLATE_PATH"
+        )
+        template_name = template["displayName"]
+        template_id = template_name + "id"
+
+        device_id = self.create_random_name(prefix="aztest", length=24)
+        device_name = self.create_random_name(prefix="aztest", length=24)
+        device_status_expected = "registered"
+
+        self.cmd(
+            "iot central app device-template create --app-id {} --device-template-id {} -k {}".format(
+                APP_ID, template_id, DEVICE_TEMPLATE_PATH
+            ),
+            checks=[
+                self.check("displayName", template_name),
+                self.check("id", template_id),
+            ],
+        )
+
+        self.cmd(
+            "iot central app device create --app-id {} -d {} --device-name {} --instance-of {}".format(
+                APP_ID, device_id, device_name, template_id
+            ),
+            checks=[
+                self.check("approved", True),
+                self.check("displayName", device_name),
+                self.check("id", device_id),
+                self.check("simulated", False),
+            ],
+        )
+
+        result = self.cmd(
+            "iot central app device registration-info --app-id {} --ds {}".format(
+                APP_ID, device_status_expected
+            )
+        )
+
+        self.cmd(
+            "iot central app device delete --app-id {} -d {}".format(APP_ID, device_id),
+            checks=[self.check("result", "success")],
+        )
+
+        self.cmd(
+            "iot central app device-template delete --app-id {} --device-template-id {}".format(
+                APP_ID, template_id
+            ),
+            checks=[self.check("result", "success")],
+        )
+
         json_result = []
         device_info_results = []
         json_result = result.get_output_in_json()
