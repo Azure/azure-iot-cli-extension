@@ -57,7 +57,7 @@ def fixture_cmd2(mocker):
     def test_handler1():
         pass
 
-    return AzCliCommand(cli.loader, 'iot-extension command', test_handler1)
+    return AzCliCommand(cli.loader, "iot-extension command", test_handler1)
 
 
 # Sets current working directory to the directory of the executing file
@@ -72,12 +72,6 @@ def fixture_cmd(mocker):
     mocker.patch(path_iot_hub_service_factory)
     cmd = mocker.MagicMock(name="cli cmd context")
     return cmd
-
-
-@pytest.fixture()
-def fixture_events_uamqp_sendclient(mocker):
-    from azext_iot.operations.events3._events import uamqp
-    return mocker.patch.object(uamqp, "SendClient", autospec=True)
 
 
 @pytest.fixture()
@@ -142,13 +136,17 @@ def fixture_monitor_events_entrypoint(mocker):
 
 
 # TODO: To be deprecated asap. Leverage mocked_response fixture for this functionality.
-def build_mock_response(mocker=None, status_code=200, payload=None, headers=None, **kwargs):
+def build_mock_response(
+    mocker=None, status_code=200, payload=None, headers=None, **kwargs
+):
     try:
         from unittest.mock import MagicMock
     except:
         from mock import MagicMock
 
-    response = mocker.MagicMock(name="response") if mocker else MagicMock(name="response")
+    response = (
+        mocker.MagicMock(name="response") if mocker else MagicMock(name="response")
+    )
     response.status_code = status_code
     del response.context
     del response._attribute_map
@@ -161,8 +159,8 @@ def build_mock_response(mocker=None, status_code=200, payload=None, headers=None
         response.text = _payload_str
         response.internal_response.json.return_value = json.loads(_payload_str)
     else:
-        response.text.return_value = ''
-        response.text = ''
+        response.text.return_value = ""
+        response.text = ""
 
     headers_get_side_effect = kwargs.get("headers_get_side_effect")
     if headers_get_side_effect:
@@ -192,13 +190,31 @@ def mocked_response():
 @pytest.fixture(params=[400, 401, 500])
 def service_client_generic_errors(mocked_response, fixture_ghcs, request):
     def error_callback(_):
-        return (request.param, {'Content-Type': "application/json; charset=utf-8"}, json.dumps({"error": "something failed"}))
+        return (
+            request.param,
+            {"Content-Type": "application/json; charset=utf-8"},
+            json.dumps({"error": "something failed"}),
+        )
 
     any_endpoint = r"^https:\/\/.+"
     with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
-        rsps.add_callback(callback=error_callback, method=responses.GET, url=re.compile(any_endpoint))
-        rsps.add_callback(callback=error_callback, method=responses.PUT, url=re.compile(any_endpoint))
-        rsps.add_callback(callback=error_callback, method=responses.POST, url=re.compile(any_endpoint))
-        rsps.add_callback(callback=error_callback, method=responses.DELETE, url=re.compile(any_endpoint))
-        rsps.add_callback(callback=error_callback, method=responses.PATCH, url=re.compile(any_endpoint))
+        rsps.add_callback(
+            callback=error_callback, method=responses.GET, url=re.compile(any_endpoint)
+        )
+        rsps.add_callback(
+            callback=error_callback, method=responses.PUT, url=re.compile(any_endpoint)
+        )
+        rsps.add_callback(
+            callback=error_callback, method=responses.POST, url=re.compile(any_endpoint)
+        )
+        rsps.add_callback(
+            callback=error_callback,
+            method=responses.DELETE,
+            url=re.compile(any_endpoint),
+        )
+        rsps.add_callback(
+            callback=error_callback,
+            method=responses.PATCH,
+            url=re.compile(any_endpoint),
+        )
         yield rsps
