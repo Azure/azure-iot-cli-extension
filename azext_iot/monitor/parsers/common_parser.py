@@ -41,7 +41,7 @@ class CommonParser(AbstractBaseParser):
         properties = kwargs.get("properties")
         pnp_context = kwargs.get("pnp_context")
         interface_name = kwargs.get("interface_name")
-        content_type_hint = kwargs.get("content_type_hint")
+        content_type_hint = kwargs.get("content_type")
 
         if not properties:
             properties = []  # guard against None being passed in

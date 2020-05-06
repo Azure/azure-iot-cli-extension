@@ -12,7 +12,7 @@ from uamqp.message import Message
 from azext_iot.common.utility import ISO8601Validator
 from azext_iot.central.providers import CentralDeviceProvider
 from azext_iot.monitor.parsers.issue import Severity, IssueMessageBuilder
-from azext_iot.monitor.parsers.parser import CommonParser
+from azext_iot.monitor.parsers.common_parser import CommonParser
 
 SUPPORTED_ENCODINGS = ["utf-8"]
 DEVICE_ID_IDENTIFIER = b"iothub-connection-device-id"

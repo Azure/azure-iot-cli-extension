@@ -9,7 +9,7 @@ import re
 import yaml
 
 from azext_iot.monitor.base_classes import AbstractBaseEventsHandler
-from azext_iot.monitor.parsers.parser import CommonParser
+from azext_iot.monitor.parsers.common_parser import CommonParser
 
 
 class CommonHandler(AbstractBaseEventsHandler):
