@@ -19,7 +19,7 @@ def validate_messages(
     repair=False,
     properties=None,
     yes=False,
-    central_api_uri="azureiotcentral.com",
+    central_dns_suffix="azureiotcentral.com",
 ):
     _events3_runner(
         cmd=cmd,
@@ -33,7 +33,7 @@ def validate_messages(
         repair=repair,
         properties=properties,
         yes=yes,
-        central_api_uri=central_api_uri,
+        central_dns_suffix=central_dns_suffix,
     )
 
 
@@ -47,7 +47,7 @@ def monitor_events(
     repair=False,
     properties=None,
     yes=False,
-    central_api_uri="azureiotcentral.com",
+    central_dns_suffix="azureiotcentral.com",
 ):
     _events3_runner(
         cmd=cmd,
@@ -61,7 +61,7 @@ def monitor_events(
         repair=repair,
         properties=properties,
         yes=yes,
-        central_api_uri=central_api_uri,
+        central_dns_suffix=central_dns_suffix,
     )
 
 
@@ -77,7 +77,7 @@ def _events3_runner(
     repair,
     properties,
     yes,
-    central_api_uri,
+    central_dns_suffix,
 ):
     provider = CentralDeviceProvider(cmd, app_id)
     (enqueued_time, properties, timeout, output) = init_monitoring(
@@ -92,7 +92,7 @@ def _events3_runner(
     on_start_string = generate_on_start_string(device_id=device_id, pnp_context=None)
 
     targets = central_target_builder.build_central_event_hub_targets(
-        cmd, app_id, central_api_uri
+        cmd, app_id, central_dns_suffix
     )
     [target.add_consumer_group(consumer_group) for target in targets]
 

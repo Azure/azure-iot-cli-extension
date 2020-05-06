@@ -62,11 +62,11 @@ def load_central_commands(self, _):
     ) as cmd_group:
         cmd_group.command("show", "device_twin_show")
 
-    # delete this by 6/5/2020
+    # TODO: Delete this by end of July 2020
     load_deprecated_commands(self, _)
 
 
-# delete this by 6/5/2020
+# TODO: Delete this by end of July 2020
 def load_deprecated_commands(self, _):
     with self.command_group(
         "iotcentral",

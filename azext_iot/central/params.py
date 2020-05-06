@@ -10,6 +10,7 @@ CLI parameter definitions.
 
 from azure.cli.core.commands.parameters import get_three_state_flag, get_enum_type
 from azext_iot.central.models.enum import DeviceStatus
+from azext_iot._params import event_msg_prop_type
 
 
 def load_central_arguments(self, _):
@@ -17,10 +18,12 @@ def load_central_arguments(self, _):
     Load CLI Args for Knack parser
     """
     with self.argument_context("iot central app") as context:
+        context.argument("app_id", options_list=["--app-id"], help="Target App.")
+        context.argument("properties", arg_type=event_msg_prop_type)
         context.argument(
             "instance_of",
             options_list=["--instance-of"],
-            help="Central model id. Example: urn:ojpkindbz:modelDefinition:iild3tm_uo",
+            help="Central template id. Example: urn:ojpkindbz:modelDefinition:iild3tm_uo",
         )
         context.argument(
             "device_name",
@@ -57,13 +60,69 @@ def load_central_arguments(self, _):
         )
         context.argument(
             "central_dns_suffix",
-            options_list=["--central-dns-suffix"],
+            options_list=["--central-dns-suffix", "--central-api-uri"],
             help="Central dns suffix. "
             "This enables running cli commands against non public/prod environments",
         )
         context.argument(
             "device_status",
-            options_list=["--devicestatus", "--ds"],
+            options_list=["--device-status", "--ds"],
             arg_type=get_enum_type(DeviceStatus),
             help="Indicates filter option for device status",
+        )
+
+    # TODO: Delete this by end of July 2020
+    load_deprecated_iotcentral_params(self, _)
+
+
+# TODO: Delete this by end of July 2020
+def load_deprecated_iotcentral_params(self, _):
+    with self.argument_context("iotcentral") as context:
+        context.argument("app_id", options_list=["--app-id"], help="Target App.")
+        context.argument("properties", arg_type=event_msg_prop_type)
+        context.argument(
+            "device_id", options_list=["--device-id", "-d"], help="Target Device."
+        )
+        context.argument(
+            "timeout",
+            options_list=["--timeout", "--to", "-t"],
+            type=int,
+            help="Maximum seconds to maintain connection without receiving message. Use 0 for infinity. ",
+        )
+        context.argument(
+            "consumer_group",
+            options_list=["--consumer-group", "--cg", "-c"],
+            help="Specify the consumer group to use when connecting to event hub endpoint.",
+        )
+        context.argument(
+            "enqueued_time",
+            options_list=["--enqueued-time", "--et", "-e"],
+            type=int,
+            help="Indicates the time that should be used as a starting point to read messages from the partitions. "
+            "Units are milliseconds since unix epoch. "
+            'If no time is indicated "now" is used.',
+        )
+        context.argument(
+            "content_type",
+            options_list=["--content-type", "--ct"],
+            help="Specify the Content-Type of the message payload to automatically format the output to that type.",
+        )
+        context.argument(
+            "repair",
+            options_list=["--repair", "-r"],
+            arg_type=get_three_state_flag(),
+            help="Reinstall uamqp dependency compatible with extension version. Default: false",
+        )
+        context.argument(
+            "yes",
+            options_list=["--yes", "-y"],
+            arg_type=get_three_state_flag(),
+            help="Skip user prompts. Indicates acceptance of dependency installation (if required). "
+            "Used primarily for automation scenarios. Default: false",
+        )
+        context.argument(
+            "central_dns_suffix",
+            options_list=["--central-dns-suffix", "--central-api-uri"],
+            help="Central dns suffix. "
+            "This enables running cli commands against non public/prod environments",
         )

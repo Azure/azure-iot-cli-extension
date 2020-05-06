@@ -15,10 +15,10 @@ def find_between(s, start, end):
     return (s.split(start))[1].split(end)[0]
 
 
-def device_twin_show(cmd, device_id, app_id, central_api_uri="azureiotcentral.com"):
+def device_twin_show(cmd, device_id, app_id, central_dns_suffix="azureiotcentral.com"):
     from azext_iot.common._azure import get_iot_central_tokens
 
-    tokens = get_iot_central_tokens(cmd, app_id, central_api_uri)
+    tokens = get_iot_central_tokens(cmd, app_id, central_dns_suffix)
     exception = None
 
     # The device could be in any hub associated with the given app.
