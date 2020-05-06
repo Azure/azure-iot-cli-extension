@@ -9,8 +9,8 @@ import time
 from typing import List
 
 from azext_iot.central.providers.device_provider import CentralDeviceProvider
-from azext_iot.monitor.utility import kill_monitor
-from azext_iot.monitor.handlers.handler import CommonHandler
+from azext_iot.monitor.utility import stop_monitor
+from azext_iot.monitor.handlers.common_handler import CommonHandler
 from azext_iot.monitor.parsers.central_parser import CentralParser
 from azext_iot.monitor.parsers.issue import Severity, Issue
 
@@ -87,12 +87,12 @@ class CentralHandler(CommonHandler):
         if self.abs_timeout and (end - self.start) >= self.abs_timeout:
             print("Exiting due to timeout.", flush=True)
             self.print_results()
-            kill_monitor()
+            stop_monitor()
 
         if self.max_messages and processed_messages_count >= self.max_messages:
             print("Exiting due to message count reached.", flush=True)
             self.print_results()
-            kill_monitor()
+            stop_monitor()
 
     def print_results(self):
         message_len = len(self.messages)

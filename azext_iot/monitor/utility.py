@@ -16,5 +16,5 @@ def generate_on_start_string(device_id, pnp_context):
     )
 
 
-def kill_monitor():
+def stop_monitor():
     raise KeyboardInterrupt()

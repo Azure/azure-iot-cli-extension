@@ -7,7 +7,6 @@
 import json
 import re
 
-from knack.log import get_logger
 from uamqp.message import Message
 
 from azext_iot.common.utility import parse_entity, unicode_binary_map, ISO8601Validator
@@ -21,17 +20,13 @@ ios_validator = ISO8601Validator()
 
 
 class CommonParser(AbstractBaseParser):
-    _logger = get_logger(__name__)
-
     def __init__(self, logger=None):
         self.issues_handler = IssueHandler()
         self._device_id = None
-        if logger:
-            self._logger = logger
 
     def write_logs(self, severity=Severity.info) -> None:
         for issue in self.issues_handler.get_issues_with_minimum_severity(severity):
-            issue.log(self._logger)
+            issue.log()
 
     def parse_message(self, message: Message, **kwargs) -> dict:
         """
