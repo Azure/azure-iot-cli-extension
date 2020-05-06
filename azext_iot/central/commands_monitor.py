@@ -21,7 +21,6 @@ def validate_messages(
     yes=False,
     central_api_uri="azureiotcentral.com",
 ):
-    provider = CentralDeviceProvider(cmd, app_id)
     _events3_runner(
         cmd=cmd,
         app_id=app_id,
@@ -35,7 +34,6 @@ def validate_messages(
         properties=properties,
         yes=yes,
         central_api_uri=central_api_uri,
-        central_device_provider=provider,
     )
 
 
@@ -64,7 +62,6 @@ def monitor_events(
         properties=properties,
         yes=yes,
         central_api_uri=central_api_uri,
-        central_device_provider=None,
     )
 
 
@@ -81,14 +78,14 @@ def _events3_runner(
     properties,
     yes,
     central_api_uri,
-    central_device_provider,
 ):
+    provider = CentralDeviceProvider(cmd, app_id)
     (enqueued_time, properties, timeout, output) = init_monitoring(
         cmd, timeout, properties, enqueued_time, repair, yes
     )
 
     from azext_iot.monitor.builders import central_target_builder
-    from azext_iot.monitor.handlers import CommonHandler
+    from azext_iot.monitor.handlers import CentralHandler
     from azext_iot.monitor.utility import generate_on_start_string
     from azext_iot.monitor import telemetry
 
@@ -99,12 +96,14 @@ def _events3_runner(
     )
     [target.add_consumer_group(consumer_group) for target in targets]
 
-    handler = CommonHandler(device_id=device_id, properties=properties, output=output)
+    handler = CentralHandler(
+        provider, device_id=device_id, properties=properties, output=output
+    )
 
     telemetry.start_multiple_monitors(
         targets=targets,
         enqueued_time_utc=enqueued_time,
         on_start_string=on_start_string,
-        on_message_received=handler.parse_message,
+        on_message_received=handler.validate_message,
         timeout=timeout,
     )

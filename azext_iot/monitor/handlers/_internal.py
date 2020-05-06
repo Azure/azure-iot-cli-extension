@@ -8,7 +8,7 @@ import json
 import re
 import yaml
 
-from azext_iot.monitor.handlers._parser import Event3Parser
+from azext_iot.monitor.parsers.parser import CommonParser
 
 
 def parse_message(
@@ -20,36 +20,28 @@ def parse_message(
     content_type,
     properties,
     output,
-    validate_messages,
-    simulate_errors,
-    central_device_provider,
 ):
-    parser = Event3Parser()
+    parser = CommonParser()
     origin_device_id = parser.parse_device_id(msg)
 
     if not _should_process_device(origin_device_id, device_id, devices):
         return
 
-    parsed_msg = parser.parse_message(
-        msg,
-        pnp_context,
-        interface_name,
-        properties,
-        content_type,
-        simulate_errors,
-        central_device_provider,
-    )
+    kwargs = {
+        "properties": properties,
+        "pnp_context": pnp_context,
+        "interface_name": interface_name,
+        "content_type_hint": content_type,
+    }
+
+    parsed_msg = parser.parse_message(msg, **kwargs)
 
     if output.lower() == "json":
         dump = json.dumps(parsed_msg, indent=4)
     else:
         dump = yaml.safe_dump(parsed_msg, default_flow_style=False)
 
-    if validate_messages:
-        parser.write_logs()
-
-    if not validate_messages:
-        print(dump, flush=True)
+    print(dump, flush=True)
 
 
 def _should_process_device(origin_device_id, device_id, devices):

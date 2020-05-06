@@ -60,7 +60,7 @@ class CentralDeviceProvider:
 
     def get_device_template_by_device_id(
         self, device_id, central_dns_suffix="azureiotcentral.com",
-    ):
+    ) -> dict:
         from azext_iot.central.providers import CentralDeviceTemplateProvider
 
         if not device_id:

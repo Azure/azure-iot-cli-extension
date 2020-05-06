@@ -5,5 +5,6 @@
 # --------------------------------------------------------------------------------------------
 
 from azext_iot.monitor.handlers.handler import CommonHandler
+from azext_iot.monitor.handlers.central_handler import CentralHandler
 
-__all__ = ["CommonHandler"]
+__all__ = ["CommonHandler", "CentralHandler"]

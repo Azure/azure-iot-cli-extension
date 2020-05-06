@@ -14,3 +14,7 @@ def generate_on_start_string(device_id, pnp_context):
         "Digital Twin " if pnp_context else "",
         device_filter_txt if device_filter_txt else "",
     )
+
+
+def kill_monitor():
+    raise KeyboardInterrupt()
