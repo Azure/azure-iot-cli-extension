@@ -202,12 +202,12 @@ class IssueMessageBuilder:
         )
 
     @staticmethod
-    def invalid_system_properties(message):
-        return "Failed to parse system_properties for message {}.".format(message)
+    def invalid_system_properties(message: object):
+        return "Failed to parse system_properties for message: {}.".format(message)
 
     @staticmethod
-    def invalid_encoding_none_found(message):
-        return "No encoding found for message: {}.".format(message)
+    def invalid_encoding_none_found(message: object):
+        return "No encoding found for message: {}.".format(message)
 
     @staticmethod
     def invalid_encoding_missing(system_properties: dict):

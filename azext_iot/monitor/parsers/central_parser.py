@@ -86,8 +86,6 @@ class CentralParser(CommonParser):
         if not template:
             return
 
-        self._template_id = template.get("id")
-
         template_schemas = self._extract_template_schemas_from_template(
             template=template
         )
@@ -111,6 +109,7 @@ class CentralParser(CommonParser):
 
     def _extract_template_schemas_from_template(self, template: dict):
         try:
+            self._template_id = template.get("id")
             schemas = []
             dcm = template["capabilityModel"]
             implements = dcm["implements"]
@@ -147,7 +146,7 @@ class CentralParser(CommonParser):
 
         if name_miss:
             issue_msg = IssueMessageBuilder.invalid_field_name_mismatch_template(
-                name_miss, template_schema_names
+                name_miss, list(template_schema_names)
             )
             self._add_central_issue(severity=Severity.warning, message=issue_msg)
 
