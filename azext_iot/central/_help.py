@@ -189,7 +189,7 @@ def _load_central_device_templates_help():
         type: command
         short-summary: Delete a device template from IoTC
         long-summary: |
-            Note: this is expected to fail if any devices are still registered to this template.
+            Note: this is expected to fail if any devices are still associated to this template.
 
         examples:
         - name: Delete a device template from IoTC
