@@ -93,19 +93,21 @@ class CentralHandler(CommonHandler):
     def generate_startup_string(self, name: str):
         device_filter_text = ""
         if self.device_id:
-            device_filter_text = "Filtering on device: {}".format(self.device_id)
+            device_filter_text = ".\nFiltering on device: {}".format(self.device_id)
 
         exit_text = ""
         if self.timeout and self.max_messages:
-            exit_text = "Exiting after {} second(s), or {} message(s) have been parsed (whichever happens first).".format(
+            exit_text = ".\nExiting after {} second(s), or {} message(s) have been parsed (whichever happens first).".format(
                 self.timeout, self.max_messages
             )
         elif self.timeout:
-            exit_text = "Exiting after {} second(s).".format(self.timeout)
+            exit_text = ".\nExiting after {} second(s).".format(self.timeout)
         elif self.max_messages:
-            exit_text = "Exiting after parsing {} message(s).".format(self.max_messages)
+            exit_text = ".\nExiting after parsing {} message(s).".format(
+                self.max_messages
+            )
 
-        result = "{} telemetry.\n{}.\n{}".format(name, device_filter_text, exit_text)
+        result = "{} telemetry{}{}".format(name, device_filter_text, exit_text)
 
         return result
 
