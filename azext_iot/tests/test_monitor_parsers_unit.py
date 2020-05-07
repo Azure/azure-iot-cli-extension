@@ -25,16 +25,16 @@ def _validate_issues(
     severity: Severity,
     expected_total_issues: int,
     expected_specified_issues: int,
-    expected_messages: list,
+    expected_detailss: list,
 ):
     issues = parser.issues_handler.get_all_issues()
     specified_issues = parser.issues_handler.get_issues_with_severity(severity)
     assert len(issues) == expected_total_issues
     assert len(specified_issues) == expected_specified_issues
 
-    actual_messages = [issue.message for issue in specified_issues]
-    for expected_message in expected_messages:
-        assert expected_message in actual_messages
+    actual_messages = [issue.details for issue in specified_issues]
+    for expected_details in expected_detailss:
+        assert expected_details in actual_messages
 
 
 class TestCommonParser:
@@ -162,13 +162,13 @@ class TestCommonParser:
         payload = str(encoded_payload, "utf8")
         assert parsed_msg["event"]["payload"] == payload
 
-        expected_message = IssueMessageBuilder.invalid_encoding_none_found(payload)
-        _validate_issues(parser, Severity.error, 2, 1, [expected_message])
+        expected_details = IssueMessageBuilder.invalid_encoding_none_found()
+        _validate_issues(parser, Severity.error, 2, 1, [expected_details])
 
-        expected_message = IssueMessageBuilder.invalid_content_type(
+        expected_details = IssueMessageBuilder.invalid_content_type(
             self.bad_content_type
         )
-        _validate_issues(parser, Severity.warning, 2, 1, [expected_message])
+        _validate_issues(parser, Severity.warning, 2, 1, [expected_details])
 
     def test_parse_message_bad_encoding_should_fail(self):
         # setup
@@ -191,8 +191,8 @@ class TestCommonParser:
             content_type=None,
         )
 
-        expected_message = IssueMessageBuilder.invalid_encoding(self.bad_encoding)
-        _validate_issues(parser, Severity.error, 1, 1, [expected_message])
+        expected_details = IssueMessageBuilder.invalid_encoding(self.bad_encoding)
+        _validate_issues(parser, Severity.error, 1, 1, [expected_details])
 
     def test_parse_message_bad_json_should_fail(self):
         # setup
@@ -219,8 +219,8 @@ class TestCommonParser:
         # parsing should attempt to place raw payload into result even if parsing fails
         assert parsed_msg["event"]["payload"] == self.bad_payload
 
-        expected_message = IssueMessageBuilder.invalid_json(self.bad_payload)
-        _validate_issues(parser, Severity.error, 1, 1, [expected_message])
+        expected_details = IssueMessageBuilder.invalid_json()
+        _validate_issues(parser, Severity.error, 1, 1, [expected_details])
 
     def test_parse_message_pnp_should_fail(self):
         # setup
@@ -254,10 +254,10 @@ class TestCommonParser:
         assert parsed_msg["event"]["origin"] == self.device_id
         assert parsed_msg["event"]["interface"] == actual_interface_name
 
-        expected_message = IssueMessageBuilder.invalid_interface_name_mismatch(
+        expected_details = IssueMessageBuilder.invalid_interface_name_mismatch(
             expected_interface_name, actual_interface_name
         )
-        _validate_issues(parser, Severity.warning, 1, 1, [expected_message])
+        _validate_issues(parser, Severity.warning, 1, 1, [expected_details])
 
 
 class TestCentralParser:
@@ -306,14 +306,14 @@ class TestCentralParser:
         # parsing should attempt to place raw payload into result even if parsing fails
         assert parsed_msg["event"]["payload"] == self.bad_field_name
 
-        expected_message_1 = IssueMessageBuilder.invalid_field_name(
+        expected_details_1 = IssueMessageBuilder.invalid_field_name(
             list(self.bad_field_name.keys())
         )
-        expected_message_2 = IssueMessageBuilder.invalid_field_name_mismatch_template(
+        expected_details_2 = IssueMessageBuilder.invalid_field_name_mismatch_template(
             list(self.bad_field_name.keys()), list(schema.keys())
         )
         _validate_issues(
-            parser, Severity.warning, 2, 2, [expected_message_1, expected_message_2]
+            parser, Severity.warning, 2, 2, [expected_details_1, expected_details_2]
         )
 
     def test_validate_against_template_should_fail(self):
@@ -353,11 +353,11 @@ class TestCentralParser:
         assert properties["system"]["content_type"] == self.content_type
         assert properties["application"] == self.app_properties
 
-        expected_message = IssueMessageBuilder.invalid_field_name_mismatch_template(
+        expected_details = IssueMessageBuilder.invalid_field_name_mismatch_template(
             list(self.bad_dcm_payload.keys()), list(schema.keys())
         )
 
-        _validate_issues(parser, Severity.warning, 1, 1, [expected_message])
+        _validate_issues(parser, Severity.warning, 1, 1, [expected_details])
 
     def test_validate_against_bad_template_should_not_throw(self):
         # setup
@@ -387,11 +387,11 @@ class TestCentralParser:
         assert parsed_msg["event"]["payload"] == self.bad_dcm_payload
         assert parsed_msg["event"]["origin"] == self.device_id
 
-        expected_message = IssueMessageBuilder.invalid_template_extract_schema_failed(
+        expected_details = IssueMessageBuilder.invalid_template_extract_schema_failed(
             device_template
         )
 
-        _validate_issues(parser, Severity.error, 1, 1, [expected_message])
+        _validate_issues(parser, Severity.error, 1, 1, [expected_details])
 
     def test_type_mismatch_should_error(self):
         # setup
@@ -425,10 +425,10 @@ class TestCentralParser:
         field_name = list(self.type_mismatch_payload.keys())[0]
         data = list(self.type_mismatch_payload.values())[0]
         data_type = "boolean"
-        expected_message = IssueMessageBuilder.invalid_primitive_schema_mismatch_template(
+        expected_details = IssueMessageBuilder.invalid_primitive_schema_mismatch_template(
             field_name, data_type, data
         )
-        _validate_issues(parser, Severity.warning, 1, 1, [expected_message])
+        _validate_issues(parser, Severity.warning, 1, 1, [expected_details])
 
     def _get_template(self):
         return load_json(FileNames.central_device_template_file)

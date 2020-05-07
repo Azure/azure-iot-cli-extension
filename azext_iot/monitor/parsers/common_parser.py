@@ -9,20 +9,19 @@ import re
 
 from uamqp.message import Message
 
-from azext_iot.common.utility import parse_entity, unicode_binary_map, ISO8601Validator
+from azext_iot.common.utility import parse_entity, unicode_binary_map
 from azext_iot.monitor.base_classes import AbstractBaseParser
 from azext_iot.monitor.parsers.issue import Severity, IssueHandler, IssueMessageBuilder
 
 DEVICE_ID_IDENTIFIER = b"iothub-connection-device-id"
 INTERFACE_NAME_IDENTIFIER = b"iothub-interface-name"
 
-ios_validator = ISO8601Validator()
-
 
 class CommonParser(AbstractBaseParser):
     def __init__(self, logger=None):
         self.issues_handler = IssueHandler()
         self._device_id = None
+        self._message = None
 
     def write_logs(self, severity=Severity.info) -> None:
         for issue in self.issues_handler.get_issues_with_minimum_severity(severity):
@@ -38,10 +37,16 @@ class CommonParser(AbstractBaseParser):
             pnp_context     (bool)  interpret the device as being a pnp device
             content_type    (str)   assumed content type (utf-8, ascii, etc)
         """
+        self._message = message
         properties = kwargs.get("properties")
         pnp_context = kwargs.get("pnp_context")
         interface_name = kwargs.get("interface_name")
         content_type_hint = kwargs.get("content_type")
+
+        event = {}
+
+        self._device_id = self.parse_device_id(message)
+        event["origin"] = self._device_id
 
         if not properties:
             properties = []  # guard against None being passed in
@@ -49,11 +54,6 @@ class CommonParser(AbstractBaseParser):
         system_properties = self._parse_system_properties(message)
 
         self._parse_content_encoding(message, system_properties)
-
-        event = {}
-
-        self._device_id = self.parse_device_id(message)
-        event["origin"] = self._device_id
 
         content_type = self._parse_content_type(content_type_hint, system_properties)
 
@@ -86,17 +86,20 @@ class CommonParser(AbstractBaseParser):
 
         return event_source
 
-    def _add_issue(self, severity: Severity, message: str):
+    def _add_issue(self, severity: Severity, details: str):
         self.issues_handler.add_issue(
-            severity=severity, message=message, device_id=self._device_id
+            severity=severity,
+            details=details,
+            message=self._message,
+            device_id=self._device_id,
         )
 
     def parse_device_id(self, message: Message) -> str:
         try:
             return str(message.annotations.get(DEVICE_ID_IDENTIFIER), "utf8")
         except Exception:
-            issue_msg = IssueMessageBuilder.unknown_device_id(message)
-            self._add_issue(severity=Severity.error, message=issue_msg)
+            details = IssueMessageBuilder.unknown_device_id()
+            self._add_issue(severity=Severity.error, details=details)
             return ""
 
     def _parse_interface_name(
@@ -109,14 +112,14 @@ class CommonParser(AbstractBaseParser):
                 message.annotations.get(INTERFACE_NAME_IDENTIFIER), "utf8"
             )
         except Exception:
-            issue_msg = IssueMessageBuilder.invalid_interface_name_not_found()
-            self._add_issue(severity=Severity.error, message=issue_msg)
+            details = IssueMessageBuilder.invalid_interface_name_not_found()
+            self._add_issue(severity=Severity.error, details=details)
 
         if expected_interface_name != actual_interface_name:
-            issue_msg = IssueMessageBuilder.invalid_interface_name_mismatch(
+            details = IssueMessageBuilder.invalid_interface_name_mismatch(
                 expected_interface_name, actual_interface_name
             )
-            self._add_issue(severity=Severity.warning, message=issue_msg)
+            self._add_issue(severity=Severity.warning, details=details)
 
         return actual_interface_name
 
@@ -124,8 +127,8 @@ class CommonParser(AbstractBaseParser):
         try:
             return unicode_binary_map(parse_entity(message.properties, True))
         except Exception:
-            issue_msg = IssueMessageBuilder.invalid_system_properties(message)
-            self._add_issue(severity=Severity.error, message=issue_msg)
+            details = IssueMessageBuilder.invalid_system_properties()
+            self._add_issue(severity=Severity.error, details=details)
             return {}
 
     def _parse_content_encoding(self, message: Message, system_properties) -> str:
@@ -135,13 +138,13 @@ class CommonParser(AbstractBaseParser):
             content_encoding = system_properties["content_encoding"]
 
         if not content_encoding:
-            issue_msg = IssueMessageBuilder.invalid_encoding_none_found(message)
-            self._add_issue(severity=Severity.error, message=issue_msg)
+            details = IssueMessageBuilder.invalid_encoding_none_found()
+            self._add_issue(severity=Severity.error, details=details)
             return None
 
         if "utf-8" not in content_encoding.lower():
-            issue_msg = IssueMessageBuilder.invalid_encoding(content_encoding.lower())
-            self._add_issue(severity=Severity.error, message=issue_msg)
+            details = IssueMessageBuilder.invalid_encoding(content_encoding.lower())
+            self._add_issue(severity=Severity.error, details=details)
             return None
 
         return content_encoding
@@ -154,8 +157,8 @@ class CommonParser(AbstractBaseParser):
             content_type = system_properties["content_type"]
 
         if not content_type:
-            issue_msg = IssueMessageBuilder.invalid_encoding_missing(system_properties)
-            self._add_issue(severity=Severity.error, message=issue_msg)
+            details = IssueMessageBuilder.invalid_encoding_missing(system_properties)
+            self._add_issue(severity=Severity.error, details=details)
 
         return content_type
 
@@ -163,16 +166,16 @@ class CommonParser(AbstractBaseParser):
         try:
             return unicode_binary_map(message.annotations)
         except Exception:
-            issue_msg = IssueMessageBuilder.invalid_annotations(message)
-            self._add_issue(severity=Severity.error, message=issue_msg)
+            details = IssueMessageBuilder.invalid_annotations(message)
+            self._add_issue(severity=Severity.error, details=details)
             return {}
 
     def _parse_application_properties(self, message: Message):
         try:
             return unicode_binary_map(message.application_properties)
         except Exception:
-            issue_msg = IssueMessageBuilder.invalid_application_properties(message)
-            self._add_issue(severity=Severity.error, message=issue_msg)
+            details = IssueMessageBuilder.invalid_application_properties(message)
+            self._add_issue(severity=Severity.error, details=details)
             return {}
 
     def _parse_payload(self, message: Message, content_type):
@@ -183,15 +186,15 @@ class CommonParser(AbstractBaseParser):
             payload = str(next(data), "utf8")
 
         if "application/json" not in content_type.lower():
-            issue_msg = IssueMessageBuilder.invalid_content_type(content_type.lower())
-            self._add_issue(severity=Severity.warning, message=issue_msg)
+            details = IssueMessageBuilder.invalid_content_type(content_type.lower())
+            self._add_issue(severity=Severity.warning, details=details)
         else:
             try:
                 regex = r"(\\r\\n)+|\\r+|\\n+"
                 payload_no_white_space = re.compile(regex).sub("", payload)
                 payload = json.loads(payload_no_white_space)
             except Exception:
-                issue_msg = IssueMessageBuilder.invalid_json(payload)
-                self._add_issue(severity=Severity.error, message=issue_msg)
+                details = IssueMessageBuilder.invalid_json()
+                self._add_issue(severity=Severity.error, details=details)
 
         return payload

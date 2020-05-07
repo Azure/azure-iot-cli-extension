@@ -37,12 +37,38 @@ class MonitorProvider:
         central_dns_suffix  (str)   This enables running cli commands against non public/prod environments.
     """
 
-    def __init__(self, cmd, app_id, **kwargs):
+    def __init__(
+        self,
+        cmd,
+        app_id,
+        device_id,
+        consumer_group,
+        timeout,
+        max_messages,
+        properties,
+        enqueued_time,
+        repair,
+        yes,
+        minimum_severity,
+        central_dns_suffix,
+        content_type,
+        time_range,
+    ):
         self._importing_allowed = False
         self._provider = CentralDeviceProvider(cmd, app_id)
-        self._init_monitoring(cmd, **kwargs)
-        self._targets = self._build_targets(cmd, app_id, **kwargs)
-        self._handler = self._build_handler(**kwargs)
+        self._init_monitoring(cmd, timeout, properties, enqueued_time, repair, yes)
+        self._targets = self._build_targets(
+            cmd, app_id, central_dns_suffix, consumer_group
+        )
+        self._handler = self._build_handler(
+            device_id,
+            content_type,
+            properties,
+            self._provider,
+            time_range,
+            max_messages,
+            minimum_severity,
+        )
 
     def start_monitor_events(self):
         self._ensure_uamqp_import_succeeded()
@@ -68,13 +94,15 @@ class MonitorProvider:
             timeout=self._timeout,
         )
 
-    def _init_monitoring(self, cmd, **kwargs):
-        timeout = kwargs.get("timeout") or 0
-        properties = kwargs.get("properties")
-        enqueued_time = kwargs.get("enqueued_time")
-        repair = kwargs.get("repair")
-        yes = kwargs.get("yes")
-
+    def _init_monitoring(
+        self,
+        cmd,
+        timeout: int,
+        properties: list,
+        enqueued_time: float,
+        repair: bool,
+        yes: bool,
+    ):
         (enqueued_time, unique_properties, timeout_ms, output) = init_monitoring(
             cmd, timeout, properties, enqueued_time, repair, yes
         )
@@ -90,13 +118,10 @@ class MonitorProvider:
         if not self._importing_allowed:
             raise CLIError("Cannot proceed until monitor is initialized")
 
-    def _build_targets(self, cmd, app_id, **kwargs):
+    def _build_targets(self, cmd, app_id, central_dns_suffix: str, consumer_group: str):
         self._ensure_uamqp_import_succeeded()
 
         from azext_iot.monitor.builders import central_target_builder
-
-        central_dns_suffix = kwargs.get("central_dns_suffix") or "azureiotcentral.com"
-        consumer_group = kwargs.get("consumer_group") or "$Default"
 
         targets = central_target_builder.build_central_event_hub_targets(
             cmd, app_id, central_dns_suffix
@@ -105,9 +130,26 @@ class MonitorProvider:
 
         return targets
 
-    def _build_handler(self, **kwargs):
+    def _build_handler(
+        self,
+        device_id,
+        content_type,
+        properties,
+        provider,
+        time_range,
+        max_messages,
+        minimum_severity,
+    ):
         self._ensure_uamqp_import_succeeded()
-        kwargs.update({"output": self._output})
         from azext_iot.monitor.handlers import CentralHandler
 
-        return CentralHandler(self._provider, **kwargs)
+        return CentralHandler(
+            device_id,
+            content_type,
+            properties,
+            self._output,
+            provider,
+            time_range,
+            max_messages,
+            minimum_severity,
+        )

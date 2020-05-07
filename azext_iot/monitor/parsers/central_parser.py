@@ -4,7 +4,6 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import random
 import re
 
 from uamqp.message import Message
@@ -13,11 +12,6 @@ from azext_iot.common.utility import ISO8601Validator
 from azext_iot.central.providers import CentralDeviceProvider
 from azext_iot.monitor.parsers.issue import Severity, IssueMessageBuilder
 from azext_iot.monitor.parsers.common_parser import CommonParser
-
-SUPPORTED_ENCODINGS = ["utf-8"]
-DEVICE_ID_IDENTIFIER = b"iothub-connection-device-id"
-INTERFACE_NAME_IDENTIFIER = b"iothub-interface-name"
-random.seed(0)
 
 ios_validator = ISO8601Validator()
 
@@ -28,10 +22,11 @@ class CentralParser(CommonParser):
         self._central_device_provider = central_device_provider
         self._template_id = None
 
-    def _add_central_issue(self, severity: Severity, message: str):
+    def _add_central_issue(self, severity: Severity, details: str):
         self.issues_handler.add_central_issue(
             severity=severity,
-            message=message,
+            details=details,
+            message=self._message,
             device_id=self._device_id,
             template_id=self._template_id,
         )
@@ -70,8 +65,8 @@ class CentralParser(CommonParser):
             if not re.search(regex, field_name)
         ]
         if invalid_field_names:
-            issue_msg = IssueMessageBuilder.invalid_field_name(invalid_field_names)
-            self._add_issue(severity=Severity.warning, message=issue_msg)
+            details = IssueMessageBuilder.invalid_field_name(invalid_field_names)
+            self._add_issue(severity=Severity.warning, details=details)
 
     # Dynamic validations should need data external to the payload
     # e.g. device template
@@ -104,8 +99,8 @@ class CentralParser(CommonParser):
                 self._device_id
             )
         except Exception as e:
-            issue_msg = IssueMessageBuilder.device_template_not_found(e)
-            self._add_central_issue(severity=Severity.error, message=issue_msg)
+            details = IssueMessageBuilder.device_template_not_found(e)
+            self._add_central_issue(severity=Severity.error, details=details)
 
     def _extract_template_schemas_from_template(self, template: dict):
         try:
@@ -118,10 +113,10 @@ class CentralParser(CommonParser):
                 schemas.extend(contents)
             return {schema["name"]: schema for schema in schemas}
         except Exception:
-            issue_msg = IssueMessageBuilder.invalid_template_extract_schema_failed(
+            details = IssueMessageBuilder.invalid_template_extract_schema_failed(
                 template
             )
-            self._add_central_issue(severity=Severity.error, message=issue_msg)
+            self._add_central_issue(severity=Severity.error, details=details)
 
     # currently validates:
     # 1) primitive types match (e.g. boolean is indeed bool etc)
@@ -139,16 +134,16 @@ class CentralParser(CommonParser):
             is_dict = isinstance(schema, dict)
             if is_dict and not self._validate_types_match(value, schema):
                 expected_type = str(schema.get("schema"))
-                issue_msg = IssueMessageBuilder.invalid_primitive_schema_mismatch_template(
+                details = IssueMessageBuilder.invalid_primitive_schema_mismatch_template(
                     name, expected_type, value
                 )
-                self._add_central_issue(severity=Severity.warning, message=issue_msg)
+                self._add_central_issue(severity=Severity.warning, details=details)
 
         if name_miss:
-            issue_msg = IssueMessageBuilder.invalid_field_name_mismatch_template(
+            details = IssueMessageBuilder.invalid_field_name_mismatch_template(
                 name_miss, list(template_schema_names)
             )
-            self._add_central_issue(severity=Severity.warning, message=issue_msg)
+            self._add_central_issue(severity=Severity.warning, details=details)
 
     def _validate_types_match(self, value, schema: dict) -> bool:
         # suppress error if there is no "schema" in schema

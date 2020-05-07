@@ -17,7 +17,7 @@ class CommonHandler(AbstractBaseEventsHandler):
     Handles messages as they are read from egress event hub.
     Use this handler if you aren't sure which handler is right for you.
 
-    Keyword Args:
+    Args:
         device_id       (str)   only process messages sent by this device
         devices         (list)  only process messages sent by these devices
         pnp_context     (bool)  interpret the device as being a pnp device
@@ -27,25 +27,34 @@ class CommonHandler(AbstractBaseEventsHandler):
         output          (str)   output format (json, yaml, etc)
     """
 
-    def __init__(self, **kwargs):
+    def __init__(
+        self,
+        device_id: str,
+        devices: list,
+        pnp_context: bool,
+        interface_name: str,
+        content_type: str,
+        properties: list,
+        output: str,
+    ):
         super(CommonHandler, self).__init__()
-        self.device_id = kwargs.get("device_id")
-        self.devices = kwargs.get("devices")
-        self.pnp_context = kwargs.get("pnp_context")
-        self.interface_name = kwargs.get("interface_name")
-        self.content_type = kwargs.get("content_type")
-        self.properties = kwargs.get("properties")
-        self.output = kwargs.get("output")
+        self.device_id = device_id
+        self.devices = devices
+        self.pnp_context = pnp_context
+        self.interface_name = interface_name
+        self.content_type = content_type
+        self.properties = properties
+        self.output = output
 
-    def parse_message(self, msg):
+    def parse_message(self, message):
         parser = CommonParser()
-        device_id = parser.parse_device_id(msg)
+        device_id = parser.parse_device_id(message)
 
         if not self._should_process_device(device_id, self.device_id, self.devices):
             return
 
-        parsed_msg = parser.parse_message(
-            msg,
+        parsed_message = parser.parse_message(
+            message,
             properties=self.properties,
             interface_name=self.interface_name,
             pnp_context=self.pnp_context,
@@ -53,9 +62,9 @@ class CommonHandler(AbstractBaseEventsHandler):
         )
 
         if self.output.lower() == "json":
-            dump = json.dumps(parsed_msg, indent=4)
+            dump = json.dumps(parsed_message, indent=4)
         else:
-            dump = yaml.safe_dump(parsed_msg, default_flow_style=False)
+            dump = yaml.safe_dump(parsed_message, default_flow_style=False)
 
         print(dump, flush=True)
 

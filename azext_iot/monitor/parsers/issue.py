@@ -4,7 +4,6 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-
 from enum import IntEnum
 from typing import List
 from knack.log import get_logger
@@ -19,17 +18,18 @@ class Severity(IntEnum):
 
 
 class Issue:
-    def __init__(self, severity: Severity, message: str, device_id=""):
+    def __init__(self, severity: Severity, details: str, message, device_id=""):
         self.severity = severity
-        self.message = message
+        self.details = details
         self.device_id = device_id
+        self.message = str(message)
 
         if not self.device_id:
             self.device_id = "Unknown"
 
     def log(self):
         to_log = "[{}] [DeviceId: {}] {}".format(
-            self.severity.name.upper(), self.device_id, self.message
+            self.severity.name.upper(), self.device_id, self.details
         )
 
         self._log(to_log)
@@ -44,10 +44,17 @@ class Issue:
         if self.severity == Severity.error:
             logger.error(to_log)
 
+    def json_repr(self):
+        json_repr = vars(self)
+        json_repr["severity"] = self.severity.name
+        return json_repr
+
 
 class CentralIssue(Issue):
-    def __init__(self, severity: Severity, message: str, device_id="", template_id=""):
-        super(CentralIssue, self).__init__(severity, message, device_id)
+    def __init__(
+        self, severity: Severity, details: str, message, device_id="", template_id=""
+    ):
+        super(CentralIssue, self).__init__(severity, details, message, device_id)
         self.template_id = template_id
 
         if not self.template_id:
@@ -55,7 +62,7 @@ class CentralIssue(Issue):
 
     def log(self):
         to_log = "[{}] [DeviceId: {}] [TemplateId: {}] {}".format(
-            self.severity.name.upper(), self.device_id, self.template_id, self.message
+            self.severity.name.upper(), self.device_id, self.template_id, self.details
         )
 
         self._log(to_log)
@@ -65,13 +72,23 @@ class IssueHandler:
     def __init__(self):
         self._issues = []
 
-    def add_issue(self, severity: Severity, message: str, device_id=""):
-        self._issues.append(Issue(severity, message, device_id))
+    def add_issue(self, severity: Severity, details: str, message, device_id=""):
+        issue = Issue(
+            severity=severity, details=details, message=message, device_id=device_id
+        )
+        self._issues.append(issue)
 
     def add_central_issue(
-        self, severity: Severity, message: str, device_id="", template_id=""
+        self, severity: Severity, details: str, message, device_id="", template_id=""
     ):
-        self._issues.append(CentralIssue(severity, message, device_id, template_id))
+        issue = CentralIssue(
+            severity=severity,
+            details=details,
+            message=message,
+            device_id=device_id,
+            template_id=template_id,
+        )
+        self._issues.append(issue)
 
     def get_all_issues(self) -> List[Issue]:
         return self._issues
@@ -126,12 +143,12 @@ SUPPORTED_MESSAGE_HEADERS = []
 
 class IssueMessageBuilder:
     @staticmethod
-    def unknown_device_id(message):
-        return "Device ID not found in message: {}".format(message)
+    def unknown_device_id():
+        return "Device ID not found in message".format()
 
     @staticmethod
-    def invalid_json(raw_payload: str):
-        return "Invalid JSON format. Raw Payload: {}".format(raw_payload)
+    def invalid_json():
+        return "Invalid JSON format.".format()
 
     @staticmethod
     def invalid_encoding(encoding: str):
@@ -161,7 +178,7 @@ class IssueMessageBuilder:
         )
 
     @staticmethod
-    def invalid_custom_headers(payload: str):
+    def invalid_custom_headers():
         return (
             "Custom message headers are not supported in IoT Central. "
             "All the custom message headers will be dropped. "
@@ -202,16 +219,16 @@ class IssueMessageBuilder:
         )
 
     @staticmethod
-    def invalid_system_properties(message: object):
-        return "Failed to parse system_properties for message: {}.".format(message)
+    def invalid_system_properties():
+        return "Failed to parse system properties.".format()
 
     @staticmethod
-    def invalid_encoding_none_found(message: object):
-        return "No encoding found for message: {}.".format(message)
+    def invalid_encoding_none_found():
+        return "No encoding found.".format()
 
     @staticmethod
     def invalid_encoding_missing(system_properties: dict):
-        return "Content type not found in system_properties. System_properties: {}.".format(
+        return "Content type not found in system properties. System properties: {}.".format(
             system_properties
         )
 

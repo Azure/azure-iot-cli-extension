@@ -17,8 +17,8 @@ class CentralHandler(CommonHandler):
     """
     Handles messages as they are read from egress event hub.
 
-    Keyword Args:
-        timeout             (int)       Maximum duration to keep listening for events. Use 0 "forever". Defaults to 0.
+    Args:
+        time_range          (int)       Maximum duration to keep listening for events. Use 0 "forever". Defaults to 0.
         max_messages        (int)       Maximum number of messages to read. Use 0 "forever". Defaults to 0.
         progress_interval   (int)       number of messages to wait between printing progress. Defaults to 5.
         minimum_severity    (Severity)  minimum severity for reporting issues. Defaults to Severity.warning.
@@ -27,32 +27,50 @@ class CentralHandler(CommonHandler):
         output              (str)       output format (json, yaml, etc)
     """
 
-    def __init__(self, central_device_provider: CentralDeviceProvider, **kwargs):
-        super(CentralHandler, self).__init__(**kwargs)
-        self.central_device_provider = central_device_provider
+    def __init__(
+        self,
+        device_id: str,
+        content_type: str,
+        properties: list,
+        output: str,
+        central_device_provider: CentralDeviceProvider,
+        time_range: int,
+        max_messages: int,
+        minimum_severity: Severity,
+    ):
+        super(CentralHandler, self).__init__(
+            device_id=device_id,
+            content_type=content_type,
+            properties=properties,
+            output=output,
+            devices=None,
+            pnp_context=None,
+            interface_name=None,
+        )
+        self._progress_interval = 1
+        self._central_device_provider = central_device_provider
 
-        self.timeout = kwargs.get("timeout") or 0
-        self.max_messages = kwargs.get("max_messages") or 0
-        self.progress_interval = kwargs.get("progress_interval") or 5
-        self.minimum_severity = kwargs.get("minimum_severity") or Severity.warning
+        self._time_range = time_range
+        self._max_messages = max_messages
+        self._minimum_severity = minimum_severity
 
         self.messages = []
         self.issues: List[Issue] = []
 
-        if self.timeout:
+        if self._time_range:
             loop = get_loop()
             # the monitor takes a few seconds to start
-            loop.call_later(self.timeout + 5, self._quit_on_timeout)
+            loop.call_later(self._time_range + 5, self._quit_on_time_range)
 
-    def validate_message(self, msg):
-        parser = CentralParser(self.central_device_provider)
-        device_id = parser.parse_device_id(msg)
+    def validate_message(self, message):
+        parser = CentralParser(self._central_device_provider)
+        device_id = parser.parse_device_id(message)
 
         if not self._should_process_device(device_id, self.device_id, self.devices):
             return
 
-        parsed_msg = parser.parse_message(
-            msg,
+        parsed_message = parser.parse_message(
+            message,
             properties=self.properties,
             interface_name=self.interface_name,
             pnp_context=self.pnp_context,
@@ -60,21 +78,21 @@ class CentralHandler(CommonHandler):
         )
 
         issues = parser.issues_handler.get_issues_with_minimum_severity(
-            self.minimum_severity
+            self._minimum_severity
         )
 
         self.issues.extend(issues)
 
-        self.messages.append(parsed_msg)
+        self.messages.append(parsed_message)
         processed_messages_count = len(self.messages)
-        if (processed_messages_count % self.progress_interval) == 0:
+        if (processed_messages_count % self._progress_interval) == 0:
             print(
                 "Processed {} messages...".format(processed_messages_count), flush=True
             )
 
-        if self.max_messages and processed_messages_count >= self.max_messages:
+        if self._max_messages and processed_messages_count >= self._max_messages:
             message = "Successfully parsed {} message(s). Processing and displaying results.".format(
-                self.max_messages
+                self._max_messages
             )
             print(message, flush=True)
             self.print_results()
@@ -87,8 +105,32 @@ class CentralHandler(CommonHandler):
             print("No errors detected after parsing {} message(s).".format(message_len))
             return
 
-        for issue in self.issues:
-            issue.log()
+        issues = [issue.json_repr() for issue in self.issues]
+
+        if self.output.lower() == "json":
+            import json
+
+            output = json.dumps(issues, indent=4)
+            print(output)
+            return
+
+        if self.output.lower() == "yaml":
+            import yaml
+
+            output = yaml.safe_dump(issues, default_flow_style=False)
+            print(output)
+            return
+
+        if self.output.lower() == "tsv":
+            import csv
+            import sys
+
+            fieldnames = ["severity", "details", "message", "device_id", "template_id"]
+            writer = csv.DictWriter(sys.stdout, fieldnames=fieldnames)
+            writer.writeheader()
+            for issue in issues:
+                writer.writerow(issue)
+            return
 
     def generate_startup_string(self, name: str):
         device_filter_text = ""
@@ -96,24 +138,24 @@ class CentralHandler(CommonHandler):
             device_filter_text = ".\nFiltering on device: {}".format(self.device_id)
 
         exit_text = ""
-        if self.timeout and self.max_messages:
+        if self._time_range and self._max_messages:
             exit_text = ".\nExiting after {} second(s), or {} message(s) have been parsed (whichever happens first).".format(
-                self.timeout, self.max_messages
+                self._time_range, self._max_messages
             )
-        elif self.timeout:
-            exit_text = ".\nExiting after {} second(s).".format(self.timeout)
-        elif self.max_messages:
+        elif self._time_range:
+            exit_text = ".\nExiting after {} second(s).".format(self._time_range)
+        elif self._max_messages:
             exit_text = ".\nExiting after parsing {} message(s).".format(
-                self.max_messages
+                self._max_messages
             )
 
         result = "{} telemetry{}{}".format(name, device_filter_text, exit_text)
 
         return result
 
-    def _quit_on_timeout(self):
+    def _quit_on_time_range(self):
         message = "{} second(s) have elapsed. Processing and displaying results.".format(
-            self.timeout
+            self._time_range
         )
         print(message, flush=True)
         self.print_results()
