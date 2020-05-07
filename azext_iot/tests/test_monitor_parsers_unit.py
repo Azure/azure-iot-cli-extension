@@ -11,7 +11,8 @@ import pytest
 from uamqp.message import Message, MessageProperties
 from azext_iot.central.providers import CentralDeviceProvider
 from azext_iot.monitor.parsers import common_parser, central_parser
-from azext_iot.monitor.parsers.issue import Severity, IssueMessageBuilder
+from azext_iot.monitor.parsers import strings
+from azext_iot.monitor.parsers.issue import Severity
 from .helpers import load_json
 from .test_constants import FileNames
 
@@ -162,12 +163,10 @@ class TestCommonParser:
         payload = str(encoded_payload, "utf8")
         assert parsed_msg["event"]["payload"] == payload
 
-        expected_details = IssueMessageBuilder.invalid_encoding_none_found()
+        expected_details = strings.invalid_encoding_none_found()
         _validate_issues(parser, Severity.error, 2, 1, [expected_details])
 
-        expected_details = IssueMessageBuilder.invalid_content_type(
-            self.bad_content_type
-        )
+        expected_details = strings.invalid_content_type(self.bad_content_type)
         _validate_issues(parser, Severity.warning, 2, 1, [expected_details])
 
     def test_parse_message_bad_encoding_should_fail(self):
@@ -191,7 +190,7 @@ class TestCommonParser:
             content_type=None,
         )
 
-        expected_details = IssueMessageBuilder.invalid_encoding(self.bad_encoding)
+        expected_details = strings.invalid_encoding(self.bad_encoding)
         _validate_issues(parser, Severity.error, 1, 1, [expected_details])
 
     def test_parse_message_bad_json_should_fail(self):
@@ -219,7 +218,7 @@ class TestCommonParser:
         # parsing should attempt to place raw payload into result even if parsing fails
         assert parsed_msg["event"]["payload"] == self.bad_payload
 
-        expected_details = IssueMessageBuilder.invalid_json()
+        expected_details = strings.invalid_json()
         _validate_issues(parser, Severity.error, 1, 1, [expected_details])
 
     def test_parse_message_pnp_should_fail(self):
@@ -254,7 +253,7 @@ class TestCommonParser:
         assert parsed_msg["event"]["origin"] == self.device_id
         assert parsed_msg["event"]["interface"] == actual_interface_name
 
-        expected_details = IssueMessageBuilder.invalid_interface_name_mismatch(
+        expected_details = strings.invalid_interface_name_mismatch(
             expected_interface_name, actual_interface_name
         )
         _validate_issues(parser, Severity.warning, 1, 1, [expected_details])
@@ -306,10 +305,10 @@ class TestCentralParser:
         # parsing should attempt to place raw payload into result even if parsing fails
         assert parsed_msg["event"]["payload"] == self.bad_field_name
 
-        expected_details_1 = IssueMessageBuilder.invalid_field_name(
+        expected_details_1 = strings.invalid_field_name(
             list(self.bad_field_name.keys())
         )
-        expected_details_2 = IssueMessageBuilder.invalid_field_name_mismatch_template(
+        expected_details_2 = strings.invalid_field_name_mismatch_template(
             list(self.bad_field_name.keys()), list(schema.keys())
         )
         _validate_issues(
@@ -353,7 +352,7 @@ class TestCentralParser:
         assert properties["system"]["content_type"] == self.content_type
         assert properties["application"] == self.app_properties
 
-        expected_details = IssueMessageBuilder.invalid_field_name_mismatch_template(
+        expected_details = strings.invalid_field_name_mismatch_template(
             list(self.bad_dcm_payload.keys()), list(schema.keys())
         )
 
@@ -387,7 +386,7 @@ class TestCentralParser:
         assert parsed_msg["event"]["payload"] == self.bad_dcm_payload
         assert parsed_msg["event"]["origin"] == self.device_id
 
-        expected_details = IssueMessageBuilder.invalid_template_extract_schema_failed(
+        expected_details = strings.invalid_template_extract_schema_failed(
             device_template
         )
 
@@ -425,7 +424,7 @@ class TestCentralParser:
         field_name = list(self.type_mismatch_payload.keys())[0]
         data = list(self.type_mismatch_payload.values())[0]
         data_type = "boolean"
-        expected_details = IssueMessageBuilder.invalid_primitive_schema_mismatch_template(
+        expected_details = strings.invalid_primitive_schema_mismatch_template(
             field_name, data_type, data
         )
         _validate_issues(parser, Severity.warning, 1, 1, [expected_details])

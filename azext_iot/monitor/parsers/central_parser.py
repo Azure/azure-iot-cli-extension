@@ -10,7 +10,8 @@ from uamqp.message import Message
 
 from azext_iot.common.utility import ISO8601Validator
 from azext_iot.central.providers import CentralDeviceProvider
-from azext_iot.monitor.parsers.issue import Severity, IssueMessageBuilder
+from azext_iot.monitor.parsers import strings
+from azext_iot.monitor.parsers.issue import Severity
 from azext_iot.monitor.parsers.common_parser import CommonParser
 
 ios_validator = ISO8601Validator()
@@ -65,7 +66,7 @@ class CentralParser(CommonParser):
             if not re.search(regex, field_name)
         ]
         if invalid_field_names:
-            details = IssueMessageBuilder.invalid_field_name(invalid_field_names)
+            details = strings.invalid_field_name(invalid_field_names)
             self._add_issue(severity=Severity.warning, details=details)
 
     # Dynamic validations should need data external to the payload
@@ -99,7 +100,7 @@ class CentralParser(CommonParser):
                 self._device_id
             )
         except Exception as e:
-            details = IssueMessageBuilder.device_template_not_found(e)
+            details = strings.device_template_not_found(e)
             self._add_central_issue(severity=Severity.error, details=details)
 
     def _extract_template_schemas_from_template(self, template: dict):
@@ -113,9 +114,7 @@ class CentralParser(CommonParser):
                 schemas.extend(contents)
             return {schema["name"]: schema for schema in schemas}
         except Exception:
-            details = IssueMessageBuilder.invalid_template_extract_schema_failed(
-                template
-            )
+            details = strings.invalid_template_extract_schema_failed(template)
             self._add_central_issue(severity=Severity.error, details=details)
 
     # currently validates:
@@ -134,13 +133,13 @@ class CentralParser(CommonParser):
             is_dict = isinstance(schema, dict)
             if is_dict and not self._validate_types_match(value, schema):
                 expected_type = str(schema.get("schema"))
-                details = IssueMessageBuilder.invalid_primitive_schema_mismatch_template(
+                details = strings.invalid_primitive_schema_mismatch_template(
                     name, expected_type, value
                 )
                 self._add_central_issue(severity=Severity.warning, details=details)
 
         if name_miss:
-            details = IssueMessageBuilder.invalid_field_name_mismatch_template(
+            details = strings.invalid_field_name_mismatch_template(
                 name_miss, list(template_schema_names)
             )
             self._add_central_issue(severity=Severity.warning, details=details)

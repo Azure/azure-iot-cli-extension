@@ -11,7 +11,8 @@ from uamqp.message import Message
 
 from azext_iot.common.utility import parse_entity, unicode_binary_map
 from azext_iot.monitor.base_classes import AbstractBaseParser
-from azext_iot.monitor.parsers.issue import Severity, IssueHandler, IssueMessageBuilder
+from azext_iot.monitor.parsers import strings
+from azext_iot.monitor.parsers.issue import Severity, IssueHandler
 
 DEVICE_ID_IDENTIFIER = b"iothub-connection-device-id"
 INTERFACE_NAME_IDENTIFIER = b"iothub-interface-name"
@@ -98,7 +99,7 @@ class CommonParser(AbstractBaseParser):
         try:
             return str(message.annotations.get(DEVICE_ID_IDENTIFIER), "utf8")
         except Exception:
-            details = IssueMessageBuilder.unknown_device_id()
+            details = strings.unknown_device_id()
             self._add_issue(severity=Severity.error, details=details)
             return ""
 
@@ -112,11 +113,11 @@ class CommonParser(AbstractBaseParser):
                 message.annotations.get(INTERFACE_NAME_IDENTIFIER), "utf8"
             )
         except Exception:
-            details = IssueMessageBuilder.invalid_interface_name_not_found()
+            details = strings.invalid_interface_name_not_found()
             self._add_issue(severity=Severity.error, details=details)
 
         if expected_interface_name != actual_interface_name:
-            details = IssueMessageBuilder.invalid_interface_name_mismatch(
+            details = strings.invalid_interface_name_mismatch(
                 expected_interface_name, actual_interface_name
             )
             self._add_issue(severity=Severity.warning, details=details)
@@ -127,7 +128,7 @@ class CommonParser(AbstractBaseParser):
         try:
             return unicode_binary_map(parse_entity(message.properties, True))
         except Exception:
-            details = IssueMessageBuilder.invalid_system_properties()
+            details = strings.invalid_system_properties()
             self._add_issue(severity=Severity.error, details=details)
             return {}
 
@@ -138,12 +139,12 @@ class CommonParser(AbstractBaseParser):
             content_encoding = system_properties["content_encoding"]
 
         if not content_encoding:
-            details = IssueMessageBuilder.invalid_encoding_none_found()
+            details = strings.invalid_encoding_none_found()
             self._add_issue(severity=Severity.error, details=details)
             return None
 
         if "utf-8" not in content_encoding.lower():
-            details = IssueMessageBuilder.invalid_encoding(content_encoding.lower())
+            details = strings.invalid_encoding(content_encoding.lower())
             self._add_issue(severity=Severity.error, details=details)
             return None
 
@@ -157,7 +158,7 @@ class CommonParser(AbstractBaseParser):
             content_type = system_properties["content_type"]
 
         if not content_type:
-            details = IssueMessageBuilder.invalid_encoding_missing(system_properties)
+            details = strings.invalid_encoding_missing(system_properties)
             self._add_issue(severity=Severity.error, details=details)
 
         return content_type
@@ -166,7 +167,7 @@ class CommonParser(AbstractBaseParser):
         try:
             return unicode_binary_map(message.annotations)
         except Exception:
-            details = IssueMessageBuilder.invalid_annotations(message)
+            details = strings.invalid_annotations(message)
             self._add_issue(severity=Severity.error, details=details)
             return {}
 
@@ -174,7 +175,7 @@ class CommonParser(AbstractBaseParser):
         try:
             return unicode_binary_map(message.application_properties)
         except Exception:
-            details = IssueMessageBuilder.invalid_application_properties(message)
+            details = strings.invalid_application_properties(message)
             self._add_issue(severity=Severity.error, details=details)
             return {}
 
@@ -186,7 +187,7 @@ class CommonParser(AbstractBaseParser):
             payload = str(next(data), "utf8")
 
         if "application/json" not in content_type.lower():
-            details = IssueMessageBuilder.invalid_content_type(content_type.lower())
+            details = strings.invalid_content_type(content_type.lower())
             self._add_issue(severity=Severity.warning, details=details)
         else:
             try:
@@ -194,7 +195,7 @@ class CommonParser(AbstractBaseParser):
                 payload_no_white_space = re.compile(regex).sub("", payload)
                 payload = json.loads(payload_no_white_space)
             except Exception:
-                details = IssueMessageBuilder.invalid_json()
+                details = strings.invalid_json()
                 self._add_issue(severity=Severity.error, details=details)
 
         return payload
