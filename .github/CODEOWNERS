@@ -1,4 +1,11 @@
 # This is a comment.
 # Each line is a file pattern followed by one or more owners.
 
+# Global Code Owner(s)
 *   @digimaun
+
+# Central Code Owner(s)
+azext_iot/central/   @prbans
+
+# Monitor Code Owner(s)
+azext_iot/monitor/   @prbans @digimaun
