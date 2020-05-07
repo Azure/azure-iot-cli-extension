@@ -4,12 +4,10 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import time
-
 from typing import List
 
 from azext_iot.central.providers.device_provider import CentralDeviceProvider
-from azext_iot.monitor.utility import stop_monitor
+from azext_iot.monitor.utility import stop_monitor, get_loop
 from azext_iot.monitor.handlers.common_handler import CommonHandler
 from azext_iot.monitor.parsers.central_parser import CentralParser
 from azext_iot.monitor.parsers.issue import Severity, Issue
@@ -18,42 +16,33 @@ from azext_iot.monitor.parsers.issue import Severity, Issue
 class CentralHandler(CommonHandler):
     """
     Handles messages as they are read from egress event hub.
-    Use this handler if you aren't sure which handler is right for you.
-    Check CommonHandler (parent) for more kwargs.
 
     Keyword Args:
-        abs_timeout         (int)       max run time for monitor in seconds. Use 0 for infinite. Defaults to 0.
-        max_messages        (int)       max number of messages to validate. Use 0 for infinite. Defaults to 0.
+        timeout             (int)       Maximum duration to keep listening for events. Use 0 "forever". Defaults to 0.
+        max_messages        (int)       Maximum number of messages to read. Use 0 "forever". Defaults to 0.
         progress_interval   (int)       number of messages to wait between printing progress. Defaults to 5.
         minimum_severity    (Severity)  minimum severity for reporting issues. Defaults to Severity.warning.
+        device_id           (str)       only process messages sent by this device
+        properties          (list)      list of properties to extract from message headers
+        output              (str)       output format (json, yaml, etc)
     """
 
     def __init__(self, central_device_provider: CentralDeviceProvider, **kwargs):
         super(CentralHandler, self).__init__(**kwargs)
         self.central_device_provider = central_device_provider
 
-        self.abs_timeout = kwargs.get("abs_timeout")
-        self.max_messages = kwargs.get("max_messages")
-        self.progress_interval = kwargs.get("progress_interval")
-        self.minimum_severity = kwargs.get("minimum_severity")
-
-        if not self.abs_timeout:
-            self.abs_timeout = 0
-
-        if not self.max_messages:
-            self.max_messages = 10
-
-        if not self.progress_interval or self.progress_interval < 1:
-            self.progress_interval = 5
-
-        if not self.minimum_severity:
-            self.minimum_severity = Severity.warning
-
-        print("Validation settings: {}".format(vars(self)))
+        self.timeout = kwargs.get("timeout") or 0
+        self.max_messages = kwargs.get("max_messages") or 0
+        self.progress_interval = kwargs.get("progress_interval") or 5
+        self.minimum_severity = kwargs.get("minimum_severity") or Severity.warning
 
         self.messages = []
         self.issues: List[Issue] = []
-        self.start = time.time()
+
+        if self.timeout:
+            loop = get_loop()
+            # the monitor takes a few seconds to start
+            loop.call_later(self.timeout + 5, self._quit_on_timeout)
 
     def validate_message(self, msg):
         parser = CentralParser(self.central_device_provider)
@@ -83,14 +72,11 @@ class CentralHandler(CommonHandler):
                 "Processed {} messages...".format(processed_messages_count), flush=True
             )
 
-        end = time.time()
-        if self.abs_timeout and (end - self.start) >= self.abs_timeout:
-            print("Exiting due to timeout.", flush=True)
-            self.print_results()
-            stop_monitor()
-
         if self.max_messages and processed_messages_count >= self.max_messages:
-            print("Exiting due to message count reached.", flush=True)
+            message = "Successfully parsed {} message(s). Processing and displaying results.".format(
+                self.max_messages
+            )
+            print(message, flush=True)
             self.print_results()
             stop_monitor()
 
@@ -98,8 +84,35 @@ class CentralHandler(CommonHandler):
         message_len = len(self.messages)
 
         if not self.issues:
-            print("No errors detected after parsing {} messages!".format(message_len))
+            print("No errors detected after parsing {} message(s).".format(message_len))
             return
 
         for issue in self.issues:
             issue.log()
+
+    def generate_startup_string(self, name: str):
+        device_filter_text = ""
+        if self.device_id:
+            device_filter_text = "Filtering on device: {}".format(self.device_id)
+
+        exit_text = ""
+        if self.timeout and self.max_messages:
+            exit_text = "Exiting after {} second(s), or {} message(s) have been parsed (whichever happens first).".format(
+                self.timeout, self.max_messages
+            )
+        elif self.timeout:
+            exit_text = "Exiting after {} second(s).".format(self.timeout)
+        elif self.max_messages:
+            exit_text = "Exiting after parsing {} message(s).".format(self.max_messages)
+
+        result = "{} telemetry.\n{}.\n{}".format(name, device_filter_text, exit_text)
+
+        return result
+
+    def _quit_on_timeout(self):
+        message = "{} second(s) have elapsed. Processing and displaying results.".format(
+            self.timeout
+        )
+        print(message, flush=True)
+        self.print_results()
+        stop_monitor()

@@ -8,9 +8,18 @@
 CLI parameter definitions.
 """
 
+from knack.arguments import CLIArgumentType, CaseInsensitiveList
+
 from azure.cli.core.commands.parameters import get_three_state_flag, get_enum_type
 from azext_iot.central.models.enum import DeviceStatus
+from azext_iot.monitor.parsers.issue import Severity
 from azext_iot._params import event_msg_prop_type
+
+severity_type = CLIArgumentType(
+    options_list=["--minimum-severity"],
+    choices=CaseInsensitiveList([sev.name for sev in Severity]),
+    help="Minimum severity of issue required for reporting.",
+)
 
 
 def load_central_arguments(self, _):
@@ -20,6 +29,14 @@ def load_central_arguments(self, _):
     with self.argument_context("iot central app") as context:
         context.argument("app_id", options_list=["--app-id"], help="Target App.")
         context.argument("properties", arg_type=event_msg_prop_type)
+        context.argument("minimum_severity", arg_type=severity_type)
+        context.argument(
+            "max_messages",
+            options_list=["--max-messages", "--mm"],
+            type=int,
+            help="Maximum number of messages to recieve from target device before terminating connection. "
+            "Use 0 for infinity.",
+        )
         context.argument(
             "instance_of",
             options_list=["--instance-of"],
@@ -87,7 +104,7 @@ def load_deprecated_iotcentral_params(self, _):
             "timeout",
             options_list=["--timeout", "--to", "-t"],
             type=int,
-            help="Maximum seconds to maintain connection without receiving message. Use 0 for infinity. ",
+            help="Maximum seconds to maintain connection. Use 0 for infinity. ",
         )
         context.argument(
             "consumer_group",
