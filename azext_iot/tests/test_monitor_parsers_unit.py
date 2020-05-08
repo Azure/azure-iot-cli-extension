@@ -149,10 +149,7 @@ class TestCommonParser:
 
         # act
         parsed_msg = parser.parse_message(
-            message=message,
-            interface_name=None,
-            properties=None,
-            content_type=None,
+            message=message, interface_name=None, properties=None, content_type=None,
         )
 
         # verify
@@ -180,10 +177,7 @@ class TestCommonParser:
 
         # act
         parser.parse_message(
-            message=message,
-            interface_name=None,
-            properties=None,
-            content_type=None,
+            message=message, interface_name=None, properties=None, content_type=None,
         )
 
         expected_details = strings.invalid_encoding(self.bad_encoding)
@@ -203,10 +197,7 @@ class TestCommonParser:
 
         # act
         parsed_msg = parser.parse_message(
-            message=message,
-            interface_name=None,
-            properties=None,
-            content_type=None,
+            message=message, interface_name=None, properties=None, content_type=None,
         )
 
         # verify
@@ -284,12 +275,7 @@ class TestCentralParser:
 
         # act
         parsed_msg = parser.parse_message(
-            message=message,
-            interface_name=None,
-            properties=None,
-            content_type_hint=None,
-            simulate_errors=False,
-            central_device_provider=None,
+            message=message, interface_name=None, properties=None, content_type=None,
         )
 
         schema = parser._extract_template_schemas_from_template(device_template)
@@ -325,10 +311,7 @@ class TestCentralParser:
 
         # act
         parsed_msg = parser.parse_message(
-            message=message,
-            interface_name=None,
-            properties=["all"],
-            content_type=None,
+            message=message, interface_name=None, properties=["all"], content_type=None,
         )
 
         schema = parser._extract_template_schemas_from_template(device_template)
@@ -367,10 +350,7 @@ class TestCentralParser:
 
         # act
         parsed_msg = parser.parse_message(
-            message=message,
-            interface_name=None,
-            properties=["all"],
-            content_type=None,
+            message=message, interface_name=None, properties=["all"], content_type=None,
         )
 
         # verify
@@ -400,10 +380,7 @@ class TestCentralParser:
 
         # act
         parsed_msg = parser.parse_message(
-            message=message,
-            interface_name=None,
-            properties=["all"],
-            content_type=None,
+            message=message, interface_name=None, properties=["all"], content_type=None,
         )
 
         # verify

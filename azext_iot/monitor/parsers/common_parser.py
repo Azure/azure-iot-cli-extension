@@ -28,7 +28,13 @@ class CommonParser(AbstractBaseParser):
         for issue in self.issues_handler.get_issues_with_minimum_severity(severity):
             issue.log()
 
-    def parse_message(self, message: Message, **kwargs) -> dict:
+    def parse_message(
+        self,
+        message: Message,
+        properties: list,
+        interface_name: str,
+        content_type: str,
+    ) -> dict:
         """
         Parse the message and collect errors if any occur
 
@@ -38,9 +44,6 @@ class CommonParser(AbstractBaseParser):
             content_type    (str)   assumed content type (utf-8, ascii, etc)
         """
         self._message = message
-        properties = kwargs.get("properties")
-        interface_name = kwargs.get("interface_name")
-        content_type_hint = kwargs.get("content_type")
 
         event = {}
 
@@ -54,7 +57,7 @@ class CommonParser(AbstractBaseParser):
 
         self._parse_content_encoding(message, system_properties)
 
-        content_type = self._parse_content_type(content_type_hint, system_properties)
+        content_type = self._parse_content_type(content_type, system_properties)
 
         if interface_name:
             message_interface_name = self._parse_interface_name(message, interface_name)

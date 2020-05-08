@@ -32,9 +32,18 @@ class CentralParser(CommonParser):
             template_id=self._template_id,
         )
 
-    def parse_message(self, message: Message, **kwargs) -> dict:
+    def parse_message(
+        self,
+        message: Message,
+        properties: list,
+        interface_name: str,
+        content_type: str,
+    ) -> dict:
         event_source = super(CentralParser, self).parse_message(
-            message=message, **kwargs
+            message=message,
+            properties=properties,
+            interface_name=interface_name,
+            content_type=content_type,
         )
 
         payload = event_source["event"]["payload"]

@@ -12,7 +12,7 @@ class AbstractBaseParser(ABC):
         super().__init__()
 
     @abstractmethod
-    def parse_message(self, message, **kwargs) -> dict:
+    def parse_message(self, message) -> dict:
         raise NotImplementedError()
 
     @abstractmethod
