@@ -18,7 +18,7 @@ class CentralHandler(CommonHandler):
     Handles messages as they are read from egress event hub.
 
     Args:
-        time_range          (int)       Maximum duration to keep listening for events. Use 0 "forever". Defaults to 0.
+        duration          (int)       Maximum duration to keep listening for events. Use 0 "forever". Defaults to 0.
         max_messages        (int)       Maximum number of messages to read. Use 0 "forever". Defaults to 0.
         progress_interval   (int)       number of messages to wait between printing progress. Defaults to 5.
         minimum_severity    (Severity)  minimum severity for reporting issues. Defaults to Severity.warning.
@@ -32,9 +32,9 @@ class CentralHandler(CommonHandler):
         device_id: str,
         content_type: str,
         properties: list,
-        output: str,
+        style: str,
         central_device_provider: CentralDeviceProvider,
-        time_range: int,
+        duration: int,
         max_messages: int,
         minimum_severity: Severity,
     ):
@@ -42,16 +42,17 @@ class CentralHandler(CommonHandler):
             device_id=device_id,
             content_type=content_type,
             properties=properties,
-            output=output,
+            output="json",
             devices=None,
             interface_name=None,
         )
         self._progress_interval = 5
         self._central_device_provider = central_device_provider
 
-        self._time_range = time_range
+        self._time_range = duration
         self._max_messages = max_messages
         self._minimum_severity = minimum_severity
+        self._style = style
 
         self.messages = []
         self.issues: List[Issue] = []
@@ -89,12 +90,14 @@ class CentralHandler(CommonHandler):
             )
 
         if self._max_messages and processed_messages_count >= self._max_messages:
-            message = "Successfully parsed {} message(s). Processing and displaying results.".format(
-                self._max_messages
-            )
+            message = "Successfully parsed {} message(s).".format(self._max_messages)
             print(message, flush=True)
             self.print_results()
             stop_monitor()
+
+        if self._style == "scroll":
+            [issue.log() for issue in issues]
+            return
 
     def print_results(self):
         message_len = len(self.messages)
@@ -103,23 +106,21 @@ class CentralHandler(CommonHandler):
             print("No errors detected after parsing {} message(s).".format(message_len))
             return
 
+        if self._style.lower() == "scroll":
+            return
+
+        print("Processing and displaying results.")
+
         issues = [issue.json_repr() for issue in self.issues]
 
-        if self.output.lower() == "json":
+        if self._style.lower() == "json":
             import json
 
             output = json.dumps(issues, indent=4)
             print(output)
             return
 
-        if self.output.lower() == "yaml":
-            import yaml
-
-            output = yaml.safe_dump(issues, default_flow_style=False)
-            print(output)
-            return
-
-        if self.output.lower() == "tsv":
+        if self._style.lower() == "csv":
             import csv
             import sys
 

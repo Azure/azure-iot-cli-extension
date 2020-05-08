@@ -19,7 +19,8 @@ def validate_messages(
     properties=None,
     yes=False,
     max_messages=10,
-    time_range=300,
+    duration=300,
+    style="json",
     minimum_severity=Severity.warning.name,
     central_dns_suffix="azureiotcentral.com",
 ):
@@ -36,8 +37,9 @@ def validate_messages(
         yes=yes,
         minimum_severity=Severity[minimum_severity],
         central_dns_suffix=central_dns_suffix,
-        time_range=time_range,
+        duration=duration,
         content_type=None,
+        style=style,
     )
     provider.start_validate_messages()
 
@@ -67,7 +69,8 @@ def monitor_events(
         yes=yes,
         minimum_severity=Severity.warning,
         central_dns_suffix=central_dns_suffix,
-        time_range=0,
+        duration=0,
         content_type=None,
+        style="scroll",
     )
     provider.start_monitor_events()

@@ -21,6 +21,13 @@ severity_type = CLIArgumentType(
     help="Minimum severity of issue required for reporting.",
 )
 
+style_type = CLIArgumentType(
+    options_list=["--style"],
+    choices=CaseInsensitiveList(["scroll", "json", "csv"]),
+    help="Indicate output style"
+    "scroll = deliver errors as they arrive, json = summarize results as json, csv = summarize results as json",
+)
+
 
 def load_central_arguments(self, _):
     """
@@ -87,9 +94,10 @@ def load_central_arguments(self, _):
     with self.argument_context("iot central app validate-messages") as context:
         context.argument("timeout", arg_type=event_timeout_type)
         context.argument("properties", arg_type=event_msg_prop_type)
+        context.argument("style", arg_type=style_type)
         context.argument(
-            "time_range",
-            options_list=["--time-range", "--tr"],
+            "duration",
+            options_list=["--duration", "--dr"],
             type=int,
             help="Maximum duration to receive messages from target device before terminating connection."
             "Use 0 for infinity.",

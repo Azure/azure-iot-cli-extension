@@ -52,7 +52,8 @@ class MonitorProvider:
         minimum_severity,
         central_dns_suffix,
         content_type,
-        time_range,
+        duration,
+        style,
     ):
         self._importing_allowed = False
         self._provider = CentralDeviceProvider(cmd, app_id)
@@ -65,9 +66,10 @@ class MonitorProvider:
             content_type,
             properties,
             self._provider,
-            time_range,
+            duration,
             max_messages,
             minimum_severity,
+            style,
         )
 
     def start_monitor_events(self):
@@ -136,20 +138,21 @@ class MonitorProvider:
         content_type,
         properties,
         provider,
-        time_range,
+        duration,
         max_messages,
         minimum_severity,
+        style,
     ):
         self._ensure_uamqp_import_succeeded()
         from azext_iot.monitor.handlers import CentralHandler
 
         return CentralHandler(
-            device_id,
-            content_type,
-            properties,
-            self._output,
-            provider,
-            time_range,
-            max_messages,
-            minimum_severity,
+            device_id=device_id,
+            content_type=content_type,
+            properties=properties,
+            style=style,
+            central_device_provider=provider,
+            duration=duration,
+            max_messages=max_messages,
+            minimum_severity=minimum_severity,
         )
