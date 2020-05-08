@@ -46,7 +46,7 @@ class CentralHandler(CommonHandler):
             devices=None,
             interface_name=None,
         )
-        self._progress_interval = 1
+        self._progress_interval = 5
         self._central_device_provider = central_device_provider
 
         self._time_range = time_range

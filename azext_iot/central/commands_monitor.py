@@ -18,8 +18,8 @@ def validate_messages(
     repair=False,
     properties=None,
     yes=False,
-    max_messages=0,
-    time_range=0,
+    max_messages=10,
+    time_range=300,
     minimum_severity=Severity.warning.name,
     central_dns_suffix="azureiotcentral.com",
 ):

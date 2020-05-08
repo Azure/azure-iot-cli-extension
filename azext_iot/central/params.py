@@ -13,7 +13,7 @@ from knack.arguments import CLIArgumentType, CaseInsensitiveList
 from azure.cli.core.commands.parameters import get_three_state_flag, get_enum_type
 from azext_iot.central.models.enum import DeviceStatus
 from azext_iot.monitor.parsers.issue import Severity
-from azext_iot._params import event_msg_prop_type
+from azext_iot._params import event_msg_prop_type, event_timeout_type
 
 severity_type = CLIArgumentType(
     options_list=["--minimum-severity"],
@@ -28,15 +28,7 @@ def load_central_arguments(self, _):
     """
     with self.argument_context("iot central app") as context:
         context.argument("app_id", options_list=["--app-id"], help="Target App.")
-        context.argument("properties", arg_type=event_msg_prop_type)
         context.argument("minimum_severity", arg_type=severity_type)
-        context.argument(
-            "max_messages",
-            options_list=["--max-messages", "--mm"],
-            type=int,
-            help="Maximum number of messages to recieve from target device before terminating connection. "
-            "Use 0 for infinity.",
-        )
         context.argument(
             "instance_of",
             options_list=["--instance-of"],
@@ -88,6 +80,28 @@ def load_central_arguments(self, _):
             help="Indicates filter option for device status",
         )
 
+    with self.argument_context("iot central app monitor-events") as context:
+        context.argument("timeout", arg_type=event_timeout_type)
+        context.argument("properties", arg_type=event_msg_prop_type)
+
+    with self.argument_context("iot central app validate-messages") as context:
+        context.argument("timeout", arg_type=event_timeout_type)
+        context.argument("properties", arg_type=event_msg_prop_type)
+        context.argument(
+            "time_range",
+            options_list=["--time-range", "--tr"],
+            type=int,
+            help="Maximum duration to receive messages from target device before terminating connection."
+            "Use 0 for infinity.",
+        )
+        context.argument(
+            "max_messages",
+            options_list=["--max-messages", "--mm"],
+            type=int,
+            help="Maximum number of messages to recieve from target device before terminating connection."
+            "Use 0 for infinity.",
+        )
+
     # TODO: Delete this by end of July 2020
     load_deprecated_iotcentral_params(self, _)
 
@@ -97,6 +111,7 @@ def load_deprecated_iotcentral_params(self, _):
     with self.argument_context("iotcentral") as context:
         context.argument("app_id", options_list=["--app-id"], help="Target App.")
         context.argument("properties", arg_type=event_msg_prop_type)
+        context.argument("timeout", arg_type=event_timeout_type)
         context.argument(
             "device_id", options_list=["--device-id", "-d"], help="Target Device."
         )
