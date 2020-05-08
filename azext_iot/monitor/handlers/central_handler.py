@@ -44,7 +44,6 @@ class CentralHandler(CommonHandler):
             properties=properties,
             output=output,
             devices=None,
-            pnp_context=None,
             interface_name=None,
         )
         self._progress_interval = 1
@@ -73,7 +72,6 @@ class CentralHandler(CommonHandler):
             message,
             properties=self.properties,
             interface_name=self.interface_name,
-            pnp_context=self.pnp_context,
             content_type=self.content_type,
         )
 

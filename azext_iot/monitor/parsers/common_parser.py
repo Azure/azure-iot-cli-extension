@@ -35,12 +35,10 @@ class CommonParser(AbstractBaseParser):
         Keyword Args:
             properties      (list)  list of properties to extract from message headers
             interface_name  (str)   expected interface name of pnp device
-            pnp_context     (bool)  interpret the device as being a pnp device
             content_type    (str)   assumed content type (utf-8, ascii, etc)
         """
         self._message = message
         properties = kwargs.get("properties")
-        pnp_context = kwargs.get("pnp_context")
         interface_name = kwargs.get("interface_name")
         content_type_hint = kwargs.get("content_type")
 
@@ -58,10 +56,8 @@ class CommonParser(AbstractBaseParser):
 
         content_type = self._parse_content_type(content_type_hint, system_properties)
 
-        if pnp_context:
-            message_interface_name = self._parse_interface_name(
-                message, pnp_context, interface_name
-            )
+        if interface_name:
+            message_interface_name = self._parse_interface_name(message, interface_name)
 
             event["interface"] = message_interface_name
 
@@ -103,9 +99,7 @@ class CommonParser(AbstractBaseParser):
             self._add_issue(severity=Severity.error, details=details)
             return ""
 
-    def _parse_interface_name(
-        self, message: Message, pnp_context, expected_interface_name
-    ) -> str:
+    def _parse_interface_name(self, message: Message, expected_interface_name) -> str:
         actual_interface_name = ""
 
         try:

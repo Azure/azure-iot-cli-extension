@@ -2201,7 +2201,6 @@ def iot_hub_distributed_tracing_show(
 def _iot_hub_monitor_events(
     cmd,
     interface_name=None,
-    pnp_context=None,
     hub_name=None,
     device_id=None,
     consumer_group="$Default",
@@ -2240,14 +2239,11 @@ def _iot_hub_monitor_events(
     target = hub_target_builder.EventTargetBuilder().build_iot_hub_target(target)
     target.add_consumer_group(consumer_group)
 
-    on_start_string = generate_on_start_string(
-        device_id=device_id, pnp_context=pnp_context
-    )
+    on_start_string = generate_on_start_string(device_id=device_id)
 
     handler = CommonHandler(
         device_id=device_id,
         devices=device_ids,
-        pnp_context=pnp_context,
         interface_name=interface_name,
         content_type=content_type,
         properties=properties,

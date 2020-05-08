@@ -8,13 +8,12 @@ import asyncio
 from asyncio import AbstractEventLoop
 
 
-def generate_on_start_string(device_id=None, pnp_context=None):
+def generate_on_start_string(device_id=None):
     device_filter_txt = None
     if device_id:
         device_filter_txt = " filtering on device: {},".format(device_id)
 
-    return "Starting {}event monitor,{} use ctrl-c to stop...".format(
-        "Digital Twin " if pnp_context else "",
+    return "Starting event monitor,{} use ctrl-c to stop...".format(
         device_filter_txt if device_filter_txt else "",
     )
 

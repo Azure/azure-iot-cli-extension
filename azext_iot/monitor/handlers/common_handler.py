@@ -20,7 +20,6 @@ class CommonHandler(AbstractBaseEventsHandler):
     Args:
         device_id       (str)   only process messages sent by this device
         devices         (list)  only process messages sent by these devices
-        pnp_context     (bool)  interpret the device as being a pnp device
         interface_name  (str)   expected interface name of pnp device
         content_type    (str)   assumed content type (utf-8, ascii, etc)
         properties      (list)  list of properties to extract from message headers
@@ -31,7 +30,6 @@ class CommonHandler(AbstractBaseEventsHandler):
         self,
         device_id: str,
         devices: list,
-        pnp_context: bool,
         interface_name: str,
         content_type: str,
         properties: list,
@@ -40,7 +38,6 @@ class CommonHandler(AbstractBaseEventsHandler):
         super(CommonHandler, self).__init__()
         self.device_id = device_id
         self.devices = devices
-        self.pnp_context = pnp_context
         self.interface_name = interface_name
         self.content_type = content_type
         self.properties = properties
@@ -57,7 +54,6 @@ class CommonHandler(AbstractBaseEventsHandler):
             message,
             properties=self.properties,
             interface_name=self.interface_name,
-            pnp_context=self.pnp_context,
             content_type=self.content_type,
         )
 

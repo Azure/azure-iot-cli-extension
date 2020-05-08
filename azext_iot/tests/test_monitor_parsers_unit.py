@@ -116,12 +116,10 @@ class TestCommonParser:
         parser = common_parser.CommonParser()
 
         # act
-        pnp_context = bool(interface_name)
         parsed_msg = parser.parse_message(
             message=message,
             properties=["all"],
             interface_name=interface_name,
-            pnp_context=pnp_context,
             content_type=content_type,
         )
 
@@ -152,7 +150,6 @@ class TestCommonParser:
         # act
         parsed_msg = parser.parse_message(
             message=message,
-            pnp_context=False,
             interface_name=None,
             properties=None,
             content_type=None,
@@ -184,7 +181,6 @@ class TestCommonParser:
         # act
         parser.parse_message(
             message=message,
-            pnp_context=False,
             interface_name=None,
             properties=None,
             content_type=None,
@@ -208,7 +204,6 @@ class TestCommonParser:
         # act
         parsed_msg = parser.parse_message(
             message=message,
-            pnp_context=False,
             interface_name=None,
             properties=None,
             content_type=None,
@@ -241,7 +236,6 @@ class TestCommonParser:
         # act
         parsed_msg = parser.parse_message(
             message=message,
-            pnp_context=True,
             interface_name=expected_interface_name,
             properties=None,
             content_type=None,
@@ -291,7 +285,6 @@ class TestCentralParser:
         # act
         parsed_msg = parser.parse_message(
             message=message,
-            pnp_context=False,
             interface_name=None,
             properties=None,
             content_type_hint=None,
@@ -333,7 +326,6 @@ class TestCentralParser:
         # act
         parsed_msg = parser.parse_message(
             message=message,
-            pnp_context=False,
             interface_name=None,
             properties=["all"],
             content_type=None,
@@ -376,7 +368,6 @@ class TestCentralParser:
         # act
         parsed_msg = parser.parse_message(
             message=message,
-            pnp_context=False,
             interface_name=None,
             properties=["all"],
             content_type=None,
@@ -410,7 +401,6 @@ class TestCentralParser:
         # act
         parsed_msg = parser.parse_message(
             message=message,
-            pnp_context=False,
             interface_name=None,
             properties=["all"],
             content_type=None,
