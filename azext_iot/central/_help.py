@@ -12,7 +12,7 @@ def load_central_help():
         "iot central"
     ] = """
         type: group
-        short-summary: Manage Azure Central (IoTC) solutions & infrastructure
+        short-summary: Manage Azure Central (IoT Central) solutions & infrastructure
     """
 
     helps[
@@ -41,14 +41,14 @@ def _load_central_devices_help():
         "iot central app device"
     ] = """
         type: group
-        short-summary: Manage and configure IoTC devices
+        short-summary: Manage and configure IoT Central devices
     """
 
     helps[
         "iot central app device create"
     ] = """
         type: command
-        short-summary: Create a device in IoTC
+        short-summary: Create a device in IoT Central
 
         examples:
         - name: Create a device
@@ -70,7 +70,7 @@ def _load_central_devices_help():
         "iot central app device show"
     ] = """
         type: command
-        short-summary: Get a device from IoTC
+        short-summary: Get a device from IoT Central
 
         examples:
         - name: Get a device
@@ -84,10 +84,10 @@ def _load_central_devices_help():
         "iot central app device list"
     ] = """
         type: command
-        short-summary: List all devices in IoTC
+        short-summary: List all devices in IoT Central
 
         examples:
-        - name: List all devices in IoTC
+        - name: List all devices in IoT Central
           text: >
             az iot central app device list
             --app-id {appid}
@@ -97,7 +97,7 @@ def _load_central_devices_help():
         "iot central app device delete"
     ] = """
         type: command
-        short-summary: Delete a device from IoTC
+        short-summary: Delete a device from IoT Central
 
         examples:
         - name: Delete a device
@@ -111,7 +111,7 @@ def _load_central_devices_help():
         "iot central app device registration-info"
     ] = """
         type: command
-        short-summary: Get registration info on device(s) from IoTC
+        short-summary: Get registration info on device(s) from IoT Central
         long-summary: |
             Note: This command can take a significant amount of time to return
             if no device id is specified and your app contains a lot of devices
@@ -135,14 +135,14 @@ def _load_central_device_templates_help():
         "iot central app device-template"
     ] = """
         type: group
-        short-summary: Manage and configure IoTC device templates
+        short-summary: Manage and configure IoT Central device templates
     """
 
     helps[
         "iot central app device-template create"
     ] = """
         type: command
-        short-summary: Create a device template in IoTC
+        short-summary: Create a device template in IoT Central
 
         examples:
         - name: Create a device template with payload read from a file
@@ -164,7 +164,7 @@ def _load_central_device_templates_help():
         "iot central app device-template show"
     ] = """
         type: command
-        short-summary: Get a device template from IoTC
+        short-summary: Get a device template from IoT Central
 
         examples:
         - name: Get a device template
@@ -178,7 +178,7 @@ def _load_central_device_templates_help():
         "iot central app device-template list"
     ] = """
         type: command
-        short-summary: List all device templates in IoTC
+        short-summary: List all device templates in IoT Central
 
         examples:
         - name: List all device templates
@@ -204,12 +204,12 @@ def _load_central_device_templates_help():
         "iot central app device-template delete"
     ] = """
         type: command
-        short-summary: Delete a device template from IoTC
+        short-summary: Delete a device template from IoT Central
         long-summary: |
             Note: this is expected to fail if any devices are still associated to this template.
 
         examples:
-        - name: Delete a device template from IoTC
+        - name: Delete a device template from IoT Central
           text: >
             az iot central app device-template delete
             --app-id {appid}
