@@ -15,10 +15,6 @@ class AbstractBaseParser(ABC):
     def parse_message(self, message) -> dict:
         raise NotImplementedError()
 
-    @abstractmethod
-    def parse_device_id(self, message) -> str:
-        raise NotImplementedError()
-
 
 class AbstractBaseEventsHandler(ABC):
     def __init__(self):

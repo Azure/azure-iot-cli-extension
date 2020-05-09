@@ -2235,20 +2235,27 @@ def _iot_hub_monitor_events(
     from azext_iot.monitor.handlers import CommonHandler
     from azext_iot.monitor.telemetry import start_single_monitor
     from azext_iot.monitor.utility import generate_on_start_string
+    from azext_iot.monitor.models.arguments import (
+        CommonParserArguments,
+        CommonHandlerArguments,
+    )
 
     target = hub_target_builder.EventTargetBuilder().build_iot_hub_target(target)
     target.add_consumer_group(consumer_group)
 
     on_start_string = generate_on_start_string(device_id=device_id)
 
-    handler = CommonHandler(
-        device_id=device_id,
-        devices=device_ids,
-        interface_name=interface_name,
-        content_type=content_type,
-        properties=properties,
-        output=output,
+    parser_args = CommonParserArguments(
+        properties=properties, interface_name=interface_name, content_type=content_type
     )
+    handler_args = CommonHandlerArguments(
+        output=output,
+        common_parser_args=parser_args,
+        devices=device_ids,
+        device_id=device_id,
+    )
+
+    handler = CommonHandler(handler_args)
 
     start_single_monitor(
         target=target,

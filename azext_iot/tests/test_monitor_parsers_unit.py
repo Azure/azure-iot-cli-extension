@@ -12,7 +12,8 @@ from uamqp.message import Message, MessageProperties
 from azext_iot.central.providers import CentralDeviceProvider
 from azext_iot.monitor.parsers import common_parser, central_parser
 from azext_iot.monitor.parsers import strings
-from azext_iot.monitor.parsers.issue import Severity
+from azext_iot.monitor.models.arguments import CommonParserArguments
+from azext_iot.monitor.models.enum import Severity
 from .helpers import load_json
 from .test_constants import FileNames
 
@@ -113,15 +114,13 @@ class TestCommonParser:
             },
             application_properties=_encode_app_props(app_properties),
         )
-        parser = common_parser.CommonParser()
+        args = CommonParserArguments(
+            properties=["all"], interface_name=interface_name, content_type=content_type
+        )
+        parser = common_parser.CommonParser(message=message, common_parser_args=args)
 
         # act
-        parsed_msg = parser.parse_message(
-            message=message,
-            properties=["all"],
-            interface_name=interface_name,
-            content_type=content_type,
-        )
+        parsed_msg = parser.parse_message()
 
         # verify
         assert parsed_msg["event"]["payload"] == payload
@@ -145,12 +144,11 @@ class TestCommonParser:
             properties=properties,
             annotations={common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
         )
-        parser = common_parser.CommonParser()
+        args = CommonParserArguments()
+        parser = common_parser.CommonParser(message=message, common_parser_args=args)
 
         # act
-        parsed_msg = parser.parse_message(
-            message=message, interface_name=None, properties=None, content_type=None,
-        )
+        parsed_msg = parser.parse_message()
 
         # verify
         # since the content_encoding header is not present, just dump the raw payload
@@ -173,12 +171,11 @@ class TestCommonParser:
             properties=properties,
             annotations={common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
         )
-        parser = common_parser.CommonParser()
+        args = CommonParserArguments()
+        parser = common_parser.CommonParser(message=message, common_parser_args=args)
 
         # act
-        parser.parse_message(
-            message=message, interface_name=None, properties=None, content_type=None,
-        )
+        parser.parse_message()
 
         expected_details = strings.invalid_encoding(self.bad_encoding)
         _validate_issues(parser, Severity.error, 1, 1, [expected_details])
@@ -193,12 +190,11 @@ class TestCommonParser:
             properties=properties,
             annotations={common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
         )
-        parser = common_parser.CommonParser()
+        args = CommonParserArguments()
+        parser = common_parser.CommonParser(message=message, common_parser_args=args)
 
         # act
-        parsed_msg = parser.parse_message(
-            message=message, interface_name=None, properties=None, content_type=None,
-        )
+        parsed_msg = parser.parse_message()
 
         # verify
         # parsing should attempt to place raw payload into result even if parsing fails
@@ -222,15 +218,11 @@ class TestCommonParser:
                 common_parser.INTERFACE_NAME_IDENTIFIER: actual_interface_name.encode(),
             },
         )
-        parser = common_parser.CommonParser()
+        args = CommonParserArguments(interface_name=expected_interface_name)
+        parser = common_parser.CommonParser(message=message, common_parser_args=args)
 
         # act
-        parsed_msg = parser.parse_message(
-            message=message,
-            interface_name=expected_interface_name,
-            properties=None,
-            content_type=None,
-        )
+        parsed_msg = parser.parse_message()
 
         # verify
         # all the items should still be parsed and available, but we should have an error
@@ -262,7 +254,6 @@ class TestCentralParser:
     def test_parse_message_bad_field_name_should_fail(self):
         # setup
         device_template = self._get_template()
-        parser = self._create_parser(device_template)
 
         properties = MessageProperties(
             content_encoding=self.encoding, content_type=self.content_type
@@ -272,12 +263,13 @@ class TestCentralParser:
             properties=properties,
             annotations={common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
         )
-
-        # act
-        parsed_msg = parser.parse_message(
-            message=message, interface_name=None, properties=None, content_type=None,
+        args = CommonParserArguments()
+        parser = self._create_parser(
+            device_template=device_template, message=message, args=args
         )
 
+        # act
+        parsed_msg = parser.parse_message()
         schema = parser._extract_template_schemas_from_template(device_template)
 
         # verify
@@ -297,7 +289,6 @@ class TestCentralParser:
     def test_validate_against_template_should_fail(self):
         # setup
         device_template = self._get_template()
-        parser = self._create_parser(device_template)
 
         properties = MessageProperties(
             content_encoding=self.encoding, content_type=self.content_type
@@ -308,11 +299,14 @@ class TestCentralParser:
             annotations={common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
             application_properties=_encode_app_props(self.app_properties),
         )
+        args = CommonParserArguments(properties=["all"])
+        parser = self._create_parser(
+            device_template=device_template, message=message, args=args
+        )
 
         # act
-        parsed_msg = parser.parse_message(
-            message=message, interface_name=None, properties=["all"], content_type=None,
-        )
+        parsed_msg = parser.parse_message()
+        schema = parser._extract_template_schemas_from_template(device_template)
 
         schema = parser._extract_template_schemas_from_template(device_template)
 
@@ -336,7 +330,6 @@ class TestCentralParser:
     def test_validate_against_bad_template_should_not_throw(self):
         # setup
         device_template = "an_unparseable_template"
-        parser = self._create_parser(device_template)
 
         properties = MessageProperties(
             content_encoding=self.encoding, content_type=self.content_type
@@ -347,11 +340,13 @@ class TestCentralParser:
             annotations={common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
             application_properties=_encode_app_props(self.app_properties),
         )
+        args = CommonParserArguments(properties=["all"])
+        parser = self._create_parser(
+            device_template=device_template, message=message, args=args
+        )
 
         # act
-        parsed_msg = parser.parse_message(
-            message=message, interface_name=None, properties=["all"], content_type=None,
-        )
+        parsed_msg = parser.parse_message()
 
         # verify
         assert parsed_msg["event"]["payload"] == self.bad_dcm_payload
@@ -366,7 +361,6 @@ class TestCentralParser:
     def test_type_mismatch_should_error(self):
         # setup
         device_template = self._get_template()
-        parser = self._create_parser(device_template)
 
         properties = MessageProperties(
             content_encoding=self.encoding, content_type=self.content_type
@@ -377,11 +371,13 @@ class TestCentralParser:
             annotations={common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
             application_properties=_encode_app_props(self.app_properties),
         )
+        args = CommonParserArguments(properties=["all"])
+        parser = self._create_parser(
+            device_template=device_template, message=message, args=args
+        )
 
         # act
-        parsed_msg = parser.parse_message(
-            message=message, interface_name=None, properties=["all"], content_type=None,
-        )
+        parsed_msg = parser.parse_message()
 
         # verify
         assert parsed_msg["event"]["payload"] == self.type_mismatch_payload
@@ -399,9 +395,13 @@ class TestCentralParser:
     def _get_template(self):
         return load_json(FileNames.central_device_template_file)
 
-    def _create_parser(self, device_template: dict):
+    def _create_parser(
+        self, device_template: dict, message: Message, args: CommonParserArguments
+    ):
         provider = CentralDeviceProvider(cmd=None, app_id=None)
         provider.get_device_template_by_device_id = mock.MagicMock(
             return_value=device_template
         )
-        return central_parser.CentralParser(provider)
+        return central_parser.CentralParser(
+            message=message, central_device_provider=provider, common_parser_args=args
+        )

@@ -12,43 +12,29 @@ from uamqp.message import Message
 from azext_iot.common.utility import parse_entity, unicode_binary_map
 from azext_iot.monitor.base_classes import AbstractBaseParser
 from azext_iot.monitor.parsers import strings
-from azext_iot.monitor.parsers.issue import Severity, IssueHandler
+from azext_iot.monitor.models.arguments import CommonParserArguments
+from azext_iot.monitor.models.enum import Severity
+from azext_iot.monitor.parsers.issue import IssueHandler
 
 DEVICE_ID_IDENTIFIER = b"iothub-connection-device-id"
 INTERFACE_NAME_IDENTIFIER = b"iothub-interface-name"
 
 
 class CommonParser(AbstractBaseParser):
-    def __init__(self, logger=None):
+    def __init__(self, message: Message, common_parser_args: CommonParserArguments):
         self.issues_handler = IssueHandler()
-        self._device_id = None
-        self._message = None
-
-    def write_logs(self, severity=Severity.info) -> None:
-        for issue in self.issues_handler.get_issues_with_minimum_severity(severity):
-            issue.log()
-
-    def parse_message(
-        self,
-        message: Message,
-        properties: list,
-        interface_name: str,
-        content_type: str,
-    ) -> dict:
-        """
-        Parse the message and collect errors if any occur
-
-        Keyword Args:
-            properties      (list)  list of properties to extract from message headers
-            interface_name  (str)   expected interface name of pnp device
-            content_type    (str)   assumed content type (utf-8, ascii, etc)
-        """
+        self._common_parser_args = common_parser_args
         self._message = message
+        self.device_id = self._parse_device_id(message)
+
+    def parse_message(self) -> dict:
+        message = self._message
+        properties = self._common_parser_args.properties
+        content_type = self._common_parser_args.content_type
+        interface_name = self._common_parser_args.interface_name
 
         event = {}
-
-        self._device_id = self.parse_device_id(message)
-        event["origin"] = self._device_id
+        event["origin"] = self.device_id
 
         if not properties:
             properties = []  # guard against None being passed in
@@ -91,10 +77,10 @@ class CommonParser(AbstractBaseParser):
             severity=severity,
             details=details,
             message=self._message,
-            device_id=self._device_id,
+            device_id=self.device_id,
         )
 
-    def parse_device_id(self, message: Message) -> str:
+    def _parse_device_id(self, message: Message) -> str:
         try:
             return str(message.annotations.get(DEVICE_ID_IDENTIFIER), "utf8")
         except Exception:

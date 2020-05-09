@@ -12,7 +12,7 @@ from knack.arguments import CLIArgumentType, CaseInsensitiveList
 
 from azure.cli.core.commands.parameters import get_three_state_flag, get_enum_type
 from azext_iot.central.models.enum import DeviceStatus
-from azext_iot.monitor.parsers.issue import Severity
+from azext_iot.monitor.models.enum import Severity
 from azext_iot._params import event_msg_prop_type, event_timeout_type
 
 severity_type = CLIArgumentType(
@@ -160,6 +160,15 @@ def load_deprecated_iotcentral_params(self, _):
             help="Skip user prompts. Indicates acceptance of dependency installation (if required). "
             "Used primarily for automation scenarios. Default: false",
         )
+        context.argument(
+            "central_dns_suffix",
+            options_list=["--central-dns-suffix", "--central-api-uri"],
+            help="Central dns suffix. "
+            "This enables running cli commands against non public/prod environments",
+        )
+
+    with self.argument_context("iot central device-twin") as context:
+        context.argument("app_id", options_list=["--app-id"], help="Target App.")
         context.argument(
             "central_dns_suffix",
             options_list=["--central-dns-suffix", "--central-api-uri"],

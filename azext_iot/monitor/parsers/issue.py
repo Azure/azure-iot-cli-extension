@@ -4,17 +4,12 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from enum import IntEnum
 from typing import List
 from knack.log import get_logger
 
+from azext_iot.monitor.models.enum import Severity
+
 logger = get_logger(__name__)
-
-
-class Severity(IntEnum):
-    info = 1
-    warning = 2
-    error = 3
 
 
 class Issue:

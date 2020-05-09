@@ -11,15 +11,23 @@ from uamqp.message import Message
 from azext_iot.common.utility import ISO8601Validator
 from azext_iot.central.providers import CentralDeviceProvider
 from azext_iot.monitor.parsers import strings
-from azext_iot.monitor.parsers.issue import Severity
+from azext_iot.monitor.models.arguments import CommonParserArguments
+from azext_iot.monitor.models.enum import Severity
 from azext_iot.monitor.parsers.common_parser import CommonParser
 
 ios_validator = ISO8601Validator()
 
 
 class CentralParser(CommonParser):
-    def __init__(self, central_device_provider: CentralDeviceProvider, logger=None):
-        super(CentralParser, self).__init__(logger)
+    def __init__(
+        self,
+        message: Message,
+        common_parser_args: CommonParserArguments,
+        central_device_provider: CentralDeviceProvider,
+    ):
+        super(CentralParser, self).__init__(
+            message=message, common_parser_args=common_parser_args
+        )
         self._central_device_provider = central_device_provider
         self._template_id = None
 
@@ -28,31 +36,20 @@ class CentralParser(CommonParser):
             severity=severity,
             details=details,
             message=self._message,
-            device_id=self._device_id,
+            device_id=self.device_id,
             template_id=self._template_id,
         )
 
-    def parse_message(
-        self,
-        message: Message,
-        properties: list,
-        interface_name: str,
-        content_type: str,
-    ) -> dict:
-        event_source = super(CentralParser, self).parse_message(
-            message=message,
-            properties=properties,
-            interface_name=interface_name,
-            content_type=content_type,
-        )
+    def parse_message(self) -> dict:
+        parsed_message = super(CentralParser, self).parse_message()
 
-        payload = event_source["event"]["payload"]
+        payload = parsed_message["event"]["payload"]
 
         self._perform_static_validations(payload=payload)
 
         self._perform_dynamic_validations(payload=payload)
 
-        return event_source
+        return parsed_message
 
     # Static validations should only need information present in the payload
     # i.e. there should be no need for network calls
@@ -106,7 +103,7 @@ class CentralParser(CommonParser):
     def _get_device_template(self):
         try:
             return self._central_device_provider.get_device_template_by_device_id(
-                self._device_id
+                self.device_id
             )
         except Exception as e:
             details = strings.device_template_not_found(e)
