@@ -89,7 +89,7 @@ def invalid_system_properties():
 
 
 def invalid_encoding_none_found():
-    return "No encoding found.".format()
+    return "No encoding found. Expected encoding 'utf-8' to be present in message header.".format()
 
 
 def invalid_encoding_missing(system_properties: dict):

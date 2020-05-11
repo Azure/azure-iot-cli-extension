@@ -27,7 +27,7 @@ def validate_messages(
     yes=False,
     max_messages=10,
     duration=300,
-    style="json",
+    style="scroll",
     minimum_severity=Severity.warning.name,
     central_dns_suffix="azureiotcentral.com",
 ):
