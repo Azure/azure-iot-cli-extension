@@ -69,7 +69,6 @@ class CentralHandler(CommonHandler):
 
         if self._central_handler_args.style == "scroll" and issues:
             [issue.log() for issue in issues]
-            print("\n")
 
     def generate_startup_string(self, name: str):
         device_filter_text = ""

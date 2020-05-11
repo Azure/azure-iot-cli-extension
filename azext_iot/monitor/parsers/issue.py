@@ -23,7 +23,7 @@ class Issue:
             self.device_id = "Unknown"
 
     def log(self):
-        to_log = "[{}] [DeviceId: {}] {}".format(
+        to_log = "[{}] [DeviceId: {}] {}\n".format(
             self.severity.name.upper(), self.device_id, self.details
         )
 
@@ -56,7 +56,7 @@ class CentralIssue(Issue):
             self.template_id = "Unknown"
 
     def log(self):
-        to_log = "[{}] [DeviceId: {}] [TemplateId: {}] {}".format(
+        to_log = "[{}] [DeviceId: {}] [TemplateId: {}] {}\n".format(
             self.severity.name.upper(), self.device_id, self.template_id, self.details
         )
 
