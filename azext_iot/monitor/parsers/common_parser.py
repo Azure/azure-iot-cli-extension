@@ -44,10 +44,9 @@ class CommonParser(AbstractBaseParser):
         self._parse_content_encoding(message, system_properties)
 
         content_type = self._parse_content_type(content_type, system_properties)
+        message_interface_name = self._parse_interface_name(message)
 
         if interface_name:
-            message_interface_name = self._parse_interface_name(message, interface_name)
-
             event["interface"] = message_interface_name
 
         if properties:
@@ -88,7 +87,7 @@ class CommonParser(AbstractBaseParser):
             self._add_issue(severity=Severity.error, details=details)
             return ""
 
-    def _parse_interface_name(self, message: Message, expected_interface_name) -> str:
+    def _parse_interface_name(self, message: Message) -> str:
         actual_interface_name = ""
 
         try:
@@ -96,14 +95,7 @@ class CommonParser(AbstractBaseParser):
                 message.annotations.get(INTERFACE_NAME_IDENTIFIER), "utf8"
             )
         except Exception:
-            details = strings.invalid_interface_name_not_found()
-            self._add_issue(severity=Severity.error, details=details)
-
-        if expected_interface_name != actual_interface_name:
-            details = strings.invalid_interface_name_mismatch(
-                expected_interface_name, actual_interface_name
-            )
-            self._add_issue(severity=Severity.warning, details=details)
+            pass
 
         return actual_interface_name
 
@@ -112,7 +104,7 @@ class CommonParser(AbstractBaseParser):
             return unicode_binary_map(parse_entity(message.properties, True))
         except Exception:
             details = strings.invalid_system_properties()
-            self._add_issue(severity=Severity.error, details=details)
+            self._add_issue(severity=Severity.warning, details=details)
             return {}
 
     def _parse_content_encoding(self, message: Message, system_properties) -> str:
@@ -123,12 +115,12 @@ class CommonParser(AbstractBaseParser):
 
         if not content_encoding:
             details = strings.invalid_encoding_none_found()
-            self._add_issue(severity=Severity.error, details=details)
+            self._add_issue(severity=Severity.warning, details=details)
             return None
 
         if "utf-8" not in content_encoding.lower():
             details = strings.invalid_encoding(content_encoding.lower())
-            self._add_issue(severity=Severity.error, details=details)
+            self._add_issue(severity=Severity.warning, details=details)
             return None
 
         return content_encoding
@@ -141,8 +133,8 @@ class CommonParser(AbstractBaseParser):
             content_type = system_properties["content_type"]
 
         if not content_type:
-            details = strings.invalid_encoding_missing(system_properties)
-            self._add_issue(severity=Severity.error, details=details)
+            details = strings.invalid_encoding_missing()
+            self._add_issue(severity=Severity.warning, details=details)
 
         return content_type
 
@@ -150,16 +142,16 @@ class CommonParser(AbstractBaseParser):
         try:
             return unicode_binary_map(message.annotations)
         except Exception:
-            details = strings.invalid_annotations(message)
-            self._add_issue(severity=Severity.error, details=details)
+            details = strings.invalid_annotations()
+            self._add_issue(severity=Severity.warning, details=details)
             return {}
 
     def _parse_application_properties(self, message: Message):
         try:
             return unicode_binary_map(message.application_properties)
         except Exception:
-            details = strings.invalid_application_properties(message)
-            self._add_issue(severity=Severity.error, details=details)
+            details = strings.invalid_application_properties()
+            self._add_issue(severity=Severity.warning, details=details)
             return {}
 
     def _parse_payload(self, message: Message, content_type):
