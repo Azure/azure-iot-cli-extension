@@ -60,7 +60,7 @@ class CentralDeviceProvider:
 
     def get_device_template_by_device_id(
         self, device_id, central_dns_suffix="azureiotcentral.com",
-    ):
+    ) -> dict:
         from azext_iot.central.providers import CentralDeviceTemplateProvider
 
         if not device_id:
@@ -103,7 +103,7 @@ class CentralDeviceProvider:
             raise CLIError("Device id must be specified.")
 
         if device_id in self._devices:
-            raise CLIError("Device already exists")
+            raise CLIError("Device already exists.")
 
         device = central_services.device.create_device(
             cmd=self._cmd,
@@ -161,7 +161,7 @@ class CentralDeviceProvider:
 
         if not credentials:
             raise CLIError(
-                "Could not find device credentials for device '{}'".format(device_id)
+                "Could not find device credentials for device '{}'.".format(device_id)
             )
 
         # add to cache
@@ -204,10 +204,10 @@ class CentralDeviceProvider:
 
     def dps_populate_essential_info(self, dps_info, device_status):
         error = {
-            "provisioned": "None",
-            "registered": "Device it not yet provisioned.",
-            "blocked": "Device is blocked by admin",
-            "unassociated": "Device does not have a valid template associated with it",
+            "provisioned": "None.",
+            "registered": "Device is not yet provisioned.",
+            "blocked": "Device is blocked by admin.",
+            "unassociated": "Device does not have a valid template associated with it.",
         }
 
         filtered_dps_info = {

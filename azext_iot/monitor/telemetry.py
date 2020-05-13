@@ -13,6 +13,7 @@ from knack.log import get_logger
 from typing import List
 from azext_iot.constants import VERSION, USER_AGENT
 from azext_iot.monitor.models.target import Target
+from azext_iot.monitor.utility import get_loop
 
 logger = get_logger(__name__)
 DEBUG = False
@@ -61,10 +62,7 @@ def start_multiple_monitors(
         for target in targets
     ]
 
-    loop = asyncio.get_event_loop()
-    if loop.is_closed():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+    loop = get_loop()
 
     future = asyncio.gather(*coroutines, loop=loop, return_exceptions=True)
     result = None

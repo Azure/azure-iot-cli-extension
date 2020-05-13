@@ -13,7 +13,6 @@ from azext_iot import (
     iotdps_ops,
     iotdigitaltwin_ops,
     iotpnp_ops,
-    iotcentral_ops,
 )
 
 
@@ -163,49 +162,6 @@ def load_command_table(self, _):
         cmd_group.command("list", "iot_dps_registration_list")
         cmd_group.command("show", "iot_dps_registration_get")
         cmd_group.command("delete", "iot_dps_registration_delete")
-
-    with self.command_group(
-        "iotcentral",
-        command_type=iotcentral_ops,
-        deprecate_info=self.deprecate(redirect="iot central", hide=True),
-    ) as cmd_group:
-        pass
-
-    with self.command_group("iotcentral app", command_type=iotcentral_ops) as cmd_group:
-        cmd_group.command(
-            "monitor-events", "iot_central_monitor_events",
-        )
-
-    with self.command_group(
-        "iotcentral device-twin", command_type=iotcentral_ops
-    ) as cmd_group:
-        cmd_group.command(
-            "show", "iot_central_device_show",
-        )
-
-    with self.command_group(
-        "iot central app", command_type=iotcentral_ops
-    ) as cmd_group:
-        cmd_group.command("monitor-events", "iot_central_monitor_events")
-        cmd_group.command(
-            "validate-messages", "iot_central_validate_messages", is_preview=True
-        )
-
-    with self.command_group(
-        "iot central device-twin", command_type=iotcentral_ops
-    ) as cmd_group:
-        cmd_group.command(
-            "show",
-            "iot_central_device_show",
-            deprecate_info=self.deprecate(
-                redirect="iot central app device-twin", hide=True
-            ),
-        )
-
-    with self.command_group(
-        "iot central app device-twin", command_type=iotcentral_ops
-    ) as cmd_group:
-        cmd_group.command("show", "iot_central_device_show")
 
     with self.command_group(
         "iot dt", command_type=iotdigitaltwin_ops, is_preview=True

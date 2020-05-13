@@ -246,7 +246,7 @@ def get_iot_dps_connection_string(
     return result
 
 
-def get_iot_central_tokens(cmd, app_id, central_api_uri):
+def get_iot_central_tokens(cmd, app_id, central_dns_suffix):
     import requests
 
     aad_token = get_aad_token(cmd, resource="https://apps.azureiotcentral.com")[
@@ -254,7 +254,7 @@ def get_iot_central_tokens(cmd, app_id, central_api_uri):
     ]
 
     url = "https://{}.{}/system/iothubs/generateSasTokens".format(
-        app_id, central_api_uri
+        app_id, central_dns_suffix
     )
     response = requests.post(
         url, headers={"Authorization": "Bearer {}".format(aad_token)}

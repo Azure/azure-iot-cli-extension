@@ -65,7 +65,7 @@ class TestIotCentral(LiveScenarioTest):
         (device_id, _) = self._create_device(instance_of=template_id, simulated=True)
 
         # wait about a few seconds for simulator to kick in so that provisioning completes
-        time.sleep(10)
+        time.sleep(60)
 
         self.cmd(
             "iotcentral device-twin show --app-id {} --device-id {}".format(

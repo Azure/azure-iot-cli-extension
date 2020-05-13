@@ -9,7 +9,8 @@ import pytest
 
 from knack.util import CLIError
 from azure.cli.core.mock import DummyCli
-from azext_iot.operations import central as subject
+from azext_iot.central import commands_device_twin
+from azext_iot.central import commands_monitor
 from azext_iot.common.shared import SdkType
 from azext_iot.central.providers import (
     CentralDeviceProvider,
@@ -40,7 +41,7 @@ def fixture_bind_sdk(mocker):
         def get_twin(self, device_id):
             return device_twin_result
 
-    mock = mocker.patch("azext_iot.operations.central._bind_sdk")
+    mock = mocker.patch("azext_iot.central.commands_device_twin._bind_sdk")
     mock.return_value = (mock_service_sdk(), None)
     return mock
 
@@ -132,7 +133,7 @@ class TestDeviceTwinShow:
     def test_device_twin_show_calls_get_twin(
         self, fixture_bind_sdk, fixture_cmd, fixture_get_iot_central_tokens
     ):
-        result = subject.iot_central_device_show(fixture_cmd, device_id, app_id)
+        result = commands_device_twin.device_twin_show(fixture_cmd, device_id, app_id)
 
         # Ensure get_twin is called and result is returned
         assert result is device_twin_result
@@ -147,7 +148,7 @@ class TestMonitorEvents:
     @pytest.mark.parametrize("timeout, exception", [(-1, CLIError)])
     def test_monitor_events_invalid_args(self, timeout, exception, fixture_cmd):
         with pytest.raises(exception):
-            subject.iot_central_monitor_events(fixture_cmd, app_id, timeout=timeout)
+            commands_monitor.monitor_events(fixture_cmd, app_id, timeout=timeout)
 
 
 class TestCentralDeviceProvider:
