@@ -24,8 +24,6 @@ iotdps_ops = CliCommandType(
     client_factory=iot_service_provisioning_factory,
 )
 
-iotcentral_ops = CliCommandType(operations_tmpl="azext_iot.operations.central#{}")
-
 iotdigitaltwin_ops = CliCommandType(
     operations_tmpl="azext_iot.operations.digitaltwin#{}"
 )

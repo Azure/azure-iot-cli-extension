@@ -587,8 +587,6 @@ class TestDTMonitorEvents(object):
 
         monitor_events_args = fixture_monitor_events_entrypoint.call_args[1]
 
-        assert monitor_events_args["pnp_context"]
-
         dt_attribute_set = [
             "device_id",
             "device_query",

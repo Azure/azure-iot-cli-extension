@@ -9,21 +9,17 @@ import mock
 import pytest
 
 from knack.util import CLIError
-from uamqp.message import Message, MessageProperties
 from azure.cli.core.extension import get_extension_path
-from azext_iot.central.providers import CentralDeviceProvider
 from azext_iot.common.utility import (
     validate_min_python_version,
     process_json_arg,
     read_file_content,
     logger,
+    ISO8601Validator,
 )
 from azext_iot.common.deps import ensure_uamqp
 from azext_iot.constants import EVENT_LIB, EXTENSION_NAME
-from azext_iot.operations.events3 import _parser
 from azext_iot._validators import mode2_iot_login_handler
-from .helpers import load_json
-from .test_constants import FileNames
 
 
 class TestMinPython(object):
@@ -284,379 +280,68 @@ class TestProcessJsonArg(object):
         assert mocked_util_logger.call_count == 0
 
 
-class TestEvents3Parser:
-    device_id = "some-device-id"
-    payload = {"String": "someValue"}
-    encoding = "UTF-8"
-    content_type = "application/json"
+# none of these are valid anything in ISO 8601
+BAD_ARRAY = ["asd", "", 123.4, 123, True, False]
 
-    bad_encoding = "ascii"
-    bad_payload = "bad-payload"
-    bad_field_name = {"violates-regex": "someValue"}
-    bad_content_type = "bad-content-type"
 
-    bad_dcm_payload = {"temperature": "someValue"}
+class TestISO8601Validator:
+    validator = ISO8601Validator()
 
-    def test_parse_message_should_succeed(self):
-        # setup
-        app_prop_type = "some_property"
-        app_prop_value = "some_value"
-        properties = MessageProperties(
-            content_encoding=self.encoding, content_type=self.content_type
-        )
-        message = Message(
-            body=json.dumps(self.payload).encode(),
-            properties=properties,
-            annotations={_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
-            application_properties={app_prop_type.encode(): app_prop_value.encode()},
-        )
-        parser = _parser.Event3Parser()
+    # Success suite
+    @pytest.mark.parametrize(
+        "to_validate", ["20200101", "20200101Z", "2020-01-01", "2020-01-01Z"]
+    )
+    def test_is_iso8601_date_pass(self, to_validate):
+        result = self.validator.is_iso8601_date(to_validate)
+        assert result
 
-        device_template = load_json(FileNames.central_device_template_file)
-        provider = CentralDeviceProvider(cmd=None, app_id=None)
-        provider.get_device_template_by_device_id = mock.MagicMock(
-            return_value=device_template
-        )
+    @pytest.mark.parametrize(
+        "to_validate",
+        [
+            "20200101T00:00:00",
+            "20200101T000000",
+            "2020-01-01T00:00:00",
+            "2020-01-01T00:00:00Z",
+            "2020-01-01T00:00:00.00",
+            "2020-01-01T00:00:00.00Z",
+            "2020-01-01T00:00:00.00+08:30",
+        ],
+    )
+    def test_is_iso8601_datetime_pass(self, to_validate):
+        result = self.validator.is_iso8601_datetime(to_validate)
+        assert result
 
-        # act
-        parsed_msg = parser.parse_message(
-            message=message,
-            pnp_context=False,
-            interface_name=None,
-            properties={"all"},
-            content_type_hint=None,
-            simulate_errors=False,
-            central_device_provider=provider,
-        )
+    @pytest.mark.parametrize("to_validate", ["P32DT7.592380349524318S", "P32DT7S"])
+    def test_is_iso8601_duration_pass(self, to_validate):
+        result = self.validator.is_iso8601_duration(to_validate)
+        assert result
 
-        # verify
-        assert parsed_msg["event"]["payload"] == self.payload
-        assert parsed_msg["event"]["origin"] == self.device_id
-        device_identifier = str(_parser.DEVICE_ID_IDENTIFIER, "utf8")
-        assert parsed_msg["event"]["annotations"][device_identifier] == self.device_id
+    @pytest.mark.parametrize(
+        "to_validate", ["00:00:00+08:30", "00:00:00Z", "00:00:00.123Z"]
+    )
+    def test_is_iso8601_time_pass(self, to_validate):
+        result = self.validator.is_iso8601_time(to_validate)
+        assert result
 
-        properties = parsed_msg["event"]["properties"]
-        assert properties["system"]["content_encoding"] == self.encoding
-        assert properties["system"]["content_type"] == self.content_type
-        assert properties["application"][app_prop_type] == app_prop_value
+    # Failure suite
+    @pytest.mark.parametrize(
+        "to_validate", ["2020-13-35", *BAD_ARRAY],
+    )
+    def test_is_iso8601_date_fail(self, to_validate):
+        result = self.validator.is_iso8601_date(to_validate)
+        assert not result
 
-        assert len(parser._errors) == 0
-        assert len(parser._warnings) == 0
-        assert len(parser._info) == 0
+    @pytest.mark.parametrize("to_validate", ["2020-13-35", "2020-00-00T", *BAD_ARRAY])
+    def test_is_iso8601_datetime_fail(self, to_validate):
+        result = self.validator.is_iso8601_datetime(to_validate)
+        assert not result
 
-    def test_parse_message_pnp_should_succeed(self):
-        # setup
-        interface_name = "interface_name"
-        properties = MessageProperties(
-            content_encoding=self.encoding, content_type=self.content_type
-        )
-        message = Message(
-            body=json.dumps(self.payload).encode(),
-            properties=properties,
-            annotations={
-                _parser.DEVICE_ID_IDENTIFIER: self.device_id.encode(),
-                _parser.INTERFACE_NAME_IDENTIFIER: interface_name.encode(),
-            },
-        )
-        parser = _parser.Event3Parser()
+    @pytest.mark.parametrize("to_validate", ["2020-01", *BAD_ARRAY])
+    def test_is_iso8601_duration_fail(self, to_validate):
+        result = self.validator.is_iso8601_duration(to_validate)
+        assert not result
 
-        # act
-        parsed_msg = parser.parse_message(
-            message=message,
-            pnp_context=True,
-            interface_name=interface_name,
-            properties=None,
-            content_type_hint=None,
-            simulate_errors=False,
-            central_device_provider=None,
-        )
-
-        # verify
-        assert parsed_msg["event"]["payload"] == self.payload
-        assert parsed_msg["event"]["origin"] == self.device_id
-        assert parsed_msg["event"]["interface"] == interface_name
-
-        assert len(parser._errors) == 0
-        assert len(parser._warnings) == 0
-        assert len(parser._info) == 0
-
-    def test_parse_message_bad_content_type_should_warn(self):
-        # setup
-        encoded_payload = json.dumps(self.payload).encode()
-        properties = MessageProperties(content_type=self.bad_content_type)
-        message = Message(
-            body=encoded_payload,
-            properties=properties,
-            annotations={_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
-        )
-        parser = _parser.Event3Parser()
-
-        # act
-        parsed_msg = parser.parse_message(
-            message=message,
-            pnp_context=False,
-            interface_name=None,
-            properties=None,
-            content_type_hint=None,
-            simulate_errors=False,
-            central_device_provider=None,
-        )
-
-        # verify
-        # since the content_encoding header is not present, just dump the raw payload
-        assert parsed_msg["event"]["payload"] == str(encoded_payload, "utf8")
-
-        assert len(parser._errors) == 1
-        assert len(parser._warnings) == 1
-        assert len(parser._info) == 0
-
-        warning = parser._warnings[0]
-        assert "Content type not supported." in warning
-        assert self.bad_content_type in warning
-        assert "application/json" in warning
-        assert self.device_id in warning
-
-        error = parser._errors[0]
-        assert "No encoding found for message" in error
-
-    def test_parse_message_bad_encoding_should_fail(self):
-        # setup
-        properties = MessageProperties(
-            content_encoding=self.bad_encoding, content_type=self.content_type
-        )
-        message = Message(
-            body=json.dumps(self.payload).encode(self.bad_encoding),
-            properties=properties,
-            annotations={_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
-        )
-        parser = _parser.Event3Parser()
-
-        # act
-        parser.parse_message(
-            message=message,
-            pnp_context=False,
-            interface_name=None,
-            properties=None,
-            content_type_hint=None,
-            simulate_errors=False,
-            central_device_provider=None,
-        )
-
-        assert len(parser._errors) == 1
-        assert len(parser._warnings) == 0
-        assert len(parser._info) == 0
-
-        errors = parser._errors[0]
-        assert "Unsupported encoding detected: '{}'".format(self.bad_encoding) in errors
-
-    def test_parse_message_bad_json_should_fail(self):
-        # setup
-        properties = MessageProperties(
-            content_encoding=self.encoding, content_type=self.content_type
-        )
-        message = Message(
-            body=self.bad_payload.encode(),
-            properties=properties,
-            annotations={_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
-        )
-        parser = _parser.Event3Parser()
-
-        # act
-        parsed_msg = parser.parse_message(
-            message=message,
-            pnp_context=False,
-            interface_name=None,
-            properties=None,
-            content_type_hint=None,
-            simulate_errors=False,
-            central_device_provider=None,
-        )
-
-        # verify
-        # parsing should attempt to place raw payload into result even if parsing fails
-        assert parsed_msg["event"]["payload"] == self.bad_payload
-
-        assert len(parser._errors) == 1
-        assert len(parser._warnings) == 0
-        assert len(parser._info) == 0
-
-        errors = parser._errors[0]
-        assert "Invalid JSON format." in errors
-        assert self.device_id in errors
-        assert self.bad_payload in errors
-
-    def test_parse_message_bad_field_name_should_fail(self):
-        # setup
-        properties = MessageProperties(
-            content_encoding=self.encoding, content_type=self.content_type
-        )
-        message = Message(
-            body=json.dumps(self.bad_field_name).encode(),
-            properties=properties,
-            annotations={_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
-        )
-        parser = _parser.Event3Parser()
-
-        # act
-        parsed_msg = parser.parse_message(
-            message=message,
-            pnp_context=False,
-            interface_name=None,
-            properties=None,
-            content_type_hint=None,
-            simulate_errors=False,
-            central_device_provider=None,
-        )
-
-        # verify
-        # parsing should attempt to place raw payload into result even if parsing fails
-        assert parsed_msg["event"]["payload"] == self.bad_field_name
-
-        assert len(parser._errors) == 1
-        assert len(parser._warnings) == 0
-        assert len(parser._info) == 0
-
-        errors = parser._errors[0]
-        assert "The following field names are not allowed" in errors
-        assert "{}".format(next(iter(self.bad_field_name))) in errors
-        assert str(self.bad_field_name) in errors
-        assert self.device_id in errors
-
-    def test_parse_message_pnp_should_fail(self):
-        # setup
-        actual_interface_name = "actual_interface_name"
-        expected_interface_name = "expected_interface_name"
-        properties = MessageProperties(
-            content_encoding=self.encoding, content_type=self.content_type
-        )
-        message = Message(
-            body=json.dumps(self.payload).encode(),
-            properties=properties,
-            annotations={
-                _parser.DEVICE_ID_IDENTIFIER: self.device_id.encode(),
-                _parser.INTERFACE_NAME_IDENTIFIER: actual_interface_name.encode(),
-            },
-        )
-        parser = _parser.Event3Parser()
-
-        # act
-        parsed_msg = parser.parse_message(
-            message=message,
-            pnp_context=True,
-            interface_name=expected_interface_name,
-            properties=None,
-            content_type_hint=None,
-            simulate_errors=False,
-            central_device_provider=None,
-        )
-
-        # verify
-        # all the items should still be parsed and available, but we should have an error
-        assert parsed_msg["event"]["payload"] == self.payload
-        assert parsed_msg["event"]["origin"] == self.device_id
-        assert parsed_msg["event"]["interface"] == actual_interface_name
-
-        assert len(parser._errors) == 1
-        assert len(parser._warnings) == 0
-        assert len(parser._info) == 0
-
-        actual_error = parser._errors[0]
-        expected_error = "Inteface name mismatch. {}. Expected: {}, Actual: {}".format(
-            self.device_id, expected_interface_name, actual_interface_name
-        )
-        assert actual_error == expected_error
-
-    def test_validate_against_template_should_fail(self):
-        # setup
-        app_prop_type = "some_property"
-        app_prop_value = "some_value"
-        properties = MessageProperties(
-            content_encoding=self.encoding, content_type=self.content_type
-        )
-        message = Message(
-            body=json.dumps(self.bad_dcm_payload).encode(),
-            properties=properties,
-            annotations={_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
-            application_properties={app_prop_type.encode(): app_prop_value.encode()},
-        )
-        parser = _parser.Event3Parser()
-
-        device_template = load_json(FileNames.central_device_template_file)
-        provider = CentralDeviceProvider(cmd=None, app_id=None)
-        provider.get_device_template_by_device_id = mock.MagicMock(
-            return_value=device_template
-        )
-
-        # act
-        parsed_msg = parser.parse_message(
-            message=message,
-            pnp_context=False,
-            interface_name=None,
-            properties={"all"},
-            content_type_hint=None,
-            simulate_errors=False,
-            central_device_provider=provider,
-        )
-
-        # verify
-        assert parsed_msg["event"]["payload"] == self.bad_dcm_payload
-        assert parsed_msg["event"]["origin"] == self.device_id
-        device_identifier = str(_parser.DEVICE_ID_IDENTIFIER, "utf8")
-        assert parsed_msg["event"]["annotations"][device_identifier] == self.device_id
-
-        properties = parsed_msg["event"]["properties"]
-        assert properties["system"]["content_encoding"] == self.encoding
-        assert properties["system"]["content_type"] == self.content_type
-        assert properties["application"][app_prop_type] == app_prop_value
-
-        assert len(parser._errors) == 1
-        assert len(parser._warnings) == 0
-        assert len(parser._info) == 0
-
-        actual_error = parser._errors[0]
-        expected_error = "Telemetry item '{}' is not present in DCM.".format(
-            list(self.bad_dcm_payload)[0]
-        )
-        assert expected_error in actual_error
-
-    def test_validate_against_bad_template_should_not_throw(self):
-        # setup
-        app_prop_type = "some_property"
-        app_prop_value = "some_value"
-        properties = MessageProperties(
-            content_encoding=self.encoding, content_type=self.content_type
-        )
-        message = Message(
-            body=json.dumps(self.bad_dcm_payload).encode(),
-            properties=properties,
-            annotations={_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
-            application_properties={app_prop_type.encode(): app_prop_value.encode()},
-        )
-        parser = _parser.Event3Parser()
-
-        provider = CentralDeviceProvider(cmd=None, app_id=None)
-        provider.get_device_template_by_device_id = mock.MagicMock(
-            return_value="an_unparseable_template"
-        )
-
-        # act
-        parsed_msg = parser.parse_message(
-            message=message,
-            pnp_context=False,
-            interface_name=None,
-            properties={"all"},
-            content_type_hint=None,
-            simulate_errors=False,
-            central_device_provider=provider,
-        )
-
-        # verify
-        assert parsed_msg["event"]["payload"] == self.bad_dcm_payload
-        assert parsed_msg["event"]["origin"] == self.device_id
-
-        assert len(parser._errors) == 1
-        assert len(parser._warnings) == 0
-        assert len(parser._info) == 0
-
-        actual_error = parser._errors[0]
-        assert "Unable to extract device schema for device" in actual_error
+    @pytest.mark.parametrize("to_validate", [*BAD_ARRAY])
+    def test_is_iso8601_time_fail(self, to_validate):
+        result = self.validator.is_iso8601_time(to_validate)
+        assert not result

@@ -1984,7 +1984,6 @@ class TestMonitorEvents:
             "repair",
         ]
 
-        assert "pnp_context" not in monitor_events_args
         assert "interface" not in monitor_events_args
 
         for attribute in attribute_set:

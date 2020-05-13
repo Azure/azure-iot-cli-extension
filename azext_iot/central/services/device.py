@@ -8,7 +8,10 @@
 import requests
 
 from knack.util import CLIError
+from typing import List
+
 from azext_iot.central.services import _utility
+from azext_iot.central.models.device import Device
 
 BASE_PATH = "api/preview/devices"
 
@@ -19,7 +22,7 @@ def get_device(
     device_id: str,
     token: str,
     central_dns_suffix="azureiotcentral.com",
-) -> dict:
+) -> Device:
     """
     Get device info given a device id
 
@@ -39,12 +42,13 @@ def get_device(
     headers = _utility.get_headers(token, cmd)
 
     response = requests.get(url, headers=headers)
-    return _utility.try_extract_result(response)
+    result = _utility.try_extract_result(response)
+    return Device(result)
 
 
 def list_devices(
-    cmd, app_id: str, token: str, central_dns_suffix="azureiotcentral.com",
-) -> list:
+    cmd, app_id: str, token: str, max_pages=1, central_dns_suffix="azureiotcentral.com",
+) -> List[Device]:
     """
     Get a list of all devices in IoTC app
 
@@ -59,17 +63,25 @@ def list_devices(
         list of devices
     """
 
+    devices = []
+
     url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
     headers = _utility.get_headers(token, cmd)
 
-    response = requests.get(url, headers=headers)
+    pages_processed = 0
+    while (pages_processed <= max_pages) and url:
+        response = requests.get(url, headers=headers)
+        result = _utility.try_extract_result(response)
 
-    result = _utility.try_extract_result(response)
+        if "value" not in result:
+            raise CLIError("Value is not present in body: {}".format(result))
 
-    if "value" not in result:
-        raise CLIError("Value is not present in body: {}".format(result))
+        devices = devices + [Device(device) for device in result["value"]]
 
-    return result["value"]
+        url = result.get("nextLink")
+        pages_processed = pages_processed + 1
+
+    return devices
 
 
 def create_device(
@@ -81,7 +93,7 @@ def create_device(
     simulated: bool,
     token: str,
     central_dns_suffix="azureiotcentral.com",
-) -> dict:
+) -> Device:
     """
     Create a device in IoTC
 
@@ -115,7 +127,8 @@ def create_device(
         payload["instanceOf"] = instance_of
 
     response = requests.put(url, headers=headers, json=payload)
-    return _utility.try_extract_result(response)
+    result = _utility.try_extract_result(response)
+    return Device(result)
 
 
 def delete_device(

@@ -6,7 +6,10 @@
 
 from knack.util import CLIError
 from knack.log import get_logger
+from typing import List
 from azext_iot.central import services as central_services
+from azext_iot.central.models.enum import DeviceStatus
+from azext_iot.central.models.device import Device
 from azext_iot.dps.services import global_service as dps_global_service
 
 logger = get_logger(__name__)
@@ -35,7 +38,7 @@ class CentralDeviceProvider:
 
     def get_device(
         self, device_id, central_dns_suffix="azureiotcentral.com",
-    ):
+    ) -> Device:
         if not device_id:
             raise CLIError("Device id must be specified.")
         # get or add to cache
@@ -57,15 +60,14 @@ class CentralDeviceProvider:
 
     def get_device_template_by_device_id(
         self, device_id, central_dns_suffix="azureiotcentral.com",
-    ):
+    ) -> dict:
         from azext_iot.central.providers import CentralDeviceTemplateProvider
 
         if not device_id:
             raise CLIError("Device id must be specified.")
 
         device = self.get_device(device_id, central_dns_suffix)
-        instance_of = device.get("instanceOf")
-        if not instance_of:
+        if not device.instance_of:
             raise CLIError(
                 "Device '{}' does not have a corresponding device template.".format(
                     device_id
@@ -74,20 +76,18 @@ class CentralDeviceProvider:
 
         template = CentralDeviceTemplateProvider.get_device_template(
             self=self,
-            device_template_id=instance_of,
+            device_template_id=device.instance_of,
             central_dns_suffix=central_dns_suffix,
         )
         return template
 
-    def list_devices(
-        self, central_dns_suffix="azureiotcentral.com",
-    ):
+    def list_devices(self, central_dns_suffix="azureiotcentral.com") -> List[Device]:
         devices = central_services.device.list_devices(
             cmd=self._cmd, app_id=self._app_id, token=self._token
         )
 
         # add to cache
-        self._devices.update({device["id"]: device for device in devices})
+        self._devices.update({device.id: device for device in devices})
 
         return self._devices
 
@@ -98,12 +98,12 @@ class CentralDeviceProvider:
         instance_of=None,
         simulated=False,
         central_dns_suffix="azureiotcentral.com",
-    ):
+    ) -> Device:
         if not device_id:
             raise CLIError("Device id must be specified.")
 
         if device_id in self._devices:
-            raise CLIError("Device already exists")
+            raise CLIError("Device already exists.")
 
         device = central_services.device.create_device(
             cmd=self._cmd,
@@ -120,13 +120,13 @@ class CentralDeviceProvider:
             raise CLIError("No device found with id: '{}'.".format(device_id))
 
         # add to cache
-        self._devices[device["id"]] = device
+        self._devices[device.id] = device
 
         return device
 
     def delete_device(
         self, device_id, central_dns_suffix="azureiotcentral.com",
-    ):
+    ) -> dict:
         if not device_id:
             raise CLIError("Device id must be specified.")
 
@@ -148,7 +148,7 @@ class CentralDeviceProvider:
 
     def get_device_credentials(
         self, device_id, central_dns_suffix="azureiotcentral.com",
-    ):
+    ) -> dict:
         credentials = self._device_credentials.get(device_id)
 
         if not credentials:
@@ -161,7 +161,7 @@ class CentralDeviceProvider:
 
         if not credentials:
             raise CLIError(
-                "Could not find device credentials for device '{}'".format(device_id)
+                "Could not find device credentials for device '{}'.".format(device_id)
             )
 
         # add to cache
@@ -170,11 +170,19 @@ class CentralDeviceProvider:
         return credentials
 
     def get_device_registration_info(
-        self, device_id, central_dns_suffix="azureiotcentral.com",
-    ):
+        self,
+        device_id,
+        device_status: DeviceStatus,
+        central_dns_suffix="azureiotcentral.com",
+    ) -> dict:
+        dps_state = {}
         info = self._device_registration_info.get(device_id)
 
-        if not info:
+        if info:
+            return info
+
+        device = self.get_device(device_id)
+        if device.device_status == DeviceStatus.provisioned:
             credentials = self.get_device_credentials(
                 device_id=device_id, central_dns_suffix=central_dns_suffix
             )
@@ -183,31 +191,58 @@ class CentralDeviceProvider:
             dps_state = dps_global_service.get_registration_state(
                 id_scope=id_scope, key=key, device_id=device_id
             )
-            central_info = self.get_device(device_id)
-            info = {
-                "@device_id": device_id,
-                "dps_state": dps_state,
-                "central_info": central_info,
-            }
+        dps_state = self.dps_populate_essential_info(dps_state, device.device_status)
+        info = {
+            "@device_id": device_id,
+            "dps_state": dps_state,
+            "device_info": device,
+        }
 
         self._device_registration_info[device_id] = info
 
         return info
 
-    def get_all_registration_info(self, central_dns_suffix="azureiotcentral.com"):
+    def dps_populate_essential_info(self, dps_info, device_status):
+        error = {
+            "provisioned": "None.",
+            "registered": "Device is not yet provisioned.",
+            "blocked": "Device is blocked by admin.",
+            "unassociated": "Device does not have a valid template associated with it.",
+        }
+
+        filtered_dps_info = {
+            "status": dps_info.get("status"),
+            "error": error.get(device_status),
+        }
+        return filtered_dps_info
+
+    def get_all_registration_info(
+        self, device_status, central_dns_suffix="azureiotcentral.com"
+    ):
+
         logger.warning("This command may take a long time to complete execution.")
         devices = self.list_devices(central_dns_suffix=central_dns_suffix)
-        real_devices = [
-            device for device in devices.values() if not device["simulated"]
-        ]
-        if len(devices) != len(real_devices):
+
+        real_devices = [device for device in devices.values() if not device.simulated]
+
+        filtered_devices = real_devices
+
+        if device_status:
+            filtered_devices = [
+                device
+                for device in real_devices
+                if device.device_status == device_status
+            ]
+
+        if len(devices) != len(filtered_devices):
             logger.warning(
-                "Getting registration info for following devices. "
-                "All other devices are simulated. "
-                "{}".format([device["id"] for device in real_devices])
+                "Getting registration info for real devices. "
+                "{}".format([device.id for device in filtered_devices])
             )
+
         result = [
-            self.get_device_registration_info(device["id"]) for device in real_devices
+            self.get_device_registration_info(device.id, device.device_status)
+            for device in filtered_devices
         ]
 
         return result
