@@ -20,7 +20,12 @@ class TelemetryArguments:
         yes: bool,
     ):
         (enqueued_time, unique_properties, timeout_ms, output) = init_monitoring(
-            cmd, timeout, properties, enqueued_time, repair, yes
+            cmd=cmd,
+            timeout=timeout,
+            properties=properties,
+            enqueued_time=enqueued_time,
+            repair=repair,
+            yes=yes,
         )
         self.output = output
         self.timeout = timeout_ms
@@ -30,7 +35,7 @@ class TelemetryArguments:
 
 class CommonParserArguments:
     def __init__(
-        self, properties=[], interface_name="", content_type="",
+        self, properties: list = None, interface_name="", content_type="",
     ):
         self.properties = properties or []
         self.interface_name = interface_name or ""
@@ -42,7 +47,7 @@ class CommonHandlerArguments:
         self,
         output: str,
         common_parser_args: CommonParserArguments,
-        devices=[],
+        devices: list = None,
         device_id="",
     ):
         self.output = output
