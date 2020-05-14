@@ -26,15 +26,16 @@ class CommonParser(AbstractBaseParser):
         self._common_parser_args = common_parser_args
         self._message = message
         self.device_id = self._parse_device_id(message)
+        self.interface_name = self._parse_interface_name(message)
 
     def parse_message(self) -> dict:
         message = self._message
         properties = self._common_parser_args.properties
         content_type = self._common_parser_args.content_type
-        interface_name = self._common_parser_args.interface_name
 
         event = {}
         event["origin"] = self.device_id
+        event["interface"] = self.interface_name
 
         if not properties:
             properties = []  # guard against None being passed in
@@ -44,10 +45,6 @@ class CommonParser(AbstractBaseParser):
         self._parse_content_encoding(message, system_properties)
 
         content_type = self._parse_content_type(content_type, system_properties)
-        message_interface_name = self._parse_interface_name(message)
-
-        if interface_name:
-            event["interface"] = message_interface_name
 
         if properties:
             event["properties"] = {}

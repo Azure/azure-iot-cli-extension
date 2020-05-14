@@ -2246,13 +2246,14 @@ def _iot_hub_monitor_events(
     on_start_string = generate_on_start_string(device_id=device_id)
 
     parser_args = CommonParserArguments(
-        properties=properties, interface_name=interface_name, content_type=content_type
+        properties=properties, content_type=content_type
     )
     handler_args = CommonHandlerArguments(
         output=output,
         common_parser_args=parser_args,
         devices=device_ids,
         device_id=device_id,
+        interface_name=interface_name,
     )
 
     handler = CommonHandler(handler_args)

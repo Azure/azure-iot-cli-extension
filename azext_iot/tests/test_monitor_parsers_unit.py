@@ -114,9 +114,7 @@ class TestCommonParser:
             },
             application_properties=_encode_app_props(app_properties),
         )
-        args = CommonParserArguments(
-            properties=["all"], interface_name=interface_name, content_type=content_type
-        )
+        args = CommonParserArguments(properties=["all"], content_type=content_type)
         parser = common_parser.CommonParser(message=message, common_parser_args=args)
 
         # act
