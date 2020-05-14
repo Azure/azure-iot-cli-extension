@@ -238,7 +238,6 @@ class TestCentralParser:
 
         # act
         parsed_msg = parser.parse_message()
-        schema = parser._extract_template_schemas_from_template(device_template)
 
         # verify
         # parsing should attempt to place raw payload into result even if parsing fails
