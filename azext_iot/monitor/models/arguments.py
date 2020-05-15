@@ -35,10 +35,9 @@ class TelemetryArguments:
 
 class CommonParserArguments:
     def __init__(
-        self, properties: list = None, interface_name="", content_type="",
+        self, properties: list = None, content_type="",
     ):
         self.properties = properties or []
-        self.interface_name = interface_name or ""
         self.content_type = content_type or ""
 
 
@@ -49,10 +48,12 @@ class CommonHandlerArguments:
         common_parser_args: CommonParserArguments,
         devices: list = None,
         device_id="",
+        interface_name="",
     ):
         self.output = output
         self.devices = devices or []
         self.device_id = device_id or ""
+        self.interface_name = interface_name or ""
         self.common_parser_args = common_parser_args
 
 
