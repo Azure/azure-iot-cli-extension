@@ -85,16 +85,12 @@ class CommonParser(AbstractBaseParser):
             return ""
 
     def _parse_interface_name(self, message: Message) -> str:
-        actual_interface_name = ""
-
         try:
-            actual_interface_name = str(
-                message.annotations.get(INTERFACE_NAME_IDENTIFIER), "utf8"
-            )
+            return str(message.annotations.get(INTERFACE_NAME_IDENTIFIER), "utf8")
         except Exception:
-            pass
-
-        return actual_interface_name
+            # a message not containing an interface name is expected for non-pnp devices
+            # so there's no "issue" to log here
+            return ""
 
     def _parse_system_properties(self, message: Message):
         try:
@@ -122,12 +118,13 @@ class CommonParser(AbstractBaseParser):
 
         return content_encoding
 
-    def _parse_content_type(self, content_type_hint, system_properties) -> str:
-        content_type = ""
-        if content_type_hint:
-            content_type = content_type_hint
-        elif "content_type" in system_properties:
-            content_type = system_properties["content_type"]
+    def _parse_content_type(self, content_type: str, system_properties: dict) -> str:
+        # if content type has been set, return it
+        if content_type:
+            return content_type
+
+        # otherwise attempt to parse it from system_properties
+        content_type = system_properties.get("content_type", "")
 
         if not content_type:
             details = strings.invalid_encoding_missing()
@@ -158,16 +155,27 @@ class CommonParser(AbstractBaseParser):
         if data:
             payload = str(next(data), "utf8")
 
-        if "application/json" not in content_type.lower():
-            details = strings.invalid_content_type(content_type.lower())
-            self._add_issue(severity=Severity.warning, details=details)
-        else:
-            try:
-                regex = r"(\\r\\n)+|\\r+|\\n+"
-                payload_no_white_space = re.compile(regex).sub("", payload)
-                payload = json.loads(payload_no_white_space)
-            except Exception:
-                details = strings.invalid_json()
-                self._add_issue(severity=Severity.error, details=details)
+        # Assume the payload is JSON, and try to parse it.
+        json_payload = self._try_parse_json(payload)
+
+        # Only return the parsed JSON if the header specifies the payload is application/json.
+        # Otherwise, just return the raw payload.
+        if "application/json" in content_type.lower():
+            return json_payload
+
+        details = strings.invalid_content_type(content_type.lower())
+        self._add_issue(severity=Severity.warning, details=details)
 
         return payload
+
+    def _try_parse_json(self, payload):
+        result = payload
+        try:
+            regex = r"(\\r\\n)+|\\r+|\\n+"
+            payload_no_white_space = re.compile(regex).sub("", payload)
+            result = json.loads(payload_no_white_space)
+        except Exception:
+            details = strings.invalid_json()
+            self._add_issue(severity=Severity.error, details=details)
+
+        return result
