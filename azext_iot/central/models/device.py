@@ -31,3 +31,14 @@ class Device:
             return DeviceStatus.registered
 
         return DeviceStatus.provisioned
+
+    def get_device_registration_info(self):
+        registration_info = {
+            "device_status": self.device_status.value,
+            "display_name": self.display_name,
+            "id": self.id,
+            "simulated": self.simulated,
+            "instance_of": self.instance_of,
+        }
+
+        return registration_info

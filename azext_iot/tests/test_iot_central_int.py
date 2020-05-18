@@ -190,7 +190,7 @@ class TestIotCentral(LiveScenarioTest):
             device_info_results.append(device.get("device_info"))
 
         for device in device_info_results:
-            assert device.get("deviceStatus") == device_status_expected
+            assert device.get("device_status") == device_status_expected
 
     def test_central_device_registration_info_filter_registered(self):
         device_status_expected = "registered"
@@ -213,7 +213,7 @@ class TestIotCentral(LiveScenarioTest):
             device_info_results.append(device.get("device_info"))
 
         for device in device_info_results:
-            assert device.get("deviceStatus") == device_status_expected
+            assert device.get("device_status") == device_status_expected
 
     def _create_device(self, **kwargs) -> (str, str):
         """
