@@ -39,9 +39,11 @@ def invalid_non_pnp_field_name_duplicate():
     raise NotImplementedError()
 
 
-def invalid_content_type(content_type: str):  # warning
+def content_type_mismatch(
+    actual_content_type: str, expected_content_type: str
+):  # warning
     return "Content type '{}' is not supported. Expected Content type is '{}'.".format(
-        content_type, SUPPORTED_CONTENT_TYPE
+        actual_content_type, expected_content_type
     )
 
 

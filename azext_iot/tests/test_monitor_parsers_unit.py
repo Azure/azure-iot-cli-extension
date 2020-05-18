@@ -142,19 +142,19 @@ class TestCommonParser:
             properties=properties,
             annotations={common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
         )
-        args = CommonParserArguments()
+        args = CommonParserArguments(content_type="application/json")
         parser = common_parser.CommonParser(message=message, common_parser_args=args)
 
         # act
         parsed_msg = parser.parse_message()
 
         # verify
-        # since the content_encoding header is not present, just dump the raw payload
-        payload = str(encoded_payload, "utf8")
-        assert parsed_msg["event"]["payload"] == payload
+        assert parsed_msg["event"]["payload"] == self.payload
 
         expected_details_1 = strings.invalid_encoding_none_found()
-        expected_details_2 = strings.invalid_content_type(self.bad_content_type)
+        expected_details_2 = strings.content_type_mismatch(
+            self.bad_content_type, "application/json"
+        )
         _validate_issues(
             parser, Severity.warning, 2, 2, [expected_details_1, expected_details_2],
         )
@@ -170,7 +170,7 @@ class TestCommonParser:
             properties=properties,
             annotations={common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
         )
-        args = CommonParserArguments()
+        args = CommonParserArguments(content_type="application/json")
         parser = common_parser.CommonParser(message=message, common_parser_args=args)
 
         # act
@@ -181,7 +181,9 @@ class TestCommonParser:
         payload = str(encoded_payload, "utf8")
         assert parsed_msg["event"]["payload"] == payload
 
-        expected_details_1 = strings.invalid_content_type(self.bad_content_type)
+        expected_details_1 = strings.content_type_mismatch(
+            self.bad_content_type, "application/json"
+        )
         _validate_issues(parser, Severity.warning, 2, 1, [expected_details_1])
 
         expected_details_2 = strings.invalid_json()

@@ -118,19 +118,27 @@ class CommonParser(AbstractBaseParser):
 
         return content_encoding
 
-    def _parse_content_type(self, content_type: str, system_properties: dict) -> str:
-        # if content type has been set, return it
-        if content_type:
-            return content_type
+    def _parse_content_type(
+        self, expected_content_type: str, system_properties: dict
+    ) -> str:
+        actual_content_type = system_properties.get("content_type", "")
 
-        # otherwise attempt to parse it from system_properties
-        content_type = system_properties.get("content_type", "")
+        # Device data is not expected to be of a certain type
+        # Continue parsing per rules that the device is sending
+        if not expected_content_type:
+            return actual_content_type.lower()
 
-        if not content_type:
-            details = strings.invalid_encoding_missing()
+        # Device is expected to send data in a certain format.
+        # Data from device implies the data is in an incorrect format.
+        # Log the issue, and continue parsing as if device is in expected format.
+        if actual_content_type.lower() != expected_content_type.lower():
+            details = strings.content_type_mismatch(
+                actual_content_type, expected_content_type
+            )
             self._add_issue(severity=Severity.warning, details=details)
+            return expected_content_type.lower()
 
-        return content_type
+        return actual_content_type
 
     def _parse_annotations(self, message: Message):
         try:
@@ -154,17 +162,9 @@ class CommonParser(AbstractBaseParser):
 
         if data:
             payload = str(next(data), "utf8")
-
-        # Assume the payload is JSON, and try to parse it.
-        json_payload = self._try_parse_json(payload)
-
-        # Only return the parsed JSON if the header specifies the payload is application/json.
-        # Otherwise, just return the raw payload.
+            
         if "application/json" in content_type.lower():
-            return json_payload
-
-        details = strings.invalid_content_type(content_type.lower())
-        self._add_issue(severity=Severity.warning, details=details)
+            return self._try_parse_json(payload)
 
         return payload
 
