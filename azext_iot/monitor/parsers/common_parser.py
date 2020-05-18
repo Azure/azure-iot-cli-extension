@@ -162,7 +162,7 @@ class CommonParser(AbstractBaseParser):
 
         if data:
             payload = str(next(data), "utf8")
-            
+
         if "application/json" in content_type.lower():
             return self._try_parse_json(payload)
 
