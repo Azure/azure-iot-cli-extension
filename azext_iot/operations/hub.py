@@ -2046,27 +2046,33 @@ def iot_device_export(
     blob_container_uri,
     include_keys=False,
     storage_authentication_type=None,
-    resource_group_name=None
+    resource_group_name=None,
 ):
     from azext_iot._factory import iot_hub_service_factory
+
     client = iot_hub_service_factory(cmd.cli_ctx)
     target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
-    
+
     import inspect
-    if 'export_devices_parameters' in inspect.getfullargspec(client.export_devices).args:
+
+    if (
+        "export_devices_parameters"
+        in inspect.getfullargspec(client.export_devices).args
+    ):
         from azure.mgmt.iothub.models import ExportDevicesRequest
+
         export_request = ExportDevicesRequest(
             export_blob_container_uri=blob_container_uri,
             exclude_keys=not include_keys,
-            authentication_type=storage_authentication_type
+            authentication_type=storage_authentication_type,
         )
         return client.export_devices(
-            target["resourcegroup"],
-            hub_name,
-            export_devices_parameters=export_request,
+            target["resourcegroup"], hub_name, export_devices_parameters=export_request,
         )
     if storage_authentication_type is not None:
-        raise CLIError('Device export authentication-type properties require a dependency of azure-mgmt-iothub>=0.12.0')
+        raise CLIError(
+            "Device export authentication-type properties require a dependency of azure-mgmt-iothub>=0.12.0"
+        )
     return client.export_devices(
         target["resourcegroup"],
         hub_name,
@@ -2084,12 +2090,18 @@ def iot_device_import(
     resource_group_name=None,
 ):
     from azext_iot._factory import iot_hub_service_factory
+
     client = iot_hub_service_factory(cmd.cli_ctx)
     target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
 
     import inspect
-    if 'import_devices_parameters' in inspect.getfullargspec(client.import_devices).args:
+
+    if (
+        "import_devices_parameters"
+        in inspect.getfullargspec(client.import_devices).args
+    ):
         from azure.mgmt.iothub.models import ImportDevicesRequest
+
         import_request = ImportDevicesRequest(
             input_blob_container_uri=input_blob_container_uri,
             output_blob_container_uri=output_blob_container_uri,
@@ -2098,18 +2110,19 @@ def iot_device_import(
             authentication_type=storage_authentication_type,
         )
         return client.import_devices(
-            target["resourcegroup"],
-            hub_name,
-            import_devices_parameters=import_request,
+            target["resourcegroup"], hub_name, import_devices_parameters=import_request,
         )
     if storage_authentication_type is not None:
-        raise CLIError('Device import authentication-type properties require a dependency of azure-mgmt-iothub>=0.12.0')
+        raise CLIError(
+            "Device import authentication-type properties require a dependency of azure-mgmt-iothub>=0.12.0"
+        )
     return client.import_devices(
         target["resourcegroup"],
         hub_name,
         input_blob_container_uri=input_blob_container_uri,
         output_blob_container_uri=output_blob_container_uri,
     )
+
 
 def iot_device_upload_file(
     cmd,
