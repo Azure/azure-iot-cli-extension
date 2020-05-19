@@ -181,7 +181,7 @@ class CentralDeviceProvider:
         if info:
             return info
 
-        device = self.get_device(device_id)
+        device = self.get_device(device_id, central_dns_suffix)
         if device.device_status == DeviceStatus.provisioned:
             credentials = self.get_device_credentials(
                 device_id=device_id, central_dns_suffix=central_dns_suffix
@@ -192,22 +192,24 @@ class CentralDeviceProvider:
                 id_scope=id_scope, key=key, device_id=device_id
             )
         dps_state = self.dps_populate_essential_info(dps_state, device.device_status)
+
         info = {
             "@device_id": device_id,
             "dps_state": dps_state,
-            "device_info": device,
+            "device_registration_info": device.get_registration_info(),
         }
 
         self._device_registration_info[device_id] = info
 
         return info
 
-    def dps_populate_essential_info(self, dps_info, device_status):
+    def dps_populate_essential_info(self, dps_info, device_status: DeviceStatus):
         error = {
-            "provisioned": "None.",
-            "registered": "Device is not yet provisioned.",
-            "blocked": "Device is blocked by admin.",
-            "unassociated": "Device does not have a valid template associated with it.",
+            DeviceStatus.provisioned: "None.",
+            DeviceStatus.registered: "Device is not yet provisioned.",
+            DeviceStatus.blocked: "Device is blocked from connecting to IoT Central application."
+            " Unblock the device in IoT Central and retry. Learn more: https://aka.ms/iotcentral-docs-dps-SAS",
+            DeviceStatus.unassociated: "Device does not have a valid template associated with it.",
         }
 
         filtered_dps_info = {
@@ -228,10 +230,11 @@ class CentralDeviceProvider:
         filtered_devices = real_devices
 
         if device_status:
+            requested_status = DeviceStatus(device_status)
             filtered_devices = [
                 device
                 for device in real_devices
-                if device.device_status == device_status
+                if device.device_status == requested_status
             ]
 
         if len(devices) != len(filtered_devices):

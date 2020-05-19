@@ -167,7 +167,7 @@ class TestIotCentral(LiveScenarioTest):
 
         # since time taken for provisioning to complete is not known
         # we can only assert that the payload is populated, not anything specific beyond that
-        assert json_result["device_info"] is not None
+        assert json_result["device_registration_info"] is not None
         assert json_result["dps_state"] is not None
 
     def test_central_device_registration_info_filter_unassociated(self):
@@ -187,10 +187,14 @@ class TestIotCentral(LiveScenarioTest):
         device_info_results = []
         json_result = result.get_output_in_json()
         for device in json_result:
-            device_info_results.append(device.get("device_info"))
+            device_info_results.append(device.get("device_registration_info"))
 
         for device in device_info_results:
-            assert device.get("deviceStatus") == device_status_expected
+            assert device.get("device_status") == device_status_expected
+            assert device.get("display_name")
+            assert device.get("id")
+            assert not device.get("simulated")
+            assert not device.get("instance_of")
 
     def test_central_device_registration_info_filter_registered(self):
         device_status_expected = "registered"
@@ -210,10 +214,14 @@ class TestIotCentral(LiveScenarioTest):
         device_info_results = []
         json_result = result.get_output_in_json()
         for device in json_result:
-            device_info_results.append(device.get("device_info"))
+            device_info_results.append(device.get("device_registration_info"))
 
         for device in device_info_results:
-            assert device.get("deviceStatus") == device_status_expected
+            assert device.get("device_status") == device_status_expected
+            assert device.get("display_name")
+            assert device.get("id")
+            assert not device.get("simulated")
+            assert device.get("instance_of")
 
     def _create_device(self, **kwargs) -> (str, str):
         """
