@@ -182,7 +182,7 @@ class CentralDeviceProvider:
             return info
 
         device = self.get_device(device_id, central_dns_suffix)
-        if DeviceStatus(device.device_status.value) == DeviceStatus.provisioned:
+        if device.device_status == DeviceStatus.provisioned:
             credentials = self.get_device_credentials(
                 device_id=device_id, central_dns_suffix=central_dns_suffix
             )
@@ -191,9 +191,7 @@ class CentralDeviceProvider:
             dps_state = dps_global_service.get_registration_state(
                 id_scope=id_scope, key=key, device_id=device_id
             )
-        dps_state = self.dps_populate_essential_info(
-            dps_state, device.device_status.value
-        )
+        dps_state = self.dps_populate_essential_info(dps_state, device.device_status)
 
         info = {
             "@device_id": device_id,
@@ -205,13 +203,13 @@ class CentralDeviceProvider:
 
         return info
 
-    def dps_populate_essential_info(self, dps_info, device_status):
+    def dps_populate_essential_info(self, dps_info, device_status: DeviceStatus):
         error = {
-            "provisioned": "None.",
-            "registered": "Device is not yet provisioned.",
-            "blocked": "Device is blocked from connecting to IoT Central application."
-            + " Unblock the device in IoT Central and retry. Learn more: https://aka.ms/iotcentral-docs-dps-SAS",
-            "unassociated": "Device does not have a valid template associated with it.",
+            DeviceStatus.provisioned: "None.",
+            DeviceStatus.registered: "Device is not yet provisioned.",
+            DeviceStatus.blocked: "Device is blocked from connecting to IoT Central application."
+            " Unblock the device in IoT Central and retry. Learn more: https://aka.ms/iotcentral-docs-dps-SAS",
+            DeviceStatus.unassociated: "Device does not have a valid template associated with it.",
         }
 
         filtered_dps_info = {
