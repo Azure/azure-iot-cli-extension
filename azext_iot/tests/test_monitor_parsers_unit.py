@@ -46,7 +46,7 @@ class TestCommonParser:
     content_type = "application/json"
 
     bad_encoding = "ascii"
-    bad_payload = "bad-payload"
+    bad_payload = "{bad-payload"
     bad_content_type = "bad-content-type"
 
     @pytest.mark.parametrize(
@@ -142,7 +142,35 @@ class TestCommonParser:
             properties=properties,
             annotations={common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
         )
-        args = CommonParserArguments()
+        args = CommonParserArguments(content_type="application/json")
+        parser = common_parser.CommonParser(message=message, common_parser_args=args)
+
+        # act
+        parsed_msg = parser.parse_message()
+
+        # verify
+        assert parsed_msg["event"]["payload"] == self.payload
+
+        expected_details_1 = strings.invalid_encoding_none_found()
+        expected_details_2 = strings.content_type_mismatch(
+            self.bad_content_type, "application/json"
+        )
+        _validate_issues(
+            parser, Severity.warning, 2, 2, [expected_details_1, expected_details_2],
+        )
+
+    def test_parse_bad_type_and_bad_payload_should_error(self):
+        # setup
+        encoded_payload = self.bad_payload.encode()
+        properties = MessageProperties(
+            content_type=self.bad_content_type, content_encoding=self.encoding
+        )
+        message = Message(
+            body=encoded_payload,
+            properties=properties,
+            annotations={common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
+        )
+        args = CommonParserArguments(content_type="application/json")
         parser = common_parser.CommonParser(message=message, common_parser_args=args)
 
         # act
@@ -153,11 +181,13 @@ class TestCommonParser:
         payload = str(encoded_payload, "utf8")
         assert parsed_msg["event"]["payload"] == payload
 
-        expected_details_1 = strings.invalid_encoding_none_found()
-        expected_details_2 = strings.invalid_content_type(self.bad_content_type)
-        _validate_issues(
-            parser, Severity.warning, 2, 2, [expected_details_1, expected_details_2]
+        expected_details_1 = strings.content_type_mismatch(
+            self.bad_content_type, "application/json"
         )
+        _validate_issues(parser, Severity.warning, 2, 1, [expected_details_1])
+
+        expected_details_2 = strings.invalid_json()
+        _validate_issues(parser, Severity.error, 2, 1, [expected_details_2])
 
     def test_parse_message_bad_encoding_should_warn(self):
         # setup
