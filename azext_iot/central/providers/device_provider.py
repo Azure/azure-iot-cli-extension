@@ -182,10 +182,7 @@ class CentralDeviceProvider:
             return info
 
         device = self.get_device(device_id, central_dns_suffix)
-        if (
-            DeviceStatus(device.get_registration_info().get("device_status"))
-            == DeviceStatus.provisioned
-        ):
+        if DeviceStatus(device.device_status.value) == DeviceStatus.provisioned:
             credentials = self.get_device_credentials(
                 device_id=device_id, central_dns_suffix=central_dns_suffix
             )
@@ -195,7 +192,7 @@ class CentralDeviceProvider:
                 id_scope=id_scope, key=key, device_id=device_id
             )
         dps_state = self.dps_populate_essential_info(
-            dps_state, device.get_registration_info().get("device_status")
+            dps_state, device.device_status.value
         )
 
         info = {
