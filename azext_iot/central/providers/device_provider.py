@@ -36,14 +36,6 @@ class CentralDeviceProvider:
         self._device_credentials = {}
         self._device_registration_info = {}
 
-    def get_device_essential_info(
-        self, device_id, central_dns_suffix="azureiotcentral.com",
-    ) -> Device:
-        device = self.get_device(device_id, central_dns_suffix)
-        registration_info = device.get_device_registration_info()
-
-        return registration_info
-
     def get_device(
         self, device_id, central_dns_suffix="azureiotcentral.com",
     ) -> Device:
@@ -189,10 +181,9 @@ class CentralDeviceProvider:
         if info:
             return info
 
-        device_essential_info = self.get_device_essential_info(device_id)
-
+        device = self.get_device(device_id, central_dns_suffix)
         if (
-            DeviceStatus(device_essential_info.get("device_status"))
+            DeviceStatus(device.get_registration_info().get("device_status"))
             == DeviceStatus.provisioned
         ):
             credentials = self.get_device_credentials(
@@ -204,13 +195,13 @@ class CentralDeviceProvider:
                 id_scope=id_scope, key=key, device_id=device_id
             )
         dps_state = self.dps_populate_essential_info(
-            dps_state, device_essential_info.get("device_status")
+            dps_state, device.get_registration_info().get("device_status")
         )
 
         info = {
             "@device_id": device_id,
             "dps_state": dps_state,
-            "device_info": device_essential_info,
+            "device_registration_info": device.get_registration_info(),
         }
 
         self._device_registration_info[device_id] = info
@@ -244,10 +235,11 @@ class CentralDeviceProvider:
         filtered_devices = real_devices
 
         if device_status:
+            requested_status = DeviceStatus(device_status)
             filtered_devices = [
                 device
                 for device in real_devices
-                if device.device_status == DeviceStatus(device_status)
+                if device.device_status == requested_status
             ]
 
         if len(devices) != len(filtered_devices):
