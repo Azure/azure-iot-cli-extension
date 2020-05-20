@@ -8,7 +8,9 @@
 azext_iot/central/   @prbans
 
 # Monitor Code Owner(s)
-azext_iot/monitor/   @prbans @digimaun
+azext_iot/monitor/   @prbans
 
 # Tests Code Owners
-azext_iot/tests/   @prbans
+azext_iot/tests/central/   @prbans
+azext_iot/tests/test_iot_central_int.py   @prbans
+azext_iot/tests/test_iot_central_unit.py   @prbans
