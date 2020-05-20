@@ -465,5 +465,5 @@ class ISO8601Validator:
 
 
 def ensure_min_version(cur_ver, min_ver):
-    from packaging import version
+    from pkg_resources._vendor.packaging import version
     return version.parse(cur_ver) >= version.parse(min_ver)

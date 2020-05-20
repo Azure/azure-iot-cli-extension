@@ -390,8 +390,7 @@ def load_arguments(self, _):
             "storage_authentication_type",
             options_list=["--auth-type", "--storage-authentication-type"],
             arg_type=get_enum_type(AuthenticationType),
-            help="Authentication type for communicating with the storage container.  "
-            "Allowed values: identity, key",
+            help="Authentication type for communicating with the storage container.",
         )
 
     with self.argument_context("iot hub device-identity import") as context:
@@ -415,8 +414,7 @@ def load_arguments(self, _):
             "storage_authentication_type",
             options_list=["--auth-type", "--storage-authentication-type"],
             arg_type=get_enum_type(AuthenticationType),
-            help="Authentication type for communicating with the storage container.  "
-            "Allowed values: identity, key",
+            help="Authentication type for communicating with the storage container.",
         )
 
     with self.argument_context("iot hub device-identity get-parent") as context:
