@@ -462,3 +462,8 @@ class ISO8601Validator:
             return bool(isodate.parse_time(to_validate))
         except Exception:
             return False
+
+
+def ensure_min_version(cur_ver, min_ver):
+    from packaging import version
+    return version.parse(cur_ver) >= version.parse(min_ver)

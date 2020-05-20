@@ -27,6 +27,7 @@ from azext_iot.common.utility import (
     unpack_msrest_error,
     init_monitoring,
     process_json_arg,
+    ensure_min_version
 )
 from azext_iot._factory import SdkResolver, CloudError
 from azext_iot.operations.generic import _execute_query, _process_top
@@ -2049,16 +2050,12 @@ def iot_device_export(
     resource_group_name=None,
 ):
     from azext_iot._factory import iot_hub_service_factory
+    from azure.mgmt.iothub import __version__ as iot_sdk_version
 
     client = iot_hub_service_factory(cmd.cli_ctx)
     target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
 
-    import inspect
-
-    if (
-        "export_devices_parameters"
-        in inspect.getfullargspec(client.export_devices).args
-    ):
+    if ensure_min_version(iot_sdk_version, "0.12.0"):
         from azure.mgmt.iothub.models import ExportDevicesRequest
 
         export_request = ExportDevicesRequest(
@@ -2090,16 +2087,12 @@ def iot_device_import(
     resource_group_name=None,
 ):
     from azext_iot._factory import iot_hub_service_factory
+    from azure.mgmt.iothub import __version__ as iot_sdk_version
 
     client = iot_hub_service_factory(cmd.cli_ctx)
     target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
 
-    import inspect
-
-    if (
-        "import_devices_parameters"
-        in inspect.getfullargspec(client.import_devices).args
-    ):
+    if ensure_min_version(iot_sdk_version, "0.12.0"):
         from azure.mgmt.iothub.models import ImportDevicesRequest
 
         import_request = ImportDevicesRequest(
