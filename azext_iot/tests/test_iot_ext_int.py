@@ -13,7 +13,7 @@ from . import IoTLiveScenarioTest
 from .settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC
 from azext_iot.constants import DEVICE_DEVICESCOPE_PREFIX
 
-opt_env_set = ["azext_iot_teststorageuri"]
+opt_env_set = ["azext_iot_teststorageuri", "azext_iot_testidentity"]
 
 settings = DynamoSettings(
     req_env_set=ENV_SET_TEST_IOTHUB_BASIC, opt_env_set=opt_env_set
@@ -27,6 +27,11 @@ LIVE_HUB_MIXED_CASE_CS = LIVE_HUB_CS.replace("HostName", "hostname", 1)
 # Set this environment variable to your empty blob container sas uri to test device export and enable file upload test.
 # For file upload, you will need to have configured your IoT Hub before running.
 LIVE_STORAGE = settings.env.azext_iot_teststorageuri
+
+# Set this environment variable to enable identity-based integration tests
+# You will need to have configured your IoT Hub and Storage Account before running.
+LIVE_IDENTITY= settings.env.azext_iot_testidentity
+
 LIVE_CONSUMER_GROUPS = ["test1", "test2", "test3"]
 
 CWD = os.path.dirname(os.path.abspath(__file__))
@@ -1253,7 +1258,11 @@ class TestIoTStorage(IoTLiveScenarioTest):
             ],
         )
 
-        # With identityBased authentication
+    @pytest.mark.skipif(
+        not LIVE_IDENTITY, reason="azext_iot_testidentity env var not set"
+    )
+    def test_identity_storage(self):
+        # identity-based device-identity export
         self.cmd(
             'iot hub device-identity export -n {} --bcu "{}" --auth-type {}'.format(
                 LIVE_HUB, LIVE_STORAGE, 'identityBased'
