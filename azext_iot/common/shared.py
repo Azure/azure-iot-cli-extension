@@ -215,6 +215,7 @@ class JobStatusType(Enum):
     scheduled = "scheduled"
     queued = "queued"
 
+
 class AuthenticationType(Enum):
     """
     Route or endpoint authentication mechanism.

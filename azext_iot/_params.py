@@ -412,7 +412,7 @@ def load_arguments(self, _):
             "https:// URI",
         )
         context.argument(
-            "storage_authentication_type", 
+            "storage_authentication_type",
             options_list=["--auth-type", "--storage-authentication-type"],
             arg_type=get_enum_type(AuthenticationType),
             help="Authentication type for communicating with the storage container.  "
