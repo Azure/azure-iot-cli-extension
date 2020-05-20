@@ -83,7 +83,10 @@ class CentralDeviceProvider:
 
     def list_devices(self, central_dns_suffix="azureiotcentral.com") -> List[Device]:
         devices = central_services.device.list_devices(
-            cmd=self._cmd, app_id=self._app_id, token=self._token
+            cmd=self._cmd,
+            app_id=self._app_id,
+            token=self._token,
+            central_dns_suffix=central_dns_suffix,
         )
 
         # add to cache
@@ -157,6 +160,7 @@ class CentralDeviceProvider:
                 app_id=self._app_id,
                 device_id=device_id,
                 token=self._token,
+                central_dns_suffix=central_dns_suffix,
             )
 
         if not credentials:
@@ -217,35 +221,3 @@ class CentralDeviceProvider:
             "error": error.get(device_status),
         }
         return filtered_dps_info
-
-    def get_all_registration_info(
-        self, device_status, central_dns_suffix="azureiotcentral.com"
-    ):
-
-        logger.warning("This command may take a long time to complete execution.")
-        devices = self.list_devices(central_dns_suffix=central_dns_suffix)
-
-        real_devices = [device for device in devices.values() if not device.simulated]
-
-        filtered_devices = real_devices
-
-        if device_status:
-            requested_status = DeviceStatus(device_status)
-            filtered_devices = [
-                device
-                for device in real_devices
-                if device.device_status == requested_status
-            ]
-
-        if len(devices) != len(filtered_devices):
-            logger.warning(
-                "Getting registration info for real devices. "
-                "{}".format([device.id for device in filtered_devices])
-            )
-
-        result = [
-            self.get_device_registration_info(device.id, device.device_status)
-            for device in filtered_devices
-        ]
-
-        return result

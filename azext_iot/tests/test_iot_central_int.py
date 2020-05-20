@@ -170,59 +170,6 @@ class TestIotCentral(LiveScenarioTest):
         assert json_result["device_registration_info"] is not None
         assert json_result["dps_state"] is not None
 
-    def test_central_device_registration_info_filter_unassociated(self):
-        device_status_expected = "unassociated"
-
-        (device_id, _) = self._create_device()
-
-        result = self.cmd(
-            "iot central app device registration-info --app-id {} --ds {}".format(
-                APP_ID, device_status_expected
-            )
-        )
-
-        self._delete_device(device_id)
-
-        json_result = []
-        device_info_results = []
-        json_result = result.get_output_in_json()
-        for device in json_result:
-            device_info_results.append(device.get("device_registration_info"))
-
-        for device in device_info_results:
-            assert device.get("device_status") == device_status_expected
-            assert device.get("display_name")
-            assert device.get("id")
-            assert not device.get("simulated")
-            assert not device.get("instance_of")
-
-    def test_central_device_registration_info_filter_registered(self):
-        device_status_expected = "registered"
-        (template_id, _) = self._create_device_template()
-        (device_id, _) = self._create_device(instance_of=template_id)
-
-        result = self.cmd(
-            "iot central app device registration-info --app-id {} --ds {}".format(
-                APP_ID, device_status_expected
-            )
-        )
-
-        self._delete_device(device_id)
-        self._delete_device_template(template_id)
-
-        json_result = []
-        device_info_results = []
-        json_result = result.get_output_in_json()
-        for device in json_result:
-            device_info_results.append(device.get("device_registration_info"))
-
-        for device in device_info_results:
-            assert device.get("device_status") == device_status_expected
-            assert device.get("display_name")
-            assert device.get("id")
-            assert not device.get("simulated")
-            assert device.get("instance_of")
-
     def _create_device(self, **kwargs) -> (str, str):
         """
         kwargs:
