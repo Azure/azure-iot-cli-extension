@@ -8,14 +8,12 @@ import re
 
 from uamqp.message import Message
 
-from azext_iot.common.utility import ISO8601Validator
 from azext_iot.central.providers import CentralDeviceProvider
 from azext_iot.monitor.parsers import strings
+from azext_iot.monitor.central_validator import validate_schema, utils
 from azext_iot.monitor.models.arguments import CommonParserArguments
 from azext_iot.monitor.models.enum import Severity
 from azext_iot.monitor.parsers.common_parser import CommonParser
-
-ios_validator = ISO8601Validator()
 
 
 class CentralParser(CommonParser):
@@ -48,7 +46,7 @@ class CentralParser(CommonParser):
         self._perform_static_validations(payload=payload)
 
         # disable dynamic validations until Microservices work is figured out
-        # self._perform_dynamic_validations(payload=payload)
+        self._perform_dynamic_validations(payload=payload)
 
         return parsed_message
 
@@ -138,8 +136,8 @@ class CentralParser(CommonParser):
                 name_miss.append(name)
 
             is_dict = isinstance(schema, dict)
-            if is_dict and not self._validate_types_match(value, schema):
-                expected_type = str(schema.get("schema"))
+            if is_dict and not validate_schema.validate(schema, value):
+                expected_type = utils.extract_schema_type(schema)
                 details = strings.invalid_primitive_schema_mismatch_template(
                     name, expected_type, value
                 )
@@ -150,34 +148,3 @@ class CentralParser(CommonParser):
                 name_miss, list(template_schema_names)
             )
             self._add_central_issue(severity=Severity.warning, details=details)
-
-    def _validate_types_match(self, value, schema: dict) -> bool:
-        # suppress error if there is no "schema" in schema
-        # means something else went wrong
-        schema_type = schema.get("schema")
-        if not schema_type:
-            return True
-
-        if schema_type == "boolean":
-            return isinstance(value, bool)
-        elif schema_type == "double":
-            return isinstance(value, (float, int))
-        elif schema_type == "float":
-            return isinstance(value, (float, int))
-        elif schema_type == "integer":
-            return isinstance(value, int)
-        elif schema_type == "long":
-            return isinstance(value, (float, int))
-        elif schema_type == "string":
-            return isinstance(value, str)
-        elif schema_type == "time":
-            return ios_validator.is_iso8601_time(value)
-        elif schema_type == "date":
-            return ios_validator.is_iso8601_date(value)
-        elif schema_type == "dateTime":
-            return ios_validator.is_iso8601_datetime(value)
-        elif schema_type == "duration":
-            return ios_validator.is_iso8601_duration(value)
-
-        # if the schema_type is not found above, suppress error
-        return True

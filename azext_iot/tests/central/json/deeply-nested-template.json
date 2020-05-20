@@ -1,0 +1,280 @@
+{
+  "@id": "urn:azCliDevelopmentFlashmagnus:deeplyNestedTemplate_7k3:1",
+  "@type": "Interface",
+  "displayName": {
+    "en": "Interface"
+  },
+  "contents": [
+    {
+      "@id": "urn:azCliDevelopmentFlashmagnus:deeplyNestedTemplate_7k3:RidiculousObject:1",
+      "@type": "Telemetry",
+      "displayName": {
+        "en": "RidiculousObject"
+      },
+      "name": "RidiculousObject",
+      "schema": {
+        "@id": "urn:azCliDevelopmentFlashmagnus:deeplyNestedTemplate_7k3:RidiculousObject:q5s_9k_ve:1",
+        "@type": "Object",
+        "displayName": {
+          "en": "Object"
+        },
+        "fields": [
+          {
+            "@id": "urn:azCliDevelopmentFlashmagnus:deeplyNestedTemplate_7k3:RidiculousObject:q5s_9k_ve:LayerA:1",
+            "@type": "SchemaField",
+            "displayName": {
+              "en": "LayerA"
+            },
+            "name": "LayerA",
+            "schema": {
+              "@id": "urn:azCliDevelopmentFlashmagnus:deeplyNestedTemplate_7k3:RidiculousObject:q5s_9k_ve:LayerA:zs4l_ugxof:1",
+              "@type": "Object",
+              "displayName": {
+                "en": "Object"
+              },
+              "fields": [
+                {
+                  "@id": "urn:azCliDevelopmentFlashmagnus:deeplyNestedTemplate_7k3:RidiculousObject:q5s_9k_ve:LayerA:zs4l_ugxof:Depth1A:1",
+                  "@type": "SchemaField",
+                  "displayName": {
+                    "en": "Depth1A"
+                  },
+                  "name": "Depth1A",
+                  "schema": {
+                    "@id": "urn:azCliDevelopmentFlashmagnus:deeplyNestedTemplate_7k3:RidiculousObject:q5s_9k_ve:LayerA:zs4l_ugxof:Depth1A:_a84htu7n_:1",
+                    "@type": "Object",
+                    "displayName": {
+                      "en": "Object"
+                    },
+                    "fields": [
+                      {
+                        "@id": "urn:azCliDevelopmentFlashmagnus:deeplyNestedTemplate_7k3:RidiculousObject:q5s_9k_ve:LayerA:zs4l_ugxof:Depth1A:_a84htu7n_:Depth2:1",
+                        "@type": "SchemaField",
+                        "displayName": {
+                          "en": "Depth2"
+                        },
+                        "name": "Depth2",
+                        "schema": {
+                          "@id": "urn:azCliDevelopmentFlashmagnus:deeplyNestedTemplate_7k3:RidiculousObject:q5s_9k_ve:LayerA:zs4l_ugxof:Depth1A:_a84htu7n_:Depth2:z6eqthrj5x:1",
+                          "@type": "Object",
+                          "displayName": {
+                            "en": "Object"
+                          },
+                          "fields": [
+                            {
+                              "@id": "urn:azCliDevelopmentFlashmagnus:deeplyNestedTemplate_7k3:RidiculousObject:q5s_9k_ve:LayerA:zs4l_ugxof:Depth1A:_a84htu7n_:Depth2:z6eqthrj5x:Depth3:1",
+                              "@type": "SchemaField",
+                              "displayName": {
+                                "en": "Depth3"
+                              },
+                              "name": "Depth3",
+                              "schema": {
+                                "@id": "urn:azCliDevelopmentFlashmagnus:deeplyNestedTemplate_7k3:RidiculousObject:q5s_9k_ve:LayerA:zs4l_ugxof:Depth1A:_a84htu7n_:Depth2:z6eqthrj5x:Depth3:dztuhj_l1m:1",
+                                "@type": "Object",
+                                "displayName": {
+                                  "en": "Object"
+                                },
+                                "fields": [
+                                  {
+                                    "@id": "urn:azCliDevelopmentFlashmagnus:deeplyNestedTemplate_7k3:RidiculousObject:q5s_9k_ve:LayerA:zs4l_ugxof:Depth1A:_a84htu7n_:Depth2:z6eqthrj5x:Depth3:dztuhj_l1m:Depth4:1",
+                                    "@type": "SchemaField",
+                                    "displayName": {
+                                      "en": "Depth4"
+                                    },
+                                    "name": "Depth4",
+                                    "schema": {
+                                      "@id": "urn:azCliDevelopmentFlashmagnus:deeplyNestedTemplate_7k3:RidiculousObject:q5s_9k_ve:LayerA:zs4l_ugxof:Depth1A:_a84htu7n_:Depth2:z6eqthrj5x:Depth3:dztuhj_l1m:Depth4:7bsubxp0pj:1",
+                                      "@type": "Object",
+                                      "displayName": {
+                                        "en": "Object"
+                                      },
+                                      "fields": [
+                                        {
+                                          "@id": "urn:azCliDevelopmentFlashmagnus:deeplyNestedTemplate_7k3:RidiculousObject:q5s_9k_ve:LayerA:zs4l_ugxof:Depth1A:_a84htu7n_:Depth2:z6eqthrj5x:Depth3:dztuhj_l1m:Depth4:7bsubxp0pj:Depth5:1",
+                                          "@type": "SchemaField",
+                                          "displayName": {
+                                            "en": "Depth5"
+                                          },
+                                          "name": "Depth5",
+                                          "schema": {
+                                            "@id": "urn:azCliDevelopmentFlashmagnus:deeplyNestedTemplate_7k3:RidiculousObject:q5s_9k_ve:LayerA:zs4l_ugxof:Depth1A:_a84htu7n_:Depth2:z6eqthrj5x:Depth3:dztuhj_l1m:Depth4:7bsubxp0pj:Depth5:2ak9p9u9th:1",
+                                            "@type": "Object",
+                                            "displayName": {
+                                              "en": "Object"
+                                            },
+                                            "fields": [
+                                              {
+                                                "@id": "urn:azCliDevelopmentFlashmagnus:deeplyNestedTemplate_7k3:RidiculousObject:q5s_9k_ve:LayerA:zs4l_ugxof:Depth1A:_a84htu7n_:Depth2:z6eqthrj5x:Depth3:dztuhj_l1m:Depth4:7bsubxp0pj:Depth5:2ak9p9u9th:Depth6Double:1",
+                                                "@type": "SchemaField",
+                                                "displayName": {
+                                                  "en": "Depth6Double"
+                                                },
+                                                "name": "Depth6Double",
+                                                "schema": "double"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        {
+                                          "@id": "urn:azCliDevelopmentFlashmagnus:deeplyNestedTemplate_7k3:RidiculousObject:q5s_9k_ve:LayerA:zs4l_ugxof:Depth1A:_a84htu7n_:Depth2:z6eqthrj5x:Depth3:dztuhj_l1m:Depth4:7bsubxp0pj:DeepestComplexEnum:1",
+                                          "@type": "SchemaField",
+                                          "displayName": {
+                                            "en": "DeepestComplexEnum"
+                                          },
+                                          "name": "DeepestComplexEnum",
+                                          "schema": {
+                                            "@id": "urn:azCliDevelopmentFlashmagnus:deeplyNestedTemplate_7k3:RidiculousObject:q5s_9k_ve:LayerA:zs4l_ugxof:Depth1A:_a84htu7n_:Depth2:z6eqthrj5x:Depth3:dztuhj_l1m:Depth4:7bsubxp0pj:DeepestComplexEnum:nilp_ucobw:1",
+                                            "@type": "Enum",
+                                            "displayName": {
+                                              "en": "Enum"
+                                            },
+                                            "valueSchema": "integer",
+                                            "enumValues": [
+                                              {
+                                                "@id": "urn:azCliDevelopmentFlashmagnus:deeplyNestedTemplate_7k3:RidiculousObject:q5s_9k_ve:LayerA:zs4l_ugxof:Depth1A:_a84htu7n_:Depth2:z6eqthrj5x:Depth3:dztuhj_l1m:Depth4:7bsubxp0pj:DeepestComplexEnum:nilp_ucobw:Value1:1",
+                                                "@type": "EnumValue",
+                                                "displayName": {
+                                                  "en": "Value1"
+                                                },
+                                                "enumValue": 1,
+                                                "name": "Value1"
+                                              },
+                                              {
+                                                "@id": "urn:azCliDevelopmentFlashmagnus:deeplyNestedTemplate_7k3:RidiculousObject:q5s_9k_ve:LayerA:zs4l_ugxof:Depth1A:_a84htu7n_:Depth2:z6eqthrj5x:Depth3:dztuhj_l1m:Depth4:7bsubxp0pj:DeepestComplexEnum:nilp_ucobw:Value2:1",
+                                                "@type": "EnumValue",
+                                                "displayName": {
+                                                  "en": "Value2"
+                                                },
+                                                "enumValue": 2,
+                                                "name": "Value2"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        {
+                                          "@id": "urn:azCliDevelopmentFlashmagnus:deeplyNestedTemplate_7k3:RidiculousObject:q5s_9k_ve:LayerA:zs4l_ugxof:Depth1A:_a84htu7n_:Depth2:z6eqthrj5x:Depth3:dztuhj_l1m:Depth4:7bsubxp0pj:DeepestGeopoint:1",
+                                          "@type": "SchemaField",
+                                          "displayName": {
+                                            "en": "DeepestGeopoint"
+                                          },
+                                          "name": "DeepestGeopoint",
+                                          "schema": "geopoint"
+                                        },
+                                        {
+                                          "@id": "urn:azCliDevelopmentFlashmagnus:deeplyNestedTemplate_7k3:RidiculousObject:q5s_9k_ve:LayerA:zs4l_ugxof:Depth1A:_a84htu7n_:Depth2:z6eqthrj5x:Depth3:dztuhj_l1m:Depth4:7bsubxp0pj:DeepestVector:1",
+                                          "@type": "SchemaField",
+                                          "displayName": {
+                                            "en": "DeepestVector"
+                                          },
+                                          "name": "DeepestVector",
+                                          "schema": "vector"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                ]
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "@id": "urn:azCliDevelopmentFlashmagnus:deeplyNestedTemplate_7k3:RidiculousObject:q5s_9k_ve:LayerB:1",
+            "@type": "SchemaField",
+            "displayName": {
+              "en": "LayerB"
+            },
+            "name": "LayerB",
+            "schema": {
+              "@id": "urn:azCliDevelopmentFlashmagnus:deeplyNestedTemplate_7k3:RidiculousObject:q5s_9k_ve:LayerB:1tzznexumc:1",
+              "@type": "Object",
+              "displayName": {
+                "en": "Object"
+              },
+              "fields": [
+                {
+                  "@id": "urn:azCliDevelopmentFlashmagnus:deeplyNestedTemplate_7k3:RidiculousObject:q5s_9k_ve:LayerB:1tzznexumc:Depth1B:1",
+                  "@type": "SchemaField",
+                  "displayName": {
+                    "en": "Depth1B"
+                  },
+                  "name": "Depth1B",
+                  "schema": {
+                    "@id": "urn:azCliDevelopmentFlashmagnus:deeplyNestedTemplate_7k3:RidiculousObject:q5s_9k_ve:LayerB:1tzznexumc:Depth1B:4luavgtalm:1",
+                    "@type": "Object",
+                    "displayName": {
+                      "en": "Object"
+                    },
+                    "fields": [
+                      {
+                        "@id": "urn:azCliDevelopmentFlashmagnus:deeplyNestedTemplate_7k3:RidiculousObject:q5s_9k_ve:LayerB:1tzznexumc:Depth1B:4luavgtalm:somedouble:1",
+                        "@type": "SchemaField",
+                        "displayName": {
+                          "en": "somedouble"
+                        },
+                        "name": "somedouble",
+                        "schema": "double"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "@id": "urn:azCliDevelopmentFlashmagnus:deeplyNestedTemplate_7k3:RidiculousObject:q5s_9k_ve:LayerC:1",
+            "@type": "SchemaField",
+            "displayName": {
+              "en": "LayerC"
+            },
+            "name": "LayerC",
+            "schema": {
+              "@id": "urn:azCliDevelopmentFlashmagnus:deeplyNestedTemplate_7k3:RidiculousObject:q5s_9k_ve:LayerC:xkxkko9pzc:1",
+              "@type": "Object",
+              "displayName": {
+                "en": "Object"
+              },
+              "fields": [
+                {
+                  "@id": "urn:azCliDevelopmentFlashmagnus:deeplyNestedTemplate_7k3:RidiculousObject:q5s_9k_ve:LayerC:xkxkko9pzc:Depth1C:1",
+                  "@type": "SchemaField",
+                  "displayName": {
+                    "en": "Depth1C"
+                  },
+                  "name": "Depth1C",
+                  "schema": {
+                    "@id": "urn:azCliDevelopmentFlashmagnus:deeplyNestedTemplate_7k3:RidiculousObject:q5s_9k_ve:LayerC:xkxkko9pzc:Depth1C:4_kzocdvyk:1",
+                    "@type": "Object",
+                    "displayName": {
+                      "en": "Object"
+                    },
+                    "fields": [
+                      {
+                        "@id": "urn:azCliDevelopmentFlashmagnus:deeplyNestedTemplate_7k3:RidiculousObject:q5s_9k_ve:LayerC:xkxkko9pzc:Depth1C:4_kzocdvyk:SomeTelemetry:1",
+                        "@type": "SchemaField",
+                        "displayName": {
+                          "en": "SomeTelemetry"
+                        },
+                        "name": "SomeTelemetry",
+                        "schema": "double"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "@context": [
+    "http://azureiot.com/v1/contexts/IoTModel.json"
+  ]
+}
