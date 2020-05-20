@@ -47,7 +47,8 @@ class CentralParser(CommonParser):
 
         self._perform_static_validations(payload=payload)
 
-        self._perform_dynamic_validations(payload=payload)
+        # disable dynamic validations until Microservices work is figured out
+        # self._perform_dynamic_validations(payload=payload)
 
         return parsed_message
 
@@ -73,7 +74,7 @@ class CentralParser(CommonParser):
         ]
         if invalid_field_names:
             details = strings.invalid_field_name(invalid_field_names)
-            self._add_issue(severity=Severity.warning, details=details)
+            self._add_issue(severity=Severity.error, details=details)
 
     # Dynamic validations should need data external to the payload
     # e.g. device template
@@ -142,7 +143,7 @@ class CentralParser(CommonParser):
                 details = strings.invalid_primitive_schema_mismatch_template(
                     name, expected_type, value
                 )
-                self._add_central_issue(severity=Severity.warning, details=details)
+                self._add_central_issue(severity=Severity.error, details=details)
 
         if name_miss:
             details = strings.invalid_field_name_mismatch_template(

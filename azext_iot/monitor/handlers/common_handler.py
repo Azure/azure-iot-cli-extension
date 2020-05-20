@@ -27,6 +27,9 @@ class CommonHandler(AbstractBaseEventsHandler):
         if not self._should_process_device(parser.device_id):
             return
 
+        if not self._should_process_interface(parser.interface_name):
+            return
+
         result = parser.parse_message()
 
         if self._common_handler_args.output.lower() == "json":
@@ -57,3 +60,13 @@ class CommonHandler(AbstractBaseEventsHandler):
             return False
 
         return True
+
+    def _should_process_interface(self, interface_name):
+        expected_interface_name = self._common_handler_args.interface_name
+
+        # if no filter is specified, then process all interfaces
+        if not expected_interface_name:
+            return True
+
+        # only process if the expected and actual interface name match
+        return expected_interface_name == interface_name

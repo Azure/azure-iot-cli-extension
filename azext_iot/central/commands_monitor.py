@@ -39,7 +39,9 @@ def validate_messages(
         repair=repair,
         yes=yes,
     )
-    common_parser_args = CommonParserArguments(properties=telemetry_args.properties)
+    common_parser_args = CommonParserArguments(
+        properties=telemetry_args.properties, content_type="application/json"
+    )
     common_handler_args = CommonHandlerArguments(
         output=telemetry_args.output,
         common_parser_args=common_parser_args,
@@ -82,7 +84,9 @@ def monitor_events(
         repair=repair,
         yes=yes,
     )
-    common_parser_args = CommonParserArguments(properties=telemetry_args.properties)
+    common_parser_args = CommonParserArguments(
+        properties=telemetry_args.properties, content_type="application/json"
+    )
     common_handler_args = CommonHandlerArguments(
         output=telemetry_args.output,
         common_parser_args=common_parser_args,
