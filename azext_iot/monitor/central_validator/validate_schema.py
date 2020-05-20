@@ -5,7 +5,10 @@
 # --------------------------------------------------------------------------------------------
 from azext_iot.common.utility import ISO8601Validator
 from azext_iot.monitor.central_validator import enum, obj, utils
-from azext_iot.monitor.central_validator.predefinied_complex_validator import *
+from azext_iot.monitor.central_validator.predefinied_complex_validator import (
+    validate_vector,
+    validate_geopoint,
+)
 
 iso_validator = ISO8601Validator()
 
@@ -35,7 +38,7 @@ validation_function_factory = {
 
 def validate(schema, value):
     # if theres nothing to validate, then its valid
-    if value == None:
+    if value is None:
         return True
 
     schema_type = utils.extract_schema_type(schema)
