@@ -30,7 +30,7 @@ LIVE_STORAGE = settings.env.azext_iot_teststorageuri
 
 # Set this environment variable to enable identity-based integration tests
 # You will need to have configured your IoT Hub and Storage Account before running.
-LIVE_IDENTITY= settings.env.azext_iot_testidentity
+LIVE_IDENTITY = settings.env.azext_iot_testidentity
 
 LIVE_CONSUMER_GROUPS = ["test1", "test2", "test3"]
 
@@ -1265,7 +1265,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
         # identity-based device-identity export
         self.cmd(
             'iot hub device-identity export -n {} --bcu "{}" --auth-type {}'.format(
-                LIVE_HUB, LIVE_STORAGE, 'identityBased'
+                LIVE_HUB, LIVE_STORAGE, "identityBased"
             ),
             checks=[
                 self.check("outputBlobContainerUri", LIVE_STORAGE),

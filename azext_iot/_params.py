@@ -375,7 +375,7 @@ def load_arguments(self, _):
             options_list=["--blob-container-uri", "--bcu"],
             help="Blob Shared Access Signature URI with write, read, and delete access to "
             "a blob container. This is used to output the status of the "
-            "job and the results.  Note: when using ""identityBased"" authentication, you must supply an "
+            "job and the results. Note: when using Identity-based authentication, you must supply an "
             "https:// URI.",
         )
         context.argument(
@@ -389,7 +389,7 @@ def load_arguments(self, _):
             "storage_authentication_type",
             options_list=["--auth-type", "--storage-authentication-type"],
             help="Authentication type for communicating with the storage container.  "
-            "Allowed values: identityBased, keyBased",
+            "Allowed values: identity, key",
         )
 
     with self.argument_context("iot hub device-identity import") as context:
@@ -398,7 +398,7 @@ def load_arguments(self, _):
             options_list=["--input-blob-container-uri", "--ibcu"],
             help="Blob Shared Access Signature URI with read access to a blob "
             "container. This blob contains the operations to be performed on "
-            "the identity registry.   Note: when using ""identityBased"" authentication, you must supply an "
+            "the identity registry. Note: when using Identity-based authentication, you must supply an "
             "https:// URI",
         )
         context.argument(
@@ -406,14 +406,14 @@ def load_arguments(self, _):
             options_list=["--output-blob-container-uri", "--obcu"],
             help="Blob Shared Access Signature URI with write access "
             "to a blob container. This is used to output the status of "
-            "the job and the results.  Note: when using ""identityBased"" authentication, you must supply an "
+            "the job and the results. Note: when using Identity-based authentication, you must supply an "
             "https:// URI",
         )
         context.argument(
             "storage_authentication_type", 
             options_list=["--auth-type", "--storage-authentication-type"],
             help="Authentication type for communicating with the storage container.  "
-            "Allowed values: identityBased, keyBased",
+            "Allowed values: identity, key",
         )
 
     with self.argument_context("iot hub device-identity get-parent") as context:
