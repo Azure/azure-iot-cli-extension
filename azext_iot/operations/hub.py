@@ -27,7 +27,7 @@ from azext_iot.common.utility import (
     unpack_msrest_error,
     init_monitoring,
     process_json_arg,
-    ensure_min_version
+    ensure_min_version,
 )
 from azext_iot._factory import SdkResolver, CloudError
 from azext_iot.operations.generic import _execute_query, _process_top
@@ -2057,7 +2057,13 @@ def iot_device_export(
 
     if ensure_min_version(iot_sdk_version, "0.12.0"):
         from azure.mgmt.iothub.models import ExportDevicesRequest
+        from azext_iot.common.shared import AuthenticationType
 
+        storage_authentication_type = (
+            AuthenticationType(storage_authentication_type).name
+            if storage_authentication_type
+            else None
+        )
         export_request = ExportDevicesRequest(
             export_blob_container_uri=blob_container_uri,
             exclude_keys=not include_keys,
@@ -2094,7 +2100,13 @@ def iot_device_import(
 
     if ensure_min_version(iot_sdk_version, "0.12.0"):
         from azure.mgmt.iothub.models import ImportDevicesRequest
+        from azext_iot.common.shared import AuthenticationType
 
+        storage_authentication_type = (
+            AuthenticationType(storage_authentication_type).name
+            if storage_authentication_type
+            else None
+        )
         import_request = ImportDevicesRequest(
             input_blob_container_uri=input_blob_container_uri,
             output_blob_container_uri=output_blob_container_uri,

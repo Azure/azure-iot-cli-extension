@@ -31,6 +31,7 @@ from azext_iot.common.shared import (
     JobType,
     JobCreateType,
     JobStatusType,
+    AuthenticationType,
 )
 from azext_iot._validators import mode2_iot_login_handler
 from azext_iot.assets.user_messages import info_param_properties_device
@@ -388,6 +389,7 @@ def load_arguments(self, _):
         context.argument(
             "storage_authentication_type",
             options_list=["--auth-type", "--storage-authentication-type"],
+            arg_type=get_enum_type(AuthenticationType),
             help="Authentication type for communicating with the storage container.  "
             "Allowed values: identity, key",
         )
@@ -412,6 +414,7 @@ def load_arguments(self, _):
         context.argument(
             "storage_authentication_type", 
             options_list=["--auth-type", "--storage-authentication-type"],
+            arg_type=get_enum_type(AuthenticationType),
             help="Authentication type for communicating with the storage container.  "
             "Allowed values: identity, key",
         )

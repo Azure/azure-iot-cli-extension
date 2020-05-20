@@ -1265,7 +1265,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
         # identity-based device-identity export
         self.cmd(
             'iot hub device-identity export -n {} --bcu "{}" --auth-type {}'.format(
-                LIVE_HUB, LIVE_STORAGE, "identityBased"
+                LIVE_HUB, LIVE_STORAGE, "identity"
             ),
             checks=[
                 self.check("outputBlobContainerUri", LIVE_STORAGE),
