@@ -10,7 +10,7 @@ from uamqp.message import Message
 
 from azext_iot.central.providers import CentralDeviceProvider
 from azext_iot.monitor.parsers import strings
-from azext_iot.monitor.central_validator import validate_schema, utils
+from azext_iot.monitor.central_validator import validate, extract_schema_type
 from azext_iot.monitor.models.arguments import CommonParserArguments
 from azext_iot.monitor.models.enum import Severity
 from azext_iot.monitor.parsers.common_parser import CommonParser
@@ -135,9 +135,9 @@ class CentralParser(CommonParser):
             if not schema:
                 name_miss.append(name)
 
-            is_dict = isinstance(schema, dict)
-            if is_dict and not validate_schema.validate(schema, value):
-                expected_type = utils.extract_schema_type(schema)
+            is_payload_valid = validate(schema, value)
+            expected_type = extract_schema_type(schema)
+            if not is_payload_valid:
                 details = strings.invalid_primitive_schema_mismatch_template(
                     name, expected_type, value
                 )

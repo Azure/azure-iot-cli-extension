@@ -6,11 +6,12 @@
 
 
 def extract_schema_type(schema: dict):
+    # some error with parsing schema
     if not isinstance(schema, dict):
         return
 
     schema_type = schema.get("schema")
-    # some kind of error with getting the device template
+    # some error with parsing schema
     if not schema_type:
         return
 

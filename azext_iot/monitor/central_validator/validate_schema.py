@@ -4,11 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 from azext_iot.common.utility import ISO8601Validator
-from azext_iot.monitor.central_validator import enum, obj, utils
-from azext_iot.monitor.central_validator.predefinied_complex_validator import (
-    validate_vector,
-    validate_geopoint,
-)
+from azext_iot.monitor.central_validator import utils
+from azext_iot.monitor.central_validator.validators import enum, geopoint, obj, vector
 
 iso_validator = ISO8601Validator()
 
@@ -21,13 +18,13 @@ validation_function_factory = {
     "long": lambda schema, value: isinstance(value, (float, int)),
     "string": lambda schema, value: isinstance(value, str),
     # primitive - time
-    "time": lambda schema, value: iso_validator.is_iso8601_time(value),
     "date": lambda schema, value: iso_validator.is_iso8601_date(value),
     "dateTime": lambda schema, value: iso_validator.is_iso8601_datetime(value),
     "duration": lambda schema, value: iso_validator.is_iso8601_duration(value),
+    "time": lambda schema, value: iso_validator.is_iso8601_time(value),
     # pre-defined complex
-    "vector": lambda schema, value: validate_vector(value),
-    "geopoint": lambda schema, value: validate_geopoint(value),
+    "geopoint": geopoint.validate,
+    "vector": vector.validate,
     # complex
     "Enum": enum.validate,
     "Object": obj.validate,
