@@ -151,8 +151,48 @@ class TestIotCentral(LiveScenarioTest):
         map_json = map_output.get_output_in_json()
         assert map_json[template_name] == template_id
 
-    def test_central_device_registration_info(self):
-        (device_id, _) = self._create_device()
+    def test_central_device_registration_info_registered(self):
+        (template_id, _) = self._create_device_template()
+        (device_id, device_name) = self._create_device(
+            instance_of=template_id, simulated=False
+        )
+
+        result = self.cmd(
+            "iot central app device registration-info --app-id {} -d {}".format(
+                APP_ID, device_id
+            )
+        )
+
+        self._delete_device(device_id)
+        self._delete_device_template(template_id)
+
+        json_result = result.get_output_in_json()
+
+        assert json_result["@device_id"] == device_id
+
+        # since time taken for provisioning to complete is not known
+        # we can only assert that the payload is populated, not anything specific beyond that
+        assert json_result["device_registration_info"] is not None
+        assert json_result["dps_state"] is not None
+
+        # Validation - device registration.
+        device_registration_info = json_result["device_registration_info"]
+        assert len(device_registration_info) == 5
+        assert device_registration_info.get("device_status") == "registered"
+        assert device_registration_info.get("id") == device_id
+        assert device_registration_info.get("display_name") == device_name
+        assert device_registration_info.get("instance_of") == template_id
+        assert not device_registration_info.get("simulated")
+
+        # Validation - dps state
+        dps_state = json_result["dps_state"]
+        assert len(dps_state) == 2
+        assert device_registration_info.get("status") is None
+        assert dps_state.get("error") == "Device is not yet provisioned."
+
+    def test_central_device_registration_info_unassociated(self):
+
+        (device_id, device_name) = self._create_device()
 
         result = self.cmd(
             "iot central app device registration-info --app-id {} -d {}".format(
@@ -163,6 +203,7 @@ class TestIotCentral(LiveScenarioTest):
         self._delete_device(device_id)
 
         json_result = result.get_output_in_json()
+
         assert json_result["@device_id"] == device_id
 
         # since time taken for provisioning to complete is not known
@@ -170,58 +211,23 @@ class TestIotCentral(LiveScenarioTest):
         assert json_result["device_registration_info"] is not None
         assert json_result["dps_state"] is not None
 
-    def test_central_device_registration_info_filter_unassociated(self):
-        device_status_expected = "unassociated"
+        # Validation - device registration.
+        device_registration_info = json_result["device_registration_info"]
+        assert len(device_registration_info) == 5
+        assert device_registration_info.get("device_status") == "unassociated"
+        assert device_registration_info.get("id") == device_id
+        assert device_registration_info.get("display_name") == device_name
+        assert device_registration_info.get("instance_of") is None
+        assert not device_registration_info.get("simulated")
 
-        (device_id, _) = self._create_device()
-
-        result = self.cmd(
-            "iot central app device registration-info --app-id {} --ds {}".format(
-                APP_ID, device_status_expected
-            )
+        # Validation - dps state
+        dps_state = json_result["dps_state"]
+        assert len(dps_state) == 2
+        assert device_registration_info.get("status") is None
+        assert (
+            dps_state.get("error")
+            == "Device does not have a valid template associated with it."
         )
-
-        self._delete_device(device_id)
-
-        json_result = []
-        device_info_results = []
-        json_result = result.get_output_in_json()
-        for device in json_result:
-            device_info_results.append(device.get("device_registration_info"))
-
-        for device in device_info_results:
-            assert device.get("device_status") == device_status_expected
-            assert device.get("display_name")
-            assert device.get("id")
-            assert not device.get("simulated")
-            assert not device.get("instance_of")
-
-    def test_central_device_registration_info_filter_registered(self):
-        device_status_expected = "registered"
-        (template_id, _) = self._create_device_template()
-        (device_id, _) = self._create_device(instance_of=template_id)
-
-        result = self.cmd(
-            "iot central app device registration-info --app-id {} --ds {}".format(
-                APP_ID, device_status_expected
-            )
-        )
-
-        self._delete_device(device_id)
-        self._delete_device_template(template_id)
-
-        json_result = []
-        device_info_results = []
-        json_result = result.get_output_in_json()
-        for device in json_result:
-            device_info_results.append(device.get("device_registration_info"))
-
-        for device in device_info_results:
-            assert device.get("device_status") == device_status_expected
-            assert device.get("display_name")
-            assert device.get("id")
-            assert not device.get("simulated")
-            assert device.get("instance_of")
 
     def _create_device(self, **kwargs) -> (str, str):
         """
