@@ -18,6 +18,7 @@ env =
     azext_iot_testhub_cs=
     azext_iot_testdps=
     azext_iot_teststorageuri=
+    azext_iot_testidentity=
     azext_pnp_endpoint=
     azext_pnp_repository=
     azext_pnp_cs=

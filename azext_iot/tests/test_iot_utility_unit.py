@@ -16,6 +16,7 @@ from azext_iot.common.utility import (
     read_file_content,
     logger,
     ISO8601Validator,
+    ensure_min_version,
 )
 from azext_iot.common.deps import ensure_uamqp
 from azext_iot.constants import EVENT_LIB, EXTENSION_NAME
@@ -345,3 +346,19 @@ class TestISO8601Validator:
     def test_is_iso8601_time_fail(self, to_validate):
         result = self.validator.is_iso8601_time(to_validate)
         assert not result
+
+
+class TestVersionComparison:
+    @pytest.mark.parametrize(
+        "current, minimum, expected",
+        [
+            ("1.0", "2.0", False),
+            ("1.8.7", "1.8.6.4", True),
+            ("1.0+a", "1.0", True),
+            ("1.0+a", "1.0+b", False),
+            ("1.0", "1.0", True),
+            ("2.0.1.9", "2.0.6", False),
+        ],
+    )
+    def test_ensure_min_version(self, current, minimum, expected):
+        assert ensure_min_version(current, minimum) == expected
