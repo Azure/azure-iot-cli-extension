@@ -2072,7 +2072,7 @@ def iot_device_export(
         return client.export_devices(
             target["resourcegroup"], hub_name, export_devices_parameters=export_request,
         )
-    if storage_authentication_type is not None:
+    if storage_authentication_type:
         raise CLIError(
             "Device export authentication-type properties require a dependency of azure-mgmt-iothub>=0.12.0"
         )
@@ -2117,7 +2117,7 @@ def iot_device_import(
         return client.import_devices(
             target["resourcegroup"], hub_name, import_devices_parameters=import_request,
         )
-    if storage_authentication_type is not None:
+    if storage_authentication_type:
         raise CLIError(
             "Device import authentication-type properties require a dependency of azure-mgmt-iothub>=0.12.0"
         )
