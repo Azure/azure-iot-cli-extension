@@ -20,6 +20,33 @@ parser = CentralParser(None, None, None)
 get_schemas = parser._extract_template_schemas_from_template
 
 
+class TestExtractSchemaType:
+    def test_extract_schema_type(self):
+        expected_mapping = {
+            "Bool": "boolean",
+            "Date": "date",
+            "DateTime": "dateTime",
+            "Double": "double",
+            "Date": "date",
+            "Duration": "duration",
+            "IntEnum": "Enum",
+            "StringEnum": "Enum",
+            "Float": "float",
+            "Geopoint": "geopoint",
+            "Long": "long",
+            "Object": "Object",
+            "String": "string",
+            "Time": "time",
+            "Vector": "vector",
+            "String": "string",
+        }
+        template = load_json(FileNames.central_device_template_file)
+        schemas = get_schemas(template)
+        for key, val in expected_mapping.items():
+            schema_type = extract_schema_type(schemas[key])
+            assert schema_type == val
+
+
 class TestPrimitiveValidations:
     @pytest.mark.parametrize(
         "value, expected_result",
