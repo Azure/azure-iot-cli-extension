@@ -31,6 +31,7 @@ from azext_iot.common.shared import (
     JobType,
     JobCreateType,
     JobStatusType,
+    AuthenticationType,
 )
 from azext_iot._validators import mode2_iot_login_handler
 from azext_iot.assets.user_messages import info_param_properties_device
@@ -373,9 +374,10 @@ def load_arguments(self, _):
         context.argument(
             "blob_container_uri",
             options_list=["--blob-container-uri", "--bcu"],
-            help="Blob Shared Access Signature URI with write access to "
+            help="Blob Shared Access Signature URI with write, read, and delete access to "
             "a blob container. This is used to output the status of the "
-            "job and the results.",
+            "job and the results. Note: when using Identity-based authentication, you must supply an "
+            "https:// URI.",
         )
         context.argument(
             "include_keys",
@@ -384,6 +386,12 @@ def load_arguments(self, _):
             help="If set, keys are exported normally. Otherwise, keys are "
             "set to null in export output.",
         )
+        context.argument(
+            "storage_authentication_type",
+            options_list=["--auth-type", "--storage-authentication-type"],
+            arg_type=get_enum_type(AuthenticationType),
+            help="Authentication type for communicating with the storage container.",
+        )
 
     with self.argument_context("iot hub device-identity import") as context:
         context.argument(
@@ -391,14 +399,22 @@ def load_arguments(self, _):
             options_list=["--input-blob-container-uri", "--ibcu"],
             help="Blob Shared Access Signature URI with read access to a blob "
             "container. This blob contains the operations to be performed on "
-            "the identity registry ",
+            "the identity registry. Note: when using Identity-based authentication, you must supply an "
+            "https:// URI",
         )
         context.argument(
             "output_blob_container_uri",
             options_list=["--output-blob-container-uri", "--obcu"],
             help="Blob Shared Access Signature URI with write access "
             "to a blob container. This is used to output the status of "
-            "the job and the results.",
+            "the job and the results. Note: when using Identity-based authentication, you must supply an "
+            "https:// URI",
+        )
+        context.argument(
+            "storage_authentication_type",
+            options_list=["--auth-type", "--storage-authentication-type"],
+            arg_type=get_enum_type(AuthenticationType),
+            help="Authentication type for communicating with the storage container.",
         )
 
     with self.argument_context("iot hub device-identity get-parent") as context:
