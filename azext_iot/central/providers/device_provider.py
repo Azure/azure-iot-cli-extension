@@ -195,7 +195,7 @@ class CentralDeviceProvider:
             dps_state = dps_global_service.get_registration_state(
                 id_scope=id_scope, key=key, device_id=device_id
             )
-        dps_state = self.dps_populate_essential_info(dps_state, device.device_status)
+        dps_state = self._dps_populate_essential_info(dps_state, device.device_status)
 
         info = {
             "@device_id": device_id,
@@ -207,7 +207,7 @@ class CentralDeviceProvider:
 
         return info
 
-    def dps_populate_essential_info(self, dps_info, device_status: DeviceStatus):
+    def _dps_populate_essential_info(self, dps_info, device_status: DeviceStatus):
         error = {
             DeviceStatus.provisioned: "None.",
             DeviceStatus.registered: "Device is not yet provisioned.",
