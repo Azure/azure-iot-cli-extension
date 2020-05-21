@@ -214,3 +214,12 @@ class JobStatusType(Enum):
     cancelled = "cancelled"
     scheduled = "scheduled"
     queued = "queued"
+
+
+class AuthenticationType(Enum):
+    """
+    Route or endpoint authentication mechanism.
+    """
+
+    keyBased = "key"
+    identityBased = "identity"

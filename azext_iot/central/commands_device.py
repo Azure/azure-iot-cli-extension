@@ -63,21 +63,10 @@ def delete_device(
 
 
 def registration_info(
-    cmd,
-    app_id: str,
-    device_id=None,
-    token=None,
-    central_dns_suffix="azureiotcentral.com",
-    device_status=None,
+    cmd, app_id: str, device_id, token=None, central_dns_suffix="azureiotcentral.com",
 ):
     provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token,)
-    if not device_id:
-        return provider.get_all_registration_info(
-            central_dns_suffix=central_dns_suffix, device_status=device_status
-        )
 
     return provider.get_device_registration_info(
-        device_id=device_id,
-        central_dns_suffix=central_dns_suffix,
-        device_status=device_status,
+        device_id=device_id, central_dns_suffix=central_dns_suffix, device_status=None,
     )

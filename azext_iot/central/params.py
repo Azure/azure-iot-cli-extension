@@ -9,9 +9,7 @@ CLI parameter definitions.
 """
 
 from knack.arguments import CLIArgumentType, CaseInsensitiveList
-
-from azure.cli.core.commands.parameters import get_three_state_flag, get_enum_type
-from azext_iot.central.models.enum import DeviceStatus
+from azure.cli.core.commands.parameters import get_three_state_flag
 from azext_iot.monitor.models.enum import Severity
 from azext_iot._params import event_msg_prop_type, event_timeout_type
 
@@ -79,12 +77,6 @@ def load_central_arguments(self, _):
             options_list=["--central-dns-suffix", "--central-api-uri"],
             help="Central dns suffix. "
             "This enables running cli commands against non public/prod environments",
-        )
-        context.argument(
-            "device_status",
-            options_list=["--device-status", "--ds"],
-            arg_type=get_enum_type(DeviceStatus),
-            help="Indicates filter option for device status",
         )
 
     with self.argument_context("iot central app monitor-events") as context:

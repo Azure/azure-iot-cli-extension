@@ -16,6 +16,7 @@ from azext_iot.common.utility import (
     read_file_content,
     logger,
     ISO8601Validator,
+    ensure_min_version,
 )
 from azext_iot.common.deps import ensure_uamqp
 from azext_iot.constants import EVENT_LIB, EXTENSION_NAME
@@ -278,3 +279,19 @@ class TestProcessJsonArg(object):
             )
         )
         assert mocked_util_logger.call_count == 0
+
+
+class TestVersionComparison:
+    @pytest.mark.parametrize(
+        "current, minimum, expected",
+        [
+            ("1.0", "2.0", False),
+            ("1.8.7", "1.8.6.4", True),
+            ("1.0+a", "1.0", True),
+            ("1.0+a", "1.0+b", False),
+            ("1.0", "1.0", True),
+            ("2.0.1.9", "2.0.6", False),
+        ],
+    )
+    def test_ensure_min_version(self, current, minimum, expected):
+        assert ensure_min_version(current, minimum) == expected
