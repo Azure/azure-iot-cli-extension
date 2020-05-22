@@ -15,7 +15,6 @@ from azext_iot.common.utility import (
     process_json_arg,
     read_file_content,
     logger,
-    ISO8601Validator,
     ensure_min_version,
 )
 from azext_iot.common.deps import ensure_uamqp
