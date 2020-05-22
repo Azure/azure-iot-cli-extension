@@ -8,7 +8,7 @@ import os
 import time
 
 from azure.cli.testsdk import LiveScenarioTest
-
+from azext_iot.central.models.enum import DeviceStatus
 from azext_iot.common import utility
 
 APP_ID = os.environ.get("azext_iot_central_app_id")
@@ -228,6 +228,19 @@ class TestIotCentral(LiveScenarioTest):
             dps_state.get("error")
             == "Device does not have a valid template associated with it."
         )
+
+    def test_central_device_registration_summary(self):
+
+        result = self.cmd(
+            "iot central app device registration-summary --app-id {}".format(APP_ID,)
+        )
+
+        json_result = result.get_output_in_json()
+        assert json_result[DeviceStatus.provisioned.value] is not None
+        assert json_result[DeviceStatus.registered.value] is not None
+        assert json_result[DeviceStatus.unassociated.value] is not None
+        assert json_result[DeviceStatus.blocked.value] is not None
+        assert len(json_result) == 4
 
     def _create_device(self, **kwargs) -> (str, str):
         """
