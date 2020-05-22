@@ -10,9 +10,11 @@ import requests
 from knack.util import CLIError
 from typing import List
 from azext_iot.central.models.enum import DeviceStatus
-
+from knack.log import get_logger
 from azext_iot.central.services import _utility
 from azext_iot.central.models.device import Device
+
+logger = get_logger(__name__)
 
 BASE_PATH = "api/preview/devices"
 
@@ -102,17 +104,14 @@ def get_device_registration_summary(
         registration summary
     """
 
-    registration_summary = {
-        DeviceStatus.provisioned.value: 0,
-        DeviceStatus.registered.value: 0,
-        DeviceStatus.unassociated.value: 0,
-        DeviceStatus.blocked.value: 0,
-    }
+    registration_summary = {status.value: 0 for status in DeviceStatus}
 
     url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
     headers = _utility.get_headers(token, cmd)
-
-    while url is not None:
+    logger.warn(
+        "This command may take a long time to complete if your app contains a lot of devices"
+    )
+    while url:
         response = requests.get(url, headers=headers)
         result = _utility.try_extract_result(response)
 
@@ -122,6 +121,7 @@ def get_device_registration_summary(
         for device in result["value"]:
             registration_summary[Device(device).device_status.value] += 1
 
+        print("Processed {} devices...".format(sum(registration_summary.values())))
         url = result.get("nextLink")
     return registration_summary
 
