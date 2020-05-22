@@ -129,7 +129,7 @@ def _load_central_devices_help():
             short-summary: Provides a registration summary of all the devices in an app.
             long-summary: |
                 Note: This command can take a significant amount of time to return
-                if no device id is specified and your app contains a lot of devices
+                if your app contains a lot of devices
             examples:
             - name: Registration summary
               text: >
