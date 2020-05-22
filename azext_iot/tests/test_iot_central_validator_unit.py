@@ -17,7 +17,8 @@ from .test_constants import FileNames
 # makes it easier to get the schemas out of the template
 # also helps surface template parsing bugs
 parser = CentralParser(None, None, None)
-get_schemas = parser._extract_template_schemas_from_template
+get_interfaces = parser._extract_interfaces
+get_schema = parser._find_schema
 
 
 class TestExtractSchemaType:
@@ -39,9 +40,10 @@ class TestExtractSchemaType:
             "Vector": "vector",
         }
         template = load_json(FileNames.central_device_template_file)
-        schemas = get_schemas(template)
+        interfaces = get_interfaces(template)
         for key, val in expected_mapping.items():
-            schema_type = extract_schema_type(schemas[key])
+            schema = get_schema(key, interfaces)
+            schema_type = extract_schema_type(schema)
             assert schema_type == val
 
 
@@ -188,8 +190,8 @@ class TestComplexType:
     )
     def test_int_enum(self, value, expected_result):
         template = load_json(FileNames.central_device_template_file)
-        schemas = get_schemas(template)
-        schema = schemas["IntEnum"]
+        interfaces = get_interfaces(template)
+        schema = get_schema("IntEnum", interfaces)
         assert validate(schema, value) == expected_result
 
     @pytest.mark.parametrize(
@@ -198,8 +200,8 @@ class TestComplexType:
     )
     def test_str_enum(self, value, expected_result):
         template = load_json(FileNames.central_device_template_file)
-        schemas = get_schemas(template)
-        schema = schemas["StringEnum"]
+        interfaces = get_interfaces(template)
+        schema = get_schema("StringEnum", interfaces)
         assert validate(schema, value) == expected_result
 
     @pytest.mark.parametrize(
@@ -213,8 +215,8 @@ class TestComplexType:
     )
     def test_object_simple(self, value, expected_result):
         template = load_json(FileNames.central_device_template_file)
-        schemas = get_schemas(template)
-        schema = schemas["Object"]
+        interfaces = get_interfaces(template)
+        schema = get_schema("Object", interfaces)
         assert validate(schema, value) == expected_result
 
     @pytest.mark.parametrize(
@@ -230,8 +232,8 @@ class TestComplexType:
     )
     def test_object_medium(self, value, expected_result):
         template = load_json(FileNames.central_deeply_nested_device_template_file)
-        schemas = get_schemas(template)
-        schema = schemas["RidiculousObject"]
+        interfaces = get_interfaces(template)
+        schema = get_schema("RidiculousObject", interfaces)
         assert validate(schema, value) == expected_result
 
     @pytest.mark.parametrize(
@@ -308,6 +310,6 @@ class TestComplexType:
     )
     def test_object_deep(self, value, expected_result):
         template = load_json(FileNames.central_deeply_nested_device_template_file)
-        schemas = get_schemas(template)
-        schema = schemas["RidiculousObject"]
+        interfaces = get_interfaces(template)
+        schema = get_schema("RidiculousObject", interfaces)
         assert validate(schema, value) == expected_result

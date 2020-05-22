@@ -56,6 +56,13 @@ def invalid_custom_headers():
 
 
 # warning
+def invalid_interface_name(interface_name: str, allowed_interfaces: list):
+    return (
+        "Device is specifying an interface that is unknown. Device specified interface: {}. Allowed interfaces: {}."
+    ).format(interface_name, allowed_interfaces)
+
+
+# warning
 def invalid_field_name_mismatch_template(
     unmodeled_capabilities: list, modeled_capabilities: list
 ):
