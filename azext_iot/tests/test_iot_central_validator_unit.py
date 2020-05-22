@@ -27,7 +27,6 @@ class TestExtractSchemaType:
             "Date": "date",
             "DateTime": "dateTime",
             "Double": "double",
-            "Date": "date",
             "Duration": "duration",
             "IntEnum": "Enum",
             "StringEnum": "Enum",
@@ -38,7 +37,6 @@ class TestExtractSchemaType:
             "String": "string",
             "Time": "time",
             "Vector": "vector",
-            "String": "string",
         }
         template = load_json(FileNames.central_device_template_file)
         schemas = get_schemas(template)
