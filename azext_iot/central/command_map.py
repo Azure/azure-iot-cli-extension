@@ -45,6 +45,9 @@ def load_central_commands(self, _):
         cmd_group.command("create", "create_device")
         cmd_group.command("delete", "delete_device")
         cmd_group.command("registration-info", "registration_info")
+        cmd_group.command(
+            "registration-summary", "registration_summary",
+        )
 
     with self.command_group(
         "iot central app device-template",

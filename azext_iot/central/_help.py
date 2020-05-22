@@ -111,16 +111,36 @@ def _load_central_devices_help():
         "iot central app device registration-info"
     ] = """
         type: command
-        short-summary: Get registration info for a given device in IoT Central
+        short-summary: Get registration info on device(s) from IoT Central
         long-summary: |
             Note: This command can take a significant amount of time to return
             if no device id is specified and your app contains a lot of devices
 
         examples:
+        - name: Get registration info on all devices. This command may take a long time to complete execution.
+          text: >
+            az iot central app device registration-info
+            --app-id {appid}
+
         - name: Get registration info on specified device
           text: >
             az iot central app device registration-info
-            --app-id {appid} --device-id {deviceid}
+            --app-id {appid}
+            --device-id {deviceid}
+    """
+
+
+helps[
+    "iot central app device registration-summary"
+] = """
+        type: command
+        short-summary: Provides a registration summary of all the devices in an app. 
+
+        examples:
+        - name: Registration summary
+          text: >
+            az iot central app device registration-summary
+            --app-id {appid}            
     """
 
 

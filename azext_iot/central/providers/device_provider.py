@@ -221,3 +221,11 @@ class CentralDeviceProvider:
             "error": error.get(device_status),
         }
         return filtered_dps_info
+
+    def get_device_registration_summary(self, central_dns_suffix="azureiotcentral.com"):
+        return central_services.device.get_device_registration_summary(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            token=self._token,
+            central_dns_suffix=central_dns_suffix,
+        )

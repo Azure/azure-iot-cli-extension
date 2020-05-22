@@ -70,3 +70,12 @@ def registration_info(
     return provider.get_device_registration_info(
         device_id=device_id, central_dns_suffix=central_dns_suffix, device_status=None,
     )
+
+
+def registration_summary(
+    cmd, app_id: str, token=None, central_dns_suffix="azureiotcentral.com",
+):
+    provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token,)
+    return provider.get_device_registration_summary(
+        central_dns_suffix=central_dns_suffix,
+    )

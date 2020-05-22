@@ -9,6 +9,7 @@ import requests
 
 from knack.util import CLIError
 from typing import List
+from azext_iot.central.models.enum import DeviceStatus
 
 from azext_iot.central.services import _utility
 from azext_iot.central.models.device import Device
@@ -82,6 +83,47 @@ def list_devices(
         pages_processed = pages_processed + 1
 
     return devices
+
+
+def get_device_registration_summary(
+    cmd, app_id: str, token: str, central_dns_suffix="azureiotcentral.com",
+):
+    """
+    Get device registration summary for a given app
+
+    Args:
+        cmd: command passed into az
+        app_id: name of app (used for forming request URL)
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        registration summary
+    """
+
+    registration_summary = {
+        DeviceStatus.provisioned.value: 0,
+        DeviceStatus.registered.value: 0,
+        DeviceStatus.unassociated.value: 0,
+        DeviceStatus.blocked.value: 0,
+    }
+
+    url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
+    headers = _utility.get_headers(token, cmd)
+
+    while url is not None:
+        response = requests.get(url, headers=headers)
+        result = _utility.try_extract_result(response)
+
+        if "value" not in result:
+            raise CLIError("Value is not present in body: {}".format(result))
+
+        for device in result["value"]:
+            registration_summary[Device(device).device_status.value] += 1
+
+        url = result.get("nextLink")
+    return registration_summary
 
 
 def create_device(
