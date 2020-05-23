@@ -130,17 +130,21 @@ class CentralParser(CommonParser):
     def _validate_payload_against_interfaces(
         self, payload: dict, interfaces: dict,
     ):
+        template_schema_names = {
+            interface_name: [schema_name for schema_name in interface_schemas]
+            for interface_name, interface_schemas in interfaces.items()
+        }
         name_miss = []
         for telemetry_name, telemetry in payload.items():
             schema = self._find_schema(telemetry_name, interfaces)
             if not schema:
                 name_miss.append(telemetry_name)
             else:
-                self._process_telemetry(schema, telemetry)
+                self._process_telemetry(telemetry_name, schema, telemetry)
 
         if name_miss:
             details = strings.invalid_field_name_mismatch_template(
-                name_miss, list(template_schema_names)
+                name_miss, template_schema_names
             )
             self._add_central_issue(severity=Severity.warning, details=details)
 
@@ -171,11 +175,11 @@ class CentralParser(CommonParser):
         # caller should add name_miss
         return None
 
-    def _process_telemetry(self, schema, telemetry):
+    def _process_telemetry(self, telemetry_name, schema, telemetry):
         expected_type = extract_schema_type(schema)
         is_payload_valid = validate(schema, telemetry)
         if expected_type and not is_payload_valid:
             details = strings.invalid_primitive_schema_mismatch_template(
-                name, expected_type, telemetry
+                telemetry_name, expected_type, telemetry
             )
             self._add_central_issue(severity=Severity.error, details=details)

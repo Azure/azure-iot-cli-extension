@@ -69,7 +69,7 @@ def invalid_field_name_mismatch_template(
     return (
         "Device is sending data that has not been defined in the device template. "
         "Following capabilities have NOT been defined in the device template '{}'. "
-        "Following capabilities have been defined in the device template '{}'. "
+        "Following capabilities have been defined in the device template (grouped by interface) '{}'. "
     ).format(unmodeled_capabilities, modeled_capabilities)
 
 
