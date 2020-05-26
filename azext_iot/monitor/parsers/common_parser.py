@@ -18,6 +18,7 @@ from azext_iot.monitor.parsers.issue import IssueHandler
 
 DEVICE_ID_IDENTIFIER = b"iothub-connection-device-id"
 INTERFACE_NAME_IDENTIFIER = b"iothub-interface-name"
+MODULE_ID_IDENTIFIER = b"iothub-connection-module-id"
 
 
 class CommonParser(AbstractBaseParser):
@@ -27,6 +28,7 @@ class CommonParser(AbstractBaseParser):
         self._message = message
         self.device_id = self._parse_device_id(message)
         self.interface_name = self._parse_interface_name(message)
+        self.module_id = self._parse_module_id(message)
 
     def parse_message(self) -> dict:
         message = self._message
@@ -81,6 +83,14 @@ class CommonParser(AbstractBaseParser):
             return str(message.annotations.get(DEVICE_ID_IDENTIFIER), "utf8")
         except Exception:
             details = strings.unknown_device_id()
+            self._add_issue(severity=Severity.error, details=details)
+            return ""
+
+    def _parse_module_id(self, message: Message) -> str:
+        try:
+            return str(message.annotations.get(MODULE_ID_IDENTIFIER), "utf8")
+        except Exception:
+            details = strings.unknown_module_id()
             self._add_issue(severity=Severity.error, details=details)
             return ""
 

@@ -275,6 +275,12 @@ def _load_central_monitors_help():
         - name: Receive all messages and parse message payload as JSON
           text: >
             az iot central app monitor-events --app-id {app_id} --output json
+          text: >
+            az iot central app monitor-events --app-id {app_id} -m {module_id}
+        - name: Basic usage when filtering on module.
+          text: >
+            az iot central app monitor-events --app-id {app_id} -m Module*
+        - name: Basic usage when filtering targeted modules with a wildcard in the ID
     """
 
     helps[
@@ -302,6 +308,12 @@ def _load_central_monitors_help():
         - name: Filter device and specify an Event Hub consumer group to bind to.
           text: >
             az iot central app validate-messages --app-id {app_id} -d {device_id} --cg {consumer_group_name}
+          text: >
+            az iot central app validate-messages --app-id {app_id} -m {module_id}
+        - name: Basic usage when filtering on module.
+          text: >
+            az iot central app validate-messages --app-id {app_id} -m Module*
+        - name: Basic usage when filtering targeted modules with a wildcard in the ID
     """
 
 
