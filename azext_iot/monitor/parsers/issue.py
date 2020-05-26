@@ -73,7 +73,6 @@ class IssueHandler:
         )
         self._issues.append(issue)
 
-
     def add_central_issue(
         self, severity: Severity, details: str, message, device_id="", template_id=""
     ):
