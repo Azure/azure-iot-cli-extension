@@ -14,10 +14,6 @@ def unknown_device_id():  # error
     return "Device ID not found in message"
 
 
-def unknown_module_id():  # error
-    return "Module ID not found in message"
-
-
 def invalid_json():  # error
     return "Invalid JSON format."
 

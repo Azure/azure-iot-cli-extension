@@ -30,9 +30,6 @@ class CommonHandler(AbstractBaseEventsHandler):
         if not self._should_process_interface(parser.interface_name):
             return
 
-        if not self._should_process_module(parser.module_id):
-            return
-
         result = parser.parse_message()
 
         if self._common_handler_args.output.lower() == "json":
@@ -73,24 +70,3 @@ class CommonHandler(AbstractBaseEventsHandler):
 
         # only process if the expected and actual interface name match
         return expected_interface_name == interface_name
-
-    def _should_process_module(self, module_id):
-        expected_module_id = self._common_handler_args.module_id
-
-        # if no filter is specified, then process all modules
-        if not expected_module_id:
-            return True
-
-        if expected_module_id and expected_module_id != module_id:
-            if "*" in expected_module_id or "?" in expected_module_id:
-                regex = (
-                    re.escape(expected_module_id)
-                    .replace("\\*", ".*")
-                    .replace("\\?", ".")
-                    + "$"
-                )
-                if not re.match(regex, module_id):
-                    return False
-            else:
-                return False
-        return True

@@ -12,9 +12,6 @@ from azext_iot.monitor.handlers.common_handler import CommonHandler
 from azext_iot.monitor.models.arguments import CentralHandlerArguments
 from azext_iot.monitor.parsers.central_parser import CentralParser
 from azext_iot.monitor.parsers.issue import Issue
-from knack.log import get_logger
-
-logger = get_logger(__name__)
 
 
 class CentralHandler(CommonHandler):
@@ -51,9 +48,6 @@ class CentralHandler(CommonHandler):
         if not self._should_process_device(parser.device_id):
             return
 
-        if not self._should_process_module(parser.module_id):
-            return
-
         parsed_message = parser.parse_message()
 
         self._messages.append(parsed_message)
@@ -77,14 +71,10 @@ class CentralHandler(CommonHandler):
             [issue.log() for issue in issues]
 
     def generate_startup_string(self, name: str):
-        filter_text = ""
+        device_filter_text = ""
         device_id = self._central_handler_args.common_handler_args.device_id
         if device_id:
-            filter_text = ".\nFiltering on device: {}".format(device_id)
-        module_id = self._central_handler_args.common_handler_args.module_id
-        if module_id:
-            logger.warn("Module filtering is applicable only for edge devices")
-            filter_text += ".\nFiltering on module: {}".format(module_id)
+            device_filter_text = ".\nFiltering on device: {}".format(device_id)
 
         exit_text = ""
         if (
@@ -104,7 +94,7 @@ class CentralHandler(CommonHandler):
                 self._central_handler_args.max_messages
             )
 
-        result = "{} telemetry{}{}".format(name, filter_text, exit_text)
+        result = "{} telemetry{}{}".format(name, device_filter_text, exit_text)
 
         return result
 
