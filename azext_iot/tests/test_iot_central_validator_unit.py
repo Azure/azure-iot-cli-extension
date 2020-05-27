@@ -4,11 +4,9 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import json
 import pytest
 
 from azext_iot.monitor.parsers.central_parser import CentralParser
-from azext_iot.monitor.central_validator.validators import enum
 from azext_iot.monitor.central_validator import validate, extract_schema_type
 
 from .helpers import load_json
@@ -186,7 +184,7 @@ class TestPredefinedComplexType:
 class TestComplexType:
     @pytest.mark.parametrize(
         "value, expected_result",
-        [(1, True), (2, True), (3, False), ("1", False), ("2", False),],
+        [(1, True), (2, True), (3, False), ("1", False), ("2", False)],
     )
     def test_int_enum(self, value, expected_result):
         template = load_json(FileNames.central_device_template_file)
@@ -196,7 +194,7 @@ class TestComplexType:
 
     @pytest.mark.parametrize(
         "value, expected_result",
-        [("A", True), ("B", True), ("C", False), (1, False), (2, False),],
+        [("A", True), ("B", True), ("C", False), (1, False), (2, False)],
     )
     def test_str_enum(self, value, expected_result):
         template = load_json(FileNames.central_device_template_file)
