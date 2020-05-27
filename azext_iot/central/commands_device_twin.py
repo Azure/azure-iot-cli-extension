@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from knack.util import CLIError
+from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot._factory import _bind_sdk
 from azext_iot.common.shared import SdkType
 from azext_iot.common.utility import unpack_msrest_error
@@ -15,7 +16,7 @@ def find_between(s, start, end):
     return (s.split(start))[1].split(end)[0]
 
 
-def device_twin_show(cmd, device_id, app_id, central_dns_suffix="azureiotcentral.com"):
+def device_twin_show(cmd, device_id, app_id, central_dns_suffix=CENTRAL_ENDPOINT):
     from azext_iot.common._azure import get_iot_central_tokens
 
     tokens = get_iot_central_tokens(cmd, app_id, central_dns_suffix)

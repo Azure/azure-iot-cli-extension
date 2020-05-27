@@ -9,7 +9,12 @@ import mock
 import pytest
 
 from uamqp.message import Message, MessageProperties
-from azext_iot.central.providers import CentralDeviceProvider
+from azext_iot.central.providers import (
+    CentralDeviceProvider,
+    CentralDeviceTemplateProvider,
+)
+from azext_iot.central.models.template import Template
+from azext_iot.central.models.device import Device
 from azext_iot.monitor.parsers import common_parser, central_parser
 from azext_iot.monitor.parsers import strings
 from azext_iot.monitor.models.arguments import CommonParserArguments
@@ -263,11 +268,6 @@ class TestCentralParser:
         parser = self._create_parser(
             device_template=device_template, message=message, args=args
         )
-        interfaces = parser._extract_interfaces(device_template)
-        template_schema_names = {
-            interface_name: list(interface_schemas.keys())
-            for interface_name, interface_schemas in interfaces.items()
-        }
 
         # act
         parsed_msg = parser.parse_message()
@@ -284,7 +284,7 @@ class TestCentralParser:
 
         # field name not present in template warning
         expected_details_2 = strings.invalid_field_name_mismatch_template(
-            list(self.bad_field_name.keys()), template_schema_names
+            list(self.bad_field_name.keys()), device_template.schema_names
         )
 
         _validate_issues(parser, Severity.warning, 2, 1, [expected_details_2])
@@ -309,11 +309,6 @@ class TestCentralParser:
 
         # act
         parsed_msg = parser.parse_message()
-        interfaces = parser._extract_interfaces(device_template)
-        template_schema_names = {
-            interface_name: list(interface_schemas.keys())
-            for interface_name, interface_schemas in interfaces.items()
-        }
 
         # verify
         assert parsed_msg["event"]["payload"] == self.bad_dcm_payload
@@ -327,7 +322,7 @@ class TestCentralParser:
         assert properties["application"] == self.app_properties
 
         expected_details = strings.invalid_field_name_mismatch_template(
-            list(self.bad_dcm_payload.keys()), template_schema_names
+            list(self.bad_dcm_payload.keys()), device_template.schema_names
         )
 
         _validate_issues(parser, Severity.warning, 1, 1, [expected_details])
@@ -350,6 +345,11 @@ class TestCentralParser:
             device_template=device_template, message=message, args=args
         )
 
+        # haven't found a better way to force the error to occur within parser
+        parser._central_template_provider.get_device_template = lambda x: Template(
+            device_template
+        )
+
         # act
         parsed_msg = parser.parse_message()
 
@@ -357,8 +357,8 @@ class TestCentralParser:
         assert parsed_msg["event"]["payload"] == self.bad_dcm_payload
         assert parsed_msg["event"]["origin"] == self.device_id
 
-        expected_details = strings.invalid_template_extract_schema_failed(
-            device_template
+        expected_details = strings.device_template_not_found(
+            "'str' object has no attribute 'get'"
         )
 
         _validate_issues(parser, Severity.error, 1, 1, [expected_details])
@@ -398,15 +398,20 @@ class TestCentralParser:
         _validate_issues(parser, Severity.error, 1, 1, [expected_details])
 
     def _get_template(self):
-        return load_json(FileNames.central_device_template_file)
+        return Template(load_json(FileNames.central_device_template_file))
 
     def _create_parser(
-        self, device_template: dict, message: Message, args: CommonParserArguments
+        self, device_template: Template, message: Message, args: CommonParserArguments
     ):
-        provider = CentralDeviceProvider(cmd=None, app_id=None)
-        provider.get_device_template_by_device_id = mock.MagicMock(
+        device_provider = CentralDeviceProvider(cmd=None, app_id=None)
+        template_provider = CentralDeviceTemplateProvider(cmd=None, app_id=None)
+        device_provider.get_device = mock.MagicMock(return_value=Device({}))
+        template_provider.get_device_template = mock.MagicMock(
             return_value=device_template
         )
         return central_parser.CentralParser(
-            message=message, central_device_provider=provider, common_parser_args=args
+            message=message,
+            central_device_provider=device_provider,
+            central_template_provider=template_provider,
+            common_parser_args=args,
         )

@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from knack.util import CLIError
+from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 
 
@@ -27,7 +28,7 @@ class CentralDeviceTemplateProvider:
         self._device_templates = {}
 
     def get_device_template(
-        self, device_template_id, central_dns_suffix="azureiotcentral.com",
+        self, device_template_id, central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         # get or add to cache
         device_template = self._device_templates.get(device_template_id)
@@ -51,20 +52,18 @@ class CentralDeviceTemplateProvider:
         return device_template
 
     def list_device_templates(
-        self, central_dns_suffix="azureiotcentral.com",
+        self, central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         templates = central_services.device_template.list_device_templates(
             cmd=self._cmd, app_id=self._app_id, token=self._token
         )
 
-        self._device_templates.update(
-            {template["id"]: template for template in templates}
-        )
+        self._device_templates.update({template.id: template for template in templates})
 
         return self._device_templates
 
     def map_device_templates(
-        self, central_dns_suffix="azureiotcentral.com",
+        self, central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         """
         Maps each template name to the corresponding template id
@@ -72,13 +71,13 @@ class CentralDeviceTemplateProvider:
         templates = central_services.device_template.list_device_templates(
             cmd=self._cmd, app_id=self._app_id, token=self._token
         )
-        return {template["displayName"]: template["id"] for template in templates}
+        return {template.name: template.id for template in templates}
 
     def create_device_template(
         self,
         device_template_id: str,
         payload: str,
-        central_dns_suffix="azureiotcentral.com",
+        central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         template = central_services.device_template.create_device_template(
             cmd=self._cmd,
@@ -89,12 +88,12 @@ class CentralDeviceTemplateProvider:
             central_dns_suffix=central_dns_suffix,
         )
 
-        self._device_templates[template["id"]] = template
+        self._device_templates[template.id] = template
 
         return template
 
     def delete_device_template(
-        self, device_template_id, central_dns_suffix="azureiotcentral.com",
+        self, device_template_id, central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         if not device_template_id:
             raise CLIError("Device template id must be specified.")

@@ -8,7 +8,11 @@ import re
 
 from uamqp.message import Message
 
-from azext_iot.central.providers import CentralDeviceProvider
+from azext_iot.central.providers import (
+    CentralDeviceProvider,
+    CentralDeviceTemplateProvider,
+)
+from azext_iot.central.models.template import Template
 from azext_iot.monitor.parsers import strings
 from azext_iot.monitor.central_validator import validate, extract_schema_type
 from azext_iot.monitor.models.arguments import CommonParserArguments
@@ -22,11 +26,13 @@ class CentralParser(CommonParser):
         message: Message,
         common_parser_args: CommonParserArguments,
         central_device_provider: CentralDeviceProvider,
+        central_template_provider: CentralDeviceTemplateProvider,
     ):
         super(CentralParser, self).__init__(
             message=message, common_parser_args=common_parser_args
         )
         self._central_device_provider = central_device_provider
+        self._central_template_provider = central_template_provider
         self._template_id = None
 
     def _add_central_issue(self, severity: Severity, details: str):
@@ -81,62 +87,46 @@ class CentralParser(CommonParser):
         if not isinstance(payload, dict):
             return
 
-        template = self._get_device_template()
+        template = self._get_template()
 
-        # _get_device_template should log error if there was an issue
-        if not template:
+        if not isinstance(template, Template):
             return
 
-        interfaces = self._extract_interfaces(template=template)
-
-        # _extract_interfaces should log error if there was an issue
-        if not isinstance(interfaces, dict):
+        # pnp device is sending data to an unrecognized interface
+        if self.interface_name and (self.interface_name not in template.interfaces):
+            details = strings.invalid_interface_name(
+                self.interface_name, list(template.interfaces.keys())
+            )
+            self._add_central_issue(severity=Severity.warning, details=details)
             return
 
         self._validate_payload_against_interfaces(
-            payload=payload, interfaces=interfaces,
+            payload=payload, template=template,
         )
 
-    def _get_device_template(self):
+    def _get_template(self):
         try:
-            return self._central_device_provider.get_device_template_by_device_id(
-                self.device_id
+            device = self._central_device_provider.get_device(self.device_id)
+            template = self._central_template_provider.get_device_template(
+                device.instance_of
             )
+            self._template_id = template.id
+            return template
         except Exception as e:
             details = strings.device_template_not_found(e)
             self._add_central_issue(severity=Severity.error, details=details)
-
-    def _extract_interfaces(self, template: dict):
-        try:
-            self._template_id = template.get("id")
-            interfaces = {}
-            dcm = template["capabilityModel"]
-            interfaces = dcm["implements"]
-            result = {
-                interface["name"]: self._extract_schemas(interface)
-                for interface in interfaces
-            }
-            return result
-        except Exception:
-            details = strings.invalid_template_extract_schema_failed(template)
-            self._add_central_issue(severity=Severity.error, details=details)
-
-    def _extract_schemas(self, interface: dict):
-        return {schema["name"]: schema for schema in interface["schema"]["contents"]}
 
     # currently validates:
     # 1) primitive types match (e.g. boolean is indeed bool etc)
     # 2) names match (i.e. Humidity vs humidity etc)
     def _validate_payload_against_interfaces(
-        self, payload: dict, interfaces: dict,
+        self, payload: dict, template: Template,
     ):
-        template_schema_names = {
-            interface_name: list(interface_schemas.keys())
-            for interface_name, interface_schemas in interfaces.items()
-        }
         name_miss = []
         for telemetry_name, telemetry in payload.items():
-            schema = self._find_schema(telemetry_name, interfaces)
+            schema = template.get_schema(
+                telemetry_name=telemetry_name, interface_name=self.interface_name
+            )
             if not schema:
                 name_miss.append(telemetry_name)
             else:
@@ -144,38 +134,11 @@ class CentralParser(CommonParser):
 
         if name_miss:
             details = strings.invalid_field_name_mismatch_template(
-                name_miss, template_schema_names
+                name_miss, template.schema_names
             )
             self._add_central_issue(severity=Severity.warning, details=details)
 
-    def _find_schema(self, telemetry_name: str, interfaces: dict):
-        interface = interfaces.get(self.interface_name)
-
-        # pnp device
-        if self.interface_name:
-            # pnp device is sending data to an unrecognized interface
-            if not isinstance(interface, dict):
-                details = strings.invalid_interface_name(
-                    self.interface_name, list(interfaces.keys())
-                )
-                self._add_central_issue(severity=Severity.warning, details=details)
-                return None
-
-            # return schema. If none is found, caller should handle adding a name_miss scenario
-            return interface.get(telemetry_name)
-
-        # non-pnp device, find first occurrence of telemetry_name
-        # no detection for multiple definitions under other interfaces
-        for interface in interfaces.values():
-            schema = interface.get(telemetry_name)
-            if schema:
-                return schema
-
-        # no interface was found if we reach this point
-        # caller should add name_miss
-        return None
-
-    def _process_telemetry(self, telemetry_name, schema, telemetry):
+    def _process_telemetry(self, telemetry_name: str, schema, telemetry):
         expected_type = extract_schema_type(schema)
         is_payload_valid = validate(schema, telemetry)
         if expected_type and not is_payload_valid:

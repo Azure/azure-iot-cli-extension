@@ -6,17 +6,11 @@
 
 import pytest
 
-from azext_iot.monitor.parsers.central_parser import CentralParser
+from azext_iot.central.models.template import Template
 from azext_iot.monitor.central_validator import validate, extract_schema_type
 
 from .helpers import load_json
 from .test_constants import FileNames
-
-# makes it easier to get the schemas out of the template
-# also helps surface template parsing bugs
-parser = CentralParser(None, None, None)
-get_interfaces = parser._extract_interfaces
-get_schema = parser._find_schema
 
 
 class TestExtractSchemaType:
@@ -37,10 +31,9 @@ class TestExtractSchemaType:
             "Time": "time",
             "Vector": "vector",
         }
-        template = load_json(FileNames.central_device_template_file)
-        interfaces = get_interfaces(template)
+        template = Template(load_json(FileNames.central_device_template_file))
         for key, val in expected_mapping.items():
-            schema = get_schema(key, interfaces)
+            schema = template.get_schema(key)
             schema_type = extract_schema_type(schema)
             assert schema_type == val
 
@@ -187,9 +180,8 @@ class TestComplexType:
         [(1, True), (2, True), (3, False), ("1", False), ("2", False)],
     )
     def test_int_enum(self, value, expected_result):
-        template = load_json(FileNames.central_device_template_file)
-        interfaces = get_interfaces(template)
-        schema = get_schema("IntEnum", interfaces)
+        template = Template(load_json(FileNames.central_device_template_file))
+        schema = template.get_schema("IntEnum")
         assert validate(schema, value) == expected_result
 
     @pytest.mark.parametrize(
@@ -197,9 +189,8 @@ class TestComplexType:
         [("A", True), ("B", True), ("C", False), (1, False), (2, False)],
     )
     def test_str_enum(self, value, expected_result):
-        template = load_json(FileNames.central_device_template_file)
-        interfaces = get_interfaces(template)
-        schema = get_schema("StringEnum", interfaces)
+        template = Template(load_json(FileNames.central_device_template_file))
+        schema = template.get_schema("StringEnum")
         assert validate(schema, value) == expected_result
 
     @pytest.mark.parametrize(
@@ -212,9 +203,8 @@ class TestComplexType:
         ],
     )
     def test_object_simple(self, value, expected_result):
-        template = load_json(FileNames.central_device_template_file)
-        interfaces = get_interfaces(template)
-        schema = get_schema("Object", interfaces)
+        template = Template(load_json(FileNames.central_device_template_file))
+        schema = template.get_schema("Object")
         assert validate(schema, value) == expected_result
 
     @pytest.mark.parametrize(
@@ -229,9 +219,10 @@ class TestComplexType:
         ],
     )
     def test_object_medium(self, value, expected_result):
-        template = load_json(FileNames.central_deeply_nested_device_template_file)
-        interfaces = get_interfaces(template)
-        schema = get_schema("RidiculousObject", interfaces)
+        template = Template(
+            load_json(FileNames.central_deeply_nested_device_template_file)
+        )
+        schema = template.get_schema("RidiculousObject")
         assert validate(schema, value) == expected_result
 
     @pytest.mark.parametrize(
@@ -307,7 +298,8 @@ class TestComplexType:
         ],
     )
     def test_object_deep(self, value, expected_result):
-        template = load_json(FileNames.central_deeply_nested_device_template_file)
-        interfaces = get_interfaces(template)
-        schema = get_schema("RidiculousObject", interfaces)
+        template = Template(
+            load_json(FileNames.central_deeply_nested_device_template_file)
+        )
+        schema = template.get_schema("RidiculousObject")
         assert validate(schema, value) == expected_result

@@ -58,7 +58,7 @@ def invalid_custom_headers():
 # warning
 def invalid_interface_name(interface_name: str, allowed_interfaces: list):
     return (
-        "Device is specifying an interface that is unknown. Device specified interface: {}. Allowed interfaces: {}."
+        "Device is specifying an interface that is unknown. Device specified interface: '{}'. Allowed interfaces: '{}'."
     ).format(interface_name, allowed_interfaces)
 
 
