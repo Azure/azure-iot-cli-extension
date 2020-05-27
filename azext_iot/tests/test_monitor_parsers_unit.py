@@ -358,7 +358,7 @@ class TestCentralParser:
         assert parsed_msg["event"]["origin"] == self.device_id
 
         expected_details = strings.device_template_not_found(
-            "'str' object has no attribute 'get'"
+            "Could not parse iot central device template."
         )
 
         _validate_issues(parser, Severity.error, 1, 1, [expected_details])
