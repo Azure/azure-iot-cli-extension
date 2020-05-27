@@ -263,6 +263,11 @@ class TestCentralParser:
         parser = self._create_parser(
             device_template=device_template, message=message, args=args
         )
+        interfaces = parser._extract_interfaces(device_template)
+        template_schema_names = {
+            interface_name: [schema_name for schema_name in interface_schemas]
+            for interface_name, interface_schemas in interfaces.items()
+        }
 
         # act
         parsed_msg = parser.parse_message()
@@ -271,12 +276,20 @@ class TestCentralParser:
         # parsing should attempt to place raw payload into result even if parsing fails
         assert parsed_msg["event"]["payload"] == self.bad_field_name
 
+        # field name contains '-' character error
         expected_details_1 = strings.invalid_field_name(
             list(self.bad_field_name.keys())
         )
-        _validate_issues(parser, Severity.error, 1, 1, [expected_details_1])
+        _validate_issues(parser, Severity.error, 2, 1, [expected_details_1])
 
-    def xtest_validate_against_template_should_fail(self):
+        # field name not present in template warning
+        expected_details_2 = strings.invalid_field_name_mismatch_template(
+            list(self.bad_field_name.keys()), template_schema_names
+        )
+
+        _validate_issues(parser, Severity.warning, 2, 1, [expected_details_2])
+
+    def test_validate_against_template_should_fail(self):
         # setup
         device_template = self._get_template()
 
@@ -296,9 +309,11 @@ class TestCentralParser:
 
         # act
         parsed_msg = parser.parse_message()
-        schema = parser._extract_template_schemas_from_template(device_template)
-
-        schema = parser._extract_template_schemas_from_template(device_template)
+        interfaces = parser._extract_interfaces(device_template)
+        template_schema_names = {
+            interface_name: [schema_name for schema_name in interface_schemas]
+            for interface_name, interface_schemas in interfaces.items()
+        }
 
         # verify
         assert parsed_msg["event"]["payload"] == self.bad_dcm_payload
@@ -312,12 +327,12 @@ class TestCentralParser:
         assert properties["application"] == self.app_properties
 
         expected_details = strings.invalid_field_name_mismatch_template(
-            list(self.bad_dcm_payload.keys()), list(schema.keys())
+            list(self.bad_dcm_payload.keys()), template_schema_names
         )
 
         _validate_issues(parser, Severity.warning, 1, 1, [expected_details])
 
-    def xtest_validate_against_bad_template_should_not_throw(self):
+    def test_validate_against_bad_template_should_not_throw(self):
         # setup
         device_template = "an_unparseable_template"
 
@@ -348,7 +363,7 @@ class TestCentralParser:
 
         _validate_issues(parser, Severity.error, 1, 1, [expected_details])
 
-    def xtest_type_mismatch_should_error(self):
+    def test_type_mismatch_should_error(self):
         # setup
         device_template = self._get_template()
 
@@ -380,7 +395,7 @@ class TestCentralParser:
         expected_details = strings.invalid_primitive_schema_mismatch_template(
             field_name, data_type, data
         )
-        _validate_issues(parser, Severity.warning, 1, 1, [expected_details])
+        _validate_issues(parser, Severity.error, 1, 1, [expected_details])
 
     def _get_template(self):
         return load_json(FileNames.central_device_template_file)
