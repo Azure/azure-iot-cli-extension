@@ -131,7 +131,7 @@ class CentralParser(CommonParser):
         self, payload: dict, interfaces: dict,
     ):
         template_schema_names = {
-            interface_name: [schema_name for schema_name in interface_schemas]
+            interface_name: list(interface_schemas.keys())
             for interface_name, interface_schemas in interfaces.items()
         }
         name_miss = []

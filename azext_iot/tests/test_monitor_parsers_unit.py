@@ -265,7 +265,7 @@ class TestCentralParser:
         )
         interfaces = parser._extract_interfaces(device_template)
         template_schema_names = {
-            interface_name: [schema_name for schema_name in interface_schemas]
+            interface_name: list(interface_schemas.keys())
             for interface_name, interface_schemas in interfaces.items()
         }
 
@@ -311,7 +311,7 @@ class TestCentralParser:
         parsed_msg = parser.parse_message()
         interfaces = parser._extract_interfaces(device_template)
         template_schema_names = {
-            interface_name: [schema_name for schema_name in interface_schemas]
+            interface_name: list(interface_schemas.keys())
             for interface_name, interface_schemas in interfaces.items()
         }
 
