@@ -165,7 +165,6 @@ def load_deprecated_iotcentral_params(self, _):
             "module_id", options_list=["--module-id", "-m"], help="Iot Edge Module ID",
         )
 
-
     with self.argument_context("iot central device-twin") as context:
         context.argument("app_id", options_list=["--app-id"], help="Target App.")
         context.argument(
