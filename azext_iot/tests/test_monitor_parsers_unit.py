@@ -141,7 +141,11 @@ class TestCommonParser:
         assert parsed_msg["event"]["origin"] == device_id
         device_identifier = str(common_parser.DEVICE_ID_IDENTIFIER, "utf8")
         assert parsed_msg["event"]["annotations"][device_identifier] == device_id
-
+        module_identifier = str(common_parser.MODULE_ID_IDENTIFIER, "utf8")
+        if module_id:
+            assert parsed_msg["event"]["annotations"][module_identifier] == module_id
+        else:
+            assert not parsed_msg["event"]["annotations"].get(module_identifier)
         properties = parsed_msg["event"]["properties"]
         assert properties["system"]["content_encoding"] == encoding
         assert properties["system"]["content_type"] == content_type
