@@ -275,7 +275,7 @@ def _load_central_monitors_help():
         - name: Receive all messages and parse message payload as JSON
           text: >
             az iot central app monitor-events --app-id {app_id} --output json
-          - name: Basic usage when filtering on module.
+        - name: Basic usage when filtering on module.
           text: >
             az iot central app monitor-events --app-id {app_id} -m {module_id}
         - name: Basic usage when filtering targeted modules with a wildcard in the ID

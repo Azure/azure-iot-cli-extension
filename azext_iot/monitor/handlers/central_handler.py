@@ -83,7 +83,7 @@ class CentralHandler(CommonHandler):
             filter_text = ".\nFiltering on device: {}".format(device_id)
         module_id = self._central_handler_args.common_handler_args.module_id
         if module_id:
-            logger.warn("Module filtering is applicable only for edge devices")
+            logger.warn("Module filtering is applicable only for edge devices. ")
             filter_text += ".\nFiltering on module: {}".format(module_id)
 
         exit_text = ""
