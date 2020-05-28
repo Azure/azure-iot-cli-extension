@@ -161,9 +161,13 @@ def load_deprecated_iotcentral_params(self, _):
             help="Central dns suffix. "
             "This enables running cli commands against non public/prod environments",
         )
-        context.argument(
-            "module_id", options_list=["--module-id", "-m"], help="Iot Edge Module ID",
-        )
+
+        with self.argument_context("iotcentral app") as context:
+            context.argument(
+                "module_id",
+                options_list=["--module-id", "-m"],
+                help="Iot Edge Module ID",
+            )
 
     with self.argument_context("iot central device-twin") as context:
         context.argument("app_id", options_list=["--app-id"], help="Target App.")
