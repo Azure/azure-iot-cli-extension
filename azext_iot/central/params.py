@@ -162,7 +162,7 @@ def load_deprecated_iotcentral_params(self, _):
             "This enables running cli commands against non public/prod environments",
         )
 
-        with self.argument_context("iotcentral app") as context:
+        with self.argument_context("iotcentral app monitor-events") as context:
             context.argument(
                 "module_id",
                 options_list=["--module-id", "-m"],
