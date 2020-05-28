@@ -79,7 +79,7 @@ def load_central_arguments(self, _):
             "This enables running cli commands against non public/prod environments",
         )
         context.argument(
-            "module_id", options_list=["--module-id", "-m"], help="Module Id"
+            "module_id", options_list=["--module-id", "-m"], help="Iot Edge Module ID",
         )
 
     with self.argument_context("iot central app monitor-events") as context:
