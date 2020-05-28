@@ -90,8 +90,8 @@ class CommonParser(AbstractBaseParser):
         try:
             return str(message.annotations.get(MODULE_ID_IDENTIFIER), "utf8")
         except Exception:
-            details = strings.unknown_module_id()
-            self._add_issue(severity=Severity.error, details=details)
+            # a message not containing an module name is expected for non-edge devices
+            # so there's no "issue" to log here
             return ""
 
     def _parse_interface_name(self, message: Message) -> str:

@@ -46,22 +46,25 @@ class CommonHandler(AbstractBaseEventsHandler):
         expected_device_id = self._common_handler_args.device_id
         expected_devices = self._common_handler_args.devices
 
-        if expected_device_id and expected_device_id != device_id:
-            if "*" in expected_device_id or "?" in expected_device_id:
+        process_device = self.perform_id_match(expected_device_id, device_id)
+
+        if expected_devices:
+            if device_id not in expected_devices:
+                return False
+
+        return process_device
+
+    def perform_id_match(self, expected_id, actual_id):
+        if expected_id and expected_id != actual_id:
+            if "*" in expected_id or "?" in expected_id:
                 regex = (
-                    re.escape(expected_device_id)
-                    .replace("\\*", ".*")
-                    .replace("\\?", ".")
+                    re.escape(expected_id).replace("\\*", ".*").replace("\\?", ".")
                     + "$"
                 )
-                if not re.match(regex, device_id):
+                if not re.match(regex, actual_id):
                     return False
             else:
                 return False
-
-        if expected_devices and device_id not in expected_devices:
-            return False
-
         return True
 
     def _should_process_interface(self, interface_name):
@@ -76,21 +79,4 @@ class CommonHandler(AbstractBaseEventsHandler):
 
     def _should_process_module(self, module_id):
         expected_module_id = self._common_handler_args.module_id
-
-        # if no filter is specified, then process all modules
-        if not expected_module_id:
-            return True
-
-        if expected_module_id and expected_module_id != module_id:
-            if "*" in expected_module_id or "?" in expected_module_id:
-                regex = (
-                    re.escape(expected_module_id)
-                    .replace("\\*", ".*")
-                    .replace("\\?", ".")
-                    + "$"
-                )
-                if not re.match(regex, module_id):
-                    return False
-            else:
-                return False
-        return True
+        return self.perform_id_match(expected_module_id, module_id)
