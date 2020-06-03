@@ -215,6 +215,25 @@ class CentralDeviceProvider:
             central_dns_suffix=central_dns_suffix,
         )
 
+    def execute_component_command(
+        self,
+        device_id: str,
+        interface_id: str,
+        command_name: str,
+        payload: dict,
+        central_dns_suffix="azureiotcentral.com",
+    ):
+        return central_services.device.execute_component_command(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            token=self._token,
+            device_id=device_id,
+            interface_id=interface_id,
+            command_name=command_name,
+            payload=payload,
+            central_dns_suffix=central_dns_suffix,
+        )
+
     def _dps_populate_essential_info(self, dps_info, device_status: DeviceStatus):
         error = {
             DeviceStatus.provisioned: "None.",

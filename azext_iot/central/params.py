@@ -45,6 +45,12 @@ def load_central_arguments(self, _):
             help="Human readable device name. Example: Fridge",
         )
         context.argument(
+            "interface_id", options_list=["--interface-id"], help="ASD",
+        )
+        context.argument(
+            "command_name", options_list=["--command-name"], help="ASD",
+        )
+        context.argument(
             "simulated",
             options_list=["--simulated"],
             arg_type=get_three_state_flag(),
