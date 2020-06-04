@@ -7,7 +7,7 @@
 
 import os
 
-VERSION = "0.9.3"
+VERSION = "0.9.4"
 EXTENSION_NAME = "azure-iot"
 EXTENSION_ROOT = os.path.dirname(os.path.abspath(__file__))
 EXTENSION_CONFIG_ROOT_KEY = "iotext"
@@ -42,7 +42,7 @@ TRACING_PROPERTY = "azureiot*com^dtracing^1"
 TRACING_ALLOWED_FOR_LOCATION = ("northeurope", "westus2", "west us 2", "southeastasia")
 TRACING_ALLOWED_FOR_SKU = "standard"
 USER_AGENT = "IoTPlatformCliExtension/{}".format(VERSION)
-
+DIGITALTWINS_RESOURCE_ID = "https://digitaltwins.azure.net"
 # (Lib name, minimum version (including), maximum version (excluding))
 EVENT_LIB = ("uamqp", "1.2", "1.3")
 

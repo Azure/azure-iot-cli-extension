@@ -169,15 +169,15 @@ def read_file_content(file_path, allow_binary=False):
     for encoding in ["utf-8-sig", "utf-8", "utf-16", "utf-16le", "utf-16be"]:
         try:
             with codecs_open(file_path, encoding=encoding) as f:
-                logger.debug("attempting to read file %s as %s", file_path, encoding)
+                logger.debug("Attempting to read file %s as %s", file_path, encoding)
                 return f.read()
         except (UnicodeError, UnicodeDecodeError):
             pass
 
     if allow_binary:
         try:
-            with open(file_path, "rb") as input_file:
-                logger.debug("attempting to read file %s as binary", file_path)
+            with open(file_path, 'rb') as input_file:
+                logger.debug("Attempting to read file %s as binary", file_path)
                 return base64.b64encode(input_file.read()).decode("utf-8")
         except Exception:  # pylint: disable=broad-except
             pass
@@ -467,3 +467,13 @@ class ISO8601Validator:
 def ensure_min_version(cur_ver, min_ver):
     from pkg_resources._vendor.packaging import version
     return version.parse(cur_ver) >= version.parse(min_ver)
+
+
+def scantree(path):
+    from os import scandir
+
+    for entry in scandir(path):
+        if entry.is_dir(follow_symlinks=False):
+            yield from scantree(entry.path)
+        else:
+            yield entry

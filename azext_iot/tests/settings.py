@@ -7,7 +7,11 @@
 from os import environ
 
 
-ENV_SET_TEST_IOTHUB_BASIC = ["azext_iot_testhub", "azext_iot_testrg", "azext_iot_testhub_cs"]
+ENV_SET_TEST_IOTHUB_BASIC = [
+    "azext_iot_testhub",
+    "azext_iot_testrg",
+    "azext_iot_testhub_cs",
+]
 
 
 class Setting(object):
@@ -34,5 +38,7 @@ class DynamoSettings(object):
             value = environ.get(key)
             if not value:
                 if not optional:
-                    raise RuntimeError("'{}' environment variable required.".format(key))
+                    raise RuntimeError(
+                        "'{}' environment variable required.".format(key)
+                    )
             setattr(self.env, key, value)
