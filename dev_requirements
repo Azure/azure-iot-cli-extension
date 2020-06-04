@@ -5,7 +5,7 @@ pytest-env
 pylint
 uamqp~=1.2
 mock;python_version<'3.3'
-responses
+responses==0.10.12
 flake8
 black;python_version>='3.6'
 wheel==0.30.0
