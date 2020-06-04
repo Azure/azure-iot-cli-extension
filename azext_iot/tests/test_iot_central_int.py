@@ -4,12 +4,15 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import mock
 import os
+import sys
 import time
 
-from azure.cli.testsdk import LiveScenarioTest
-from azext_iot.central.models.enum import DeviceStatus
 from azext_iot.common import utility
+from azext_iot.central.models.enum import DeviceStatus
+
+from . import CaptureOutputLiveScenarioTest, helpers
 
 APP_ID = os.environ.get("azext_iot_central_app_id")
 DEVICE_TEMPLATE_PATH = os.environ.get("azext_iot_central_device_template_path")
@@ -21,9 +24,9 @@ if not all([APP_ID, DEVICE_TEMPLATE_PATH]):
     )
 
 
-class TestIotCentral(LiveScenarioTest):
-    def __init__(self, test_case):
-        super(TestIotCentral, self).__init__(test_case)
+class TestIotCentral(CaptureOutputLiveScenarioTest):
+    def __init__(self, test_scenario):
+        super(TestIotCentral, self).__init__(test_scenario=test_scenario)
 
     def test_central_device_twin_show_fail(self):
         (device_id, _) = self._create_device()
@@ -95,14 +98,24 @@ class TestIotCentral(LiveScenarioTest):
         self.cmd("iotcentral app monitor-events --app-id {} --to 1".format(APP_ID))
 
     def test_central_validate_messages(self):
-        # Test with invalid app-id
-        self.cmd(
-            "iot central app validate-messages --app-id {}".format(APP_ID + "zzz"),
-            expect_failure=True,
-        )
-        # Ensure no failure
-        # We cannot verify that the result is correct, as the Azure CLI for IoT Central does not support adding devices
-        self.cmd("iot central app validate-messages --app-id {} --to 1".format(APP_ID))
+        (template_id, _) = self._create_device_template()
+        (device_id, _) = self._create_device(instance_of=template_id)
+        credentials = self._get_credentials(device_id)
+
+        device_client = helpers.dps_connect_device(device_id, credentials)
+
+        enqueued_time = utility.calculate_millisec_since_unix_epoch_utc()
+
+        device_client.send_message("some message")
+
+        # Validate the messages
+        mock_logger = helpers.MockLogger()
+        with mock.patch("knack.log.get_logger", return_value=mock_logger) as _:
+            output = self._get_validate_messages_output(device_id, enqueued_time)
+            pass
+
+        self._delete_device(device_id)
+        # self._delete_device_template(template_id)
 
     def test_central_device_methods_CRLD(self):
         (device_id, device_name) = self._create_device()
@@ -306,3 +319,27 @@ class TestIotCentral(LiveScenarioTest):
             ),
             checks=[self.check("result", "success")],
         )
+
+    def _get_credentials(self, device_id):
+        return self.cmd(
+            "iot central app device get-credentials --app-id {} -d {}".format(
+                APP_ID, device_id
+            )
+        ).get_output_in_json()
+
+    def _get_validate_messages_output(
+        self, device_id, enqueued_time, duration=10, max_messages=1
+    ):
+        output = self.command_execute_assert(
+            "iot central app validate-messages --app-id {} -d {} --et {} --duration {} --mm {} -y".format(
+                APP_ID, device_id, enqueued_time, duration, max_messages
+            ),
+            [],
+        )
+
+        if not output:
+            output = ""
+
+        output = output.split("\n")
+
+        return output

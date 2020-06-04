@@ -50,7 +50,25 @@ def capture_output():
         buffer_tee.close()
 
 
-class IoTLiveScenarioTest(LiveScenarioTest):
+class CaptureOutputLiveScenarioTest(LiveScenarioTest):
+    def __init__(self, test_scenario):
+        super(CaptureOutputLiveScenarioTest, self).__init__(test_scenario)
+
+    # TODO: @digimaun - Maybe put a helper like this in the shared lib, when you create it?
+    def command_execute_assert(self, command, asserts):
+        from . import capture_output
+
+        with capture_output() as buffer:
+            self.cmd(command, checks=None)
+            output = buffer.get_output()
+
+        for a in asserts:
+            assert a in output
+
+        return output
+
+
+class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def __init__(self, test_scenario, entity_name, entity_rg, entity_cs):
         assert test_scenario
         assert entity_name
@@ -95,20 +113,8 @@ class IoTLiveScenarioTest(LiveScenarioTest):
 
     def generate_job_names(self, count=1):
         return [
-            self.create_random_name(prefix=PREFIX_JOB, length=32)
-            for i in range(count)
+            self.create_random_name(prefix=PREFIX_JOB, length=32) for i in range(count)
         ]
-
-    # TODO: @digimaun - Maybe put a helper like this in the shared lib, when you create it?
-    def command_execute_assert(self, command, asserts):
-        from . import capture_output
-
-        with capture_output() as buffer:
-            self.cmd(command, checks=None)
-            output = buffer.get_output()
-
-        for a in asserts:
-            assert a in output
 
     def tearDown(self):
         if self.device_ids:

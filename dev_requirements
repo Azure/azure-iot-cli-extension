@@ -11,3 +11,4 @@ black;python_version>='3.6'
 wheel==0.30.0
 pre-commit
 six==1.12
+azure-iot-device

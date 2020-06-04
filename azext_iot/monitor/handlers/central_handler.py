@@ -67,14 +67,14 @@ class CentralHandler(CommonHandler):
 
         self._print_progress_update(n_messages)
 
+        if self._central_handler_args.style == "scroll" and issues:
+            [issue.log() for issue in issues]
+
         if (
             self._central_handler_args.max_messages
             and n_messages >= self._central_handler_args.max_messages
         ):
             self._quit_messages_exceeded()
-
-        if self._central_handler_args.style == "scroll" and issues:
-            [issue.log() for issue in issues]
 
     def generate_startup_string(self, name: str):
         device_filter_text = ""
