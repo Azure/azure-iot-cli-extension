@@ -15,11 +15,7 @@ logger = get_logger(__name__)
 
 class RouteProvider(DigitalTwinsProvider):
     def __init__(self, cmd, name, rg=None):
-        super(RouteProvider, self).__init__(
-            cmd=cmd,
-            name=name,
-            rg=rg
-        )
+        super(RouteProvider, self).__init__(cmd=cmd, name=name, rg=rg)
         self.sdk = self.get_sdk().event_routes
 
     def get(self, route_name):
@@ -30,12 +26,11 @@ class RouteProvider(DigitalTwinsProvider):
 
     def list(self, top=None):  # top is guarded for int() in arg def
         from azext_iot.sdk.digitaltwins.models import EventRoutesListOptions
+
         list_options = EventRoutesListOptions(max_item_count=top)
 
         try:
-            return self.sdk.list(
-                event_routes_list_options=list_options,
-            )
+            return self.sdk.list(event_routes_list_options=list_options,)
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
 

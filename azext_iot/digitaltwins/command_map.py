@@ -48,41 +48,57 @@ def load_digitaltwins_commands(self, _):
         cmd_group.command("delete", "delete_instance")
 
     with self.command_group(
-        "dt endpoint",
-        command_type=digitaltwins_resource_ops
+        "dt endpoint", command_type=digitaltwins_resource_ops
     ) as cmd_group:
-        cmd_group.command("show", "show_endpoint")
-        cmd_group.command("list", "list_endpoints")
+        cmd_group.command(
+            "show",
+            "show_endpoint",
+            table_transformer=(
+                "{EndpointName:name, EndpointType:properties.endpointType,"
+                "ProvisioningState:properties.provisioningState,CreatedTime:properties.createdTime}"
+            ),
+        )
+        cmd_group.command(
+            "list",
+            "list_endpoints",
+            table_transformer=(
+                "[*].{EndpointName:name, EndpointType:properties.endpointType,"
+                "ProvisioningState:properties.provisioningState,CreatedTime:properties.createdTime}"
+            ),
+        )
         cmd_group.command("delete", "delete_endpoint")
 
     with self.command_group(
-        "dt endpoint create",
-        command_type=digitaltwins_resource_ops
+        "dt endpoint create", command_type=digitaltwins_resource_ops
     ) as cmd_group:
         cmd_group.command("eventgrid", "add_endpoint_eventgrid")
         cmd_group.command("servicebus", "add_endpoint_servicebus")
         cmd_group.command("eventhub", "add_endpoint_eventhub")
 
     with self.command_group(
-        "dt route",
-        command_type=digitaltwins_route_ops
+        "dt route", command_type=digitaltwins_route_ops
     ) as cmd_group:
-        cmd_group.command("show", "show_route")
-        cmd_group.command("list", "list_routes")
+        cmd_group.command(
+            "show",
+            "show_route",
+            table_transformer="{RouteName:id,EndpointName:endpointName,Filter:filter}",
+        )
+        cmd_group.command(
+            "list",
+            "list_routes",
+            table_transformer="[*].{RouteName:id,EndpointName:endpointName,Filter:filter}",
+        )
         cmd_group.command("delete", "delete_route")
         cmd_group.command("create", "create_route")
 
     with self.command_group(
-        "dt role-assignment",
-        command_type=digitaltwins_rbac_ops
+        "dt role-assignment", command_type=digitaltwins_rbac_ops
     ) as cmd_group:
         cmd_group.command("create", "assign_role")
         cmd_group.command("delete", "remove_role")
         cmd_group.command("list", "list_assignments")
 
-    with self.command_group(
-        "dt twin", command_type=digitaltwins_twin_ops
-    ) as cmd_group:
+    with self.command_group("dt twin", command_type=digitaltwins_twin_ops) as cmd_group:
         cmd_group.command("query", "query_twins")
         cmd_group.command("create", "create_twin")
         cmd_group.command("show", "show_twin")
@@ -113,7 +129,15 @@ def load_digitaltwins_commands(self, _):
         "dt model", command_type=digitaltwins_model_ops
     ) as cmd_group:
         cmd_group.command("create", "add_models")
-        cmd_group.command("show", "show_model")
-        cmd_group.command("list", "list_models")
+        cmd_group.command(
+            "show",
+            "show_model",
+            table_transformer="{ModelId:id,UploadTime:uploadTime,Decommissioned:decommissioned}",
+        )
+        cmd_group.command(
+            "list",
+            "list_models",
+            table_transformer="[*].{ModelId:id,UploadTime:uploadTime,Decommissioned:decommissioned}",
+        )
         cmd_group.command("update", "update_model")
         cmd_group.command("delete", "delete_model")

@@ -13,7 +13,9 @@ logger = get_logger(__name__)
 
 def create_instance(cmd, name, resource_group_name, location, tags=None):
     rp = ResourceProvider(cmd)
-    return rp.create(name=name, resource_group_name=resource_group_name, location=location, tags=tags)
+    return rp.create(
+        name=name, resource_group_name=resource_group_name, location=location, tags=tags
+    )
 
 
 def list_instances(cmd, resource_group_name=None):
@@ -41,21 +43,27 @@ def list_endpoints(cmd, name, resource_group_name=None):
 
 def show_endpoint(cmd, name, endpoint_name, resource_group_name=None):
     rp = ResourceProvider(cmd)
-    return rp.get_endpoint(name=name,
-                           endpoint_name=endpoint_name,
-                           resource_group_name=resource_group_name)
+    return rp.get_endpoint(
+        name=name, endpoint_name=endpoint_name, resource_group_name=resource_group_name
+    )
 
 
 def delete_endpoint(cmd, name, endpoint_name, resource_group_name=None):
     rp = ResourceProvider(cmd)
-    return rp.delete_endpoint(name=name,
-                              endpoint_name=endpoint_name,
-                              resource_group_name=resource_group_name)
+    return rp.delete_endpoint(
+        name=name, endpoint_name=endpoint_name, resource_group_name=resource_group_name
+    )
 
 
-def add_endpoint_eventgrid(cmd, name, endpoint_name, eventgrid_topic_name,
-                           eventgrid_resource_group, resource_group_name=None,
-                           tags=None):
+def add_endpoint_eventgrid(
+    cmd,
+    name,
+    endpoint_name,
+    eventgrid_topic_name,
+    eventgrid_resource_group,
+    resource_group_name=None,
+    tags=None,
+):
     return _add_endpoint_eventgrid(
         cmd=cmd,
         name=name,
@@ -63,27 +71,44 @@ def add_endpoint_eventgrid(cmd, name, endpoint_name, eventgrid_topic_name,
         eventgrid_resource_group=eventgrid_resource_group,
         eventgrid_topic_name=eventgrid_topic_name,
         resource_group_name=resource_group_name,
-        tags=tags)
+        tags=tags,
+    )
 
 
-def _add_endpoint_eventgrid(cmd, name, endpoint_name, eventgrid_topic_name,
-                            eventgrid_resource_group, timeout=15, resource_group_name=None,
-                            tags=None):
+def _add_endpoint_eventgrid(
+    cmd,
+    name,
+    endpoint_name,
+    eventgrid_topic_name,
+    eventgrid_resource_group,
+    timeout=15,
+    resource_group_name=None,
+    tags=None,
+):
     rp = ResourceProvider(cmd)
-    return rp.add_endpoint(name=name,
-                           resource_group_name=resource_group_name,
-                           endpoint_name=endpoint_name,
-                           endpoint_resource_type=ADTEndpointType.eventgridtopic,
-                           endpoint_resource_name=eventgrid_topic_name,
-                           endpoint_resource_group=eventgrid_resource_group,
-                           tags=tags,
-                           timeout=timeout)
+    return rp.add_endpoint(
+        name=name,
+        resource_group_name=resource_group_name,
+        endpoint_name=endpoint_name,
+        endpoint_resource_type=ADTEndpointType.eventgridtopic,
+        endpoint_resource_name=eventgrid_topic_name,
+        endpoint_resource_group=eventgrid_resource_group,
+        tags=tags,
+        timeout=timeout,
+    )
 
 
-def add_endpoint_servicebus(cmd, name, endpoint_name, servicebus_topic_name,
-                            servicebus_resource_group, servicebus_policy,
-                            servicebus_namespace, resource_group_name=None,
-                            tags=None):
+def add_endpoint_servicebus(
+    cmd,
+    name,
+    endpoint_name,
+    servicebus_topic_name,
+    servicebus_resource_group,
+    servicebus_policy,
+    servicebus_namespace,
+    resource_group_name=None,
+    tags=None,
+):
     return _add_endpoint_servicebus(
         cmd=cmd,
         name=name,
@@ -93,30 +118,48 @@ def add_endpoint_servicebus(cmd, name, endpoint_name, servicebus_topic_name,
         servicebus_policy=servicebus_policy,
         servicebus_namespace=servicebus_namespace,
         resource_group_name=resource_group_name,
-        tags=tags)
+        tags=tags,
+    )
 
 
-def _add_endpoint_servicebus(cmd, name, endpoint_name, servicebus_topic_name,
-                             servicebus_resource_group, servicebus_policy,
-                             servicebus_namespace, timeout=15, resource_group_name=None,
-                             tags=None):
+def _add_endpoint_servicebus(
+    cmd,
+    name,
+    endpoint_name,
+    servicebus_topic_name,
+    servicebus_resource_group,
+    servicebus_policy,
+    servicebus_namespace,
+    timeout=15,
+    resource_group_name=None,
+    tags=None,
+):
     rp = ResourceProvider(cmd)
-    return rp.add_endpoint(name=name,
-                           resource_group_name=resource_group_name,
-                           endpoint_name=endpoint_name,
-                           endpoint_resource_type=ADTEndpointType.servicebus,
-                           endpoint_resource_name=servicebus_topic_name,
-                           endpoint_resource_group=servicebus_resource_group,
-                           endpoint_resource_namespace=servicebus_namespace,
-                           endpoint_resource_policy=servicebus_policy,
-                           tags=tags,
-                           timeout=timeout)
+    return rp.add_endpoint(
+        name=name,
+        resource_group_name=resource_group_name,
+        endpoint_name=endpoint_name,
+        endpoint_resource_type=ADTEndpointType.servicebus,
+        endpoint_resource_name=servicebus_topic_name,
+        endpoint_resource_group=servicebus_resource_group,
+        endpoint_resource_namespace=servicebus_namespace,
+        endpoint_resource_policy=servicebus_policy,
+        tags=tags,
+        timeout=timeout,
+    )
 
 
-def add_endpoint_eventhub(cmd, name, endpoint_name, eventhub_name,
-                          eventhub_resource_group, eventhub_policy,
-                          eventhub_namespace, resource_group_name=None,
-                          tags=None):
+def add_endpoint_eventhub(
+    cmd,
+    name,
+    endpoint_name,
+    eventhub_name,
+    eventhub_resource_group,
+    eventhub_policy,
+    eventhub_namespace,
+    resource_group_name=None,
+    tags=None,
+):
     return _add_endpoint_eventhub(
         cmd=cmd,
         name=name,
@@ -126,21 +169,32 @@ def add_endpoint_eventhub(cmd, name, endpoint_name, eventhub_name,
         eventhub_policy=eventhub_policy,
         eventhub_namespace=eventhub_namespace,
         resource_group_name=resource_group_name,
-        tags=tags)
+        tags=tags,
+    )
 
 
-def _add_endpoint_eventhub(cmd, name, endpoint_name, eventhub_name,
-                           eventhub_resource_group, eventhub_policy,
-                           eventhub_namespace, timeout=15, resource_group_name=None,
-                           tags=None):
+def _add_endpoint_eventhub(
+    cmd,
+    name,
+    endpoint_name,
+    eventhub_name,
+    eventhub_resource_group,
+    eventhub_policy,
+    eventhub_namespace,
+    timeout=15,
+    resource_group_name=None,
+    tags=None,
+):
     rp = ResourceProvider(cmd)
-    return rp.add_endpoint(name=name,
-                           resource_group_name=resource_group_name,
-                           endpoint_name=endpoint_name,
-                           endpoint_resource_type=ADTEndpointType.eventhub,
-                           endpoint_resource_name=eventhub_name,
-                           endpoint_resource_group=eventhub_resource_group,
-                           endpoint_resource_namespace=eventhub_namespace,
-                           endpoint_resource_policy=eventhub_policy,
-                           tags=tags,
-                           timeout=timeout)
+    return rp.add_endpoint(
+        name=name,
+        resource_group_name=resource_group_name,
+        endpoint_name=endpoint_name,
+        endpoint_resource_type=ADTEndpointType.eventhub,
+        endpoint_resource_name=eventhub_name,
+        endpoint_resource_group=eventhub_resource_group,
+        endpoint_resource_namespace=eventhub_namespace,
+        endpoint_resource_policy=eventhub_policy,
+        tags=tags,
+        timeout=timeout,
+    )

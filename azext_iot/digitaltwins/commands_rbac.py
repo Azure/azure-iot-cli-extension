@@ -30,10 +30,13 @@ def remove_role(cmd, name, assignee=None, role_type=None, resource_group_name=No
     )
 
 
-def list_assignments(cmd, name, include_inherited=False, role_type=None, resource_group_name=None):
+def list_assignments(
+    cmd, name, include_inherited=False, role_type=None, resource_group_name=None
+):
     rp = ResourceProvider(cmd)
     return rp.get_role_assignments(
         name=name,
         include_inherited=include_inherited,
         resource_group_name=resource_group_name,
-        role_type=role_type)
+        role_type=role_type,
+    )
