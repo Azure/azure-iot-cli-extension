@@ -303,9 +303,7 @@ def load_digitaltwins_help():
             az dt twin create -n {instance_name} --dtmi dtmi:example:Room;1 --twin-id {twin_id} --properties '{
                 "Temperature": 10.2,
                 "Thermostat": {
-                    "$metadata": {
-                        "$model": "dtmi:com:example:Thermostat;1"
-                    },
+                    "$metadata": {},
                     "setPointTemp": 23.12
                 }
             }'

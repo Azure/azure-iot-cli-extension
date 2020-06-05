@@ -80,7 +80,7 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
             {
                 "Temperature": 10.2,
                 "Thermostat": {
-                    "$metadata": {"$model": self.thermostat_dtmi},
+                    "$metadata": {},
                     "setPointTemp": 23.12,
                 },
             }
@@ -126,8 +126,6 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
                 self.thermostat_component_id,
             )
         ).get_output_in_json()
-
-        assert thermostat_component["$metadata"]["$model"] == self.thermostat_dtmi
 
         self.kwargs["thermostatJsonPatch"] = json.dumps(
             [{"op": "replace", "path": "/setPointTemp", "value": 50.5}]
