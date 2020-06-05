@@ -12,24 +12,6 @@ shared: Define shared data types(enums)
 from enum import Enum
 
 
-class ADTSkuType(Enum):
-    """
-    ADT SKU Type.
-    """
-
-    S1 = "S1"
-
-
-class ADTLocationType(Enum):
-    """
-    ADT Location Type.
-    """
-
-    WestCentralUS = "westcentralus"
-    WestUS2 = "westus2"
-    EastUS2EUAP = "eastus2euap"
-
-
 class ADTEndpointType(Enum):
     """
     ADT Location Type.

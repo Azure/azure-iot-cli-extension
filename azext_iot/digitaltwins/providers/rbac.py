@@ -22,8 +22,11 @@ class RbacProvider(object):
         if role_type:
             filter_role_type = "--role '{}'".format(role_type)
 
-        list_op = self.cli.invoke("role assignment list --scope '{}' {} {}".format(
-            dt_scope, filter_role_type, include_inherited_flag))
+        list_op = self.cli.invoke(
+            "role assignment list --scope '{}' {} {}".format(
+                dt_scope, filter_role_type, include_inherited_flag
+            )
+        )
 
         if not list_op.success():
             raise CLIError("Unable to determine assignments.")

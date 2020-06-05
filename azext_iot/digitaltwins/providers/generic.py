@@ -6,7 +6,13 @@
 
 
 # Experimental - depends on consistency of APIs
-def accumulate_result(method, token_name="continuationToken", token_arg_name="continuation_token", values_name="items", **kwargs):
+def accumulate_result(
+    method,
+    token_name="continuationToken",
+    token_arg_name="continuation_token",
+    values_name="items",
+    **kwargs
+):
     result_accumulator = []
 
     nextlink = None
@@ -39,5 +45,5 @@ def accumulate_result(method, token_name="continuationToken", token_arg_name="co
 
 def remove_prefix(text, prefix):
     if text.startswith(prefix):
-        return text[len(prefix):]
+        return text[len(prefix) :]
     return text

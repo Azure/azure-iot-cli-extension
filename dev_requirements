@@ -2,12 +2,12 @@ pytest
 pytest-mock
 pytest-cov
 pytest-env
-pylint
 uamqp~=1.2
 mock;python_version<'3.3'
-responses==0.10.12
-flake8
+responses
 black;python_version>='3.6'
 wheel==0.30.0
 pre-commit
 six>=1.12
+pylint
+flake8

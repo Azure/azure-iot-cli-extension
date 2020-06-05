@@ -36,9 +36,7 @@ def update_model(cmd, name, model_id, decommission=None, resource_group_name=Non
         return
 
     model_provider = ModelProvider(cmd=cmd, name=name, rg=resource_group_name)
-    return model_provider.update(
-        id=model_id, decommission=decommission,
-    )
+    return model_provider.update(id=model_id, decommission=decommission,)
 
 
 def delete_model(cmd, name, model_id, resource_group_name=None):

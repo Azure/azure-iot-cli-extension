@@ -10,9 +10,13 @@ from knack.log import get_logger
 logger = get_logger(__name__)
 
 
-def create_route(cmd, name, route_name, endpoint_name, filter="true", resource_group_name=None):
+def create_route(
+    cmd, name, route_name, endpoint_name, filter="true", resource_group_name=None
+):
     route_provider = RouteProvider(cmd=cmd, name=name, rg=resource_group_name)
-    return route_provider.create(route_name=route_name, endpoint_name=endpoint_name, filter=filter)
+    return route_provider.create(
+        route_name=route_name, endpoint_name=endpoint_name, filter=filter
+    )
 
 
 def show_route(cmd, name, route_name, resource_group_name=None):

@@ -64,9 +64,7 @@ def load_digitaltwins_arguments(self, _):
             "filter", options_list=["--filter"], help="Event route filter.",
         )
         context.argument(
-            "role_type",
-            options_list=["--role"],
-            help="Role name or Id.",
+            "role_type", options_list=["--role"], help="Role name or Id.",
         )
         context.argument(
             "assignee",
@@ -210,7 +208,7 @@ def load_digitaltwins_arguments(self, _):
         context.argument(
             "component_path",
             options_list=["--component"],
-            help="The path to the DTDL component."
+            help="The path to the DTDL component.",
         )
 
     with self.argument_context("dt twin create") as context:
@@ -218,7 +216,7 @@ def load_digitaltwins_arguments(self, _):
             "properties",
             options_list=["--properties", "-p"],
             help="Initial property values for instantiating a digital twin or related components. "
-                 "Provide file path or inline JSON.",
+            "Provide file path or inline JSON.",
         )
 
     with self.argument_context("dt twin telemetry") as context:
@@ -236,7 +234,7 @@ def load_digitaltwins_arguments(self, _):
         context.argument(
             "component_path",
             options_list=["--component"],
-            help="The path to the DTDL component. If set telemetry will be emitted on behalf of the component."
+            help="The path to the DTDL component. If set telemetry will be emitted on behalf of the component.",
         )
 
     with self.argument_context("dt twin relationship create") as context:
