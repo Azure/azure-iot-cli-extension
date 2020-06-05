@@ -43,11 +43,11 @@ Introducing 35 new commands in the following command groups:
 
 Known issues
 
-  * The following preview commands will retrieve at most 25 results
+* The following preview commands will retrieve at most 25 results
 
-    * az iot central app device list
-    * az iot central app device-template list
-    * az iot central app device-template map
+  * az iot central app device list
+  * az iot central app device-template list
+  * az iot central app device-template map
 
 0.9.2
 +++++++++++++++
