@@ -5,37 +5,46 @@ Release History
 
 0.9.4
 +++++++++++++++
-* Azure Digital Twins Public Preview - CLI release
-  * Introducing 35 new commands in the following command groups
-    * az dt
-    * az dt endpoint
-    * az dt model
-    * az dt role-assignment
-    * az dt route
-    * az dt twin
-    * az dt twin relationship
-    * az dt twin telemety
+Azure Digital Twins Public Preview - CLI release
+
+Introducing 35 new commands in the following command groups:
+
+* az dt
+* az dt endpoint
+* az dt model
+* az dt role-assignment
+* az dt route
+* az dt twin
+* az dt twin relationship
+* az dt twin telemety
 
 0.9.3
 +++++++++++++++
 * IoT Hub device identity import/export commands support usage via managed service identity using the --auth-type argument.
+
 * Adds preview command group "az iot central app device"
+
   * Adds preview command "az iot central app device create"
   * Adds preview command "az iot central app device show"
   * Adds preview command "az iot central app device list"
   * Adds preview command "az iot central app device delete"
   * Adds preview command "az iot central app device registration-info"
   * Adds preview command "az iot central app device registration-summary"
+
 * Adds preview command group "az iot central app device-template"
+
   * Adds preview command "az iot central app device-template create"
   * Adds preview command "az iot central app device-template show"
   * Adds preview command "az iot central app device-template list"
   * Adds preview command "az iot central app device-template delete"
   * Adds preview command "az iot central app device-template map"
+
 * Changed how results are displayed in "az iot central app validate-messages"
 
-* Known issues:
+Known issues
+
   * The following preview commands will retrieve at most 25 results
+
     * az iot central app device list
     * az iot central app device-template list
     * az iot central app device-template map
