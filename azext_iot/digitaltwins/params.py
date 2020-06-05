@@ -234,7 +234,7 @@ def load_digitaltwins_arguments(self, _):
         context.argument(
             "component_path",
             options_list=["--component"],
-            help="The path to the DTDL component. If set telemetry will be emitted on behalf of the component.",
+            help="The path to the DTDL component. If set, telemetry will be emitted on behalf of the component.",
         )
 
     with self.argument_context("dt twin relationship create") as context:
