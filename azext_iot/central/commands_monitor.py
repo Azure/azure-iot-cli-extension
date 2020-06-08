@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from azure.cli.core.commands import AzCliCommand
+from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.providers.monitor_provider import MonitorProvider
 from azext_iot.monitor.models.enum import Severity
 from azext_iot.monitor.models.arguments import (
@@ -29,7 +30,7 @@ def validate_messages(
     duration=300,
     style="scroll",
     minimum_severity=Severity.warning.name,
-    central_dns_suffix="azureiotcentral.com",
+    central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     telemetry_args = TelemetryArguments(
         cmd,
@@ -74,7 +75,7 @@ def monitor_events(
     repair=False,
     properties=None,
     yes=False,
-    central_dns_suffix="azureiotcentral.com",
+    central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     telemetry_args = TelemetryArguments(
         cmd,

@@ -25,6 +25,7 @@ class CommonParser(AbstractBaseParser):
         self.issues_handler = IssueHandler()
         self._common_parser_args = common_parser_args
         self._message = message
+        self.device_id = ""  # need to default
         self.device_id = self._parse_device_id(message)
         self.interface_name = self._parse_interface_name(message)
 

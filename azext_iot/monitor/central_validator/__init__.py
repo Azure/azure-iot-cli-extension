@@ -4,10 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from azext_iot.monitor.central_validator.validate_schema import validate
+from azext_iot.monitor.central_validator.utils import extract_schema_type
 
-class FileNames:
-    central_device_template_file = "central/json/device_template.json"
-    central_deeply_nested_device_template_file = (
-        "central/json/deeply_nested_template.json"
-    )
-    central_device_file = "central/json/device.json"
+__all__ = ["validate", "extract_schema_type"]

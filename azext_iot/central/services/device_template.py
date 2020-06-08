@@ -7,9 +7,13 @@
 
 import requests
 
+from typing import List
+
 from knack.util import CLIError
 from knack.log import get_logger
+from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
+from azext_iot.central.models.template import Template
 
 logger = get_logger(__name__)
 
@@ -21,8 +25,8 @@ def get_device_template(
     app_id: str,
     device_template_id: str,
     token: str,
-    central_dns_suffix="azureiotcentral.com",
-) -> dict:
+    central_dns_suffix=CENTRAL_ENDPOINT,
+) -> Template:
     """
     Get a specific device template from IoTC
 
@@ -43,12 +47,12 @@ def get_device_template(
     headers = _utility.get_headers(token, cmd)
 
     response = requests.get(url, headers=headers)
-    return _utility.try_extract_result(response)
+    return Template(_utility.try_extract_result(response))
 
 
 def list_device_templates(
-    cmd, app_id: str, token: str, central_dns_suffix="azureiotcentral.com",
-) -> list:
+    cmd, app_id: str, token: str, central_dns_suffix=CENTRAL_ENDPOINT,
+) -> List[Template]:
     """
     Get a list of all device templates in IoTC
 
@@ -73,7 +77,7 @@ def list_device_templates(
     if "value" not in result:
         raise CLIError("Value is not present in body: {}".format(result))
 
-    return result["value"]
+    return [Template(item) for item in result["value"]]
 
 
 def create_device_template(
@@ -82,8 +86,8 @@ def create_device_template(
     device_template_id: str,
     payload: dict,
     token: str,
-    central_dns_suffix="azureiotcentral.com",
-) -> list:
+    central_dns_suffix=CENTRAL_ENDPOINT,
+) -> Template:
     """
     Create a device template in IoTC
 
@@ -109,7 +113,7 @@ def create_device_template(
     headers = _utility.get_headers(token, cmd, has_json_payload=True)
 
     response = requests.put(url, headers=headers, json=payload)
-    return _utility.try_extract_result(response)
+    return Template(_utility.try_extract_result(response))
 
 
 def delete_device_template(
@@ -117,7 +121,7 @@ def delete_device_template(
     app_id: str,
     device_template_id: str,
     token: str,
-    central_dns_suffix="azureiotcentral.com",
+    central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> dict:
     """
     Delete a device template from IoTC

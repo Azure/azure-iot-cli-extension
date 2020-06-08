@@ -8,11 +8,13 @@
 import requests
 
 from knack.util import CLIError
-from typing import List
-from azext_iot.central.models.enum import DeviceStatus
 from knack.log import get_logger
+from typing import List
+
+from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
 from azext_iot.central.models.device import Device
+from azext_iot.central.models.enum import DeviceStatus
 
 logger = get_logger(__name__)
 
@@ -20,11 +22,7 @@ BASE_PATH = "api/preview/devices"
 
 
 def get_device(
-    cmd,
-    app_id: str,
-    device_id: str,
-    token: str,
-    central_dns_suffix="azureiotcentral.com",
+    cmd, app_id: str, device_id: str, token: str, central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> Device:
     """
     Get device info given a device id
@@ -50,7 +48,7 @@ def get_device(
 
 
 def list_devices(
-    cmd, app_id: str, token: str, max_pages=1, central_dns_suffix="azureiotcentral.com",
+    cmd, app_id: str, token: str, max_pages=1, central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> List[Device]:
     """
     Get a list of all devices in IoTC app
@@ -88,7 +86,7 @@ def list_devices(
 
 
 def get_device_registration_summary(
-    cmd, app_id: str, token: str, central_dns_suffix="azureiotcentral.com",
+    cmd, app_id: str, token: str, central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     """
     Get device registration summary for a given app
@@ -134,7 +132,7 @@ def create_device(
     instance_of: str,
     simulated: bool,
     token: str,
-    central_dns_suffix="azureiotcentral.com",
+    central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> Device:
     """
     Create a device in IoTC
@@ -174,11 +172,7 @@ def create_device(
 
 
 def delete_device(
-    cmd,
-    app_id: str,
-    device_id: str,
-    token: str,
-    central_dns_suffix="azureiotcentral.com",
+    cmd, app_id: str, device_id: str, token: str, central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> dict:
     """
     Delete a device from IoTC
@@ -203,11 +197,7 @@ def delete_device(
 
 
 def get_device_credentials(
-    cmd,
-    app_id: str,
-    device_id: str,
-    token: str,
-    central_dns_suffix="azureiotcentral.com",
+    cmd, app_id: str, device_id: str, token: str, central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     """
     Get device credentials from IoTC

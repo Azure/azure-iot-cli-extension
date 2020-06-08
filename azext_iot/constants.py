@@ -35,6 +35,7 @@ MIN_SIM_MSG_INTERVAL = 1
 MIN_SIM_MSG_COUNT = 1
 SIM_RECEIVE_SLEEP_SEC = 3
 PNP_API_VERSION = "2019-07-01-preview"
+CENTRAL_ENDPOINT = "azureiotcentral.com"
 PNP_ENDPOINT = "https://provider.azureiotrepository.com"
 PNP_REPO_ENDPOINT = "https://repo.azureiotrepository.com"
 DEVICE_DEVICESCOPE_PREFIX = "ms-azure-iot-edge://"

@@ -6,22 +6,17 @@
 # Dev note - think of this as a controller
 
 from knack.util import CLIError
+from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.providers import CentralDeviceProvider
 
 
-def list_devices(
-    cmd, app_id: str, token=None, central_dns_suffix="azureiotcentral.com"
-):
+def list_devices(cmd, app_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT):
     provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token)
     return provider.list_devices()
 
 
 def get_device(
-    cmd,
-    app_id: str,
-    device_id: str,
-    token=None,
-    central_dns_suffix="azureiotcentral.com",
+    cmd, app_id: str, device_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token)
     return provider.get_device(device_id)
@@ -35,7 +30,7 @@ def create_device(
     instance_of=None,
     simulated=False,
     token=None,
-    central_dns_suffix="azureiotcentral.com",
+    central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     if simulated and not instance_of:
         raise CLIError(
@@ -52,18 +47,14 @@ def create_device(
 
 
 def delete_device(
-    cmd,
-    app_id: str,
-    device_id: str,
-    token=None,
-    central_dns_suffix="azureiotcentral.com",
+    cmd, app_id: str, device_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token)
     return provider.delete_device(device_id)
 
 
 def registration_info(
-    cmd, app_id: str, device_id, token=None, central_dns_suffix="azureiotcentral.com",
+    cmd, app_id: str, device_id, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token,)
 
@@ -73,7 +64,7 @@ def registration_info(
 
 
 def registration_summary(
-    cmd, app_id: str, token=None, central_dns_suffix="azureiotcentral.com",
+    cmd, app_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token,)
     return provider.get_device_registration_summary(
