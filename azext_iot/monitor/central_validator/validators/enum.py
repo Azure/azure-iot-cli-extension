@@ -5,9 +5,13 @@
 # --------------------------------------------------------------------------------------------
 
 
-class FileNames:
-    central_device_template_file = "central/json/device_template.json"
-    central_deeply_nested_device_template_file = (
-        "central/json/deeply_nested_template.json"
-    )
-    central_device_file = "central/json/device.json"
+def validate(schema, value):
+    if not isinstance(schema, dict):
+        return False
+
+    # schema.schema.enumValues, but done safely
+    enum_values = schema.get("schema", {}).get("enumValues", [])
+
+    allowed_values = [item["enumValue"] for item in enum_values if "enumValue" in item]
+
+    return value in allowed_values

@@ -53,7 +53,7 @@ def load_central_arguments(self, _):
         )
         context.argument(
             "device_template_id",
-            options_list=["--device-template-id"],
+            options_list=["--device-template-id", "--dtid"],
             help="Device template id. Example: somedevicetemplate",
         )
         context.argument(

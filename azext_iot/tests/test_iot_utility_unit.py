@@ -15,7 +15,6 @@ from azext_iot.common.utility import (
     process_json_arg,
     read_file_content,
     logger,
-    ISO8601Validator,
     ensure_min_version,
 )
 from azext_iot.common.deps import ensure_uamqp
@@ -279,73 +278,6 @@ class TestProcessJsonArg(object):
             )
         )
         assert mocked_util_logger.call_count == 0
-
-
-# none of these are valid anything in ISO 8601
-BAD_ARRAY = ["asd", "", 123.4, 123, True, False]
-
-
-class TestISO8601Validator:
-    validator = ISO8601Validator()
-
-    # Success suite
-    @pytest.mark.parametrize(
-        "to_validate", ["20200101", "20200101Z", "2020-01-01", "2020-01-01Z"]
-    )
-    def test_is_iso8601_date_pass(self, to_validate):
-        result = self.validator.is_iso8601_date(to_validate)
-        assert result
-
-    @pytest.mark.parametrize(
-        "to_validate",
-        [
-            "20200101T00:00:00",
-            "20200101T000000",
-            "2020-01-01T00:00:00",
-            "2020-01-01T00:00:00Z",
-            "2020-01-01T00:00:00.00",
-            "2020-01-01T00:00:00.00Z",
-            "2020-01-01T00:00:00.00+08:30",
-        ],
-    )
-    def test_is_iso8601_datetime_pass(self, to_validate):
-        result = self.validator.is_iso8601_datetime(to_validate)
-        assert result
-
-    @pytest.mark.parametrize("to_validate", ["P32DT7.592380349524318S", "P32DT7S"])
-    def test_is_iso8601_duration_pass(self, to_validate):
-        result = self.validator.is_iso8601_duration(to_validate)
-        assert result
-
-    @pytest.mark.parametrize(
-        "to_validate", ["00:00:00+08:30", "00:00:00Z", "00:00:00.123Z"]
-    )
-    def test_is_iso8601_time_pass(self, to_validate):
-        result = self.validator.is_iso8601_time(to_validate)
-        assert result
-
-    # Failure suite
-    @pytest.mark.parametrize(
-        "to_validate", ["2020-13-35", *BAD_ARRAY],
-    )
-    def test_is_iso8601_date_fail(self, to_validate):
-        result = self.validator.is_iso8601_date(to_validate)
-        assert not result
-
-    @pytest.mark.parametrize("to_validate", ["2020-13-35", "2020-00-00T", *BAD_ARRAY])
-    def test_is_iso8601_datetime_fail(self, to_validate):
-        result = self.validator.is_iso8601_datetime(to_validate)
-        assert not result
-
-    @pytest.mark.parametrize("to_validate", ["2020-01", *BAD_ARRAY])
-    def test_is_iso8601_duration_fail(self, to_validate):
-        result = self.validator.is_iso8601_duration(to_validate)
-        assert not result
-
-    @pytest.mark.parametrize("to_validate", [*BAD_ARRAY])
-    def test_is_iso8601_time_fail(self, to_validate):
-        result = self.validator.is_iso8601_time(to_validate)
-        assert not result
 
 
 class TestVersionComparison:

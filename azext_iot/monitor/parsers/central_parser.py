@@ -8,14 +8,16 @@ import re
 
 from uamqp.message import Message
 
-from azext_iot.common.utility import ISO8601Validator
-from azext_iot.central.providers import CentralDeviceProvider
+from azext_iot.central.providers import (
+    CentralDeviceProvider,
+    CentralDeviceTemplateProvider,
+)
+from azext_iot.central.models.template import Template
 from azext_iot.monitor.parsers import strings
+from azext_iot.monitor.central_validator import validate, extract_schema_type
 from azext_iot.monitor.models.arguments import CommonParserArguments
 from azext_iot.monitor.models.enum import Severity
 from azext_iot.monitor.parsers.common_parser import CommonParser
-
-ios_validator = ISO8601Validator()
 
 
 class CentralParser(CommonParser):
@@ -24,11 +26,13 @@ class CentralParser(CommonParser):
         message: Message,
         common_parser_args: CommonParserArguments,
         central_device_provider: CentralDeviceProvider,
+        central_template_provider: CentralDeviceTemplateProvider,
     ):
         super(CentralParser, self).__init__(
             message=message, common_parser_args=common_parser_args
         )
         self._central_device_provider = central_device_provider
+        self._central_template_provider = central_template_provider
         self._template_id = None
 
     def _add_central_issue(self, severity: Severity, details: str):
@@ -48,7 +52,7 @@ class CentralParser(CommonParser):
         self._perform_static_validations(payload=payload)
 
         # disable dynamic validations until Microservices work is figured out
-        # self._perform_dynamic_validations(payload=payload)
+        self._perform_dynamic_validations(payload=payload)
 
         return parsed_message
 
@@ -83,101 +87,62 @@ class CentralParser(CommonParser):
         if not isinstance(payload, dict):
             return
 
-        template = self._get_device_template()
+        template = self._get_template()
 
-        # _get_device_template should log error if there was an issue
-        if not template:
+        if not isinstance(template, Template):
             return
 
-        template_schemas = self._extract_template_schemas_from_template(
-            template=template
-        )
-
-        # _extract_template_schemas_from_template should log error if there was an issue
-        if not isinstance(template_schemas, dict):
-            return
-
-        self._validate_payload_against_schema(
-            payload=payload, template_schemas=template_schemas,
-        )
-
-    def _get_device_template(self):
-        try:
-            return self._central_device_provider.get_device_template_by_device_id(
-                self.device_id
+        # pnp device is sending data to an unrecognized interface
+        if self.interface_name and (self.interface_name not in template.interfaces):
+            details = strings.invalid_interface_name(
+                self.interface_name, list(template.interfaces.keys())
             )
+            self._add_central_issue(severity=Severity.warning, details=details)
+            return
+
+        self._validate_payload_against_interfaces(
+            payload=payload, template=template,
+        )
+
+    def _get_template(self):
+        try:
+            device = self._central_device_provider.get_device(self.device_id)
+            template = self._central_template_provider.get_device_template(
+                device.instance_of
+            )
+            self._template_id = template.id
+            return template
         except Exception as e:
             details = strings.device_template_not_found(e)
-            self._add_central_issue(severity=Severity.error, details=details)
-
-    def _extract_template_schemas_from_template(self, template: dict):
-        try:
-            self._template_id = template.get("id")
-            schemas = []
-            dcm = template["capabilityModel"]
-            implements = dcm["implements"]
-            for implementation in implements:
-                contents = implementation["schema"]["contents"]
-                schemas.extend(contents)
-            return {schema["name"]: schema for schema in schemas}
-        except Exception:
-            details = strings.invalid_template_extract_schema_failed(template)
             self._add_central_issue(severity=Severity.error, details=details)
 
     # currently validates:
     # 1) primitive types match (e.g. boolean is indeed bool etc)
     # 2) names match (i.e. Humidity vs humidity etc)
-    def _validate_payload_against_schema(
-        self, payload: dict, template_schemas: dict,
+    def _validate_payload_against_interfaces(
+        self, payload: dict, template: Template,
     ):
-        template_schema_names = template_schemas.keys()
         name_miss = []
-        for name, value in payload.items():
-            schema = template_schemas.get(name)
+        for telemetry_name, telemetry in payload.items():
+            schema = template.get_schema(
+                telemetry_name=telemetry_name, interface_name=self.interface_name
+            )
             if not schema:
-                name_miss.append(name)
-
-            is_dict = isinstance(schema, dict)
-            if is_dict and not self._validate_types_match(value, schema):
-                expected_type = str(schema.get("schema"))
-                details = strings.invalid_primitive_schema_mismatch_template(
-                    name, expected_type, value
-                )
-                self._add_central_issue(severity=Severity.error, details=details)
+                name_miss.append(telemetry_name)
+            else:
+                self._process_telemetry(telemetry_name, schema, telemetry)
 
         if name_miss:
             details = strings.invalid_field_name_mismatch_template(
-                name_miss, list(template_schema_names)
+                name_miss, template.schema_names
             )
             self._add_central_issue(severity=Severity.warning, details=details)
 
-    def _validate_types_match(self, value, schema: dict) -> bool:
-        # suppress error if there is no "schema" in schema
-        # means something else went wrong
-        schema_type = schema.get("schema")
-        if not schema_type:
-            return True
-
-        if schema_type == "boolean":
-            return isinstance(value, bool)
-        elif schema_type == "double":
-            return isinstance(value, (float, int))
-        elif schema_type == "float":
-            return isinstance(value, (float, int))
-        elif schema_type == "integer":
-            return isinstance(value, int)
-        elif schema_type == "long":
-            return isinstance(value, (float, int))
-        elif schema_type == "string":
-            return isinstance(value, str)
-        elif schema_type == "time":
-            return ios_validator.is_iso8601_time(value)
-        elif schema_type == "date":
-            return ios_validator.is_iso8601_date(value)
-        elif schema_type == "dateTime":
-            return ios_validator.is_iso8601_datetime(value)
-        elif schema_type == "duration":
-            return ios_validator.is_iso8601_duration(value)
-
-        # if the schema_type is not found above, suppress error
-        return True
+    def _process_telemetry(self, telemetry_name: str, schema, telemetry):
+        expected_type = extract_schema_type(schema)
+        is_payload_valid = validate(schema, telemetry)
+        if expected_type and not is_payload_valid:
+            details = strings.invalid_primitive_schema_mismatch_template(
+                telemetry_name, expected_type, telemetry
+            )
+            self._add_central_issue(severity=Severity.error, details=details)
