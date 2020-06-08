@@ -39,19 +39,23 @@ class IoTExtCommandsLoader(AzCommandsLoader):
         from azext_iot.commands import load_command_table
         from azext_iot.iothub.command_bindings import load_iothub_commands
         from azext_iot.central.command_map import load_central_commands
+        from azext_iot.digitaltwins.command_map import load_digitaltwins_commands
 
         load_command_table(self, args)
         load_iothub_commands(self, args)
         load_central_commands(self, args)
+        load_digitaltwins_commands(self, args)
 
         return self.command_table
 
     def load_arguments(self, command):
         from azext_iot._params import load_arguments
         from azext_iot.central.params import load_central_arguments
+        from azext_iot.digitaltwins.params import load_digitaltwins_arguments
 
         load_arguments(self, command)
         load_central_arguments(self, command)
+        load_digitaltwins_arguments(self, command)
 
 
 COMMAND_LOADER_CLS = IoTExtCommandsLoader

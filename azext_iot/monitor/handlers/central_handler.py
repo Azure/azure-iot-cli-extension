@@ -7,7 +7,10 @@
 from typing import List
 
 from azext_iot.monitor.utility import stop_monitor, get_loop
-from azext_iot.central.providers.device_provider import CentralDeviceProvider
+from azext_iot.central.providers import (
+    CentralDeviceProvider,
+    CentralDeviceTemplateProvider,
+)
 from azext_iot.monitor.handlers.common_handler import CommonHandler
 from azext_iot.monitor.models.arguments import CentralHandlerArguments
 from azext_iot.monitor.parsers.central_parser import CentralParser
@@ -18,6 +21,7 @@ class CentralHandler(CommonHandler):
     def __init__(
         self,
         central_device_provider: CentralDeviceProvider,
+        central_template_provider: CentralDeviceTemplateProvider,
         central_handler_args: CentralHandlerArguments,
     ):
         super(CentralHandler, self).__init__(
@@ -25,6 +29,7 @@ class CentralHandler(CommonHandler):
         )
 
         self._central_device_provider = central_device_provider
+        self._central_template_provider = central_template_provider
 
         self._central_handler_args = central_handler_args
 
@@ -43,6 +48,7 @@ class CentralHandler(CommonHandler):
             message=message,
             common_parser_args=self._common_handler_args.common_parser_args,
             central_device_provider=self._central_device_provider,
+            central_template_provider=self._central_template_provider,
         )
 
         if not self._should_process_device(parser.device_id):

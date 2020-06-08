@@ -1,7 +1,7 @@
 # coding=utf-8
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
-# Unpublished works.
+# Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
 """
@@ -59,7 +59,7 @@ def load_central_arguments(self, _):
         )
         context.argument(
             "device_template_id",
-            options_list=["--device-template-id"],
+            options_list=["--device-template-id", "--dtid"],
             help="Device template id. Example: somedevicetemplate",
         )
         context.argument(

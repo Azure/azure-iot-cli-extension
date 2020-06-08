@@ -7,4 +7,7 @@
 
 class FileNames:
     central_device_template_file = "central/json/device_template.json"
+    central_deeply_nested_device_template_file = (
+        "central/json/deeply_nested_template.json"
+    )
     central_device_file = "central/json/device.json"

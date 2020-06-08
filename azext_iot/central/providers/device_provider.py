@@ -7,6 +7,7 @@
 from knack.util import CLIError
 from knack.log import get_logger
 from typing import List
+from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.enum import DeviceStatus
 from azext_iot.central.models.device import Device
@@ -36,9 +37,7 @@ class CentralDeviceProvider:
         self._device_credentials = {}
         self._device_registration_info = {}
 
-    def get_device(
-        self, device_id, central_dns_suffix="azureiotcentral.com",
-    ) -> Device:
+    def get_device(self, device_id, central_dns_suffix=CENTRAL_ENDPOINT) -> Device:
         if not device_id:
             raise CLIError("Device id must be specified.")
         # get or add to cache
@@ -58,30 +57,7 @@ class CentralDeviceProvider:
 
         return device
 
-    def get_device_template_by_device_id(
-        self, device_id, central_dns_suffix="azureiotcentral.com",
-    ) -> dict:
-        from azext_iot.central.providers import CentralDeviceTemplateProvider
-
-        if not device_id:
-            raise CLIError("Device id must be specified.")
-
-        device = self.get_device(device_id, central_dns_suffix)
-        if not device.instance_of:
-            raise CLIError(
-                "Device '{}' does not have a corresponding device template.".format(
-                    device_id
-                )
-            )
-
-        template = CentralDeviceTemplateProvider.get_device_template(
-            self=self,
-            device_template_id=device.instance_of,
-            central_dns_suffix=central_dns_suffix,
-        )
-        return template
-
-    def list_devices(self, central_dns_suffix="azureiotcentral.com") -> List[Device]:
+    def list_devices(self, central_dns_suffix=CENTRAL_ENDPOINT) -> List[Device]:
         devices = central_services.device.list_devices(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -100,7 +76,7 @@ class CentralDeviceProvider:
         device_name=None,
         instance_of=None,
         simulated=False,
-        central_dns_suffix="azureiotcentral.com",
+        central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> Device:
         if not device_id:
             raise CLIError("Device id must be specified.")
@@ -127,9 +103,7 @@ class CentralDeviceProvider:
 
         return device
 
-    def delete_device(
-        self, device_id, central_dns_suffix="azureiotcentral.com",
-    ) -> dict:
+    def delete_device(self, device_id, central_dns_suffix=CENTRAL_ENDPOINT,) -> dict:
         if not device_id:
             raise CLIError("Device id must be specified.")
 
@@ -150,7 +124,7 @@ class CentralDeviceProvider:
         return result
 
     def get_device_credentials(
-        self, device_id, central_dns_suffix="azureiotcentral.com",
+        self, device_id, central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> dict:
         credentials = self._device_credentials.get(device_id)
 
@@ -177,7 +151,7 @@ class CentralDeviceProvider:
         self,
         device_id,
         device_status: DeviceStatus,
-        central_dns_suffix="azureiotcentral.com",
+        central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> dict:
         dps_state = {}
         info = self._device_registration_info.get(device_id)
@@ -207,7 +181,7 @@ class CentralDeviceProvider:
 
         return info
 
-    def get_device_registration_summary(self, central_dns_suffix="azureiotcentral.com"):
+    def get_device_registration_summary(self, central_dns_suffix=CENTRAL_ENDPOINT):
         return central_services.device.get_device_registration_summary(
             cmd=self._cmd,
             app_id=self._app_id,

@@ -7,6 +7,7 @@
 
 from knack.util import CLIError
 
+from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.common import utility
 from azext_iot.central.providers import CentralDeviceTemplateProvider
 
@@ -16,23 +17,25 @@ def get_device_template(
     app_id: str,
     device_template_id: str,
     token=None,
-    central_dns_suffix="azureiotcentral.com",
+    central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     provider = CentralDeviceTemplateProvider(cmd=cmd, app_id=app_id, token=token)
-    return provider.get_device_template(
+    template = provider.get_device_template(
         device_template_id=device_template_id, central_dns_suffix=central_dns_suffix
     )
+    return template.template
 
 
 def list_device_templates(
-    cmd, app_id: str, token=None, central_dns_suffix="azureiotcentral.com"
+    cmd, app_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT
 ):
     provider = CentralDeviceTemplateProvider(cmd=cmd, app_id=app_id, token=token)
-    return provider.list_device_templates(central_dns_suffix=central_dns_suffix)
+    templates = provider.list_device_templates(central_dns_suffix=central_dns_suffix)
+    return {template.id: template.template for template in templates.values()}
 
 
 def map_device_templates(
-    cmd, app_id: str, token=None, central_dns_suffix="azureiotcentral.com"
+    cmd, app_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT
 ):
     provider = CentralDeviceTemplateProvider(cmd=cmd, app_id=app_id, token=token)
     return provider.map_device_templates(central_dns_suffix=central_dns_suffix)
@@ -44,7 +47,7 @@ def create_device_template(
     device_template_id: str,
     content: str,
     token=None,
-    central_dns_suffix="azureiotcentral.com",
+    central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     if not isinstance(content, str):
         raise CLIError("content must be a string: {}".format(content))
@@ -52,11 +55,12 @@ def create_device_template(
     payload = utility.process_json_arg(content, argument_name="content")
 
     provider = CentralDeviceTemplateProvider(cmd=cmd, app_id=app_id, token=token)
-    return provider.create_device_template(
+    template = provider.create_device_template(
         device_template_id=device_template_id,
         payload=payload,
         central_dns_suffix=central_dns_suffix,
     )
+    return template.template
 
 
 def delete_device_template(
@@ -64,7 +68,7 @@ def delete_device_template(
     app_id: str,
     device_template_id: str,
     token=None,
-    central_dns_suffix="azureiotcentral.com",
+    central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     provider = CentralDeviceTemplateProvider(cmd=cmd, app_id=app_id, token=token)
     return provider.delete_device_template(

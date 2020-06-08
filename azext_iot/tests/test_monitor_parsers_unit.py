@@ -9,7 +9,12 @@ import mock
 import pytest
 
 from uamqp.message import Message, MessageProperties
-from azext_iot.central.providers import CentralDeviceProvider
+from azext_iot.central.providers import (
+    CentralDeviceProvider,
+    CentralDeviceTemplateProvider,
+)
+from azext_iot.central.models.template import Template
+from azext_iot.central.models.device import Device
 from azext_iot.monitor.parsers import common_parser, central_parser
 from azext_iot.monitor.parsers import strings
 from azext_iot.monitor.models.arguments import CommonParserArguments
@@ -271,12 +276,20 @@ class TestCentralParser:
         # parsing should attempt to place raw payload into result even if parsing fails
         assert parsed_msg["event"]["payload"] == self.bad_field_name
 
+        # field name contains '-' character error
         expected_details_1 = strings.invalid_field_name(
             list(self.bad_field_name.keys())
         )
-        _validate_issues(parser, Severity.error, 1, 1, [expected_details_1])
+        _validate_issues(parser, Severity.error, 2, 1, [expected_details_1])
 
-    def xtest_validate_against_template_should_fail(self):
+        # field name not present in template warning
+        expected_details_2 = strings.invalid_field_name_mismatch_template(
+            list(self.bad_field_name.keys()), device_template.schema_names
+        )
+
+        _validate_issues(parser, Severity.warning, 2, 1, [expected_details_2])
+
+    def test_validate_against_template_should_fail(self):
         # setup
         device_template = self._get_template()
 
@@ -296,9 +309,6 @@ class TestCentralParser:
 
         # act
         parsed_msg = parser.parse_message()
-        schema = parser._extract_template_schemas_from_template(device_template)
-
-        schema = parser._extract_template_schemas_from_template(device_template)
 
         # verify
         assert parsed_msg["event"]["payload"] == self.bad_dcm_payload
@@ -312,12 +322,12 @@ class TestCentralParser:
         assert properties["application"] == self.app_properties
 
         expected_details = strings.invalid_field_name_mismatch_template(
-            list(self.bad_dcm_payload.keys()), list(schema.keys())
+            list(self.bad_dcm_payload.keys()), device_template.schema_names
         )
 
         _validate_issues(parser, Severity.warning, 1, 1, [expected_details])
 
-    def xtest_validate_against_bad_template_should_not_throw(self):
+    def test_validate_against_bad_template_should_not_throw(self):
         # setup
         device_template = "an_unparseable_template"
 
@@ -335,6 +345,11 @@ class TestCentralParser:
             device_template=device_template, message=message, args=args
         )
 
+        # haven't found a better way to force the error to occur within parser
+        parser._central_template_provider.get_device_template = lambda x: Template(
+            device_template
+        )
+
         # act
         parsed_msg = parser.parse_message()
 
@@ -342,13 +357,13 @@ class TestCentralParser:
         assert parsed_msg["event"]["payload"] == self.bad_dcm_payload
         assert parsed_msg["event"]["origin"] == self.device_id
 
-        expected_details = strings.invalid_template_extract_schema_failed(
-            device_template
+        expected_details = strings.device_template_not_found(
+            "Could not parse iot central device template."
         )
 
         _validate_issues(parser, Severity.error, 1, 1, [expected_details])
 
-    def xtest_type_mismatch_should_error(self):
+    def test_type_mismatch_should_error(self):
         # setup
         device_template = self._get_template()
 
@@ -380,18 +395,23 @@ class TestCentralParser:
         expected_details = strings.invalid_primitive_schema_mismatch_template(
             field_name, data_type, data
         )
-        _validate_issues(parser, Severity.warning, 1, 1, [expected_details])
+        _validate_issues(parser, Severity.error, 1, 1, [expected_details])
 
     def _get_template(self):
-        return load_json(FileNames.central_device_template_file)
+        return Template(load_json(FileNames.central_device_template_file))
 
     def _create_parser(
-        self, device_template: dict, message: Message, args: CommonParserArguments
+        self, device_template: Template, message: Message, args: CommonParserArguments
     ):
-        provider = CentralDeviceProvider(cmd=None, app_id=None)
-        provider.get_device_template_by_device_id = mock.MagicMock(
+        device_provider = CentralDeviceProvider(cmd=None, app_id=None)
+        template_provider = CentralDeviceTemplateProvider(cmd=None, app_id=None)
+        device_provider.get_device = mock.MagicMock(return_value=Device({}))
+        template_provider.get_device_template = mock.MagicMock(
             return_value=device_template
         )
         return central_parser.CentralParser(
-            message=message, central_device_provider=provider, common_parser_args=args
+            message=message,
+            central_device_provider=device_provider,
+            central_template_provider=template_provider,
+            common_parser_args=args,
         )
