@@ -197,7 +197,7 @@ class CentralDeviceProvider:
         payload: dict,
         central_dns_suffix="azureiotcentral.com",
     ):
-        return central_services.device.execute_component_command(
+        central_services.device.execute_component_command(
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
@@ -205,6 +205,15 @@ class CentralDeviceProvider:
             interface_id=interface_id,
             command_name=command_name,
             payload=payload,
+            central_dns_suffix=central_dns_suffix,
+        )
+        return central_services.device.get_component_command_history(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            token=self._token,
+            device_id=device_id,
+            interface_id=interface_id,
+            command_name=command_name,
             central_dns_suffix=central_dns_suffix,
         )
 

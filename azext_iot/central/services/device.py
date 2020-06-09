@@ -233,7 +233,39 @@ def execute_component_command(
     central_dns_suffix="azureiotcentral.com",
 ):
     """
-    Get device credentials from IoTC
+    Execute a direct method on a device
+
+    Args:
+        cmd: command passed into az
+        app_id: name of app (used for forming request URL)
+        device_id: unique case-sensitive device id,
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        result (currently a 201)
+    """
+    url = "https://{}.{}/{}/{}/components/{}/commands/{}".format(
+        app_id, central_dns_suffix, BASE_PATH, device_id, interface_id, command_name
+    )
+    headers = _utility.get_headers(token, cmd)
+
+    response = requests.post(url, headers=headers, json=payload)
+    return _utility.try_extract_result(response)
+
+
+def get_component_command_history(
+    cmd,
+    app_id: str,
+    token: str,
+    device_id: str,
+    interface_id: str,
+    command_name: str,
+    central_dns_suffix="azureiotcentral.com",
+):
+    """
+    Get component command history
 
     Args:
         cmd: command passed into az
@@ -251,5 +283,5 @@ def execute_component_command(
     )
     headers = _utility.get_headers(token, cmd)
 
-    response = requests.post(url, headers=headers, json=payload)
+    response = requests.get(url, headers=headers)
     return _utility.try_extract_result(response)
