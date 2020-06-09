@@ -49,11 +49,13 @@ class CommonHandlerArguments:
         devices: list = None,
         device_id="",
         interface_name="",
+        module_id="",
     ):
         self.output = output
         self.devices = devices or []
         self.device_id = device_id or ""
         self.interface_name = interface_name or ""
+        self.module_id = module_id or ""
         self.common_parser_args = common_parser_args
 
 

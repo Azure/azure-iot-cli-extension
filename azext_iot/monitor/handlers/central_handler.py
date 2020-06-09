@@ -57,6 +57,9 @@ class CentralHandler(CommonHandler):
         if not self._should_process_device(parser.device_id):
             return
 
+        if not self._should_process_module(parser.module_id):
+            return
+
         parsed_message = parser.parse_message()
 
         self._messages.append(parsed_message)

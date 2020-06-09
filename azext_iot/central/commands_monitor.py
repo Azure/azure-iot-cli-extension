@@ -20,6 +20,7 @@ def validate_messages(
     cmd: AzCliCommand,
     app_id,
     device_id=None,
+    module_id=None,
     consumer_group="$Default",
     timeout=300,
     enqueued_time=None,
@@ -47,6 +48,7 @@ def validate_messages(
         output=telemetry_args.output,
         common_parser_args=common_parser_args,
         device_id=device_id,
+        module_id=module_id,
     )
     central_handler_args = CentralHandlerArguments(
         duration=duration,
@@ -69,6 +71,7 @@ def monitor_events(
     cmd: AzCliCommand,
     app_id,
     device_id=None,
+    module_id=None,
     consumer_group="$Default",
     timeout=300,
     enqueued_time=None,
@@ -92,6 +95,7 @@ def monitor_events(
         output=telemetry_args.output,
         common_parser_args=common_parser_args,
         device_id=device_id,
+        module_id=module_id,
     )
     central_handler_args = CentralHandlerArguments(
         duration=0,
