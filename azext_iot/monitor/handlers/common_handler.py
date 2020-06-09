@@ -30,6 +30,9 @@ class CommonHandler(AbstractBaseEventsHandler):
         if not self._should_process_interface(parser.interface_name):
             return
 
+        if not self._should_process_module(parser.module_id):
+            return
+
         result = parser.parse_message()
 
         if self._common_handler_args.output.lower() == "json":
