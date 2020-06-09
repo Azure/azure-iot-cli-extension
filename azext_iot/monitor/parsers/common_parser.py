@@ -39,6 +39,7 @@ class CommonParser(AbstractBaseParser):
         event = {}
         event["origin"] = self.device_id
         event["interface"] = self.interface_name
+        event["module"] = self.module_id
 
         if not properties:
             properties = []  # guard against None being passed in

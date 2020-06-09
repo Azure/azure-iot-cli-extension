@@ -332,6 +332,11 @@ def load_arguments(self, _):
     with self.argument_context("iot hub monitor-events") as context:
         context.argument("timeout", arg_type=event_timeout_type)
         context.argument("properties", arg_type=event_msg_prop_type)
+        context.argument(
+            "interface",
+            options_list=["--interface", "-i"],
+            help="Target interface name. This should be the name of the interface not the urn-id.",
+        )
 
     with self.argument_context("iot hub monitor-feedback") as context:
         context.argument(
