@@ -78,6 +78,9 @@ def load_central_arguments(self, _):
             help="Central dns suffix. "
             "This enables running cli commands against non public/prod environments",
         )
+        context.argument(
+            "module_id", options_list=["--module-id", "-m"], help="Iot Edge Module ID",
+        )
 
     with self.argument_context("iot central app monitor-events") as context:
         context.argument("timeout", arg_type=event_timeout_type)
@@ -157,6 +160,10 @@ def load_deprecated_iotcentral_params(self, _):
             options_list=["--central-dns-suffix", "--central-api-uri"],
             help="Central dns suffix. "
             "This enables running cli commands against non public/prod environments",
+        )
+
+        context.argument(
+            "module_id", options_list=["--module-id", "-m"], help="Iot Edge Module ID",
         )
 
     with self.argument_context("iot central device-twin") as context:
