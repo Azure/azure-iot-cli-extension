@@ -11,10 +11,13 @@ from azext_iot.central.providers import (
     CentralDeviceProvider,
     CentralDeviceTemplateProvider,
 )
-from azext_iot.monitor.handlers.common_handler import CommonHandler
+from azext_iot.monitor.handlers import CommonHandler
 from azext_iot.monitor.models.arguments import CentralHandlerArguments
 from azext_iot.monitor.parsers.central_parser import CentralParser
 from azext_iot.monitor.parsers.issue import Issue
+from knack.log import get_logger
+
+logger = get_logger(__name__)
 
 
 class CentralHandler(CommonHandler):
@@ -80,8 +83,11 @@ class CentralHandler(CommonHandler):
         device_filter_text = ""
         device_id = self._central_handler_args.common_handler_args.device_id
         if device_id:
-            device_filter_text = ".\nFiltering on device: {}".format(device_id)
-
+            filter_text = ".\nFiltering on device: {}".format(device_id)
+        module_id = self._central_handler_args.common_handler_args.module_id
+        if module_id:
+            logger.warn("Module filtering is applicable only for edge devices. ")
+            filter_text += ".\nFiltering on module: {}".format(module_id)
         exit_text = ""
         if (
             self._central_handler_args.duration

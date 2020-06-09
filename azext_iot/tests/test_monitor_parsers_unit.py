@@ -55,13 +55,24 @@ class TestCommonParser:
     bad_content_type = "bad-content-type"
 
     @pytest.mark.parametrize(
-        "device_id, encoding, content_type, interface_name, payload, properties, app_properties",
+        "device_id, encoding, content_type, interface_name, module_id, payload, properties, app_properties",
         [
             (
                 "device-id",
                 "utf-8",
                 "application/json",
                 "interface_name",
+                "module-id",
+                {"payloadKey": "payloadValue"},
+                {"propertiesKey": "propertiesValue"},
+                {"appPropsKey": "appPropsValue"},
+            ),
+            (
+                "device-id",
+                "utf-8",
+                "application/json",
+                "interface_name",
+                "",
                 {"payloadKey": "payloadValue"},
                 {"propertiesKey": "propertiesValue"},
                 {"appPropsKey": "appPropsValue"},
@@ -71,6 +82,7 @@ class TestCommonParser:
                 "utf-8",
                 "application/json",
                 "",
+                "",
                 {"payloadKey": "payloadValue"},
                 {"propertiesKey": "propertiesValue"},
                 {"appPropsKey": "appPropsValue"},
@@ -80,6 +92,7 @@ class TestCommonParser:
                 "utf-8",
                 "application/json",
                 "",
+                "",
                 {},
                 {"propertiesKey": "propertiesValue"},
                 {"appPropsKey": "appPropsValue"},
@@ -89,11 +102,12 @@ class TestCommonParser:
                 "utf-8",
                 "application/json",
                 "",
+                "",
                 {},
                 {},
                 {"appPropsKey": "appPropsValue"},
             ),
-            ("device-id", "utf-8", "application/json", "", {}, {}, {},),
+            ("device-id", "utf-8", "application/json", "", "", {}, {}, {},),
         ],
     )
     def test_parse_message_should_succeed(
@@ -105,6 +119,7 @@ class TestCommonParser:
         payload,
         properties,
         app_properties,
+        module_id,
     ):
         # setup
         properties = MessageProperties(
@@ -116,6 +131,7 @@ class TestCommonParser:
             annotations={
                 common_parser.DEVICE_ID_IDENTIFIER: device_id.encode(),
                 common_parser.INTERFACE_NAME_IDENTIFIER: interface_name.encode(),
+                common_parser.MODULE_ID_IDENTIFIER: module_id.encode(),
             },
             application_properties=_encode_app_props(app_properties),
         )
@@ -130,7 +146,11 @@ class TestCommonParser:
         assert parsed_msg["event"]["origin"] == device_id
         device_identifier = str(common_parser.DEVICE_ID_IDENTIFIER, "utf8")
         assert parsed_msg["event"]["annotations"][device_identifier] == device_id
-
+        module_identifier = str(common_parser.MODULE_ID_IDENTIFIER, "utf8")
+        if module_id:
+            assert parsed_msg["event"]["annotations"][module_identifier] == module_id
+        else:
+            assert not parsed_msg["event"]["annotations"].get(module_identifier)
         properties = parsed_msg["event"]["properties"]
         assert properties["system"]["content_encoding"] == encoding
         assert properties["system"]["content_type"] == content_type

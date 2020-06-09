@@ -85,6 +85,14 @@ class CommonParser(AbstractBaseParser):
             self._add_issue(severity=Severity.error, details=details)
             return ""
 
+    def _parse_module_id(self, message: Message) -> str:
+        try:
+            return str(message.annotations.get(MODULE_ID_IDENTIFIER), "utf8")
+        except Exception:
+            # a message not containing an module name is expected for non-edge devices
+            # so there's no "issue" to log here
+            return ""
+
     def _parse_interface_name(self, message: Message) -> str:
         try:
             return str(message.annotations.get(INTERFACE_NAME_IDENTIFIER), "utf8")

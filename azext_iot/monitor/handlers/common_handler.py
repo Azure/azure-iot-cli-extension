@@ -43,22 +43,24 @@ class CommonHandler(AbstractBaseEventsHandler):
         expected_device_id = self._common_handler_args.device_id
         expected_devices = self._common_handler_args.devices
 
-        if expected_device_id and expected_device_id != device_id:
-            if "*" in expected_device_id or "?" in expected_device_id:
-                regex = (
-                    re.escape(expected_device_id)
-                    .replace("\\*", ".*")
-                    .replace("\\?", ".")
-                    + "$"
-                )
-                if not re.match(regex, device_id):
-                    return False
-            else:
-                return False
+        process_device = self._perform_id_match(expected_device_id, device_id)
 
         if expected_devices and device_id not in expected_devices:
             return False
 
+        return process_device
+
+    def _perform_id_match(self, expected_id, actual_id):
+        if expected_id and expected_id != actual_id:
+            if "*" in expected_id or "?" in expected_id:
+                regex = (
+                    re.escape(expected_id).replace("\\*", ".*").replace("\\?", ".")
+                    + "$"
+                )
+                if not re.match(regex, actual_id):
+                    return False
+            else:
+                return False
         return True
 
     def _should_process_interface(self, interface_name):
@@ -70,3 +72,7 @@ class CommonHandler(AbstractBaseEventsHandler):
 
         # only process if the expected and actual interface name match
         return expected_interface_name == interface_name
+
+    def _should_process_module(self, module_id):
+        expected_module_id = self._common_handler_args.module_id
+        return self._perform_id_match(expected_module_id, module_id)
