@@ -9,7 +9,7 @@ from knack.util import CLIError
 
 class Template:
     def __init__(self, template: dict):
-        self.template = template
+        self.raw_template = template
         try:
             self.id = template.get("id")
             self.name = template.get("displayName")
