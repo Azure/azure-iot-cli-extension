@@ -207,7 +207,7 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
         )
 
         twin_relationship_create_result = self.cmd(
-            "dt twin relationship create -n {} -g {} --relationship-id {} --relationship {} --source-twin-id {} "
+            "dt twin relationship create -n {} -g {} --relationship-id {} --relationship {} --twin-id {} "
             "--target-twin-id {} --properties '{}'".format(
                 self.instance_name,
                 self.group_names[0],
