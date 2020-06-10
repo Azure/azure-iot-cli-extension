@@ -2185,6 +2185,8 @@ def iot_hub_monitor_events(
     cmd,
     hub_name=None,
     device_id=None,
+    interface=None,
+    module_id=None,
     consumer_group="$Default",
     timeout=300,
     enqueued_time=None,
@@ -2201,6 +2203,8 @@ def iot_hub_monitor_events(
             cmd,
             hub_name=hub_name,
             device_id=device_id,
+            interface_name=interface,
+            module_id=module_id,
             consumer_group=consumer_group,
             timeout=timeout,
             enqueued_time=enqueued_time,
@@ -2259,6 +2263,7 @@ def iot_hub_distributed_tracing_show(
 def _iot_hub_monitor_events(
     cmd,
     interface_name=None,
+    module_id=None,
     hub_name=None,
     device_id=None,
     consumer_group="$Default",
@@ -2312,6 +2317,7 @@ def _iot_hub_monitor_events(
         devices=device_ids,
         device_id=device_id,
         interface_name=interface_name,
+        module_id=module_id,
     )
 
     handler = CommonHandler(handler_args)

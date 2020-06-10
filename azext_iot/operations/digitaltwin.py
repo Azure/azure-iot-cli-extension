@@ -283,6 +283,7 @@ def iot_digitaltwin_monitor_events(
     content_type=None,
     device_query=None,
     interface=None,
+    module_id=None,
 ):
     _iot_hub_monitor_events(
         cmd=cmd,
@@ -299,6 +300,7 @@ def iot_digitaltwin_monitor_events(
         content_type=content_type,
         device_query=device_query,
         interface_name=interface,
+        module_id=module_id,
     )
 
 
