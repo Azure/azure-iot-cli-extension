@@ -18,6 +18,7 @@ from azext_iot.monitor.parsers.issue import IssueHandler
 
 DEVICE_ID_IDENTIFIER = b"iothub-connection-device-id"
 INTERFACE_NAME_IDENTIFIER = b"iothub-interface-name"
+MODULE_ID_IDENTIFIER = b"iothub-connection-module-id"
 
 
 class CommonParser(AbstractBaseParser):
@@ -28,6 +29,7 @@ class CommonParser(AbstractBaseParser):
         self.device_id = ""  # need to default
         self.device_id = self._parse_device_id(message)
         self.interface_name = self._parse_interface_name(message)
+        self.module_id = self._parse_module_id(message)
 
     def parse_message(self) -> dict:
         message = self._message
@@ -37,6 +39,7 @@ class CommonParser(AbstractBaseParser):
         event = {}
         event["origin"] = self.device_id
         event["interface"] = self.interface_name
+        event["module"] = self.module_id
 
         if not properties:
             properties = []  # guard against None being passed in
@@ -83,6 +86,14 @@ class CommonParser(AbstractBaseParser):
         except Exception:
             details = strings.unknown_device_id()
             self._add_issue(severity=Severity.error, details=details)
+            return ""
+
+    def _parse_module_id(self, message: Message) -> str:
+        try:
+            return str(message.annotations.get(MODULE_ID_IDENTIFIER), "utf8")
+        except Exception:
+            # a message not containing an module name is expected for non-edge devices
+            # so there's no "issue" to log here
             return ""
 
     def _parse_interface_name(self, message: Message) -> str:
