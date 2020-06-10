@@ -184,16 +184,6 @@ def load_digitaltwins_arguments(self, _):
             help="Relationship Id.",
         )
         context.argument(
-            "source_twin_id",
-            options_list=["--source-twin-id", "--source", "-s"],
-            help="The source twin Id for a relationship.",
-        )
-        context.argument(
-            "target_twin_id",
-            options_list=["--target-twin-id", "--target", "-t"],
-            help="The target twin Id for a relationship.",
-        )
-        context.argument(
             "relationship",
             options_list=["--relationship", "--kind"],
             help="Relationship name or kind. For example: 'contains'",
@@ -235,6 +225,18 @@ def load_digitaltwins_arguments(self, _):
             "component_path",
             options_list=["--component"],
             help="The path to the DTDL component. If set, telemetry will be emitted on behalf of the component.",
+        )
+
+    with self.argument_context("dt twin relationship") as context:
+        context.argument(
+            "twin_id",
+            options_list=["--twin-id", "-t"],
+            help="The source twin Id for a relationship.",
+        )
+        context.argument(
+            "target_twin_id",
+            options_list=["--target-twin-id", "--target"],
+            help="The target twin Id for a relationship.",
         )
 
     with self.argument_context("dt twin relationship create") as context:
