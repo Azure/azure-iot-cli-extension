@@ -36,6 +36,7 @@ def load_central_commands(self, _):
     ) as cmd_group:
         cmd_group.command("monitor-events", "monitor_events")
         cmd_group.command("validate-messages", "validate_messages", is_preview=True)
+        cmd_group.command("monitor-properties", "monitor_properties", is_preview=True)
 
     with self.command_group(
         "iot central app device", command_type=central_device_ops, is_preview=True,
@@ -64,7 +65,6 @@ def load_central_commands(self, _):
         "iot central app device-twin", command_type=central_device_twin_ops
     ) as cmd_group:
         cmd_group.command("show", "device_twin_show")
-
     # TODO: Delete this by end of July 2020
     load_deprecated_commands(self, _)
 
