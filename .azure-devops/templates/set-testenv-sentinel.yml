@@ -1,0 +1,28 @@
+steps:
+  - task: PythonScript@0
+    displayName : 'Set test envs with sentinel values'
+    name: 'setTestEnvSentinel'
+    inputs:
+      scriptSource: 'inline'
+      script: |
+        # This task is in place to get around DevOps pipelines env var naming rules which would require
+        # application code changes.
+        sentinel_value = "sentinel"
+        envvars = [
+            "azext_iot_testhub",
+            "azext_iot_testhub_cs",
+            "azext_iot_testrg",
+            "azext_iot_testdps",
+            "azext_pnp_endpoint",
+            "azext_pnp_repository",
+            "azext_pnp_cs",
+            "azext_iot_central_app_id",
+            "azext_iot_central_device_template_path",
+        ]
+        f = open("./pytest.ini", "w+")
+        f.write("[pytest]\n")
+        f.write("junit_family = xunit1\n")
+        f.write("env = \n")
+        envvars_sentinel = ["  {}={}\n".format(envvar, sentinel_value) for envvar in envvars]
+        f.writelines(envvars_sentinel)
+        f.close()

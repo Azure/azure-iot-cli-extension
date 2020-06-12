@@ -28,22 +28,9 @@ steps:
       displayName: 'Execute all Tests'
 
   - ${{ if eq(parameters.runUnitTestsOnly, 'true') }}:
-    - script: pytest -v azext_iot/tests/test_iot_ext_unit.py --junitxml=junit/test-iothub-unit-results.xml
-      displayName: 'Execute IoT Hub unit tests'
-    - script: pytest -v azext_iot/tests/test_iot_dps_unit.py --junitxml=junit/test-dps-unit-results.xml
-      displayName: 'Execute DPS unit tests'
-    - script: pytest -v azext_iot/tests/test_iot_utility_unit.py --junitxml=junit/test-utility-unit-results.xml
-      displayName: 'Execute Utility unit tests'
-    - script: pytest -v azext_iot/tests/test_iot_central_unit.py --junitxml=junit/test-central-unit-results.xml
-      displayName: 'Execute IoT Central unit tests'
-    - script: pytest -v azext_iot/tests/test_iot_pnp_unit.py --junitxml=junit/test-pnp-unit-results.xml
-      displayName: 'Execute IoT PnP unit tests'
-    - script: pytest -v azext_iot/tests/test_iot_digitaltwin_unit.py --junitxml=junit/test-dt-unit-results.xml
-      displayName: 'Execute IoT DigitalTwin unit tests'
-    - script: pytest -v azext_iot/tests/iothub/configurations/test_iot_config_unit.py --junitxml=junit/test-config-unit-results.xml
-      displayName: 'Execute IoT Configuration unit tests'
-    - script: pytest -v azext_iot/tests/iothub/jobs/test_iothub_jobs_unit.py --junitxml=junit/test-jobs-unit-results.xml
-      displayName: 'Execute IoT Hub job unit tests'
+    - template: set-testenv-sentinel.yml
+    - script: pytest -vv azext_iot/tests/ -k "_unit" --junitxml=junit/test-iotext-unit-results.xml
+      displayName: 'Execute IoT extension unit tests'
 
   - task: PublishTestResults@2
     condition: succeededOrFailed()
