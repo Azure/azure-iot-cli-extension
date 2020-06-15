@@ -113,6 +113,13 @@ def load_digitaltwins_arguments(self, _):
             help="Name of EventGrid Topic resource group.",
             arg_group="Event Grid Topic",
         )
+        context.argument(
+            "endpoint_subscription",
+            options_list=["--eventgrid-subscription", "--egs"],
+            help="Name or ID of subscription where the endpoint resource exists. "
+            "If no subscription is provided the default subscription is used.",
+            arg_group="Event Grid Topic",
+        )
 
     with self.argument_context("dt endpoint create eventhub") as context:
         context.argument(
@@ -139,6 +146,13 @@ def load_digitaltwins_arguments(self, _):
             help="Name of EventHub resource group.",
             arg_group="Event Hub",
         )
+        context.argument(
+            "endpoint_subscription",
+            options_list=["--eventhub-subscription", "--ehs"],
+            help="Name or ID of subscription where the endpoint resource exists. "
+            "If no subscription is provided the default subscription is used.",
+            arg_group="Event Hub",
+        )
 
     with self.argument_context("dt endpoint create servicebus") as context:
         context.argument(
@@ -163,6 +177,13 @@ def load_digitaltwins_arguments(self, _):
             "servicebus_resource_group",
             options_list=["--servicebus-resource-group", "--sbg"],
             help="Name of ServiceBus resource group.",
+            arg_group="Service Bus Topic",
+        )
+        context.argument(
+            "endpoint_subscription",
+            options_list=["--servicebus-subscription", "--sbs"],
+            help="Name or ID of subscription where the endpoint resource exists. "
+            "If no subscription is provided the default subscription is used.",
             arg_group="Service Bus Topic",
         )
 
@@ -230,7 +251,7 @@ def load_digitaltwins_arguments(self, _):
     with self.argument_context("dt twin relationship") as context:
         context.argument(
             "twin_id",
-            options_list=["--twin-id", "-t"],
+            options_list=["--twin-id", "-t", "--source"],
             help="The source twin Id for a relationship.",
         )
         context.argument(

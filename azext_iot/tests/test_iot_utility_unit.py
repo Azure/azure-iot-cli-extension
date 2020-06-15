@@ -20,6 +20,7 @@ from azext_iot.common.utility import (
 from azext_iot.common.deps import ensure_uamqp
 from azext_iot.constants import EVENT_LIB, EXTENSION_NAME
 from azext_iot._validators import mode2_iot_login_handler
+from azext_iot.common.embedded_cli import EmbeddedCLI
 
 
 class TestMinPython(object):
@@ -294,3 +295,49 @@ class TestVersionComparison:
     )
     def test_ensure_min_version(self, current, minimum, expected):
         assert ensure_min_version(current, minimum) == expected
+
+
+class TestEmbeddedCli:
+    @pytest.fixture(params=[0, 1])
+    def mocked_azclient(self, mocker, request):
+        def mock_invoke(args, out_file):
+            out_file.write(json.dumps({"generickey": "genericvalue"}))
+            return request.param
+
+        azclient = mocker.patch("azext_iot.common.embedded_cli.get_default_cli")
+        azclient.return_value.invoke.side_effect = mock_invoke
+        azclient.test_meta.error_code = request.param
+        return azclient
+
+    @pytest.mark.parametrize(
+        "command, subscription",
+        [
+            ("iot hub device-identity create -n abcd -d dcba", None),
+            ("iot hub device-twin show -n 'abcd' -d 'dcba'", "20a300e5-a444-4130-bb5a-1abd08ad930a"),
+        ],
+    )
+    def test_embedded_cli(self, mocked_azclient, command, subscription):
+        import shlex
+
+        cli = EmbeddedCLI()
+        cli.invoke(command=command, subscription=subscription)
+
+        # Due to forced json output
+        command += " -o json"
+
+        if subscription:
+            command += " --subscription '{}'".format(subscription)
+
+        expected_args = shlex.split(command)
+        call = mocked_azclient().invoke.call_args_list[0]
+        actual_args, _ = call
+        assert expected_args == actual_args[0]
+        success = cli.success()
+
+        if mocked_azclient.test_meta.error_code == 1:
+            assert not success
+        elif mocked_azclient.test_meta.error_code == 0:
+            assert success
+
+        assert cli.output
+        assert cli.as_json()
