@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 import re
+from datetime import datetime, timezone, timezone
 
 
 class Instance:
@@ -40,27 +41,17 @@ class InstanceProperty:
         # self.pnp = "iotin:" in instanceName
         pass
 
-    def extract_print(
-        self, timeLimit, metadata: dict, data: dict,
-    ):
-        from datetime import datetime, timezone, timezone
+    def extract_print(self, time_limit, metadata: dict, data: dict, time_now: datetime):
 
-        updated = metadata.get("$lastUpdated")
-        updated = updated.split(".")
-        updated = datetime.strptime(updated[0], "%Y-%m-%dT%H:%M:%S")
-        timestamp = updated.timestamp()
+        time_delta = time_now - self.utc_time_stamp_from_metadata(metadata)
 
-        utc_time = datetime.utcnow()
-        utc_timestamp = utc_time.timestamp()
-        timedelta = utc_timestamp - timestamp
-
-        if timedelta <= timeLimit:
+        if time_delta <= time_limit:
             if type(data) is dict:
                 for value in data:
                     if type(metadata[value]) is dict:
                         self.dataset = self.dataset + (value,)
                         result = self.extract_print(
-                            timeLimit, metadata[value], data[value]
+                            time_limit, metadata[value], data[value], time_now
                         )
                         if result:
                             import json
@@ -74,3 +65,10 @@ class InstanceProperty:
                 self.dataset = self.dataset + (data,)
                 return data
         return
+
+    def utc_time_stamp_from_metadata(self, metadata: dict):
+        lastUpdated = metadata.get("$lastUpdated")
+        lastUpdated = lastUpdated.split(".")
+        timestamp = datetime.strptime(lastUpdated[0], "%Y-%m-%dT%H:%M:%S")
+        timestamp = timestamp.timestamp()
+        return timestamp

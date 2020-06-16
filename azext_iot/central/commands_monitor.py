@@ -151,11 +151,17 @@ def monitor_properties(cmd, device_id, app_id, central_dns_suffix=CENTRAL_ENDPOI
                 reported_properties_metadata = reported_properties.get("$metadata")
                 reported_properties = without_keys(reported_properties, invalid)
 
+                from datetime import datetime, timezone, timezone
+
+                utc_time = datetime.utcnow()
+                utc_timestamp = utc_time.timestamp()
+
                 desiredInstance = InstanceProperty("desired properties")
                 value = desiredInstance.extract_print(
-                    polling_interval_seconds + 00,
+                    polling_interval_seconds + 100,
                     desired_properties_metadata,
                     desired_properties,
+                    utc_timestamp,
                 )
                 if desiredInstance.jsonList:
                     print(desiredInstance.name)
@@ -167,9 +173,10 @@ def monitor_properties(cmd, device_id, app_id, central_dns_suffix=CENTRAL_ENDPOI
 
                 reportedInstance = InstanceProperty("reported properties")
                 value = reportedInstance.extract_print(
-                    polling_interval_seconds + 000,
+                    polling_interval_seconds + 1000,
                     reported_properties_metadata,
                     reported_properties,
+                    utc_timestamp,
                 )
                 if reportedInstance.jsonList:
                     print(reportedInstance.name)
