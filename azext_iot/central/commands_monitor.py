@@ -13,7 +13,7 @@ from azext_iot.common.shared import SdkType
 from azext_iot.common.utility import unpack_msrest_error, find_between
 from azext_iot.common.sas_token_auth import BasicSasTokenAuthentication
 
-from azext_iot.central.models.instance import Instance
+from azext_iot.central.models.instance import Instance, InstanceProperty
 
 from azext_iot.monitor.models.arguments import (
     CommonParserArguments,
@@ -135,44 +135,89 @@ def monitor_properties(cmd, device_id, app_id, central_dns_suffix=CENTRAL_ENDPOI
         target = {"entity": endpoint}
         auth = BasicSasTokenAuthentication(sas_token=sas_token)
         service_sdk, errors = _bind_sdk(target, SdkType.service_sdk, auth=auth)
+        values = {}
+        polling_interval_seconds = 10
         try:
             while True:
                 twin_data = service_sdk.get_twin(device_id)
+
+                invalid = {"$metadata", "$version"}
+
                 desired_properties = twin_data.get("properties").get("desired")
+                desired_properties_metadata = desired_properties.get("$metadata")
+                desired_properties = without_keys(desired_properties, invalid)
+
                 reported_properties = twin_data.get("properties").get("reported")
+                reported_properties_metadata = reported_properties.get("$metadata")
+                reported_properties = without_keys(reported_properties, invalid)
 
-                reported_properties_list = []
-                desired_properties_list = []
+                desiredInstance = InstanceProperty("desired properties")
+                value = desiredInstance.extract_print(
+                    polling_interval_seconds + 00,
+                    desired_properties_metadata,
+                    desired_properties,
+                )
+                if desiredInstance.jsonList:
+                    print(desiredInstance.name)
+                    print(desiredInstance.jsonList, sep="\n")
 
-                for value in reported_properties.items():
-                    if "iotin:" in value[0]:
-                        metadata = reported_properties.get("$metadata")
-                        temp = Instance(value[1], value[0], metadata)
-                        reported_properties_list.append(temp)
+                # if desiredInstance.dataset:
+                #     print)
+                #     print(desiredInstance.dataset)
 
-                for value in desired_properties.items():
-                    if "iotin:" in value[0]:
-                        metadata = desired_properties.get("$metadata")
-                        temp = Instance(value[1], value[0], metadata)
-                        desired_properties_list.append(temp)
+                reportedInstance = InstanceProperty("reported properties")
+                value = reportedInstance.extract_print(
+                    polling_interval_seconds + 000,
+                    reported_properties_metadata,
+                    reported_properties,
+                )
+                if reportedInstance.jsonList:
+                    print(reportedInstance.name)
+                    print(*reportedInstance.jsonList, sep="\n")
+                # if desiredInstance.dataset:
+                #     print()
+
+                # print(value)
+
+                # for values in data.items():
+                #     datetime = values.get
+                #     print(values, "\n")
+                # # reported_properties_list = []
+                # desired_properties_list = []
+
+                # for value in reported_properties.items():
+                #     if "iotin:" in value[0]:
+                #         metadata = reported_properties.get("$metadata")
+                #         temp = Instance(value[1], value[0], metadata)
+                #         reported_properties_list.append(temp)
+
+                # for value in desired_properties.items():
+                #     if "iotin:" in value[0]:
+                #         metadata = desired_properties.get("$metadata")
+                #         temp = Instance(value[1], value[0], metadata)
+                #         desired_properties_list.append(temp)
 
                 import time
 
-                print("desired properties")
-                for value in desired_properties_list:
-                    print("instanceName :", value.instanceName)
-                    print(*value.property_list, sep="\n")
-                print("")
+                # print("desired properties")
+                # for value in desired_properties_list:
+                #     print("instanceName :", value.instanceName)
+                #     print(*value.property_list, sep="\n")
+                # print("")
 
-                print("reported properties")
-                for value in reported_properties_list:
-                    print("instanceName :", value.instanceName)
-                    print(*value.property_list, sep="\n")
-                print("")
-                time.sleep(10)
+                # print("reported properties")
+                # for value in reported_properties_list:
+                #     print("instanceName :", value.instanceName)
+                #     print(*value.property_list, sep="\n")
+                # print("")
+                time.sleep(polling_interval_seconds)
             return twin_data
         except errors.CloudError as e:
             if exception is None:
                 exception = CLIError(unpack_msrest_error(e))
 
     raise exception
+
+
+def without_keys(d, keys):
+    return {x: d[x] for x in d if x not in keys}
