@@ -163,9 +163,9 @@ def monitor_properties(cmd, device_id, app_id, central_dns_suffix=CENTRAL_ENDPOI
                     desired_properties,
                     utc_timestamp,
                 )
-                if desiredInstance.jsonList:
+                if desiredInstance.data_List:
                     print(desiredInstance.name)
-                    print(desiredInstance.jsonList, sep="\n")
+                    print(desiredInstance.data_List, sep="\n")
 
                 # if desiredInstance.dataset:
                 #     print)
@@ -178,9 +178,9 @@ def monitor_properties(cmd, device_id, app_id, central_dns_suffix=CENTRAL_ENDPOI
                     reported_properties,
                     utc_timestamp,
                 )
-                if reportedInstance.jsonList:
+                if reportedInstance.data_List:
                     print(reportedInstance.name)
-                    print(*reportedInstance.jsonList, sep="\n")
+                    print(*reportedInstance.data_List, sep="\n")
                 # if desiredInstance.dataset:
                 #     print()
 

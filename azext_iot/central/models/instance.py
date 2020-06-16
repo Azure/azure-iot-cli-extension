@@ -33,7 +33,7 @@ class Instance:
 class InstanceProperty:
     def __init__(self, name: str):
         self.dataset = ()
-        self.jsonList = []
+        self.data_List = []
         self.name = name
         # self.lastUpdated = property.get("approved")
         # self.value = property.get("description")
@@ -54,11 +54,7 @@ class InstanceProperty:
                             time_limit, metadata[value], data[value], time_now
                         )
                         if result:
-                            import json
-
-                            jsonStr = json.dumps(self.dataset)
-                            self.jsonList.append(jsonStr)
-                            # print(jsonStr)
+                            self.data_List.append(self.dataset)
                         self.dataset = ()
 
             else:
