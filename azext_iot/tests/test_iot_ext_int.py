@@ -109,6 +109,17 @@ class TestIoTHub(IoTLiveScenarioTest):
             expect_failure=True,
         )
 
+        # Test Event Hub-compatible connection string
+        pattern = r'^Endpoint=sb://.*;SharedAccessKeyName=iothubowner;SharedAccessKey=.*;EntityPath={}$'.format(
+            LIVE_HUB
+        )
+        self.cmd(
+            'iot hub show-event-hub-connection-string --hub-name {}'.format(
+                LIVE_HUB
+            ),
+            checks=[self.check_pattern('connectionString', pattern)]
+        )
+
 
 class TestIoTHubDevices(IoTLiveScenarioTest):
     def __init__(self, test_case):

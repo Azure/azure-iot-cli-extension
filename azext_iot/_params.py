@@ -650,6 +650,14 @@ def load_arguments(self, _):
             help="Maximum number of configurations to return.",
         )
 
+    with self.argument_context("iot hub show-event-hub-connection-string") as context:
+        context.argument(
+            "key",
+            arg_type=get_enum_type(KeyType),
+            options_list=['--key'],
+            help='The key to use.'
+        )
+
     with self.argument_context("iot edge") as context:
         context.argument(
             "config_id",

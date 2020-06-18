@@ -17,7 +17,7 @@ from azext_iot.constants import (
     TRACING_ALLOWED_FOR_SKU,
 )
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
-from azext_iot.common.shared import DeviceAuthType, SdkType, ProtocolType, ConfigType
+from azext_iot.common.shared import DeviceAuthType, SdkType, ProtocolType, ConfigType, KeyType
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
     shell_safe_json_parse,
@@ -2478,3 +2478,30 @@ def _customize_device_tracing_output(device_id, desired, reported):
         ):
             output["isSynced"] = True
     return output
+
+
+def show_event_hub_connection_string(
+    cmd,
+    hub_name,
+    resource_group_name=None,
+    policy_name='iothubowner',
+    key=KeyType.primary.value
+):
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        include_events=True,
+        key_type=key,
+        policy_name=policy_name
+    )
+    connectionString = "Endpoint=sb://{}/;SharedAccessKeyName={};SharedAccessKey={};EntityPath={}".format(
+        target["events"]["endpoint"],
+        policy_name,
+        target["primarykey"] if key == KeyType.primary else target["secondarykey"],
+        target["events"]["path"]
+    )
+
+    return {
+        'connectionString': connectionString
+    }
