@@ -14,7 +14,7 @@ def load_digitaltwins_help():
 
     helps["dt"] = """
         type: group
-        short-summary: Manage Azure Digital Twins (ADT) solutions & infrastructure.
+        short-summary: Manage Azure Digital Twins solutions & infrastructure.
     """
 
     helps["dt create"] = """
