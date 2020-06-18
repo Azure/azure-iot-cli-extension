@@ -7,62 +7,64 @@ import re
 from datetime import datetime, timezone, timezone
 
 
-class Instance:
-    def __init__(self, instance: dict, instanceName, metadata: dict):
-        self.lastUpdated = instance.get("approved")
-        self.value = instance.get("description")
-        self.instanceName = instanceName.replace("iotin:", "")
-        self.pnp = "iotin:" in instanceName
-        self.property_list = self.get_property_info(instance, metadata, instanceName)
-
-        pass
-
-    def get_property_info(self, instance: dict, metadata: dict, instanceName):
-        property_list = []
-        data = metadata.get(instanceName)
-        for item in instance.items():
-            property_item = {
-                "lastUpdated": data.get("$lastUpdated"),
-                item[0]: item[1].get("value"),
-            }
-            property_list.append(property_item)
-
-        return property_list
-
-
-class InstanceProperty:
-    def __init__(self, name: str):
-        self.dataset = ()
-        self.data_List = []
+class Property:
+    def __init__(
+        self, name: str, property_collection: dict, request_utc_timestamp: datetime
+    ):
         self.name = name
-        # self.lastUpdated = property.get("approved")
-        # self.value = property.get("description")
-        # self.instanceName = instanceName.replace("iotin:", "")
-        # self.pnp = "iotin:" in instanceName
+        self.property_collection = property_collection
+        self.property_collection_metadata = property_collection.get("$metadata")
+        self.property_capabilities = self._get_capabilities(property_collection)
+        self.version = property_collection.get("$version")
+        self.request_utc_timestamp = request_utc_timestamp
         pass
 
-    def extract_print(self, time_limit, metadata: dict, data: dict, time_now: datetime):
+    def _get_capabilities(self, d):
+        keys_to_remove = {"$metadata", "$version"}
+        return {x: d[x] for x in d if x not in keys_to_remove}
 
-        time_delta = time_now - self.utc_time_stamp_from_metadata(metadata)
+    def process_property_updates(self,):
 
-        if time_delta <= time_limit:
-            if type(data) is dict:
-                for value in data:
-                    if type(metadata[value]) is dict:
-                        self.dataset = self.dataset + (value,)
-                        result = self.extract_print(
-                            time_limit, metadata[value], data[value], time_now
-                        )
-                        if result:
-                            self.data_List.append(self.dataset)
-                        self.dataset = ()
-
-            else:
-                self.dataset = self.dataset + (data,)
-                return data
+        for value in self.property_capabilities:
+            updated_data = self._get_updated_data(
+                self.property_collection_metadata.get(value),
+                self.property_capabilities.get(value),
+                value,
+            )
+            if updated_data:
+                print(self.name, "version:", self.version)
+                print(updated_data)
         return
 
-    def utc_time_stamp_from_metadata(self, metadata: dict):
+    def _get_updated_data(
+        self, metadata: dict, data: dict, instance_name: str,
+    ):
+
+        updated_data = {}
+        if self._data_changed_in_time_limit(metadata=metadata):
+            for value in data:
+                if type(data) is dict:
+                    updated_data.update({"instance_name": instance_name})
+                    if self._data_changed_in_time_limit(metadata=metadata[value]):
+                        updated_data.update({value: data[value]})
+                else:
+                    updated_data.update({instance_name: data})
+        return updated_data
+
+    def _data_changed_in_time_limit(
+        self, metadata: dict,
+    ):
+        time_limit_seconds = 15
+        time_delta = (
+            self.request_utc_timestamp
+            - self._get_utc_time_stamp_from_metadata(metadata)
+        )
+        if time_delta <= time_limit_seconds:
+            return True
+
+        return False
+
+    def _get_utc_time_stamp_from_metadata(self, metadata: dict):
         lastUpdated = metadata.get("$lastUpdated")
         lastUpdated = lastUpdated.split(".")
         timestamp = datetime.strptime(lastUpdated[0], "%Y-%m-%dT%H:%M:%S")

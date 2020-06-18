@@ -21,6 +21,7 @@ from datetime import datetime
 from knack.log import get_logger
 from knack.util import CLIError
 
+
 logger = get_logger(__name__)
 
 
@@ -482,3 +483,4 @@ def scantree(path):
 
 def find_between(s, start, end):
     return (s.split(start))[1].split(end)[0]
+

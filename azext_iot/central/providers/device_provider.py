@@ -12,6 +12,14 @@ from azext_iot.central import services as central_services
 from azext_iot.central.models.enum import DeviceStatus
 from azext_iot.central.models.device import Device
 from azext_iot.dps.services import global_service as dps_global_service
+from azext_iot.common.utility import find_between
+from azext_iot._factory import _bind_sdk
+from azext_iot.common.shared import SdkType
+from azext_iot.common.utility import unpack_msrest_error
+from azext_iot.common.sas_token_auth import BasicSasTokenAuthentication
+from knack.util import CLIError
+from azext_iot.constants import CENTRAL_ENDPOINT
+
 
 logger = get_logger(__name__)
 
@@ -203,3 +211,27 @@ class CentralDeviceProvider:
             "error": error.get(device_status),
         }
         return filtered_dps_info
+
+
+def get_device_twin(cmd, device_id, app_id, central_dns_suffix):
+    from azext_iot.common._azure import get_iot_central_tokens
+
+    tokens = get_iot_central_tokens(cmd, app_id, central_dns_suffix)
+
+    exception = None
+
+    # The device could be in any hub associated with the given app.
+    # We must search through each IoT Hub until device is found.
+    for token_group in tokens.values():
+        sas_token = token_group["iothubTenantSasToken"]["sasToken"]
+        endpoint = find_between(sas_token, "SharedAccessSignature sr=", "&sig=")
+        target = {"entity": endpoint}
+        auth = BasicSasTokenAuthentication(sas_token=sas_token)
+        service_sdk, errors = _bind_sdk(target, SdkType.service_sdk, auth=auth)
+        try:
+            return service_sdk.get_twin(device_id)
+        except errors.CloudError as e:
+            if exception is None:
+                exception = CLIError(unpack_msrest_error(e))
+
+    raise CLIError("Could not get device twin")
