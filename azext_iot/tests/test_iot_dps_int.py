@@ -163,12 +163,15 @@ class IoTDpsTest(LiveScenarioTest):
 
     def test_dps_enrollment_symmetrickey_lifecycle(self):
         enrollment_id = self.create_random_name('enrollment-for-test', length=48)
+        enrollment_id2 = self.create_random_name('enrollment-for-test', length=48)
         attestation_type = AttestationType.symmetricKey.value
         primary_key = 'x3XNu1HeSw93rmtDXduRUZjhqdGbcqR/zloWYiyPUzw='
         secondary_key = 'PahMnOSBblv9CRn5B765iK35jTvnjDUjYP9hKBZa4Ug='
         device_id = self.create_random_name('device-id-for-test', length=48)
         reprovisionPolicy_reprovisionandresetdata = 'reprovisionandresetdata'
         hub_host_name = '{}.azure-devices.net'.format(hub)
+        webhook_url = 'https://www.test.test'
+        api_version = '2018-09-01-preview'
 
         etag = self.cmd('iot dps enrollment create --enrollment-id {} --attestation-type {}'
                         ' -g {} --dps-name {} --pk {} --sk {}'
@@ -210,14 +213,18 @@ class IoTDpsTest(LiveScenarioTest):
 
         self.cmd('iot dps enrollment update -g {} --dps-name {} --enrollment-id {}'
                  ' --provisioning-status {} --etag {} --edge-enabled False'
-                 .format(rg, dps, enrollment_id, self.provisioning_status_new, etag),
+                 ' --allocation-policy {} --webhook-url {} --api-version {}'
+                 .format(rg, dps, enrollment_id, self.provisioning_status_new, etag,
+                         AllocationType.custom.value, webhook_url, api_version),
                  checks=[
                      self.check('attestation.type', attestation_type),
                      self.check('registrationId', enrollment_id),
                      self.check('provisioningStatus',
                                 self.provisioning_status_new),
                      self.check('deviceId', device_id),
-                     self.check('allocationPolicy', "geoLatency"),
+                     self.check('allocationPolicy', "custom"),
+                     self.check('customAllocationDefinition.webhookUrl', webhook_url),
+                     self.check('customAllocationDefinition.apiVersion', api_version),
                      self.check('iotHubs', hub_host_name.split()),
                      self.exists('initialTwin.tags'),
                      self.exists('initialTwin.properties.desired'),
@@ -225,13 +232,29 @@ class IoTDpsTest(LiveScenarioTest):
                      self.check('capabilities.iotEdge', False)
                  ])
 
+        self.cmd('iot dps enrollment create --enrollment-id {} --attestation-type {}'
+                 ' -g {} --dps-name {} --allocation-policy {} --webhook-url {} --api-version {}'
+                 .format(enrollment_id2, attestation_type, rg, dps, AllocationType.custom.value,
+                         webhook_url, api_version),
+                 checks=[
+                     self.check('attestation.type', attestation_type),
+                     self.check('registrationId', enrollment_id2),
+                     self.check('allocationPolicy', 'custom'),
+                     self.check('customAllocationDefinition.webhookUrl', webhook_url),
+                     self.check('customAllocationDefinition.apiVersion', api_version),
+                 ])
+
         self.cmd('iot dps enrollment delete -g {} --dps-name {} --enrollment-id {}'
                  .format(rg, dps, enrollment_id))
+        self.cmd('iot dps enrollment delete -g {} --dps-name {} --enrollment-id {}'
+                 .format(rg, dps, enrollment_id2))
 
     def test_dps_enrollment_group_lifecycle(self):
         enrollment_id = self.create_random_name('enrollment-for-test', length=48)
         reprovisionPolicy_never = 'never'
         hub_host_name = '{}.azure-devices.net'.format(hub)
+        webhook_url = 'https://www.test.test'
+        api_version = '2018-09-01-preview'
         etag = self.cmd('iot dps enrollment-group create --enrollment-id {} -g {} --dps-name {}'
                         ' --cp {} --scp {} --provisioning-status {} --allocation-policy {}'
                         ' --iot-hubs {} --edge-enabled'
@@ -287,12 +310,16 @@ class IoTDpsTest(LiveScenarioTest):
                              checks=[self.check('name', cert_name)]).get_output_in_json()['etag']
 
         self.cmd('iot dps enrollment-group update -g {} --dps-name {} --enrollment-id {}'
-                 ' --cn {} --etag {}'
-                 .format(rg, dps, enrollment_id, cert_name, etag),
+                 ' --cn {} --etag {} --allocation-policy {} --webhook-url {} --api-version {}'
+                 .format(rg, dps, enrollment_id, cert_name, etag,
+                         AllocationType.custom.value, webhook_url, api_version),
                  checks=[
                      self.check('attestation.type',
                                 AttestationType.x509.value),
                      self.check('enrollmentGroupId', enrollment_id),
+                     self.check('allocationPolicy', "custom"),
+                     self.check('customAllocationDefinition.webhookUrl', webhook_url),
+                     self.check('customAllocationDefinition.apiVersion', api_version),
                      self.check(
                          'attestation.x509.caReferences.primary', cert_name),
                      self.check(
