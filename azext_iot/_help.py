@@ -490,7 +490,7 @@ helps[
 """
 
 helps[
-  "iot hub show-event-hub-connection-string"
+    "iot hub show-event-hub-connection-string"
 ] = """
     type: command
     short-summary: Show the Event Hub-compatible connection string for an IoT hub.
