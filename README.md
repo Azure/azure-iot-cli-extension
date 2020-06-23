@@ -19,7 +19,7 @@ cliextensions/azure-cli-iot-ext/azext_iot/_factory.py, ln 29, in iot_hub_service
 ModuleNotFoundError: No module named 'azure.mgmt.iothub.iot_hub_client'
 ```
 
-The resolution is to remove the deprecated `azure-cli-iot-ext` and install any version of the `azure-iot` extension. 
+The resolution is to remove the deprecated `azure-cli-iot-ext` and install any version of the `azure-iot` extension.
 
 
 ## Commands
@@ -49,40 +49,41 @@ Group
     az iot hub : Manage entities in an Azure IoT Hub.
 
 Subgroups:
-    certificate                   : Manage IoT Hub certificates.
-    configuration                 : Manage IoT device configurations at scale.
-    consumer-group                : Manage the event hub consumer groups of an IoT hub.
-    device-identity               : Manage IoT devices.
-    device-twin                   : Manage IoT device twin configuration.
-    devicestream                  : Manage device streams of an IoT hub.
-    distributed-tracing [Preview] : Manage distributed settings per-device.
-    job                           : Manage jobs in an IoT hub.
-    message-enrichment            : Manage message enrichments for endpoints of an IoT Hub.
-    module-identity               : Manage IoT device modules.
-    module-twin                   : Manage IoT device module twin configuration.
-    policy                        : Manage shared access policies of an IoT hub.
-    route                         : Manage routes of an IoT hub.
-    routing-endpoint              : Manage custom endpoints of an IoT hub.
+    certificate                         : Manage IoT Hub certificates.
+    configuration                       : Manage IoT device configurations at scale.
+    consumer-group                      : Manage the event hub consumer groups of an IoT hub.
+    device-identity                     : Manage IoT devices.
+    device-twin                         : Manage IoT device twin configuration.
+    devicestream                        : Manage device streams of an IoT hub.
+    distributed-tracing [Preview]       : Manage distributed settings per-device.
+    job                                 : Manage jobs in an IoT hub.
+    message-enrichment                  : Manage message enrichments for endpoints of an IoT Hub.
+    module-identity                     : Manage IoT device modules.
+    module-twin                         : Manage IoT device module twin configuration.
+    policy                              : Manage shared access policies of an IoT hub.
+    route                               : Manage routes of an IoT hub.
+    routing-endpoint                    : Manage custom endpoints of an IoT hub.
 
 Commands:
-    create                        : Create an Azure IoT hub.
-    delete                        : Delete an IoT hub.
-    generate-sas-token            : Generate a SAS token for a target IoT Hub, device or module.
-    invoke-device-method          : Invoke a device method.
-    invoke-module-method          : Invoke an Edge module method.
-    list                          : List IoT hubs.
-    list-skus                     : List available pricing tiers.
-    manual-failover               : Initiate a manual failover for the IoT Hub to the geo-paired
-                                    disaster recovery region.
-    monitor-events                : Monitor device telemetry & messages sent to an IoT Hub.
-    monitor-feedback              : Monitor feedback sent by devices to acknowledge cloud-to-device
-                                    (C2D) messages.
-    query                         : Query an IoT Hub using a powerful SQL-like language.
-    show                          : Get the details of an IoT hub.
-    show-connection-string        : Show the connection strings for an IoT hub.
-    show-quota-metrics            : Get the quota metrics for an IoT hub.
-    show-stats                    : Get the statistics for an IoT hub.
-    update                        : Update metadata for an IoT hub.
+    create                              : Create an Azure IoT hub.
+    delete                              : Delete an IoT hub.
+    generate-sas-token                  : Generate a SAS token for a target IoT Hub, device or module.
+    invoke-device-method                : Invoke a device method.
+    invoke-module-method                : Invoke an Edge module method.
+    list                                : List IoT hubs.
+    list-skus                           : List available pricing tiers.
+    manual-failover                     : Initiate a manual failover for the IoT Hub to the geo-paired
+                                            disaster recovery region.
+    monitor-events                      : Monitor device telemetry & messages sent to an IoT Hub.
+    monitor-feedback                    : Monitor feedback sent by devices to acknowledge cloud-to-device
+                                            (C2D) messages.
+    query                               : Query an IoT Hub using a powerful SQL-like language.
+    show                                : Get the details of an IoT hub.
+    show-connection-string              : Show the connection strings for an IoT hub.
+    show-event-hub-connection-string    : Show the Event Hub-compatible connection string for an IoT hub.
+    show-quota-metrics                  : Get the quota metrics for an IoT hub.
+    show-stats                          : Get the statistics for an IoT hub.
+    update                              : Update metadata for an IoT hub.
 ```
 
 ## Scenario Automation

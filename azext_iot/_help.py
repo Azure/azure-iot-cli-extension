@@ -490,6 +490,20 @@ helps[
 """
 
 helps[
+  "iot hub show-event-hub-connection-string"
+] = """
+    type: command
+    short-summary: Show the Event Hub-compatible connection string for an IoT hub.
+    examples:
+    - name: Basic usage.
+      text: >
+        az iot hub show-event-hub-connection-string --hub-name {iothub_name}
+    - name: Specify access policy and key type.
+      text: >
+        az iot hub show-event-hub-connection-string --hub-name {iothub_name} --policy-name service --key secondary
+"""
+
+helps[
     "iot hub configuration"
 ] = """
     type: group
