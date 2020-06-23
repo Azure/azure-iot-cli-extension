@@ -12,7 +12,7 @@ from azext_iot._factory import _bind_sdk
 from azext_iot.common.shared import SdkType
 from azext_iot.common.utility import unpack_msrest_error, find_between
 from azext_iot.common.sas_token_auth import BasicSasTokenAuthentication
-from azext_iot.central.models.instance import Property
+from azext_iot.central.models.devicetwin import DeviceTwin
 from datetime import datetime, timezone, timezone
 from azext_iot.central.providers.device_provider import get_device_twin
 import time
@@ -136,28 +136,30 @@ def monitor_properties(cmd, device_id, app_id, central_dns_suffix=CENTRAL_ENDPOI
             central_dns_suffix=central_dns_suffix,
         )
 
+        structured_twin_data = DeviceTwin(twin_data)
         utc_time_stamp_now = datetime.utcnow().timestamp()
-
-        desired_properties = Property(
-            "desired property",
-            twin_data.get("properties").get("desired"),
-            utc_time_stamp_now,
-        )
-
-        reported_properties = Property(
-            "reported property",
-            twin_data.get("properties").get("reported"),
-            utc_time_stamp_now,
-        )
-
         # process desired properties
-        if processed_desired_properties_version != desired_properties.version:
-            desired_properties.process_property_updates()
-            processed_desired_properties_version = desired_properties.version
+        if (
+            processed_desired_properties_version
+            != structured_twin_data.desiredProperty.version
+        ):
+            structured_twin_data.desiredProperty.process_property_updates(
+                utc_time_stamp_now
+            )
+            processed_desired_properties_version = (
+                structured_twin_data.desiredProperty.version
+            )
 
         # process reported properties
-        if processed_reported_properties_version != reported_properties.version:
-            reported_properties.process_property_updates()
-            processed_reported_properties_version = reported_properties.version
+        if (
+            processed_reported_properties_version
+            != structured_twin_data.reportedProperty.version
+        ):
+            structured_twin_data.reportedProperty.process_property_updates(
+                utc_time_stamp_now
+            )
+            processed_reported_properties_version = (
+                structured_twin_data.reportedProperty.version
+            )
         time.sleep(polling_interval_seconds)
 
