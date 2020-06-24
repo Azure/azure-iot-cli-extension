@@ -4,6 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+# TODO: This module will look very different for the PnP refresh.
+
 import pytest
 import json
 import os
@@ -34,7 +36,7 @@ hub_entity = "myhub.azure-devices.net"
 # Patch Paths #
 path_mqtt_client = "azext_iot.operations._mqtt.mqtt.Client"
 path_service_client = "msrest.service_client.ServiceClient.send"
-path_ghcs = "azext_iot.operations.digitaltwin.get_iot_hub_connection_string"
+path_ghcs = "azext_iot.iothub.providers.discovery.IotHubDiscovery.get_target"
 path_pnpcs = "azext_iot.operations.pnp.get_iot_pnp_connection_string"
 path_sas = "azext_iot._factory.SasTokenAuthentication"
 

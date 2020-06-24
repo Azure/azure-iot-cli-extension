@@ -21,10 +21,16 @@ class EmbeddedCLI(object):
         self.error_code = 0
         self.az_cli = get_default_cli()
 
-    def invoke(self, command):
+    def invoke(self, command: str, subscription: str = None):
         output_file = StringIO()
-        command = self._ensure_json_output(command)
-        self.error_code = self.az_cli.invoke(shlex.split(command), out_file=output_file) or 0
+        command = self._ensure_json_output(command=command)
+        if subscription:
+            command = self._ensure_subscription(
+                command=command, subscription=subscription
+            )
+        self.error_code = (
+            self.az_cli.invoke(shlex.split(command), out_file=output_file) or 0
+        )
         self.output = output_file.getvalue()
         logger.debug(
             "Embedded CLI received error code: %s, output: '%s'",
@@ -49,5 +55,8 @@ class EmbeddedCLI(object):
         logger.debug("Operation error code: %s", self.error_code)
         return self.error_code == 0
 
-    def _ensure_json_output(self, command):
+    def _ensure_json_output(self, command: str):
         return "{} -o json".format(command)
+
+    def _ensure_subscription(self, command: str, subscription: str):
+        return "{} --subscription '{}'".format(command, subscription)
