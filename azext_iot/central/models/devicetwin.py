@@ -28,13 +28,13 @@ class DeviceTwin:
 
 class Property:
     def __init__(
-        self, name: str, property_collection: dict, device_id,
+        self, name: str, props: dict, device_id,
     ):
         self.name = name
-        self.property_collection = property_collection
-        self.property_collection_metadata = property_collection.get("$metadata")
-        self.capabilities_properties = self._get_capabilities(property_collection)
-        self.version = property_collection.get("$version")
+        self.props = props
+        self.metadata = props.get("$metadata")
+        self.version = props.get("$version")
+        self.capabilities = self._get_capabilities(props)
         self.device_id = device_id
         pass
 
@@ -76,15 +76,15 @@ class Property:
 
     def process_property_updates(self, timestamp: float, template: Template):
         updated_properties_collection = {}
-        for value in self.capabilities_properties:
+        for value in self.capabilities:
             if self._is_value_interface(value, template):
                 # iterate thru all the properties in the interface
                 updated_properties_interface_level = {}
-                for props in self.capabilities_properties[value]:
+                for props in self.capabilities[value]:
                     updated_properties_interface_level.update(
                         self._get_updated_data(
-                            self.property_collection_metadata.get(value).get(props),
-                            self.capabilities_properties.get(value).get(props),
+                            self.metadata.get(value).get(props),
+                            self.capabilities.get(value).get(props),
                             props,
                             timestamp,
                         )
@@ -95,8 +95,8 @@ class Property:
                     )
             else:
                 updated_property = self._get_updated_data(
-                    self.property_collection_metadata.get(value),
-                    self.capabilities_properties.get(value),
+                    self.metadata.get(value),
+                    self.capabilities.get(value),
                     value,
                     timestamp,
                 )

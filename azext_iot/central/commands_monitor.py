@@ -4,8 +4,10 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from datetime import datetime
+import datetime
+import isodate
 import time
+
 from azure.cli.core.commands import AzCliCommand
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.providers.monitor_provider import MonitorProvider
@@ -16,7 +18,7 @@ from azext_iot.monitor.models.arguments import (
     CentralHandlerArguments,
     TelemetryArguments,
 )
-from azext_iot.central.models.devicetwin import DeviceTwin
+from azext_iot.central.models.devicetwin import DeviceTwin, Property
 from azext_iot.central.providers.device_provider import get_device_twin
 from azext_iot.central.providers.device_provider import CentralDeviceProvider
 from azext_iot.central.providers.device_template_provider import (
@@ -122,61 +124,62 @@ def monitor_events(
     provider.start_monitor_events(telemetry_args)
 
 
-def monitor_properties(cmd, device_id, app_id, central_dns_suffix=CENTRAL_ENDPOINT):
-    polling_interval_seconds = 10
-    processed_desired_properties_version = None
-    processed_reported_properties_version = None
-    central_device_provider = CentralDeviceProvider(cmd, app_id)
-    device = central_device_provider.get_device(device_id)
-    provider = CentralDeviceTemplateProvider(cmd=cmd, app_id=app_id)
-    template = provider.get_device_template(
-        device_template_id=device.instance_of, central_dns_suffix=central_dns_suffix
-    )
+def monitor_properties(
+    cmd,
+    device_id,
+    app_id,
+    polling_interval_seconds=1,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+):
+    prev_twin = None
 
     while True:
-
-        twin_data = get_device_twin(
+        raw_twin = get_device_twin(
             cmd,
             device_id=device_id,
             app_id=app_id,
             central_dns_suffix=central_dns_suffix,
         )
 
-        structured_twin_data = DeviceTwin(twin_data)
-        utc_time_stamp_now = datetime.utcnow().timestamp()
-        # process desired properties
-        if (
-            processed_desired_properties_version
-            != structured_twin_data.desired_property.version
-        ):
-            updated_desired_properties = structured_twin_data.desired_property.process_property_updates(
-                utc_time_stamp_now, template
+        twin = DeviceTwin(raw_twin)
+        if prev_twin:
+            change_d = compare_properties(
+                prev_twin.desired_property, twin.desired_property
+            )
+            change_r = compare_properties(
+                prev_twin.reported_property, twin.reported_property
             )
 
-            processed_desired_properties_version = (
-                structured_twin_data.desired_property.version
-            )
+            if change_d:
+                print("Changes in desired properties:")
+                print(change_d)
 
-            if updated_desired_properties:
-                structured_twin_data.desired_property.print_property_updates(
-                    updated_desired_properties
-                )
-
-        # process reported properties
-        if (
-            processed_reported_properties_version
-            != structured_twin_data.reported_property.version
-        ):
-            updated_reported_properties = structured_twin_data.reported_property.process_property_updates(
-                utc_time_stamp_now, template
-            )
-            processed_reported_properties_version = (
-                structured_twin_data.reported_property.version
-            )
-            if updated_reported_properties:
-                structured_twin_data.reported_property.print_property_updates(
-                updated_reported_properties
-                )
-
+            if change_r:
+                print("Changes in reported properties:")
+                print(change_r)
 
         time.sleep(polling_interval_seconds)
+
+        prev_twin = twin
+
+
+def compare_properties(prev_prop: Property, prop: Property):
+    if prev_prop.version == prop.version:
+        return
+
+    changes = {
+        key: prop.capabilities[key]
+        for key, val in prop.metadata.items()
+        if is_relevant(key, val)
+    }
+
+    return changes
+
+
+def is_relevant(key, val):
+    if key in {"$lastUpdated", "$lastUpdatedVersion"}:
+        return False
+
+    updated_within = datetime.datetime.now() - datetime.timedelta(seconds=10)
+    last_updated = isodate.parse_datetime(val["$lastUpdated"])
+    return last_updated.timestamp() >= updated_within.timestamp()
