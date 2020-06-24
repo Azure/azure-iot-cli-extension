@@ -19,6 +19,7 @@ from azext_iot.common.utility import unpack_msrest_error
 from azext_iot.common.sas_token_auth import BasicSasTokenAuthentication
 from knack.util import CLIError
 from azext_iot.constants import CENTRAL_ENDPOINT
+from azext_iot.common._azure import get_iot_central_tokens
 
 
 logger = get_logger(__name__)
@@ -214,7 +215,6 @@ class CentralDeviceProvider:
 
 
 def get_device_twin(cmd, device_id, app_id, central_dns_suffix):
-    from azext_iot.common._azure import get_iot_central_tokens
 
     tokens = get_iot_central_tokens(cmd, app_id, central_dns_suffix)
 

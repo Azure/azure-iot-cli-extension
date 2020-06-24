@@ -40,7 +40,7 @@ class Property:
 
     def _get_capabilities(self, d):
         keys_to_remove = {"$metadata", "$version"}
-        return {x: d[x] for x in d if x not in keys_to_remove}
+        return {key: value for key, value in d.items() if key not in keys_to_remove}
 
     def _get_updated_data(
         self, metadata: dict, data: dict, instance_name: str, timestamp: float
@@ -57,10 +57,7 @@ class Property:
     ):
 
         time_delta = timestamp - self._get_utc_time_stamp_from_metadata(metadata)
-        if time_delta <= time_limit_seconds:
-            return True
-
-        return False
+        return time_delta <= time_limit_seconds
 
     def _get_utc_time_stamp_from_metadata(self, metadata: dict):
         lastUpdated = metadata.get("$lastUpdated")
@@ -71,21 +68,20 @@ class Property:
 
     def _is_value_interface(self, value, template: Template):
         name = value.replace("$iotin:", "")
-        if name in template.interfaces:
-            return True
-        return False
+        return name in template.interfaces
 
-    def _print_property_updates(self, data):
+    def print_property_updates(self, data):
         print(self.name, "version:", self.version)
         print(data)
 
     def process_property_updates(self, timestamp: float, template: Template):
+        updated_properties_collection = {}
         for value in self.capabilities_properties:
             if self._is_value_interface(value, template):
                 # iterate thru all the properties in the interface
-                updated_properties = {}
+                updated_properties_interface_level = {}
                 for props in self.capabilities_properties[value]:
-                    updated_properties.update(
+                    updated_properties_interface_level.update(
                         self._get_updated_data(
                             self.property_collection_metadata.get(value).get(props),
                             self.capabilities_properties.get(value).get(props),
@@ -94,9 +90,10 @@ class Property:
                         )
                     )
 
-                if updated_properties:
-                    final_data = {value: updated_properties}
-                    self._print_property_updates(final_data)
+                if updated_properties_interface_level:
+                    updated_properties_collection.update(
+                        {value: updated_properties_interface_level}
+                    )
             else:
                 updated_property = self._get_updated_data(
                     self.property_collection_metadata.get(value),
@@ -105,6 +102,5 @@ class Property:
                     timestamp,
                 )
                 if updated_property:
-                    self._print_property_updates(updated_property)
-        return
-
+                    updated_properties_collection.update({value: updated_property})
+        return updated_properties_collection

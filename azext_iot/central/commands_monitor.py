@@ -4,6 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from datetime import datetime
+import time
 from azure.cli.core.commands import AzCliCommand
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.providers.monitor_provider import MonitorProvider
@@ -15,9 +17,7 @@ from azext_iot.monitor.models.arguments import (
     TelemetryArguments,
 )
 from azext_iot.central.models.devicetwin import DeviceTwin
-from datetime import datetime, timezone, timezone
 from azext_iot.central.providers.device_provider import get_device_twin
-import time
 from azext_iot.central.providers.device_provider import CentralDeviceProvider
 from azext_iot.central.providers.device_template_provider import (
     CentralDeviceTemplateProvider,
@@ -149,23 +149,34 @@ def monitor_properties(cmd, device_id, app_id, central_dns_suffix=CENTRAL_ENDPOI
             processed_desired_properties_version
             != structured_twin_data.desired_property.version
         ):
-            structured_twin_data.desired_property.process_property_updates(
+            updated_desired_properties = structured_twin_data.desired_property.process_property_updates(
                 utc_time_stamp_now, template
             )
+
             processed_desired_properties_version = (
                 structured_twin_data.desired_property.version
             )
+
+            if updated_desired_properties:
+                structured_twin_data.desired_property.print_property_updates(
+                    updated_desired_properties
+                )
 
         # process reported properties
         if (
             processed_reported_properties_version
             != structured_twin_data.reported_property.version
         ):
-            structured_twin_data.reported_property.process_property_updates(
+            updated_reported_properties = structured_twin_data.reported_property.process_property_updates(
                 utc_time_stamp_now, template
             )
             processed_reported_properties_version = (
                 structured_twin_data.reported_property.version
             )
+            if updated_reported_properties:
+                structured_twin_data.reported_property.print_property_updates(
+                updated_reported_properties
+                )
+
 
         time.sleep(polling_interval_seconds)
