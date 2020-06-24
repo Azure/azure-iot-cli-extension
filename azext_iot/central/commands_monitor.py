@@ -168,7 +168,7 @@ def compare_properties(prev_prop: Property, prop: Property):
         return
 
     changes = {
-        key: prop.capabilities[key]
+        key: prop.props[key]
         for key, val in prop.metadata.items()
         if is_relevant(key, val)
     }
