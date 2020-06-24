@@ -18,7 +18,7 @@ from azext_iot.constants import (
 )
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import DeviceAuthType, SdkType, ProtocolType, ConfigType
-from azext_iot.common._azure import get_iot_hub_connection_string
+from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
     shell_safe_json_parse,
     read_file_content,
@@ -43,10 +43,10 @@ def iot_query(
     cmd, query_command, hub_name=None, top=None, resource_group_name=None, login=None
 ):
     top = _process_top(top)
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, rg=resource_group_name, login=login
     )
-
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
@@ -65,8 +65,9 @@ def iot_query(
 def iot_device_show(
     cmd, device_id, hub_name=None, resource_group_name=None, login=None
 ):
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     return _iot_device_show(target, device_id)
 
@@ -123,8 +124,9 @@ def iot_device_create(
     login=None,
 ):
 
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -242,8 +244,9 @@ def _create_self_signed_cert(subject, valid_days, output_path=None):
 def iot_device_update(
     cmd, device_id, parameters, hub_name=None, resource_group_name=None, login=None
 ):
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -289,8 +292,9 @@ def _handle_device_update_params(parameters):
 def iot_device_delete(
     cmd, device_id, hub_name=None, resource_group_name=None, login=None
 ):
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -316,8 +320,9 @@ def iot_device_delete(
 def iot_device_get_parent(
     cmd, device_id, hub_name=None, resource_group_name=None, login=None
 ):
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     child_device = _iot_device_show(target, device_id)
     _validate_nonedge_device(child_device)
@@ -338,8 +343,9 @@ def iot_device_set_parent(
     resource_group_name=None,
     login=None,
 ):
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     parent_device = _iot_device_show(target, parent_id)
     _validate_edge_device(parent_device)
@@ -358,8 +364,9 @@ def iot_device_children_add(
     resource_group_name=None,
     login=None,
 ):
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     devices = []
     edge_device = _iot_device_show(target, device_id)
@@ -385,8 +392,9 @@ def iot_device_children_remove(
     resource_group_name=None,
     login=None,
 ):
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     devices = []
     if remove_all:
@@ -442,8 +450,9 @@ def iot_device_children_list(
 def _iot_device_children_list(
     cmd, device_id, hub_name=None, resource_group_name=None, login=None
 ):
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     device = _iot_device_show(target, device_id)
     _validate_edge_device(device)
@@ -541,8 +550,9 @@ def iot_device_module_create(
         cert = _create_self_signed_cert(module_id, valid_days, output_dir)
         primary_thumbprint = cert["thumbprint"]
 
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -579,8 +589,9 @@ def iot_device_module_update(
     resource_group_name=None,
     login=None,
 ):
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -637,8 +648,9 @@ def _parse_auth(parameters):
 def iot_device_module_list(
     cmd, device_id, hub_name=None, top=1000, resource_group_name=None, login=None
 ):
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -652,8 +664,9 @@ def iot_device_module_list(
 def iot_device_module_show(
     cmd, device_id, module_id, hub_name=None, resource_group_name=None, login=None
 ):
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     return _iot_device_module_show(target, device_id, module_id)
 
@@ -675,8 +688,9 @@ def _iot_device_module_show(target, device_id, module_id):
 def iot_device_module_delete(
     cmd, device_id, module_id, hub_name=None, resource_group_name=None, login=None
 ):
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -703,8 +717,9 @@ def iot_device_module_delete(
 def iot_device_module_twin_show(
     cmd, device_id, module_id, hub_name=None, resource_group_name=None, login=None
 ):
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     return _iot_device_module_twin_show(
         target=target, device_id=device_id, module_id=module_id
@@ -734,8 +749,9 @@ def iot_device_module_twin_update(
 ):
     from azext_iot.common.utility import verify_transform
 
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -771,8 +787,9 @@ def iot_device_module_twin_replace(
     resource_group_name=None,
     login=None,
 ):
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -804,8 +821,9 @@ def iot_edge_set_modules(
 ):
     from azext_iot.sdk.iothub.service.models import ConfigurationContent
 
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -898,8 +916,9 @@ def _iot_hub_configuration_create(
         ConfigurationMetrics,
     )
 
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -1045,8 +1064,9 @@ def iot_hub_configuration_update(
     from azext_iot.sdk.service.models.configuration import Configuration
     from azext_iot.common.utility import verify_transform
 
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -1083,8 +1103,9 @@ def iot_hub_configuration_update(
 def iot_hub_configuration_show(
     cmd, config_id, hub_name=None, resource_group_name=None, login=None
 ):
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     return _iot_hub_configuration_show(target=target, config_id=config_id)
 
@@ -1137,8 +1158,9 @@ def _iot_hub_configuration_list(
 ):
     top = _process_top(top, upper_limit=100)
 
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -1157,8 +1179,9 @@ def _iot_hub_configuration_list(
 def iot_hub_configuration_delete(
     cmd, config_id, hub_name=None, resource_group_name=None, login=None
 ):
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -1207,8 +1230,9 @@ def iot_hub_configuration_metric_show(
     resource_group_name=None,
     login=None,
 ):
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -1252,8 +1276,9 @@ def iot_hub_configuration_metric_show(
 def iot_device_twin_show(
     cmd, device_id, hub_name=None, resource_group_name=None, login=None
 ):
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     return _iot_device_twin_show(target=target, device_id=device_id)
 
@@ -1287,8 +1312,9 @@ def iot_device_twin_update(
 ):
     from azext_iot.common.utility import verify_transform
 
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -1315,8 +1341,9 @@ def iot_device_twin_update(
 def iot_device_twin_replace(
     cmd, device_id, target_json, hub_name=None, resource_group_name=None, login=None
 ):
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -1363,8 +1390,9 @@ def iot_device_method(
             "timeout must be at least {} seconds".format(METHOD_INVOKE_MIN_TIMEOUT_SEC)
         )
 
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -1414,8 +1442,9 @@ def iot_device_module_method(
             "timeout must not be over {} seconds".format(METHOD_INVOKE_MIN_TIMEOUT_SEC)
         )
 
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -1500,8 +1529,12 @@ def _iot_build_sas_token(
         parse_iot_device_module_connection_string,
     )
 
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, policy_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        policy_name=policy_name,
+        login=login,
     )
     uri = None
     policy = None
@@ -1636,8 +1669,9 @@ def iot_device_send_message(
     login=None,
     qos=1,
 ):
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     return _iot_device_send_message(
         target=target,
@@ -1702,8 +1736,9 @@ def iot_device_send_message_http(
     resource_group_name=None,
     login=None,
 ):
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     return _iot_device_send_message_http(target, device_id, data, headers)
 
@@ -1723,8 +1758,9 @@ def _iot_device_send_message_http(target, device_id, data, headers=None):
 def iot_c2d_message_complete(
     cmd, device_id, etag, hub_name=None, resource_group_name=None, login=None
 ):
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     return _iot_c2d_message_complete(target, device_id, etag)
 
@@ -1744,8 +1780,9 @@ def _iot_c2d_message_complete(target, device_id, etag):
 def iot_c2d_message_reject(
     cmd, device_id, etag, hub_name=None, resource_group_name=None, login=None
 ):
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     return _iot_c2d_message_reject(target, device_id, etag)
 
@@ -1765,8 +1802,9 @@ def _iot_c2d_message_reject(target, device_id, etag):
 def iot_c2d_message_abandon(
     cmd, device_id, etag, hub_name=None, resource_group_name=None, login=None
 ):
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     return _iot_c2d_message_abandon(target, device_id, etag)
 
@@ -1786,8 +1824,9 @@ def _iot_c2d_message_abandon(target, device_id, etag):
 def iot_c2d_message_receive(
     cmd, device_id, hub_name=None, lock_timeout=60, resource_group_name=None, login=None
 ):
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     return _iot_c2d_message_receive(target, device_id, lock_timeout)
 
@@ -1880,8 +1919,9 @@ def iot_c2d_message_send(
     config = cmd.cli_ctx.config
     ensure_uamqp(config, yes, repair)
 
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
 
     if properties:
@@ -1957,8 +1997,9 @@ def iot_simulate_device(
     user_properties = validate_key_value_pairs(properties) or {}
     properties_to_send.update(user_properties)
 
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     token = None
 
@@ -2053,7 +2094,10 @@ def iot_device_export(
     from azure.mgmt.iothub import __version__ as iot_sdk_version
 
     client = iot_hub_service_factory(cmd.cli_ctx)
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name
+    )
 
     if ensure_min_version(iot_sdk_version, "0.12.0"):
         from azure.mgmt.iothub.models import ExportDevicesRequest
@@ -2096,7 +2140,10 @@ def iot_device_import(
     from azure.mgmt.iothub import __version__ as iot_sdk_version
 
     client = iot_hub_service_factory(cmd.cli_ctx)
-    target = get_iot_hub_connection_string(client, hub_name, resource_group_name)
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name
+    )
 
     if ensure_min_version(iot_sdk_version, "0.12.0"):
         from azure.mgmt.iothub.models import ImportDevicesRequest
@@ -2140,8 +2187,9 @@ def iot_device_upload_file(
 ):
     from azext_iot.sdk.iothub.device.models import FileUploadCompletionStatus
 
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
 
     resolver = SdkResolver(target=target, device_id=device_id)
@@ -2185,6 +2233,8 @@ def iot_hub_monitor_events(
     cmd,
     hub_name=None,
     device_id=None,
+    interface=None,
+    module_id=None,
     consumer_group="$Default",
     timeout=300,
     enqueued_time=None,
@@ -2201,6 +2251,8 @@ def iot_hub_monitor_events(
             cmd,
             hub_name=hub_name,
             device_id=device_id,
+            interface_name=interface,
+            module_id=module_id,
             consumer_group=consumer_group,
             timeout=timeout,
             enqueued_time=enqueued_time,
@@ -2234,8 +2286,9 @@ def iot_hub_monitor_feedback(
     config = cmd.cli_ctx.config
     ensure_uamqp(config, yes, repair)
 
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
 
     return _iot_hub_monitor_feedback(
@@ -2244,11 +2297,14 @@ def iot_hub_monitor_feedback(
 
 
 def iot_hub_distributed_tracing_show(
-    cmd, hub_name, device_id, resource_group_name=None
+    cmd, hub_name, device_id, resource_group_name=None, login=None,
 ):
-    device_twin = _iot_hub_distributed_tracing_show(
-        cmd, hub_name, device_id, resource_group_name
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
+
+    device_twin = _iot_hub_distributed_tracing_show(target=target, device_id=device_id)
     return _customize_device_tracing_output(
         device_twin["deviceId"],
         device_twin["properties"]["desired"],
@@ -2259,6 +2315,7 @@ def iot_hub_distributed_tracing_show(
 def _iot_hub_monitor_events(
     cmd,
     interface_name=None,
+    module_id=None,
     hub_name=None,
     device_id=None,
     consumer_group="$Default",
@@ -2285,8 +2342,12 @@ def _iot_hub_monitor_events(
             for device_result in devices_result:
                 device_ids[device_result["deviceId"]] = True
 
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, include_events=True, login=login
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        include_events=True,
+        login=login,
     )
 
     from azext_iot.monitor.builders import hub_target_builder
@@ -2312,6 +2373,7 @@ def _iot_hub_monitor_events(
         devices=device_ids,
         device_id=device_id,
         interface_name=interface_name,
+        module_id=module_id,
     )
 
     handler = CommonHandler(handler_args)
@@ -2326,15 +2388,27 @@ def _iot_hub_monitor_events(
 
 
 def iot_hub_distributed_tracing_update(
-    cmd, hub_name, device_id, sampling_mode, sampling_rate, resource_group_name=None
+    cmd,
+    hub_name,
+    device_id,
+    sampling_mode,
+    sampling_rate,
+    resource_group_name=None,
+    login=None,
 ):
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        include_events=True,
+        login=login,
+    )
+
     if int(sampling_rate) not in range(0, 101):
         raise CLIError(
             "Sampling rate is a percentage, So only values from 0 to 100(inclusive) are permitted."
         )
-    device_twin = _iot_hub_distributed_tracing_show(
-        cmd, hub_name, device_id, resource_group_name
-    )
+    device_twin = _iot_hub_distributed_tracing_show(target=target, device_id=device_id)
     if TRACING_PROPERTY not in device_twin["properties"]["desired"]:
         device_twin["properties"]["desired"][TRACING_PROPERTY] = {}
     device_twin["properties"]["desired"][TRACING_PROPERTY]["sampling_rate"] = int(
@@ -2344,7 +2418,7 @@ def iot_hub_distributed_tracing_update(
         1 if sampling_mode.lower() == "on" else 2
     )
     result = iot_device_twin_update(
-        cmd, device_id, device_twin, hub_name, resource_group_name
+        cmd, device_id, device_twin, hub_name, resource_group_name, login
     )
     return _customize_device_tracing_output(
         result.device_id, result.properties.desired, result.properties.reported
@@ -2359,11 +2433,8 @@ def _iot_hub_monitor_feedback(target, device_id, wait_on_id):
     )
 
 
-def _iot_hub_distributed_tracing_show(
-    cmd, hub_name, device_id, resource_group_name=None
-):
-    target = get_iot_hub_connection_string(cmd, hub_name, resource_group_name)
-    device_twin = iot_device_twin_show(cmd, device_id, hub_name, resource_group_name)
+def _iot_hub_distributed_tracing_show(target, device_id):
+    device_twin = _iot_device_twin_show(target=target, device_id=device_id)
     _validate_device_tracing(target, device_twin)
     return device_twin
 

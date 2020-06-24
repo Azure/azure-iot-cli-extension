@@ -3,11 +3,65 @@
 Release History
 ===============
 
+0.9.5
++++++++++++++++
+* IoT Hub commands now support dynamic privileged policy discovery. `iothubhowner` is no longer relied on. Instead any policy that has `RegistryWrite`, `ServiceConnect` and `DeviceConnect` permissions will be used.
+* Monitoring commands (such as for `central` or `hub`) support module Id filter. Also it is more clear that an event comes from a module.
+* Improved validation of central telemetry.
+* Digital Twin endpoint create commands now support custom subscription options.
+
+0.9.4
++++++++++++++++
+Azure Digital Twins Public Preview - CLI release
+
+Introducing 35 new commands in the following command groups:
+
+* az dt
+* az dt endpoint
+* az dt model
+* az dt role-assignment
+* az dt route
+* az dt twin
+* az dt twin relationship
+* az dt twin telemety
+
+0.9.3
++++++++++++++++
+* IoT Hub device identity import/export commands support usage via managed service identity using the --auth-type argument.
+
+* Adds preview command group "az iot central app device"
+
+  * Adds preview command "az iot central app device create"
+  * Adds preview command "az iot central app device show"
+  * Adds preview command "az iot central app device list"
+  * Adds preview command "az iot central app device delete"
+  * Adds preview command "az iot central app device registration-info"
+  * Adds preview command "az iot central app device registration-summary"
+
+* Adds preview command group "az iot central app device-template"
+
+  * Adds preview command "az iot central app device-template create"
+  * Adds preview command "az iot central app device-template show"
+  * Adds preview command "az iot central app device-template list"
+  * Adds preview command "az iot central app device-template delete"
+  * Adds preview command "az iot central app device-template map"
+
+* Changed how results are displayed in "az iot central app validate-messages"
+
+Known issues
+
+* The following preview commands will retrieve at most 25 results
+
+  * az iot central app device list
+  * az iot central app device-template list
+  * az iot central app device-template map
+
 0.9.2
 +++++++++++++++
 * Device and module twin update operations provide explicit patch arguments (--desired, --tags).
 * Adds command "az iot central app validate-messages"
-* Remove Py 2.7 remnants from setup manifest.
+* Remove Py 2.7 support and remnants from setup manifest.
+* Remove Py 3.4 support and remnants from setup manifest.
 
 0.9.1
 +++++++++++++++

@@ -9,7 +9,7 @@ from knack.util import CLIError
 from azext_iot.constants import PNP_ENDPOINT
 from azext_iot._factory import _bind_sdk
 from azext_iot.common.shared import SdkType, ModelSourceType
-from azext_iot.common._azure import get_iot_hub_connection_string
+from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
     shell_safe_json_parse,
     read_file_content,
@@ -219,9 +219,8 @@ def iot_digitaltwin_invoke_command(
         if target_json or isinstance(target_json, bool):
             command_payload = target_json
 
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
-    )
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(hub_name=hub_name, resource_group_name=resource_group_name, login=login)
     service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
     try:
         result = service_sdk.invoke_interface_command(
@@ -257,9 +256,8 @@ def iot_digitaltwin_property_update(
     if target_json:
         interface_payload = target_json
 
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
-    )
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(hub_name=hub_name, resource_group_name=resource_group_name, login=login)
     service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
     try:
         result = service_sdk.update_interfaces(device_id, interfaces=interface_payload)
@@ -283,6 +281,7 @@ def iot_digitaltwin_monitor_events(
     content_type=None,
     device_query=None,
     interface=None,
+    module_id=None,
 ):
     _iot_hub_monitor_events(
         cmd=cmd,
@@ -299,15 +298,15 @@ def iot_digitaltwin_monitor_events(
         content_type=content_type,
         device_query=device_query,
         interface_name=interface,
+        module_id=module_id,
     )
 
 
 def _iot_digitaltwin_interface_show(
     cmd, device_id, interface, hub_name=None, resource_group_name=None, login=None
 ):
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
-    )
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(hub_name=hub_name, resource_group_name=resource_group_name, login=login)
     service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
     try:
         device_interface = service_sdk.get_interface(device_id, interface)
@@ -319,9 +318,8 @@ def _iot_digitaltwin_interface_show(
 def _iot_digitaltwin_interface_list(
     cmd, device_id, hub_name=None, resource_group_name=None, login=None
 ):
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
-    )
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(hub_name=hub_name, resource_group_name=resource_group_name, login=login)
     service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
     try:
         device_interfaces = service_sdk.get_interfaces(device_id)
@@ -363,9 +361,8 @@ def _pnp_interface_elements(cmd, interface, target_type, repo_endpoint, repo_id,
 def _device_interface_elements(
     cmd, device_id, interface, target_type, hub_name, resource_group_name, login
 ):
-    target = get_iot_hub_connection_string(
-        cmd, hub_name, resource_group_name, login=login
-    )
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(hub_name=hub_name, resource_group_name=resource_group_name, login=login)
     service_sdk, errors = _bind_sdk(target, SdkType.service_sdk)
     interface_elements = []
     try:

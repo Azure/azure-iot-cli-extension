@@ -4,17 +4,23 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import csv
+import sys
+
 from typing import List
+from knack.log import get_logger
 
 from azext_iot.monitor.utility import stop_monitor, get_loop
 from azext_iot.central.providers import (
     CentralDeviceProvider,
     CentralDeviceTemplateProvider,
 )
-from azext_iot.monitor.handlers.common_handler import CommonHandler
+from azext_iot.monitor.handlers import CommonHandler
 from azext_iot.monitor.models.arguments import CentralHandlerArguments
 from azext_iot.monitor.parsers.central_parser import CentralParser
 from azext_iot.monitor.parsers.issue import Issue
+
+logger = get_logger(__name__)
 
 
 class CentralHandler(CommonHandler):
@@ -54,6 +60,9 @@ class CentralHandler(CommonHandler):
         if not self._should_process_device(parser.device_id):
             return
 
+        if not self._should_process_module(parser.module_id):
+            return
+
         parsed_message = parser.parse_message()
 
         self._messages.append(parsed_message)
@@ -77,30 +86,30 @@ class CentralHandler(CommonHandler):
             self._quit_messages_exceeded()
 
     def generate_startup_string(self, name: str):
-        device_filter_text = ""
         device_id = self._central_handler_args.common_handler_args.device_id
+        duration = self._central_handler_args.duration
+        max_messages = self._central_handler_args.max_messages
+        module_id = self._central_handler_args.common_handler_args.module_id
+
+        filter_text = ""
         if device_id:
-            device_filter_text = ".\nFiltering on device: {}".format(device_id)
+            filter_text = ".\nFiltering on device: {}".format(device_id)
+
+        if module_id:
+            logger.warn("Module filtering is applicable only for edge devices.")
+            filter_text += ".\nFiltering on module: {}".format(module_id)
 
         exit_text = ""
-        if (
-            self._central_handler_args.duration
-            and self._central_handler_args.max_messages
-        ):
+        if duration and max_messages:
             exit_text = ".\nExiting after {} second(s), or {} message(s) have been parsed (whichever happens first).".format(
-                self._central_handler_args.duration,
-                self._central_handler_args.max_messages,
+                duration, max_messages,
             )
-        elif self._central_handler_args.duration:
-            exit_text = ".\nExiting after {} second(s).".format(
-                self._central_handler_args.duration
-            )
-        elif self._central_handler_args.max_messages:
-            exit_text = ".\nExiting after parsing {} message(s).".format(
-                self._central_handler_args.max_messages
-            )
+        elif duration:
+            exit_text = ".\nExiting after {} second(s).".format(duration)
+        elif max_messages:
+            exit_text = ".\nExiting after parsing {} message(s).".format(max_messages)
 
-        result = "{} telemetry{}{}".format(name, device_filter_text, exit_text)
+        result = "{} telemetry{}{}".format(name, filter_text, exit_text)
 
         return result
 
@@ -137,9 +146,6 @@ class CentralHandler(CommonHandler):
         print(output)
 
     def _handle_csv_summary(self, issues: List[Issue]):
-        import csv
-        import sys
-
         fieldnames = ["severity", "details", "message", "device_id", "template_id"]
         writer = csv.DictWriter(sys.stdout, fieldnames=fieldnames)
         writer.writeheader()

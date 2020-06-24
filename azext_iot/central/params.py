@@ -1,7 +1,7 @@
 # coding=utf-8
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
-# Unpublished works.
+# Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
 """
@@ -53,7 +53,7 @@ def load_central_arguments(self, _):
         )
         context.argument(
             "device_template_id",
-            options_list=["--device-template-id", "--dt"],
+            options_list=["--device-template-id", "--dtid"],
             help="Device template id. Example: somedevicetemplate",
         )
         context.argument(
@@ -77,6 +77,9 @@ def load_central_arguments(self, _):
             options_list=["--central-dns-suffix", "--central-api-uri"],
             help="Central dns suffix. "
             "This enables running cli commands against non public/prod environments",
+        )
+        context.argument(
+            "module_id", options_list=["--module-id", "-m"], help="Iot Edge Module ID",
         )
 
     with self.argument_context("iot central app monitor-events") as context:
@@ -157,6 +160,10 @@ def load_deprecated_iotcentral_params(self, _):
             options_list=["--central-dns-suffix", "--central-api-uri"],
             help="Central dns suffix. "
             "This enables running cli commands against non public/prod environments",
+        )
+
+        context.argument(
+            "module_id", options_list=["--module-id", "-m"], help="Iot Edge Module ID",
         )
 
     with self.argument_context("iot central device-twin") as context:
