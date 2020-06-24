@@ -20,10 +20,6 @@ from azext_iot.monitor.models.arguments import (
 )
 from azext_iot.central.models.devicetwin import DeviceTwin, Property
 from azext_iot.central.providers.device_provider import get_device_twin
-from azext_iot.central.providers.device_provider import CentralDeviceProvider
-from azext_iot.central.providers.device_template_provider import (
-    CentralDeviceTemplateProvider,
-)
 
 
 def validate_messages(
