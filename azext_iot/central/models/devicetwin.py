@@ -89,7 +89,6 @@ class Property:
                             timestamp,
                         )
                     )
-
                 if updated_properties_interface_level:
                     updated_properties_collection.update(
                         {value: updated_properties_interface_level}
@@ -102,5 +101,5 @@ class Property:
                     timestamp,
                 )
                 if updated_property:
-                    updated_properties_collection.update({value: updated_property})
+                    updated_properties_collection.update(updated_property)
         return updated_properties_collection
