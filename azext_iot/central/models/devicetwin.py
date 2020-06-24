@@ -5,36 +5,37 @@
 # --------------------------------------------------------------------------------------------
 import re
 from datetime import datetime, timezone, timezone
+from azext_iot.central.models.template import Template
 
 
 class DeviceTwin:
     def __init__(
-        self, devicetwin: dict,
+        self, device_twin: dict,
     ):
-        self.devicetwin = devicetwin
-        self.deviceid = devicetwin.get("deviceId")
-        self.desiredProperty = Property(
+        self.device_twin = device_twin
+        self.device_id = device_twin.get("deviceId")
+        self.desired_property = Property(
             "desired property",
-            devicetwin.get("properties").get("desired"),
-            self.deviceid,
+            device_twin.get("properties").get("desired"),
+            self.device_id,
         )
-        self.reportedProperty = Property(
+        self.reported_property = Property(
             "reported property",
-            devicetwin.get("properties").get("reported"),
-            self.deviceid,
+            device_twin.get("properties").get("reported"),
+            self.device_id,
         )
 
 
 class Property:
     def __init__(
-        self, name: str, property_collection: dict, deviceid,
+        self, name: str, property_collection: dict, device_id,
     ):
         self.name = name
         self.property_collection = property_collection
         self.property_collection_metadata = property_collection.get("$metadata")
         self.capabilities_properties = self._get_capabilities(property_collection)
         self.version = property_collection.get("$version")
-        self.deviceid = deviceid
+        self.device_id = device_id
         pass
 
     def _get_capabilities(self, d):
@@ -68,16 +69,42 @@ class Property:
         timestamp = timestamp.timestamp()
         return timestamp
 
-    def process_property_updates(self, timestamp: float):
+    def _is_value_interface(self, value, template: Template):
+        name = value.replace("$iotin:", "")
+        if name in template.interfaces:
+            return True
+        return False
+
+    def _print_property_updates(self, data):
+        print(self.name, "version:", self.version)
+        print(data)
+
+    def process_property_updates(self, timestamp: float, template: Template):
         for value in self.capabilities_properties:
-            updated_data = self._get_updated_data(
-                self.property_collection_metadata.get(value),
-                self.capabilities_properties.get(value),
-                value,
-                timestamp,
-            )
-            if updated_data:
-                print(self.name, "version:", self.version)
-                print(updated_data)
+            if self._is_value_interface(value, template):
+                # iterate thru all the properties in the interface
+                updated_properties = {}
+                for props in self.capabilities_properties[value]:
+                    updated_properties.update(
+                        self._get_updated_data(
+                            self.property_collection_metadata.get(value).get(props),
+                            self.capabilities_properties.get(value).get(props),
+                            props,
+                            timestamp,
+                        )
+                    )
+
+                if updated_properties:
+                    final_data = {value: updated_properties}
+                    self._print_property_updates(final_data)
+            else:
+                updated_property = self._get_updated_data(
+                    self.property_collection_metadata.get(value),
+                    self.capabilities_properties.get(value),
+                    value,
+                    timestamp,
+                )
+                if updated_property:
+                    self._print_property_updates(updated_property)
         return
 
