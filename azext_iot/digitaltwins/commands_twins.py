@@ -42,7 +42,7 @@ def delete_twin(cmd, name, twin_id, resource_group_name=None):
 def create_relationship(
     cmd,
     name,
-    source_twin_id,
+    twin_id,
     target_twin_id,
     relationship_id,
     relationship,
@@ -51,7 +51,7 @@ def create_relationship(
 ):
     twin_provider = TwinProvider(cmd=cmd, name=name, rg=resource_group_name)
     return twin_provider.add_relationship(
-        source_twin_id=source_twin_id,
+        twin_id=twin_id,
         target_twin_id=target_twin_id,
         relationship_id=relationship_id,
         relationship=relationship,

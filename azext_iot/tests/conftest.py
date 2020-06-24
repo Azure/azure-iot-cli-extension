@@ -16,7 +16,7 @@ from azure.cli.core.mock import DummyCli
 
 path_iot_hub_service_factory = "azext_iot.common._azure.iot_hub_service_factory"
 path_service_client = "msrest.service_client.ServiceClient.send"
-path_ghcs = "azext_iot.operations.hub.get_iot_hub_connection_string"
+path_ghcs = "azext_iot.iothub.providers.discovery.IotHubDiscovery.get_target"
 path_sas = "azext_iot._factory.SasTokenAuthentication"
 path_mqtt_client = "azext_iot.operations._mqtt.mqtt.Client"
 path_iot_hub_monitor_events_entrypoint = (
@@ -48,18 +48,6 @@ def generate_cs(
     return result.lower() if lower_case else result
 
 
-@pytest.fixture()
-def fixture_cmd2(mocker):
-    cli = DummyCli()
-    cli.loader = mocker.MagicMock()
-    cli.loader.cli_ctx = cli
-
-    def test_handler1():
-        pass
-
-    return AzCliCommand(cli.loader, "iot-extension command", test_handler1)
-
-
 # Sets current working directory to the directory of the executing file
 @pytest.fixture()
 def set_cwd(request):
@@ -68,10 +56,14 @@ def set_cwd(request):
 
 @pytest.fixture()
 def fixture_cmd(mocker):
-    # Placeholder for later use
-    mocker.patch(path_iot_hub_service_factory)
-    cmd = mocker.MagicMock(name="cli cmd context")
-    return cmd
+    cli = DummyCli()
+    cli.loader = mocker.MagicMock()
+    cli.loader.cli_ctx = cli
+
+    def test_handler1():
+        pass
+
+    return AzCliCommand(cli.loader, "iot-extension command", test_handler1)
 
 
 @pytest.fixture()

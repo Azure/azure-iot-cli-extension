@@ -98,7 +98,7 @@ class TwinProvider(DigitalTwinsProvider):
 
     def add_relationship(
         self,
-        source_twin_id,
+        twin_id,
         target_twin_id,
         relationship_id,
         relationship,
@@ -117,7 +117,7 @@ class TwinProvider(DigitalTwinsProvider):
 
         logger.info("Relationship payload %s", json.dumps(relationship_request))
         return self.twins_sdk.add_relationship(
-            id=source_twin_id,
+            id=twin_id,
             relationship_id=relationship_id,
             relationship=relationship_request,
             if_none_match="*",

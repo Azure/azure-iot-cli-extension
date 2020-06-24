@@ -14,7 +14,7 @@ def load_digitaltwins_help():
 
     helps["dt"] = """
         type: group
-        short-summary: Manage Azure Digital Twins (ADT) solutions & infrastructure.
+        short-summary: Manage Azure Digital Twins solutions & infrastructure.
     """
 
     helps["dt create"] = """
@@ -383,12 +383,12 @@ def load_digitaltwins_help():
         - name: Create a relationship between two digital twins.
           text: >
             az dt twin relationship create -n {instance_name} --relationship-id {relationship_id} --relationship contains
-            --source {source_twin_id} --target {target_twin_id}
+            --twin-id {source_twin_id} --target {target_twin_id}
 
         - name: Create a relationship with initialized properties between two digital twins.
           text: >
             az dt twin relationship create -n {instance_name} --relationship-id {relationship_id} --relationship contains
-            --source {source_twin_id} --target {target_twin_id}
+            --twin-id {source_twin_id} --target {target_twin_id}
             --properties '{"ownershipUser": "me", "ownershipDepartment": "Computer Science"}'
     """
 

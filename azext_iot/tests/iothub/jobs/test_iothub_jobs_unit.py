@@ -214,7 +214,7 @@ class TestJobCreate:
     )
     def test_job_create(
         self,
-        fixture_cmd2,
+        fixture_cmd,
         serviceclient,
         job_id,
         job_type,
@@ -229,7 +229,7 @@ class TestJobCreate:
     ):
         job_create = partial(
             subject.job_create,
-            cmd=fixture_cmd2,
+            cmd=fixture_cmd,
             job_id=job_id,
             job_type=job_type,
             hub_name=hub_name,
@@ -304,7 +304,7 @@ class TestJobCreate:
     )
     def test_job_create_wait(
         self,
-        fixture_cmd2,
+        fixture_cmd,
         serviceclient_test_wait,
         job_id,
         job_type,
@@ -319,7 +319,7 @@ class TestJobCreate:
     ):
         job_create = partial(
             subject.job_create,
-            cmd=fixture_cmd2,
+            cmd=fixture_cmd,
             job_id=job_id,
             job_type=job_type,
             hub_name=hub_name,
@@ -453,7 +453,7 @@ class TestJobCreate:
     )
     def test_job_create_malformed(
         self,
-        fixture_cmd2,
+        fixture_cmd,
         serviceclient,
         job_id,
         job_type,
@@ -472,7 +472,7 @@ class TestJobCreate:
         with pytest.raises(CLIError) as exc:
             job_create = partial(
                 subject.job_create,
-                cmd=fixture_cmd2,
+                cmd=fixture_cmd,
                 job_id=job_id,
                 job_type=job_type,
                 hub_name=hub_name,
@@ -528,7 +528,7 @@ class TestJobCreate:
     )
     def test_job_create_error(
         self,
-        fixture_cmd2,
+        fixture_cmd,
         serviceclient_generic_error,
         job_id,
         job_type,
@@ -544,7 +544,7 @@ class TestJobCreate:
         with pytest.raises(CLIError):
             job_create = partial(
                 subject.job_create,
-                cmd=fixture_cmd2,
+                cmd=fixture_cmd,
                 job_id=job_id,
                 job_type=job_type,
                 hub_name=hub_name,
@@ -601,10 +601,10 @@ class TestJobShow:
 
         return service_client
 
-    def test_job_show(self, fixture_cmd2, serviceclient):
+    def test_job_show(self, fixture_cmd, serviceclient):
         target_job_id = generate_job_id()
         result = subject.job_show(
-            cmd=fixture_cmd2, job_id=target_job_id, hub_name=mock_target["entity"]
+            cmd=fixture_cmd, job_id=target_job_id, hub_name=mock_target["entity"]
         )
 
         args_list = serviceclient.call_args_list
@@ -630,12 +630,12 @@ class TestJobShow:
             assert result["startTime"]
             assert result["endTime"]
 
-    def test_job_show_error(self, fixture_cmd2, serviceclient_generic_error):
+    def test_job_show_error(self, fixture_cmd, serviceclient_generic_error):
         target_job_id = generate_job_id()
 
         with pytest.raises(CLIError):
             subject.job_show(
-                cmd=fixture_cmd2, job_id=target_job_id, hub_name=mock_target["entity"]
+                cmd=fixture_cmd, job_id=target_job_id, hub_name=mock_target["entity"]
             )
 
 
@@ -686,10 +686,10 @@ class TestJobCancel:
 
         return service_client
 
-    def test_job_cancel(self, fixture_cmd2, serviceclient):
+    def test_job_cancel(self, fixture_cmd, serviceclient):
         target_job_id = generate_job_id()
         result = subject.job_cancel(
-            cmd=fixture_cmd2, job_id=target_job_id, hub_name=mock_target["entity"]
+            cmd=fixture_cmd, job_id=target_job_id, hub_name=mock_target["entity"]
         )
 
         args_list = serviceclient.call_args_list
@@ -727,12 +727,12 @@ class TestJobCancel:
             )
             assert args_list[2][0][0].method == "DELETE"
 
-    def test_job_cancel_error(self, fixture_cmd2, serviceclient_generic_error):
+    def test_job_cancel_error(self, fixture_cmd, serviceclient_generic_error):
         target_job_id = generate_job_id()
 
         with pytest.raises(CLIError):
             subject.job_cancel(
-                cmd=fixture_cmd2, job_id=target_job_id, hub_name=mock_target["entity"]
+                cmd=fixture_cmd, job_id=target_job_id, hub_name=mock_target["entity"]
             )
 
 
@@ -870,9 +870,9 @@ class TestJobList:
             (None, None, 5),
         ],
     )
-    def test_job_list(self, fixture_cmd2, serviceclient, job_type, job_status, top):
+    def test_job_list(self, fixture_cmd, serviceclient, job_type, job_status, top):
         result = subject.job_list(
-            cmd=fixture_cmd2,
+            cmd=fixture_cmd,
             job_type=job_type,
             job_status=job_status,
             top=top,
@@ -955,6 +955,6 @@ class TestJobList:
 
         return result
 
-    def test_job_list_error(self, fixture_cmd2, serviceclient_generic_error):
+    def test_job_list_error(self, fixture_cmd, serviceclient_generic_error):
         with pytest.raises(CLIError):
-            subject.job_list(cmd=fixture_cmd2, hub_name=mock_target["entity"])
+            subject.job_list(cmd=fixture_cmd, hub_name=mock_target["entity"])
