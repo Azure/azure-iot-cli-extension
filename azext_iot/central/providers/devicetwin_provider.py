@@ -6,19 +6,11 @@
 
 from knack.util import CLIError
 from knack.log import get_logger
-from typing import List
-from azext_iot.constants import CENTRAL_ENDPOINT
-from azext_iot.central import services as central_services
-from azext_iot.central.models.enum import DeviceStatus
-from azext_iot.central.models.device import Device
-from azext_iot.dps.services import global_service as dps_global_service
 from azext_iot.common.utility import find_between
 from azext_iot._factory import _bind_sdk
 from azext_iot.common.shared import SdkType
 from azext_iot.common.utility import unpack_msrest_error
 from azext_iot.common.sas_token_auth import BasicSasTokenAuthentication
-from knack.util import CLIError
-from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.common._azure import get_iot_central_tokens
 
 
@@ -63,4 +55,3 @@ class CentralDeviceTwinProvider:
                     exception = CLIError(unpack_msrest_error(e))
 
         raise CLIError("Could not get device twin")
-

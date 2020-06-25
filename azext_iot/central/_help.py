@@ -323,11 +323,11 @@ def _load_central_monitors_help():
         short-summary: Monitor desired and reported  sent to/from the IoT Hub for an IoT Central app.
         long-summary: |
                     EXPERIMENTAL requires Python 3.5+
-                    
+
         examples:
         - name: Basic usage
           text: >
-            az iot central app monitor-properties --app-id {app_id} -d {device_id}        
+            az iot central app monitor-properties --app-id {app_id} -d {device_id}
     """
 
 

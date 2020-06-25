@@ -125,4 +125,3 @@ def monitor_properties(
         app_id=app_id,
         central_dns_suffix=central_dns_suffix,
     )
-
