@@ -13,4 +13,4 @@ def device_twin_show(cmd, device_id, app_id, central_dns_suffix=CENTRAL_ENDPOINT
     device_twin_provider = CentralDeviceTwinProvider(
         cmd=cmd, app_id=app_id, device_id=device_id
     )
-    device_twin_provider.get_device_twin(central_dns_suffix=central_dns_suffix)
+    return device_twin_provider.get_device_twin(central_dns_suffix=central_dns_suffix)
