@@ -41,7 +41,7 @@ def fixture_bind_sdk(mocker):
         def get_twin(self, device_id):
             return device_twin_result
 
-    mock = mocker.patch("azext_iot.central.commands_device_twin._bind_sdk")
+    mock = mocker.patch("azext_iot.central.providers.devicetwin_provider._bind_sdk")
     mock.return_value = (mock_service_sdk(), None)
     return mock
 
