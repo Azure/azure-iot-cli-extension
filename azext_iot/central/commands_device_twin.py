@@ -6,8 +6,11 @@
 
 
 from azext_iot.constants import CENTRAL_ENDPOINT
-from azext_iot.central.providers.device_provider import get_device_twin
+from azext_iot.central.providers.devicetwin_provider import CentralDeviceTwinProvider
 
 
 def device_twin_show(cmd, device_id, app_id, central_dns_suffix=CENTRAL_ENDPOINT):
-    get_device_twin(cmd, device_id, app_id, central_dns_suffix=central_dns_suffix)
+    device_twin_provider = CentralDeviceTwinProvider(
+        cmd=cmd, app_id=app_id, device_id=device_id
+    )
+    device_twin_provider.get_device_twin(central_dns_suffix=central_dns_suffix)

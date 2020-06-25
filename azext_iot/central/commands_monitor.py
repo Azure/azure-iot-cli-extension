@@ -4,9 +4,6 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import datetime
-import isodate
-import time
 
 from azure.cli.core.commands import AzCliCommand
 from azext_iot.constants import CENTRAL_ENDPOINT
@@ -18,8 +15,7 @@ from azext_iot.monitor.models.arguments import (
     CentralHandlerArguments,
     TelemetryArguments,
 )
-from azext_iot.central.models.devicetwin import DeviceTwin, Property
-from azext_iot.central.providers.device_provider import get_device_twin
+from azext_iot.monitor.property import start_property_monitor
 
 
 def validate_messages(
@@ -121,61 +117,12 @@ def monitor_events(
 
 
 def monitor_properties(
-    cmd,
-    device_id,
-    app_id,
-    polling_interval_seconds=1,
-    central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd, device_id, app_id, central_dns_suffix=CENTRAL_ENDPOINT,
 ):
-    prev_twin = None
+    start_property_monitor(
+        cmd=cmd,
+        device_id=device_id,
+        app_id=app_id,
+        central_dns_suffix=central_dns_suffix,
+    )
 
-    while True:
-        raw_twin = get_device_twin(
-            cmd,
-            device_id=device_id,
-            app_id=app_id,
-            central_dns_suffix=central_dns_suffix,
-        )
-
-        twin = DeviceTwin(raw_twin)
-        if prev_twin:
-            change_d = compare_properties(
-                prev_twin.desired_property, twin.desired_property
-            )
-            change_r = compare_properties(
-                prev_twin.reported_property, twin.reported_property
-            )
-
-            if change_d:
-                print("Changes in desired properties:")
-                print(change_d)
-
-            if change_r:
-                print("Changes in reported properties:")
-                print(change_r)
-
-        time.sleep(polling_interval_seconds)
-
-        prev_twin = twin
-
-
-def compare_properties(prev_prop: Property, prop: Property):
-    if prev_prop.version == prop.version:
-        return
-
-    changes = {
-        key: prop.props[key]
-        for key, val in prop.metadata.items()
-        if is_relevant(key, val)
-    }
-
-    return changes
-
-
-def is_relevant(key, val):
-    if key in {"$lastUpdated", "$lastUpdatedVersion"}:
-        return False
-
-    updated_within = datetime.datetime.now() - datetime.timedelta(seconds=10)
-    last_updated = isodate.parse_datetime(val["$lastUpdated"])
-    return last_updated.timestamp() >= updated_within.timestamp()
