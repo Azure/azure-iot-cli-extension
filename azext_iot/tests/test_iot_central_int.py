@@ -4,10 +4,14 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+
+import json
 import mock
 import os
 import sys
 import time
+
+from azure.iot.device import Message
 
 from azext_iot.common import utility
 from azext_iot.central.models.enum import DeviceStatus
@@ -97,25 +101,36 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         # We cannot verify that the result is correct, as the Azure CLI for IoT Central does not support adding devices
         self.cmd("iotcentral app monitor-events --app-id {} --to 1".format(APP_ID))
 
-    def test_central_validate_messages(self):
+    def test_central_validate_messages_success(self):
         (template_id, _) = self._create_device_template()
         (device_id, _) = self._create_device(instance_of=template_id)
         credentials = self._get_credentials(device_id)
 
         device_client = helpers.dps_connect_device(device_id, credentials)
 
-        enqueued_time = utility.calculate_millisec_since_unix_epoch_utc()
+        enqueued_time = utility.calculate_millisec_since_unix_epoch_utc() - 10000
 
-        device_client.send_message("some message")
+        payload = {"Bool": True}
+        msg = Message(
+            data=json.dumps(payload),
+            content_encoding="utf-8",
+            content_type="application/json",
+        )
+
+        device_client.send_message(msg)
 
         # Validate the messages
         mock_logger = helpers.MockLogger()
+        output = None
         with mock.patch("knack.log.get_logger", return_value=mock_logger) as _:
             output = self._get_validate_messages_output(device_id, enqueued_time)
-            pass
 
         self._delete_device(device_id)
-        # self._delete_device_template(template_id)
+        self._delete_device_template(template_id)
+
+        assert output
+        assert "Successfully parsed 1 message(s)" in output
+        assert "No errors detected" in output
 
     def test_central_device_methods_CRLD(self):
         (device_id, device_name) = self._create_device()
@@ -328,13 +343,16 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         ).get_output_in_json()
 
     def _get_validate_messages_output(
-        self, device_id, enqueued_time, duration=10, max_messages=1
+        self, device_id, enqueued_time, duration=60, max_messages=1, asserts=None
     ):
+        if not asserts:
+            asserts = []
+
         output = self.command_execute_assert(
             "iot central app validate-messages --app-id {} -d {} --et {} --duration {} --mm {} -y".format(
                 APP_ID, device_id, enqueued_time, duration, max_messages
             ),
-            [],
+            asserts,
         )
 
         if not output:
