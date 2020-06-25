@@ -238,7 +238,10 @@ def execute_component_command(
     Args:
         cmd: command passed into az
         app_id: name of app (used for forming request URL)
-        device_id: unique case-sensitive device id,
+        device_id: unique case-sensitive device id
+        interface_id: interface id where command exists
+        command_name: name of command to execute
+        payload: params for command
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
         central_dns_suffix: {centralDnsSuffixInPath} as found in docs
@@ -270,13 +273,15 @@ def get_component_command_history(
     Args:
         cmd: command passed into az
         app_id: name of app (used for forming request URL)
-        device_id: unique case-sensitive device id,
+        device_id: unique case-sensitive device id
+        interface_id: interface id where command exists
+        command_name: name of command to view execution history
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
         central_dns_suffix: {centralDnsSuffixInPath} as found in docs
 
     Returns:
-        device_credentials: dict
+        Command history (List) - currently limited to 1 item
     """
     url = "https://{}.{}/{}/{}/components/{}/commands/{}".format(
         app_id, central_dns_suffix, BASE_PATH, device_id, interface_id, command_name
