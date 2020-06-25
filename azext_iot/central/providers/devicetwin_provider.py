@@ -11,7 +11,6 @@ from azext_iot._factory import _bind_sdk
 from azext_iot.common.shared import SdkType
 from azext_iot.common.utility import unpack_msrest_error
 from azext_iot.common.sas_token_auth import BasicSasTokenAuthentication
-from azext_iot.common._azure import get_iot_central_tokens
 
 
 logger = get_logger(__name__)
@@ -35,6 +34,7 @@ class CentralDeviceTwinProvider:
         self._device_id = device_id
 
     def get_device_twin(self, central_dns_suffix):
+        from azext_iot.common._azure import get_iot_central_tokens
 
         tokens = get_iot_central_tokens(self._cmd, self._app_id, central_dns_suffix)
 
