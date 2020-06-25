@@ -327,8 +327,7 @@ def _load_central_monitors_help():
         examples:
         - name: Basic usage
           text: >
-            az iot central app monitor-properties --app-id {app_id} -d {device_id}
-        - name: Basic usage when filtering targeted devices with a wildcard in the ID
+            az iot central app monitor-properties --app-id {app_id} -d {device_id}        
     """
 
 
