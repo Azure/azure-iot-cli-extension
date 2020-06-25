@@ -136,6 +136,35 @@ def _load_central_devices_help():
                 az iot central app device registration-summary --app-id {appid}
         """
 
+    helps[
+        "iot central app device command-response"
+    ] = """
+            type: command
+            short-summary: Execute a command on a device and view associated response. Does NOT monitor property updates that the command may perform.
+            long-summary: |
+                Note: payload should be nested under "request".
+                i.e. if your device expects the payload in a shape {"key": "value"}
+                payload should be {"request": {"key": "value"}}
+            examples:
+            - name: Execute command response
+              text: >
+                az iot central app device command-response
+                --app-id {appid}
+                --device-id {deviceid}
+                --interface-id {interfaceid}
+                --command-name {commandname}
+                --content {payload}
+
+            - name: Short execute command response
+              text: >
+                az iot central app device command-response
+                -n {appid}
+                -d {deviceid}
+                -i {interfaceid}
+                --cn {commandname}
+                -k {payload}
+        """
+
 
 def _load_central_device_templates_help():
     helps[

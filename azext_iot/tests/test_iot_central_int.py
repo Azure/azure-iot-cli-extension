@@ -200,18 +200,16 @@ class TestIotCentral(LiveScenarioTest):
         interface_id = "modelOne_g4"
         command_name = "sync_cmd"
         (template_id, _) = self._create_device_template()
-        (device_id, device_name) = self._create_device(
-            instance_of=template_id, simulated=True
-        )
+        (device_id, _) = self._create_device(instance_of=template_id, simulated=True)
 
         self._wait_for_provisioned(device_id)
 
         result = self.cmd(
             "iot central app device command-response"
-            " --app-id {}"
+            " -n {}"
             " -d {}"
-            " --interface-id {}"
-            " --command-name {}"
+            " -i {}"
+            " --cn {}"
             " -k '{}'".format(
                 APP_ID, device_id, interface_id, command_name, sync_command_params
             )

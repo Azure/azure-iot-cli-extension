@@ -73,7 +73,7 @@ def command_response(
     command_name: str,
     content: str,
     token=None,
-    central_dns_suffix="azureiotcentral.com",
+    central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     if not isinstance(content, str):
         raise CLIError("content must be a string: {}".format(content))
@@ -85,7 +85,7 @@ def command_response(
         device_id=device_id,
         interface_id=interface_id,
         command_name=command_name,
-        payload={"request": payload},
+        payload=payload,
     )
     return command_history["value"]
 

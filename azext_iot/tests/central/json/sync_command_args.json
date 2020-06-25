@@ -1,3 +1,5 @@
 {
-    "argument": "value"
+    "request": {
+        "argument": "value"
+    }
 }

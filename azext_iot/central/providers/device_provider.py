@@ -195,7 +195,7 @@ class CentralDeviceProvider:
         interface_id: str,
         command_name: str,
         payload: dict,
-        central_dns_suffix="azureiotcentral.com",
+        central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         central_services.device.execute_component_command(
             cmd=self._cmd,

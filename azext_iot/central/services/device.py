@@ -230,7 +230,7 @@ def execute_component_command(
     interface_id: str,
     command_name: str,
     payload: dict,
-    central_dns_suffix="azureiotcentral.com",
+    central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     """
     Execute a direct method on a device
@@ -262,7 +262,7 @@ def get_component_command_history(
     device_id: str,
     interface_id: str,
     command_name: str,
-    central_dns_suffix="azureiotcentral.com",
+    central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     """
     Get component command history
