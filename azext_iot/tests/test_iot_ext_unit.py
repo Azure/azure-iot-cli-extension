@@ -34,7 +34,6 @@ from .conftest import (
     build_mock_response,
     path_service_client,
     mock_target,
-    hub_entity,
     generate_cs,
 )
 
@@ -502,7 +501,7 @@ class TestDeviceDelete:
 
 # Starting PoC for improving/simplyfing unit tests
 class TestDeviceShow:
-    def test_device_show(self, fixture_cmd2, mocked_response, fixture_ghcs):
+    def test_device_show(self, fixture_cmd, mocked_response, fixture_ghcs):
         device_id = generate_generic_id()
         mocked_response.add(
             method=responses.GET,
@@ -513,12 +512,12 @@ class TestDeviceShow:
             match_querystring=False
         )
 
-        result = subject.iot_device_show(fixture_cmd2, device_id, mock_target["entity"])
+        result = subject.iot_device_show(fixture_cmd, device_id, mock_target["entity"])
         assert result["deviceId"] == device_id
 
-    def test_device_show_error(self, fixture_cmd2, service_client_generic_errors):
+    def test_device_show_error(self, fixture_cmd, service_client_generic_errors):
         with pytest.raises(CLIError):
-            subject.iot_device_show(fixture_cmd2, device_id, mock_target["entity"])
+            subject.iot_device_show(fixture_cmd, device_id, mock_target["entity"])
 
 
 class TestDeviceList:
@@ -543,8 +542,8 @@ class TestDeviceList:
         yield mocked_response
 
     @pytest.mark.parametrize("top, edge", [(10, True), (1000, False)])
-    def test_device_list(self, fixture_cmd2, service_client, top, edge):
-        result = subject.iot_device_list(fixture_cmd2, mock_target["entity"], top, edge)
+    def test_device_list(self, fixture_cmd, service_client, top, edge):
+        result = subject.iot_device_list(fixture_cmd, mock_target["entity"], top, edge)
         list_request = service_client.calls[0].request
 
         body = json.loads(list_request.body)
@@ -563,14 +562,14 @@ class TestDeviceList:
         assert headers["x-ms-max-item-count"] == str(top)
 
     @pytest.mark.parametrize("top", [-2, 0])
-    def test_device_list_invalid_args(self, fixture_cmd2, top):
+    def test_device_list_invalid_args(self, fixture_cmd, top):
         with pytest.raises(CLIError):
-            subject.iot_device_list(fixture_cmd2, mock_target["entity"], top)
+            subject.iot_device_list(fixture_cmd, mock_target["entity"], top)
 
-    def test_device_list_error(self, fixture_cmd2, service_client_generic_errors):
+    def test_device_list_error(self, fixture_cmd, service_client_generic_errors):
         service_client_generic_errors.assert_all_requests_are_fired = False
         with pytest.raises(CLIError):
-            subject.iot_device_list(fixture_cmd2, mock_target["entity"])
+            subject.iot_device_list(fixture_cmd, mock_target["entity"])
 
 
 def generate_module_create_req(
@@ -1436,163 +1435,6 @@ class TestDeviceModuleMethodInvoke:
                 hub_name=mock_target["entity"],
                 method_payload='{"key":"value"}',
             )
-
-
-hub_suffix = "awesome-azure.net"
-
-
-# TODO: Refactor to leverage fixture pattern and reduce redundent params
-class TestGetIoTHubConnString:
-    @pytest.mark.parametrize(
-        "hubcount, targethub, policy_name, rg_name, include_events, login, failure_reason, mgmt_sdk_ver",
-        [
-            (5, "hub1", "iothubowner", str(uuid4()), False, None, None, "0.4"),
-            (0, "hub1", "iothubowner", None, False, True, None, "0.4"),
-            (5, "hub1", "iothubowner", str(uuid4()), False, None, None, None),
-            (0, "hub1", "iothubowner", None, False, True, None, None),
-            (1, "hub0", "iothubowner", None, True, None, None, None),
-            (10, "hub3", "custompolicy", "myrg", False, None, None, None),
-            (1, "hub0", "custompolicy", None, False, None, None, None),
-            (3, "hub4", "iothubowner", None, False, None, "subscription", None),
-            (1, "hub1", "iothubowner", "myrg", False, None, "policy", None),
-            (1, "myhub", "iothubowner", "myrg", False, None, "resource", None),
-        ],
-    )
-    def test_get_hub_conn_string(
-        self,
-        mocker,
-        hubcount,
-        targethub,
-        policy_name,
-        rg_name,
-        include_events,
-        login,
-        failure_reason,
-        mgmt_sdk_ver,
-    ):
-        from azext_iot.common._azure import get_iot_hub_connection_string
-
-        def _build_hub(hub, name, rg):
-            hub.name = name
-            hub.properties.host_name = "{}.{}".format(name, hub_suffix)
-
-            if mgmt_sdk_ver == "0.4":
-                hub.resourcegroup = rg
-                hub.additional_properties = None
-            else:
-                d = {}
-                d["resourcegroup"] = rg
-                hub.additional_properties.return_value = d
-                hub.additional_properties.get.return_value = rg
-
-            return hub
-
-        def _build_policy(policy, name):
-            policy.key_name = name
-            policy.primary_key = mock_target["primarykey"]
-            policy.secondary_key = mock_target["secondarykey"]
-            return policy
-
-        def _build_event(hub):
-            hub.properties.event_hub_endpoints = {"events": mocker.Mock()}
-            hub.properties.event_hub_endpoints["events"].endpoint = "sb://" + str(
-                uuid4()
-            )
-            hub.properties.event_hub_endpoints["events"].partition_count = "2"
-            hub.properties.event_hub_endpoints["events"].path = hub_entity
-            hub.properties.event_hub_endpoints["events"].partition_ids = ["0", "1"]
-            return hub
-
-        cmd = mocker.Mock(name="cmd")
-        ihsf = mocker.patch(path_iot_hub_service_factory)
-        client = mocker.Mock(name="hubclient")
-
-        if not rg_name:
-            hub_list = []
-            for i in range(0, hubcount):
-                hub_list.append(
-                    _build_hub(mocker.Mock(), "hub{}".format(i), str(uuid4()))
-                )
-            client.list_by_subscription.return_value = hub_list
-        else:
-            client.get.return_value = _build_hub(mocker.Mock(), targethub, rg_name)
-
-        if failure_reason == "resource":
-            client.get.side_effect = ValueError
-        elif failure_reason == "policy":
-            client.get_keys_for_key_name.side_effect = ValueError
-        else:
-            client.get_keys_for_key_name.return_value = _build_policy(
-                mocker.Mock(), policy_name
-            )
-
-        if include_events:
-            _build_event(hub_list[0])
-
-        client.config.subscription_id = mock_target["subscription"]
-        ihsf.return_value = client
-
-        if not failure_reason:
-            if not login:
-                result = get_iot_hub_connection_string(
-                    cmd, targethub, rg_name, policy_name, include_events=include_events
-                )
-
-                expecting_hub = "{}.{}".format(targethub, hub_suffix)
-                assert result["entity"] == expecting_hub
-                assert result["policy"] == policy_name
-                assert result["subscription"] == mock_target["subscription"]
-                assert result["cs"] == generic_cs_template.format(
-                    expecting_hub, policy_name, mock_target["primarykey"]
-                )
-
-                if rg_name:
-                    client.get.assert_called_with(rg_name, targethub)
-                    assert result["resourcegroup"] == rg_name
-                else:
-                    assert result["resourcegroup"]
-
-                client.get_keys_for_key_name.assert_called_with(
-                    mocker.ANY, targethub, policy_name
-                )
-
-                if include_events:
-                    assert result["events"]["endpoint"]
-                    assert result["events"]["partition_count"]
-                    assert result["events"]["path"]
-                    assert result["events"]["partition_ids"]
-            else:
-                hub = str(uuid4())
-                policy = str(uuid4())
-                key = str(uuid4())
-                cs = generate_cs(hub, policy, key)
-                lower_cs = generate_cs(hub, policy, key, lower_case=True)
-
-                result = get_iot_hub_connection_string(
-                    cmd, targethub, rg_name, policy_name, login=cs
-                )
-                result_lower = get_iot_hub_connection_string(
-                    cmd, targethub, rg_name, policy_name, login=lower_cs
-                )
-
-                assert result["entity"] == hub
-                assert result["policy"] == policy
-                assert result["primarykey"] == key
-                assert not result.get("resourcegroup")
-                assert not result.get("subscription")
-                assert result["cs"] == generic_cs_template.format(hub, policy, key)
-                assert result_lower["entity"] == hub
-                assert result_lower["policy"] == policy
-                assert result_lower["primarykey"] == key
-                assert not result_lower.get("resourcegroup")
-                assert not result_lower.get("subscription")
-                assert (
-                    result_lower["cs"]
-                    == generic_cs_template.format(hub, policy, key).lower()
-                )
-        else:
-            with pytest.raises(CLIError):
-                get_iot_hub_connection_string(client, targethub, rg_name, policy_name)
 
 
 class TestCloudToDeviceMessaging:

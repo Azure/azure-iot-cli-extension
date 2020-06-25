@@ -3,6 +3,13 @@
 Release History
 ===============
 
+0.9.5
++++++++++++++++
+* IoT Hub commands now support dynamic privileged policy discovery. `iothubhowner` is no longer relied on. Instead any policy that has `RegistryWrite`, `ServiceConnect` and `DeviceConnect` permissions will be used.
+* Monitoring commands (such as for `central` or `hub`) support module Id filter. Also it is more clear that an event comes from a module.
+* Improved validation of central telemetry.
+* Digital Twin endpoint create commands now support custom subscription options.
+
 0.9.4
 +++++++++++++++
 Azure Digital Twins Public Preview - CLI release

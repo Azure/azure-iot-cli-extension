@@ -126,7 +126,7 @@ class TestConfigMetricShow:
     )
     def test_config_metric_show(
         self,
-        fixture_cmd2,
+        fixture_cmd,
         service_client,
         metric_id,
         content_type,
@@ -141,7 +141,7 @@ class TestConfigMetricShow:
             else partial(subject.iot_hub_configuration_metric_show)
         )
         result = target_method(
-            cmd=fixture_cmd2,
+            cmd=fixture_cmd,
             config_id=config_id,
             metric_type=metric_type,
             metric_id=metric_id,
@@ -174,7 +174,7 @@ class TestConfigMetricShow:
         ],
     )
     def test_config_metric_show_invalid_args(
-        self, fixture_cmd2, service_client, metric_id, content_type, metric_type
+        self, fixture_cmd, service_client, metric_id, content_type, metric_type
     ):
         from functools import partial
         service_client.assert_all_requests_are_fired = False
@@ -187,7 +187,7 @@ class TestConfigMetricShow:
             )
 
             target_method(
-                cmd=fixture_cmd2,
+                cmd=fixture_cmd,
                 config_id=config_id,
                 metric_type=metric_type,
                 metric_id=metric_id,
@@ -206,9 +206,9 @@ class TestConfigShow:
         )
         return service_client
 
-    def test_config_show(self, serviceclient, fixture_cmd2):
+    def test_config_show(self, serviceclient, fixture_cmd):
         result = subject.iot_hub_configuration_show(
-            fixture_cmd2, config_id=config_id, hub_name=mock_target["entity"]
+            fixture_cmd, config_id=config_id, hub_name=mock_target["entity"]
         )
 
         args = serviceclient.call_args
@@ -219,10 +219,10 @@ class TestConfigShow:
         assert method == "GET"
         assert isinstance(result, dict)
 
-    def test_config_show_error(self, serviceclient_generic_error, fixture_cmd2):
+    def test_config_show_error(self, serviceclient_generic_error, fixture_cmd):
         with pytest.raises(CLIError):
             subject.iot_hub_configuration_show(
-                fixture_cmd2, config_id=config_id, hub_name=mock_target["entity"]
+                fixture_cmd, config_id=config_id, hub_name=mock_target["entity"]
             )
 
 
@@ -255,7 +255,7 @@ class TestConfigCreate:
     )
     def test_config_create_edge(
         self,
-        fixture_cmd2,
+        fixture_cmd,
         serviceclient,
         sample_config_edge,
         sample_config_metrics,
@@ -266,7 +266,7 @@ class TestConfigCreate:
         labels,
     ):
         subject.iot_edge_deployment_create(
-            cmd=fixture_cmd2,
+            cmd=fixture_cmd,
             config_id=config_id,
             hub_name=hub_name,
             content=sample_config_edge[1],
@@ -329,7 +329,7 @@ class TestConfigCreate:
     )
     def test_config_create_edge_malformed(
         self,
-        fixture_cmd2,
+        fixture_cmd,
         serviceclient,
         sample_config_edge_malformed,
         config_id,
@@ -340,7 +340,7 @@ class TestConfigCreate:
     ):
         with pytest.raises(CLIError) as exc:
             subject.iot_edge_deployment_create(
-                cmd=fixture_cmd2,
+                cmd=fixture_cmd,
                 config_id=config_id,
                 hub_name=hub_name,
                 content=sample_config_edge_malformed,
@@ -378,7 +378,7 @@ class TestConfigCreate:
     )
     def test_config_create_adm(
         self,
-        fixture_cmd2,
+        fixture_cmd,
         serviceclient,
         sample_config_adm,
         sample_config_metrics,
@@ -400,7 +400,7 @@ class TestConfigCreate:
             target_condition = "FROM devices.modules WHERE {}".format(target_condition)
 
         subject.iot_hub_configuration_create(
-            cmd=fixture_cmd2,
+            cmd=fixture_cmd,
             config_id=config_id,
             hub_name=hub_name,
             content=sample_config_adm[1],
@@ -470,7 +470,7 @@ class TestConfigCreate:
     )
     def test_config_create_adm_invalid(
         self,
-        fixture_cmd2,
+        fixture_cmd,
         serviceclient,
         config_id,
         hub_name,
@@ -480,7 +480,7 @@ class TestConfigCreate:
     ):
         with pytest.raises(CLIError) as exc1:
             subject.iot_hub_configuration_create(
-                cmd=fixture_cmd2,
+                cmd=fixture_cmd,
                 config_id=config_id,
                 hub_name=hub_name,
                 content=get_context_path(__file__, "test_edge_deployment.json"),
@@ -493,7 +493,7 @@ class TestConfigCreate:
         content = json.dumps({"deviceContent": {}, "moduleContent": {}})
         with pytest.raises(CLIError) as exc2:
             subject.iot_hub_configuration_create(
-                cmd=fixture_cmd2,
+                cmd=fixture_cmd,
                 config_id=config_id,
                 hub_name=hub_name,
                 content=content,
@@ -512,7 +512,7 @@ class TestConfigCreate:
         content = json.dumps({"moduleContent": {"key": "value"}})
         with pytest.raises(CLIError) as exc3:
             subject.iot_hub_configuration_create(
-                cmd=fixture_cmd2,
+                cmd=fixture_cmd,
                 config_id=config_id,
                 hub_name=hub_name,
                 content=content,
@@ -540,7 +540,7 @@ class TestConfigCreate:
     )
     def test_config_create_error(
         self,
-        fixture_cmd2,
+        fixture_cmd,
         serviceclient_generic_error,
         sample_config_edge,
         config_id,
@@ -551,7 +551,7 @@ class TestConfigCreate:
     ):
         with pytest.raises(CLIError):
             subject.iot_edge_deployment_create(
-                cmd=fixture_cmd2,
+                cmd=fixture_cmd,
                 config_id=config_id,
                 hub_name=hub_name,
                 content=sample_config_edge[1],
@@ -574,9 +574,9 @@ class TestConfigDelete:
         service_client.side_effect = side_effect
         return service_client
 
-    def test_config_delete(self, serviceclient, fixture_cmd2):
+    def test_config_delete(self, serviceclient, fixture_cmd):
         subject.iot_hub_configuration_delete(
-            fixture_cmd2, config_id=config_id, hub_name=mock_target["entity"]
+            fixture_cmd, config_id=config_id, hub_name=mock_target["entity"]
         )
         args = serviceclient.call_args
         url = args[0][0].url
@@ -590,19 +590,19 @@ class TestConfigDelete:
     @pytest.mark.parametrize("expected_error", [CLIError])
     def test_config_delete_invalid_args(
         self,
-        fixture_cmd2,
+        fixture_cmd,
         serviceclient_generic_invalid_or_missing_etag,
         expected_error,
     ):
         with pytest.raises(expected_error):
             subject.iot_hub_configuration_delete(
-                fixture_cmd2, config_id=config_id, hub_name=mock_target["entity"]
+                fixture_cmd, config_id=config_id, hub_name=mock_target["entity"]
             )
 
-    def test_config_delete_error(self, fixture_cmd2, serviceclient_generic_error):
+    def test_config_delete_error(self, fixture_cmd, serviceclient_generic_error):
         with pytest.raises(CLIError):
             subject.iot_hub_configuration_delete(
-                fixture_cmd2, config_id=config_id, hub_name=mock_target["entity"]
+                fixture_cmd, config_id=config_id, hub_name=mock_target["entity"]
             )
 
 
@@ -613,9 +613,9 @@ class TestConfigUpdate:
         service_client.return_value = build_mock_response(mocker, request.param, {})
         return service_client
 
-    def test_config_update(self, fixture_cmd2, serviceclient, sample_config_show):
+    def test_config_update(self, fixture_cmd, serviceclient, sample_config_show):
         subject.iot_hub_configuration_update(
-            cmd=fixture_cmd2,
+            cmd=fixture_cmd,
             config_id=config_id,
             hub_name=mock_target["entity"],
             parameters=sample_config_show,
@@ -639,7 +639,7 @@ class TestConfigUpdate:
         assert body.get("labels") == sample_config_show.get("labels")
 
     def test_config_update_invalid_args(
-        self, fixture_cmd2, serviceclient, sample_config_show
+        self, fixture_cmd, serviceclient, sample_config_show
     ):
         from copy import deepcopy
 
@@ -648,7 +648,7 @@ class TestConfigUpdate:
 
         with pytest.raises(CLIError):
             subject.iot_hub_configuration_update(
-                cmd=fixture_cmd2,
+                cmd=fixture_cmd,
                 config_id=config_id,
                 hub_name=mock_target["entity"],
                 parameters=request,
@@ -659,7 +659,7 @@ class TestConfigUpdate:
 
         with pytest.raises(CLIError) as exc_label:
             subject.iot_hub_configuration_update(
-                cmd=fixture_cmd2,
+                cmd=fixture_cmd,
                 config_id=config_id,
                 hub_name=mock_target["entity"],
                 parameters=request,
@@ -670,10 +670,10 @@ class TestConfigUpdate:
                                         "Input: not a dictionary. Review inline JSON examples here --> "
                                         "https://github.com/Azure/azure-iot-cli-extension/wiki/Tips".format(type_name))
 
-    def test_config_update_error(self, fixture_cmd2, serviceclient_generic_error):
+    def test_config_update_error(self, fixture_cmd, serviceclient_generic_error):
         with pytest.raises(CLIError):
             subject.iot_hub_configuration_update(
-                cmd=fixture_cmd2,
+                cmd=fixture_cmd,
                 config_id=config_id,
                 hub_name=mock_target["entity"],
                 parameters={},
@@ -715,9 +715,9 @@ class TestConfigList:
         yield mocked_response
 
     @pytest.mark.parametrize("top", [1, 100])
-    def test_config_list(self, fixture_cmd2, service_client, top):
+    def test_config_list(self, fixture_cmd, service_client, top):
         result = subject.iot_hub_configuration_list(
-            cmd=fixture_cmd2, hub_name=mock_target["entity"], top=top
+            cmd=fixture_cmd, hub_name=mock_target["entity"], top=top
         )
         assert json.dumps(result)
 
@@ -728,9 +728,9 @@ class TestConfigList:
         assert "top={}".format(top) in list_request.url
 
     @pytest.mark.parametrize("top", [1, 10])
-    def test_deployment_list(self, fixture_cmd2, service_client, top):
+    def test_deployment_list(self, fixture_cmd, service_client, top):
         result = subject.iot_edge_deployment_list(
-            cmd=fixture_cmd2, hub_name=mock_target["entity"], top=top
+            cmd=fixture_cmd, hub_name=mock_target["entity"], top=top
         )
         assert json.dumps(result)
 
@@ -740,17 +740,17 @@ class TestConfigList:
         assert "top={}".format(top) in list_request.url
 
     @pytest.mark.parametrize("top", [-1, 0, 101])
-    def test_config_list_invalid_args(self, fixture_cmd2, top):
+    def test_config_list_invalid_args(self, fixture_cmd, top):
         with pytest.raises(CLIError):
             subject.iot_hub_configuration_list(
-                cmd=fixture_cmd2, hub_name=mock_target["entity"], top=top
+                cmd=fixture_cmd, hub_name=mock_target["entity"], top=top
             )
 
-    def test_config_list_error(self, fixture_cmd2, service_client_generic_errors):
+    def test_config_list_error(self, fixture_cmd, service_client_generic_errors):
         service_client_generic_errors.assert_all_requests_are_fired = False
         with pytest.raises(CLIError):
             subject.iot_hub_configuration_list(
-                cmd=fixture_cmd2, hub_name=mock_target["entity"]
+                cmd=fixture_cmd, hub_name=mock_target["entity"]
             )
 
 
@@ -768,14 +768,14 @@ class TestConfigApply:
         "device_id, hub_name", [("test-device-01", mock_target["entity"])]
     )
     def test_config_apply_edge(
-        self, fixture_cmd2, serviceclient, device_id, hub_name, sample_config_edge
+        self, fixture_cmd, serviceclient, device_id, hub_name, sample_config_edge
     ):
         # Not yet supporting layered deployments
         if sample_config_edge[0] == "layered":
             return
 
         result = subject.iot_edge_set_modules(
-            cmd=fixture_cmd2,
+            cmd=fixture_cmd,
             device_id=device_id,
             hub_name=mock_target["entity"],
             content=sample_config_edge[1],
@@ -832,7 +832,7 @@ class TestConfigApply:
     )
     def test_config_apply_edge_malformed(
         self,
-        fixture_cmd2,
+        fixture_cmd,
         serviceclient,
         device_id,
         hub_name,
@@ -840,7 +840,7 @@ class TestConfigApply:
     ):
         with pytest.raises(CLIError) as exc:
             subject.iot_edge_set_modules(
-                cmd=fixture_cmd2,
+                cmd=fixture_cmd,
                 device_id=device_id,
                 hub_name=mock_target["entity"],
                 content=sample_config_edge_malformed,
@@ -858,7 +858,7 @@ class TestConfigApply:
     )
     def test_config_apply_edge_error(
         self,
-        fixture_cmd2,
+        fixture_cmd,
         serviceclient_generic_error,
         device_id,
         hub_name,
@@ -866,7 +866,7 @@ class TestConfigApply:
     ):
         with pytest.raises(CLIError):
             subject.iot_edge_set_modules(
-                cmd=fixture_cmd2,
+                cmd=fixture_cmd,
                 device_id=device_id,
                 hub_name=mock_target["entity"],
                 content=sample_config_edge_malformed,

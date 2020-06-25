@@ -113,6 +113,13 @@ def load_digitaltwins_arguments(self, _):
             help="Name of EventGrid Topic resource group.",
             arg_group="Event Grid Topic",
         )
+        context.argument(
+            "endpoint_subscription",
+            options_list=["--eventgrid-subscription", "--egs"],
+            help="Name or ID of subscription where the endpoint resource exists. "
+            "If no subscription is provided the default subscription is used.",
+            arg_group="Event Grid Topic",
+        )
 
     with self.argument_context("dt endpoint create eventhub") as context:
         context.argument(
@@ -137,6 +144,13 @@ def load_digitaltwins_arguments(self, _):
             "eventhub_resource_group",
             options_list=["--eventhub-resource-group", "--ehg"],
             help="Name of EventHub resource group.",
+            arg_group="Event Hub",
+        )
+        context.argument(
+            "endpoint_subscription",
+            options_list=["--eventhub-subscription", "--ehs"],
+            help="Name or ID of subscription where the endpoint resource exists. "
+            "If no subscription is provided the default subscription is used.",
             arg_group="Event Hub",
         )
 
@@ -165,6 +179,13 @@ def load_digitaltwins_arguments(self, _):
             help="Name of ServiceBus resource group.",
             arg_group="Service Bus Topic",
         )
+        context.argument(
+            "endpoint_subscription",
+            options_list=["--servicebus-subscription", "--sbs"],
+            help="Name or ID of subscription where the endpoint resource exists. "
+            "If no subscription is provided the default subscription is used.",
+            arg_group="Service Bus Topic",
+        )
 
     with self.argument_context("dt twin") as context:
         context.argument(
@@ -182,16 +203,6 @@ def load_digitaltwins_arguments(self, _):
             "relationship_id",
             options_list=["--relationship-id", "-r"],
             help="Relationship Id.",
-        )
-        context.argument(
-            "source_twin_id",
-            options_list=["--source-twin-id", "--source", "-s"],
-            help="The source twin Id for a relationship.",
-        )
-        context.argument(
-            "target_twin_id",
-            options_list=["--target-twin-id", "--target", "-t"],
-            help="The target twin Id for a relationship.",
         )
         context.argument(
             "relationship",
@@ -235,6 +246,18 @@ def load_digitaltwins_arguments(self, _):
             "component_path",
             options_list=["--component"],
             help="The path to the DTDL component. If set, telemetry will be emitted on behalf of the component.",
+        )
+
+    with self.argument_context("dt twin relationship") as context:
+        context.argument(
+            "twin_id",
+            options_list=["--twin-id", "-t", "--source"],
+            help="The source twin Id for a relationship.",
+        )
+        context.argument(
+            "target_twin_id",
+            options_list=["--target-twin-id", "--target"],
+            help="The target twin Id for a relationship.",
         )
 
     with self.argument_context("dt twin relationship create") as context:

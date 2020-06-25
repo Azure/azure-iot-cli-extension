@@ -20,7 +20,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
         self.mgmt_sdk = self.get_mgmt_sdk()
         self.rbac = RbacProvider()
 
-    def create(self, name, resource_group_name, location, tags=None, timeout=15):
+    def create(self, name, resource_group_name, location, tags=None, timeout=20):
         if tags:
             tags = validate_key_value_pairs(tags)
 
@@ -207,6 +207,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
 
+    # TODO: Breakout and refactor
     def add_endpoint(
         self,
         name,
@@ -216,6 +217,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
         endpoint_resource_group,
         endpoint_resource_policy=None,
         endpoint_resource_namespace=None,
+        endpoint_subscription=None,
         tags=None,
         resource_group_name=None,
         timeout=20,
@@ -255,7 +257,8 @@ class ResourceProvider(DigitalTwinsResourceManager):
             eg_topic_keys_op = cli.invoke(
                 "eventgrid topic key list -n {} -g {}".format(
                     endpoint_resource_name, endpoint_resource_group
-                )
+                ),
+                subscription=endpoint_subscription
             )
             if not eg_topic_keys_op.success():
                 raise CLIError("{} Event Grid topic keys.".format(error_prefix))
@@ -264,7 +267,8 @@ class ResourceProvider(DigitalTwinsResourceManager):
             eg_topic_endpoint_op = cli.invoke(
                 "eventgrid topic show -n {} -g {}".format(
                     endpoint_resource_name, endpoint_resource_group
-                )
+                ),
+                subscription=endpoint_subscription
             )
             if not eg_topic_endpoint_op.success():
                 raise CLIError("{} Event Grid topic endpoint.".format(error_prefix))
@@ -283,7 +287,8 @@ class ResourceProvider(DigitalTwinsResourceManager):
                     endpoint_resource_namespace,
                     endpoint_resource_group,
                     endpoint_resource_name,
-                )
+                ),
+                subscription=endpoint_subscription
             )
             if not sb_topic_keys_op.success():
                 raise CLIError("{} Service Bus topic keys.".format(error_prefix))
@@ -305,7 +310,8 @@ class ResourceProvider(DigitalTwinsResourceManager):
                     endpoint_resource_namespace,
                     endpoint_resource_group,
                     endpoint_resource_name,
-                )
+                ),
+                subscription=endpoint_subscription
             )
             if not eventhub_topic_keys_op.success():
                 raise CLIError("{} Event Hub keys.".format(error_prefix))
