@@ -82,6 +82,8 @@ def is_relevant(key, val):
     )
 
     last_updated = isodate.parse_datetime(val["$lastUpdated"])
+    last_updated_timestamp = last_updated.timestamp()
+    updated_within_timestamp = updated_within.timestamp()
     return last_updated.timestamp() >= updated_within.timestamp()
 
 
