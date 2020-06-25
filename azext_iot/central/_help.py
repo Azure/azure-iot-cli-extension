@@ -137,7 +137,7 @@ def _load_central_devices_help():
         """
 
     helps[
-        "iot central app device command-response"
+        "iot central app device execute-command"
     ] = """
             type: command
             short-summary: Execute a command on a device and view associated response. Does NOT monitor property updates that the command may perform.
@@ -148,7 +148,7 @@ def _load_central_devices_help():
             examples:
             - name: Execute command response
               text: >
-                az iot central app device command-response
+                az iot central app device execute-command
                 --app-id {appid}
                 --device-id {deviceid}
                 --interface-id {interfaceid}
@@ -157,7 +157,7 @@ def _load_central_devices_help():
 
             - name: Short execute command response
               text: >
-                az iot central app device command-response
+                az iot central app device execute-command
                 -n {appid}
                 -d {deviceid}
                 -i {interfaceid}
