@@ -7,14 +7,20 @@
 import os
 import time
 
+from .conftest import get_context_path
+
 from azure.cli.testsdk import LiveScenarioTest
 from azext_iot.central.models.enum import DeviceStatus
 from azext_iot.common import utility
 
 APP_ID = os.environ.get("azext_iot_central_app_id")
-DEVICE_TEMPLATE_PATH = os.environ.get("azext_iot_central_device_template_path")
 
-if not all([APP_ID, DEVICE_TEMPLATE_PATH]):
+device_template_path = get_context_path(
+    __file__, "central/json/device_template_int_test.json"
+)
+sync_command_params = get_context_path(__file__, "central/json/sync_command_args.json")
+
+if not all([APP_ID, device_template_path]):
     raise ValueError(
         "Set azext_iot_central_app_id, azext_iot_central_device_template_path"
         "to run central integration tests. "
@@ -190,6 +196,39 @@ class TestIotCentral(LiveScenarioTest):
         assert device_registration_info.get("status") is None
         assert dps_state.get("error") == "Device is not yet provisioned."
 
+    def test_central_command_response(self):
+        interface_id = "modelOne_g4"
+        command_name = "sync_cmd"
+        (template_id, _) = self._create_device_template()
+        (device_id, device_name) = self._create_device(
+            instance_of=template_id, simulated=True
+        )
+
+        self._wait_for_provisioned(device_id)
+
+        result = self.cmd(
+            "iot central app device command-response"
+            " --app-id {}"
+            " -d {}"
+            " --interface-id {}"
+            " --command-name {}"
+            " -k '{}'".format(
+                APP_ID, device_id, interface_id, command_name, sync_command_params
+            )
+        )
+
+        self._delete_device(device_id)
+        # self._delete_device_template(template_id)
+
+        json_result = result.get_output_in_json()
+        assert len(json_result) > 0
+
+        # from file indicated by `sync_command_params`
+        assert json_result[0]["request"] == {"argument": "value"}
+
+        # since the device is simulated we don't actually know waht the result will be
+        assert json_result[0]["response"]
+
     def test_central_device_registration_info_unassociated(self):
 
         (device_id, device_name) = self._create_device()
@@ -274,6 +313,21 @@ class TestIotCentral(LiveScenarioTest):
         self.cmd(command, checks=checks)
         return (device_id, device_name)
 
+    def _wait_for_provisioned(self, device_id):
+        command = "iot central app device show --app-id {} -d {}".format(
+            APP_ID, device_id
+        )
+        while True:
+            result = self.cmd(command)
+            device = result.get_output_in_json()
+
+            # return when its provisioned
+            if device.get("provisioned"):
+                return
+
+            # wait 10 seconds for provisioning to complete
+            time.sleep(10)
+
     def _delete_device(self, device_id) -> None:
         self.cmd(
             "iot central app device delete --app-id {} -d {}".format(APP_ID, device_id),
@@ -282,14 +336,14 @@ class TestIotCentral(LiveScenarioTest):
 
     def _create_device_template(self):
         template = utility.process_json_arg(
-            DEVICE_TEMPLATE_PATH, argument_name="DEVICE_TEMPLATE_PATH"
+            device_template_path, argument_name="device_template_path"
         )
         template_name = template["displayName"]
         template_id = template_name + "id"
 
         self.cmd(
-            "iot central app device-template create --app-id {} --device-template-id {} -k {}".format(
-                APP_ID, template_id, DEVICE_TEMPLATE_PATH
+            "iot central app device-template create --app-id {} --device-template-id {} -k '{}'".format(
+                APP_ID, template_id, device_template_path
             ),
             checks=[
                 self.check("displayName", template_name),

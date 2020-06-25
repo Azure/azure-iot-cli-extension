@@ -44,7 +44,7 @@ def load_central_commands(self, _):
         cmd_group.command("show", "get_device")
         cmd_group.command("create", "create_device")
         cmd_group.command("delete", "delete_device")
-        cmd_group.command("execute-command", "execute_command")
+        cmd_group.command("command-response", "command_response")
         cmd_group.command("registration-info", "registration_info")
         cmd_group.command(
             "registration-summary", "registration_summary",

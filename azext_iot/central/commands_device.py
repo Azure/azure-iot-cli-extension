@@ -65,7 +65,7 @@ def registration_info(
     )
 
 
-def execute_command(
+def command_response(
     cmd,
     app_id: str,
     device_id: str,
@@ -81,12 +81,13 @@ def execute_command(
     payload = utility.process_json_arg(content, argument_name="content")
 
     provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token)
-    return provider.execute_component_command(
+    command_history = provider.execute_component_command(
         device_id=device_id,
         interface_id=interface_id,
         command_name=command_name,
-        payload=payload,
+        payload={"request": payload},
     )
+    return command_history["value"]
 
 
 def registration_summary(
