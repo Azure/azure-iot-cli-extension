@@ -196,7 +196,7 @@ class TestIotCentral(LiveScenarioTest):
         assert device_registration_info.get("status") is None
         assert dps_state.get("error") == "Device is not yet provisioned."
 
-    def test_central_execute_command(self):
+    def test_central_run_command(self):
         interface_id = "modelOne_g4"
         command_name = "sync_cmd"
         (template_id, _) = self._create_device_template()
@@ -205,7 +205,7 @@ class TestIotCentral(LiveScenarioTest):
         self._wait_for_provisioned(device_id)
 
         result = self.cmd(
-            "iot central app device execute-command"
+            "iot central app device run-command"
             " -n {}"
             " -d {}"
             " -i {}"

@@ -65,7 +65,7 @@ def registration_info(
     )
 
 
-def execute_command(
+def run_command(
     cmd,
     app_id: str,
     device_id: str,
