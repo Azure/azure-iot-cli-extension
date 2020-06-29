@@ -320,10 +320,11 @@ def _load_central_monitors_help():
         "iot central app monitor-properties"
     ] = """
         type: command
-        short-summary: Monitor desired and reported  sent to/from the IoT Hub for an IoT Central app.
+        short-summary: Monitor desired and reported properties sent to/from the IoT Hub for an IoT Central app.
         long-summary: |
-                    EXPERIMENTAL requires Python 3.5+
-
+                    Polls device-twin from central and compares it to the last device-twin
+                    Parses out properties from device-twin, and detects if changes were made
+                    Prints subset of properties that were changed within the polling interval
         examples:
         - name: Basic usage
           text: >

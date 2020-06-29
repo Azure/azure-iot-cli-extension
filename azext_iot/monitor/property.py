@@ -89,8 +89,9 @@ def changed_props(prop, metadata, property_name):
     # not an interface - whole thing is change log
     if "$iotin" not in property_name:
         return prop
+
     # iterate over property in the interface
-    # if the property is not an exact match for what is present in the previous set of properties
+    # if the property has been updated within DEVICETWIN_MONITOR_TIME_SEC
     # track it as a change
     diff = {key: prop[key] for key, val in metadata.items() if is_relevant(key, val)}
     return diff
