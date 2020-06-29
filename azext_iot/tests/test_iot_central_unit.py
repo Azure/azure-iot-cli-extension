@@ -6,7 +6,9 @@
 
 import mock
 import pytest
-
+import json
+import ast
+from datetime import datetime
 from knack.util import CLIError
 from azure.cli.core.mock import DummyCli
 from azext_iot.central import commands_device_twin
@@ -16,7 +18,8 @@ from azext_iot.central.providers import (
     CentralDeviceProvider,
     CentralDeviceTemplateProvider,
 )
-
+from azext_iot.central.models.devicetwin import DeviceTwin
+from azext_iot.monitor.property import compare_properties
 from .helpers import load_json
 from .test_constants import FileNames
 
@@ -41,7 +44,7 @@ def fixture_bind_sdk(mocker):
         def get_twin(self, device_id):
             return device_twin_result
 
-    mock = mocker.patch("azext_iot.central.commands_device_twin._bind_sdk")
+    mock = mocker.patch("azext_iot.central.providers.devicetwin_provider._bind_sdk")
     mock.return_value = (mock_service_sdk(), None)
     return mock
 
@@ -154,6 +157,7 @@ class TestMonitorEvents:
 class TestCentralDeviceProvider:
     _device = load_json(FileNames.central_device_file)
     _device_template = load_json(FileNames.central_device_template_file)
+    _device_twin = load_json(FileNames.central_device_twin_file)
 
     @mock.patch("azext_iot.central.services.device_template")
     @mock.patch("azext_iot.central.services.device")
@@ -197,3 +201,53 @@ class TestCentralDeviceProvider:
         # call counts should be at most 1 since the provider has a cache
         assert mock_device_template_svc.get_device_template.call_count == 1
         assert template == self._device_template
+
+    @mock.patch("azext_iot.central.services.device_template")
+    @mock.patch("azext_iot.central.services.device")
+    def test_should_return_updated_properties(
+        self, mock_device_svc, mock_device_template_svc
+    ):
+        # setup
+        device_twin_data = json.dumps(self._device_twin)
+        raw_twin = ast.literal_eval(
+            device_twin_data.replace("current_time", datetime.now().isoformat())
+        )
+
+        twin = DeviceTwin(raw_twin)
+        twin_next = DeviceTwin(raw_twin)
+        twin_next.reported_property.version = twin.reported_property.version + 1
+        result = compare_properties(twin_next.reported_property, twin.reported_property)
+        assert len(result) == 3
+        assert len(result["$iotin:urn_azureiot_Client_SDKInformation"]) == 3
+        assert result["$iotin:urn_azureiot_Client_SDKInformation"]["language"]
+        assert result["$iotin:urn_azureiot_Client_SDKInformation"]["version"]
+        assert result["$iotin:urn_azureiot_Client_SDKInformation"]["vendor"]
+
+        assert len(result["$iotin:deviceinfo"]) == 8
+        assert result["$iotin:deviceinfo"]["manufacturer"]
+        assert result["$iotin:deviceinfo"]["model"]
+        assert result["$iotin:deviceinfo"]["osName"]
+        assert result["$iotin:deviceinfo"]["processorArchitecture"]
+        assert result["$iotin:deviceinfo"]["swVersion"]
+        assert result["$iotin:deviceinfo"]["processorManufacturer"]
+        assert result["$iotin:deviceinfo"]["totalStorage"]
+        assert result["$iotin:deviceinfo"]["totalMemory"]
+
+        assert len(result["$iotin:settings"]) == 1
+        assert result["$iotin:settings"]["fanSpeed"]
+
+    @mock.patch("azext_iot.central.services.device_template")
+    @mock.patch("azext_iot.central.services.device")
+    def test_should_return_no_properties(
+        self, mock_device_svc, mock_device_template_svc
+    ):
+        # test to check that no property updates are reported when version is not upadted
+        # setup
+        device_twin_data = json.dumps(self._device_twin)
+        raw_twin = ast.literal_eval(
+            device_twin_data.replace("current_time", datetime.now().isoformat())
+        )
+        twin = DeviceTwin(raw_twin)
+        twin_next = DeviceTwin(raw_twin)
+        result = compare_properties(twin_next.reported_property, twin.reported_property)
+        assert result is None

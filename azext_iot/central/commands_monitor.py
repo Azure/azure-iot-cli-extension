@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+
 from azure.cli.core.commands import AzCliCommand
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.providers.monitor_provider import MonitorProvider
@@ -14,6 +15,7 @@ from azext_iot.monitor.models.arguments import (
     CentralHandlerArguments,
     TelemetryArguments,
 )
+from azext_iot.monitor.property import start_property_monitor
 
 
 def validate_messages(
@@ -112,3 +114,14 @@ def monitor_events(
         central_handler_args=central_handler_args,
     )
     provider.start_monitor_events(telemetry_args)
+
+
+def monitor_properties(
+    cmd, device_id, app_id, central_dns_suffix=CENTRAL_ENDPOINT,
+):
+    start_property_monitor(
+        cmd=cmd,
+        device_id=device_id,
+        app_id=app_id,
+        central_dns_suffix=central_dns_suffix,
+    )
