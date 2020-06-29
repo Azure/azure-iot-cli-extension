@@ -15,7 +15,7 @@ from azext_iot.monitor.models.arguments import (
     CentralHandlerArguments,
     TelemetryArguments,
 )
-from azext_iot.monitor.property import start_property_monitor
+from azext_iot.monitor.property import PropertyMonitor
 
 
 def validate_messages(
@@ -119,9 +119,5 @@ def monitor_events(
 def monitor_properties(
     cmd, device_id, app_id, central_dns_suffix=CENTRAL_ENDPOINT,
 ):
-    start_property_monitor(
-        cmd=cmd,
-        device_id=device_id,
-        app_id=app_id,
-        central_dns_suffix=central_dns_suffix,
-    )
+    monitor = PropertyMonitor(cmd=cmd, app_id=app_id, device_id=device_id, central_dns_suffix=central_dns_suffix)
+    monitor.start_property_monitor()
