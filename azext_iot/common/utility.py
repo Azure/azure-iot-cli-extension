@@ -478,3 +478,7 @@ def scantree(path):
             yield from scantree(entry.path)
         else:
             yield entry
+
+
+def find_between(s, start, end):
+    return (s.split(start))[1].split(end)[0]

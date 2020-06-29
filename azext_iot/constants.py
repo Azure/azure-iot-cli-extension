@@ -44,6 +44,8 @@ TRACING_ALLOWED_FOR_LOCATION = ("northeurope", "westus2", "west us 2", "southeas
 TRACING_ALLOWED_FOR_SKU = "standard"
 USER_AGENT = "IoTPlatformCliExtension/{}".format(VERSION)
 DIGITALTWINS_RESOURCE_ID = "https://digitaltwins.azure.net"
+DEVICETWIN_POLLING_INTERVAL_SEC = 10
+DEVICETWIN_MONITOR_TIME_SEC = 15
 # (Lib name, minimum version (including), maximum version (excluding))
 EVENT_LIB = ("uamqp", "1.2", "1.3")
 
