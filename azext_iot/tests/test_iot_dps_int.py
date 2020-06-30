@@ -171,7 +171,7 @@ class IoTDpsTest(LiveScenarioTest):
         reprovisionPolicy_reprovisionandresetdata = 'reprovisionandresetdata'
         hub_host_name = '{}.azure-devices.net'.format(hub)
         webhook_url = 'https://www.test.test'
-        api_version = '2018-09-01-preview'
+        api_version = '2019-03-31'
 
         etag = self.cmd('iot dps enrollment create --enrollment-id {} --attestation-type {}'
                         ' -g {} --dps-name {} --pk {} --sk {}'
@@ -254,7 +254,7 @@ class IoTDpsTest(LiveScenarioTest):
         reprovisionPolicy_never = 'never'
         hub_host_name = '{}.azure-devices.net'.format(hub)
         webhook_url = 'https://www.test.test'
-        api_version = '2018-09-01-preview'
+        api_version = '2019-03-31'
         etag = self.cmd('iot dps enrollment-group create --enrollment-id {} -g {} --dps-name {}'
                         ' --cp {} --scp {} --provisioning-status {} --allocation-policy {}'
                         ' --iot-hubs {} --edge-enabled'

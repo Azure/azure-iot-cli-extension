@@ -659,10 +659,9 @@ def _validate_allocation_policy_for_enrollment(allocation_policy,
             if iot_hub_list and len(iot_hub_list) > 1:
                 raise CLIError('Only one hub is required in static allocation policy.')
         if allocation_policy == AllocationType.custom.value:
-            if webhook_url is None:
-                raise CLIError('Please provide an Azure function url when allocation-policy is defined as Custom.')
-            if api_version is None:
-                raise CLIError('Please provide an Azure function api-version when allocation-policy is defined as Custom.')
+            if webhook_url is None or api_version is None:
+                raise CLIError('Please provide both the Azure function webhook url and provisioning'
+                               ' service api-version when the allocation-policy is defined as Custom.')
     else:
         if iot_hub_list:
             raise CLIError('Please provide allocation policy.')

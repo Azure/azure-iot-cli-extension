@@ -770,7 +770,8 @@ def load_arguments(self, _):
         context.argument(
             "api_version",
             options_list=["--api-version", "--av"],
-            help="The API version of the provisioning service in the custom allocation request.",
+            help="The API version of the provisioning service types sent in the custom allocation"
+                 " request. Minimum supported version: 2018-09-01-preview."
         )
 
     with self.argument_context("iot dps enrollment") as context:
