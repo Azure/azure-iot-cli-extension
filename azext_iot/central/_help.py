@@ -316,6 +316,21 @@ def _load_central_monitors_help():
             az iot central app validate-messages --app-id {app_id} -d {device_id} --cg {consumer_group_name}
     """
 
+    helps[
+        "iot central app monitor-properties"
+    ] = """
+        type: command
+        short-summary: Monitor desired and reported properties sent to/from the IoT Hub for an IoT Central app.
+        long-summary: |
+                    Polls device-twin from central and compares it to the last device-twin
+                    Parses out properties from device-twin, and detects if changes were made
+                    Prints subset of properties that were changed within the polling interval
+        examples:
+        - name: Basic usage
+          text: >
+            az iot central app monitor-properties --app-id {app_id} -d {device_id}
+    """
+
 
 # TODO: Delete this by July 2020
 def _load_central_deprecated_commands():

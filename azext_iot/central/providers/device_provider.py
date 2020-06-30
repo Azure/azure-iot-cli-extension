@@ -13,6 +13,7 @@ from azext_iot.central.models.enum import DeviceStatus
 from azext_iot.central.models.device import Device
 from azext_iot.dps.services import global_service as dps_global_service
 
+
 logger = get_logger(__name__)
 
 
