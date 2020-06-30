@@ -167,14 +167,14 @@ def _load_central_devices_help():
         """
 
     helps[
-        "iot central app device show-command"
+        "iot central app device show-command-history"
     ] = """
             type: command
             short-summary: Get most recent command-response request and response payload.
             examples:
             - name: Show command response
               text: >
-                az iot central app device show-command
+                az iot central app device show-command-history
                 --app-id {appid}
                 --device-id {deviceid}
                 --interface-id {interfaceid}

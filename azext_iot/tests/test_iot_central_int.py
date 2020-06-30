@@ -216,7 +216,7 @@ class TestIotCentral(LiveScenarioTest):
         )
 
         show_command_result = self.cmd(
-            "iot central app device show-command"
+            "iot central app device show-command-history"
             " -n {}"
             " -d {}"
             " -i {}"
