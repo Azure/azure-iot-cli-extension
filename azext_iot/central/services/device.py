@@ -222,7 +222,7 @@ def get_device_credentials(
     return _utility.try_extract_result(response)
 
 
-def execute_component_command(
+def run_component_command(
     cmd,
     app_id: str,
     token: str,
@@ -255,6 +255,12 @@ def execute_component_command(
     headers = _utility.get_headers(token, cmd)
 
     response = requests.post(url, headers=headers, json=payload)
+
+    # execute command response has caveats in it due to Async/Sync device methods
+    # return the response if we get 201, otherwise try to apply generic logic
+    if response.status_code == 201:
+        return response.json()
+
     return _utility.try_extract_result(response)
 
 

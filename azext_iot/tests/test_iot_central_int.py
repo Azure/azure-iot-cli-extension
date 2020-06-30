@@ -204,7 +204,7 @@ class TestIotCentral(LiveScenarioTest):
 
         self._wait_for_provisioned(device_id)
 
-        result = self.cmd(
+        run_command_result = self.cmd(
             "iot central app device run-command"
             " -n {}"
             " -d {}"
@@ -215,17 +215,25 @@ class TestIotCentral(LiveScenarioTest):
             )
         )
 
+        show_command_result = self.cmd(
+            "iot central app device show-command"
+            " -n {}"
+            " -d {}"
+            " -i {}"
+            " --cn {}".format(APP_ID, device_id, interface_id, command_name)
+        )
+
         self._delete_device(device_id)
         self._delete_device_template(template_id)
 
-        json_result = result.get_output_in_json()
-        assert len(json_result) > 0
+        run_result = run_command_result.get_output_in_json()
+        show_result = show_command_result.get_output_in_json()
 
         # from file indicated by `sync_command_params`
-        assert json_result[0]["request"] == {"argument": "value"}
+        assert run_result["request"] == {"argument": "value"}
 
-        # since the device is simulated we don't actually know waht the result will be
-        assert json_result[0]["response"]
+        # check that run result and show result indeed match
+        assert run_result["response"] == show_result["value"][0]["response"]
 
     def test_central_device_registration_info_unassociated(self):
 

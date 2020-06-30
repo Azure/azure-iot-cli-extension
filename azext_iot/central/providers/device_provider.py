@@ -190,7 +190,7 @@ class CentralDeviceProvider:
             central_dns_suffix=central_dns_suffix,
         )
 
-    def execute_component_command(
+    def run_component_command(
         self,
         device_id: str,
         interface_id: str,
@@ -198,7 +198,7 @@ class CentralDeviceProvider:
         payload: dict,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
-        central_services.device.execute_component_command(
+        return central_services.device.run_component_command(
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
@@ -208,6 +208,14 @@ class CentralDeviceProvider:
             payload=payload,
             central_dns_suffix=central_dns_suffix,
         )
+
+    def get_component_command_history(
+        self,
+        device_id: str,
+        interface_id: str,
+        command_name: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
         return central_services.device.get_component_command_history(
             cmd=self._cmd,
             app_id=self._app_id,
