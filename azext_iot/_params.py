@@ -762,6 +762,17 @@ def load_arguments(self, _):
             options_list=["--iot-hubs", "--ih"],
             help="Host name of target IoT Hub. Use space-separated list for multiple IoT Hubs.",
         )
+        context.argument(
+            "webhook_url",
+            options_list=["--webhook-url", "--wh"],
+            help="The webhook URL used for custom allocation requests.",
+        )
+        context.argument(
+            "api_version",
+            options_list=["--api-version", "--av"],
+            help="The API version of the provisioning service types sent in the custom allocation"
+                 " request. Minimum supported version: 2018-09-01-preview."
+        )
 
     with self.argument_context("iot dps enrollment") as context:
         context.argument("enrollment_id", help="ID of device enrollment record")
