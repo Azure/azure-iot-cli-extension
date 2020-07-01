@@ -66,7 +66,7 @@ def generate_enrollment_create_req(attestation_type=None, endorsement_key=None,
                                    initial_twin_tags=None, initial_twin_properties=None,
                                    provisioning_status=None, reprovision_policy=None,
                                    primary_key=None, secondary_key=None, allocation_policy=None,
-                                   iot_hubs=None, edge_enabled=False):
+                                   iot_hubs=None, edge_enabled=False, webhook_url=None, api_version=None):
     return {'client': None,
             'enrollment_id': enrollment_id,
             'rg': resource_group,
@@ -85,7 +85,9 @@ def generate_enrollment_create_req(attestation_type=None, endorsement_key=None,
             'secondary_key': secondary_key,
             'allocation_policy': allocation_policy,
             'iot_hubs': iot_hubs,
-            'edge_enabled': edge_enabled}
+            'edge_enabled': edge_enabled,
+            'webhook_url': webhook_url,
+            'api_version': api_version}
 
 
 class TestEnrollmentCreate():
@@ -154,6 +156,13 @@ class TestEnrollmentCreate():
         (generate_enrollment_create_req(attestation_type='symmetricKey',
                                         primary_key='primarykey',
                                         secondary_key='secondarykey',
+                                        reprovision_policy='never',
+                                        allocation_policy='custom',
+                                        webhook_url="https://www.test.test",
+                                        api_version="2019-03-31")),
+        (generate_enrollment_create_req(attestation_type='symmetricKey',
+                                        primary_key='primarykey',
+                                        secondary_key='secondarykey',
                                         edge_enabled=True)),
     ])
     def test_enrollment_create(self, serviceclient, req):
@@ -174,7 +183,9 @@ class TestEnrollmentCreate():
                                                  req['reprovision_policy'],
                                                  req['allocation_policy'],
                                                  req['iot_hubs'],
-                                                 req['edge_enabled'])
+                                                 req['edge_enabled'],
+                                                 req['webhook_url'],
+                                                 req['api_version'])
         args = serviceclient.call_args
         url = args[0][0].url
         assert "{}/enrollments/{}?".format(mock_target['entity'], enrollment_id) in url
@@ -225,6 +236,9 @@ class TestEnrollmentCreate():
             assert not body['reprovisionPolicy']['updateHubAssignment']
         if req['allocation_policy']:
             assert body['allocationPolicy'] == req['allocation_policy']
+            if body['allocationPolicy'] == 'custom':
+                assert body['customAllocationDefinition']['webhookUrl'] == req['webhook_url']
+                assert body['customAllocationDefinition']['apiVersion'] == req['api_version']
         if req['iot_hubs']:
             assert body['iotHubs'] == req['iot_hubs'].split()
         if req['edge_enabled']:
@@ -238,6 +252,8 @@ class TestEnrollmentCreate():
         (generate_enrollment_create_req(reprovision_policy='invalid')),
         (generate_enrollment_create_req(allocation_policy='invalid')),
         (generate_enrollment_create_req(allocation_policy='static')),
+        (generate_enrollment_create_req(allocation_policy='custom')),
+        (generate_enrollment_create_req(allocation_policy='custom', webhook_url="https://www.test.test")),
         (generate_enrollment_create_req(allocation_policy='static', iot_hubs='hub1 hub2')),
         (generate_enrollment_create_req(allocation_policy='static', iot_hub_host_name='hubname')),
         (generate_enrollment_create_req(iot_hubs='hub1 hub2'))
@@ -259,7 +275,8 @@ class TestEnrollmentCreate():
                                                      None,
                                                      req['reprovision_policy'],
                                                      req['allocation_policy'],
-                                                     req['iot_hubs'])
+                                                     req['iot_hubs'],
+                                                     req['webhook_url'])
 
     @pytest.mark.parametrize("req", [
         (generate_enrollment_create_req(attestation_type='tpm', endorsement_key='mykey'))
@@ -308,7 +325,7 @@ def generate_enrollment_update_req(certificate_path=None, iot_hub_host_name=None
                                    device_id=None,
                                    etag=None, reprovision_policy=None,
                                    allocation_policy=None, iot_hubs=None,
-                                   edge_enabled=None):
+                                   edge_enabled=None, webhook_url=None, api_version=None):
     return {'client': None,
             'enrollment_id': enrollment_id,
             'rg': resource_group,
@@ -326,7 +343,9 @@ def generate_enrollment_update_req(certificate_path=None, iot_hub_host_name=None
             'reprovision_policy': reprovision_policy,
             'allocation_policy': allocation_policy,
             'iot_hubs': iot_hubs,
-            'edge_enabled': edge_enabled}
+            'edge_enabled': edge_enabled,
+            'webhook_url': webhook_url,
+            'api_version': api_version}
 
 
 class TestEnrollmentUpdate():
@@ -355,6 +374,9 @@ class TestEnrollmentUpdate():
         (generate_enrollment_update_req(allocation_policy='static', iot_hubs='hub1')),
         (generate_enrollment_update_req(allocation_policy='hashed', iot_hubs='hub1 hub2')),
         (generate_enrollment_update_req(allocation_policy='geolatency')),
+        (generate_enrollment_update_req(allocation_policy='custom',
+                                        webhook_url="https://www.test.test",
+                                        api_version="2019-03-31")),
         (generate_enrollment_update_req(edge_enabled=True)),
         (generate_enrollment_update_req(edge_enabled=False))
     ])
@@ -379,7 +401,9 @@ class TestEnrollmentUpdate():
                                                  req['reprovision_policy'],
                                                  req['allocation_policy'],
                                                  req['iot_hubs'],
-                                                 edge_enabled=req['edge_enabled'])
+                                                 req['edge_enabled'],
+                                                 req['webhook_url'],
+                                                 req['api_version'])
         # Index 1 is the update args
         args = serviceclient.call_args_list[1]
         url = args[0][0].url
@@ -419,6 +443,9 @@ class TestEnrollmentUpdate():
             assert not body['reprovisionPolicy']['updateHubAssignment']
         if req['allocation_policy']:
             assert body['allocationPolicy'] == req['allocation_policy']
+            if body['allocationPolicy'] == 'custom':
+                assert body['customAllocationDefinition']['webhookUrl'] == req['webhook_url']
+                assert body['customAllocationDefinition']['apiVersion'] == req['api_version']
         if req['iot_hubs']:
             assert body['iotHubs'] == req['iot_hubs'].split()
         if req['edge_enabled'] is not None:
@@ -512,7 +539,9 @@ def generate_enrollment_group_create_req(iot_hub_host_name=None,
                                          reprovision_policy=None,
                                          allocation_policy=None,
                                          iot_hubs=None,
-                                         edge_enabled=False):
+                                         edge_enabled=False,
+                                         webhook_url=None,
+                                         api_version=None):
     return {'client': None,
             'enrollment_id': enrollment_id,
             'rg': resource_group,
@@ -530,7 +559,9 @@ def generate_enrollment_group_create_req(iot_hub_host_name=None,
             'reprovision_policy': reprovision_policy,
             'allocation_policy': allocation_policy,
             'iot_hubs': iot_hubs,
-            'edge_enabled': edge_enabled}
+            'edge_enabled': edge_enabled,
+            'webhook_url': webhook_url,
+            'api_version': api_version}
 
 
 class TestEnrollmentGroupCreate():
@@ -567,6 +598,10 @@ class TestEnrollmentGroupCreate():
                                               iot_hubs='hub1 hub2')),
         (generate_enrollment_group_create_req(certificate_path='myCert',
                                               allocation_policy='geolatency')),
+        (generate_enrollment_group_create_req(certificate_path='myCert',
+                                              allocation_policy='custom',
+                                              webhook_url="https://www.test.test",
+                                              api_version="2019-03-31")),
         (generate_enrollment_group_create_req(primary_key='primarykey',
                                               secondary_key='secondarykey',
                                               edge_enabled=True)),
@@ -589,7 +624,9 @@ class TestEnrollmentGroupCreate():
                                                        req['reprovision_policy'],
                                                        req['allocation_policy'],
                                                        req['iot_hubs'],
-                                                       edge_enabled=req['edge_enabled'])
+                                                       req['edge_enabled'],
+                                                       req['webhook_url'],
+                                                       req['api_version'])
         args = serviceclient.call_args
         url = args[0][0].url
         assert "{}/enrollmentGroups/{}?".format(mock_target['entity'], enrollment_id) in url
@@ -639,6 +676,9 @@ class TestEnrollmentGroupCreate():
             assert not body['reprovisionPolicy']['updateHubAssignment']
         if req['allocation_policy']:
             assert body['allocationPolicy'] == req['allocation_policy']
+            if body['allocationPolicy'] == 'custom':
+                assert body['customAllocationDefinition']['webhookUrl'] == req['webhook_url']
+                assert body['customAllocationDefinition']['apiVersion'] == req['api_version']
         if req['iot_hubs']:
             assert body['iotHubs'] == req['iot_hubs'].split()
         if req['edge_enabled']:
@@ -654,6 +694,8 @@ class TestEnrollmentGroupCreate():
                                               secondary_certificate_path='myCert2')),
         (generate_enrollment_group_create_req(reprovision_policy='invalid')),
         (generate_enrollment_group_create_req(allocation_policy='invalid')),
+        (generate_enrollment_group_create_req(allocation_policy='custom')),
+        (generate_enrollment_group_create_req(allocation_policy='custom', webhook_url="https://www.test.test")),
         (generate_enrollment_group_create_req(allocation_policy='static', iot_hub_host_name='hub')),
         (generate_enrollment_group_create_req(allocation_policy='static', iot_hubs='hub1 hub2')),
         (generate_enrollment_group_create_req(iot_hubs='hub1 hub2'))
@@ -676,7 +718,8 @@ class TestEnrollmentGroupCreate():
                                                            req['provisioning_status'],
                                                            req['reprovision_policy'],
                                                            req['allocation_policy'],
-                                                           req['iot_hubs'])
+                                                           req['iot_hubs'],
+                                                           webhook_url=req['webhook_url'])
 
     @pytest.mark.parametrize("req", [
         (generate_enrollment_group_create_req(certificate_path='myCert'))
@@ -735,7 +778,9 @@ def generate_enrollment_group_update_req(iot_hub_host_name=None,
                                          reprovision_policy=None,
                                          allocation_policy=None,
                                          iot_hubs=None,
-                                         edge_enabled=None):
+                                         edge_enabled=None,
+                                         webhook_url=None,
+                                         api_version=None):
     return {'client': None,
             'enrollment_id': enrollment_id,
             'rg': resource_group,
@@ -756,7 +801,9 @@ def generate_enrollment_group_update_req(iot_hub_host_name=None,
             'reprovision_policy': reprovision_policy,
             'allocation_policy': allocation_policy,
             'iot_hubs': iot_hubs,
-            'edge_enabled': edge_enabled}
+            'edge_enabled': edge_enabled,
+            'webhook_url': webhook_url,
+            'api_version': api_version}
 
 
 class TestEnrollmentGroupUpdate():
@@ -784,6 +831,9 @@ class TestEnrollmentGroupUpdate():
         (generate_enrollment_group_update_req(reprovision_policy='reprovisionandresetdata')),
         (generate_enrollment_group_update_req(reprovision_policy='never')),
         (generate_enrollment_group_update_req(allocation_policy='static', iot_hubs='hub1')),
+        (generate_enrollment_group_update_req(allocation_policy='custom',
+                                              webhook_url="https://www.test.test",
+                                              api_version="2019-03-31")),
         (generate_enrollment_group_update_req(allocation_policy='hashed', iot_hubs='hub1 hub2')),
         (generate_enrollment_group_update_req(allocation_policy='geolatency')),
         (generate_enrollment_group_update_req(iot_hub_host_name='hub1')),
@@ -811,7 +861,9 @@ class TestEnrollmentGroupUpdate():
                                                        req['reprovision_policy'],
                                                        req['allocation_policy'],
                                                        req['iot_hubs'],
-                                                       edge_enabled=req['edge_enabled'])
+                                                       req['edge_enabled'],
+                                                       req['webhook_url'],
+                                                       req['api_version'])
         # Index 1 is the update args
         args = serviceclient.call_args_list[1]
         url = args[0][0].url
@@ -854,6 +906,9 @@ class TestEnrollmentGroupUpdate():
             assert not body['reprovisionPolicy']['updateHubAssignment']
         if req['allocation_policy']:
             assert body['allocationPolicy'] == req['allocation_policy']
+            if body['allocationPolicy'] == 'custom':
+                assert body['customAllocationDefinition']['webhookUrl'] == req['webhook_url']
+                assert body['customAllocationDefinition']['apiVersion'] == req['api_version']
         if req['iot_hubs']:
             assert body['iotHubs'] == req['iot_hubs'].split()
         if req['edge_enabled'] is not None:
@@ -872,6 +927,8 @@ class TestEnrollmentGroupUpdate():
         (generate_enrollment_group_update_req(remove_certificate='true')),
         (generate_enrollment_group_update_req(reprovision_policy='invalid')),
         (generate_enrollment_group_update_req(allocation_policy='invalid')),
+        (generate_enrollment_group_update_req(allocation_policy='custom')),
+        (generate_enrollment_group_update_req(allocation_policy='custom', webhook_url="https://www.test.test")),
         (generate_enrollment_group_update_req(allocation_policy='static', iot_hub_host_name='hub')),
         (generate_enrollment_group_update_req(allocation_policy='static', iot_hubs='hub1 hub2')),
         (generate_enrollment_group_update_req(iot_hubs='hub1 hub2'))
@@ -897,7 +954,9 @@ class TestEnrollmentGroupUpdate():
                                                            req['provisioning_status'],
                                                            req['reprovision_policy'],
                                                            req['allocation_policy'],
-                                                           req['iot_hubs'])
+                                                           req['iot_hubs'],
+                                                           None,
+                                                           req['webhook_url'])
 
 
 class TestEnrollmentGroupShow():

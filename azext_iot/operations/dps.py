@@ -16,6 +16,7 @@ from azext_iot.common.certops import open_certificate
 from azext_iot.operations.generic import _execute_query
 from azext_iot._factory import _bind_sdk
 from azext_iot.sdk.dps.models.individual_enrollment import IndividualEnrollment
+from azext_iot.sdk.dps.models.custom_allocation_definition import CustomAllocationDefinition
 from azext_iot.sdk.dps.models.attestation_mechanism import AttestationMechanism
 from azext_iot.sdk.dps.models.tpm_attestation import TpmAttestation
 from azext_iot.sdk.dps.models.symmetric_key_attestation import SymmetricKeyAttestation
@@ -75,7 +76,9 @@ def iot_dps_device_enrollment_create(client,
                                      reprovision_policy=None,
                                      allocation_policy=None,
                                      iot_hubs=None,
-                                     edge_enabled=False):
+                                     edge_enabled=False,
+                                     webhook_url=None,
+                                     api_version=None):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
@@ -93,11 +96,17 @@ def iot_dps_device_enrollment_create(client,
         reprovision = _get_reprovision_policy(reprovision_policy)
         initial_twin = _get_initial_twin(initial_twin_tags, initial_twin_properties)
         iot_hub_list = iot_hubs.split() if iot_hubs else iot_hubs
-        _validate_allocation_policy_for_enrollment(allocation_policy, iot_hub_host_name, iot_hub_list)
+        _validate_allocation_policy_for_enrollment(allocation_policy,
+                                                   iot_hub_host_name,
+                                                   iot_hub_list,
+                                                   webhook_url,
+                                                   api_version)
         if iot_hub_host_name and allocation_policy is None:
             allocation_policy = AllocationType.static.value
             iot_hub_list = iot_hub_host_name.split()
 
+        custom_allocation_definition = CustomAllocationDefinition(
+            webhook_url, api_version) if allocation_policy == AllocationType.custom.value else None
         capabilities = DeviceCapabilities(iot_edge=edge_enabled)
         enrollment = IndividualEnrollment(enrollment_id,
                                           attestation,
@@ -109,7 +118,8 @@ def iot_dps_device_enrollment_create(client,
                                           provisioning_status,
                                           reprovision,
                                           allocation_policy,
-                                          iot_hub_list)
+                                          iot_hub_list,
+                                          custom_allocation_definition)
         return m_sdk.device_enrollment.create_or_update(enrollment_id, enrollment)
     except errors.ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
@@ -135,7 +145,9 @@ def iot_dps_device_enrollment_update(client,
                                      reprovision_policy=None,
                                      allocation_policy=None,
                                      iot_hubs=None,
-                                     edge_enabled=None):
+                                     edge_enabled=None,
+                                     webhook_url=None,
+                                     api_version=None):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
@@ -186,12 +198,17 @@ def iot_dps_device_enrollment_update(client,
                                                                   initial_twin_tags,
                                                                   initial_twin_properties)
         iot_hub_list = iot_hubs.split() if iot_hubs else iot_hubs
-        _validate_allocation_policy_for_enrollment(allocation_policy, iot_hub_host_name, iot_hub_list)
+        _validate_allocation_policy_for_enrollment(allocation_policy,
+                                                   iot_hub_host_name,
+                                                   iot_hub_list,
+                                                   webhook_url,
+                                                   api_version)
         if allocation_policy:
             enrollment_record.allocation_policy = allocation_policy
             enrollment_record.iot_hubs = iot_hub_list
             enrollment_record.iot_hub_host_name = None
-
+            if allocation_policy == AllocationType.custom.value:
+                enrollment_record.custom_allocation_definition = CustomAllocationDefinition(webhook_url, api_version)
         if edge_enabled is not None:
             enrollment_record.capabilities = DeviceCapabilities(iot_edge=edge_enabled)
 
@@ -250,7 +267,9 @@ def iot_dps_device_enrollment_group_create(client,
                                            reprovision_policy=None,
                                            allocation_policy=None,
                                            iot_hubs=None,
-                                           edge_enabled=False):
+                                           edge_enabled=False,
+                                           webhook_url=None,
+                                           api_version=None):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
@@ -271,10 +290,17 @@ def iot_dps_device_enrollment_group_create(client,
         reprovision = _get_reprovision_policy(reprovision_policy)
         initial_twin = _get_initial_twin(initial_twin_tags, initial_twin_properties)
         iot_hub_list = iot_hubs.split() if iot_hubs else iot_hubs
-        _validate_allocation_policy_for_enrollment(allocation_policy, iot_hub_host_name, iot_hub_list)
+        _validate_allocation_policy_for_enrollment(allocation_policy,
+                                                   iot_hub_host_name,
+                                                   iot_hub_list,
+                                                   webhook_url,
+                                                   api_version)
         if iot_hub_host_name and allocation_policy is None:
             allocation_policy = AllocationType.static.value
             iot_hub_list = iot_hub_host_name.split()
+
+        custom_allocation_definition = CustomAllocationDefinition(
+            webhook_url, api_version) if allocation_policy == AllocationType.custom.value else None
 
         capabilities = DeviceCapabilities(iot_edge=edge_enabled)
         group_enrollment = EnrollmentGroup(enrollment_id,
@@ -286,7 +312,8 @@ def iot_dps_device_enrollment_group_create(client,
                                            provisioning_status,
                                            reprovision,
                                            allocation_policy,
-                                           iot_hub_list)
+                                           iot_hub_list,
+                                           custom_allocation_definition)
         return m_sdk.device_enrollment_group.create_or_update(enrollment_id, group_enrollment)
     except errors.ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
@@ -312,7 +339,9 @@ def iot_dps_device_enrollment_group_update(client,
                                            reprovision_policy=None,
                                            allocation_policy=None,
                                            iot_hubs=None,
-                                           edge_enabled=None):
+                                           edge_enabled=None,
+                                           webhook_url=None,
+                                           api_version=None):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         m_sdk, errors = _bind_sdk(target, SdkType.dps_sdk)
@@ -371,11 +400,17 @@ def iot_dps_device_enrollment_group_update(client,
                                                                   initial_twin_tags,
                                                                   initial_twin_properties)
         iot_hub_list = iot_hubs.split() if iot_hubs else iot_hubs
-        _validate_allocation_policy_for_enrollment(allocation_policy, iot_hub_host_name, iot_hub_list)
+        _validate_allocation_policy_for_enrollment(allocation_policy,
+                                                   iot_hub_host_name,
+                                                   iot_hub_list,
+                                                   webhook_url,
+                                                   api_version)
         if allocation_policy:
             enrollment_record.allocation_policy = allocation_policy
             enrollment_record.iot_hubs = iot_hub_list
             enrollment_record.iot_hub_host_name = None
+            if allocation_policy == AllocationType.custom.value:
+                enrollment_record.custom_allocation_definition = CustomAllocationDefinition(webhook_url, api_version)
         if edge_enabled is not None:
             enrollment_record.capabilities = DeviceCapabilities(iot_edge=edge_enabled)
         return m_sdk.device_enrollment_group.create_or_update(enrollment_id, enrollment_record, etag)
@@ -610,7 +645,9 @@ def _validate_arguments_for_attestation_mechanism(attestation_type,
 
 def _validate_allocation_policy_for_enrollment(allocation_policy,
                                                iot_hub_host_name,
-                                               iot_hub_list):
+                                               iot_hub_list,
+                                               webhook_url,
+                                               api_version):
     if allocation_policy:
         if iot_hub_host_name is not None:
             raise CLIError('\'iot_hub_host_name\' is not required when allocation-policy is defined.')
@@ -621,6 +658,10 @@ def _validate_allocation_policy_for_enrollment(allocation_policy,
                 raise CLIError('Please provide a hub to be assigned with device.')
             if iot_hub_list and len(iot_hub_list) > 1:
                 raise CLIError('Only one hub is required in static allocation policy.')
+        if allocation_policy == AllocationType.custom.value:
+            if webhook_url is None or api_version is None:
+                raise CLIError('Please provide both the Azure function webhook url and provisioning'
+                               ' service api-version when the allocation-policy is defined as Custom.')
     else:
         if iot_hub_list:
             raise CLIError('Please provide allocation policy.')
