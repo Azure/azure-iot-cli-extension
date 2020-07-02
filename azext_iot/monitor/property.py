@@ -7,36 +7,49 @@
 import datetime
 import isodate
 import time
-
-
+from azext_iot.monitor.parsers import strings
+from azext_iot.monitor.models.enum import Severity
 from azext_iot.constants import (
     CENTRAL_ENDPOINT,
     DEVICETWIN_POLLING_INTERVAL_SEC,
     DEVICETWIN_MONITOR_TIME_SEC,
     PNP_INTERFACE_PREFIX,
 )
+
 from azext_iot.central.models.devicetwin import DeviceTwin, Property
 from azext_iot.central.providers import (
     CentralDeviceProvider,
     CentralDeviceTemplateProvider,
     CentralDeviceTwinProvider,
 )
+from azext_iot.monitor.parsers.issue import IssueHandler
 
 
 class PropertyMonitor:
-    def __init__(self, cmd, app_id, device_id, central_dns_suffix=CENTRAL_ENDPOINT):
+    def __init__(
+        self,
+        cmd,
+        app_id,
+        device_id,
+        minimum_severity,
+        validate_property,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
         self._cmd = cmd
         self._app_id = app_id
         self._device_id = device_id
         self._central_dns_suffix = central_dns_suffix
         self._template = self._get_device_template()
+        self._issues_handler = IssueHandler()
+        self._minimum_severity = Severity[minimum_severity]
+        self._validate_property = validate_property
 
-    def _compare_properties(self, prev_prop: Property, prop: Property):
+    def compare_properties(self, prev_prop: Property, prop: Property):
         if prev_prop.version == prop.version:
             return
 
         changes = {
-            key: self._changed_props(prop.props[key], prop.metadata[key], key)
+            key: self._changed_props(prop.props[key], prop.metadata[key], key,)
             for key, val in prop.metadata.items()
             if self._is_relevant(key, val)
         }
@@ -68,6 +81,66 @@ class PropertyMonitor:
         }
         return diff
 
+    def validate_payload(self, changes):
+        for value in changes:
+            self._validate_payload_against_interfaces(changes[value], value)
+
+        issues = self._issues_handler.get_issues_with_minimum_severity(
+            self._minimum_severity
+        )
+
+        for issue in issues:
+            issue.log()
+
+    def _validate_payload_against_interfaces(self, payload: dict, name):
+        name_miss = []
+        interface_name = name.replace(PNP_INTERFACE_PREFIX, "")
+        if self._is_interface(interface_name):
+            # if the payload is an interface then iterate thru the properties under the interface
+            for property_name in payload.keys():
+                schema = self._template.get_schema(
+                    name=property_name, interface_name=interface_name
+                )
+                if not schema:
+                    name_miss.append(property_name)
+        else:
+            # if the payload is a property then process the payload as a single unit.
+            schema = self._template.get_schema(name=name, interface_name="")
+
+            if not schema:
+                name_miss.append(name)
+
+            if self._validate_duplicate_properties(name):
+                details = strings.duplicate_property_name(
+                    name, list(self._template.interfaces.keys())
+                )
+                self._add_central_issue(severity=Severity.warning, details=details)
+
+        if name_miss:
+            details = strings.invalid_field_name_mismatch_template(
+                name_miss, self._template.schema_names
+            )
+            self._add_central_issue(severity=Severity.warning, details=details)
+
+    def _validate_duplicate_properties(self, property_name):
+        value = (
+            sum(
+                property_name in idnumber
+                for idnumber in self._template.interfaces.values()
+            )
+            > 1
+        )
+        return value
+
+    def _add_central_issue(self, severity: Severity, details: str):
+        self._issues_handler.add_central_issue(
+            severity=severity,
+            details=details,
+            message=None,
+            device_id=self._device_id,
+            template_id=self._template.id,
+        )
+
     def _is_interface(self, interface_name):
         # Remove PNP interface prefix to get the actual interface name
         interface_name = interface_name.replace(PNP_INTERFACE_PREFIX, "")
@@ -84,7 +157,7 @@ class PropertyMonitor:
         )
         return template
 
-    def start_property_monitor(self):
+    def start_property_monitor(self,):
         prev_twin = None
 
         device_twin_provider = CentralDeviceTwinProvider(
@@ -99,10 +172,10 @@ class PropertyMonitor:
 
             twin = DeviceTwin(raw_twin)
             if prev_twin:
-                change_d = self._compare_properties(
-                    prev_twin.desired_property, twin.desired_property
+                change_d = self.compare_properties(
+                    prev_twin.desired_property, twin.desired_property,
                 )
-                change_r = self._compare_properties(
+                change_r = self.compare_properties(
                     prev_twin.reported_property, twin.reported_property
                 )
 
@@ -115,6 +188,8 @@ class PropertyMonitor:
                     print("Changes in reported properties:")
                     print("version :", twin.reported_property.version)
                     print(change_r)
+                    if self._validate_property:
+                        self.validate_payload(change_r)
 
             time.sleep(DEVICETWIN_POLLING_INTERVAL_SEC)
 

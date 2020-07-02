@@ -73,6 +73,14 @@ def invalid_field_name_mismatch_template(
     ).format(unmodeled_capabilities, modeled_capabilities)
 
 
+# warning
+def duplicate_property_name(duplicate_prop_name, interfaces: list):
+    return (
+        "Property: {} => is declared under interfaces {}"
+        "Include interface name as part of updated property or specify unique name for the property"
+    ).format(duplicate_prop_name, interfaces)
+
+
 # error
 def invalid_primitive_schema_mismatch_template(field_name: str, data_type: str, data):
     return (
