@@ -136,6 +136,51 @@ def _load_central_devices_help():
                 az iot central app device registration-summary --app-id {appid}
         """
 
+    helps[
+        "iot central app device run-command"
+    ] = """
+            type: command
+            short-summary: Run a command on a device and view associated response. Does NOT monitor property updates that the command may perform.
+            long-summary: |
+                Note: payload should be nested under "request".
+                i.e. if your device expects the payload in a shape {"key": "value"}
+                payload should be {"request": {"key": "value"}}.
+                --content can be pointed at a filepath too (.../path/to/payload.json)
+            examples:
+            - name: Run command response
+              text: >
+                az iot central app device run-command
+                --app-id {appid}
+                --device-id {deviceid}
+                --interface-id {interfaceid}
+                --command-name {commandname}
+                --content {payload}
+
+            - name: Short Run command response
+              text: >
+                az iot central app device run-command
+                -n {appid}
+                -d {deviceid}
+                -i {interfaceid}
+                --cn {commandname}
+                -k {payload}
+        """
+
+    helps[
+        "iot central app device show-command-history"
+    ] = """
+            type: command
+            short-summary: Get most recent command-response request and response payload.
+            examples:
+            - name: Show command response
+              text: >
+                az iot central app device show-command-history
+                --app-id {appid}
+                --device-id {deviceid}
+                --interface-id {interfaceid}
+                --command-name {commandname}
+        """
+
 
 def _load_central_device_templates_help():
     helps[

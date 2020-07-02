@@ -228,6 +228,34 @@
                             "displayName": "Vector",
                             "name": "Vector",
                             "schema": "vector"
+                        },
+                        {
+                            "@id": "urn:sampleApp:modelOne_g4:sync_cmd:1",
+                            "@type": [
+                                "Command"
+                            ],
+                            "commandType": "synchronous",
+                            "displayName": "sync_cmd",
+                            "durable": false,
+                            "name": "sync_cmd",
+                            "request": {
+                                "@id": "urn:sampleApp:modelOne_g4:sync_cmd:argument:1",
+                                "@type": [
+                                    "SchemaField"
+                                ],
+                                "displayName": "argument",
+                                "name": "argument",
+                                "schema": "string"
+                            },
+                            "response": {
+                                "@id": "urn:sampleApp:modelOne_g4:sync_cmd:status:1",
+                                "@type": [
+                                    "SchemaField"
+                                ],
+                                "displayName": "status",
+                                "name": "status",
+                                "schema": "double"
+                            }
                         }
                     ]
                 }
