@@ -471,9 +471,7 @@ def ensure_min_version(cur_ver, min_ver):
 
 
 def scantree(path):
-    from os import scandir
-
-    for entry in scandir(path):
+    for entry in os.scandir(path):
         if entry.is_dir(follow_symlinks=False):
             yield from scantree(entry.path)
         else:

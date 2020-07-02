@@ -7,6 +7,7 @@
 import json
 import mock
 import pytest
+import os
 
 from knack.util import CLIError
 from azure.cli.core.extension import get_extension_path
@@ -281,7 +282,7 @@ class TestProcessJsonArg(object):
         assert mocked_util_logger.call_count == 0
 
 
-class TestVersionComparison:
+class TestVersionComparison(object):
     @pytest.mark.parametrize(
         "current, minimum, expected",
         [
@@ -297,7 +298,7 @@ class TestVersionComparison:
         assert ensure_min_version(current, minimum) == expected
 
 
-class TestEmbeddedCli:
+class TestEmbeddedCli(object):
     @pytest.fixture(params=[0, 1])
     def mocked_azclient(self, mocker, request):
         def mock_invoke(args, out_file):
@@ -313,7 +314,10 @@ class TestEmbeddedCli:
         "command, subscription",
         [
             ("iot hub device-identity create -n abcd -d dcba", None),
-            ("iot hub device-twin show -n 'abcd' -d 'dcba'", "20a300e5-a444-4130-bb5a-1abd08ad930a"),
+            (
+                "iot hub device-twin show -n 'abcd' -d 'dcba'",
+                "20a300e5-a444-4130-bb5a-1abd08ad930a",
+            ),
         ],
     )
     def test_embedded_cli(self, mocked_azclient, command, subscription):
@@ -341,3 +345,28 @@ class TestEmbeddedCli:
 
         assert cli.output
         assert cli.as_json()
+
+
+class TestCliInit(object):
+    def test_package_init(self):
+        from azext_iot.constants import EXTENSION_ROOT
+
+        tests_root = "tests"
+        directory_structure = {}
+
+        def _validate_directory(path):
+            for entry in os.scandir(path):
+                if entry.is_dir(follow_symlinks=False) and all(
+                    [not entry.name.startswith("__"), tests_root not in entry.path]
+                ):
+                    directory_structure[entry.path] = None
+                    _validate_directory(entry.path)
+                else:
+                    if entry.path.endswith("__init__.py"):
+                        directory_structure[os.path.dirname(entry.path)] = entry.path
+
+        _validate_directory(EXTENSION_ROOT)
+
+        for directory in directory_structure:
+            if directory_structure[directory] is None:
+                pytest.fail("Directory: '{}' missing __init__.py".format(directory))
