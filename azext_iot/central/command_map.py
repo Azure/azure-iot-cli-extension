@@ -37,6 +37,7 @@ def load_central_commands(self, _):
         cmd_group.command("monitor-events", "monitor_events")
         cmd_group.command("validate-messages", "validate_messages", is_preview=True)
         cmd_group.command("monitor-properties", "monitor_properties", is_preview=True)
+        cmd_group.command("validate-properties", "validate_properties", is_preview=True)
 
     with self.command_group(
         "iot central app device", command_type=central_device_ops, is_preview=True,

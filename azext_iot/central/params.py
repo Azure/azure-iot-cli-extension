@@ -104,15 +104,6 @@ def load_central_arguments(self, _):
             help="Maximum number of messages to recieve from target device before terminating connection."
             "Use 0 for infinity.",
         )
-
-    with self.argument_context("iot central app monitor-properties") as context:
-        context.argument(
-            "validate_property",
-            options_list=["--validate"],
-            arg_type=get_three_state_flag(),
-            help="Add this flag to run validation on desired property updates",
-        )
-
     # TODO: Delete this by end of July 2020
     load_deprecated_iotcentral_params(self, _)
 

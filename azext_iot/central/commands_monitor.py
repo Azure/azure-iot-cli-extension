@@ -117,19 +117,28 @@ def monitor_events(
 
 
 def monitor_properties(
-    cmd,
-    device_id,
-    app_id,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    minimum_severity=Severity.warning.name,
-    validate_property=False,
+    cmd, device_id, app_id, central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     monitor = PropertyMonitor(
         cmd=cmd,
         app_id=app_id,
         device_id=device_id,
         central_dns_suffix=central_dns_suffix,
-        minimum_severity=minimum_severity,
-        validate_property=validate_property,
     )
     monitor.start_property_monitor()
+
+
+def validate_properties(
+    cmd,
+    device_id,
+    app_id,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    minimum_severity=Severity.warning.name,
+):
+    monitor = PropertyMonitor(
+        cmd=cmd,
+        app_id=app_id,
+        device_id=device_id,
+        central_dns_suffix=central_dns_suffix,
+    )
+    monitor.start_validate_property_monitor(Severity[minimum_severity])

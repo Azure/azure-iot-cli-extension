@@ -27,13 +27,7 @@ from azext_iot.monitor.parsers.issue import IssueHandler
 
 class PropertyMonitor:
     def __init__(
-        self,
-        cmd,
-        app_id,
-        device_id,
-        minimum_severity,
-        validate_property,
-        central_dns_suffix=CENTRAL_ENDPOINT,
+        self, cmd, app_id, device_id, central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         self._cmd = cmd
         self._app_id = app_id
@@ -41,8 +35,6 @@ class PropertyMonitor:
         self._central_dns_suffix = central_dns_suffix
         self._template = self._get_device_template()
         self._issues_handler = IssueHandler()
-        self._minimum_severity = Severity[minimum_severity]
-        self._validate_property = validate_property
 
     def compare_properties(self, prev_prop: Property, prop: Property):
         if prev_prop.version == prop.version:
@@ -81,13 +73,11 @@ class PropertyMonitor:
         }
         return diff
 
-    def validate_payload(self, changes):
+    def _validate_payload(self, changes, minimum_severity):
         for value in changes:
             self._validate_payload_against_interfaces(changes[value], value)
 
-        issues = self._issues_handler.get_issues_with_minimum_severity(
-            self._minimum_severity
-        )
+        issues = self._issues_handler.get_issues_with_minimum_severity(minimum_severity)
 
         for issue in issues:
             issue.log()
@@ -188,8 +178,30 @@ class PropertyMonitor:
                     print("Changes in reported properties:")
                     print("version :", twin.reported_property.version)
                     print(change_r)
-                    if self._validate_property:
-                        self.validate_payload(change_r)
+            time.sleep(DEVICETWIN_POLLING_INTERVAL_SEC)
+
+            prev_twin = twin
+
+    def start_validate_property_monitor(self, minimum_severity):
+        prev_twin = None
+
+        device_twin_provider = CentralDeviceTwinProvider(
+            cmd=self._cmd, app_id=self._app_id, device_id=self._device_id
+        )
+
+        while True:
+
+            raw_twin = device_twin_provider.get_device_twin(
+                central_dns_suffix=self._central_dns_suffix
+            )
+
+            twin = DeviceTwin(raw_twin)
+            if prev_twin:
+                change_r = self.compare_properties(
+                    prev_twin.reported_property, twin.reported_property
+                )
+                if change_r:
+                    self._validate_payload(change_r, minimum_severity)
 
             time.sleep(DEVICETWIN_POLLING_INTERVAL_SEC)
 
