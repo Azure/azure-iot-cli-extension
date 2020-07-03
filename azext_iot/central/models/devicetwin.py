@@ -13,12 +13,12 @@ class DeviceTwin:
         self.device_id = device_twin.get("deviceId")
         self.desired_property = Property(
             "desired property",
-            device_twin.get("properties").get("desired"),
+            device_twin.get("properties", {}).get("desired"),
             self.device_id,
         )
         self.reported_property = Property(
             "reported property",
-            device_twin.get("properties").get("reported"),
+            device_twin.get("properties", {}).get("reported"),
             self.device_id,
         )
 

@@ -32,7 +32,7 @@ def load_central_arguments(self, _):
     Load CLI Args for Knack parser
     """
     with self.argument_context("iot central app") as context:
-        context.argument("app_id", options_list=["--app-id"], help="Target App.")
+        context.argument("app_id", options_list=["--app-id", "-n"], help="Target App.")
         context.argument("minimum_severity", arg_type=severity_type)
         context.argument(
             "instance_of",
@@ -43,6 +43,16 @@ def load_central_arguments(self, _):
             "device_name",
             options_list=["--device-name"],
             help="Human readable device name. Example: Fridge",
+        )
+        context.argument(
+            "interface_id",
+            options_list=["--interface-id", "-i"],
+            help="Interface name as specified in the device template. Example: c2dTestingTemplate_356",
+        )
+        context.argument(
+            "command_name",
+            options_list=["--command-name", "--cn"],
+            help="Command name as specified in device template. Example: run_firmware_update",
         )
         context.argument(
             "simulated",
@@ -111,7 +121,7 @@ def load_central_arguments(self, _):
 # TODO: Delete this by end of July 2020
 def load_deprecated_iotcentral_params(self, _):
     with self.argument_context("iotcentral") as context:
-        context.argument("app_id", options_list=["--app-id"], help="Target App.")
+        context.argument("app_id", options_list=["--app-id", "-n"], help="Target App.")
         context.argument("properties", arg_type=event_msg_prop_type)
         context.argument("timeout", arg_type=event_timeout_type)
         context.argument(
@@ -166,7 +176,7 @@ def load_deprecated_iotcentral_params(self, _):
         )
 
     with self.argument_context("iot central device-twin") as context:
-        context.argument("app_id", options_list=["--app-id"], help="Target App.")
+        context.argument("app_id", options_list=["--app-id", "-n"], help="Target App.")
         context.argument(
             "central_dns_suffix",
             options_list=["--central-dns-suffix", "--central-api-uri"],

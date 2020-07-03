@@ -218,23 +218,23 @@ class TestCentralDeviceProvider:
         twin_next.reported_property.version = twin.reported_property.version + 1
         result = compare_properties(twin_next.reported_property, twin.reported_property)
         assert len(result) == 3
-        assert len(result.get("$iotin:urn_azureiot_Client_SDKInformation")) == 3
-        assert result.get("$iotin:urn_azureiot_Client_SDKInformation").get("language")
-        assert result.get("$iotin:urn_azureiot_Client_SDKInformation").get("version")
-        assert result.get("$iotin:urn_azureiot_Client_SDKInformation").get("vendor")
+        assert len(result["$iotin:urn_azureiot_Client_SDKInformation"]) == 3
+        assert result["$iotin:urn_azureiot_Client_SDKInformation"]["language"]
+        assert result["$iotin:urn_azureiot_Client_SDKInformation"]["version"]
+        assert result["$iotin:urn_azureiot_Client_SDKInformation"]["vendor"]
 
-        assert len(result.get("$iotin:deviceinfo")) == 8
-        assert result.get("$iotin:deviceinfo").get("manufacturer")
-        assert result.get("$iotin:deviceinfo").get("model")
-        assert result.get("$iotin:deviceinfo").get("osName")
-        assert result.get("$iotin:deviceinfo").get("processorArchitecture")
-        assert result.get("$iotin:deviceinfo").get("swVersion")
-        assert result.get("$iotin:deviceinfo").get("processorManufacturer")
-        assert result.get("$iotin:deviceinfo").get("totalStorage")
-        assert result.get("$iotin:deviceinfo").get("totalMemory")
+        assert len(result["$iotin:deviceinfo"]) == 8
+        assert result["$iotin:deviceinfo"]["manufacturer"]
+        assert result["$iotin:deviceinfo"]["model"]
+        assert result["$iotin:deviceinfo"]["osName"]
+        assert result["$iotin:deviceinfo"]["processorArchitecture"]
+        assert result["$iotin:deviceinfo"]["swVersion"]
+        assert result["$iotin:deviceinfo"]["processorManufacturer"]
+        assert result["$iotin:deviceinfo"]["totalStorage"]
+        assert result["$iotin:deviceinfo"]["totalMemory"]
 
-        assert len(result.get("$iotin:settings")) == 1
-        assert result.get("$iotin:settings").get("fanSpeed")
+        assert len(result["$iotin:settings"]) == 1
+        assert result["$iotin:settings"]["fanSpeed"]
 
     @mock.patch("azext_iot.central.services.device_template")
     @mock.patch("azext_iot.central.services.device")

@@ -36,7 +36,7 @@ class PropertyMonitor:
         self._template = self._get_device_template()
         self._issues_handler = IssueHandler()
 
-    def compare_properties(self, prev_prop: Property, prop: Property):
+    def _compare_properties(self, prev_prop: Property, prop: Property):
         if prev_prop.version == prop.version:
             return
 
@@ -162,10 +162,10 @@ class PropertyMonitor:
 
             twin = DeviceTwin(raw_twin)
             if prev_twin:
-                change_d = self.compare_properties(
+                change_d = self._compare_properties(
                     prev_twin.desired_property, twin.desired_property,
                 )
-                change_r = self.compare_properties(
+                change_r = self._compare_properties(
                     prev_twin.reported_property, twin.reported_property
                 )
 
@@ -197,7 +197,7 @@ class PropertyMonitor:
 
             twin = DeviceTwin(raw_twin)
             if prev_twin:
-                change_r = self.compare_properties(
+                change_r = self._compare_properties(
                     prev_twin.reported_property, twin.reported_property
                 )
                 if change_r:

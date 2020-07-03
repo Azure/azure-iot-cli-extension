@@ -131,6 +131,7 @@ class AllocationType(Enum):
     hashed = "hashed"
     geolatency = "geolatency"
     static = "static"
+    custom = "custom"
 
 
 class DistributedTracingSamplingModeType(Enum):
