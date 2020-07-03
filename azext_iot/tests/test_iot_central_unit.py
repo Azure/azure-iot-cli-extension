@@ -19,7 +19,7 @@ from azext_iot.central.providers import (
     CentralDeviceTemplateProvider,
 )
 from azext_iot.central.models.devicetwin import DeviceTwin
-from azext_iot.monitor.property import compare_properties
+from azext_iot.monitor.property import PropertyMonitor
 from .helpers import load_json
 from .test_constants import FileNames
 
@@ -157,7 +157,6 @@ class TestMonitorEvents:
 class TestCentralDeviceProvider:
     _device = load_json(FileNames.central_device_file)
     _device_template = load_json(FileNames.central_device_template_file)
-    _device_twin = load_json(FileNames.central_device_twin_file)
 
     @mock.patch("azext_iot.central.services.device_template")
     @mock.patch("azext_iot.central.services.device")
@@ -202,6 +201,10 @@ class TestCentralDeviceProvider:
         assert mock_device_template_svc.get_device_template.call_count == 1
         assert template == self._device_template
 
+
+class TestCentralPropertyMonitor:
+    _device_twin = load_json(FileNames.central_device_twin_file)
+
     @mock.patch("azext_iot.central.services.device_template")
     @mock.patch("azext_iot.central.services.device")
     def test_should_return_updated_properties(
@@ -216,7 +219,12 @@ class TestCentralDeviceProvider:
         twin = DeviceTwin(raw_twin)
         twin_next = DeviceTwin(raw_twin)
         twin_next.reported_property.version = twin.reported_property.version + 1
-        result = compare_properties(twin_next.reported_property, twin.reported_property)
+        monitor = PropertyMonitor(
+            cmd=None, app_id=app_id, device_id=device_id, central_dns_suffix=None,
+        )
+        result = monitor._compare_properties(
+            twin_next.reported_property, twin.reported_property
+        )
         assert len(result) == 3
         assert len(result["$iotin:urn_azureiot_Client_SDKInformation"]) == 3
         assert result["$iotin:urn_azureiot_Client_SDKInformation"]["language"]
@@ -249,5 +257,10 @@ class TestCentralDeviceProvider:
         )
         twin = DeviceTwin(raw_twin)
         twin_next = DeviceTwin(raw_twin)
-        result = compare_properties(twin_next.reported_property, twin.reported_property)
+        monitor = PropertyMonitor(
+            cmd=None, app_id=app_id, device_id=device_id, central_dns_suffix=None,
+        )
+        result = monitor._compare_properties(
+            twin_next.reported_property, twin.reported_property
+        )
         assert result is None
