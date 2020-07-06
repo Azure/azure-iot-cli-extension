@@ -106,7 +106,7 @@ class SdkResolver(object):
 def _bind_sdk(target, sdk_type, device_id=None, auth=None):
     from azext_iot.sdk.service.iot_hub_gateway_service_apis import IotHubGatewayServiceAPIs
     from azext_iot.sdk.dps import ProvisioningServiceClient
-    from azext_iot.sdk.pnp.digital_twin_repository_service import DigitalTwinRepositoryService
+    from azext_iot.sdk.pnp.dataplane.digital_twin_repository_service import DigitalTwinRepositoryService
 
     sas_uri = target['entity']
     endpoint = "https://{}".format(sas_uri)

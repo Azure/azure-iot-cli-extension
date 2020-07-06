@@ -9,5 +9,10 @@
 # regenerated.
 # --------------------------------------------------------------------------
 
-VERSION = "v1"
+from .digital_twin_model_repository_api import DigitalTwinModelRepositoryApi
+from .version import VERSION
+
+__all__ = ['DigitalTwinModelRepositoryApi']
+
+__version__ = VERSION
 

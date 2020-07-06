@@ -34,7 +34,7 @@ METHOD_INVOKE_MIN_TIMEOUT_SEC = 10
 MIN_SIM_MSG_INTERVAL = 1
 MIN_SIM_MSG_COUNT = 1
 SIM_RECEIVE_SLEEP_SEC = 3
-PNP_API_VERSION = "2019-07-01-preview"
+PNP_API_VERSION = "2020-05-01-preview"
 CENTRAL_ENDPOINT = "azureiotcentral.com"
 PNP_ENDPOINT = "https://provider.azureiotrepository.com"
 PNP_REPO_ENDPOINT = "https://repo.azureiotrepository.com"
@@ -44,6 +44,7 @@ TRACING_ALLOWED_FOR_LOCATION = ("northeurope", "westus2", "west us 2", "southeas
 TRACING_ALLOWED_FOR_SKU = "standard"
 USER_AGENT = "IoTPlatformCliExtension/{}".format(VERSION)
 DIGITALTWINS_RESOURCE_ID = "https://digitaltwins.azure.net"
+PNP_TENANT_RESOURCE_ID = "822c8694-ad95-4735-9c55-256f7db2f9b4"
 DEVICETWIN_POLLING_INTERVAL_SEC = 10
 DEVICETWIN_MONITOR_TIME_SEC = 15
 # (Lib name, minimum version (including), maximum version (excluding))

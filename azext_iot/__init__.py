@@ -28,8 +28,6 @@ iotdigitaltwin_ops = CliCommandType(
     operations_tmpl="azext_iot.operations.digitaltwin#{}"
 )
 
-iotpnp_ops = CliCommandType(operations_tmpl="azext_iot.operations.pnp#{}")
-
 
 class IoTExtCommandsLoader(AzCommandsLoader):
     def __init__(self, cli_ctx=None):
@@ -40,11 +38,13 @@ class IoTExtCommandsLoader(AzCommandsLoader):
         from azext_iot.iothub.command_bindings import load_iothub_commands
         from azext_iot.central.command_map import load_central_commands
         from azext_iot.digitaltwins.command_map import load_digitaltwins_commands
+        from azext_iot.pnp.command_map import load_pnp_commands
 
         load_command_table(self, args)
         load_iothub_commands(self, args)
         load_central_commands(self, args)
         load_digitaltwins_commands(self, args)
+        load_pnp_commands(self, args)
 
         return self.command_table
 
@@ -52,10 +52,12 @@ class IoTExtCommandsLoader(AzCommandsLoader):
         from azext_iot._params import load_arguments
         from azext_iot.central.params import load_central_arguments
         from azext_iot.digitaltwins.params import load_digitaltwins_arguments
+        from azext_iot.pnp.params import load_pnp_arguments
 
         load_arguments(self, command)
         load_central_arguments(self, command)
         load_digitaltwins_arguments(self, command)
+        load_pnp_arguments(self, command)
 
 
 COMMAND_LOADER_CLS = IoTExtCommandsLoader

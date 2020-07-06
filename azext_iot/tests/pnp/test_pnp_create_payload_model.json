@@ -1,0 +1,13 @@
+{
+    "@id": "dtmi:iotcli:cli_model_test;",
+    "@type": "Interface",
+    "displayName": "My Sample Root Interface",
+    "contents": [
+      {
+        "@type": "Component",
+        "schema": "dtmi:Contoso1:EnvironmentalSensor;1",
+        "name": "sensor"
+      }
+    ],
+    "@context": "dtmi:dtdl:context;2"
+}

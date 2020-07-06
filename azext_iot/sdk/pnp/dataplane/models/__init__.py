@@ -10,16 +10,16 @@
 # --------------------------------------------------------------------------
 
 try:
-    from .search_options_py3 import SearchOptions
     from .model_information_py3 import ModelInformation
-    from .search_response_py3 import SearchResponse
+    from .service_error_py3 import ServiceError
+    from .model_search_options_py3 import ModelSearchOptions
 except (SyntaxError, ImportError):
-    from .search_options import SearchOptions
     from .model_information import ModelInformation
-    from .search_response import SearchResponse
+    from .service_error import ServiceError
+    from .model_search_options import ModelSearchOptions
 
 __all__ = [
-    'SearchOptions',
     'ModelInformation',
-    'SearchResponse',
+    'ServiceError',
+    'ModelSearchOptions',
 ]

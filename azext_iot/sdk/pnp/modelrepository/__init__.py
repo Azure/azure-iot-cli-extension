@@ -9,10 +9,10 @@
 # regenerated.
 # --------------------------------------------------------------------------
 
-from .digital_twin_repository_service import DigitalTwinRepositoryService
+from .model_repository_control_plane_api import ModelRepositoryControlPlaneApi
 from .version import VERSION
 
-__all__ = ['DigitalTwinRepositoryService']
+__all__ = ['ModelRepositoryControlPlaneApi']
 
 __version__ = VERSION
 

@@ -12,22 +12,21 @@
 from msrest.serialization import Model
 
 
-class SearchResponse(Model):
-    """SearchResponse.
+class ServiceError(Model):
+    """Error Class.
 
-    :param continuation_token:
-    :type continuation_token: str
-    :param results:
-    :type results:
-     list[~digitaltwinmodelrepositoryservice.models.ModelInformation]
+    :param code: Gets or sets the code.
+    :type code: str
+    :param message: Gets or sets the message.
+    :type message: str
     """
 
     _attribute_map = {
-        'continuation_token': {'key': 'continuationToken', 'type': 'str'},
-        'results': {'key': 'results', 'type': '[ModelInformation]'},
+        'code': {'key': 'code', 'type': 'str'},
+        'message': {'key': 'message', 'type': 'str'},
     }
 
     def __init__(self, **kwargs):
-        super(SearchResponse, self).__init__(**kwargs)
-        self.continuation_token = kwargs.get('continuation_token', None)
-        self.results = kwargs.get('results', None)
+        super(ServiceError, self).__init__(**kwargs)
+        self.code = kwargs.get('code', None)
+        self.message = kwargs.get('message', None)
