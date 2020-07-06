@@ -34,7 +34,6 @@ class PropertyMonitor:
         self._device_id = device_id
         self._central_dns_suffix = central_dns_suffix
         self._template = self._get_device_template()
-        self._issues_handler = IssueHandler()
 
     def _compare_properties(self, prev_prop: Property, prop: Property):
         if prev_prop.version == prop.version:
@@ -75,15 +74,16 @@ class PropertyMonitor:
 
     def _validate_payload(self, changes, minimum_severity):
         for value in changes:
-            self._validate_payload_against_interfaces(changes[value], value)
+            issues = self._validate_payload_against_interfaces(
+                changes[value], value, minimum_severity
+            )
+            [issue.log() for issue in issues]
 
-        issues = self._issues_handler.get_issues_with_minimum_severity(minimum_severity)
-
-        for issue in issues:
-            issue.log()
-
-    def _validate_payload_against_interfaces(self, payload: dict, name):
+    def _validate_payload_against_interfaces(
+        self, payload: dict, name, minimum_severity
+    ):
         name_miss = []
+        issues_handler = IssueHandler()
         interface_name = name.replace(PNP_INTERFACE_PREFIX, "")
         if self._is_interface(interface_name):
             # if the payload is an interface then iterate thru the properties under the interface
@@ -104,13 +104,27 @@ class PropertyMonitor:
                 details = strings.duplicate_property_name(
                     name, list(self._template.interfaces.keys())
                 )
-                self._add_central_issue(severity=Severity.warning, details=details)
+                issues_handler.add_central_issue(
+                    severity=Severity.warning,
+                    details=details,
+                    message=None,
+                    device_id=self._device_id,
+                    template_id=self._template.id,
+                )
 
         if name_miss:
             details = strings.invalid_field_name_mismatch_template(
                 name_miss, self._template.schema_names
             )
-            self._add_central_issue(severity=Severity.warning, details=details)
+            issues_handler.add_central_issue(
+                severity=Severity.warning,
+                details=details,
+                message=None,
+                device_id=self._device_id,
+                template_id=self._template.id,
+            )
+
+        return issues_handler.get_issues_with_minimum_severity(minimum_severity)
 
     def _validate_duplicate_properties(self, property_name):
         value = (
@@ -121,15 +135,6 @@ class PropertyMonitor:
             > 1
         )
         return value
-
-    def _add_central_issue(self, severity: Severity, details: str):
-        self._issues_handler.add_central_issue(
-            severity=severity,
-            details=details,
-            message=None,
-            device_id=self._device_id,
-            template_id=self._template.id,
-        )
 
     def _is_interface(self, interface_name):
         # Remove PNP interface prefix to get the actual interface name
