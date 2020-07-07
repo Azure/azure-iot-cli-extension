@@ -14,6 +14,7 @@ from .conftest import get_context_path
 from azure.iot.device import Message
 from azext_iot.common import utility
 from azext_iot.central.models.enum import DeviceStatus
+from azext_iot.monitor.parsers import strings
 
 from . import CaptureOutputLiveScenarioTest, helpers
 
@@ -150,7 +151,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         assert "No errors detected" in output
 
     def test_central_validate_messages_issues_detected(self):
-        messages_count = 5
+        expected_messages = []
         (template_id, _) = self._create_device_template()
         (device_id, _) = self._create_device(instance_of=template_id)
         credentials = self._get_credentials(device_id)
@@ -159,15 +160,17 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
         enqueued_time = utility.calculate_millisec_since_unix_epoch_utc() - 10000
 
-        # Bad utf encoding
+        # Invalid encoding
         payload = {"Bool": True}
         msg = Message(data=json.dumps(payload), content_type="application/json")
         device_client.send_message(msg)
+        expected_messages.append(strings.invalid_encoding(""))
 
-        # Missing application/json
+        # Content type mismatch (e.g. non application/json)
         payload = {"Bool": True}
         msg = Message(data=json.dumps(payload), content_encoding="utf-8")
         device_client.send_message(msg)
+        expected_messages.append(strings.content_type_mismatch("", "application/json"))
 
         # Invalid type
         payload = {"Bool": 123}
@@ -177,6 +180,9 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             content_type="application/json",
         )
         device_client.send_message(msg)
+        expected_messages.append(
+            strings.invalid_primitive_schema_mismatch_template("Bool", "boolean", 123)
+        )
 
         # Telemetry not defined
         payload = {"NotPresentInTemplate": True}
@@ -186,6 +192,10 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             content_type="application/json",
         )
         device_client.send_message(msg)
+        # this error is harder to build from strings because we have to construct a whole template for it
+        expected_messages.append(
+            "Following capabilities have NOT been defined in the device template '['NotPresentInTemplate']'"
+        )
 
         # Invalid JSON
         payload = '{"asd":"def}'
@@ -193,10 +203,11 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             data=payload, content_encoding="utf-8", content_type="application/json",
         )
         device_client.send_message(msg)
+        expected_messages.append(strings.invalid_json())
 
         # Validate the messages
         output = self._get_validate_messages_output(
-            device_id, enqueued_time, max_messages=messages_count
+            device_id, enqueued_time, max_messages=len(expected_messages)
         )
 
         self._delete_device(device_id)
