@@ -108,6 +108,20 @@ def _load_central_devices_help():
     """
 
     helps[
+        "iot central app device get-credentials"
+    ] = """
+        type: command
+        short-summary: Get device credentials from IoT Central
+
+        examples:
+        - name: Get device credentials for a device
+          text: >
+            az iot central app device get-credentials
+            --app-id {appid}
+            --device-id {deviceid}
+    """
+
+    helps[
         "iot central app device registration-info"
     ] = """
         type: command

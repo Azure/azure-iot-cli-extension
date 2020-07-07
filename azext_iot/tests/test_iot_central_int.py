@@ -6,14 +6,10 @@
 
 
 import json
-import mock
 import os
-import sys
 import time
 
 from .conftest import get_context_path
-
-from azure.cli.testsdk import LiveScenarioTest
 
 from azure.iot.device import Message
 from azext_iot.common import utility
@@ -124,7 +120,6 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         device_client.send_message(msg)
 
         # Validate the messages
-        mock_logger = helpers.MockLogger()
         output = self._get_validate_messages_output(device_id, enqueued_time)
 
         self._delete_device(device_id)
@@ -192,7 +187,8 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         expected_issues = [
             "No encoding found. Expected encoding 'utf-8' to be present in message header.",
             "Content type '' is not supported. Expected Content type is 'application/json'.",
-            "Datatype of field 'Bool' does not match the datatype 'boolean'. Data '123'. All dates/times/datetimes/durations must be ISO 8601 compliant.",
+            "Datatype of field 'Bool' does not match the datatype 'boolean'.",
+            "Data '123'. All dates/times/datetimes/durations must be ISO 8601 compliant.",
             "Following capabilities have NOT been defined in the device template '['NotPresentInTemplate']'",
             "Invalid JSON format",
         ]

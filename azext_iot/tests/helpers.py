@@ -8,7 +8,7 @@ import json
 import os
 
 from inspect import getsourcefile
-from azure.iot.device import ProvisioningDeviceClient, IoTHubDeviceClient, Message
+from azure.iot.device import ProvisioningDeviceClient, IoTHubDeviceClient
 
 from azext_iot.common.utility import read_file_content
 
