@@ -92,14 +92,35 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         self._delete_device_template(template_id)
 
     def test_central_monitor_events(self):
+        (template_id, _) = self._create_device_template()
+        (device_id, _) = self._create_device(instance_of=template_id)
+        credentials = self._get_credentials(device_id)
+
+        device_client = helpers.dps_connect_device(device_id, credentials)
+
+        payload = {"Bool": True}
+        msg = Message(
+            data=json.dumps(payload),
+            content_encoding="utf-8",
+            content_type="application/json",
+        )
+        device_client.send_message(msg)
+
+        enqueued_time = utility.calculate_millisec_since_unix_epoch_utc() - 10000
+
         # Test with invalid app-id
         self.cmd(
             "iotcentral app monitor-events --app-id {}".format(APP_ID + "zzz"),
             expect_failure=True,
         )
+
         # Ensure no failure
-        # We cannot verify that the result is correct, as the Azure CLI for IoT Central does not support adding devices
-        self.cmd("iotcentral app monitor-events --app-id {} --to 1".format(APP_ID))
+        output = self._get_monitor_events_output(device_id, enqueued_time)
+
+        self._delete_device(device_id)
+        self._delete_device_template(template_id)
+        assert '"Bool": true' in output
+        assert device_id in output
 
     def test_central_validate_messages_success(self):
         (template_id, _) = self._create_device_template()
@@ -116,7 +137,6 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             content_encoding="utf-8",
             content_type="application/json",
         )
-
         device_client.send_message(msg)
 
         # Validate the messages
@@ -468,6 +488,22 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         output = self.command_execute_assert(
             "iot central app validate-messages --app-id {} -d {} --et {} --duration {} --mm {} -y --style json".format(
                 APP_ID, device_id, enqueued_time, duration, max_messages
+            ),
+            asserts,
+        )
+
+        if not output:
+            output = ""
+
+        return output
+
+    def _get_monitor_events_output(self, device_id, enqueued_time, asserts=None):
+        if not asserts:
+            asserts = []
+
+        output = self.command_execute_assert(
+            "iot central app monitor-events -n {} -d {} --et {} --to 1".format(
+                APP_ID, device_id, enqueued_time
             ),
             asserts,
         )
