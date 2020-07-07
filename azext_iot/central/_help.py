@@ -380,9 +380,8 @@ def _load_central_monitors_help():
         "iot central app validate-properties"
     ] = """
         type: command
-        short-summary: Validate reported properties sent to the IoT Hub for an IoT Central app.
+        short-summary: Validate reported properties sent to IoT Central app.
         long-summary: |
-                    EXPERIMENTAL requires Python 3.5+
 
         examples:
         - name: Basic usage

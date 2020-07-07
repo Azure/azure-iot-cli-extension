@@ -13,7 +13,7 @@ from azext_iot.constants import (
     CENTRAL_ENDPOINT,
     DEVICETWIN_POLLING_INTERVAL_SEC,
     DEVICETWIN_MONITOR_TIME_SEC,
-    PNP_INTERFACE_PREFIX,
+    CENTRAL_PNP_INTERFACE_PREFIX,
 )
 
 from azext_iot.central.models.devicetwin import DeviceTwin, Property
@@ -33,6 +33,13 @@ class PropertyMonitor:
         self._app_id = app_id
         self._device_id = device_id
         self._central_dns_suffix = central_dns_suffix
+        self._device_twin_provider = CentralDeviceTwinProvider(
+            cmd=self._cmd, app_id=self._app_id, device_id=self._device_id
+        )
+        self._central_device_provider = CentralDeviceProvider(self._cmd, self._app_id)
+        self._central_template_provider = CentralDeviceTemplateProvider(
+            cmd=self._cmd, app_id=self._app_id
+        )
         self._template = self._get_device_template()
 
     def _compare_properties(self, prev_prop: Property, prop: Property):
@@ -77,14 +84,15 @@ class PropertyMonitor:
             issues = self._validate_payload_against_interfaces(
                 changes[value], value, minimum_severity
             )
-            [issue.log() for issue in issues]
+            for issue in issues:
+                issue.log()
 
     def _validate_payload_against_interfaces(
         self, payload: dict, name, minimum_severity
     ):
         name_miss = []
         issues_handler = IssueHandler()
-        interface_name = name.replace(PNP_INTERFACE_PREFIX, "")
+        interface_name = name.replace(CENTRAL_PNP_INTERFACE_PREFIX, "")
         if self._is_interface(interface_name):
             # if the payload is an interface then iterate thru the properties under the interface
             for property_name in payload.keys():
@@ -100,9 +108,12 @@ class PropertyMonitor:
             if not schema:
                 name_miss.append(name)
 
-            if self._validate_duplicate_properties(name):
+            interfaces_with_specified_property = self._validate_duplicate_properties(
+                name
+            )
+            if len(interfaces_with_specified_property) > 1:
                 details = strings.duplicate_property_name(
-                    name, list(self._template.interfaces.keys())
+                    name, interfaces_with_specified_property
                 )
                 issues_handler.add_central_issue(
                     severity=Severity.warning,
@@ -127,26 +138,23 @@ class PropertyMonitor:
         return issues_handler.get_issues_with_minimum_severity(minimum_severity)
 
     def _validate_duplicate_properties(self, property_name):
-        value = (
-            sum(
-                property_name in idnumber
-                for idnumber in self._template.interfaces.values()
-            )
-            > 1
-        )
-        return value
+        return [
+            interface
+            for interface, schema in self._template.schema_names.items()
+            if property_name in schema
+        ]
 
     def _is_interface(self, interface_name):
         # Remove PNP interface prefix to get the actual interface name
-        interface_name = interface_name.replace(PNP_INTERFACE_PREFIX, "")
-        return interface_name in self._template.interfaces
+        interface_name_modified = interface_name.replace(
+            CENTRAL_PNP_INTERFACE_PREFIX, ""
+        )
+        return interface_name_modified in self._template.interfaces
 
     def _get_device_template(self):
 
-        central_device_provider = CentralDeviceProvider(self._cmd, self._app_id)
-        device = central_device_provider.get_device(self._device_id)
-        provider = CentralDeviceTemplateProvider(cmd=self._cmd, app_id=self._app_id)
-        template = provider.get_device_template(
+        device = self._central_device_provider.get_device(self._device_id)
+        template = self._central_template_provider.get_device_template(
             device_template_id=device.instance_of,
             central_dns_suffix=self._central_dns_suffix,
         )
@@ -155,13 +163,9 @@ class PropertyMonitor:
     def start_property_monitor(self,):
         prev_twin = None
 
-        device_twin_provider = CentralDeviceTwinProvider(
-            cmd=self._cmd, app_id=self._app_id, device_id=self._device_id
-        )
-
         while True:
 
-            raw_twin = device_twin_provider.get_device_twin(
+            raw_twin = self._device_twin_provider.get_device_twin(
                 central_dns_suffix=self._central_dns_suffix
             )
 
@@ -190,13 +194,9 @@ class PropertyMonitor:
     def start_validate_property_monitor(self, minimum_severity):
         prev_twin = None
 
-        device_twin_provider = CentralDeviceTwinProvider(
-            cmd=self._cmd, app_id=self._app_id, device_id=self._device_id
-        )
-
         while True:
 
-            raw_twin = device_twin_provider.get_device_twin(
+            raw_twin = self._device_twin_provider.get_device_twin(
                 central_dns_suffix=self._central_dns_suffix
             )
 
