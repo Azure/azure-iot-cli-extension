@@ -272,7 +272,7 @@ class TestCentralPropertyMonitor:
 
     @mock.patch("azext_iot.central.services.device_template")
     @mock.patch("azext_iot.central.services.device")
-    def test_validate_properties_duplicate_name(
+    def test_validate_properties_declared_multiple_interfaces(
         self, mock_device_svc, mock_device_template_svc
     ):
 

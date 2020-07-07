@@ -95,7 +95,7 @@ class PropertyMonitor:
         interface_name = name.replace(CENTRAL_PNP_INTERFACE_PREFIX, "")
         if self._is_interface(interface_name):
             # if the payload is an interface then iterate thru the properties under the interface
-            for property_name in payload.keys():
+            for property_name in payload:
                 schema = self._template.get_schema(
                     name=property_name, interface_name=interface_name
                 )
@@ -103,14 +103,15 @@ class PropertyMonitor:
                     name_miss.append(property_name)
         else:
             # if the payload is a property then process the payload as a single unit.
-            schema = self._template.get_schema(name=name, interface_name="")
+            schema = self._template.get_schema(name=name)
 
             if not schema:
                 name_miss.append(name)
 
-            interfaces_with_specified_property = self._validate_duplicate_properties(
+            interfaces_with_specified_property = self._template._get_interface_list_property(
                 name
             )
+
             if len(interfaces_with_specified_property) > 1:
                 details = strings.duplicate_property_name(
                     name, interfaces_with_specified_property
@@ -136,13 +137,6 @@ class PropertyMonitor:
             )
 
         return issues_handler.get_issues_with_minimum_severity(minimum_severity)
-
-    def _validate_duplicate_properties(self, property_name):
-        return [
-            interface
-            for interface, schema in self._template.schema_names.items()
-            if property_name in schema
-        ]
 
     def _is_interface(self, interface_name):
         # Remove PNP interface prefix to get the actual interface name

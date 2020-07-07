@@ -381,7 +381,6 @@ def _load_central_monitors_help():
     ] = """
         type: command
         short-summary: Validate reported properties sent to IoT Central app.
-        long-summary: |
 
         examples:
         - name: Basic usage

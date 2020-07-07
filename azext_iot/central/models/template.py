@@ -55,3 +55,11 @@ class Template:
             interface_name: list(interface_schemas.keys())
             for interface_name, interface_schemas in interfaces.items()
         }
+
+    def _get_interface_list_property(self, property_name):
+        # returns the list of interfaces where property with property_name is defined
+        return [
+            interface
+            for interface, schema in self.schema_names.items()
+            if property_name in schema
+        ]
