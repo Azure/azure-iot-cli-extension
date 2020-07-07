@@ -136,6 +136,51 @@ def _load_central_devices_help():
                 az iot central app device registration-summary --app-id {appid}
         """
 
+    helps[
+        "iot central app device run-command"
+    ] = """
+            type: command
+            short-summary: Run a command on a device and view associated response. Does NOT monitor property updates that the command may perform.
+            long-summary: |
+                Note: payload should be nested under "request".
+                i.e. if your device expects the payload in a shape {"key": "value"}
+                payload should be {"request": {"key": "value"}}.
+                --content can be pointed at a filepath too (.../path/to/payload.json)
+            examples:
+            - name: Run command response
+              text: >
+                az iot central app device run-command
+                --app-id {appid}
+                --device-id {deviceid}
+                --interface-id {interfaceid}
+                --command-name {commandname}
+                --content {payload}
+
+            - name: Short Run command response
+              text: >
+                az iot central app device run-command
+                -n {appid}
+                -d {deviceid}
+                -i {interfaceid}
+                --cn {commandname}
+                -k {payload}
+        """
+
+    helps[
+        "iot central app device show-command-history"
+    ] = """
+            type: command
+            short-summary: Get most recent command-response request and response payload.
+            examples:
+            - name: Show command response
+              text: >
+                az iot central app device show-command-history
+                --app-id {appid}
+                --device-id {deviceid}
+                --interface-id {interfaceid}
+                --command-name {commandname}
+        """
+
 
 def _load_central_device_templates_help():
     helps[
@@ -314,6 +359,21 @@ def _load_central_monitors_help():
         - name: Filter device and specify an Event Hub consumer group to bind to.
           text: >
             az iot central app validate-messages --app-id {app_id} -d {device_id} --cg {consumer_group_name}
+    """
+
+    helps[
+        "iot central app monitor-properties"
+    ] = """
+        type: command
+        short-summary: Monitor desired and reported properties sent to/from the IoT Hub for an IoT Central app.
+        long-summary: |
+                    Polls device-twin from central and compares it to the last device-twin
+                    Parses out properties from device-twin, and detects if changes were made
+                    Prints subset of properties that were changed within the polling interval
+        examples:
+        - name: Basic usage
+          text: >
+            az iot central app monitor-properties --app-id {app_id} -d {device_id}
     """
 
 

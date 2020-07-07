@@ -6,6 +6,8 @@
 # Dev note - think of this as a controller
 
 from knack.util import CLIError
+
+from azext_iot.common import utility
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.providers import CentralDeviceProvider
 
@@ -60,6 +62,45 @@ def registration_info(
 
     return provider.get_device_registration_info(
         device_id=device_id, central_dns_suffix=central_dns_suffix, device_status=None,
+    )
+
+
+def run_command(
+    cmd,
+    app_id: str,
+    device_id: str,
+    interface_id: str,
+    command_name: str,
+    content: str,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+):
+    if not isinstance(content, str):
+        raise CLIError("content must be a string: {}".format(content))
+
+    payload = utility.process_json_arg(content, argument_name="content")
+
+    provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token)
+    return provider.run_component_command(
+        device_id=device_id,
+        interface_id=interface_id,
+        command_name=command_name,
+        payload=payload,
+    )
+
+
+def get_command_history(
+    cmd,
+    app_id: str,
+    device_id: str,
+    interface_id: str,
+    command_name: str,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+):
+    provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token)
+    return provider.get_component_command_history(
+        device_id=device_id, interface_id=interface_id, command_name=command_name,
     )
 
 

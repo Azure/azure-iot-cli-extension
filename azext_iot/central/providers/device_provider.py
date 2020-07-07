@@ -13,6 +13,7 @@ from azext_iot.central.models.enum import DeviceStatus
 from azext_iot.central.models.device import Device
 from azext_iot.dps.services import global_service as dps_global_service
 
+
 logger = get_logger(__name__)
 
 
@@ -186,6 +187,42 @@ class CentralDeviceProvider:
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def run_component_command(
+        self,
+        device_id: str,
+        interface_id: str,
+        command_name: str,
+        payload: dict,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.run_component_command(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            token=self._token,
+            device_id=device_id,
+            interface_id=interface_id,
+            command_name=command_name,
+            payload=payload,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def get_component_command_history(
+        self,
+        device_id: str,
+        interface_id: str,
+        command_name: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.get_component_command_history(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            token=self._token,
+            device_id=device_id,
+            interface_id=interface_id,
+            command_name=command_name,
             central_dns_suffix=central_dns_suffix,
         )
 

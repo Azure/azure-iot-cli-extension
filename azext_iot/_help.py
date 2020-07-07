@@ -945,6 +945,11 @@ helps[
         az iot dps enrollment create -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --attestation-type tpm --allocation-policy hashed
         --endorsement-key 14963E8F3BA5B3984110B3C1CA8E8B89 --iot-hubs "{iot_hub_host_name1} {iot_hub_host_name2}"
+    - name: Create an enrollment 'MyEnrollment' with custom allocation policy,
+      text: >
+        az iot dps enrollment create -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id} --attestation-type symmetrickey --allocation-policy custom
+        --webhook-url {webhook_url} --api-version {api_version}
 """
 
 helps[
@@ -1044,6 +1049,11 @@ helps[
       text: >
         az iot dps enrollment-group create -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --primary-key {primary_key} --secondary-key {secondary_key}
+    - name: Create an enrollment group '{enrollment_id}' with custom allocation policy,
+      text: >
+        az iot dps enrollment-group create -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id} --allocation-policy custom --webhook-url {webhook_url}
+        --api-version {api_version}
 
 """
 

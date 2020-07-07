@@ -36,6 +36,7 @@ def load_central_commands(self, _):
     ) as cmd_group:
         cmd_group.command("monitor-events", "monitor_events")
         cmd_group.command("validate-messages", "validate_messages", is_preview=True)
+        cmd_group.command("monitor-properties", "monitor_properties", is_preview=True)
 
     with self.command_group(
         "iot central app device", command_type=central_device_ops, is_preview=True,
@@ -44,6 +45,8 @@ def load_central_commands(self, _):
         cmd_group.command("show", "get_device")
         cmd_group.command("create", "create_device")
         cmd_group.command("delete", "delete_device")
+        cmd_group.command("run-command", "run_command")
+        cmd_group.command("show-command-history", "get_command_history")
         cmd_group.command("registration-info", "registration_info")
         cmd_group.command(
             "registration-summary", "registration_summary",
