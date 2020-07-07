@@ -28,11 +28,8 @@ device_template_path = get_context_path(
 )
 sync_command_params = get_context_path(__file__, "central/json/sync_command_args.json")
 
-if not all([APP_ID, device_template_path]):
-    raise ValueError(
-        "Set azext_iot_central_app_id, azext_iot_central_device_template_path"
-        "to run central integration tests. "
-    )
+if not all([APP_ID]):
+    raise ValueError("Set azext_iot_central_app_id to run central integration tests.")
 
 
 class TestIotCentral(CaptureOutputLiveScenarioTest):
@@ -128,9 +125,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
         # Validate the messages
         mock_logger = helpers.MockLogger()
-        output = None
-        with mock.patch("knack.log.get_logger", return_value=mock_logger) as _:
-            output = self._get_validate_messages_output(device_id, enqueued_time)
+        output = self._get_validate_messages_output(device_id, enqueued_time)
 
         self._delete_device(device_id)
         self._delete_device_template(template_id)
@@ -138,6 +133,71 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         assert output
         assert "Successfully parsed 1 message(s)" in output
         assert "No errors detected" in output
+
+    def test_central_validate_messages_issues_detected(self):
+        messages_count = 5
+        (template_id, _) = self._create_device_template()
+        (device_id, _) = self._create_device(instance_of=template_id)
+        credentials = self._get_credentials(device_id)
+
+        device_client = helpers.dps_connect_device(device_id, credentials)
+
+        enqueued_time = utility.calculate_millisec_since_unix_epoch_utc() - 10000
+
+        # Bad utf encoding
+        payload = {"Bool": True}
+        msg = Message(data=json.dumps(payload), content_type="application/json")
+        device_client.send_message(msg)
+
+        # Missing application/json
+        payload = {"Bool": True}
+        msg = Message(data=json.dumps(payload), content_encoding="utf-8")
+        device_client.send_message(msg)
+
+        # Invalid type
+        payload = {"Bool": 123}
+        msg = Message(
+            data=json.dumps(payload),
+            content_encoding="utf-8",
+            content_type="application/json",
+        )
+        device_client.send_message(msg)
+
+        # Telemetry not defined
+        payload = {"NotPresentInTemplate": True}
+        msg = Message(
+            data=json.dumps(payload),
+            content_encoding="utf-8",
+            content_type="application/json",
+        )
+        device_client.send_message(msg)
+
+        # Invalid JSON
+        payload = '{"asd":"def}'
+        msg = Message(
+            data=payload, content_encoding="utf-8", content_type="application/json",
+        )
+        device_client.send_message(msg)
+
+        # Validate the messages
+        output = self._get_validate_messages_output(
+            device_id, enqueued_time, max_messages=messages_count
+        )
+
+        self._delete_device(device_id)
+        self._delete_device_template(template_id)
+
+        assert output
+
+        expected_issues = [
+            "No encoding found. Expected encoding 'utf-8' to be present in message header.",
+            "Content type '' is not supported. Expected Content type is 'application/json'.",
+            "Datatype of field 'Bool' does not match the datatype 'boolean'. Data '123'. All dates/times/datetimes/durations must be ISO 8601 compliant.",
+            "Following capabilities have NOT been defined in the device template '['NotPresentInTemplate']'",
+            "Invalid JSON format",
+        ]
+        for issue in expected_issues:
+            assert issue in output
 
     def test_central_device_methods_CRLD(self):
         (device_id, device_name) = self._create_device()
@@ -410,7 +470,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             asserts = []
 
         output = self.command_execute_assert(
-            "iot central app validate-messages --app-id {} -d {} --et {} --duration {} --mm {} -y".format(
+            "iot central app validate-messages --app-id {} -d {} --et {} --duration {} --mm {} -y --style json".format(
                 APP_ID, device_id, enqueued_time, duration, max_messages
             ),
             asserts,
@@ -418,7 +478,5 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
         if not output:
             output = ""
-
-        output = output.split("\n")
 
         return output
