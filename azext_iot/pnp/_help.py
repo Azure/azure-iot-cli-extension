@@ -78,7 +78,7 @@ def load_pnp_help():
             --subject-type ServicePrincipal
     """
 
-    helps["iot pnp role-assigment delete"] = """
+    helps["iot pnp role-assignment delete"] = """
         type: command
         short-summary: Deletes a role assignment for a specific resource and user or service principal
 

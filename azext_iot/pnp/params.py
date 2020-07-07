@@ -24,6 +24,16 @@ def load_pnp_arguments(self, _):
     """
     with self.argument_context("iot pnp role-assignment") as context:
         context.argument(
+            "resource_id",
+            options_list=["--resource-id"],
+            help="The ID of the resource to manage role assignments for",
+        )
+        context.argument(
+            "subject_id",
+            options_list=["--subject-id"],
+            help="The ID of a specific subject (User or Service Principal) to manage role assignments for.",
+        )
+        context.argument(
             "resource_type",
             arg_type=get_enum_type(RoleResourceType),
             options_list=["--resource-type"],
