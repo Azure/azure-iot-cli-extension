@@ -17,7 +17,7 @@ class RepoResourceProvider(PnPModelRepositoryManager):
         super(RepoResourceProvider, self).__init__(cmd=cmd)
         self.mgmt_sdk = self.get_mgmt_sdk()
 
-    def create(self, tags=None):
+    def create(self):
         try:
             return self.mgmt_sdk.create_tenant_async(self)
         except CloudError as e:

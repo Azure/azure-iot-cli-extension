@@ -8,9 +8,9 @@ from azext_iot.pnp.providers.resource import RepoResourceProvider
 from azext_iot.sdk.pnp.modelrepository.models import Subject
 
 
-def iot_pnp_tenant_create(cmd, tags=None):
+def iot_pnp_tenant_create(cmd):
     rp = RepoResourceProvider(cmd)
-    return rp.create(tags=tags)
+    return rp.create()
 
 
 def iot_pnp_tenant_show(cmd):
