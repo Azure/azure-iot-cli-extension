@@ -24,9 +24,9 @@ def load_pnp_help():
 
     helps["iot pnp repo create"] = """
         type: command
-        short-summary: Create a new PnP tenant repository. 
+        short-summary: Create a new PnP tenant repository.
         long-summary: |
-          Note that this command takes no parameters. The repository will be created in your tenant, 
+          Note that this command takes no parameters. The repository will be created in your tenant,
           and the user who creates the repository will be granted the TenantAdministrator role.
     """
 
@@ -52,13 +52,13 @@ def load_pnp_help():
         - name: List role assignments for a specific model and subject.
           text: >
             az iot pnp role-assignment list --resource-id {model_id}
-            --resource-type Model 
+            --resource-type Model
             --subject-id {user_or_spn_id}
     """
 
     helps["iot pnp role-assignment create"] = """
         type: command
-        short-summary: Creates role assignments for a specific resource and user or service principal. 
+        short-summary: Creates role assignments for a specific resource and user or service principal.
 
         examples:
         - name: Assign a user the role of Tenant Administrator

@@ -4,10 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import json
 from azext_iot.pnp.providers.model_repository_api import ModelApiProvider
 from azext_iot.sdk.pnp.dataplane.models import ModelSearchOptions, ServiceError
-from azext_iot.pnp.common import ModelState
 from knack.util import CLIError
 from azext_iot.common.utility import process_json_arg
 
@@ -48,7 +46,7 @@ def iot_pnp_model_create(cmd, model_id, model):
         )
     ap = ModelApiProvider(cmd)
     model = process_json_arg(model, argument_name="model")
-    is_valid = ap.validate_models([model], False)
+    is_valid = ap.validate_models([model], validate_dependencies=True)
     if isinstance(is_valid, ServiceError):
         raise CLIError("{}: {}".format(is_valid.code, is_valid.message))
     return ap.create_model(model_id, model)

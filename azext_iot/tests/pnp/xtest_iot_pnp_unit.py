@@ -6,9 +6,7 @@
 
 import pytest
 import json
-import os
 
-from uuid import uuid4
 from azext_iot.pnp import commands_api as subject
 from azext_iot.constants import PNP_REPO_ENDPOINT
 from azext_iot.common.utility import url_encode_str, read_file_content
@@ -28,6 +26,7 @@ _pnp_generic_model_id = "urn:example:capabilityModels:Mxchip:1"
 
 mock_target = {}
 
+
 @pytest.fixture()
 def fixture_ghcs(mocker):
     ghcs = mocker
@@ -46,7 +45,7 @@ def generate_pnp_model_create_payload(content_from_file=False):
 
 
 @pytest.mark.usefixtures("set_cwd")
-class TestModelRepoModelCreate(object):
+class xTestModelRepoModelCreate(object):
     @pytest.fixture(params=[201, 204, 412])
     def serviceclient(self, mocker, fixture_ghcs, request, set_cwd):
         service_client = mocker.patch(path_service_client)
@@ -137,7 +136,7 @@ class TestModelRepoModelCreate(object):
             )
 
 
-class TestModelRepoModelPublish(object):
+class xTestModelRepoModelPublish(object):
     @pytest.fixture(params=[(200, 200, 201), (200, 200, 204), (200, 200, 412)])
     def serviceclient(self, mocker, fixture_ghcs, request):
         service_client = mocker.patch(path_service_client)
@@ -208,7 +207,7 @@ class TestModelRepoModelPublish(object):
             )
 
 
-class TestModelRepoModelShow(object):
+class xTestModelRepoModelShow(object):
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, request):
         service_client = mocker.patch(path_service_client)
@@ -274,7 +273,7 @@ class TestModelRepoModelShow(object):
             )
 
 
-class TestModelRepoModelList(object):
+class xTestModelRepoModelList(object):
     @pytest.fixture(params=[200])
     def service_client(self, mocker, fixture_ghcs, request):
         serviceclient = mocker.patch(path_service_client)

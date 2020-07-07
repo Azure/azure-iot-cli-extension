@@ -18,7 +18,7 @@ __all__ = [
     "iot_service_provisioning_factory",
     "SdkResolver",
     "_bind_sdk",
-    "_get_sdk_exception_type"
+    "_get_sdk_exception_type",
 ]
 
 
@@ -59,6 +59,7 @@ def iot_service_provisioning_factory(cli_ctx, *_):
     """
     from azure.cli.core.commands.client_factory import get_mgmt_service_client
     from azure.mgmt.iothubprovisioningservices.iot_dps_client import IotDpsClient
+
     return get_mgmt_service_client(cli_ctx, IotDpsClient)
 
 
@@ -80,58 +81,57 @@ class SdkResolver(object):
     def _construct_sdk_map(self):
         return {
             SdkType.service_sdk: self._get_iothub_service_sdk,  # Don't need to call here
-            SdkType.device_sdk: self._get_iothub_device_sdk
+            SdkType.device_sdk: self._get_iothub_device_sdk,
         }
 
     def _get_iothub_device_sdk(self):
         from azext_iot.sdk.iothub.device import IotHubGatewayDeviceAPIs
+
         credentials = SasTokenAuthentication(
             uri=self.sas_uri,
-            shared_access_policy_name=self.target['policy'],
-            shared_access_key=self.target['primarykey'])
+            shared_access_policy_name=self.target["policy"],
+            shared_access_key=self.target["primarykey"],
+        )
 
         return IotHubGatewayDeviceAPIs(credentials=credentials, base_url=self.endpoint)
 
     def _get_iothub_service_sdk(self):
         from azext_iot.sdk.iothub.service import IotHubGatewayServiceAPIs
+
         credentials = SasTokenAuthentication(
             uri=self.sas_uri,
-            shared_access_policy_name=self.target['policy'],
-            shared_access_key=self.target['primarykey'])
+            shared_access_policy_name=self.target["policy"],
+            shared_access_key=self.target["primarykey"],
+        )
 
         return IotHubGatewayServiceAPIs(credentials=credentials, base_url=self.endpoint)
 
 
 # TODO: Deprecated. To be removed asap.
 def _bind_sdk(target, sdk_type, device_id=None, auth=None):
-    from azext_iot.sdk.service.iot_hub_gateway_service_apis import IotHubGatewayServiceAPIs
+    from azext_iot.sdk.service.iot_hub_gateway_service_apis import (
+        IotHubGatewayServiceAPIs,
+    )
     from azext_iot.sdk.dps import ProvisioningServiceClient
-    from azext_iot.sdk.pnp.dataplane.digital_twin_repository_service import DigitalTwinRepositoryService
 
-    sas_uri = target['entity']
+    sas_uri = target["entity"]
     endpoint = "https://{}".format(sas_uri)
     if device_id:
-        sas_uri = '{}/devices/{}'.format(sas_uri, device_id)
-
-    if sdk_type is SdkType.pnp_sdk:
-        return (
-            DigitalTwinRepositoryService(endpoint),
-            _get_sdk_exception_type(sdk_type)
-        )
+        sas_uri = "{}/devices/{}".format(sas_uri, device_id)
 
     if not auth:
-        auth = SasTokenAuthentication(sas_uri, target['policy'], target['primarykey'])
+        auth = SasTokenAuthentication(sas_uri, target["policy"], target["primarykey"])
 
     if sdk_type is SdkType.service_sdk:
         return (
             IotHubGatewayServiceAPIs(auth, endpoint),
-            _get_sdk_exception_type(sdk_type)
+            _get_sdk_exception_type(sdk_type),
         )
 
     if sdk_type is SdkType.dps_sdk:
         return (
             ProvisioningServiceClient(auth, endpoint),
-            _get_sdk_exception_type(sdk_type)
+            _get_sdk_exception_type(sdk_type),
         )
 
     return None
@@ -142,8 +142,9 @@ def _get_sdk_exception_type(sdk_type):
     from importlib import import_module
 
     exception_library = {
-        SdkType.service_sdk: import_module('msrestazure.azure_exceptions'),
-        SdkType.dps_sdk: import_module('azext_iot.sdk.dps.models.provisioning_service_error_details'),
-        SdkType.pnp_sdk: import_module('msrest.exceptions')
+        SdkType.service_sdk: import_module("msrestazure.azure_exceptions"),
+        SdkType.dps_sdk: import_module(
+            "azext_iot.sdk.dps.models.provisioning_service_error_details"
+        ),
     }
     return exception_library.get(sdk_type, None)

@@ -6,7 +6,6 @@
 
 from azext_iot.pnp.providers.resource import RepoResourceProvider
 from azext_iot.sdk.pnp.modelrepository.models import Subject
-from knack.util import CLIError
 
 
 def iot_pnp_tenant_create(cmd, tags=None):

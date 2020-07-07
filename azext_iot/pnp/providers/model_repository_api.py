@@ -8,9 +8,8 @@ from azext_iot.pnp.providers import (
     PnPModelRepositoryApiManager,
     CloudError,
 )
-from azext_iot.sdk.pnp.dataplane.models import ServiceError
 from azext_iot.pnp.common import ModelState
-from azext_iot.common.utility import validate_key_value_pairs, unpack_msrest_error
+from azext_iot.common.utility import unpack_msrest_error
 from knack.util import CLIError
 
 
@@ -25,7 +24,7 @@ class ModelApiProvider(PnPModelRepositoryApiManager):
                 model_id=model_id, expand=expand, raw=True
             ).response.json()
         except CloudError as e:
-            raise e
+            raise CLIError(unpack_msrest_error(e))
 
     def create_model(
         self,
@@ -40,8 +39,7 @@ class ModelApiProvider(PnPModelRepositoryApiManager):
                 raw=True,
             ).response.json()
         except CloudError as e:
-            raise e
-
+            raise CLIError(unpack_msrest_error(e))
 
     def publish_model(
         self,
@@ -56,7 +54,7 @@ class ModelApiProvider(PnPModelRepositoryApiManager):
                 raw=True,
             ).response.json()
         except CloudError as e:
-            raise e
+            raise CLIError(unpack_msrest_error(e))
 
     def search_models(
         self, search_options, shared_models_only=None, top=None,
@@ -77,7 +75,7 @@ class ModelApiProvider(PnPModelRepositoryApiManager):
 
             return payload[:top] if top else payload
         except CloudError as e:
-            raise e
+            raise CLIError(unpack_msrest_error(e))
 
     def validate_models(
         self, models=None, validate_dependencies=None
@@ -88,4 +86,4 @@ class ModelApiProvider(PnPModelRepositoryApiManager):
                 validate_dependencies=validate_dependencies,
             )
         except CloudError as e:
-            raise e
+            raise CLIError(unpack_msrest_error(e))

@@ -5,15 +5,8 @@
 # --------------------------------------------------------------------------------------------
 
 import pytest
-import json
-from time import sleep
 from knack.log import get_logger
 from azext_iot.pnp.common import RoleIdentifier
-from azext_iot.common.utility import (
-    scantree,
-    process_json_arg,
-)
-from ..settings import DynamoSettings
 from . import PNPLiveScenarioTest
 
 logger = get_logger(__name__)
@@ -70,7 +63,8 @@ class TestPNPRepo(PNPLiveScenarioTest):
         # add role assignment for repo (tenant)
         new_role = RoleIdentifier.modelsCreator.value
         self.cmd(
-            "az iot pnp role-assignment create --resource-id {0} --resource-type Tenant --subject-id {1} --subject-type {2} --role {3}".format(
+            "az iot pnp role-assignment create --resource-id {0} --resource-type Tenant "
+            "--subject-id {1} --subject-type {2} --role {3}".format(
                 repo_id, self.user_id, self.user_type, new_role
             )
         )
@@ -125,4 +119,3 @@ class TestPNPRepo(PNPLiveScenarioTest):
             )
             == 0
         )
-

@@ -24,10 +24,6 @@ iotdps_ops = CliCommandType(
     client_factory=iot_service_provisioning_factory,
 )
 
-iotdigitaltwin_ops = CliCommandType(
-    operations_tmpl="azext_iot.operations.digitaltwin#{}"
-)
-
 
 class IoTExtCommandsLoader(AzCommandsLoader):
     def __init__(self, cli_ctx=None):

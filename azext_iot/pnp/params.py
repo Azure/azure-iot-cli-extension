@@ -16,7 +16,6 @@ from azext_iot.pnp.common import (
     ModelType,
 )
 from azure.cli.core.commands.parameters import get_enum_type, get_three_state_flag
-from knack.arguments import CLIArgumentType
 
 
 def load_pnp_arguments(self, _):

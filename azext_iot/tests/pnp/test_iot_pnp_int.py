@@ -25,9 +25,7 @@ class TestPnPModel(LiveScenarioTest):
 
     def __init__(self, _):
         super(TestPnPModel, self).__init__(_)
-        self.kwargs.update(
-            {"model": "test_model_definition.json",}
-        )
+        self.kwargs.update({"model": "test_model_definition.json"})
 
     def setUp(self):
         if self._testMethodName == "test_model_life_cycle":
@@ -61,7 +59,8 @@ class TestPnPModel(LiveScenarioTest):
 
         # Error: wrong path of model definition
         self.cmd(
-            "iot pnp model create -m {model_id} --model model.json", expect_failure=True,
+            "iot pnp model create -m {model_id} --model model.json",
+            expect_failure=True,
         )
 
         # Success: Create new model

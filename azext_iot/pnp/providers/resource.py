@@ -8,8 +8,8 @@ from azext_iot.pnp.providers import (
     PnPModelRepositoryManager,
     CloudError,
 )
-from azext_iot.pnp.common import RoleResourceType
-from azext_iot.common.utility import validate_key_value_pairs, unpack_msrest_error
+from azext_iot.common.utility import unpack_msrest_error
+from knack.util import CLIError
 
 
 class RepoResourceProvider(PnPModelRepositoryManager):
@@ -21,13 +21,13 @@ class RepoResourceProvider(PnPModelRepositoryManager):
         try:
             return self.mgmt_sdk.create_tenant_async(self)
         except CloudError as e:
-            raise e
+            raise CLIError(unpack_msrest_error(e))
 
     def list(self):
         try:
             return self.mgmt_sdk.get_tenant_async(self)
         except CloudError as e:
-            raise e
+            raise CLIError(unpack_msrest_error(e))
 
     # RBAC
 
@@ -37,7 +37,7 @@ class RepoResourceProvider(PnPModelRepositoryManager):
                 resource_id=resource_id, resource_type=resource_type,
             )
         except CloudError as e:
-            raise e
+            raise CLIError(unpack_msrest_error(e))
 
     def get_role_assignments_for_subject(self, resource_id, resource_type, subject_id):
         try:
@@ -47,7 +47,7 @@ class RepoResourceProvider(PnPModelRepositoryManager):
                 subject_id=subject_id,
             )
         except CloudError as e:
-            raise e
+            raise CLIError(unpack_msrest_error(e))
 
     def add_role_assignment(self, resource_id, resource_type, subject_id, subject=None):
         try:
@@ -58,7 +58,7 @@ class RepoResourceProvider(PnPModelRepositoryManager):
                 subject_id=subject_id,
             )
         except CloudError as e:
-            raise e
+            raise CLIError(unpack_msrest_error(e))
 
     def remove_role_assignment(self, resource_id, resource_type, role_id, subject_id):
         try:
@@ -69,4 +69,4 @@ class RepoResourceProvider(PnPModelRepositoryManager):
                 role_id=role_id,
             )
         except CloudError as e:
-            raise e
+            raise CLIError(unpack_msrest_error(e))
