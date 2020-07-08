@@ -4,14 +4,19 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+
+import json
 import os
 import time
 
 from .conftest import get_context_path
 
-from azure.cli.testsdk import LiveScenarioTest
-from azext_iot.central.models.enum import DeviceStatus
+from azure.iot.device import Message
 from azext_iot.common import utility
+from azext_iot.central.models.enum import DeviceStatus
+from azext_iot.monitor.parsers import strings
+
+from . import CaptureOutputLiveScenarioTest, helpers
 
 APP_ID = os.environ.get("azext_iot_central_app_id")
 
@@ -20,16 +25,13 @@ device_template_path = get_context_path(
 )
 sync_command_params = get_context_path(__file__, "central/json/sync_command_args.json")
 
-if not all([APP_ID, device_template_path]):
-    raise ValueError(
-        "Set azext_iot_central_app_id, azext_iot_central_device_template_path"
-        "to run central integration tests. "
-    )
+if not all([APP_ID]):
+    raise ValueError("Set azext_iot_central_app_id to run central integration tests.")
 
 
-class TestIotCentral(LiveScenarioTest):
-    def __init__(self, test_case):
-        super(TestIotCentral, self).__init__(test_case)
+class TestIotCentral(CaptureOutputLiveScenarioTest):
+    def __init__(self, test_scenario):
+        super(TestIotCentral, self).__init__(test_scenario=test_scenario)
 
     def test_central_device_twin_show_fail(self):
         (device_id, _) = self._create_device()
@@ -91,24 +93,138 @@ class TestIotCentral(LiveScenarioTest):
         self._delete_device_template(template_id)
 
     def test_central_monitor_events(self):
+        (template_id, _) = self._create_device_template()
+        (device_id, _) = self._create_device(instance_of=template_id)
+        credentials = self._get_credentials(device_id)
+
+        device_client = helpers.dps_connect_device(device_id, credentials)
+
+        payload = {"Bool": True}
+        msg = Message(
+            data=json.dumps(payload),
+            content_encoding="utf-8",
+            content_type="application/json",
+        )
+        device_client.send_message(msg)
+
+        enqueued_time = utility.calculate_millisec_since_unix_epoch_utc() - 10000
+
         # Test with invalid app-id
         self.cmd(
             "iotcentral app monitor-events --app-id {}".format(APP_ID + "zzz"),
             expect_failure=True,
         )
-        # Ensure no failure
-        # We cannot verify that the result is correct, as the Azure CLI for IoT Central does not support adding devices
-        self.cmd("iotcentral app monitor-events --app-id {} --to 1".format(APP_ID))
 
-    def test_central_validate_messages(self):
-        # Test with invalid app-id
-        self.cmd(
-            "iot central app validate-messages --app-id {}".format(APP_ID + "zzz"),
-            expect_failure=True,
-        )
         # Ensure no failure
-        # We cannot verify that the result is correct, as the Azure CLI for IoT Central does not support adding devices
-        self.cmd("iot central app validate-messages --app-id {} --to 1".format(APP_ID))
+        output = self._get_monitor_events_output(device_id, enqueued_time)
+
+        self._delete_device(device_id)
+        self._delete_device_template(template_id)
+        assert '"Bool": true' in output
+        assert device_id in output
+
+    def test_central_validate_messages_success(self):
+        (template_id, _) = self._create_device_template()
+        (device_id, _) = self._create_device(instance_of=template_id)
+        credentials = self._get_credentials(device_id)
+
+        device_client = helpers.dps_connect_device(device_id, credentials)
+
+        enqueued_time = utility.calculate_millisec_since_unix_epoch_utc() - 10000
+
+        payload = {"Bool": True}
+        msg = Message(
+            data=json.dumps(payload),
+            content_encoding="utf-8",
+            content_type="application/json",
+        )
+        device_client.send_message(msg)
+
+        # Validate the messages
+        output = self._get_validate_messages_output(device_id, enqueued_time)
+
+        self._delete_device(device_id)
+        self._delete_device_template(template_id)
+
+        assert output
+        assert "Successfully parsed 1 message(s)" in output
+        assert "No errors detected" in output
+
+    def test_central_validate_messages_issues_detected(self):
+        expected_messages = []
+        (template_id, _) = self._create_device_template()
+        (device_id, _) = self._create_device(instance_of=template_id)
+        credentials = self._get_credentials(device_id)
+
+        device_client = helpers.dps_connect_device(device_id, credentials)
+
+        enqueued_time = utility.calculate_millisec_since_unix_epoch_utc() - 10000
+
+        # Invalid encoding
+        payload = {"Bool": True}
+        msg = Message(data=json.dumps(payload), content_type="application/json")
+        device_client.send_message(msg)
+        expected_messages.append(strings.invalid_encoding(""))
+
+        # Content type mismatch (e.g. non application/json)
+        payload = {"Bool": True}
+        msg = Message(data=json.dumps(payload), content_encoding="utf-8")
+        device_client.send_message(msg)
+        expected_messages.append(strings.content_type_mismatch("", "application/json"))
+
+        # Invalid type
+        payload = {"Bool": 123}
+        msg = Message(
+            data=json.dumps(payload),
+            content_encoding="utf-8",
+            content_type="application/json",
+        )
+        device_client.send_message(msg)
+        expected_messages.append(
+            strings.invalid_primitive_schema_mismatch_template("Bool", "boolean", 123)
+        )
+
+        # Telemetry not defined
+        payload = {"NotPresentInTemplate": True}
+        msg = Message(
+            data=json.dumps(payload),
+            content_encoding="utf-8",
+            content_type="application/json",
+        )
+        device_client.send_message(msg)
+        # this error is harder to build from strings because we have to construct a whole template for it
+        expected_messages.append(
+            "Following capabilities have NOT been defined in the device template '['NotPresentInTemplate']'"
+        )
+
+        # Invalid JSON
+        payload = '{"asd":"def}'
+        msg = Message(
+            data=payload, content_encoding="utf-8", content_type="application/json",
+        )
+        device_client.send_message(msg)
+        expected_messages.append(strings.invalid_json())
+
+        # Validate the messages
+        output = self._get_validate_messages_output(
+            device_id, enqueued_time, max_messages=len(expected_messages)
+        )
+
+        self._delete_device(device_id)
+        self._delete_device_template(template_id)
+
+        assert output
+
+        expected_issues = [
+            "No encoding found. Expected encoding 'utf-8' to be present in message header.",
+            "Content type '' is not supported. Expected Content type is 'application/json'.",
+            "Datatype of field 'Bool' does not match the datatype 'boolean'.",
+            "Data '123'. All dates/times/datetimes/durations must be ISO 8601 compliant.",
+            "Following capabilities have NOT been defined in the device template '['NotPresentInTemplate']'",
+            "Invalid JSON format",
+        ]
+        for issue in expected_issues:
+            assert issue in output
 
     def test_central_device_methods_CRLD(self):
         (device_id, device_name) = self._create_device()
@@ -366,3 +482,44 @@ class TestIotCentral(LiveScenarioTest):
             ),
             checks=[self.check("result", "success")],
         )
+
+    def _get_credentials(self, device_id):
+        return self.cmd(
+            "iot central app device show-credentials --app-id {} -d {}".format(
+                APP_ID, device_id
+            )
+        ).get_output_in_json()
+
+    def _get_validate_messages_output(
+        self, device_id, enqueued_time, duration=60, max_messages=1, asserts=None
+    ):
+        if not asserts:
+            asserts = []
+
+        output = self.command_execute_assert(
+            "iot central app validate-messages --app-id {} -d {} --et {} --duration {} --mm {} -y --style json".format(
+                APP_ID, device_id, enqueued_time, duration, max_messages
+            ),
+            asserts,
+        )
+
+        if not output:
+            output = ""
+
+        return output
+
+    def _get_monitor_events_output(self, device_id, enqueued_time, asserts=None):
+        if not asserts:
+            asserts = []
+
+        output = self.command_execute_assert(
+            "iot central app monitor-events -n {} -d {} --et {} --to 1".format(
+                APP_ID, device_id, enqueued_time
+            ),
+            asserts,
+        )
+
+        if not output:
+            output = ""
+
+        return output

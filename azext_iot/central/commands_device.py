@@ -111,3 +111,12 @@ def registration_summary(
     return provider.get_device_registration_summary(
         central_dns_suffix=central_dns_suffix,
     )
+
+
+def get_credentials(
+    cmd, app_id: str, device_id, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
+):
+    provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token,)
+    return provider.get_device_credentials(
+        device_id=device_id, central_dns_suffix=central_dns_suffix,
+    )
