@@ -335,7 +335,7 @@ def load_arguments(self, _):
         context.argument(
             "interface",
             options_list=["--interface", "-i"],
-            help="Target interface name. This should be the name of the interface not the urn-id.",
+            help="Target interface identifier to filter on. For example: dtmi:com:example:TemperatureController;1",
         )
 
     with self.argument_context("iot hub monitor-feedback") as context:

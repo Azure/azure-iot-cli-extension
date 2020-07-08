@@ -7,19 +7,25 @@
 """
 Load CLI commands
 """
+from azure.cli.core.commands import CliCommandType
 
-from azext_iot import iothub_ops_job, iothub_ops_device
+pnp_runtime_ops = CliCommandType(
+    operations_tmpl="azext_iot.iothub.commands_pnp_runtime#{}"
+)
+iothub_job_ops = CliCommandType(operations_tmpl="azext_iot.iothub.commands_job#{}")
 
 
 def load_iothub_commands(self, _):
     """
     Load CLI commands
     """
-    with self.command_group("iot hub job", command_type=iothub_ops_job) as cmd_group:
+    with self.command_group("iot hub job", command_type=iothub_job_ops) as cmd_group:
         cmd_group.command("create", "job_create")
         cmd_group.command("show", "job_show")
         cmd_group.command("list", "job_list")
         cmd_group.command("cancel", "job_cancel")
 
-    with self.command_group("iot hub device-identity", command_type=iothub_ops_device) as cmd_group:
-        pass
+    with self.command_group("iot pnp twin", command_type=pnp_runtime_ops, is_preview=True) as cmd_group:
+        cmd_group.command("invoke-command", "invoke_device_command")
+        cmd_group.command("show", "get_digital_twin")
+        cmd_group.command("update", "patch_digital_twin")
