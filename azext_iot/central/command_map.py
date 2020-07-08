@@ -52,6 +52,7 @@ def load_central_commands(self, _):
         cmd_group.command(
             "registration-summary", "registration_summary",
         )
+        cmd_group.command("show-credentials", "get_credentials")
 
     with self.command_group(
         "iot central app device-template",

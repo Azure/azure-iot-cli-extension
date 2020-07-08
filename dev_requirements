@@ -11,3 +11,4 @@ pre-commit
 six>=1.12
 pylint
 flake8
+azure-iot-device
