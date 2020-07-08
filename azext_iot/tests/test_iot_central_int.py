@@ -485,7 +485,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
     def _get_credentials(self, device_id):
         return self.cmd(
-            "iot central app device get-credentials --app-id {} -d {}".format(
+            "iot central app device show-credentials --app-id {} -d {}".format(
                 APP_ID, device_id
             )
         ).get_output_in_json()
