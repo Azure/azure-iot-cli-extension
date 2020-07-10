@@ -294,7 +294,7 @@ class TestCentralPropertyMonitor:
         assert (
             issues[0].details == "Duplicate property: 'Model' found under following "
             "interfaces ['groupOne_g4', 'groupTwo_ed', 'groupThree_ed'] "
-            "in the device model.Either provide the interface name as part "
+            "in the device model. Either provide the interface name as part "
             "of the device payload or make the propery name unique in the device model"
         )
 

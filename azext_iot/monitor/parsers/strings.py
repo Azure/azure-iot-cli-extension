@@ -76,7 +76,7 @@ def invalid_field_name_mismatch_template(
 # warning
 def duplicate_property_name(duplicate_prop_name, interfaces: list):
     return (
-        "Duplicate property: '{}' found under following interfaces {} in the device model."
+        "Duplicate property: '{}' found under following interfaces {} in the device model. "
         "Either provide the interface name as part of the device payload or make the propery name unique in the device model"
     ).format(duplicate_prop_name, interfaces)
 

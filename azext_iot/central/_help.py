@@ -395,7 +395,11 @@ def _load_central_monitors_help():
     ] = """
         type: command
         short-summary: Validate reported properties sent to IoT Central app.
-
+        long-summary: |
+                    Performs validations on reported property updates:
+                    1) Warning - Properties sent by device that are not modeled in central.
+                    2) Warning - Properties with same name declared in multiple interfaces
+                       should have interface name included as part of the property update.
         examples:
         - name: Basic usage
           text: >
