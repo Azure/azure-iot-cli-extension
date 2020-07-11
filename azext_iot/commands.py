@@ -39,7 +39,11 @@ def load_command_table(self, _):
             "update", getter_name="iot_device_show", setter_name="iot_device_update"
         )
 
-        cmd_group.command("show-connection-string", "iot_get_device_connection_string")
+        cmd_group.command(
+            "show-connection-string",
+            "iot_get_device_connection_string",
+            deprecate_info=self.deprecate(redirect='az iot hub device-identity connection-string show')
+        )
         cmd_group.command("import", "iot_device_import")
         cmd_group.command("export", "iot_device_export")
         cmd_group.command("add-children", "iot_device_children_add")
@@ -47,6 +51,11 @@ def load_command_table(self, _):
         cmd_group.command("list-children", "iot_device_children_list")
         cmd_group.command("get-parent", "iot_device_get_parent")
         cmd_group.command("set-parent", "iot_device_set_parent")
+
+    with self.command_group(
+        "iot hub device-identity connection-string", command_type=iothub_ops
+    ) as cmd_group:
+        cmd_group.command("show", "iot_get_device_connection_string")
 
     with self.command_group(
         "iot hub module-identity", command_type=iothub_ops
@@ -61,7 +70,16 @@ def load_command_table(self, _):
             setter_name="iot_device_module_update",
         )
 
-        cmd_group.command("show-connection-string", "iot_get_module_connection_string")
+        cmd_group.command(
+            "show-connection-string",
+            "iot_get_module_connection_string",
+            deprecate_info=self.deprecate(redirect='az iot hub module-identity connection-string show')
+        )
+
+    with self.command_group(
+        "iot hub module-identity connection-string", command_type=iothub_ops
+    ) as cmd_group:
+        cmd_group.command("show", "iot_get_module_connection_string")
 
     with self.command_group(
         "iot hub module-twin", command_type=iothub_ops
@@ -108,6 +126,11 @@ def load_command_table(self, _):
     ) as cmd_group:
         cmd_group.command("show", "iot_hub_distributed_tracing_show")
         cmd_group.command("update", "iot_hub_distributed_tracing_update")
+
+    with self.command_group(
+        "iot hub connection-string", command_type=iothub_ops
+    ) as cmd_group:
+        cmd_group.command("show", "iot_hub_connection_string_show")
 
     with self.command_group("iot edge", command_type=iothub_ops) as cmd_group:
         cmd_group.command("set-modules", "iot_edge_set_modules")

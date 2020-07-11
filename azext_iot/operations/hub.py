@@ -17,7 +17,7 @@ from azext_iot.constants import (
     TRACING_ALLOWED_FOR_SKU,
 )
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
-from azext_iot.common.shared import DeviceAuthType, SdkType, ProtocolType, ConfigType
+from azext_iot.common.shared import DeviceAuthType, SdkType, ProtocolType, ConfigType, KeyType
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
     shell_safe_json_parse,
@@ -2423,6 +2423,98 @@ def iot_hub_distributed_tracing_update(
     return _customize_device_tracing_output(
         result.device_id, result.properties.desired, result.properties.reported
     )
+
+
+def iot_hub_connection_string_show(
+    cmd,
+    hub_name=None,
+    resource_group_name=None,
+    policy_name='iothubowner',
+    key_type=KeyType.primary.value,
+    show_all=False,
+    include_eventhub=False
+):
+    discovery = IotHubDiscovery(cmd)
+
+    if hub_name is None:
+        hubs = discovery.get_iothubs(resource_group_name)
+        if hubs is None:
+            raise CLIError("No IoT Hub found.")
+
+        def conn_str_getter(hub):
+            return _get_hub_connection_string(
+                discovery,
+                hub,
+                policy_name,
+                key_type,
+                show_all,
+                include_eventhub
+            )
+        return [{'name': hub.name, 'connectionString': conn_str_getter(hub)} for hub in hubs]
+    hub = discovery.find_iothub(hub_name, resource_group_name)
+    if hub:
+        conn_str = _get_hub_connection_string(
+            discovery,
+            hub,
+            policy_name,
+            key_type,
+            show_all,
+            include_eventhub
+        )
+        return {'connectionString': conn_str if show_all else conn_str[0]}
+
+
+def _get_hub_connection_string(
+    discovery,
+    hub,
+    policy_name,
+    key_type,
+    show_all,
+    include_eventhub
+):
+
+    policies = []
+    if show_all:
+        policies.extend(
+            discovery.find_policy(
+                hub.name,
+                hub.additional_properties['resourcegroup'],
+                "auto",
+                True
+            )
+        )
+    else:
+        policies.append(
+            discovery.find_policy(
+                hub.name,
+                hub.additional_properties['resourcegroup'],
+                policy_name
+            )
+        )
+
+    if include_eventhub:
+        cs_template_eventhub = 'Endpoint={};SharedAccessKeyName={};SharedAccessKey={};EntityPath={}'
+        endpoint = hub.properties.event_hub_endpoints['events'].endpoint
+        entityPath = hub.properties.event_hub_endpoints['events'].path
+        return [
+            cs_template_eventhub.format(
+                endpoint,
+                p.key_name,
+                p.secondary_key if key_type == KeyType.secondary.value else p.primary_key,
+                entityPath
+            ) for p in policies if "serviceconnect" in p.rights.value.lower()
+        ]
+
+    hostname = hub.properties.host_name
+    cs_template = 'HostName={};SharedAccessKeyName={};SharedAccessKey={}'
+    return [
+        cs_template.format(
+            hostname,
+            p.key_name,
+            p.secondary_key
+            if key_type == KeyType.secondary.value else p.primary_key
+        ) for p in policies
+    ]
 
 
 def _iot_hub_monitor_feedback(target, device_id, wait_on_id):

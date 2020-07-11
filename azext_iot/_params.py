@@ -263,6 +263,18 @@ def load_arguments(self, _):
             help="Twin desired properties.",
         )
 
+    with self.argument_context("iot hub connection-string") as context:
+        context.argument(
+            "show_all",
+            options_list=["--show-all", "--all"],
+            help="Allow to show all shared access policies."
+        )
+        context.argument(
+            "include_eventhub",
+            options_list=["--include-eventhub", "--eh"],
+            help="To get eventhub compatible connection-string for the IoT Hub\'s default eventhub."
+        )
+
     with self.argument_context("iot hub job") as context:
         context.argument("job_id", options_list=["--job-id"], help="IoT Hub job Id.")
         context.argument(

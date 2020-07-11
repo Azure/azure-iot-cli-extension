@@ -34,7 +34,10 @@ class IotHubDiscovery(object):
                 self.client = self.cmd
             self.sub_id = self.client.config.subscription_id
 
-    def find_iothub(self, hub_name, rg=None):
+    def get_iothubs(self, rg=None):
+        return self.find_iothub('auto', rg, True)
+
+    def find_iothub(self, hub_name, rg=None, show_all=False):
         from azure.mgmt.iothub.models import ErrorDetailsException
         self._self_initialize_client()
 
@@ -48,7 +51,7 @@ class IotHubDiscovery(object):
                     )
                 )
 
-        hubs_pager = self.client.list_by_subscription()
+        hubs_pager = self.client.list_by_resource_group(rg) if rg else self.client.list_by_subscription()
         hubs_list = []
 
         try:
@@ -56,6 +59,9 @@ class IotHubDiscovery(object):
                 hubs_list.extend(hubs_pager.advance_page())
         except StopIteration:
             pass
+
+        if show_all:
+            return hubs_list
 
         if hubs_list:
             target_hub = next(
@@ -70,7 +76,7 @@ class IotHubDiscovery(object):
             )
         )
 
-    def find_policy(self, hub_name, rg, policy_name="auto"):
+    def find_policy(self, hub_name, rg, policy_name="auto", show_all=False):
         self._self_initialize_client()
 
         if policy_name.lower() != "auto":
@@ -88,6 +94,9 @@ class IotHubDiscovery(object):
                 policy_list.extend(policy_pager.advance_page())
         except StopIteration:
             pass
+
+        if show_all:
+            return policy_list
 
         for policy in policy_list:
             rights_set = set(policy.rights.split(", "))
