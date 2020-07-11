@@ -12,3 +12,6 @@ class FileNames:
     )
     central_device_file = "central/json/device.json"
     central_device_twin_file = "central/json/device_twin.json"
+    central_property_validation_template_file = (
+        "central/json/property_validation_template.json"
+    )

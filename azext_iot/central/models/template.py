@@ -18,15 +18,15 @@ class Template:
         except:
             raise CLIError("Could not parse iot central device template.")
 
-    def get_schema(self, telemetry_name, interface_name=""):
+    def get_schema(self, name, interface_name=""):
         # interface_name has been specified, do a pointed lookup
         if interface_name:
             interface = self.interfaces.get(interface_name, {})
-            return interface.get(telemetry_name)
+            return interface.get(name)
 
-        # find first matching telemetry_name in any interface
+        # find first matching name in any interface
         for interface in self.interfaces.values():
-            schema = interface.get(telemetry_name)
+            schema = interface.get(name)
             if schema:
                 return schema
 
@@ -55,3 +55,11 @@ class Template:
             interface_name: list(interface_schemas.keys())
             for interface_name, interface_schemas in interfaces.items()
         }
+
+    def _get_interface_list_property(self, property_name):
+        # returns the list of interfaces where property with property_name is defined
+        return [
+            interface
+            for interface, schema in self.schema_names.items()
+            if property_name in schema
+        ]

@@ -125,7 +125,7 @@ class CentralParser(CommonParser):
         name_miss = []
         for telemetry_name, telemetry in payload.items():
             schema = template.get_schema(
-                telemetry_name=telemetry_name, interface_name=self.interface_name
+                name=telemetry_name, interface_name=self.interface_name
             )
             if not schema:
                 name_miss.append(telemetry_name)
