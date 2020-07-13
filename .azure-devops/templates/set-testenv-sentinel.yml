@@ -1,7 +1,4 @@
 steps:
-  - env:
-    AZEXT_IOT_CENTRAL_APP_ID: $(azext_iot_central_app_id)
-
   - task: PythonScript@0
     displayName : 'Set test envs with sentinel values'
     name: 'setTestEnvSentinel'
@@ -22,3 +19,6 @@ steps:
         f.writelines(envvars_sentinel)
         print(envvars_sentinel)
         f.close()
+    
+    env:
+      AZEXT_IOT_CENTRAL_APP_ID: $(azext_iot_central_app_id)
