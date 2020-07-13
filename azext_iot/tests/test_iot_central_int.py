@@ -114,7 +114,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
         # Test with invalid app-id
         self.cmd(
-            "iotcentral app monitor-events --app-id {} --token {}".format(
+            "iotcentral app monitor-events --app-id {} --token {} -y".format(
                 APP_ID + "zzz", TOKEN
             ),
             expect_failure=True,
@@ -537,7 +537,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             asserts = []
 
         output = self.command_execute_assert(
-            "iot central app monitor-events -n {} -d {} --et {} --to 1 --token {}".format(
+            "iot central app monitor-events -n {} -d {} --et {} --to 1 --token {} -y".format(
                 APP_ID, device_id, enqueued_time, TOKEN
             ),
             asserts,

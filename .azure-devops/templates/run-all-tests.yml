@@ -5,4 +5,4 @@ steps:
     azureSubscription: AzIoTCLIService
     scriptType: bash
     scriptLocation: inlineScript
-    inlineScript: pytest --junitxml "TEST-results.xml"
+    inlineScript: pytest -vv -rf azext_iot/tests/ --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-full-results.xml
