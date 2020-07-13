@@ -9,7 +9,7 @@ steps:
         # application code changes.
         import os
         envvars = {
-            "AZURE_TEST_RUN_LIVE"=True,
+            "AZURE_TEST_RUN_LIVE":True,
             "azext_iot_testrg": os.environ["AZEXT_IOT_TESTRG"],
             "azext_iot_testhub": os.environ["AZEXT_IOT_TESTHUB"],
             "azext_iot_testhub_cs": os.environ["AZEXT_IOT_TESTHUB_CS"],
