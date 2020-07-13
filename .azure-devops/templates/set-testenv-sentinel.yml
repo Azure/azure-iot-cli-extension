@@ -7,21 +7,15 @@ steps:
       script: |
         # This task is in place to get around DevOps pipelines env var naming rules which would require
         # application code changes.
-        sentinel_value = "sentinel"
-        envvars = [
-            "azext_iot_testhub",
-            "azext_iot_testhub_cs",
-            "azext_iot_testrg",
-            "azext_iot_testdps",
-            "azext_pnp_endpoint",
-            "azext_pnp_repository",
-            "azext_pnp_cs",
-            "azext_iot_central_app_id",
-        ]
+        import os
+        envvars = {
+            "azext_iot_central_app_id": os.environ["azext_iot_central_app_id"],
+        }
         f = open("./pytest.ini", "w+")
         f.write("[pytest]\n")
         f.write("junit_family = xunit1\n")
         f.write("env = \n")
-        envvars_sentinel = ["  {}={}\n".format(envvar, sentinel_value) for envvar in envvars]
+        envvars_sentinel = ["  {}={}\n".format(key, val) for key, val in envvars.items()]
         f.writelines(envvars_sentinel)
+        print(envvars_sentinel)
         f.close()
