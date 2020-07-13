@@ -1,0 +1,8 @@
+steps:
+- task: AzureCLI@2
+  displayName: 'Set az context'
+  inputs:
+    azureSubscription: AzIoTCLIService
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: 'echo "success"'
