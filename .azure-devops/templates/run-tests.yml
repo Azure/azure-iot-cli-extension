@@ -8,7 +8,6 @@ steps:
     inputs:
       versionSpec: ${{ parameters.pythonVersion }}
       architecture: 'x64'
-      azureSubscription: AzIoTCLIService
 
   - ${{ if eq(parameters.runWithAzureCliReleased, 'false') }}:
     - template: install-azure-cli-edge.yml
@@ -26,8 +25,7 @@ steps:
 
   - ${{ if eq(parameters.runUnitTestsOnly, 'false') }}:
     - template: set-testenv-sentinel.yml
-    - template: set-az-context.yml
-    - script: pytest --junitxml "TEST-results.xml"
+    - template: run-all-tests.yml
       displayName: 'Execute all Tests'
 
   - ${{ if eq(parameters.runUnitTestsOnly, 'true') }}:

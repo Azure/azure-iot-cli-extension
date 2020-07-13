@@ -5,4 +5,4 @@ steps:
     azureSubscription: AzIoTCLIService
     scriptType: bash
     scriptLocation: inlineScript
-    inlineScript: 'echo "success"'
+    inlineScript: pytest --junitxml "TEST-results.xml"
