@@ -26,7 +26,6 @@ steps:
   - ${{ if eq(parameters.runUnitTestsOnly, 'false') }}:
     - template: set-testenv-sentinel.yml
     - template: run-all-tests.yml
-      displayName: 'Execute all Tests'
 
   - ${{ if eq(parameters.runUnitTestsOnly, 'true') }}:
     - template: set-testenv-sentinel.yml

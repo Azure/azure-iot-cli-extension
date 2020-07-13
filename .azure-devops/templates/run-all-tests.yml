@@ -1,6 +1,6 @@
 steps:
 - task: AzureCLI@2
-  displayName: 'Set az context'
+  displayName: 'Run all tests'
   inputs:
     azureSubscription: AzIoTCLIService
     scriptType: bash
