@@ -21,13 +21,14 @@ def start_property_monitor(
     cmd,
     device_id,
     app_id,
+    token,
     central_dns_suffix=CENTRAL_ENDPOINT,
     polling_interval_seconds=DEVICETWIN_POLLING_INTERVAL_SEC,
 ):
     prev_twin = None
 
     device_twin_provider = CentralDeviceTwinProvider(
-        cmd=cmd, app_id=app_id, device_id=device_id
+        cmd=cmd, app_id=app_id, token=token, device_id=device_id
     )
 
     while True:

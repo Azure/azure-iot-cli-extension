@@ -112,7 +112,7 @@ class TestCentralHelpers:
 
         # Test to ensure get_iot_central_tokens calls requests.post and tokens are returned
         assert (
-            get_iot_central_tokens(Cmd(), "app_id", "api-uri").value()
+            get_iot_central_tokens(Cmd(), "app_id", "", "api-uri").value()
             == "fixture_requests_post value"
         )
 

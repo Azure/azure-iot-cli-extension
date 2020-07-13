@@ -17,7 +17,7 @@ logger = get_logger(__name__)
 
 
 class CentralDeviceTwinProvider:
-    def __init__(self, cmd, app_id: str, device_id: str):
+    def __init__(self, cmd, app_id: str, token: str, device_id: str):
         """
         Provider for devicetwin APIs
 
@@ -31,12 +31,15 @@ class CentralDeviceTwinProvider:
         """
         self._cmd = cmd
         self._app_id = app_id
+        self._token = token
         self._device_id = device_id
 
     def get_device_twin(self, central_dns_suffix):
         from azext_iot.common._azure import get_iot_central_tokens
 
-        tokens = get_iot_central_tokens(self._cmd, self._app_id, central_dns_suffix)
+        tokens = get_iot_central_tokens(
+            self._cmd, self._app_id, self._token, central_dns_suffix
+        )
 
         exception = None
 
