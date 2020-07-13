@@ -25,6 +25,7 @@ steps:
 
   - ${{ if eq(parameters.runUnitTestsOnly, 'false') }}:
     - template: set-testenv-sentinel.yml
+    - template: set-az-account.yml
     - script: pytest --junitxml "TEST-results.xml"
       displayName: 'Execute all Tests'
 

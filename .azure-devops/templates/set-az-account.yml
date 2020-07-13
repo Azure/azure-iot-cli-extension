@@ -1,0 +1,8 @@
+steps:
+  - task: AzureCLI@2
+    displayName: 'Set Azure Context'
+    inputs:
+      azureSubscription: AzIoTCLIService
+      scriptType: ps
+      scriptLocation: inlineScript
+      inlineScript: 'Write-Host "success"'
