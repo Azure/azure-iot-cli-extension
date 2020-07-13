@@ -9,7 +9,17 @@ steps:
         # application code changes.
         import os
         envvars = {
+            "AZURE_TEST_RUN_LIVE"=True,
+            "azext_iot_testrg": os.environ["AZEXT_IOT_TESTRG"],
+            "azext_iot_testhub": os.environ["AZEXT_IOT_TESTHUB"],
+            "azext_iot_testhub_cs": os.environ["AZEXT_IOT_TESTHUB_CS"],
+            "azext_iot_testdps": os.environ["AZEXT_IOT_TESTDPS"],
+            "azext_iot_teststorageuri": os.environ["AZEXT_IOT_TESTSTORAGEURI"],
+            "azext_iot_testidentity": os.environ["AZEXT_IOT_TESTIDENTITY"],
             "azext_iot_central_app_id": os.environ["AZEXT_IOT_CENTRAL_APP_ID"],
+            "azext_pnp_endpoint": os.environ["AZEXT_PNP_ENDPOINT"],
+            "azext_pnp_repository": os.environ["AZEXT_PNP_REPOSITORY"],
+            "azext_pnp_cs": os.environ["AZEXT_PNP_CS"],
         }
         f = open("./pytest.ini", "w+")
         f.write("[pytest]\n")
@@ -21,4 +31,13 @@ steps:
         f.close()
     
     env:
+      AZEXT_IOT_TESTRG: $(azext_iot_testrg)
+      AZEXT_IOT_TESTHUB: $(azext_iot_testhub)
+      AZEXT_IOT_TESTHUB_CS: $(azext_iot_testhub_cs)
+      AZEXT_IOT_TESTDPS: $(azext_iot_testdps)
+      AZEXT_IOT_TESTSTORAGEURI: $(azext_iot_teststorageuri)
+      AZEXT_IOT_TESTIDENTITY: $(azext_iot_testidentity)
       AZEXT_IOT_CENTRAL_APP_ID: $(azext_iot_central_app_id)
+      AZEXT_PNP_ENDPOINT: $(azext_pnp_endpoint)
+      AZEXT_PNP_REPOSITORY: $(azext_pnp_repository)
+      AZEXT_PNP_CS: $(azext_pnp_cs)
