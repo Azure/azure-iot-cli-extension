@@ -114,7 +114,6 @@ def load_central_arguments(self, _):
             help="Maximum number of messages to recieve from target device before terminating connection."
             "Use 0 for infinity.",
         )
-
     # TODO: Delete this by end of July 2020
     load_deprecated_iotcentral_params(self, _)
 

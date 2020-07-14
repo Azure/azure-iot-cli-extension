@@ -1,0 +1,161 @@
+{
+  "id": "urn:d9cltbeus:tvj4oal1a0",
+  "etag": "\"~WgqHZmg+d95gTA53P8AnqBsDLGgj2wa0msOL7xozC9Y=\"",
+  "types": [
+    "DeviceModel"
+  ],
+  "displayName": "property-validation",
+  "capabilityModel": {
+    "@id": "urn:sampleApp:groupOne_bz:2",
+    "@type": [
+      "CapabilityModel"
+    ],
+    "implements": [
+      {
+        "@id": "urn:sampleApp:groupOne_bz:_rpgcmdpo:1",
+        "@type": [
+          "InterfaceInstance"
+        ],
+        "displayName": "Interface",
+        "name": "groupOne_g4",
+        "schema": {
+          "@id": "urn:sampleApp:groupOne_g4:1",
+          "@type": [
+            "Interface"
+          ],
+          "displayName": "Interface",
+          "contents": [
+            {
+              "@id": "urn:sampleApp:groupOne_g4:Model:1",
+              "@type": [
+                "Property"
+              ],
+              "displayName": "Model",
+              "name": "Model",
+              "schema": "string"
+            },
+            {
+              "@id": "urn:sampleApp:groupOne_g4:Version:1",
+              "@type": [
+                "Property"
+              ],
+              "displayName": "Version",
+              "name": "Version",
+              "schema": "string"
+            },
+            {
+              "@id": "urn:sampleApp:groupOne_g4:TotalStorage:1",
+              "@type": [
+                "Property"
+              ],
+              "displayName": "TotalStorage",
+              "name": "TotalStorage",
+              "schema": "string"
+            }
+          ]
+        }
+      },
+      {
+        "@id": "urn:sampleApp:groupTwo_bz:myxqftpsr:2",
+        "@type": [
+          "InterfaceInstance"
+        ],
+        "displayName": "Interface",
+        "name": "groupTwo_ed",
+        "schema": {
+          "@id": "urn:sampleApp:groupTwo_ed:1",
+          "@type": [
+            "Interface"
+          ],
+          "displayName": "Interface",
+          "contents": [
+            {
+              "@id": "urn:sampleApp:groupTwo_ed:Model:1",
+              "@type": [
+                "Property"
+              ],
+              "displayName": "Model",
+              "name": "Model",
+              "schema": "string"
+            },
+            {
+              "@id": "urn:sampleApp:groupThree_ed:Manufacturer:1",
+              "@type": [
+                "Property"
+              ],
+              "displayName": "Manufacturer",
+              "name": "Manufacturer",
+              "schema": "string"
+            }
+          ]
+        }
+      },
+      {
+        "@id": "urn:sampleApp:groupThree_bz:myxqftpsr:2",
+        "@type": [
+          "InterfaceInstance"
+        ],
+        "displayName": "Interface",
+        "name": "groupThree_ed",
+        "schema": {
+          "@id": "urn:sampleApp:groupThree_ed:1",
+          "@type": [
+            "Interface"
+          ],
+          "displayName": "Interface",
+          "contents": [
+            {
+              "@id": "urn:sampleApp:groupThree_ed:Manufacturer:1",
+              "@type": [
+                "Property"
+              ],
+              "displayName": "Manufacturer",
+              "name": "Manufacturer",
+              "schema": "string"
+            },
+            {
+              "@id": "urn:sampleApp:groupThree_g4:Version:1",
+              "@type": [
+                "Property"
+              ],
+              "displayName": "Version",
+              "name": "Version",
+              "schema": "string"
+            },
+            {
+              "@id": "urn:sampleApp:groupThree_ed:Model:1",
+              "@type": [
+                "Property"
+              ],
+              "displayName": "Model",
+              "name": "Model",
+              "schema": "string"
+            },
+            {
+              "@id": "urn:sampleApp:groupThree_ed:OsName:1",
+              "@type": [
+                "Property"
+              ],
+              "displayName": "OsName",
+              "name": "OsName",
+              "schema": "string"
+            }
+          ]
+        }
+      }
+    ],
+    "displayName": "property_validation",
+    "@context": [
+      "http://azureiot.com/v1/contexts/IoTModel.json"
+    ]
+  },
+  "solutionModel": {
+    "@id": "urn:d9cltbeus:lz1tl4a_jz",
+    "@type": [
+      "SolutionModel"
+    ],
+    "cloudProperties": [],
+    "initialValues": [],
+    "overrides": []
+  }
+}

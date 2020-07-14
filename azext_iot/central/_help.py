@@ -390,6 +390,22 @@ def _load_central_monitors_help():
             az iot central app monitor-properties --app-id {app_id} -d {device_id}
     """
 
+    helps[
+        "iot central app validate-properties"
+    ] = """
+        type: command
+        short-summary: Validate reported properties sent to IoT Central app.
+        long-summary: |
+                    Performs validations on reported property updates:
+                    1) Warning - Properties sent by device that are not modeled in central.
+                    2) Warning - Properties with same name declared in multiple interfaces
+                       should have interface name included as part of the property update.
+        examples:
+        - name: Basic usage
+          text: >
+            az iot central app validate-properties --app-id {app_id} -d {device_id}
+    """
+
 
 # TODO: Delete this by July 2020
 def _load_central_deprecated_commands():
