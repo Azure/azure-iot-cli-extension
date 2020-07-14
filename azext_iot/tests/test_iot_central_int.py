@@ -19,7 +19,6 @@ from azext_iot.monitor.parsers import strings
 from . import CaptureOutputLiveScenarioTest, helpers
 
 APP_ID = os.environ.get("azext_iot_central_app_id")
-TOKEN = os.environ.get("azext_iot_central_app_token")
 
 device_template_path = get_context_path(
     __file__, "central/json/device_template_int_test.json"
@@ -27,9 +26,7 @@ device_template_path = get_context_path(
 sync_command_params = get_context_path(__file__, "central/json/sync_command_args.json")
 
 if not all([APP_ID]):
-    raise ValueError(
-        "Set azext_iot_central_app_id and azext_iot_central_app_token to run central integration tests."
-    )
+    raise ValueError("Set azext_iot_central_app_id to run central integration tests.")
 
 
 class TestIotCentral(CaptureOutputLiveScenarioTest):
@@ -229,7 +226,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         for issue in expected_issues:
             assert issue in output
 
-    def test_central_device_methods_CRLD(self):
+    def test_central_device_methods_CRD(self):
         (device_id, device_name) = self._create_device()
 
         self.cmd(
@@ -242,13 +239,9 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             ],
         )
 
-        list_output = self.cmd("iot central app device list --app-id {}".format(APP_ID))
-
         self._delete_device(device_id)
 
-        assert device_id in list_output.get_output_in_json()
-
-    def test_central_device_template_methods_CRLD(self):
+    def test_central_device_template_methods_CRD(self):
         # currently: create, show, list, delete
         (template_id, template_name) = self._create_device_template()
 
@@ -262,19 +255,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             ],
         )
 
-        list_output = self.cmd(
-            "iot central app device-template list --app-id {}".format(APP_ID)
-        )
-        map_output = self.cmd(
-            "iot central app device-template map --app-id {}".format(APP_ID)
-        )
-
         self._delete_device_template(template_id)
-
-        assert template_id in list_output.get_output_in_json()
-
-        map_json = map_output.get_output_in_json()
-        assert map_json[template_name] == template_id
 
     def test_central_device_registration_info_registered(self):
         (template_id, _) = self._create_device_template()
