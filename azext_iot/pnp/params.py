@@ -22,6 +22,13 @@ def load_pnp_arguments(self, _):
     """
     Load CLI Args for Knack parser
     """
+    with self.argument_context("iot pnp") as context:
+        context.argument(
+            "pnp_dns_suffix",
+            options_list=["--pnp-dns-suffix"],
+            help="An optional PnP DNS suffix used to interact with different PnP environments"
+        )
+
     with self.argument_context("iot pnp role-assignment") as context:
         context.argument(
             "resource_id",

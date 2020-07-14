@@ -103,7 +103,7 @@ def load_pnp_help():
     examples:
     - name: Create a new model by uploading a JSON file
       text: >
-        az iot pnp model create -m {model_id} --model {path\\to\\definition\\file.json}
+        az iot pnp model create --model {path\\to\\definition\\file.json}
     """
 
     helps["iot pnp model show"] = """

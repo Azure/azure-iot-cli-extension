@@ -13,9 +13,9 @@ from knack.util import CLIError
 
 
 class RepoResourceProvider(PnPModelRepositoryManager):
-    def __init__(self, cmd):
+    def __init__(self, cmd, pnp_dns_suffix=None):
         super(RepoResourceProvider, self).__init__(cmd=cmd)
-        self.mgmt_sdk = self.get_mgmt_sdk()
+        self.mgmt_sdk = self.get_mgmt_sdk(pnp_dns_suffix)
 
     def create(self):
         try:

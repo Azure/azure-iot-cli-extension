@@ -35,5 +35,5 @@ def load_pnp_commands(self, _):
     ) as cmd_group:
         cmd_group.command("show", "iot_pnp_model_show")
         cmd_group.command("create", "iot_pnp_model_create")
-        cmd_group.command("publish", "iot_pnp_model_publish")
+        cmd_group.command("publish", "iot_pnp_model_publish", confirmation=True)
         cmd_group.command("list", "iot_pnp_model_list")

@@ -14,9 +14,9 @@ from knack.util import CLIError
 
 
 class ModelApiProvider(PnPModelRepositoryApiManager):
-    def __init__(self, cmd):
+    def __init__(self, cmd, pnp_dns_suffix=None):
         super(ModelApiProvider, self).__init__(cmd=cmd)
-        self.mgmt_sdk = self.get_mgmt_sdk()
+        self.mgmt_sdk = self.get_mgmt_sdk(pnp_dns_suffix)
 
     def get_model(self, model_id, expand=False):
         try:
@@ -27,9 +27,7 @@ class ModelApiProvider(PnPModelRepositoryApiManager):
             raise CLIError(unpack_msrest_error(e))
 
     def create_model(
-        self,
-        model_id,
-        json_ld_model,
+        self, model_id, json_ld_model,
     ):
         try:
             return self.mgmt_sdk.create_or_update_async(
@@ -42,14 +40,20 @@ class ModelApiProvider(PnPModelRepositoryApiManager):
             raise CLIError(unpack_msrest_error(e))
 
     def publish_model(
-        self,
-        model_id,
+        self, model_id,
     ):
         try:
+            model_response = self.mgmt_sdk.get_model_async(model_id, raw=True)
+            etag = model_response.response.headers.get("eTag")
+            if not etag:
+                raise CLIError(
+                    "No model found with @id `{}` to publish".format(model_id)
+                )
+            etag = etag.replace('\\"', "")
             return self.mgmt_sdk.create_or_update_async(
                 model_id=model_id,
                 update_metadata=True,
-                if_match='*',
+                if_match=etag,
                 x_ms_model_state=ModelState.listed.value,
                 raw=True,
             ).response.json()
@@ -67,7 +71,6 @@ class ModelApiProvider(PnPModelRepositoryApiManager):
                 model_search_options=search_options,
                 x_ms_show_shared_models_only=shared_models_only,
                 custom_headers=headers,
-                x_ms_page_size=top,
                 raw=True,
             )
 
@@ -77,13 +80,10 @@ class ModelApiProvider(PnPModelRepositoryApiManager):
         except CloudError as e:
             raise CLIError(unpack_msrest_error(e))
 
-    def validate_models(
-        self, models=None, validate_dependencies=None
-    ):
+    def validate_models(self, models=None, validate_dependencies=None):
         try:
             return self.mgmt_sdk.are_valid_models(
-                json_ld_models=models,
-                validate_dependencies=validate_dependencies,
+                json_ld_models=models, validate_dependencies=validate_dependencies,
             )
         except CloudError as e:
             raise CLIError(unpack_msrest_error(e))

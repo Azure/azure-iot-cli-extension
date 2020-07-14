@@ -1,5 +1,5 @@
 {
-    "@id": "dtmi:iotcli:cli_model_test;",
+    "@id": "dtmi:iotpnpcli",
     "@type": "Interface",
     "displayName": "My Sample Root Interface",
     "contents": [
