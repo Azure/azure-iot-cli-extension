@@ -331,12 +331,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             " --cn {}"
             " -k '{}'"
             "".format(
-                APP_ID,
-                device_id,
-                interface_id,
-                command_name,
-                sync_command_params,
-                TOKEN,
+                APP_ID, device_id, interface_id, command_name, sync_command_params
             )
         )
 
