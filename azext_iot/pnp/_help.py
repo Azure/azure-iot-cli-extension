@@ -24,15 +24,15 @@ def load_pnp_help():
 
     helps["iot pnp repo create"] = """
         type: command
-        short-summary: Create a new PnP tenant repository.
+        short-summary: Create a new PnP company repository for your tenant.
         long-summary: |
-          Note that this command takes no parameters. The repository will be created in your tenant,
+          Note that this command takes no parameters. The company repository will be created in your tenant,
           and the user who creates the repository will be granted the TenantAdministrator role.
     """
 
     helps["iot pnp repo list"] = """
         type: command
-        short-summary: List PnP repositories in your tenant
+        short-summary: List PnP repositories for your tenant
     """
 
     helps["iot pnp role-assignment"] = """
@@ -58,7 +58,7 @@ def load_pnp_help():
 
     helps["iot pnp role-assignment create"] = """
         type: command
-        short-summary: Creates role assignments for a specific resource and user or service principal.
+        short-summary: Creates a role assignment for a user or service principal to a specific resource.
 
         examples:
         - name: Assign a user the role of Tenant Administrator
@@ -80,7 +80,7 @@ def load_pnp_help():
 
     helps["iot pnp role-assignment delete"] = """
         type: command
-        short-summary: Deletes a role assignment for a specific resource and user or service principal
+        short-summary: Deletes a role assignment for a user or service principal to a specific resource
 
         examples:
         - name: Remove an assigned role for a specific user
@@ -93,12 +93,12 @@ def load_pnp_help():
 
     helps["iot pnp model"] = """
     type: group
-    short-summary: Create, view, and publish device models in your PnP model repository.
+    short-summary: Create, view, and publish device models in your company repository.
     """
 
     helps["iot pnp model create"] = """
     type: command
-    short-summary: Create a new device model in your PnP model repository
+    short-summary: Create a new device model in your company repository
 
     examples:
     - name: Create a new model by uploading a JSON file
@@ -108,17 +108,17 @@ def load_pnp_help():
 
     helps["iot pnp model show"] = """
     type: command
-    short-summary: View a device model in your PnP model repository
+    short-summary: View a device model by ID
 
     examples:
-    - name: View a model named {dtmi:my:model}
+    - name: View a model with the ID {dtmi:my:model}
       text: >
         az iot pnp model show --dtmi {dtmi:my:model}
     """
 
     helps["iot pnp model list"] = """
     type: command
-    short-summary: List or search for models in your PnP model repository
+    short-summary: List or search for models in the PnP model repository
 
     examples:
     - name: List all models in the repository
@@ -136,10 +136,10 @@ def load_pnp_help():
 
     helps["iot pnp model publish"] = """
     type: command
-    short-summary: Publish a device model located in your PnP model repository.
+    short-summary: Publish a device model located in your company repository.
 
     examples:
-    - name: Publish a model named {dtmi:my:model}
+    - name: Publish a model with the ID {dtmi:my:model}
       text: >
         az iot pnp model publish --model-id {dtmi:my:model}
     """
