@@ -58,7 +58,6 @@ class TestModelRepoModelCreate(object):
         url = args[0][0].url
         method = args[0][0].method
         data = args[0][0].data
-        headers = args[0][0].headers
 
         assert method == "PUT"
         assert "/models/{}?".format(url_encode_str(model_id, plus=True)) in url
@@ -87,9 +86,7 @@ class TestModelRepoModelCreate(object):
     @pytest.mark.parametrize("model_id, exp", [("", CLIError)])
     def test_model_create_invalid_args(self, serviceclient, model_id, exp):
         with pytest.raises(exp):
-            dataplane.iot_pnp_model_create(
-                fixture_cmd, model='{{}'
-            )
+            dataplane.iot_pnp_model_create(fixture_cmd, model="{{}")
 
     def test_model_create_invalid_payload(self, serviceclient):
 
@@ -142,9 +139,13 @@ class TestModelRepoModelPublish(object):
             "@context": "http://azureiot.com/v1/contexts/CapabilityModel.json",
         }
         test_side_effect = [
-            build_mock_response(mocker, request.param[0], payload=payload_list, headers={'eTag': 'eTag'}),
-            build_mock_response(mocker, request.param[1], payload=payload_show, headers={'eTag': 'eTag'}),
-            build_mock_response(mocker, request.param[2], {}, headers={'eTag': 'eTag'}),
+            build_mock_response(
+                mocker, request.param[0], payload=payload_list, headers={"eTag": "eTag"}
+            ),
+            build_mock_response(
+                mocker, request.param[1], payload=payload_show, headers={"eTag": "eTag"}
+            ),
+            build_mock_response(mocker, request.param[2], {}, headers={"eTag": "eTag"}),
         ]
         service_client.side_effect = test_side_effect
         return service_client
@@ -157,8 +158,8 @@ class TestModelRepoModelPublish(object):
         args = serviceclient.call_args
         url = args[0][0].url
         method = args[0][0].method
-        data = args[0][0].data
         headers = args[0][0].headers
+
         assert method == "PUT"
         assert "/models/{}?".format(url_encode_str(target_model, plus=True)) in url
         assert "update-metadata=true" in url
@@ -206,7 +207,6 @@ class TestModelRepoModelShow(object):
         args = serviceclient.call_args
         url = args[0][0].url
         method = args[0][0].method
-        headers = args[0][0].headers
 
         assert method == "GET"
         assert "/models/{}?".format(url_encode_str(target_model, plus=True)) in url
@@ -337,8 +337,6 @@ class TestModelRepoRepoCreate(object):
         args = serviceclient.call_args
         url = args[0][0].url
         method = args[0][0].method
-        data = args[0][0].data
-        headers = args[0][0].headers
 
         assert "/tenants" in url
         assert method == "PUT"
@@ -356,8 +354,6 @@ class TestModelRepoRepoList(object):
         args = serviceclient.call_args
         url = args[0][0].url
         method = args[0][0].method
-        data = args[0][0].data
-        headers = args[0][0].headers
 
         assert "/tenants" in url
         assert method == "GET"
@@ -377,7 +373,7 @@ class TestModelRepoRBAC(object):
         return service_client
 
     @pytest.mark.parametrize(
-        ["role", "resource_id", "resource_type", "subject_id", "subject_type",],
+        ["role", "resource_id", "resource_type", "subject_id", "subject_type"],
         [
             (
                 RoleIdentifier.modelAdmin,
@@ -432,7 +428,6 @@ class TestModelRepoRBAC(object):
         url = args[0][0].url
         method = args[0][0].method
         data = json.loads(args[0][0].data)
-        headers = args[0][0].headers
 
         assert method == "PUT"
         assert (
@@ -462,7 +457,6 @@ class TestModelRepoRBAC(object):
         args = serviceclient_arr.call_args
         url = args[0][0].url
         method = args[0][0].method
-        headers = args[0][0].headers
 
         assert method == "GET"
         assert (
@@ -509,9 +503,7 @@ class TestModelRepoRBAC(object):
         )
         args = serviceclient.call_args
         url = args[0][0].url
-        method = args[0][0].method
-        headers = args[0][0].headers
-        assert method == "DELETE"
+
         assert (
             "/resources/{0}/types/{1}/subjects/{2}/roles/{3}".format(
                 url_encode_str(resource_id),

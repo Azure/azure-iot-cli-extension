@@ -5,7 +5,6 @@
 # --------------------------------------------------------------------------------------------
 
 import pytest
-import random
 import json
 import os
 
@@ -47,7 +46,8 @@ class TestPnPModelLifecycle(PNPLiveScenarioTest):
         if self._testMethodName == "test_model_lifecycle":
 
             roles = self.cmd(
-                "iot pnp role-assignment list --resource-id {repo_id} --resource-type Tenant --subject-id {user_id} --pnp-dns-suffix {pnp_dns_suffix}"
+                "iot pnp role-assignment list --resource-id {repo_id} --resource-type Tenant --subject-id {user_id} "
+                "--pnp-dns-suffix {pnp_dns_suffix}"
             )
             # check for TenantAdministrator
             try:
@@ -63,11 +63,13 @@ class TestPnPModelLifecycle(PNPLiveScenarioTest):
             # Assign roles for model test
 
             self.cmd(
-                "iot pnp role-assignment create --resource-id {repo_id} --resource-type Tenant --subject-id {user_id} --subject-type {user_type} --role ModelsCreator --pnp-dns-suffix {pnp_dns_suffix}"
+                "iot pnp role-assignment create --resource-id {repo_id} --resource-type Tenant --subject-id {user_id} "
+                "--subject-type {user_type} --role ModelsCreator --pnp-dns-suffix {pnp_dns_suffix}"
             )
 
             self.cmd(
-                "iot pnp role-assignment create --resource-id {repo_id} --resource-type Tenant --subject-id {user_id} --subject-type {user_type} --role ModelsPublisher --pnp-dns-suffix {pnp_dns_suffix}"
+                "iot pnp role-assignment create --resource-id {repo_id} --resource-type Tenant --subject-id {user_id} "
+                "--subject-type {user_type} --role ModelsPublisher --pnp-dns-suffix {pnp_dns_suffix}"
             )
 
             # Generate model ID
@@ -93,11 +95,13 @@ class TestPnPModelLifecycle(PNPLiveScenarioTest):
             # RBAC for model integration tests (create, show, publish models in tenant)
 
             self.cmd(
-                "iot pnp role-assignment delete --resource-id {repo_id} --resource-type Tenant --subject-id {user_id} --role ModelsCreator --pnp-dns-suffix {pnp_dns_suffix}"
+                "iot pnp role-assignment delete --resource-id {repo_id} --resource-type Tenant --subject-id {user_id} "
+                "--role ModelsCreator --pnp-dns-suffix {pnp_dns_suffix}"
             )
 
             self.cmd(
-                "iot pnp role-assignment delete --resource-id {repo_id} --resource-type Tenant --subject-id {user_id} --role ModelsPublisher --pnp-dns-suffix {pnp_dns_suffix}"
+                "iot pnp role-assignment delete --resource-id {repo_id} --resource-type Tenant --subject-id {user_id} "
+                "--role ModelsPublisher --pnp-dns-suffix {pnp_dns_suffix}"
             )
 
     def _generate_model_id(self, model_id):
@@ -181,7 +185,8 @@ class TestPNPRepo(PNPLiveScenarioTest):
                     .as_json()[0]["tenantId"]
                 )
                 roles = self.cmd(
-                    "iot pnp role-assignment list --resource-id {0} --resource-type Tenant --subject-id {1} --pnp-dns-suffix {2}".format(
+                    "iot pnp role-assignment list --resource-id {0} --resource-type Tenant --subject-id {1} "
+                    "--pnp-dns-suffix {2}".format(
                         repo_id, self.user_id, _pnp_dns_suffix
                     )
                 )
@@ -250,9 +255,8 @@ class TestPNPRepo(PNPLiveScenarioTest):
         # get newest role assignments for user
 
         role_assignments = self.cmd(
-            "az iot pnp role-assignment list --resource-id {0} --resource-type Tenant --subject-id {1} --pnp-dns-suffix {2}".format(
-                repo_id, self.user_id, _pnp_dns_suffix
-            )
+            "az iot pnp role-assignment list --resource-id {0} --resource-type Tenant --subject-id {1} "
+            "--pnp-dns-suffix {2}".format(repo_id, self.user_id, _pnp_dns_suffix)
         ).get_output_in_json()
 
         # ensure our new role exists
@@ -272,7 +276,8 @@ class TestPNPRepo(PNPLiveScenarioTest):
         # delete role assignment
 
         self.cmd(
-            "az iot pnp role-assignment delete --resource-id {0} --resource-type Tenant --role {1} --subject {2} --pnp-dns-suffix {3}".format(
+            "az iot pnp role-assignment delete --resource-id {0} --resource-type Tenant --role {1} --subject {2} "
+            "--pnp-dns-suffix {3}".format(
                 repo_id, new_role, self.user_id, _pnp_dns_suffix
             )
         )
@@ -280,9 +285,8 @@ class TestPNPRepo(PNPLiveScenarioTest):
         # get assignments again
 
         role_assignments = self.cmd(
-            "az iot pnp role-assignment list --resource-id {0} --resource-type Tenant --subject-id {1} --pnp-dns-suffix {2}".format(
-                repo_id, self.user_id, _pnp_dns_suffix
-            )
+            "az iot pnp role-assignment list --resource-id {0} --resource-type Tenant --subject-id {1} "
+            "--pnp-dns-suffix {2}".format(repo_id, self.user_id, _pnp_dns_suffix)
         ).get_output_in_json()
 
         # ensure our new role does not exist

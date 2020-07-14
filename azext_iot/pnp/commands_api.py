@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from azext_iot.pnp.providers.model_repository_api import ModelApiProvider
-from azext_iot.sdk.pnp.dataplane.models import ModelSearchOptions, ServiceError
+from azext_iot.sdk.pnp.dataplane.models import ModelSearchOptions
 from knack.util import CLIError
 from azext_iot.common.utility import process_json_arg
 from azext_iot.operations.generic import _process_top
