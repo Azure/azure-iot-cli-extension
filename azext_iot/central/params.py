@@ -170,6 +170,14 @@ def load_deprecated_iotcentral_params(self, _):
             help="Central dns suffix. "
             "This enables running cli commands against non public/prod environments",
         )
+        context.argument(
+            "token",
+            options_list=["--token"],
+            help="Authorization token for request. "
+            "More info available here: https://docs.microsoft.com/en-us/learn/modules/manage-iot-central-apps-with-rest-api/ "
+            "MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...'). "
+            "Example: 'Bearer someBearerTokenHere'",
+        )
 
         context.argument(
             "module_id", options_list=["--module-id", "-m"], help="Iot Edge Module ID",
@@ -182,4 +190,12 @@ def load_deprecated_iotcentral_params(self, _):
             options_list=["--central-dns-suffix", "--central-api-uri"],
             help="Central dns suffix. "
             "This enables running cli commands against non public/prod environments",
+        )
+        context.argument(
+            "token",
+            options_list=["--token"],
+            help="Authorization token for request. "
+            "More info available here: https://docs.microsoft.com/en-us/learn/modules/manage-iot-central-apps-with-rest-api/ "
+            "MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...'). "
+            "Example: 'Bearer someBearerTokenHere'",
         )
