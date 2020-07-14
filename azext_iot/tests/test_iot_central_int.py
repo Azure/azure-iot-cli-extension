@@ -500,12 +500,18 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         return (template_id, template_name)
 
     def _delete_device_template(self, template_id):
-        self.cmd(
-            "iot central app device-template delete --app-id {} --device-template-id {} --token {}".format(
-                APP_ID, template_id, TOKEN
-            ),
-            checks=[self.check("result", "success")],
+        attempts = range(0, 10)
+        command = "iot central app device-template delete --app-id {} --device-template-id {} --token {}".format(
+            APP_ID, template_id, TOKEN
         )
+
+        # retry logic to delete the template
+        for _ in attempts:
+            try:
+                self.cmd(command, checks=[self.check("result", "success")])
+                return
+            except:
+                time.sleep(10)
 
     def _get_credentials(self, device_id):
         return self.cmd(
