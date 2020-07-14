@@ -25,6 +25,8 @@ central_monitor_ops = CliCommandType(
     operations_tmpl="azext_iot.central.commands_monitor#{}"
 )
 
+central_user_ops = CliCommandType(operations_tmpl="azext_iot.central.commands_user#{}")
+
 
 # Dev note - think of this as the "router" and all self.command_group as the controllers
 def load_central_commands(self, _):
@@ -38,6 +40,11 @@ def load_central_commands(self, _):
         cmd_group.command("validate-messages", "validate_messages", is_preview=True)
         cmd_group.command("monitor-properties", "monitor_properties", is_preview=True)
         cmd_group.command("validate-properties", "validate_properties", is_preview=True)
+
+    with self.command_group(
+        "iot central app user", command_type=central_user_ops, is_preview=True,
+    ) as cmd_group:
+        cmd_group.command("add-service-principal", "add_service_principal")
 
     with self.command_group(
         "iot central app device", command_type=central_device_ops, is_preview=True,

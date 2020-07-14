@@ -28,6 +28,7 @@ def load_central_help():
         """
 
     _load_central_devices_help()
+    _load_central_users_help()
     _load_central_device_templates_help()
     _load_central_device_twin_help()
     _load_central_monitors_help()
@@ -194,6 +195,22 @@ def _load_central_devices_help():
                 --interface-id {interfaceid}
                 --command-name {commandname}
         """
+
+
+def _load_central_users_help():
+    helps[
+        "iot central app user"
+    ] = """
+        type: group
+        short-summary: Manage and configure IoT Central users
+    """
+
+    helps[
+        "iot central app user add-service-principal"
+    ] = """
+        type: command
+        short-summary: Add a service principal to the app
+    """
 
 
 def _load_central_device_templates_help():
