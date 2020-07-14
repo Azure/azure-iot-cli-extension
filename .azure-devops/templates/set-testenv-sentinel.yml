@@ -8,19 +8,20 @@ steps:
         # This task is in place to get around DevOps pipelines env var naming rules which would require
         # application code changes.
         import os
+        sentinel_value = "sentinel"
         envvars = {
             "AZURE_TEST_RUN_LIVE":True,
-            "azext_iot_testrg": os.environ["AZEXT_IOT_TESTRG"],
-            "azext_iot_testhub": os.environ["AZEXT_IOT_TESTHUB"],
-            "azext_iot_testhub_cs": os.environ["AZEXT_IOT_TESTHUB_CS"],
-            "azext_iot_testdps": os.environ["AZEXT_IOT_TESTDPS"],
-            "azext_iot_teststorageuri": os.environ["AZEXT_IOT_TESTSTORAGEURI"],
-            "azext_iot_testidentity": os.environ["AZEXT_IOT_TESTIDENTITY"],
-            "azext_iot_central_app_id": os.environ["AZEXT_IOT_CENTRAL_APP_ID"],
-            "azext_iot_central_app_token": os.environ["AZEXT_IOT_CENTRAL_APP_TOKEN"],
-            "azext_pnp_endpoint": os.environ["AZEXT_PNP_ENDPOINT"],
-            "azext_pnp_repository": os.environ["AZEXT_PNP_REPOSITORY"],
-            "azext_pnp_cs": os.environ["AZEXT_PNP_CS"],
+            "azext_iot_testrg": os.environ.get("AZEXT_IOT_TESTRG", sentinel_value),
+            "azext_iot_testhub": os.environ.get("AZEXT_IOT_TESTHUB", sentinel_value),
+            "azext_iot_testhub_cs": os.environ.get("AZEXT_IOT_TESTHUB_CS", sentinel_value),
+            "azext_iot_testdps": os.environ.get("AZEXT_IOT_TESTDPS", sentinel_value),
+            "azext_iot_teststorageuri": os.environ.get("AZEXT_IOT_TESTSTORAGEURI", sentinel_value),
+            "azext_iot_testidentity": os.environ.get("AZEXT_IOT_TESTIDENTITY", sentinel_value),
+            "azext_iot_central_app_id": os.environ.get("AZEXT_IOT_CENTRAL_APP_ID", sentinel_value),
+            "azext_iot_central_app_token": os.environ.get("AZEXT_IOT_CENTRAL_APP_TOKEN", sentinel_value),
+            "azext_pnp_endpoint": os.environ.get("AZEXT_PNP_ENDPOINT", sentinel_value),
+            "azext_pnp_repository": os.environ.get("AZEXT_PNP_REPOSITORY", sentinel_value),
+            "azext_pnp_cs": os.environ.get("AZEXT_PNP_CS", sentinel_value),
         }
         f = open("./pytest.ini", "w+")
         f.write("[pytest]\n")
