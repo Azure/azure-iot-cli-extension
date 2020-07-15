@@ -13,7 +13,7 @@ from azext_iot.operations.generic import _process_top
 
 def iot_pnp_model_show(cmd, model_id, expand=False, pnp_dns_suffix=None):
     if not model_id:
-        raise CLIError("Please provide a model id [-m, --model-id]")
+        raise CLIError("Please provide a model id [--model-id]")
     ap = ModelApiProvider(cmd, pnp_dns_suffix)
     return ap.get_model(model_id, expand)
 
