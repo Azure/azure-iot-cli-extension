@@ -17,8 +17,10 @@ from azext_iot.monitor.models.enum import Severity
 from azext_iot.monitor.parsers.issue import IssueHandler
 
 DEVICE_ID_IDENTIFIER = b"iothub-connection-device-id"
-INTERFACE_NAME_IDENTIFIER = b"iothub-interface-name"
 MODULE_ID_IDENTIFIER = b"iothub-connection-module-id"
+INTERFACE_NAME_IDENTIFIER_V1 = b"iothub-interface-name"
+INTERFACE_NAME_IDENTIFIER_V2 = b"dt-dataschema"
+COMPONENT_NAME_IDENTIFIER = b"dt-subject"
 
 
 class CommonParser(AbstractBaseParser):
@@ -28,18 +30,25 @@ class CommonParser(AbstractBaseParser):
         self._message = message
         self.device_id = ""  # need to default
         self.device_id = self._parse_device_id(message)
-        self.interface_name = self._parse_interface_name(message)
         self.module_id = self._parse_module_id(message)
+        self.interface_name = self._parse_interface_name(message)
+        self.component_name = self._parse_component_name(message)
 
     def parse_message(self) -> dict:
+        """
+        Parses an AMQP based IoT Hub telemetry event.
+
+        """
+
         message = self._message
         properties = self._common_parser_args.properties
         content_type = self._common_parser_args.content_type
 
         event = {}
         event["origin"] = self.device_id
-        event["interface"] = self.interface_name
         event["module"] = self.module_id
+        event["interface"] = self.interface_name
+        event["component"] = self.component_name
 
         if not properties:
             properties = []  # guard against None being passed in
@@ -98,10 +107,22 @@ class CommonParser(AbstractBaseParser):
 
     def _parse_interface_name(self, message: Message) -> str:
         try:
-            return str(message.annotations.get(INTERFACE_NAME_IDENTIFIER), "utf8")
+            # Grab either the DTDL v1 or v2 amqp interface identifier.
+            # It's highly unlikely both will be present at the same time
+            # as they reflect different versions of a Plug & Play device.
+            target_interface = message.annotations.get(
+                INTERFACE_NAME_IDENTIFIER_V1
+            ) or message.annotations.get(INTERFACE_NAME_IDENTIFIER_V2)
+            return str(target_interface, "utf8")
         except Exception:
             # a message not containing an interface name is expected for non-pnp devices
             # so there's no "issue" to log here
+            return ""
+
+    def _parse_component_name(self, message: Message) -> str:
+        try:
+            return str(message.annotations.get(COMPONENT_NAME_IDENTIFIER), "utf8")
+        except Exception:
             return ""
 
     def _parse_system_properties(self, message: Message):

@@ -13,9 +13,6 @@ steps:
             "azext_iot_testhub_cs",
             "azext_iot_testrg",
             "azext_iot_testdps",
-            "azext_pnp_endpoint",
-            "azext_pnp_repository",
-            "azext_pnp_cs",
             "azext_iot_central_app_id",
         ]
         f = open("./pytest.ini", "w+")
