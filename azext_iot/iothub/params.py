@@ -17,7 +17,7 @@ def load_iothub_arguments(self, _):
         context.argument(
             "component_path",
             options_list=["--component-path"],
-            help="Digital twin component path.",
+            help="Digital twin component path. For example: thermostat1.",
         )
         context.argument(
             "json_patch",

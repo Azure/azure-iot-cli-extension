@@ -66,7 +66,7 @@ class TestCommonParser:
 
     @pytest.mark.parametrize(
         "device_id, encoding, content_type, interface_name, component_name, "
-        "module_id, payload, properties, app_properties, include_component",
+        "module_id, payload, properties, app_properties",
         [
             (
                 "device-id",
@@ -78,7 +78,6 @@ class TestCommonParser:
                 {"payloadKey": "payloadValue"},
                 {"propertiesKey": "propertiesValue"},
                 {"appPropsKey": "appPropsValue"},
-                True,
             ),
             (
                 "device-id",
@@ -90,7 +89,6 @@ class TestCommonParser:
                 {"payloadKey": "payloadValue"},
                 {"propertiesKey": "propertiesValue"},
                 {"appPropsKey": "appPropsValue"},
-                False,
             ),
             (
                 "device-id",
@@ -102,7 +100,6 @@ class TestCommonParser:
                 {"payloadKey": "payloadValue"},
                 {"propertiesKey": "propertiesValue"},
                 {"appPropsKey": "appPropsValue"},
-                True,
             ),
             (
                 "device-id",
@@ -114,7 +111,6 @@ class TestCommonParser:
                 {"payloadKey": "payloadValue"},
                 {"propertiesKey": "propertiesValue"},
                 {"appPropsKey": "appPropsValue"},
-                True,
             ),
             (
                 "device-id",
@@ -126,7 +122,6 @@ class TestCommonParser:
                 {},
                 {"propertiesKey": "propertiesValue"},
                 {"appPropsKey": "appPropsValue"},
-                True,
             ),
             (
                 "device-id",
@@ -138,9 +133,8 @@ class TestCommonParser:
                 {},
                 {},
                 {"appPropsKey": "appPropsValue"},
-                True,
             ),
-            ("device-id", "utf-8", "application/json", "", "", "", {}, {}, {}, True),
+            ("device-id", "utf-8", "application/json", "", "", "", {}, {}, {}),
         ],
     )
     def test_parse_message_should_succeed(
@@ -155,7 +149,6 @@ class TestCommonParser:
         app_properties,
         module_id,
         interface_identifier_bytes,
-        include_component,
     ):
         # setup
         properties = MessageProperties(
@@ -176,10 +169,7 @@ class TestCommonParser:
         parser = common_parser.CommonParser(message=message, common_parser_args=args)
 
         # act
-        parse_kwargs = {}
-        if not include_component:
-            parse_kwargs["include_component"] = False
-        parsed_msg = parser.parse_message(**parse_kwargs)
+        parsed_msg = parser.parse_message()
 
         # verify
         assert parsed_msg["event"]["payload"] == payload
@@ -197,6 +187,7 @@ class TestCommonParser:
         assert properties["application"] == app_properties
 
         assert parsed_msg["event"]["interface"] == interface_name
+        assert parsed_msg["event"]["component"] == component_name
 
         if interface_name:
             interface_identifier = str(interface_identifier_bytes, "utf8")
@@ -204,11 +195,6 @@ class TestCommonParser:
                 parsed_msg["event"]["annotations"][interface_identifier]
                 == interface_name
             )
-
-        if include_component:
-            assert parsed_msg["event"]["component"] == component_name
-        else:
-            assert parsed_msg["event"].get("component") is None
 
         if component_name:
             component_identifier = str(common_parser.COMPONENT_NAME_IDENTIFIER, "utf8")

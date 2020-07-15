@@ -38,8 +38,6 @@ class CommonParser(AbstractBaseParser):
         """
         Parses an AMQP based IoT Hub telemetry event.
 
-        Args:
-            **include_component: Include the component of a PnP telemetry event. Default: True.
         """
 
         message = self._message
@@ -50,9 +48,7 @@ class CommonParser(AbstractBaseParser):
         event["origin"] = self.device_id
         event["module"] = self.module_id
         event["interface"] = self.interface_name
-
-        if kwargs.get("include_component", True):
-            event["component"] = self.component_name
+        event["component"] = self.component_name
 
         if not properties:
             properties = []  # guard against None being passed in

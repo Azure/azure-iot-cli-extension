@@ -289,7 +289,7 @@ def load_digitaltwins_arguments(self, _):
         )
         context.argument(
             "models",
-            options_list=["--models", "--model"],
+            options_list=["--models"],
             help="Inline model JSON or file path to model JSON.",
             arg_group="Models Input",
         )

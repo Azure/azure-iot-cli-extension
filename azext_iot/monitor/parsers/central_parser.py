@@ -45,7 +45,7 @@ class CentralParser(CommonParser):
         )
 
     def parse_message(self) -> dict:
-        parsed_message = super(CentralParser, self).parse_message(include_component=False)
+        parsed_message = super(CentralParser, self).parse_message()
 
         payload = parsed_message["event"]["payload"]
 
