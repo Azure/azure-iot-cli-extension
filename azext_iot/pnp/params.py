@@ -86,11 +86,6 @@ def load_pnp_arguments(self, _):
             help="Restrict model list to those matching a provided keyword",
         )
         context.argument(
-            "created_by",
-            options_list=["--created-by"],
-            help="Restrict model list to models created by a specific user or service principal",
-        )
-        context.argument(
             "model_state",
             arg_type=get_enum_type(ModelState),
             options_list=["--state", "--model-state"],
@@ -105,7 +100,7 @@ def load_pnp_arguments(self, _):
         context.argument(
             "publisher_id",
             options_list=["--publisher-id", "--pub"],
-            help="Restrict model list to models published by a specific user or service principal",
+            help="Restrict model list to models published by a specific tenant",
         )
         context.argument(
             "shared",

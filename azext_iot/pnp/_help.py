@@ -125,9 +125,9 @@ def load_pnp_help():
       text: >
         az iot pnp model list
 
-    - name: Search for all 'Listed' models created by a specific user or spn
+    - name: Search for all 'Listed' models published by a specific tenant
       text: >
-        az iot pnp model list --state Listed --created-by {user_or_spn_id}
+        az iot pnp model list --state Listed --publisher-id {tenant_id}
 
     - name: Search for shared interfaces with name or description matching `{keyword}`
       text: >
