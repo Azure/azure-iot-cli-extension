@@ -30,7 +30,6 @@ class RepoResourceProvider(PnPModelRepositoryManager):
             raise CLIError(unpack_msrest_error(e))
 
     # RBAC
-
     def get_role_assignments_for_resource(self, resource_id, resource_type):
         try:
             return self.mgmt_sdk.get_subjects_for_resources_async(

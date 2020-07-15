@@ -35,14 +35,12 @@ def iot_pnp_role_list(
     cmd, resource_id, resource_type, subject_id=None, pnp_dns_suffix=None
 ):
     rp = RepoResourceProvider(cmd, pnp_dns_suffix)
-    return (
-        rp.get_role_assignments_for_resource(
-            resource_id=resource_id, resource_type=resource_type,
-        )
-        if not subject_id
-        else rp.get_role_assignments_for_subject(
+    if subject_id:
+        return rp.get_role_assignments_for_subject(
             resource_id=resource_id, subject_id=subject_id, resource_type=resource_type,
         )
+    return rp.get_role_assignments_for_resource(
+        resource_id=resource_id, resource_type=resource_type,
     )
 
 

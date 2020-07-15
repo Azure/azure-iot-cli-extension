@@ -54,6 +54,6 @@ def iot_pnp_model_create(cmd, model, pnp_dns_suffix=None):
 
 def iot_pnp_model_publish(cmd, model_id, pnp_dns_suffix=None):
     if not model_id:
-        raise CLIError("Please provide a model id [-m, --model-id]")
+        raise CLIError("Please provide a model id [--model-id]")
     ap = ModelApiProvider(cmd, pnp_dns_suffix)
     return ap.publish_model(model_id=model_id)
