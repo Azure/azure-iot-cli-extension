@@ -18,9 +18,6 @@ steps:
             "azext_iot_teststorageuri": os.environ.get("AZEXT_IOT_TESTSTORAGEURI", sentinel_value),
             "azext_iot_testidentity": os.environ.get("AZEXT_IOT_TESTIDENTITY", sentinel_value),
             "azext_iot_central_app_id": os.environ.get("AZEXT_IOT_CENTRAL_APP_ID", sentinel_value),
-            "azext_pnp_endpoint": os.environ.get("AZEXT_PNP_ENDPOINT", sentinel_value),
-            "azext_pnp_repository": os.environ.get("AZEXT_PNP_REPOSITORY", sentinel_value),
-            "azext_pnp_cs": os.environ.get("AZEXT_PNP_CS", sentinel_value),
         }
         f = open("./pytest.ini", "w+")
         f.write("[pytest]\n")
@@ -39,6 +36,3 @@ steps:
       AZEXT_IOT_TESTSTORAGEURI: $(azext_iot_teststorageuri)
       AZEXT_IOT_TESTIDENTITY: $(azext_iot_testidentity)
       AZEXT_IOT_CENTRAL_APP_ID: $(azext_iot_central_app_id)
-      AZEXT_PNP_ENDPOINT: $(azext_pnp_endpoint)
-      AZEXT_PNP_REPOSITORY: $(azext_pnp_repository)
-      AZEXT_PNP_CS: $(azext_pnp_cs)
