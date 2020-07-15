@@ -100,19 +100,24 @@ def load_central_arguments(self, _):
             "module_id", options_list=["--module-id", "-m"], help="Iot Edge Module ID",
         )
         context.argument(
-            "user_id",
-            options_list=["--user-id", "--uid"],
-            help="User ID for service principal to be added to the app. ",
+            "assignee",
+            options_list=["--id", "--assignee"],
+            help="ID that will be associated with user being added to app. ",
+        )
+        context.argument(
+            "email",
+            options_list=["--email"],
+            help="Email address of user to be added to the app. ",
         )
         context.argument(
             "object_id",
             options_list=["--object-id", "--oid"],
-            help="Object ID for service principal to be added to the app. ",
+            help="Object ID for service principal to be added to the app. Tenant ID must also be specified. ",
         )
         context.argument(
             "tenant_id",
             options_list=["--tenant-id", "--tnid"],
-            help="Tenant ID for service principal to be added to the app. ",
+            help="Tenant ID for service principal to be added to the app. Object ID must also be specified. ",
         )
 
     with self.argument_context("iot central app monitor-events") as context:

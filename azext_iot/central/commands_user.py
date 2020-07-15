@@ -11,19 +11,29 @@ from azext_iot.central.providers import CentralUserProvider
 from azext_iot.central.models.enum import Role
 
 
-def add_service_principal(
+def add_user(
     cmd,
     app_id: str,
-    user_id: str,
-    tenant_id: str,
-    object_id: str,
-    role: Role.admin.name,
+    assignee: str,
+    role: str,
+    email=None,
+    tenant_id=None,
+    object_id=None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     provider = CentralUserProvider(cmd=cmd, app_id=app_id, token=token)
+
+    if email:
+        return provider.add_email(
+            assignee=assignee,
+            email=email,
+            role=Role[role],
+            central_dns_suffix=central_dns_suffix,
+        )
+
     return provider.add_service_principal(
-        user_id=user_id,
+        assignee=assignee,
         tenant_id=tenant_id,
         object_id=object_id,
         role=Role[role],

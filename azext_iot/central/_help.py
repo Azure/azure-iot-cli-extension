@@ -193,10 +193,27 @@ def _load_central_users_help():
     """
 
     helps[
-        "iot central app user add-service-principal"
+        "iot central app user create"
     ] = """
         type: command
-        short-summary: Add a service principal to the app
+        short-summary: Add a user to the app
+        examples:
+        - name: Add a user with email to the app
+          text: >
+            az iot central app user create
+            --id {userId}
+            --app-id {appid}
+            --email {emailAddress}
+            --role admin
+
+        - name: Add a service-principal to the app
+          text: >
+            az iot central app user create
+            --id {userId}
+            --app-id {appid}
+            --tenant-id {tenantId}
+            --object-id {objectId}
+            --role operator
     """
 
 

@@ -5,6 +5,8 @@
 # --------------------------------------------------------------------------------------------
 
 from knack.log import get_logger
+from knack.util import CLIError
+
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.enum import Role
@@ -32,18 +34,44 @@ class CentralUserProvider:
 
     def add_service_principal(
         self,
-        user_id: str,
+        assignee: str,
         tenant_id: str,
         object_id: str,
         role: Role,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
+        if not tenant_id:
+            raise CLIError("Must specify --tenant-id when adding a service principal")
+
+        if not object_id:
+            raise CLIError("Must specify --object-id when adding a service principal")
+
         return central_services.user.add_service_principal(
             cmd=self._cmd,
             app_id=self._app_id,
-            user_id=user_id,
+            assignee=assignee,
             tenant_id=tenant_id,
             object_id=object_id,
+            role=role,
+            token=self._token,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def add_email(
+        self,
+        assignee: str,
+        email: str,
+        role: Role,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        if not email:
+            raise CLIError("Must specify --email when adding a user by email")
+
+        return central_services.user.add_email(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            assignee=assignee,
+            email=email,
             role=role,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
