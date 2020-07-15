@@ -285,7 +285,6 @@ class TestModelRepoModelList(object):
                     "modelType": "type",
                     "modelState": "state",
                     "publisherId": "publisher",
-                    "createdBy": "creator",
                 },
                 False,
             ),
@@ -300,7 +299,6 @@ class TestModelRepoModelList(object):
             model_type=search_content.get("modelType"),
             model_state=search_content.get("modelState"),
             publisher_id=search_content.get("publisherId"),
-            created_by=search_content.get("createdBy"),
             shared=shared,
         )
         args = service_client.call_args
