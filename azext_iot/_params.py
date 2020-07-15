@@ -335,7 +335,7 @@ def load_arguments(self, _):
         context.argument(
             "interface",
             options_list=["--interface", "-i"],
-            help="Target interface name. This should be the name of the interface not the urn-id.",
+            help="Target interface identifier to filter on. For example: dtmi:com:example:TemperatureController;1",
         )
 
     with self.argument_context("iot hub monitor-feedback") as context:
@@ -911,67 +911,3 @@ def load_arguments(self, _):
     with self.argument_context("iot dt monitor-events") as context:
         context.argument("timeout", arg_type=event_timeout_type)
         context.argument("properties", arg_type=event_msg_prop_type)
-
-    with self.argument_context("iot pnp") as context:
-        context.argument(
-            "model",
-            options_list=["--model", "-m"],
-            help="Target capability-model urn-id. Example: urn:example:capabilityModels:Mxchip:1",
-        )
-        context.argument(
-            "interface",
-            options_list=["--interface", "-i"],
-            help="Target interface urn-id. Example: urn:example:interfaces:MXChip:1",
-        )
-
-    with self.argument_context("iot pnp interface") as context:
-        context.argument(
-            "interface_definition",
-            options_list=["--definition", "--def"],
-            help="IoT Plug and Play interface definition written in PPDL (JSON-LD). "
-            "Can be directly input or a file path where the content is extracted.",
-        )
-
-    with self.argument_context("iot pnp interface list") as context:
-        context.argument(
-            "search_string",
-            options_list=["--search", "--ss"],
-            help="Searches IoT Plug and Play interfaces for given string in the"
-            ' "Description, DisplayName, comment and Id".',
-        )
-        context.argument(
-            "top",
-            type=int,
-            options_list=["--top"],
-            help="Maximum number of interface to return.",
-        )
-
-    with self.argument_context("iot pnp capability-model") as context:
-        context.argument(
-            "model_definition",
-            options_list=["--definition", "--def"],
-            help="IoT Plug and Play capability-model definition written in PPDL (JSON-LD). "
-            "Can be directly input or a file path where the content is extracted.",
-        )
-
-    with self.argument_context("iot pnp capability-model show") as context:
-        context.argument(
-            "expand",
-            options_list=["--expand"],
-            help="Indicates whether to expand the device capability model's"
-            " interface definitions or not.",
-        )
-
-    with self.argument_context("iot pnp capability-model list") as context:
-        context.argument(
-            "search_string",
-            options_list=["--search", "--ss"],
-            help="Searches IoT Plug and Play models for given string in the"
-            ' "Description, DisplayName, comment and Id".',
-        )
-        context.argument(
-            "top",
-            type=int,
-            options_list=["--top"],
-            help="Maximum number of capability-model to return.",
-        )
