@@ -34,7 +34,7 @@ class CommonParser(AbstractBaseParser):
         self.interface_name = self._parse_interface_name(message)
         self.component_name = self._parse_component_name(message)
 
-    def parse_message(self, **kwargs) -> dict:
+    def parse_message(self) -> dict:
         """
         Parses an AMQP based IoT Hub telemetry event.
 
