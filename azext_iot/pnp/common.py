@@ -6,7 +6,6 @@
 
 """
 shared: Define shared data types(enums)
-
 """
 
 from enum import Enum

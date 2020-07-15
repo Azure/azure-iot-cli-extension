@@ -62,7 +62,7 @@ def load_pnp_arguments(self, _):
     with self.argument_context("iot pnp model") as context:
         context.argument(
             "model_id",
-            options_list=["--model-id", "--dtmi", "-m"],
+            options_list=["--model-id", "--dtmi"],
             help="Digital Twins model Id. Example: dtmi:example:Room;2",
         )
     with self.argument_context("iot pnp model create") as context:

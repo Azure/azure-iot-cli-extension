@@ -144,14 +144,14 @@ class TestPnPModelLifecycle(PNPLiveScenarioTest):
 
         # Get model
         model = self.cmd(
-            "iot pnp model show -m {model_id} --pnp-dns-suffix {pnp_dns_suffix}"
+            "iot pnp model show --model-id {model_id} --pnp-dns-suffix {pnp_dns_suffix}"
         ).get_output_in_json()
         assert json.dumps(model)
         assert model["@id"] == self.kwargs["model_id"]
 
         # Publish model
         published = self.cmd(
-            "iot pnp model publish -m {model_id} --pnp-dns-suffix {pnp_dns_suffix} --yes"
+            "iot pnp model publish --model-id {model_id} --pnp-dns-suffix {pnp_dns_suffix} --yes"
         ).get_output_in_json()
         assert json.dumps(published)
         assert published["@id"] == self.kwargs["model_id"]
