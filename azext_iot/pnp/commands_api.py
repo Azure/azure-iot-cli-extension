@@ -24,7 +24,6 @@ def iot_pnp_model_list(
     model_type=None,
     model_state=None,
     publisher_id=None,
-    created_by=None,
     shared=False,
     top=None,
     pnp_dns_suffix=None,
@@ -35,7 +34,6 @@ def iot_pnp_model_list(
         model_type=model_type,
         model_state=model_state,
         publisher_id=publisher_id,
-        created_by=created_by,
     )
 
     return ap.search_models(search_options, shared, _process_top(top))
