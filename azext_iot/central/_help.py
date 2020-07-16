@@ -202,7 +202,7 @@ def _load_central_users_help():
           text: >
             az iot central app user create
             --id {userId}
-            --app-id {appid}
+            --app-id {appId}
             --email {emailAddress}
             --role admin
 
@@ -210,7 +210,7 @@ def _load_central_users_help():
           text: >
             az iot central app user create
             --id {userId}
-            --app-id {appid}
+            --app-id {appId}
             --tenant-id {tenantId}
             --object-id {objectId}
             --role operator
