@@ -27,18 +27,29 @@ from azext_iot.monitor.parsers.issue import IssueHandler
 
 class PropertyMonitor:
     def __init__(
-        self, cmd, app_id, device_id, central_dns_suffix=CENTRAL_ENDPOINT,
+        self,
+        cmd,
+        app_id: str,
+        device_id: str,
+        token: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         self._cmd = cmd
         self._app_id = app_id
         self._device_id = device_id
+        self._token = token
         self._central_dns_suffix = central_dns_suffix
         self._device_twin_provider = CentralDeviceTwinProvider(
-            cmd=self._cmd, app_id=self._app_id, device_id=self._device_id
+            cmd=self._cmd,
+            app_id=self._app_id,
+            token=self._token,
+            device_id=self._device_id,
         )
-        self._central_device_provider = CentralDeviceProvider(self._cmd, self._app_id)
+        self._central_device_provider = CentralDeviceProvider(
+            cmd=self._cmd, app_id=self._app_id, token=self._token
+        )
         self._central_template_provider = CentralDeviceTemplateProvider(
-            cmd=self._cmd, app_id=self._app_id
+            cmd=self._cmd, app_id=self._app_id, token=self._token
         )
         self._template = self._get_device_template()
 
@@ -146,7 +157,6 @@ class PropertyMonitor:
         return interface_name_modified in self._template.interfaces
 
     def _get_device_template(self):
-
         device = self._central_device_provider.get_device(self._device_id)
         template = self._central_template_provider.get_device_template(
             device_template_id=device.instance_of,
@@ -158,7 +168,6 @@ class PropertyMonitor:
         prev_twin = None
 
         while True:
-
             raw_twin = self._device_twin_provider.get_device_twin(
                 central_dns_suffix=self._central_dns_suffix
             )
@@ -181,6 +190,7 @@ class PropertyMonitor:
                     print("Changes in reported properties:")
                     print("version :", twin.reported_property.version)
                     print(change_r)
+
             time.sleep(DEVICETWIN_POLLING_INTERVAL_SEC)
 
             prev_twin = twin

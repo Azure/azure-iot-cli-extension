@@ -114,7 +114,7 @@ class TestCentralHelpers:
 
         # Test to ensure get_iot_central_tokens calls requests.post and tokens are returned
         assert (
-            get_iot_central_tokens(Cmd(), "app_id", "api-uri").value()
+            get_iot_central_tokens(Cmd(), "app_id", "", "api-uri").value()
             == "fixture_requests_post value"
         )
 
@@ -225,7 +225,11 @@ class TestCentralPropertyMonitor:
         twin_next = DeviceTwin(raw_twin)
         twin_next.reported_property.version = twin.reported_property.version + 1
         monitor = PropertyMonitor(
-            cmd=None, app_id=app_id, device_id=device_id, central_dns_suffix=None,
+            cmd=None,
+            app_id=app_id,
+            device_id=device_id,
+            token=None,
+            central_dns_suffix=None,
         )
         result = monitor._compare_properties(
             twin_next.reported_property, twin.reported_property
@@ -263,7 +267,11 @@ class TestCentralPropertyMonitor:
         twin = DeviceTwin(raw_twin)
         twin_next = DeviceTwin(raw_twin)
         monitor = PropertyMonitor(
-            cmd=None, app_id=app_id, device_id=device_id, central_dns_suffix=None,
+            cmd=None,
+            app_id=app_id,
+            device_id=device_id,
+            token=None,
+            central_dns_suffix=None,
         )
         result = monitor._compare_properties(
             twin_next.reported_property, twin.reported_property
@@ -282,7 +290,11 @@ class TestCentralPropertyMonitor:
         )
 
         monitor = PropertyMonitor(
-            cmd=None, app_id=app_id, device_id=device_id, central_dns_suffix=None,
+            cmd=None,
+            app_id=app_id,
+            device_id=device_id,
+            token=None,
+            central_dns_suffix=None,
         )
 
         model = {"Model": "test_model"}
@@ -318,7 +330,11 @@ class TestCentralPropertyMonitor:
         )
 
         monitor = PropertyMonitor(
-            cmd=None, app_id=app_id, device_id=device_id, central_dns_suffix=None,
+            cmd=None,
+            app_id=app_id,
+            device_id=device_id,
+            token=None,
+            central_dns_suffix=None,
         )
 
         # invalid interface / property
@@ -371,7 +387,11 @@ class TestCentralPropertyMonitor:
         )
 
         monitor = PropertyMonitor(
-            cmd=None, app_id=app_id, device_id=device_id, central_dns_suffix=None,
+            cmd=None,
+            app_id=app_id,
+            device_id=device_id,
+            token=None,
+            central_dns_suffix=None,
         )
 
         # severity level info

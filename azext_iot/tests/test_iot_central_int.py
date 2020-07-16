@@ -111,7 +111,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
         # Test with invalid app-id
         self.cmd(
-            "iotcentral app monitor-events --app-id {}".format(APP_ID + "zzz"),
+            "iotcentral app monitor-events --app-id {} -y".format(APP_ID + "zzz"),
             expect_failure=True,
         )
 
@@ -226,7 +226,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         for issue in expected_issues:
             assert issue in output
 
-    def test_central_device_methods_CRLD(self):
+    def test_central_device_methods_CRD(self):
         (device_id, device_name) = self._create_device()
 
         self.cmd(
@@ -239,13 +239,9 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             ],
         )
 
-        list_output = self.cmd("iot central app device list --app-id {}".format(APP_ID))
-
         self._delete_device(device_id)
 
-        assert device_id in list_output.get_output_in_json()
-
-    def test_central_device_template_methods_CRLD(self):
+    def test_central_device_template_methods_CRD(self):
         # currently: create, show, list, delete
         (template_id, template_name) = self._create_device_template()
 
@@ -259,19 +255,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             ],
         )
 
-        list_output = self.cmd(
-            "iot central app device-template list --app-id {}".format(APP_ID)
-        )
-        map_output = self.cmd(
-            "iot central app device-template map --app-id {}".format(APP_ID)
-        )
-
         self._delete_device_template(template_id)
-
-        assert template_id in list_output.get_output_in_json()
-
-        map_json = map_output.get_output_in_json()
-        assert map_json[template_name] == template_id
 
     def test_central_device_registration_info_registered(self):
         (template_id, _) = self._create_device_template()
@@ -326,7 +310,8 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             " -d {}"
             " -i {}"
             " --cn {}"
-            " -k '{}'".format(
+            " -k '{}'"
+            "".format(
                 APP_ID, device_id, interface_id, command_name, sync_command_params
             )
         )
@@ -336,7 +321,8 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             " -n {}"
             " -d {}"
             " -i {}"
-            " --cn {}".format(APP_ID, device_id, interface_id, command_name)
+            " --cn {}"
+            "".format(APP_ID, device_id, interface_id, command_name)
         )
 
         self._delete_device(device_id)
@@ -393,7 +379,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
     def test_central_device_registration_summary(self):
 
         result = self.cmd(
-            "iot central app device registration-summary --app-id {}".format(APP_ID,)
+            "iot central app device registration-summary --app-id {}".format(APP_ID)
         )
 
         json_result = result.get_output_in_json()
@@ -476,12 +462,18 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         return (template_id, template_name)
 
     def _delete_device_template(self, template_id):
-        self.cmd(
-            "iot central app device-template delete --app-id {} --device-template-id {}".format(
-                APP_ID, template_id
-            ),
-            checks=[self.check("result", "success")],
+        attempts = range(0, 10)
+        command = "iot central app device-template delete --app-id {} --device-template-id {}".format(
+            APP_ID, template_id
         )
+
+        # retry logic to delete the template
+        for _ in attempts:
+            try:
+                self.cmd(command, checks=[self.check("result", "success")])
+                return
+            except:
+                time.sleep(10)
 
     def _get_credentials(self, device_id):
         return self.cmd(
@@ -513,7 +505,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             asserts = []
 
         output = self.command_execute_assert(
-            "iot central app monitor-events -n {} -d {} --et {} --to 1".format(
+            "iot central app monitor-events -n {} -d {} --et {} --to 1 -y".format(
                 APP_ID, device_id, enqueued_time
             ),
             asserts,
