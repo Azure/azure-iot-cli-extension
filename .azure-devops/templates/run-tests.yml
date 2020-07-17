@@ -23,12 +23,12 @@ steps:
 
   - template: set-pythonpath.yml
 
+  - template: set-testenv-sentinel.yml
+
   - ${{ if eq(parameters.runUnitTestsOnly, 'false') }}:
-    - template: set-testenv-sentinel.yml
     - template: run-all-tests.yml
 
   - ${{ if eq(parameters.runUnitTestsOnly, 'true') }}:
-    - template: set-testenv-sentinel.yml
     - script: pytest -vv azext_iot/tests/ -k "_unit" --junitxml=junit/test-iotext-unit-results.xml
       displayName: 'Execute IoT extension unit tests'
 

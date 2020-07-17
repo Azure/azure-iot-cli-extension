@@ -7,7 +7,10 @@
 import pytest
 import os
 from ..generators import generate_generic_id
+from ..settings import DynamoSettings
 from azure.cli.testsdk import LiveScenarioTest
+from azext_iot.common.embedded_cli import EmbeddedCLI
+
 
 MOCK_RESOURCE_TAGS = "a=b;c=d"
 MOCK_ENDPOINT_TAGS = "key0=value0;key1=value1;"
@@ -17,35 +20,26 @@ def generate_resource_id():
     return "dt{}".format(generate_generic_id())
 
 
-def generate_group_id():
-    return "group{}".format(generate_generic_id())
-
-
 class DTLiveScenarioTest(LiveScenarioTest):
-    group_location = "westus2"
-    group_names = []
-    dt_location_default = "eastus2euap"
-
     role_map = {
         "owner": "Azure Digital Twins Owner (Preview)",
         "reader": "Azure Digital Twins Reader (Preview)",
     }
 
-    def __init__(self, test_scenario, group_names):
+    def __init__(self, test_scenario):
         assert test_scenario
-        assert group_names
 
         os.environ["AZURE_CORE_COLLECT_TELEMETRY"] = "no"
         super(DTLiveScenarioTest, self).__init__(test_scenario)
-        DTLiveScenarioTest.handle = self
+        self.settings = DynamoSettings(
+            opt_env_set=["azext_iot_testrg", "azext_dt_resource_location"]
+        )
 
-        DTLiveScenarioTest.group_names = group_names
         self._bootup_scenario()
 
     def _bootup_scenario(self):
         self._is_provider_registered()
-        for group_name in self.group_names:
-            self.cmd("group create -n {} -l {}".format(group_name, self.group_location))
+        self._init_basic_env_vars()
 
     def _is_provider_registered(self):
         result = self.cmd(
@@ -53,26 +47,43 @@ class DTLiveScenarioTest(LiveScenarioTest):
         )
         if '"registered"' in result.output.lower():
             return
+
         pytest.skip(
             "Microsoft.DigitalTwins provider not registered. "
             "Run 'az provider register --namespace Microsoft.DigitalTwins'"
         )
 
+    def _init_basic_env_vars(self):
+        self._location = self.settings.env.azext_dt_resource_location
+        if not self._location:
+            self._location = "westus2"
+
+        self._rg = self.settings.env.azext_iot_testrg
+        if not self._rg:
+            pytest.skip(
+                "Digital Twins CLI tests requires at least 'azext_iot_testrg' for resource deployment."
+            )
+
+    @property
+    def current_user(self):
+        return EmbeddedCLI().invoke("account show").as_json()["user"]["name"]
+
+    @property
+    def current_subscription(self):
+        return EmbeddedCLI().invoke("account show").as_json()["id"]
+
     @property
     def dt_location(self):
-        return self.dt_location_default
+        return self._location
 
     @dt_location.setter
     def dt_location(self, value):
-        self.dt_location_default = value
+        self._location = value
 
-    @classmethod
-    def tearDownClass(cls):
-        super().tearDownClass()
-        target_groups = DTLiveScenarioTest.group_names
-        # Ensure clean-up after ourselves.
-        for group in target_groups:
-            try:
-                cls.handle.cmd("group delete -n {} -y --no-wait".format(group))
-            except:
-                pass
+    @property
+    def dt_resource_group(self):
+        return self._rg
+
+    @dt_resource_group.setter
+    def dt_resource_group(self, value):
+        self._rg = value
