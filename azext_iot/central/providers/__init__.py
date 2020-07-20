@@ -9,9 +9,11 @@ from azext_iot.central.providers.device_template_provider import (
     CentralDeviceTemplateProvider,
 )
 from azext_iot.central.providers.devicetwin_provider import CentralDeviceTwinProvider
+from azext_iot.central.providers.user_provider import CentralUserProvider
 
 __all__ = [
     "CentralDeviceProvider",
     "CentralDeviceTemplateProvider",
     "CentralDeviceTwinProvider",
+    "CentralUserProvider",
 ]

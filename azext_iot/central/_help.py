@@ -28,6 +28,7 @@ def load_central_help():
         """
 
     _load_central_devices_help()
+    _load_central_users_help()
     _load_central_device_templates_help()
     _load_central_device_twin_help()
     _load_central_monitors_help()
@@ -78,19 +79,6 @@ def _load_central_devices_help():
             az iot central app device show
             --app-id {appid}
             --device-id {deviceid}
-    """
-
-    helps[
-        "iot central app device list"
-    ] = """
-        type: command
-        short-summary: List all devices in IoT Central
-
-        examples:
-        - name: List all devices in IoT Central
-          text: >
-            az iot central app device list
-            --app-id {appid}
     """
 
     helps[
@@ -196,6 +184,39 @@ def _load_central_devices_help():
         """
 
 
+def _load_central_users_help():
+    helps[
+        "iot central app user"
+    ] = """
+        type: group
+        short-summary: Manage and configure IoT Central users
+    """
+
+    helps[
+        "iot central app user create"
+    ] = """
+        type: command
+        short-summary: Add a user to the app
+        examples:
+        - name: Add a user with email to the app
+          text: >
+            az iot central app user create
+            --id {userId}
+            --app-id {appId}
+            --email {emailAddress}
+            --role admin
+
+        - name: Add a service-principal to the app
+          text: >
+            az iot central app user create
+            --id {userId}
+            --app-id {appId}
+            --tenant-id {tenantId}
+            --object-id {objectId}
+            --role operator
+    """
+
+
 def _load_central_device_templates_help():
     helps[
         "iot central app device-template"
@@ -238,32 +259,6 @@ def _load_central_device_templates_help():
             az iot central app device-template show
             --app-id {appid}
             --device-template-id {devicetemplateid}
-    """
-
-    helps[
-        "iot central app device-template list"
-    ] = """
-        type: command
-        short-summary: List all device templates in IoT Central
-
-        examples:
-        - name: List all device templates
-          text: >
-            az iot central app device-template list
-            --app-id {appid}
-    """
-
-    helps[
-        "iot central app device-template map"
-    ] = """
-        type: command
-        short-summary: Returns a mapping of device template name to device template id
-
-        examples:
-        - name: Get device template name to id mapping
-          text: >
-            az iot central app device-template map
-            --app-id {appid}
     """
 
     helps[

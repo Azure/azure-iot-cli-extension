@@ -11,12 +11,19 @@ CLI parameter definitions.
 from knack.arguments import CLIArgumentType, CaseInsensitiveList
 from azure.cli.core.commands.parameters import get_three_state_flag
 from azext_iot.monitor.models.enum import Severity
+from azext_iot.central.models.enum import Role
 from azext_iot._params import event_msg_prop_type, event_timeout_type
 
 severity_type = CLIArgumentType(
     options_list=["--minimum-severity"],
     choices=CaseInsensitiveList([sev.name for sev in Severity]),
     help="Minimum severity of issue required for reporting.",
+)
+
+role_type = CLIArgumentType(
+    options_list=["--role", "-r"],
+    choices=CaseInsensitiveList([role.name for role in Role]),
+    help="Role for the user/service-principal you are adding to the app.",
 )
 
 style_type = CLIArgumentType(
@@ -34,6 +41,7 @@ def load_central_arguments(self, _):
     with self.argument_context("iot central app") as context:
         context.argument("app_id", options_list=["--app-id", "-n"], help="Target App.")
         context.argument("minimum_severity", arg_type=severity_type)
+        context.argument("role", arg_type=role_type)
         context.argument(
             "instance_of",
             options_list=["--instance-of"],
@@ -90,6 +98,26 @@ def load_central_arguments(self, _):
         )
         context.argument(
             "module_id", options_list=["--module-id", "-m"], help="Iot Edge Module ID",
+        )
+        context.argument(
+            "assignee",
+            options_list=["--id", "--assignee"],
+            help="ID that will be associated with user being added to app. ",
+        )
+        context.argument(
+            "email",
+            options_list=["--email"],
+            help="Email address of user to be added to the app. ",
+        )
+        context.argument(
+            "object_id",
+            options_list=["--object-id", "--oid"],
+            help="Object ID for service principal to be added to the app. Tenant ID must also be specified. ",
+        )
+        context.argument(
+            "tenant_id",
+            options_list=["--tenant-id", "--tnid"],
+            help="Tenant ID for service principal to be added to the app. Object ID must also be specified. ",
         )
 
     with self.argument_context("iot central app monitor-events") as context:
@@ -170,6 +198,14 @@ def load_deprecated_iotcentral_params(self, _):
             help="Central dns suffix. "
             "This enables running cli commands against non public/prod environments",
         )
+        context.argument(
+            "token",
+            options_list=["--token"],
+            help="Authorization token for request. "
+            "More info available here: https://docs.microsoft.com/en-us/learn/modules/manage-iot-central-apps-with-rest-api/ "
+            "MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...'). "
+            "Example: 'Bearer someBearerTokenHere'",
+        )
 
         context.argument(
             "module_id", options_list=["--module-id", "-m"], help="Iot Edge Module ID",
@@ -182,4 +218,12 @@ def load_deprecated_iotcentral_params(self, _):
             options_list=["--central-dns-suffix", "--central-api-uri"],
             help="Central dns suffix. "
             "This enables running cli commands against non public/prod environments",
+        )
+        context.argument(
+            "token",
+            options_list=["--token"],
+            help="Authorization token for request. "
+            "More info available here: https://docs.microsoft.com/en-us/learn/modules/manage-iot-central-apps-with-rest-api/ "
+            "MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...'). "
+            "Example: 'Bearer someBearerTokenHere'",
         )

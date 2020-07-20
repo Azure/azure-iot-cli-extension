@@ -26,15 +26,21 @@ class MonitorProvider:
         self,
         cmd: AzCliCommand,
         app_id: str,
+        token: str,
         consumer_group: str,
         central_handler_args: CentralHandlerArguments,
         central_dns_suffix: str,
     ):
-        central_device_provider = CentralDeviceProvider(cmd, app_id)
-        central_template_provider = CentralDeviceTemplateProvider(cmd, app_id)
+        central_device_provider = CentralDeviceProvider(
+            cmd=cmd, app_id=app_id, token=token
+        )
+        central_template_provider = CentralDeviceTemplateProvider(
+            cmd=cmd, app_id=app_id, token=token
+        )
         self._targets = self._build_targets(
             cmd=cmd,
             app_id=app_id,
+            token=token,
             consumer_group=consumer_group,
             central_dns_suffix=central_dns_suffix,
         )
@@ -70,13 +76,14 @@ class MonitorProvider:
         self,
         cmd: AzCliCommand,
         app_id: str,
+        token: str,
         consumer_group: str,
         central_dns_suffix: str,
     ):
         from azext_iot.monitor.builders import central_target_builder
 
         targets = central_target_builder.build_central_event_hub_targets(
-            cmd, app_id, central_dns_suffix
+            cmd, app_id, token, central_dns_suffix
         )
         [target.add_consumer_group(consumer_group) for target in targets]
 
