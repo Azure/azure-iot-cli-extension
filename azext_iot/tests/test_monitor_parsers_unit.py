@@ -44,6 +44,16 @@ def _validate_issues(
         assert expected_details in actual_messages
 
 
+@pytest.fixture(
+    params=[
+        common_parser.INTERFACE_NAME_IDENTIFIER_V1,
+        common_parser.INTERFACE_NAME_IDENTIFIER_V2,
+    ]
+)
+def interface_identifier_bytes(request):
+    return request.param
+
+
 class TestCommonParser:
     device_id = "some-device-id"
     payload = {"String": "someValue"}
@@ -55,13 +65,15 @@ class TestCommonParser:
     bad_content_type = "bad-content-type"
 
     @pytest.mark.parametrize(
-        "device_id, encoding, content_type, interface_name, module_id, payload, properties, app_properties",
+        "device_id, encoding, content_type, interface_name, component_name, "
+        "module_id, payload, properties, app_properties",
         [
             (
                 "device-id",
                 "utf-8",
                 "application/json",
                 "interface_name",
+                "component_name",
                 "module-id",
                 {"payloadKey": "payloadValue"},
                 {"propertiesKey": "propertiesValue"},
@@ -72,6 +84,18 @@ class TestCommonParser:
                 "utf-8",
                 "application/json",
                 "interface_name",
+                "component_name",
+                "",
+                {"payloadKey": "payloadValue"},
+                {"propertiesKey": "propertiesValue"},
+                {"appPropsKey": "appPropsValue"},
+            ),
+            (
+                "device-id",
+                "utf-8",
+                "application/json",
+                "interface_name",
+                "",
                 "",
                 {"payloadKey": "payloadValue"},
                 {"propertiesKey": "propertiesValue"},
@@ -83,6 +107,7 @@ class TestCommonParser:
                 "application/json",
                 "",
                 "",
+                "",
                 {"payloadKey": "payloadValue"},
                 {"propertiesKey": "propertiesValue"},
                 {"appPropsKey": "appPropsValue"},
@@ -93,6 +118,7 @@ class TestCommonParser:
                 "application/json",
                 "",
                 "",
+                "",
                 {},
                 {"propertiesKey": "propertiesValue"},
                 {"appPropsKey": "appPropsValue"},
@@ -103,11 +129,12 @@ class TestCommonParser:
                 "application/json",
                 "",
                 "",
+                "",
                 {},
                 {},
                 {"appPropsKey": "appPropsValue"},
             ),
-            ("device-id", "utf-8", "application/json", "", "", {}, {}, {},),
+            ("device-id", "utf-8", "application/json", "", "", "", {}, {}, {}),
         ],
     )
     def test_parse_message_should_succeed(
@@ -116,10 +143,12 @@ class TestCommonParser:
         encoding,
         content_type,
         interface_name,
+        component_name,
         payload,
         properties,
         app_properties,
         module_id,
+        interface_identifier_bytes,
     ):
         # setup
         properties = MessageProperties(
@@ -130,8 +159,9 @@ class TestCommonParser:
             properties=properties,
             annotations={
                 common_parser.DEVICE_ID_IDENTIFIER: device_id.encode(),
-                common_parser.INTERFACE_NAME_IDENTIFIER: interface_name.encode(),
+                interface_identifier_bytes: interface_name.encode(),
                 common_parser.MODULE_ID_IDENTIFIER: module_id.encode(),
+                common_parser.COMPONENT_NAME_IDENTIFIER: component_name.encode(),
             },
             application_properties=_encode_app_props(app_properties),
         )
@@ -155,6 +185,23 @@ class TestCommonParser:
         assert properties["system"]["content_encoding"] == encoding
         assert properties["system"]["content_type"] == content_type
         assert properties["application"] == app_properties
+
+        assert parsed_msg["event"]["interface"] == interface_name
+        assert parsed_msg["event"]["component"] == component_name
+
+        if interface_name:
+            interface_identifier = str(interface_identifier_bytes, "utf8")
+            assert (
+                parsed_msg["event"]["annotations"][interface_identifier]
+                == interface_name
+            )
+
+        if component_name:
+            component_identifier = str(common_parser.COMPONENT_NAME_IDENTIFIER, "utf8")
+            assert (
+                parsed_msg["event"]["annotations"][component_identifier]
+                == component_name
+            )
 
         assert len(parser.issues_handler.get_all_issues()) == 0
 

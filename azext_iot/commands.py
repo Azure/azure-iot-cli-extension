@@ -11,8 +11,6 @@ Load CLI commands
 from azext_iot import (
     iothub_ops,
     iotdps_ops,
-    iotdigitaltwin_ops,
-    iotpnp_ops,
 )
 
 
@@ -185,33 +183,3 @@ def load_command_table(self, _):
         cmd_group.command("list", "iot_dps_registration_list")
         cmd_group.command("show", "iot_dps_registration_get")
         cmd_group.command("delete", "iot_dps_registration_delete")
-
-    with self.command_group(
-        "iot dt", command_type=iotdigitaltwin_ops, is_preview=True
-    ) as cmd_group:
-        cmd_group.command("list-interfaces", "iot_digitaltwin_interface_list")
-        cmd_group.command("list-properties", "iot_digitaltwin_properties_list")
-        cmd_group.command("update-property", "iot_digitaltwin_property_update")
-        cmd_group.command("invoke-command", "iot_digitaltwin_invoke_command")
-        cmd_group.command("monitor-events", "iot_digitaltwin_monitor_events")
-        cmd_group.command("list-commands", "iot_digitaltwin_command_list")
-
-    with self.command_group(
-        "iot pnp interface", command_type=iotpnp_ops, is_preview=True
-    ) as cmd_group:
-        cmd_group.command("show", "iot_pnp_interface_show")
-        cmd_group.command("list", "iot_pnp_interface_list")
-        cmd_group.command("create", "iot_pnp_interface_create")
-        cmd_group.command("publish", "iot_pnp_interface_publish")
-        cmd_group.command("delete", "iot_pnp_interface_delete")
-        cmd_group.command("update", "iot_pnp_interface_update")
-
-    with self.command_group(
-        "iot pnp capability-model", command_type=iotpnp_ops, is_preview=True
-    ) as cmd_group:
-        cmd_group.command("show", "iot_pnp_model_show")
-        cmd_group.command("list", "iot_pnp_model_list")
-        cmd_group.command("create", "iot_pnp_model_create")
-        cmd_group.command("publish", "iot_pnp_model_publish")
-        cmd_group.command("delete", "iot_pnp_model_delete")
-        cmd_group.command("update", "iot_pnp_model_update")
