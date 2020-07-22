@@ -38,21 +38,6 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
         # Verify incorrect app-id throws error
         self.cmd(
-            "iotcentral device-twin show --app-id incorrect-app --device-id {}".format(
-                device_id
-            ),
-            expect_failure=True,
-        )
-        # Verify incorrect device-id throws error
-        self.cmd(
-            "iotcentral device-twin show --app-id {} --device-id incorrect-device".format(
-                APP_ID
-            ),
-            expect_failure=True,
-        )
-
-        # Verify incorrect app-id throws error
-        self.cmd(
             "iot central app device-twin show --app-id incorrect-app --device-id {}".format(
                 device_id
             ),
@@ -74,13 +59,6 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
         # wait about a few seconds for simulator to kick in so that provisioning completes
         time.sleep(60)
-
-        self.cmd(
-            "iotcentral device-twin show --app-id {} --device-id {}".format(
-                APP_ID, device_id
-            ),
-            checks=[self.check("deviceId", device_id)],
-        )
 
         self.cmd(
             "iot central app device-twin show --app-id {} --device-id {}".format(
@@ -111,7 +89,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
         # Test with invalid app-id
         self.cmd(
-            "iotcentral app monitor-events --app-id {} -y".format(APP_ID + "zzz"),
+            "iot central app monitor-events --app-id {} -y".format(APP_ID + "zzz"),
             expect_failure=True,
         )
 
