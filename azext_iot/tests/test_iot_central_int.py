@@ -197,8 +197,8 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             "No encoding found. Expected encoding 'utf-8' to be present in message header.",
             "Content type '' is not supported. Expected Content type is 'application/json'.",
             "Datatype of telemetry field 'Bool' does not match the datatype boolean.",
-            "Data sent by the device - 123.",
-            "For information about format of the payload refer: https://aka.ms/iotcentral-payloads",
+            "Data sent by the device : 123.",
+            "For more information, https://aka.ms/iotcentral-payloads",
             "Following capabilities have NOT been defined in the device template '['NotPresentInTemplate']'",
             "Invalid JSON format",
         ]
