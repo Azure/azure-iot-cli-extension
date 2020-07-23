@@ -86,9 +86,10 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             expect_failure=True,
         )
 
+        # No location specified. Use the resource group location.
         create_output = self.cmd(
-            "dt create -n {} -g {} -l {}".format(
-                instance_names[1], self.dt_resource_group, self.dt_location
+            "dt create -n {} -g {}".format(
+                instance_names[1], self.dt_resource_group
             )
         ).get_output_in_json()
 
@@ -96,7 +97,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             create_output,
             instance_names[1],
             self.dt_resource_group,
-            self.dt_location,
+            self.dt_resource_group_loc,
             None,
         )
 

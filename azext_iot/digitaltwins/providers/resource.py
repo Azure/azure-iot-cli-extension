@@ -20,9 +20,14 @@ class ResourceProvider(DigitalTwinsResourceManager):
         self.mgmt_sdk = self.get_mgmt_sdk()
         self.rbac = RbacProvider()
 
-    def create(self, name, resource_group_name, location, tags=None, timeout=20):
+    def create(self, name, resource_group_name, location=None, tags=None, timeout=20):
         if tags:
             tags = validate_key_value_pairs(tags)
+
+        if not location:
+            from azext_iot.common.embedded_cli import EmbeddedCLI
+            resource_group_meta = EmbeddedCLI().invoke("group show --name {}".format(resource_group_name)).as_json()
+            location = resource_group_meta["location"]
 
         try:
             return self.mgmt_sdk.digital_twins.create_or_update(

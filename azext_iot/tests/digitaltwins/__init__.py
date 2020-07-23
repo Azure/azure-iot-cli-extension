@@ -34,7 +34,7 @@ class DTLiveScenarioTest(LiveScenarioTest):
         self.settings = DynamoSettings(
             opt_env_set=["azext_iot_testrg", "azext_dt_resource_location"]
         )
-
+        self.embedded_cli = EmbeddedCLI()
         self._bootup_scenario()
 
     def _bootup_scenario(self):
@@ -64,13 +64,15 @@ class DTLiveScenarioTest(LiveScenarioTest):
                 "Digital Twins CLI tests requires at least 'azext_iot_testrg' for resource deployment."
             )
 
+        self._rg_loc = self.embedded_cli.invoke("group show --name {}".format(self._rg)).as_json()["location"]
+
     @property
     def current_user(self):
-        return EmbeddedCLI().invoke("account show").as_json()["user"]["name"]
+        return self.embedded_cli.invoke("account show").as_json()["user"]["name"]
 
     @property
     def current_subscription(self):
-        return EmbeddedCLI().invoke("account show").as_json()["id"]
+        return self.embedded_cli.invoke("account show").as_json()["id"]
 
     @property
     def dt_location(self):
@@ -87,3 +89,7 @@ class DTLiveScenarioTest(LiveScenarioTest):
     @dt_resource_group.setter
     def dt_resource_group(self, value):
         self._rg = value
+
+    @property
+    def dt_resource_group_loc(self):
+        return self._rg_loc
