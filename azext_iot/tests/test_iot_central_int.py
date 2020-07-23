@@ -198,7 +198,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             "Content type '' is not supported. Expected Content type is 'application/json'.",
             "Datatype of telemetry field 'Bool' does not match the datatype boolean.",
             "Data sent by the device : 123.",
-            "For more information, https://aka.ms/iotcentral-payloads",
+            "For more information, see: https://aka.ms/iotcentral-payloads",
             "Following capabilities have NOT been defined in the device template '['NotPresentInTemplate']'",
             "Invalid JSON format",
         ]
