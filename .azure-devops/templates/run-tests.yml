@@ -33,7 +33,7 @@ steps:
         azureSubscription: AzIoTCLIService
         scriptType: bash
         scriptLocation: inlineScript
-        inlineScript: pytest -vv -rf azext_iot/tests/ --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-full-results.xml --cov-report=xml
+        inlineScript: pytest -vv -r azext_iot/tests/ --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-full-results.xml --cov-report=xml
 
   - ${{ if eq(parameters.runUnitTestsOnly, 'true') }}:
 
