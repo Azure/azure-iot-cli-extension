@@ -126,22 +126,3 @@ jobs:
       source ./$(iot_ext_venv)/bin/activate
       cp ./linter_exclusions.yml $AZURE_EXTENSION_DIR/$(iot_ext_package)/
       azdev linter --include-whl-extensions $(iot_ext_package) --min-severity medium
-
-- job: CredScan
-  displayName: "Credential Scan"
-  pool:
-    vmImage: "windows-2019"
-  steps:
-  - task: ms-codeanalysis.vss-microsoft-security-code-analysis-devops.build-task-credscan.CredScan@2
-    displayName: 'Run Credential Scanner'
-    inputs:
-      toolMajorVersion: V2
-  - task: ms-codeanalysis.vss-microsoft-security-code-analysis-devops.build-task-postanalysis.PostAnalysis@1
-    displayName: 'Post Analysis'
-    inputs:
-      AllTools: false
-      BinSkim: false
-      CredScan: true
-      RoslynAnalyzers: false
-      TSLint: false
-      ToolLogsNotFoundAction: 'Standard'
