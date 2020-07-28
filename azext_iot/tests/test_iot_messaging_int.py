@@ -4,15 +4,13 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import os
 import pytest
 import json
 
 from time import time
 from uuid import uuid4
 from . import IoTLiveScenarioTest, PREFIX_DEVICE
-
-# Temporary workaround.
+from .settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC
 from azext_iot.common.utility import (
     validate_min_python_version,
     execute_onthread,
@@ -20,25 +18,17 @@ from azext_iot.common.utility import (
     validate_key_value_pairs
 )
 
-# Set these to the proper IoT Hub, IoT Hub Cstring and Resource Group for Live Integration Tests.
-LIVE_HUB = os.environ.get("azext_iot_testhub")
-LIVE_RG = os.environ.get("azext_iot_testrg")
-LIVE_HUB_CS = os.environ.get("azext_iot_testhub_cs")
+settings = DynamoSettings(ENV_SET_TEST_IOTHUB_BASIC)
+LIVE_HUB = settings.env.azext_iot_testhub
+LIVE_RG = settings.env.azext_iot_testrg
 
 LIVE_CONSUMER_GROUPS = ["test1", "test2", "test3"]
 
 
-if not all([LIVE_HUB, LIVE_HUB_CS, LIVE_RG]):
-    raise ValueError(
-        "Set azext_iot_testhub, azext_iot_testhub_cs and azext_iot_testrg to run IoT Hub integration tests."
-    )
-
-
-# IoT Hub Messaging tests currently are run live due to non HTTP based interaction i.e. amqp, mqtt.
 class TestIoTHubMessaging(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTHubMessaging, self).__init__(
-            test_case, LIVE_HUB, LIVE_RG, LIVE_HUB_CS
+            test_case, LIVE_HUB, LIVE_RG
         )
 
     @pytest.mark.skipif(
@@ -127,7 +117,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             """iot device c2d-message send -d {} --login {} --data '{}' --cid {} --mid {} --ct {} --expiry {}
             --ce {} --ack positive --props {}""".format(
                 device_ids[0],
-                LIVE_HUB_CS,
+                self.connection_string,
                 "{c2d_json_send_data}",
                 test_cid,
                 test_mid,
@@ -141,7 +131,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         result = self.cmd(
             "iot device c2d-message receive -d {} --login {}".format(
-                device_ids[0], LIVE_HUB_CS
+                device_ids[0], self.connection_string
             )
         ).get_output_in_json()
 
@@ -166,7 +156,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         self.cmd(
             "iot device c2d-message reject -d {} --etag {} --login {}".format(
-                device_ids[0], etag, LIVE_HUB_CS
+                device_ids[0], etag, self.connection_string
             ),
             checks=self.is_empty(),
         )
@@ -197,7 +187,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         self.cmd(
             "iot device c2d-message send -d {} --ack {} --login {} --wait -y".format(
-                device_ids[0], "full", LIVE_HUB_CS
+                device_ids[0], "full", self.connection_string
             )
         )
         token.set()
@@ -206,7 +196,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         # Error - invalid wait when no ack requested
         self.cmd(
             "iot device c2d-message send -d {} --login {} --wait -y".format(
-                device_ids[0], LIVE_HUB_CS
+                device_ids[0], self.connection_string
             ),
             expect_failure=True,
         )
@@ -214,7 +204,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         # Error - content-type is application/json but data is not.
         self.cmd(
             "iot device c2d-message send -d {} --login {} --ct application/json --data notjson".format(
-                device_ids[0], LIVE_HUB_CS
+                device_ids[0], self.connection_string
             ),
             expect_failure=True,
         )
@@ -222,7 +212,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         # Error - expiry is in the past.
         self.cmd(
             "iot device c2d-message send -d {} --login {} --expiry {}".format(
-                device_ids[0], LIVE_HUB_CS, int(time() * 1000)
+                device_ids[0], self.connection_string, int(time() * 1000)
             ),
             expect_failure=True,
         )
@@ -248,7 +238,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         # With connection string
         self.cmd(
             "iot device c2d-message receive -d {} --login {}".format(
-                device_ids[0], LIVE_HUB_CS
+                device_ids[0], self.connection_string
             ),
             checks=self.is_empty(),
         )
@@ -264,7 +254,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         # With connection string
         self.cmd(
             "iot device c2d-message complete -d {} --login {} -e {}".format(
-                device_ids[0], LIVE_HUB_CS, etag
+                device_ids[0], self.connection_string, etag
             ),
             expect_failure=True,
         )
@@ -279,7 +269,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         # With connection string
         self.cmd(
             "iot device c2d-message reject -d {} --login {} -e {}".format(
-                device_ids[0], LIVE_HUB_CS, etag
+                device_ids[0], self.connection_string, etag
             ),
             expect_failure=True,
         )
@@ -294,7 +284,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         # With connection string
         self.cmd(
             "iot device c2d-message abandon -d {} --login {} --etag {}".format(
-                device_ids[0], LIVE_HUB_CS, etag
+                device_ids[0], self.connection_string, etag
             ),
             expect_failure=True,
         )
@@ -309,7 +299,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         # With connection string
         self.cmd(
             "iot device simulate -d {} --login {} --mc {} --mi {} --data '{}' --rs 'complete'".format(
-                device_ids[0], LIVE_HUB_CS, 2, 1, "IoT Ext Test"
+                device_ids[0], self.connection_string, 2, 1, "IoT Ext Test"
             ),
             checks=self.is_empty(),
         )
@@ -324,7 +314,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         # With connection string
         self.cmd(
             "iot device simulate -d {} --login {} --mc {} --mi {} --data '{}' --rs 'abandon' --protocol http".format(
-                device_ids[0], LIVE_HUB_CS, 2, 1, "IoT Ext Test"
+                device_ids[0], self.connection_string, 2, 1, "IoT Ext Test"
             ),
             checks=self.is_empty(),
         )
@@ -380,7 +370,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         # With connection string
         self.cmd(
             'iot device send-d2c-message -d {} --login {} --props "MessageId=12345;CorrelationId=54321"'.format(
-                device_ids[0], LIVE_HUB_CS
+                device_ids[0], self.connection_string
             ),
             checks=self.is_empty(),
         )
@@ -410,7 +400,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # Test with invalid connection string
         self.cmd(
-            "iot hub monitor-events -t 1 -y --login {}".format(LIVE_HUB_CS + "zzz"),
+            "iot hub monitor-events -t 1 -y --login {}".format(self.connection_string + "zzz"),
             expect_failure=True,
         )
 
@@ -443,7 +433,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             )
         # Monitor events for all devices and include sys, anno, app
         self.command_execute_assert(
-            "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 10 -y -p sys anno app".format(
+            "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 5 -y -p sys anno app".format(
                 LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUPS[0], enqueued_time
             ),
             device_ids
@@ -459,7 +449,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # Monitor events for a single device
         self.command_execute_assert(
-            "iot hub monitor-events -n {} -g {} -d {} --cg {} --et {} -t 10 -y -p all".format(
+            "iot hub monitor-events -n {} -g {} -d {} --cg {} --et {} -t 5 -y -p all".format(
                 LIVE_HUB, LIVE_RG, device_ids[0], LIVE_CONSUMER_GROUPS[1], enqueued_time
             ),
             [
@@ -475,7 +465,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # Monitor events with device-id wildcards
         self.command_execute_assert(
-            "iot hub monitor-events -n {} -g {} -d {} --et {} -t 10 -y -p sys anno app".format(
+            "iot hub monitor-events -n {} -g {} -d {} --et {} -t 5 -y -p sys anno app".format(
                 LIVE_HUB, LIVE_RG, PREFIX_DEVICE + "*", enqueued_time
             ),
             device_ids,
@@ -491,7 +481,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         )
 
         self.command_execute_assert(
-            'iot hub monitor-events -n {} -g {} --device-query "{}" --et {} -t 10 -y -p sys anno app'.format(
+            'iot hub monitor-events -n {} -g {} --device-query "{}" --et {} -t 5 -y -p sys anno app'.format(
                 LIVE_HUB, LIVE_RG, query_string, enqueued_time
             ),
             device_subset_include,
@@ -501,7 +491,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         device_subset_exclude = device_ids[device_count // 2 :]
         with pytest.raises(Exception):
             self.command_execute_assert(
-                'iot hub monitor-events -n {} -g {} --device-query "{}" --et {} -t 10 -y -p sys anno app'.format(
+                'iot hub monitor-events -n {} -g {} --device-query "{}" --et {} -t 5 -y -p sys anno app'.format(
                     LIVE_HUB, LIVE_RG, query_string, enqueued_time
                 ),
                 device_subset_exclude,
@@ -509,8 +499,8 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # Monitor events with --login parameter
         self.command_execute_assert(
-            "iot hub monitor-events -t 10 -y -p all --cg {} --et {} --login {}".format(
-                LIVE_CONSUMER_GROUPS[2], enqueued_time, LIVE_HUB_CS
+            "iot hub monitor-events -t 5 -y -p all --cg {} --et {} --login {}".format(
+                LIVE_CONSUMER_GROUPS[2], enqueued_time, self.connection_string
             ),
             device_ids,
         )
@@ -536,7 +526,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # Monitor messages for ugly JSON output
         self.command_execute_assert(
-            "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 10 -y".format(
+            "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 5 -y".format(
                 LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUPS[0], enqueued_time
             ),
             ["\\r\\n"],
@@ -544,7 +534,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # Monitor messages and parse payload as JSON with the --ct parameter
         self.command_execute_assert(
-            "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 10 --ct application/json -y".format(
+            "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 5 --ct application/json -y".format(
                 LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUPS[1], enqueued_time
             ),
             ['"payload_data1": "payload_value1"'],
@@ -569,7 +559,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # Monitor messages for pretty JSON output
         self.command_execute_assert(
-            "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 10 -y".format(
+            "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 5 -y".format(
                 LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUPS[0], enqueued_time
             ),
             ['"payload_data1": "payload_value1"'],
@@ -577,7 +567,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # Monitor messages with yaml output
         self.command_execute_assert(
-            "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 10 -y -o yaml".format(
+            "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 5 -y -o yaml".format(
                 LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUPS[1], enqueued_time
             ),
             ["payload_data1: payload_value1"],
@@ -602,7 +592,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # Monitor messages to ensure it returns improperly formatted JSON
         self.command_execute_assert(
-            "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 10 -y".format(
+            "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 5 -y".format(
                 LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUPS[0], enqueued_time
             ),
             ['{\\r\\n\\"payload_data1\\"\\"payload_value1\\"\\r\\n}'],
@@ -669,14 +659,14 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         ack = "positive"
         self.cmd(
             "iot device c2d-message send -d {} --login {} --ack {} -y".format(
-                device_ids[0], LIVE_HUB_CS, ack
+                device_ids[0], self.connection_string, ack
             ),
             checks=self.is_empty(),
         )
 
         result = self.cmd(
             "iot device c2d-message receive -d {} --login {}".format(
-                device_ids[0], LIVE_HUB_CS
+                device_ids[0], self.connection_string
             )
         ).get_output_in_json()
 
@@ -688,13 +678,13 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         self.cmd(
             "iot device c2d-message complete -d {} --login {} -e {}".format(
-                device_ids[0], LIVE_HUB_CS, etag
+                device_ids[0], self.connection_string, etag
             )
         )
 
         self.command_execute_assert(
             "iot hub monitor-feedback --login {} -w {} -d {} -y".format(
-                LIVE_HUB_CS, msg_id, device_ids[0]
+                self.connection_string, msg_id, device_ids[0]
             ),
             ["description: Success"],
         )
@@ -705,34 +695,34 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         # Create some noise
         self.cmd(
             "iot device c2d-message send -d {} --login {} --ack {} -y".format(
-                device_ids[0], LIVE_HUB_CS, ack
+                device_ids[0], self.connection_string, ack
             ),
             checks=self.is_empty(),
         )
         result = self.cmd(
             "iot device c2d-message receive -d {} --login {}".format(
-                device_ids[0], LIVE_HUB_CS
+                device_ids[0], self.connection_string
             )
         ).get_output_in_json()
         etag = result["etag"]
 
         self.cmd(
             "iot device c2d-message reject -d {} --login {} -e {}".format(
-                device_ids[0], LIVE_HUB_CS, etag
+                device_ids[0], self.connection_string, etag
             )
         )
 
         # Target message
         self.cmd(
             "iot device c2d-message send -d {} --login {} --ack {} -y".format(
-                device_ids[0], LIVE_HUB_CS, ack
+                device_ids[0], self.connection_string, ack
             ),
             checks=self.is_empty(),
         )
 
         result = self.cmd(
             "iot device c2d-message receive -d {} --login {}".format(
-                device_ids[0], LIVE_HUB_CS
+                device_ids[0], self.connection_string
             )
         ).get_output_in_json()
 
@@ -744,11 +734,11 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         self.cmd(
             "iot device c2d-message reject -d {} --login {} -e {}".format(
-                device_ids[0], LIVE_HUB_CS, etag
+                device_ids[0], self.connection_string, etag
             )
         )
 
         self.command_execute_assert(
-            "iot hub monitor-feedback --login {} -w {} -y".format(LIVE_HUB_CS, msg_id),
+            "iot hub monitor-feedback --login {} -w {} -y".format(self.connection_string, msg_id),
             ["description: Message rejected"],
         )
