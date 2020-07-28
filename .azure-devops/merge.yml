@@ -126,3 +126,10 @@ jobs:
       source ./$(iot_ext_venv)/bin/activate
       cp ./linter_exclusions.yml $AZURE_EXTENSION_DIR/$(iot_ext_package)/
       azdev linter --include-whl-extensions $(iot_ext_package) --min-severity medium
+
+- job: CredScan
+  displayName: "Credential Scan"
+  steps:
+  - task: CredScan@3
+    inputs:
+      scanFolder: '$(Build.SourcesDirectory)'
