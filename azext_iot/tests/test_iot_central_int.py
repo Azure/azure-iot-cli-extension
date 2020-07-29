@@ -220,6 +220,20 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
         self._delete_device(device_id)
 
+    def test_central_user_methods_CRD(self):
+        (user_id, email) = self._create_user()
+
+        self.cmd(
+            "iot central app user show --app-id {} --id {}".format(APP_ID, user_id),
+            checks=[
+                self.check("id", user_id),
+                self.check("email", email),
+                self.check("type", "EmailUser"),
+            ],
+        )
+
+        self._delete_user(user_id)
+
     def test_central_device_template_methods_CRD(self):
         # currently: create, show, list, delete
         (template_id, template_name) = self._create_device_template()
@@ -399,6 +413,28 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
         self.cmd(command, checks=checks)
         return (device_id, device_name)
+
+    def _create_user(self,):
+        user_id = self.create_random_name(prefix="aztest", length=24)
+        email = user_id + "@test.com"
+
+        command = "iot central app user create --app-id {} --id {} -r admin --email {}".format(
+            APP_ID, user_id, email,
+        )
+
+        checks = [
+            self.check("id", user_id),
+            self.check("email", email),
+            self.check("type", "EmailUser"),
+        ]
+        self.cmd(command, checks=checks)
+        return (user_id, email)
+
+    def _delete_user(self, user_id) -> None:
+        self.cmd(
+            "iot central app user delete --app-id {} --id {}".format(APP_ID, user_id),
+            checks=[self.check("result", "success")],
+        )
 
     def _wait_for_provisioned(self, device_id):
         command = "iot central app device show --app-id {} -d {}".format(
