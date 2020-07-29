@@ -1,8 +1,4 @@
 steps:
-  - script: 'pip install --upgrade .'
-    displayName: 'Install Azure IoT CLI extension'
-    workingDirectory: '.'
-
   - script: 'python setup.py sdist bdist_wheel'
     displayName: 'Build wheel for Azure IoT CLI extension'
     workingDirectory: '.'

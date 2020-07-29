@@ -42,7 +42,7 @@ def load_digitaltwins_arguments(self, _):
         context.argument(
             "location",
             options_list=["--location", "-l"],
-            help="Digital Twins instance location. "
+            help="Digital Twins instance location. If no location is provided the resource group location is used."
             "You can configure the default location using `az configure --defaults location=<name>`.",
         ),
         context.argument(

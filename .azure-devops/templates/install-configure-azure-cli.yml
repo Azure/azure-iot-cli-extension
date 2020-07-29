@@ -1,0 +1,14 @@
+steps:
+  - task: Bash@3
+    inputs:
+      targetType: 'inline'
+      script: |
+        set -ev
+        pip install virtualenv
+        python -m virtualenv $(iot_ext_venv)/
+        source ./$(iot_ext_venv)/bin/activate
+        git clone --single-branch -b master https://github.com/Azure/azure-cli.git ../azure-cli
+        pip install azdev
+        azdev --version
+        azdev setup -c ../azure-cli
+        AZURE_EXTENSION_DIR=~/.azure/cliextensions

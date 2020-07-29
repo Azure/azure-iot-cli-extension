@@ -1,12 +1,11 @@
 steps:
   - task: PythonScript@0
-    displayName : 'Extract extension path'
-    name: 'extractExtensionPath'
+    displayName : 'Set Extension Path'
+    name: 'setExtensionPath'
     inputs:
       scriptSource: 'inline'
       script: |
         from azure.cli.core.extension import get_extension_path
-        from six import print_
         extension_path = get_extension_path("azure-iot")
-        print_("Extension path is " + extension_path)
-        print_("##vso[task.setvariable variable=PYTHONPATH;]"+extension_path)
+        print("Extension path is " + extension_path)
+        print("##vso[task.setvariable variable=PYTHONPATH;]"+extension_path)
