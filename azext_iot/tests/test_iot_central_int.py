@@ -416,7 +416,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
     def _create_user(self,):
         user_id = self.create_random_name(prefix="aztest", length=24)
-        email = user_id + "@test.com"
+        email = user_id + "@microsoft.com"
 
         command = "iot central app user create --app-id {} --id {} -r admin --email {}".format(
             APP_ID, user_id, email,
