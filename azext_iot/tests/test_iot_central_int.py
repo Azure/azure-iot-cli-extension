@@ -236,8 +236,10 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         user_list = result.get("value")
 
         for user in users:
-            assert user in user_list
             self._delete_user(user.get("id"))
+
+        for user in users:
+            assert user in user_list
 
     def test_central_device_template_methods_CRD(self):
         # currently: create, show, list, delete
