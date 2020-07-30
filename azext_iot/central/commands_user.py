@@ -39,3 +39,29 @@ def add_user(
         role=Role[role],
         central_dns_suffix=central_dns_suffix,
     )
+
+
+def list_users(
+    cmd, app_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
+):
+    provider = CentralUserProvider(cmd=cmd, app_id=app_id, token=token)
+
+    return provider.get_user_list(central_dns_suffix=central_dns_suffix,)
+
+
+def get_user(
+    cmd, app_id: str, assignee: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
+):
+    provider = CentralUserProvider(cmd=cmd, app_id=app_id, token=token)
+
+    return provider.get_user(assignee=assignee, central_dns_suffix=central_dns_suffix)
+
+
+def delete_user(
+    cmd, app_id: str, assignee: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
+):
+    provider = CentralUserProvider(cmd=cmd, app_id=app_id, token=token)
+
+    return provider.delete_user(
+        assignee=assignee, central_dns_suffix=central_dns_suffix
+    )

@@ -45,6 +45,9 @@ def load_central_commands(self, _):
         "iot central app user", command_type=central_user_ops, is_preview=True,
     ) as cmd_group:
         cmd_group.command("create", "add_user")
+        cmd_group.command("list", "list_users")
+        cmd_group.command("show", "get_user")
+        cmd_group.command("delete", "delete_user")
 
     with self.command_group(
         "iot central app device", command_type=central_device_ops, is_preview=True,

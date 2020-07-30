@@ -193,24 +193,63 @@ def _load_central_users_help():
         "iot central app user create"
     ] = """
         type: command
-        short-summary: Add a user to the app
+        short-summary: Add a user to the application
         examples:
-        - name: Add a user with email to the app
+        - name: Add a user by email to the application
           text: >
             az iot central app user create
-            --id {userId}
+            --user-id {userId}
             --app-id {appId}
             --email {emailAddress}
             --role admin
 
-        - name: Add a service-principal to the app
+        - name: Add a service-principal to the application
           text: >
             az iot central app user create
-            --id {userId}
+            --user-id {userId}
             --app-id {appId}
             --tenant-id {tenantId}
             --object-id {objectId}
             --role operator
+    """
+    helps[
+        "iot central app user show"
+    ] = """
+    type: command
+    short-summary: Get the details of a user by ID
+    examples:
+      - name: Get details of user
+        text: >
+          az iot central app user show
+          --app-id {appid}
+          --user-id {userId}
+    """
+
+    helps[
+        "iot central app user delete"
+    ] = """
+    type: command
+    short-summary: Delete a user from the application
+    examples:
+      - name: Delete a user
+        text: >
+          az iot central app user delete
+          --app-id {appid}
+          --user-id {userId}
+
+    """
+
+    helps[
+        "iot central app user list"
+    ] = """
+    type: command
+    short-summary: Get list of users in an application
+    examples:
+      - name: List of users
+        text: >
+          az iot central app user list
+          --app-id {appid}
+
     """
 
 

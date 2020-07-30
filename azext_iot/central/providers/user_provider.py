@@ -57,6 +57,38 @@ class CentralUserProvider:
             central_dns_suffix=central_dns_suffix,
         )
 
+    def get_user_list(
+        self, central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.user.get_user_list(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            token=self._token,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def get_user(
+        self, assignee, central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.user.get_user(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            assignee=assignee,
+            token=self._token,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def delete_user(
+        self, assignee, central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.user.delete_user(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            assignee=assignee,
+            token=self._token,
+            central_dns_suffix=central_dns_suffix,
+        )
+
     def add_email(
         self,
         assignee: str,
