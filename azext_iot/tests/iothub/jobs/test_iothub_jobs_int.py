@@ -13,12 +13,11 @@ from ...settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC
 settings = DynamoSettings(ENV_SET_TEST_IOTHUB_BASIC)
 LIVE_HUB = settings.env.azext_iot_testhub
 LIVE_RG = settings.env.azext_iot_testrg
-LIVE_HUB_CS = settings.env.azext_iot_testhub_cs
 
 
 class TestIoTHubJobs(IoTLiveScenarioTest):
     def __init__(self, test_case):
-        super(TestIoTHubJobs, self).__init__(test_case, LIVE_HUB, LIVE_RG, LIVE_HUB_CS)
+        super(TestIoTHubJobs, self).__init__(test_case, LIVE_HUB, LIVE_RG)
 
         job_count = 3
         self.job_ids = self.generate_job_names(job_count)
@@ -89,7 +88,7 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
                 "scheduleUpdateTwin",
                 query_condition,
                 "{twin_patch_props}",
-                LIVE_HUB_CS,
+                self.connection_string,
             ),
             checks=[
                 self.check("jobId", self.job_ids[1]),
@@ -150,7 +149,7 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
         # With connection string
         self.cmd(
             "iot hub job show --job-id {} --login {}".format(
-                self.job_ids[1], LIVE_HUB_CS
+                self.job_ids[1], self.connection_string
             ),
             checks=[
                 self.check("jobId", self.job_ids[1]),
@@ -211,7 +210,7 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
 
         # List Jobs - with connection string
         job_result_set_cs = self.cmd(
-            "iot hub job list --login {}".format(LIVE_HUB_CS)
+            "iot hub job list --login {}".format(self.connection_string)
         ).get_output_in_json()
 
         self.validate_job_list(jobs_set=job_result_set_cs)

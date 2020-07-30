@@ -21,8 +21,6 @@ settings = DynamoSettings(
 
 LIVE_HUB = settings.env.azext_iot_testhub
 LIVE_RG = settings.env.azext_iot_testrg
-LIVE_HUB_CS = settings.env.azext_iot_testhub_cs
-LIVE_HUB_MIXED_CASE_CS = LIVE_HUB_CS.replace("HostName", "hostname", 1)
 
 # Set this environment variable to your empty blob container sas uri to test device export and enable file upload test.
 # For file upload, you will need to have configured your IoT Hub before running.
@@ -42,7 +40,7 @@ SECONDARY_THUMBPRINT = "14963E8F3BA5B3984110B3C1CA8E8B8988599087"
 
 class TestIoTHub(IoTLiveScenarioTest):
     def __init__(self, test_case):
-        super(TestIoTHub, self).__init__(test_case, LIVE_HUB, LIVE_RG, LIVE_HUB_CS)
+        super(TestIoTHub, self).__init__(test_case, LIVE_HUB, LIVE_RG)
 
     def test_hub(self):
         self.cmd(
@@ -62,13 +60,13 @@ class TestIoTHub(IoTLiveScenarioTest):
 
         # With connection string
         self.cmd(
-            "az iot hub generate-sas-token --login {}".format(LIVE_HUB_CS),
+            "az iot hub generate-sas-token --login {}".format(self.connection_string),
             checks=[self.exists("sas")],
         )
 
         self.cmd(
             "az iot hub generate-sas-token --login {} --pn somepolicy".format(
-                LIVE_HUB_CS
+                self.connection_string
             ),
             expect_failure=True,
         )
@@ -104,7 +102,7 @@ class TestIoTHub(IoTLiveScenarioTest):
         # Error can't change key for a sas token with conn string
         self.cmd(
             "az iot hub generate-sas-token --login {} --kt secondary".format(
-                LIVE_HUB_CS
+                self.connection_string
             ),
             expect_failure=True,
         )
@@ -119,7 +117,7 @@ class TestIoTHub(IoTLiveScenarioTest):
         # With connection string
         self.cmd(
             'iot hub query --query-command "{}" --login {}'.format(
-                "select * from devices", LIVE_HUB_CS
+                "select * from devices", self.connection_string
             ),
             checks=[self.check("length([*])", 0)],
         )
@@ -140,7 +138,7 @@ class TestIoTHub(IoTLiveScenarioTest):
 class TestIoTHubDevices(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTHubDevices, self).__init__(
-            test_case, LIVE_HUB, LIVE_RG, LIVE_HUB_CS
+            test_case, LIVE_HUB, LIVE_RG
         )
 
     def test_hub_devices(self):
@@ -227,7 +225,7 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
         # With connection string
         self.cmd(
             'iot hub query -q "{}" --login {}'.format(
-                "select * from devices", LIVE_HUB_CS
+                "select * from devices", self.connection_string
             ),
             checks=query_checks,
         )
@@ -235,7 +233,7 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
         # -1 for no return limit
         self.cmd(
             'iot hub query -q "{}" --login {} --top -1'.format(
-                "select * from devices", LIVE_HUB_CS
+                "select * from devices", self.connection_string
             ),
             checks=query_checks,
         )
@@ -291,7 +289,7 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
         self.cmd(
             '''iot hub device-identity create --device-id {} --login {}
                     --auth-method x509_ca --status disabled --status-reason "{}"'''.format(
-                device_ids[2], LIVE_HUB_CS, status_reason
+                device_ids[2], self.connection_string, status_reason
             ),
             checks=[
                 self.check("deviceId", device_ids[2]),
@@ -349,7 +347,7 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
         # With connection string
         self.cmd(
             "iot hub device-identity show -d {} --login {}".format(
-                edge_device_ids[0], LIVE_HUB_CS
+                edge_device_ids[0], self.connection_string
             ),
             checks=[
                 self.check("deviceId", edge_device_ids[0]),
@@ -385,7 +383,7 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
 
         # With connection string
         self.cmd(
-            "iot hub device-identity list --ee --login {}".format(LIVE_HUB_CS),
+            "iot hub device-identity list --ee --login {}".format(self.connection_string),
             checks=[self.check("length([*])", edge_device_count)],
         )
 
@@ -427,7 +425,7 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
         self.cmd(
             '''iot hub device-identity update -d {} --login {} --set authentication.symmetricKey.primaryKey=""
                  authentication.symmetricKey.secondaryKey=""'''.format(
-                edge_device_ids[1], LIVE_HUB_CS
+                edge_device_ids[1], self.connection_string
             ),
             checks=[
                 self.check("deviceId", edge_device_ids[1]),
@@ -518,21 +516,21 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
         # With connection string
         self.cmd(
             "iot hub generate-sas-token -d {} --login {}".format(
-                edge_device_ids[0], LIVE_HUB_CS
+                edge_device_ids[0], self.connection_string
             ),
             checks=[self.exists("sas")],
         )
 
         self.cmd(
             'iot hub generate-sas-token -d {} --login {} --kt "secondary"'.format(
-                edge_device_ids[1], LIVE_HUB_CS
+                edge_device_ids[1], self.connection_string
             ),
             checks=[self.exists("sas")],
         )
 
         self.cmd(
             'iot hub generate-sas-token -d {} --login {} --pn "mypolicy"'.format(
-                edge_device_ids[1], LIVE_HUB_CS
+                edge_device_ids[1], self.connection_string
             ),
             expect_failure=True,
         )
@@ -541,7 +539,7 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
 class TestIoTHubDeviceTwins(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTHubDeviceTwins, self).__init__(
-            test_case, LIVE_HUB, LIVE_RG, LIVE_HUB_CS
+            test_case, LIVE_HUB, LIVE_RG
         )
 
     def test_hub_device_twins(self):
@@ -576,7 +574,7 @@ class TestIoTHubDeviceTwins(IoTLiveScenarioTest):
         # With connection string
         self.cmd(
             "iot hub device-twin show -d {} --login {}".format(
-                device_ids[0], LIVE_HUB_CS
+                device_ids[0], self.connection_string
             ),
             checks=[
                 self.check("deviceId", device_ids[0]),
@@ -606,7 +604,7 @@ class TestIoTHubDeviceTwins(IoTLiveScenarioTest):
         # Patch based twin update of tags with connection string
         self.cmd(
             "iot hub device-twin update -d {} --login {} --tags {}".format(
-                device_ids[2], LIVE_HUB_CS, '"{patch_tags}"'
+                device_ids[2], self.connection_string, '"{patch_tags}"'
             ),
             checks=[
                 self.check("deviceId", device_ids[2]),
@@ -658,7 +656,7 @@ class TestIoTHubDeviceTwins(IoTLiveScenarioTest):
         # With connection string
         result = self.cmd(
             "iot hub device-twin update -d {} --login {} --set properties.desired.special={}".format(
-                device_ids[0], LIVE_HUB_CS, '"{generic_dict}"'
+                device_ids[0], self.connection_string, '"{generic_dict}"'
             )
         ).get_output_in_json()
         assert result["deviceId"] == device_ids[0]
@@ -703,7 +701,7 @@ class TestIoTHubDeviceTwins(IoTLiveScenarioTest):
         # With connection string
         self.cmd(
             "iot hub device-twin replace -d {} --login {} -j '{}'".format(
-                device_ids[1], LIVE_HUB_CS, "{twin_payload}"
+                device_ids[1], self.connection_string, "{twin_payload}"
             ),
             checks=[
                 self.check("deviceId", device_ids[1]),
@@ -741,7 +739,7 @@ class TestIoTHubDeviceTwins(IoTLiveScenarioTest):
 class TestIoTHubModules(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTHubModules, self).__init__(
-            test_case, LIVE_HUB, LIVE_RG, LIVE_HUB_CS
+            test_case, LIVE_HUB, LIVE_RG
         )
 
     def test_hub_modules(self):
@@ -784,7 +782,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
 
         self.cmd(
             "iot hub module-identity create -d {} --login {} -m {}".format(
-                edge_device_ids[0], LIVE_HUB_CS, module_ids[0]
+                edge_device_ids[0], self.connection_string, module_ids[0]
             ),
             checks=[
                 self.check("deviceId", edge_device_ids[0]),
@@ -813,15 +811,16 @@ class TestIoTHubModules(IoTLiveScenarioTest):
         # sas token for module with connection string
         self.cmd(
             "iot hub generate-sas-token -d {} -m {} --login {}".format(
-                edge_device_ids[0], module_ids[1], LIVE_HUB_CS
+                edge_device_ids[0], module_ids[1], self.connection_string
             ),
             checks=[self.exists("sas")],
         )
 
         # sas token for module with mixed case connection string
+        mixed_case_cstring = self.connection_string.replace("HostName", "hostname", 1)
         self.cmd(
             "iot hub generate-sas-token -d {} -m {} --login {}".format(
-                edge_device_ids[0], module_ids[1], LIVE_HUB_MIXED_CASE_CS
+                edge_device_ids[0], module_ids[1], mixed_case_cstring
             ),
             checks=[self.exists("sas")],
         )
@@ -833,7 +832,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
                     --auth-method x509_thumbprint --primary-thumbprint {} --secondary-thumbprint {}""".format(
                 module_ids[0],
                 device_ids[0],
-                LIVE_HUB_CS,
+                self.connection_string,
                 PRIMARY_THUMBPRINT,
                 SECONDARY_THUMBPRINT,
             ),
@@ -873,7 +872,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
         # With connection string
         self.cmd(
             """iot hub module-identity create --module-id {} --device-id {} --login {} --auth-method x509_ca""".format(
-                module_ids[0], edge_device_ids[1], LIVE_HUB_CS
+                module_ids[0], edge_device_ids[1], self.connection_string
             ),
             checks=[
                 self.check("deviceId", edge_device_ids[1]),
@@ -915,7 +914,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
         self.cmd(
             '''iot hub module-identity update -d {} --login {} -m {}
                     --set authentication.symmetricKey.primaryKey="" authentication.symmetricKey.secondaryKey=""'''.format(
-                edge_device_ids[0], LIVE_HUB_CS, module_ids[0]
+                edge_device_ids[0], self.connection_string, module_ids[0]
             ),
             checks=[
                 self.check("deviceId", edge_device_ids[0]),
@@ -950,7 +949,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
         # With connection string
         self.cmd(
             "iot hub module-identity list -d {} --login {}".format(
-                edge_device_ids[0], LIVE_HUB_CS
+                edge_device_ids[0], self.connection_string
             ),
             checks=[
                 self.check("length([*])", 4),
@@ -974,7 +973,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
         # With connection string
         self.cmd(
             "iot hub module-identity show -d {} --login {} -m {}".format(
-                edge_device_ids[0], LIVE_HUB_CS, module_ids[0]
+                edge_device_ids[0], self.connection_string, module_ids[0]
             ),
             checks=[
                 self.check("deviceId", edge_device_ids[0]),
@@ -997,7 +996,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
         # With connection string
         self.cmd(
             "iot hub module-identity show-connection-string -d {} --login {} -m {}".format(
-                edge_device_ids[0], LIVE_HUB_CS, module_ids[0]
+                edge_device_ids[0], self.connection_string, module_ids[0]
             ),
             checks=[self.check_pattern("connectionString", mod_sym_conn_str_pattern)],
         )
@@ -1036,7 +1035,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
                 # With connection string
                 self.cmd(
                     "iot hub module-identity delete -d {} --login {} --module-id {}".format(
-                        edge_device_ids[0], LIVE_HUB_CS, i
+                        edge_device_ids[0], self.connection_string, i
                     ),
                     checks=self.is_empty(),
                 )
@@ -1052,7 +1051,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
 class TestIoTHubModuleTwins(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTHubModuleTwins, self).__init__(
-            test_case, LIVE_HUB, LIVE_RG, LIVE_HUB_CS
+            test_case, LIVE_HUB, LIVE_RG
         )
 
     def test_hub_module_twins(self):
@@ -1122,7 +1121,7 @@ class TestIoTHubModuleTwins(IoTLiveScenarioTest):
         # With connection string
         self.cmd(
             "iot hub module-twin show -d {} --login {} -m {}".format(
-                edge_device_ids[0], LIVE_HUB_CS, module_ids[0]
+                edge_device_ids[0], self.connection_string, module_ids[0]
             ),
             checks=[
                 self.check("deviceId", edge_device_ids[0]),
@@ -1154,7 +1153,7 @@ class TestIoTHubModuleTwins(IoTLiveScenarioTest):
         # Patch based twin update of tags with connection string
         self.cmd(
             "iot hub module-twin update -d {} --login {} -m {} --tags {}".format(
-                edge_device_ids[0], LIVE_HUB_CS, module_ids[0], '"{patch_tags}"'
+                edge_device_ids[0], self.connection_string, module_ids[0], '"{patch_tags}"'
             ),
             checks=[
                 self.check("deviceId", edge_device_ids[0]),
@@ -1203,7 +1202,7 @@ class TestIoTHubModuleTwins(IoTLiveScenarioTest):
         # With connection string
         self.cmd(
             "iot hub module-twin update -d {} --login {} -m {} --set properties.desired.special={}".format(
-                edge_device_ids[0], LIVE_HUB_CS, module_ids[0], '"{generic_dict}"'
+                edge_device_ids[0], self.connection_string, module_ids[0], '"{generic_dict}"'
             ),
             checks=[
                 self.check("deviceId", edge_device_ids[0]),
@@ -1215,14 +1214,14 @@ class TestIoTHubModuleTwins(IoTLiveScenarioTest):
         # Error case test type enforcer
         self.cmd(
             "iot hub module-twin update -d {} --login {} -m {} --set properties.desired={}".format(
-                edge_device_ids[0], LIVE_HUB_CS, module_ids[0], '"{bad_format}"'
+                edge_device_ids[0], self.connection_string, module_ids[0], '"{bad_format}"'
             ),
             expect_failure=True,
         )
 
         self.cmd(
             "iot hub module-twin update -d {} --login {} -m {} --set tags={}".format(
-                edge_device_ids[0], LIVE_HUB_CS, module_ids[0], '"{bad_format}"'
+                edge_device_ids[0], self.connection_string, module_ids[0], '"{bad_format}"'
             ),
             expect_failure=True,
         )
@@ -1245,7 +1244,7 @@ class TestIoTHubModuleTwins(IoTLiveScenarioTest):
         # With connection string
         self.cmd(
             "iot hub module-twin replace -d {} --login {} -m {} -j '{}'".format(
-                edge_device_ids[0], LIVE_HUB_CS, module_ids[0], content_path
+                edge_device_ids[0], self.connection_string, module_ids[0], content_path
             ),
             checks=[
                 self.check("deviceId", edge_device_ids[0]),
@@ -1283,7 +1282,7 @@ class TestIoTHubModuleTwins(IoTLiveScenarioTest):
 
 class TestIoTStorage(IoTLiveScenarioTest):
     def __init__(self, test_case):
-        super(TestIoTStorage, self).__init__(test_case, LIVE_HUB, LIVE_RG, LIVE_HUB_CS)
+        super(TestIoTStorage, self).__init__(test_case, LIVE_HUB, LIVE_RG)
 
     @pytest.mark.skipif(
         not LIVE_STORAGE, reason="empty azext_iot_teststorageuri env var"
@@ -1311,7 +1310,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
         # With connection string
         self.cmd(
             'iot device upload-file -d {} --login {} --fp "{}" --ct {}'.format(
-                device_ids[0], LIVE_HUB_CS, content_path, "application/json"
+                device_ids[0], self.connection_string, content_path, "application/json"
             ),
             checks=self.is_empty(),
         )
@@ -1349,7 +1348,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
 class TestIoTEdgeOffline(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTEdgeOffline, self).__init__(
-            test_case, LIVE_HUB, LIVE_RG, LIVE_HUB_CS
+            test_case, LIVE_HUB, LIVE_RG
         )
 
     def test_edge_offline(self):

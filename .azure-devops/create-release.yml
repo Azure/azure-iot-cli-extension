@@ -4,6 +4,11 @@ trigger: none
 
 jobs:
 
+  # track deployment in environments
+- deployment: 'StageGitHub'
+  displayName: 'Stage CLI extension on GitHub'
+  environment: 'production'
+
 - job: 'Build_Publish_Azure_IoT_CLI_Extension'
   pool:
     vmImage: 'Ubuntu-16.04'
@@ -11,7 +16,7 @@ jobs:
   steps:
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.7.x'
+      versionSpec: '3.6.x'
       architecture: 'x64'
 
   - template: templates/setup-ci-machine.yml
@@ -25,7 +30,7 @@ jobs:
   steps:
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.7.x'
+      versionSpec: '3.6.x'
       architecture: 'x64'
 
   - template: templates/setup-ci-machine.yml
@@ -40,7 +45,7 @@ jobs:
   steps:
   - template: templates/run-tests.yml
     parameters:
-      pythonVersion: '3.7.x'
+      pythonVersion: '3.6.x'
       runUnitTestsOnly: 'false'
 
   - script: 'pip install .'
@@ -91,7 +96,7 @@ jobs:
 
   - task: GitHubRelease@0
     inputs:
-      gitHubConnection: GitHub
+      gitHubConnection: GitHubP
       repositoryName: $(Build.Repository.Name)
       action: 'create'
       target: '$(Build.SourceVersion)'

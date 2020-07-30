@@ -49,9 +49,9 @@ def load_pnp_help():
           text: >
             az iot pnp role-assignment list --resource-id {tenant_id} --resource-type Tenant
 
-        - name: List role assignments for a specific model and subject.
+        - name: List role assignments for a specific model "dtmi:com:example:ClimateSensor;1" and subject.
           text: >
-            az iot pnp role-assignment list --resource-id {model_id}
+            az iot pnp role-assignment list --resource-id "dtmi:com:example:ClimateSensor;1"
             --resource-type Model
             --subject-id {user_or_spn_id}
     """
@@ -103,7 +103,7 @@ def load_pnp_help():
     examples:
     - name: Create a new model by uploading a JSON file
       text: >
-        az iot pnp model create --model {path\\to\\definition\\file.json}
+        az iot pnp model create --model ./path/to/definition/file.json
     """
 
     helps["iot pnp model show"] = """
@@ -111,9 +111,9 @@ def load_pnp_help():
     short-summary: View a device model by ID
 
     examples:
-    - name: View a model with the ID {dtmi:my:model}
+    - name: View a model with the ID "dtmi:com:example:ClimateSensor;1"
       text: >
-        az iot pnp model show --dtmi {dtmi:my:model}
+        az iot pnp model show --dtmi "dtmi:com:example:ClimateSensor;1"
     """
 
     helps["iot pnp model list"] = """

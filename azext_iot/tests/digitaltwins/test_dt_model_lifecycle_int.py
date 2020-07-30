@@ -12,55 +12,38 @@ from azext_iot.common.utility import (
     scantree,
     process_json_arg,
 )
-from ..settings import DynamoSettings
 from . import DTLiveScenarioTest
 from . import (
-    generate_resource_id,
-    generate_group_id,
+    generate_resource_id
 )
 
 logger = get_logger(__name__)
 
-model_tests_env_vars = [
-    "azext_dt_rbac_assignee_owner",
-]
 
-settings = DynamoSettings([], model_tests_env_vars)
-run_tests = False
-
-if all([settings.env.azext_dt_rbac_assignee_owner]):
-    run_tests = True
-
-
-@pytest.mark.skipif(not run_tests, reason="azext_dt_rbac_assignee_owner is required.")
 @pytest.mark.usefixtures("set_cwd")
 class TestDTModelLifecycle(DTLiveScenarioTest):
     def __init__(self, test_case):
-        self.group_names = [generate_group_id()]
-        self.rbac_assignee_owner = settings.env.azext_dt_rbac_assignee_owner
-        self.dt_location = "westus2"
-        self.room_dtmi = "dtmi:example:Room;1"
-        self.floor_dtmi = "dtmi:example:Floor;1"
-
-        super(TestDTModelLifecycle, self).__init__(test_case, self.group_names)
+        super(TestDTModelLifecycle, self).__init__(test_case)
 
     def test_dt_models(self):
         instance_name = generate_resource_id()
         models_directory = "./models"
         inline_model = "./models/Floor.json"
-        component_id = "dtmi:com:example:Thermostat;1"
+        component_dtmi = "dtmi:com:example:Thermostat;1"
+        room_dtmi = "dtmi:example:Room;1"
 
         self.cmd(
             "dt create -n {} -g {} -l {}".format(
-                instance_name, self.group_names[0], self.dt_location
+                instance_name, self.dt_resource_group, self.dt_location
             )
         )
 
         self.cmd(
             "dt role-assignment create -n {} -g {} --assignee {} --role '{}'".format(
-                instance_name, self.group_names[0], self.rbac_assignee_owner, self.role_map["owner"]
+                instance_name, self.dt_resource_group, self.current_user, self.role_map["owner"]
             )
         )
+
         # Wait for RBAC to catch-up
         sleep(10)
 
@@ -83,7 +66,7 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
 
         list_models_output = self.cmd(
             "dt model list -n {} -g {} --definition".format(
-                instance_name, self.group_names[0]
+                instance_name, self.dt_resource_group
             )
         ).get_output_in_json()
         assert len(list_models_output) == len(create_models_output)
@@ -93,7 +76,7 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
 
         model_dependencies_output = self.cmd(
             "dt model list -n {} -g {} --dependencies-for '{}'".format(
-                instance_name, self.group_names[0], self.room_dtmi,
+                instance_name, self.dt_resource_group, room_dtmi,
             )
         ).get_output_in_json()
         assert len(model_dependencies_output) == 2
@@ -106,7 +89,7 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
 
             model_show_def_output = self.cmd(
                 "dt model show -n {} -g {} --dtmi '{}' --definition".format(
-                    instance_name, self.group_names[0], model["id"]
+                    instance_name, self.dt_resource_group, model["id"]
                 )
             ).get_output_in_json()
 
@@ -138,14 +121,14 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
 
         # Delete non-referenced models first
         for model in list_models_output:
-            if model["id"] != component_id:
+            if model["id"] != component_dtmi:
                 self.cmd(
                     "dt model delete -n {} --dtmi {}".format(instance_name, model["id"])
                 )
 
         # Now referenced component
         self.cmd(
-            "dt model delete -n {} --dtmi {}".format(instance_name, component_id)
+            "dt model delete -n {} --dtmi {}".format(instance_name, component_dtmi)
         )
 
         assert (
@@ -155,6 +138,10 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
                 ).get_output_in_json()
             )
             == 0
+        )
+
+        self.cmd(
+            "dt delete -n {} -g {}".format(instance_name, self.dt_resource_group)
         )
 
 

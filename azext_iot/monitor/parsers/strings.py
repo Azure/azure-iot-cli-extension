@@ -84,11 +84,9 @@ def duplicate_property_name(duplicate_prop_name, interfaces: list):
 # error
 def invalid_primitive_schema_mismatch_template(field_name: str, data_type: str, data):
     return (
-        "Datatype of field '{}' does not match the datatype '{}'. Data '{}'. "
-        "All dates/times/datetimes/durations must be ISO 8601 compliant.".format(
-            field_name, data_type, data,
-        )
-    )
+        "Datatype of telemetry field '{}' does not match the datatype {}. Data sent by the device : {}. "
+        "For more information, see: https://aka.ms/iotcentral-payloads"
+    ).format(field_name, data_type, data,)
 
 
 # to remove

@@ -23,14 +23,29 @@ steps:
 
   - template: set-pythonpath.yml
 
+  - template: set-testenv-sentinel.yml
+
   - ${{ if eq(parameters.runUnitTestsOnly, 'false') }}:
-    - template: set-testenv-sentinel.yml
-    - template: run-all-tests.yml
+
+    - task: AzureCLI@2
+      displayName: 'Execute full IoT extension test run'
+      inputs:
+        azureSubscription: AzIoTCLIService
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: pytest -vv -r azext_iot/tests/ --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-full-results.xml --cov-report=xml
 
   - ${{ if eq(parameters.runUnitTestsOnly, 'true') }}:
-    - template: set-testenv-sentinel.yml
-    - script: pytest -vv azext_iot/tests/ -k "_unit" --junitxml=junit/test-iotext-unit-results.xml
+
+    - script: pytest -vv -r azext_iot/tests/ -k "_unit" --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-unit-results.xml --cov-report=xml
       displayName: 'Execute IoT extension unit tests'
+
+  - task: PublishCodeCoverageResults@1
+    inputs:
+      codeCoverageTool: 'cobertura'
+      summaryFileLocation: '$(System.DefaultWorkingDirectory)/coverage.xml'
+      reportDirectory: '$(System.DefaultWorkingDirectory)/htmlcov'
+      additionalCodeCoverageFiles: '$(System.DefaultWorkingDirectory)/htmlcov/**/*.*'
 
   - task: PublishTestResults@2
     condition: succeededOrFailed()
