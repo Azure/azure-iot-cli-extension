@@ -101,8 +101,8 @@ def load_central_arguments(self, _):
         )
         context.argument(
             "assignee",
-            options_list=["--id", "--assignee"],
-            help="ID associated with a user. ",
+            options_list=["--user-id", "--assignee"],
+            help="ID associated with the user. ",
         )
         context.argument(
             "email",

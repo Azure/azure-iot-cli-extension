@@ -195,10 +195,10 @@ def _load_central_users_help():
         type: command
         short-summary: Add a user to the application
         examples:
-        - name: Add a user with email to the application
+        - name: Add a user by email to the application
           text: >
             az iot central app user create
-            --id {userId}
+            --user-id {userId}
             --app-id {appId}
             --email {emailAddress}
             --role admin
@@ -206,7 +206,7 @@ def _load_central_users_help():
         - name: Add a service-principal to the application
           text: >
             az iot central app user create
-            --id {userId}
+            --user-id {userId}
             --app-id {appId}
             --tenant-id {tenantId}
             --object-id {objectId}
@@ -222,7 +222,7 @@ def _load_central_users_help():
         text: >
           az iot central app user show
           --app-id {appid}
-          --id {userId}
+          --user-id {userId}
     """
 
     helps[
@@ -235,7 +235,7 @@ def _load_central_users_help():
         text: >
           az iot central app user delete
           --app-id {appid}
-          --id {userId}
+          --user-id {userId}
 
     """
 
