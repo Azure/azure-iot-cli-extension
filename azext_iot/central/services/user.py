@@ -91,3 +91,77 @@ def add_email(
 
     response = requests.put(url, headers=headers, json=payload)
     return _utility.try_extract_result(response)
+
+
+def get_user_list(
+    cmd, app_id: str, token: str, central_dns_suffix=CENTRAL_ENDPOINT,
+):
+    """
+    Get the list of users for central app.
+
+    Args:
+        cmd: command passed into az
+        app_id: name of app (used for forming request URL)
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        users: dict
+    """
+    url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
+
+    headers = _utility.get_headers(token, cmd)
+
+    response = requests.get(url, headers=headers)
+    return _utility.try_extract_result(response)
+
+
+def get_user(
+    cmd, app_id: str, token: str, assignee: str, central_dns_suffix=CENTRAL_ENDPOINT,
+):
+    """
+    Get information for the specified user.
+
+    Args:
+        cmd: command passed into az
+        app_id: name of app (used for forming request URL)
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        assignee: unique ID of the user
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        users: dict
+    """
+    url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, assignee)
+
+    headers = _utility.get_headers(token, cmd)
+
+    response = requests.get(url, headers=headers)
+    return _utility.try_extract_result(response)
+
+
+def delete_user(
+    cmd, app_id: str, token: str, assignee: str, central_dns_suffix=CENTRAL_ENDPOINT,
+):
+    """
+    delete user from theapp.
+
+    Args:
+        cmd: command passed into az
+        app_id: name of app (used for forming request URL)
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        assignee: unique ID of the user
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        users: dict
+    """
+    url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, assignee)
+
+    headers = _utility.get_headers(token, cmd)
+
+    response = requests.delete(url, headers=headers)
+    return _utility.try_extract_result(response)

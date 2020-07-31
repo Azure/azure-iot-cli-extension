@@ -1,7 +1,8 @@
 # Microsoft Azure IoT extension for Azure CLI
 
 ![Python](https://img.shields.io/pypi/pyversions/azure-cli.svg?maxAge=2592000)
-[![Build Status](https://dev.azure.com/azure/azure-iot-cli-extension/_apis/build/status/Merge%20-%20Azure.azure-iot-cli-extension?branchName=dev)](https://dev.azure.com/azure/azure-iot-cli-extension/_build/latest?definitionId=49&branchName=dev)
+![Build Status](https://dev.azure.com/azureiotdevxp/aziotcli/_apis/build/status/Merge%20-%20Azure.azure-iot-cli-extension?branchName=dev)
+
 
 The **Azure IoT extension for Azure CLI** aims to accelerate the development, management and automation of Azure IoT solutions. It does this via addition of rich features and functionality to the official [Azure CLI](https://docs.microsoft.com/en-us/cli/azure).
 

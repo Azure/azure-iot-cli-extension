@@ -13,7 +13,7 @@ from .conftest import get_context_path
 
 from azure.iot.device import Message
 from azext_iot.common import utility
-from azext_iot.central.models.enum import DeviceStatus
+from azext_iot.central.models.enum import DeviceStatus, Role
 from azext_iot.monitor.parsers import strings
 
 from . import CaptureOutputLiveScenarioTest, helpers
@@ -220,6 +220,27 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
         self._delete_device(device_id)
 
+    def test_central_user_methods_CRD(self):
+        users = self._create_users()
+
+        self.cmd(
+            "iot central app user show --app-id {} --user-id {}".format(
+                APP_ID, users[0].get("id")
+            ),
+        )
+
+        result = self.cmd(
+            "iot central app user list --app-id {}".format(APP_ID,),
+        ).get_output_in_json()
+
+        user_list = result.get("value")
+
+        for user in users:
+            self._delete_user(user.get("id"))
+
+        for user in users:
+            assert user in user_list
+
     def test_central_device_template_methods_CRD(self):
         # currently: create, show, list, delete
         (template_id, template_name) = self._create_device_template()
@@ -399,6 +420,34 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
         self.cmd(command, checks=checks)
         return (device_id, device_name)
+
+    def _create_users(self,):
+
+        users = []
+        for role in Role:
+            user_id = self.create_random_name(prefix="aztest", length=24)
+            email = user_id + "@microsoft.com"
+            command = "iot central app user create --app-id {} --user-id {} -r {} --email {}".format(
+                APP_ID, user_id, role.name, email,
+            )
+
+            checks = [
+                self.check("id", user_id),
+                self.check("email", email),
+                self.check("type", "EmailUser"),
+                self.check("roles[0].role", role.value),
+            ]
+            users.append(self.cmd(command, checks=checks).get_output_in_json())
+
+        return users
+
+    def _delete_user(self, user_id) -> None:
+        self.cmd(
+            "iot central app user delete --app-id {} --user-id {}".format(
+                APP_ID, user_id
+            ),
+            checks=[self.check("result", "success")],
+        )
 
     def _wait_for_provisioned(self, device_id):
         command = "iot central app device show --app-id {} -d {}".format(
