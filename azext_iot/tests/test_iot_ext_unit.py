@@ -48,9 +48,6 @@ generic_cs_template = "HostName={};SharedAccessKeyName={};SharedAccessKey={}"
 
 mock_target["cs"] = generate_cs()
 
-# Patch Paths #
-path_iot_hub_service_factory = "azext_iot.common._azure.iot_hub_service_factory"
-
 # TODO generalize all fixtures across DPS/Hub unit tests
 
 
