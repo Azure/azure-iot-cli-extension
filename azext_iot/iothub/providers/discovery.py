@@ -9,7 +9,7 @@ from knack.log import get_logger
 from azext_iot.common.utility import trim_from_start
 from azext_iot.iothub.models.iothub_target import IotHubTarget
 from azext_iot._factory import iot_hub_service_factory
-from typing import Dict
+from typing import Dict, List
 
 PRIVILEDGED_ACCESS_RIGHTS_SET = set(
     ["RegistryWrite", "ServiceConnect", "DeviceConnect"]
@@ -25,8 +25,9 @@ class IotHubDiscovery(object):
         self.cmd = cmd
         self.client = None
         self.sub_id = "unknown"
+        self._initialize_client()
 
-    def _self_initialize_client(self):
+    def _initialize_client(self):
         if not self.client:
             if getattr(self.cmd, "cli_ctx", None):
                 self.client = iot_hub_service_factory(self.cmd.cli_ctx)
@@ -34,9 +35,38 @@ class IotHubDiscovery(object):
                 self.client = self.cmd
             self.sub_id = self.client.config.subscription_id
 
-    def find_iothub(self, hub_name, rg=None):
+    def get_iothubs(self, rg: str = None) -> List:
+        hubs_list = []
+
+        if not rg:
+            hubs_pager = self.client.list_by_subscription()
+        else:
+            hubs_pager = self.client.list_by_resource_group(resource_group_name=rg)
+
+        try:
+            while True:
+                hubs_list.extend(hubs_pager.advance_page())
+        except StopIteration:
+            pass
+
+        return hubs_list
+
+    def get_policies(self, hub_name: str, rg: str) -> List:
+        policy_pager = self.client.list_keys(
+            resource_group_name=rg, resource_name=hub_name
+        )
+        policy_list = []
+
+        try:
+            while True:
+                policy_list.extend(policy_pager.advance_page())
+        except StopIteration:
+            pass
+
+        return policy_list
+
+    def find_iothub(self, hub_name: str, rg: str = None):
         from azure.mgmt.iothub.models import ErrorDetailsException
-        self._self_initialize_client()
 
         if rg:
             try:
@@ -48,14 +78,7 @@ class IotHubDiscovery(object):
                     )
                 )
 
-        hubs_pager = self.client.list_by_subscription()
-        hubs_list = []
-
-        try:
-            while True:
-                hubs_list.extend(hubs_pager.advance_page())
-        except StopIteration:
-            pass
+        hubs_list = self.get_iothubs()
 
         if hubs_list:
             target_hub = next(
@@ -70,29 +93,20 @@ class IotHubDiscovery(object):
             )
         )
 
-    def find_policy(self, hub_name, rg, policy_name="auto"):
-        self._self_initialize_client()
-
+    def find_policy(self, hub_name: str, rg: str, policy_name: str = "auto"):
         if policy_name.lower() != "auto":
             return self.client.get_keys_for_key_name(
                 resource_group_name=rg, resource_name=hub_name, key_name=policy_name
             )
 
-        policy_pager = self.client.list_keys(
-            resource_group_name=rg, resource_name=hub_name
-        )
-        policy_list = []
-
-        try:
-            while True:
-                policy_list.extend(policy_pager.advance_page())
-        except StopIteration:
-            pass
+        policy_list = self.get_policies(hub_name=hub_name, rg=rg)
 
         for policy in policy_list:
             rights_set = set(policy.rights.split(", "))
             if PRIVILEDGED_ACCESS_RIGHTS_SET == rights_set:
-                logger.info("Using policy '%s' for IoT Hub interaction.", policy.key_name)
+                logger.info(
+                    "Using policy '%s' for IoT Hub interaction.", policy.key_name
+                )
                 return policy
 
         raise CLIError(
@@ -107,7 +121,7 @@ class IotHubDiscovery(object):
     def get_target_by_cstring(cls, connection_string: str) -> IotHubTarget:
         return IotHubTarget.from_connection_string(cstring=connection_string).as_dict()
 
-    def get_target(self, hub_name, rg=None, **kwargs) -> Dict[str, str]:
+    def get_target(self, hub_name: str, rg: str = None, **kwargs) -> Dict[str, str]:
         cstring = kwargs.get("login")
         if cstring:
             return self.get_target_by_cstring(connection_string=cstring)
@@ -130,8 +144,22 @@ class IotHubDiscovery(object):
             include_events=include_events,
         )
 
+    def get_targets(self, rg: str = None, **kwargs) -> List[Dict[str, str]]:
+        targets = []
+        hubs = self.get_iothubs(rg=rg)
+        if hubs:
+            for hub in hubs:
+                targets.append(
+                    self.get_target(hub_name=hub.name, rg=self._get_rg(hub), **kwargs)
+                )
+
+        return targets
+
+    def _get_rg(self, hub):
+        return hub.additional_properties.get("resourcegroup")
+
     def _build_target(
-        self, iothub, policy, key_type=None, include_events=False
+        self, iothub, policy, key_type: str = None, include_events=False
     ) -> Dict[str, str]:
         # This is more or less a compatibility function which produces the
         # same result as _azure.get_iot_hub_connection_string()
