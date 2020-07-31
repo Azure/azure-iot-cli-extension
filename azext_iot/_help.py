@@ -12,11 +12,18 @@ from knack.help_files import helps
 
 helps['iot'] = """
     type: group
-    short-summary: Manage Internet of Things (IoT) assets.
-                   Augmented with the IoT extension.
-    long-summary: |
-                  Review the extension wiki tips to maximize usage
-                  https://github.com/Azure/azure-iot-cli-extension/wiki/Tips
+    short-summary: |
+                   This extension is deprecated and scheduled for removal.
+                   Please remove 'azure-cli-iot-ext' and install the 'azure-iot' extension instead.
+                   https://docs.microsoft.com/en-us/cli/azure/ext/azure-iot/?view=azure-cli-latest
+"""
+
+helps['iotcentral'] = """
+    type: group
+    short-summary: |
+                   This extension is deprecated and scheduled for removal.
+                   Please remove 'azure-cli-iot-ext' and install the 'azure-iot' extension instead.
+                   https://docs.microsoft.com/en-us/cli/azure/ext/azure-iot/?view=azure-cli-latest
 """
 
 helps['iot hub'] = """

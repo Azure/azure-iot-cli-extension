@@ -70,15 +70,13 @@ CLASSIFIERS = [
 with open("HISTORY.rst", "r", encoding="utf-8") as f:
     HISTORY = f.read()
 
-short_description = "The Azure IoT extension for Azure CLI."
+short_description = "[Deprecated: Use the 'azure-iot' extension instead.]"
 
 setup(
     name=PACKAGE_NAME,
     version=VERSION,
     description=short_description,
-    long_description="{} Intended for power users and/or automation of IoT solutions at scale.".format(short_description)
-    + "\n\n"
-    + HISTORY,
+    long_description=short_description,
     license="MIT",
     author="Microsoft",
     author_email="iotupx@microsoft.com",  # +@digimaun

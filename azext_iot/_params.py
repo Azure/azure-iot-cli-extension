@@ -32,7 +32,7 @@ from azext_iot.common.shared import (
     JobCreateType,
     JobStatusType
 )
-from azext_iot._validators import mode2_iot_login_handler
+from azext_iot._validators import mode2_iot_login_handler, deprecation_info
 from azext_iot.assets.user_messages import info_param_properties_device
 
 hub_name_type = CLIArgumentType(
@@ -76,7 +76,7 @@ def load_arguments(self, _):
                          'Use to avoid session login via "az login". '
                          'If both an entity connection string and name are provided the connection string takes priority.')
         context.argument('resource_group_name', arg_type=resource_group_name_type)
-        context.argument('hub_name', options_list=['--hub-name', '-n'], arg_type=hub_name_type)
+        context.argument('hub_name', options_list=['--hub-name', '-n'], arg_type=hub_name_type, validator=deprecation_info)
         context.argument('device_id', options_list=['--device-id', '-d'], help='Target Device.')
         context.argument('module_id', options_list=['--module-id', '-m'], help='Target Module.')
         context.argument('key_type', options_list=['--key-type', '--kt'],
@@ -368,7 +368,7 @@ def load_arguments(self, _):
                          )
 
     with self.argument_context('iot dps') as context:
-        context.argument('dps_name', help='Name of the Azure IoT Hub device provisioning service')
+        context.argument('dps_name', help='Name of the Azure IoT Hub device provisioning service', validator=deprecation_info)
         context.argument('initial_twin_properties',
                          options_list=['--initial-twin-properties', '--props'],
                          help='Initial twin properties')
@@ -487,12 +487,12 @@ def load_arguments(self, _):
 
     with self.argument_context('iotcentral device-twin show') as context:
         context.argument('device_id', options_list=['--device-id', '-d'], help='Target Device.')
-        context.argument('app_id', options_list=['--app-id'], help='Target App.')
+        context.argument('app_id', options_list=['--app-id'], help='Target App.', validator=deprecation_info)
         context.argument('central_api_uri', options_list=['--central-api-uri'],
                          help='IoT Central API override.  For use with environments other than production.')
 
     with self.argument_context('iot central') as context:
-        context.argument('app_id', options_list=['--app-id'], help='Target App.')
+        context.argument('app_id', options_list=['--app-id'], help='Target App.', validator=deprecation_info)
         context.argument('central_api_uri', options_list=['--central-api-uri'],
                          help='IoT Central API override.  For use with environments other than production.')
 
