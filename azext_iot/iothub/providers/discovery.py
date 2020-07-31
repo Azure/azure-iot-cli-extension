@@ -35,7 +35,7 @@ class IotHubDiscovery(object):
                 self.client = self.cmd
             self.sub_id = self.client.config.subscription_id
 
-    def get_iothubs(self, rg=None) -> List:
+    def get_iothubs(self, rg: str = None) -> List:
         hubs_list = []
 
         if not rg:
@@ -51,7 +51,7 @@ class IotHubDiscovery(object):
 
         return hubs_list
 
-    def get_policies(self, hub_name, rg):
+    def get_policies(self, hub_name: str, rg: str) -> List:
         policy_pager = self.client.list_keys(
             resource_group_name=rg, resource_name=hub_name
         )
@@ -65,7 +65,7 @@ class IotHubDiscovery(object):
 
         return policy_list
 
-    def find_iothub(self, hub_name, rg=None):
+    def find_iothub(self, hub_name: str, rg: str = None):
         from azure.mgmt.iothub.models import ErrorDetailsException
 
         if rg:
@@ -93,7 +93,7 @@ class IotHubDiscovery(object):
             )
         )
 
-    def find_policy(self, hub_name, rg, policy_name="auto"):
+    def find_policy(self, hub_name: str, rg: str, policy_name: str = "auto"):
         if policy_name.lower() != "auto":
             return self.client.get_keys_for_key_name(
                 resource_group_name=rg, resource_name=hub_name, key_name=policy_name
@@ -121,7 +121,7 @@ class IotHubDiscovery(object):
     def get_target_by_cstring(cls, connection_string: str) -> IotHubTarget:
         return IotHubTarget.from_connection_string(cstring=connection_string).as_dict()
 
-    def get_target(self, hub_name, rg=None, **kwargs) -> Dict[str, str]:
+    def get_target(self, hub_name: str, rg: str = None, **kwargs) -> Dict[str, str]:
         cstring = kwargs.get("login")
         if cstring:
             return self.get_target_by_cstring(connection_string=cstring)
@@ -144,7 +144,7 @@ class IotHubDiscovery(object):
             include_events=include_events,
         )
 
-    def get_targets(self, rg=None, **kwargs) -> List[Dict[str, str]]:
+    def get_targets(self, rg: str = None, **kwargs) -> List[Dict[str, str]]:
         targets = []
         hubs = self.get_iothubs(rg=rg)
         if hubs:
