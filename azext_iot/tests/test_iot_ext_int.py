@@ -1018,7 +1018,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
         # With connection string
         self.cmd(
             "iot hub module-identity connection-string show -d {} --login {} -m {}".format(
-                edge_device_ids[0], LIVE_HUB_CS, module_ids[0]
+                edge_device_ids[0], self.connection_string, module_ids[0]
             ),
             checks=[self.check_pattern("connectionString", mod_sym_conn_str_pattern)],
         )
