@@ -393,8 +393,8 @@ def load_arguments(self, _):
             options_list=["--blob-container-uri", "--bcu"],
             help="Blob Shared Access Signature URI with write, read, and delete access to "
             "a blob container. This is used to output the status of the "
-            "job and the results. Note: when using Identity-based authentication, you must supply an "
-            "https:// URI.",
+            "job and the results. Note: when using Identity-based authentication an "
+            "https:// URI is still required. Input for this argument can be inline or from a file path.",
         )
         context.argument(
             "include_keys",
@@ -416,16 +416,18 @@ def load_arguments(self, _):
             options_list=["--input-blob-container-uri", "--ibcu"],
             help="Blob Shared Access Signature URI with read access to a blob "
             "container. This blob contains the operations to be performed on "
-            "the identity registry. Note: when using Identity-based authentication, you must supply an "
-            "https:// URI",
+            "the identity registry. Note: when using Identity-based authentication "
+            "an https:// URI is still required. Input for this argument can be inline "
+            "or from a file path.",
         )
         context.argument(
             "output_blob_container_uri",
             options_list=["--output-blob-container-uri", "--obcu"],
             help="Blob Shared Access Signature URI with write access "
             "to a blob container. This is used to output the status of "
-            "the job and the results. Note: when using Identity-based authentication, you must supply an "
-            "https:// URI",
+            "the job and the results. Note: when using Identity-based "
+            "authentication an https:// URI is still required. Input for "
+            "this argument can be inline or from a file path.",
         )
         context.argument(
             "storage_authentication_type",
