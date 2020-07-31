@@ -2099,6 +2099,9 @@ def iot_device_export(
         hub_name=hub_name, resource_group_name=resource_group_name
     )
 
+    if exists(blob_container_uri):        
+        blob_container_uri = read_file_content(blob_container_uri)
+
     if ensure_min_version(iot_sdk_version, "0.12.0"):
         from azure.mgmt.iothub.models import ExportDevicesRequest
         from azext_iot.common.shared import AuthenticationType
@@ -2144,6 +2147,12 @@ def iot_device_import(
     target = discovery.get_target(
         hub_name=hub_name, resource_group_name=resource_group_name
     )
+
+    if exists(input_blob_container_uri):        
+        input_blob_container_uri = read_file_content(input_blob_container_uri)
+
+    if exists(output_blob_container_uri):        
+        output_blob_container_uri = read_file_content(output_blob_container_uri)
 
     if ensure_min_version(iot_sdk_version, "0.12.0"):
         from azure.mgmt.iothub.models import ImportDevicesRequest
