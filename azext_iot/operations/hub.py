@@ -2099,7 +2099,7 @@ def iot_device_export(
         hub_name=hub_name, resource_group_name=resource_group_name
     )
 
-    if exists(blob_container_uri):        
+    if exists(blob_container_uri):
         blob_container_uri = read_file_content(blob_container_uri)
 
     if ensure_min_version(iot_sdk_version, "0.12.0"):
@@ -2148,10 +2148,10 @@ def iot_device_import(
         hub_name=hub_name, resource_group_name=resource_group_name
     )
 
-    if exists(input_blob_container_uri):        
+    if exists(input_blob_container_uri):
         input_blob_container_uri = read_file_content(input_blob_container_uri)
 
-    if exists(output_blob_container_uri):        
+    if exists(output_blob_container_uri):
         output_blob_container_uri = read_file_content(output_blob_container_uri)
 
     if ensure_min_version(iot_sdk_version, "0.12.0"):
