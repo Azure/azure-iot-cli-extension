@@ -70,7 +70,8 @@ CLASSIFIERS = [
 with open("HISTORY.rst", "r", encoding="utf-8") as f:
     HISTORY = f.read()
 
-short_description = "[Deprecated: Use the 'azure-iot' extension instead.]"
+short_description = ("Deprecated: please remove 'azure-cli-iot-ext' and install the 'azure-iot' extension instead. "
+                     "The legacy extension 'azure-cli-iot-ext' is scheduled for removal after 9/15/2020.")
 
 setup(
     name=PACKAGE_NAME,
