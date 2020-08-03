@@ -120,6 +120,12 @@ def load_central_arguments(self, _):
             help="Tenant ID for service principal to be added to the app. Object ID must also be specified. ",
         )
 
+        context.argument(
+            "token_id",
+            options_list=["--token-id", "--tkid"],
+            help="Unique ID for the API token. ",
+        )
+
     with self.argument_context("iot central app monitor-events") as context:
         context.argument("timeout", arg_type=event_timeout_type)
         context.argument("properties", arg_type=event_msg_prop_type)

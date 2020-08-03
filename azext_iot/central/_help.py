@@ -29,6 +29,7 @@ def load_central_help():
 
     _load_central_devices_help()
     _load_central_users_help()
+    _load_central_api_token_help()
     _load_central_device_templates_help()
     _load_central_device_twin_help()
     _load_central_monitors_help()
@@ -248,6 +249,68 @@ def _load_central_users_help():
       - name: List of users
         text: >
           az iot central app user list
+          --app-id {appid}
+
+    """
+
+
+def _load_central_api_token_help():
+    helps[
+        "iot central app api-token"
+    ] = """
+        type: group
+        short-summary: Create and Manage API tokens .
+    """
+
+    helps[
+        "iot central app api-token create"
+    ] = """
+        type: command
+        short-summary: Create a new API token in the application
+        examples:
+        - name: Add new API token
+          text: >
+            az iot central app api-token create
+            --token-id {tokenId}
+            --app-id {appId}
+            --role admin
+
+    """
+    helps[
+        "iot central app api-token show"
+    ] = """
+    type: command
+    short-summary: Get an API token by ID
+    examples:
+      - name: Get API token
+        text: >
+          az iot central app api-token show
+          --app-id {appid}
+          --token-id {tokenId}
+    """
+
+    helps[
+        "iot central app api-token delete"
+    ] = """
+    type: command
+    short-summary: Delete an API token from the application
+    examples:
+      - name: Delete an API token
+        text: >
+          az iot central app api-token delete
+          --app-id {appid}
+          --token-id {tokenId}
+    """
+
+    helps[
+        "iot central app api-token list"
+    ] = """
+    type: command
+    short-summary: Get list of API tokens in an application
+    examples:
+      - name: List of API tokens
+        text: >
+          az iot central app api-token list
           --app-id {appid}
 
     """
