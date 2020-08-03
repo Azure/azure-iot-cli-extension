@@ -14,9 +14,10 @@ from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azure.cli.core.commands import AzCliCommand
 from azure.cli.core.mock import DummyCli
 
-path_iot_hub_service_factory = "azext_iot.common._azure.iot_hub_service_factory"
+path_iot_hub_service_factory = "azext_iot._factory.iot_hub_service_factory"
 path_service_client = "msrest.service_client.ServiceClient.send"
 path_ghcs = "azext_iot.iothub.providers.discovery.IotHubDiscovery.get_target"
+path_discovery_init = "azext_iot.iothub.providers.discovery.IotHubDiscovery._initialize_client"
 path_sas = "azext_iot._factory.SasTokenAuthentication"
 path_mqtt_client = "azext_iot.operations._mqtt.mqtt.Client"
 path_iot_hub_monitor_events_entrypoint = (
@@ -85,6 +86,9 @@ def serviceclient_generic_error(mocker, fixture_ghcs, fixture_sas, request):
 def fixture_ghcs(mocker):
     ghcs = mocker.patch(path_ghcs)
     ghcs.return_value = mock_target
+    mocker.patch(path_iot_hub_service_factory)
+    mocker.patch(path_discovery_init)
+
     return ghcs
 
 
