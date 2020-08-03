@@ -80,9 +80,6 @@ class IotHubDiscovery(object):
 
         hubs_list = self.get_iothubs()
 
-        if show_all:
-            return hubs_list
-
         if hubs_list:
             target_hub = next(
                 (hub for hub in hubs_list if hub_name.lower() == hub.name.lower()), None
@@ -103,9 +100,6 @@ class IotHubDiscovery(object):
             )
 
         policy_list = self.get_policies(hub_name=hub_name, rg=rg)
-
-        if show_all:
-            return policy_list
 
         for policy in policy_list:
             rights_set = set(policy.rights.split(", "))

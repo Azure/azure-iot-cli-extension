@@ -2485,11 +2485,9 @@ def _get_hub_connection_string(
     policies = []
     if show_all:
         policies.extend(
-            discovery.find_policy(
+            discovery.get_policies(
                 hub.name,
-                hub.additional_properties['resourcegroup'],
-                "auto",
-                True
+                hub.additional_properties['resourcegroup']
             )
         )
     else:
