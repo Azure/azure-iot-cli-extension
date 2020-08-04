@@ -281,6 +281,7 @@ def _load_central_api_token_help():
     ] = """
     type: command
     short-summary: Get an API token by ID
+    long-summary: API token information contains basic information about the token and does not include the value of the token.
     examples:
       - name: Get API token
         text: >
@@ -307,6 +308,7 @@ def _load_central_api_token_help():
     ] = """
     type: command
     short-summary: Get list of API tokens in an application
+    long-summary: Information in the list contains basic information about the tokens in the application and does not include token values.
     examples:
       - name: List of API tokens
         text: >
