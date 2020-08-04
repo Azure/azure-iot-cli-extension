@@ -107,24 +107,24 @@ helps[
     "iot hub connection-string show"
 ] = """
     type: command
-    short-summary: Show the connection strings for an IoT hub.
+    short-summary: Show the connection strings for an IoT Hub.
     examples:
-    - name: Show the connection strings for all IoT hubs in a subscription.
+    - name: Show the connection string for all IoT Hubs in a subscription using the default policy and primary key.
       text: >
           az iot hub connection-string show
-    - name: Show the connection strings for all IoT hubs in a resource group.
+    - name: Show the connection string for all IoT Hubs in a resource group using the default policy and primary key.
       text: >
           az iot hub connection-string show --resource-group MyResourceGroup
-    - name: Show all the connection string of an IoT hub using default key.
+    - name: Show all the connection string of an IoT Hub using primary key.
       text: >
           az iot hub connection-string show -n MyIotHub --all
-    - name: Show the connection string of an IoT hub using default policy and primary key.
+    - name: Show the connection string of an IoT Hub using default policy and primary key.
       text: >
           az iot hub connection-string show -n MyIotHub
     - name: Show the connection string of an IoT Hub using policy 'service' and secondary key.
       text: >
           az iot hub connection-string show -n MyIotHub --policy-name service --key-type secondary
-    - name: Show the eventhub compatible connection string of an IoT hub\'s default eventhub.
+    - name: Show the eventhub compatible connection string of an IoT Hub\'s default eventhub.
       text: >
           az iot hub connection-string show -n MyIotHub --default-eventhub
 """

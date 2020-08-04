@@ -2459,7 +2459,8 @@ def iot_hub_connection_string_show(
                 show_all,
                 default_eventhub
             )
-        return [{'name': hub.name, 'connectionString': conn_str_getter(hub)} for hub in hubs]
+        return [{'name': hub.name, 'connectionString': conn_str_getter(hub)
+                if show_all else conn_str_getter(hub)[0]} for hub in hubs]
     hub = discovery.find_iothub(hub_name, resource_group_name)
     if hub:
         conn_str = _get_hub_connection_string(
