@@ -270,8 +270,8 @@ def load_arguments(self, _):
             help="Allow to show all shared access policies."
         )
         context.argument(
-            "include_eventhub",
-            options_list=["--include-eventhub", "--eh"],
+            "default_eventhub",
+            options_list=["--default-eventhub", "--eh"],
             help="To get eventhub compatible connection-string for the IoT Hub\'s default eventhub."
         )
 

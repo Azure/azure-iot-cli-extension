@@ -109,27 +109,24 @@ helps[
     type: command
     short-summary: Show the connection strings for an IoT hub.
     examples:
-    - name: Show the connection string of an IoT hub using default policy and primary key.
-      text: >
-          az iot hub connection-string show -n MyIotHub
-    - name: Show all the connection string of an IoT hub using default key.
-      text: >
-          az iot hub connection-string show -n MyIotHub --all
-    - name: Show the connection string of an IoT hub included eventhub using default policy and primary key.
-      text: >
-          az iot hub connection-string show -n MyIotHub --include-eventhub
-    - name: Show the connection string of an IoT Hub using policy 'service' and secondary key.
-      text: >
-          az iot hub connection-string show -n MyIotHub --policy-name service --key-type secondary
-    - name: Show the connection strings for all IoT hubs in a resource group.
-      text: >
-          az iot hub connection-string show --resource-group MyResourceGroup
     - name: Show the connection strings for all IoT hubs in a subscription.
       text: >
           az iot hub connection-string show
-    - name: Show the connection strings for an IoT hub.
-      text: az iot hub connection-string show --key primary --policy-name MyPolicy
-      crafted: true
+    - name: Show the connection strings for all IoT hubs in a resource group.
+      text: >
+          az iot hub connection-string show --resource-group MyResourceGroup
+    - name: Show all the connection string of an IoT hub using default key.
+      text: >
+          az iot hub connection-string show -n MyIotHub --all
+    - name: Show the connection string of an IoT hub using default policy and primary key.
+      text: >
+          az iot hub connection-string show -n MyIotHub
+    - name: Show the connection string of an IoT Hub using policy 'service' and secondary key.
+      text: >
+          az iot hub connection-string show -n MyIotHub --policy-name service --key-type secondary
+    - name: Show the eventhub compatible connection string of an IoT hub\'s default eventhub.
+      text: >
+          az iot hub connection-string show -n MyIotHub --default-eventhub
 """
 
 helps[

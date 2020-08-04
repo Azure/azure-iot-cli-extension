@@ -2441,7 +2441,7 @@ def iot_hub_connection_string_show(
     policy_name='iothubowner',
     key_type=KeyType.primary.value,
     show_all=False,
-    include_eventhub=False
+    default_eventhub=False
 ):
     discovery = IotHubDiscovery(cmd)
 
@@ -2457,7 +2457,7 @@ def iot_hub_connection_string_show(
                 policy_name,
                 key_type,
                 show_all,
-                include_eventhub
+                default_eventhub
             )
         return [{'name': hub.name, 'connectionString': conn_str_getter(hub)} for hub in hubs]
     hub = discovery.find_iothub(hub_name, resource_group_name)
@@ -2468,7 +2468,7 @@ def iot_hub_connection_string_show(
             policy_name,
             key_type,
             show_all,
-            include_eventhub
+            default_eventhub
         )
         return {'connectionString': conn_str if show_all else conn_str[0]}
 
@@ -2479,7 +2479,7 @@ def _get_hub_connection_string(
     policy_name,
     key_type,
     show_all,
-    include_eventhub
+    default_eventhub
 ):
 
     policies = []
@@ -2499,7 +2499,7 @@ def _get_hub_connection_string(
             )
         )
 
-    if include_eventhub:
+    if default_eventhub:
         cs_template_eventhub = 'Endpoint={};SharedAccessKeyName={};SharedAccessKey={};EntityPath={}'
         endpoint = hub.properties.event_hub_endpoints['events'].endpoint
         entityPath = hub.properties.event_hub_endpoints['events'].path
