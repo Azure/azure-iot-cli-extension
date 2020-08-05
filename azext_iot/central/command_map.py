@@ -27,6 +27,10 @@ central_monitor_ops = CliCommandType(
 
 central_user_ops = CliCommandType(operations_tmpl="azext_iot.central.commands_user#{}")
 
+central_api_token_ops = CliCommandType(
+    operations_tmpl="azext_iot.central.commands_api_token#{}"
+)
+
 
 # Dev note - think of this as the "router" and all self.command_group as the controllers
 def load_central_commands(self, _):
@@ -48,6 +52,16 @@ def load_central_commands(self, _):
         cmd_group.command("list", "list_users")
         cmd_group.command("show", "get_user")
         cmd_group.command("delete", "delete_user")
+
+    with self.command_group(
+        "iot central app api-token",
+        command_type=central_api_token_ops,
+        is_preview=True,
+    ) as cmd_group:
+        cmd_group.command("create", "add_api_token")
+        cmd_group.command("list", "list_api_tokens")
+        cmd_group.command("show", "get_api_token")
+        cmd_group.command("delete", "delete_api_token")
 
     with self.command_group(
         "iot central app device", command_type=central_device_ops, is_preview=True,

@@ -241,6 +241,32 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         for user in users:
             assert user in user_list
 
+    def test_central_api_token_methods_CRD(self):
+        tokens = self._create_api_tokens()
+
+        self.cmd(
+            "iot central app api-token show --app-id {} --token-id {}".format(
+                APP_ID, tokens[0].get("id")
+            ),
+        )
+
+        result = self.cmd(
+            "iot central app api-token list --app-id {}".format(APP_ID,),
+        ).get_output_in_json()
+
+        token_list = result.get("value")
+
+        for token in tokens:
+            self._delete_api_token(token.get("id"))
+
+        for token in tokens:
+            token_info_basic = {
+                "expiry": token.get("expiry"),
+                "id": token.get("id"),
+                "roles": token.get("roles"),
+            }
+            assert token_info_basic in token_list
+
     def test_central_device_template_methods_CRD(self):
         # currently: create, show, list, delete
         (template_id, template_name) = self._create_device_template()
@@ -445,6 +471,31 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         self.cmd(
             "iot central app user delete --app-id {} --user-id {}".format(
                 APP_ID, user_id
+            ),
+            checks=[self.check("result", "success")],
+        )
+
+    def _create_api_tokens(self,):
+
+        tokens = []
+        for role in Role:
+            token_id = self.create_random_name(prefix="aztest", length=24)
+            command = "iot central app api-token create --app-id {} --token-id {} -r {}".format(
+                APP_ID, token_id, role.name,
+            )
+
+            checks = [
+                self.check("id", token_id),
+                self.check("roles[0].role", role.value),
+            ]
+
+            tokens.append(self.cmd(command, checks=checks).get_output_in_json())
+        return tokens
+
+    def _delete_api_token(self, token_id) -> None:
+        self.cmd(
+            "iot central app api-token delete --app-id {} --token-id {}".format(
+                APP_ID, token_id
             ),
             checks=[self.check("result", "success")],
         )
