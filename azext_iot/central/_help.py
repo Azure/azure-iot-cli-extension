@@ -267,6 +267,7 @@ def _load_central_api_token_help():
     ] = """
         type: command
         short-summary: Create a new API token in the application
+        long-summary: The only time you will see the value of this token is when creating the token. Ensure you store this token somewhere securely, as if you lose it, you will need to create another.
         examples:
         - name: Add new API token
           text: >
@@ -280,7 +281,7 @@ def _load_central_api_token_help():
         "iot central app api-token show"
     ] = """
     type: command
-    short-summary: Get an API token by ID
+    short-summary: Get token meta data (e.g. role as a GUID, expiration)
     long-summary: API token information contains basic information about the token and does not include the value of the token.
     examples:
       - name: Get API token
@@ -307,7 +308,7 @@ def _load_central_api_token_help():
         "iot central app api-token list"
     ] = """
     type: command
-    short-summary: Get list of API tokens in an application
+    short-summary: Get a list of all token meta data (e.g. Role as a GUID and expiration)
     long-summary: Information in the list contains basic information about the tokens in the application and does not include token values.
     examples:
       - name: List of API tokens
