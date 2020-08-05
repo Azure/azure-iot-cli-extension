@@ -126,6 +126,12 @@ def load_central_arguments(self, _):
             help="Unique ID for the API token. ",
         )
 
+        context.argument(
+            "export_id",
+            options_list=["--export-id", "--exid"],
+            help="Unique ID for the continuous data export. ",
+        )
+
     with self.argument_context("iot central app monitor-events") as context:
         context.argument("timeout", arg_type=event_timeout_type)
         context.argument("properties", arg_type=event_msg_prop_type)
