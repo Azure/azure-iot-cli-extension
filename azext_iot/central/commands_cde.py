@@ -8,18 +8,31 @@
 
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.providers import CentralContDataExportProvider
+from azext_iot.common import utility
+from azext_iot.common.utility import process_json_arg
+from azext_iot.central.models.enum import EndpointType
 
 
 def add_cde(
     cmd,
+    sources,
+    ep_type: EndpointType,
+    ep_conn,
+    name,
+    export_id,
     app_id: str,
-    export_id: str,
-    role: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     provider = CentralContDataExportProvider(cmd=cmd, app_id=app_id, token=token)
-    return provider.add_cde(export_id=export_id, central_dns_suffix=central_dns_suffix,)
+    return provider.add_cde(
+        sources=sources,
+        ep_type=ep_type,
+        ep_conn=ep_conn,
+        name=name,
+        export_id=export_id,
+        central_dns_suffix=central_dns_suffix,
+    )
 
 
 def list_cdes(

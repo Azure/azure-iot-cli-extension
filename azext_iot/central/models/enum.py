@@ -41,3 +41,14 @@ class UserType(Enum):
 
     service_principal = "ServicePrincipalUser"
     email = "EmailUser"
+
+
+class EndpointType(Enum):
+    """
+    Type of Endpoint
+    """
+
+    StorageEndpoint = "StorageEndpoint"
+    EventHubsEndpoint = "EventHubsEndpoint"
+    ServiceBusQueueEndpoint = "ServiceBusQueueEndpoint"
+    ServiceBusTopicEndpoint = "ServiceBusTopicEndpoint"

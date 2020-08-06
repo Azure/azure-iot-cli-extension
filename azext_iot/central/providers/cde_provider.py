@@ -31,12 +31,22 @@ class CentralContDataExportProvider:
         self._token = token
 
     def add_cde(
-        self, export_id: str, central_dns_suffix=CENTRAL_ENDPOINT,
+        self,
+        sources,
+        ep_type,
+        export_id,
+        ep_conn,
+        name,
+        central_dns_suffix=CENTRAL_ENDPOINT,
     ):
 
         return central_services.cde.add_cde(
             cmd=self._cmd,
             app_id=self._app_id,
+            sources=sources,
+            ep_type=ep_type,
+            ep_conn=ep_conn,
+            name=name,
             export_id=export_id,
             token=self._token,
             central_dns_suffix=central_dns_suffix,

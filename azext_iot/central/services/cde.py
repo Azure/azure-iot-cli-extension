@@ -17,15 +17,22 @@ BASE_PATH = "api/preview/continuousDataExports"
 
 
 def add_cde(
-    cmd, app_id: str, export_id: str, token: str, central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd,
+    app_id: str,
+    token: str,
+    sources: str,
+    ep_type,
+    ep_conn,
+    export_id,
+    name,
+    central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     """
     Add an API token to a Central app
 
     Args:
         cmd: command passed into az
-        app_id: name of app (used for forming request URL)
-        export_id: Unique ID for the continuous data export
+        app_id: name of app (used for forming request URL)        
         role : permission level to access the application
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
@@ -34,12 +41,20 @@ def add_cde(
     Returns:
     token: dict
     """
-    url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, token_id)
+    ep = {
+        "type": ep_type,
+        "connectionString": ep_conn,
+        "name": name,
+    }
+    data = sources.split(",")
+    url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, export_id)
 
     payload = {
-        "roles": [{"role": ""}],
+        "displayName": "Export to Storage 2",
+        "endpoint": ep,
+        "enabled": True,
+        "sources": data,
     }
-
     headers = _utility.get_headers(token, cmd, has_json_payload=True)
 
     response = requests.put(url, headers=headers, json=payload)

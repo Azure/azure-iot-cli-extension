@@ -14,6 +14,13 @@ from azext_iot.monitor.models.enum import Severity
 from azext_iot.central.models.enum import Role
 from azext_iot._params import event_msg_prop_type, event_timeout_type
 
+sources = CLIArgumentType(
+    options_list=["--sources", "-s"],
+    nargs="*",
+    choices=CaseInsensitiveList(["devices", "deviceTemplates", "telemetry", "all"]),
+    help="Data sources to export to the endpoint. ",
+)
+
 severity_type = CLIArgumentType(
     options_list=["--minimum-severity"],
     choices=CaseInsensitiveList([sev.name for sev in Severity]),
@@ -130,6 +137,24 @@ def load_central_arguments(self, _):
             "export_id",
             options_list=["--export-id", "--exid"],
             help="Unique ID for the continuous data export. ",
+        )
+
+        context.argument(
+            "ep_type",
+            options_list=["--ep_type", "-t"],
+            help="Location where exported data should be sent.. ",
+        )
+
+        context.argument(
+            "ep_conn",
+            options_list=["--ep_conn", "-c"],
+            help="Location where exported data should be sent.. ",
+        )
+
+        context.argument(
+            "name",
+            options_list=["--name"],
+            help="Location where exported data should be sent.. ",
         )
 
     with self.argument_context("iot central app monitor-events") as context:
