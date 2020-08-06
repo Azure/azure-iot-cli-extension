@@ -75,6 +75,11 @@ class TestIoTHub(IoTLiveScenarioTest):
         conn_str_pattern = r'^HostName={0}.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey='.format(
             LIVE_HUB)
         conn_str_eventhub_pattern = r'^Endpoint=sb://'
+
+        hubs_in_sub = self.cmd('iot hub connection-string show').get_output_in_json()
+        hubs_in_rg = self.cmd('iot hub connection-string show -g {}'.format(LIVE_RG)).get_output_in_json()
+        assert len(hubs_in_sub) >= len(hubs_in_rg)
+
         self.cmd('iot hub connection-string show -n {0}'.format(LIVE_HUB), checks=[
             self.check_pattern('connectionString', conn_str_pattern)
         ])
@@ -89,12 +94,12 @@ class TestIoTHub(IoTLiveScenarioTest):
         ])
 
         self.cmd('iot hub connection-string show -n {0} -g {1} --all'.format(LIVE_HUB, LIVE_RG), checks=[
-            self.check('length(connectionString[*])', 5),
+            self.greater_than('length(connectionString[*])', 0),
             self.check_pattern('connectionString[0]', conn_str_pattern)
         ])
 
         self.cmd('iot hub connection-string show -n {0} -g {1} --all --eh'.format(LIVE_HUB, LIVE_RG), checks=[
-            self.check('length(connectionString[*])', 2),
+            self.greater_than('length(connectionString[*])', 0),
             self.check_pattern('connectionString[0]', conn_str_eventhub_pattern)
         ])
 

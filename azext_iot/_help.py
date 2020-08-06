@@ -100,7 +100,7 @@ helps[
     "iot hub connection-string"
 ] = """
     type: group
-    short-summary: Manage IoT hub\'s connection string.
+    short-summary: Manage IoT Hub connection strings.
 """
 
 helps[
