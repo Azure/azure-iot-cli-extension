@@ -367,6 +367,10 @@ class TestCliInit(object):
 
         _validate_directory(EXTENSION_ROOT)
 
+        invalid_directories = []
         for directory in directory_structure:
             if directory_structure[directory] is None:
-                pytest.fail("Directory: '{}' missing __init__.py".format(directory))
+                invalid_directories.append("Directory: '{}' missing __init__.py".format(directory))
+
+        if invalid_directories:
+            pytest.fail(", ".join(directory))

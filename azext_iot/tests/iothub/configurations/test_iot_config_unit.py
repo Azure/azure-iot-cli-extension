@@ -285,7 +285,6 @@ class TestConfigCreate:
         assert "{}/configurations/{}?".format(hub_name, config_id.lower()) in url
         assert method == "PUT"
         assert body["id"] == config_id.lower()
-        assert body["contentType"] == "assignment"
         assert body.get("targetCondition") == target_condition
         assert body.get("priority") == priority
         assert body.get("labels") == evaluate_literal(labels, dict)
@@ -418,7 +417,6 @@ class TestConfigCreate:
         assert "{}/configurations/{}?".format(hub_name, config_id.lower()) in url
         assert method == "PUT"
         assert body["id"] == config_id.lower()
-        assert body["contentType"] == "assignment"
         assert body.get("targetCondition") == target_condition
         assert body.get("priority") == priority
         assert body.get("labels") == evaluate_literal(labels, dict)
@@ -632,7 +630,6 @@ class TestConfigUpdate:
         assert headers["If-Match"] == '"{}"'.format(sample_config_show["etag"])
 
         assert body["id"] == sample_config_show["id"]
-        assert body["contentType"] == "assignment"
         assert body.get("metrics") == sample_config_show.get("metrics")
         assert body.get("targetCondition") == sample_config_show.get("targetCondition")
         assert body.get("priority") == sample_config_show.get("priority")
