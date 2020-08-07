@@ -16,9 +16,10 @@ from azext_iot.central.models.enum import EndpointType
 def add_cde(
     cmd,
     sources,
+    display_name,
     ep_type: EndpointType,
     ep_conn,
-    name,
+    entity_name,
     enable,
     export_id,
     app_id: str,
@@ -30,7 +31,8 @@ def add_cde(
         sources=sources,
         ep_type=ep_type,
         ep_conn=ep_conn,
-        name=name,
+        entity_name=entity_name,
+        display_name=display_name,
         enable=enable,
         export_id=export_id,
         central_dns_suffix=central_dns_suffix,
@@ -65,12 +67,12 @@ def delete_cde(
 
 def update_cde(
     cmd,
-    sources,
+    export_id,
     enable,
     ep_type: EndpointType,
     ep_conn,
-    name,
-    export_id,
+    entity_name,
+    sources,
     app_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
@@ -78,13 +80,16 @@ def update_cde(
     provider = CentralContDataExportProvider(cmd=cmd, app_id=app_id, token=token)
 
     # Check to see if the resource is present before we perform an update
-    provider.get_cde(export_id=export_id, central_dns_suffix=central_dns_suffix)
+    cde_info = provider.get_cde(
+        export_id=export_id, central_dns_suffix=central_dns_suffix
+    )
 
     return provider.add_cde(
         sources=sources,
         ep_type=ep_type,
         ep_conn=ep_conn,
-        name=name,
+        entity_name=entity_name,
+        display_name=cde_info.get("displayName"),
         enable=enable,
         export_id=export_id,
         central_dns_suffix=central_dns_suffix,

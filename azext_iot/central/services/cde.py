@@ -21,10 +21,11 @@ def add_cde(
     app_id: str,
     token: str,
     sources: str,
+    display_name,
+    export_id,
     ep_type,
     ep_conn,
-    export_id,
-    name,
+    entity_name,
     enable,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ):
@@ -36,24 +37,30 @@ def add_cde(
         app_id: name of app (used for forming request URL)        
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
-        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
         sources: Data sources to export to the endpoint.
+        display_name: Display name of the continuous data export
+        export_id: Unique ID for the continuous data export.
         ep_type: Type of endpoint where exported data should be sent.
         ep_conn: Connections string for the endpoint. 
+        entity_name: Name of entity pointing at Eg: container_name, queue_name, etc..
+        enable: Boolean indicating whether the continuous data export should be running or not. 
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+        
 
     Returns:
-    token: dict
+    cde: dict
     """
     ep = {
         "type": ep_type,
         "connectionString": ep_conn,
-        "name": name,
+        "name": entity_name,
     }
     # data = sources.split(",")
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, export_id)
 
     payload = {
-        "displayName": "Export to Storage 2",
+        "displayName": display_name,
         "endpoint": ep,
         "enabled": enable,
         "sources": sources,
@@ -78,7 +85,7 @@ def get_cde_list(
         central_dns_suffix: {centralDnsSuffixInPath} as found in docs
 
     Returns:
-        tokens: dict
+        cdes: dict
     """
     url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
 
@@ -103,7 +110,7 @@ def get_cde(
         central_dns_suffix: {centralDnsSuffixInPath} as found in docs
 
     Returns:
-        token: dict
+        cde: dict
     """
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, export_id)
 

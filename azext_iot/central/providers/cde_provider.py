@@ -32,12 +32,13 @@ class CentralContDataExportProvider:
 
     def add_cde(
         self,
-        sources,
-        ep_type,
         export_id,
-        ep_conn,
-        name,
+        display_name,
         enable,
+        ep_type,
+        ep_conn,
+        entity_name,
+        sources,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
 
@@ -47,7 +48,8 @@ class CentralContDataExportProvider:
             sources=sources,
             ep_type=ep_type,
             ep_conn=ep_conn,
-            name=name,
+            entity_name=entity_name,
+            display_name=display_name,
             export_id=export_id,
             token=self._token,
             enable=enable,

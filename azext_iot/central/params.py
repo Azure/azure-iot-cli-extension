@@ -11,13 +11,13 @@ CLI parameter definitions.
 from knack.arguments import CLIArgumentType, CaseInsensitiveList
 from azure.cli.core.commands.parameters import get_three_state_flag, get_enum_type
 from azext_iot.monitor.models.enum import Severity
-from azext_iot.central.models.enum import Role, EndpointType
+from azext_iot.central.models.enum import Role, EndpointType, DataSourceType
 from azext_iot._params import event_msg_prop_type, event_timeout_type
 
 sources = CLIArgumentType(
     options_list=["--sources", "-s"],
     nargs="*",
-    choices=CaseInsensitiveList(["devices", "deviceTemplates", "telemetry", "all"]),
+    choices=CaseInsensitiveList([source.name for source in DataSourceType]),
     help="Data sources to export to the endpoint. ",
 )
 
@@ -29,7 +29,7 @@ severity_type = CLIArgumentType(
 
 role_type = CLIArgumentType(
     options_list=["--role", "-r"],
-    choices=CaseInsensitiveList([role.name for role in Role]),
+    choices=([role.name for role in Role]),
     help="Role for the user/service-principal you are adding to the app.",
 )
 
@@ -154,8 +154,8 @@ def load_central_arguments(self, _):
         )
 
         context.argument(
-            "name",
-            options_list=["--name"],
+            "entity_name",
+            options_list=["--entity-name", "--en"],
             help="Name of entity pointing at Eg: container_name, queue_name, etc..",
         )
 
@@ -164,6 +164,12 @@ def load_central_arguments(self, _):
             options_list=["--enable", "-e"],
             arg_type=get_three_state_flag(),
             help="Boolean indicating whether the continuous data export should be running or not. ",
+        )
+
+        context.argument(
+            "display_name",
+            options_list=["--display-name", "--dn"],
+            help="Display name of the continuous data export.",
         )
 
     with self.argument_context("iot central app monitor-events") as context:

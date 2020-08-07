@@ -13,13 +13,19 @@ from .conftest import get_context_path
 
 from azure.iot.device import Message
 from azext_iot.common import utility
-from azext_iot.central.models.enum import DeviceStatus, Role
+from azext_iot.central.models.enum import (
+    DeviceStatus,
+    Role,
+    DataSourceType,
+    EndpointType,
+)
 from azext_iot.monitor.parsers import strings
 
 from . import CaptureOutputLiveScenarioTest, helpers
 
 APP_ID = os.environ.get("azext_iot_central_app_id")
-
+STORAGE_CS = os.environ.get("azext_iot_central_sa_cs")
+STORAGE_CONTRAINER = os.environ.get("azext_iot_central_sa_cn")
 device_template_path = get_context_path(
     __file__, "central/json/device_template_int_test.json"
 )
@@ -267,6 +273,32 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             }
             assert token_info_basic in token_list
 
+    def test_central_cde_methods_CRUD(self):
+        cde = self._create_cde()
+
+        self.cmd(
+            "iot central app api-token show --app-id {} --token-id {}".format(
+                APP_ID, tokens[0].get("id")
+            ),
+        )
+
+        result = self.cmd(
+            "iot central app api-token list --app-id {}".format(APP_ID,),
+        ).get_output_in_json()
+
+        token_list = result.get("value")
+
+        for token in tokens:
+            self._delete_api_token(token.get("id"))
+
+        for token in tokens:
+            token_info_basic = {
+                "expiry": token.get("expiry"),
+                "id": token.get("id"),
+                "roles": token.get("roles"),
+            }
+            assert token_info_basic in token_list
+
     def test_central_device_template_methods_CRD(self):
         # currently: create, show, list, delete
         (template_id, template_name) = self._create_device_template()
@@ -474,6 +506,31 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             ),
             checks=[self.check("result", "success")],
         )
+
+    def _create_cde(self,):
+
+        cde = []
+        for source in DataSourceType:
+            display_name = self.create_random_name(prefix="aztest", length=24)
+            export_id = display_name
+            command = "iot central app cde create --app-id {} --dn {} -d {} -s {} -e True -t {} -c {}  --en {} ".format(
+                APP_ID,
+                display_name,
+                export_id,
+                source.name,
+                EndpointType.StorageEndpoint.name,
+                STORAGE_CS,
+                STORAGE_CONTRAINER,
+            )
+
+            checks = [
+                self.check("id", export_id),
+                # self.check("displayName", display_name),
+                # self.check("enbaled", True),
+            ]
+
+            cde.append(self.cmd(command, checks=checks).get_output_in_json())
+        return cde
 
     def _create_api_tokens(self,):
 

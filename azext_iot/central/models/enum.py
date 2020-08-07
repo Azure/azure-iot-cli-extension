@@ -45,10 +45,21 @@ class UserType(Enum):
 
 class EndpointType(Enum):
     """
-    Type of Endpoint
+    Type of Endpoint 
     """
 
     StorageEndpoint = "StorageEndpoint"
     EventHubsEndpoint = "EventHubsEndpoint"
     ServiceBusQueueEndpoint = "ServiceBusQueueEndpoint"
     ServiceBusTopicEndpoint = "ServiceBusTopicEndpoint"
+
+
+class DataSourceType(Enum):
+    """
+    Type of Data Sources to export to the endpoint
+    """
+
+    devices = "devices"
+    deviceTemplates = "deviceTemplates"
+    telemetry = "telemetry"
+
