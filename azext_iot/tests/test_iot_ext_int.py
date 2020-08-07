@@ -719,9 +719,7 @@ class TestIoTHubDeviceTwins(IoTLiveScenarioTest):
 
         # Region specific test
         if self.region not in ["West US 2", "North Europe", "Southeast Asia"]:
-            warnings.warn(
-                "Skipping distributed-tracing tests. IoT Hub not in supported region!"
-            )
+            warnings.warn(UserWarning("Skipping distributed-tracing tests. IoT Hub not in supported region!"))
         else:
             self.cmd(
                 "iot hub distributed-tracing show -d {} -n {} -g {}".format(
