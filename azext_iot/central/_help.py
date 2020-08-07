@@ -337,10 +337,13 @@ def _load_central_cde_help():
         - name: Add new continuous data export
           text: >
             az iot central app cde create
-            --token-id {tokenId}
-            --app-id {appId}
-            --endpoint {endpoint}
-            --enbaled True           
+            --app-id {appid}
+            --sources "devices, deviceTemplates, telemetry"
+            --enable True,
+            --ep-type {epType}
+            --ep-conn {epConnStr}
+            --name {name}
+            --export-id {exportId}
     """
 
     helps[
@@ -360,7 +363,7 @@ def _load_central_cde_help():
         "iot central app cde delete"
     ] = """
     type: command
-    short-summary: Delete a CDE from the application
+    short-summary: Delete a continuous data export from the application
     examples:
       - name: Delete a continuous data export
         text: >
@@ -379,6 +382,26 @@ def _load_central_cde_help():
         text: >
           az iot central app api-token list
           --app-id {appid}
+
+    """
+
+    helps[
+        "iot central app cde update"
+    ] = """
+    type: command
+    short-summary: Update continuous data export in an application.    
+    examples:
+      - name: update continuous data export
+        text: >
+          az iot central app cde update
+          --app-id {appid}
+          --sources "devices,deviceTemplates,telemetry"
+          --enable True,
+          --ep-type {epType}
+          --ep-conn {epConnStr}
+          --name {name}
+          --export-id {exportId}
+
 
     """
 

@@ -9,9 +9,9 @@ CLI parameter definitions.
 """
 
 from knack.arguments import CLIArgumentType, CaseInsensitiveList
-from azure.cli.core.commands.parameters import get_three_state_flag
+from azure.cli.core.commands.parameters import get_three_state_flag, get_enum_type
 from azext_iot.monitor.models.enum import Severity
-from azext_iot.central.models.enum import Role
+from azext_iot.central.models.enum import Role, EndpointType
 from azext_iot._params import event_msg_prop_type, event_timeout_type
 
 sources = CLIArgumentType(
@@ -49,6 +49,7 @@ def load_central_arguments(self, _):
         context.argument("app_id", options_list=["--app-id", "-n"], help="Target App.")
         context.argument("minimum_severity", arg_type=severity_type)
         context.argument("role", arg_type=role_type)
+        context.argument("sources", arg_type=sources)
         context.argument(
             "instance_of",
             options_list=["--instance-of"],
@@ -135,26 +136,34 @@ def load_central_arguments(self, _):
 
         context.argument(
             "export_id",
-            options_list=["--export-id", "--exid"],
+            options_list=["--export-id", "-d"],
             help="Unique ID for the continuous data export. ",
         )
 
         context.argument(
             "ep_type",
-            options_list=["--ep_type", "-t"],
-            help="Location where exported data should be sent.. ",
+            options_list=["--ep-type", "-t"],
+            arg_type=get_enum_type(EndpointType),
+            help="Type of endpoint where exported data should be sent to. ",
         )
 
         context.argument(
             "ep_conn",
-            options_list=["--ep_conn", "-c"],
-            help="Location where exported data should be sent.. ",
+            options_list=["--ep-conn", "-c"],
+            help="Connection string for the endpoint. ",
         )
 
         context.argument(
             "name",
             options_list=["--name"],
-            help="Location where exported data should be sent.. ",
+            help="Name of entity pointing at Eg: container_name, queue_name, etc..",
+        )
+
+        context.argument(
+            "enable",
+            options_list=["--enable", "-e"],
+            arg_type=get_three_state_flag(),
+            help="Boolean indicating whether the continuous data export should be running or not. ",
         )
 
     with self.argument_context("iot central app monitor-events") as context:

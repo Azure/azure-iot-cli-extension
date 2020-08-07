@@ -37,6 +37,7 @@ class CentralContDataExportProvider:
         export_id,
         ep_conn,
         name,
+        enable,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
 
@@ -49,6 +50,7 @@ class CentralContDataExportProvider:
             name=name,
             export_id=export_id,
             token=self._token,
+            enable=enable,
             central_dns_suffix=central_dns_suffix,
         )
 
@@ -78,17 +80,6 @@ class CentralContDataExportProvider:
         self, export_id, central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         return central_services.cde.delete_cde(
-            cmd=self._cmd,
-            app_id=self._app_id,
-            export_id=export_id,
-            token=self._token,
-            central_dns_suffix=central_dns_suffix,
-        )
-
-    def update_cde(
-        self, export_id, central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
-        return central_services.cde.update_cde(
             cmd=self._cmd,
             app_id=self._app_id,
             export_id=export_id,

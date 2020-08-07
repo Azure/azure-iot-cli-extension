@@ -25,6 +25,7 @@ def add_cde(
     ep_conn,
     export_id,
     name,
+    enable,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     """
@@ -33,10 +34,12 @@ def add_cde(
     Args:
         cmd: command passed into az
         app_id: name of app (used for forming request URL)        
-        role : permission level to access the application
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
         central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+        sources: Data sources to export to the endpoint.
+        ep_type: Type of endpoint where exported data should be sent.
+        ep_conn: Connections string for the endpoint. 
 
     Returns:
     token: dict
@@ -46,14 +49,14 @@ def add_cde(
         "connectionString": ep_conn,
         "name": name,
     }
-    data = sources.split(",")
+    # data = sources.split(",")
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, export_id)
 
     payload = {
         "displayName": "Export to Storage 2",
         "endpoint": ep,
-        "enabled": True,
-        "sources": data,
+        "enabled": enable,
+        "sources": sources,
     }
     headers = _utility.get_headers(token, cmd, has_json_payload=True)
 
@@ -126,31 +129,6 @@ def delete_cde(
 
     Returns:
        result (currently a 204)
-    """
-    url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, export_id)
-
-    headers = _utility.get_headers(token, cmd)
-
-    response = requests.delete(url, headers=headers)
-    return _utility.try_extract_result(response)
-
-
-def update_cde(
-    cmd, app_id: str, token: str, export_id: str, central_dns_suffix=CENTRAL_ENDPOINT,
-):
-    """
-    delete API token from the app.
-
-    Args:
-        cmd: command passed into az
-        app_id: name of app (used for forming request URL)
-        token: (OPTIONAL) authorization token to fetch device details from IoTC.
-            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
-        token_id:Unique ID for the API token.
-        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
-
-    Returns:
-       result (currently a 201)
     """
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, export_id)
 
