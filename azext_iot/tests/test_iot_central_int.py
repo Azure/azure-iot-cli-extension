@@ -8,6 +8,7 @@
 import json
 import os
 import time
+import pytest
 
 from .conftest import get_context_path
 
@@ -273,31 +274,44 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             }
             assert token_info_basic in token_list
 
+    @pytest.mark.skipif(not STORAGE_CS, reason="empty azext_iot_central_sa_cs env var")
+    @pytest.mark.skipif(
+        not STORAGE_CONTRAINER, reason="empty azext_iot_central_sa_cn env var"
+    )
     def test_central_cde_methods_CRUD(self):
-        cde = self._create_cde()
+        cdes = self._create_cde()
 
         self.cmd(
-            "iot central app api-token show --app-id {} --token-id {}".format(
-                APP_ID, tokens[0].get("id")
+            "iot central app cde show --app-id {} --export-id {}".format(
+                APP_ID, cdes[0].get("id")
             ),
         )
 
         result = self.cmd(
-            "iot central app api-token list --app-id {}".format(APP_ID,),
+            "iot central app cde list --app-id {}".format(APP_ID,),
         ).get_output_in_json()
+        cde_list = result.get("value")
 
-        token_list = result.get("value")
+        update_command = "iot central app cde update --app-id {} -d {} -s {} -e True -t {} -c {}  --en {}".format(
+            APP_ID,
+            cdes[0].get("id"),
+            cdes[0].get("sources")[0],
+            cdes[0].get("endpoint").get("type"),
+            STORAGE_CS,
+            STORAGE_CONTRAINER,
+        )
 
-        for token in tokens:
-            self._delete_api_token(token.get("id"))
+        checks = [
+            self.check("id", cdes[0].get("id")),
+        ]
 
-        for token in tokens:
-            token_info_basic = {
-                "expiry": token.get("expiry"),
-                "id": token.get("id"),
-                "roles": token.get("roles"),
-            }
-            assert token_info_basic in token_list
+        self.cmd(update_command, checks=checks)
+
+        for cde in cdes:
+            self._delete_cde(cde.get("id"))
+
+        for cde in cdes:
+            assert cde in cde_list
 
     def test_central_device_template_methods_CRD(self):
         # currently: create, show, list, delete
@@ -513,7 +527,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         for source in DataSourceType:
             display_name = self.create_random_name(prefix="aztest", length=24)
             export_id = display_name
-            command = "iot central app cde create --app-id {} --dn {} -d {} -s {} -e True -t {} -c {}  --en {} ".format(
+            command = "iot central app cde create --app-id {} --dn {} -d {} -s {} -e False -t {} -c {}  --en {} ".format(
                 APP_ID,
                 display_name,
                 export_id,
@@ -525,12 +539,21 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
             checks = [
                 self.check("id", export_id),
-                # self.check("displayName", display_name),
-                # self.check("enbaled", True),
+                self.check("displayName", display_name),
+                self.check("enabled", False),
+                self.check("sources[0]", source.name),
             ]
 
             cde.append(self.cmd(command, checks=checks).get_output_in_json())
         return cde
+
+    def _delete_cde(self, cde_id) -> None:
+        self.cmd(
+            "iot central app cde delete --app-id {} --export-id {}".format(
+                APP_ID, cde_id
+            ),
+            checks=[self.check("result", "success")],
+        )
 
     def _create_api_tokens(self,):
 
