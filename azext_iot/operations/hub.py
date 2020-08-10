@@ -17,7 +17,13 @@ from azext_iot.constants import (
     TRACING_ALLOWED_FOR_SKU,
 )
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
-from azext_iot.common.shared import DeviceAuthType, SdkType, ProtocolType, ConfigType
+from azext_iot.common.shared import (
+    DeviceAuthType,
+    SdkType,
+    ProtocolType,
+    ConfigType,
+    KeyType,
+)
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
     shell_safe_json_parse,
@@ -910,7 +916,7 @@ def _iot_hub_configuration_create(
     resource_group_name=None,
     login=None,
 ):
-    from azext_iot.sdk.service.models import (
+    from azext_iot.sdk.iothub.service.models import (
         Configuration,
         ConfigurationContent,
         ConfigurationMetrics,
@@ -965,8 +971,8 @@ def _iot_hub_configuration_create(
         target_condition=target_condition,
         etag="*",
         priority=priority,
-        content_type="assignment",
     )
+
     try:
         return service_sdk.configuration.create_or_update(
             id=config_id, configuration=config
@@ -1061,7 +1067,7 @@ def _validate_payload_schema(content):
 def iot_hub_configuration_update(
     cmd, config_id, parameters, hub_name=None, resource_group_name=None, login=None
 ):
-    from azext_iot.sdk.service.models.configuration import Configuration
+    from azext_iot.sdk.iothub.service.models import Configuration
     from azext_iot.common.utility import verify_transform
 
     discovery = IotHubDiscovery(cmd)
@@ -1375,7 +1381,7 @@ def iot_device_method(
     resource_group_name=None,
     login=None,
 ):
-    from azext_iot.sdk.service.models import CloudToDeviceMethod
+    from azext_iot.sdk.iothub.service.models import CloudToDeviceMethod
     from azext_iot.constants import (
         METHOD_INVOKE_MAX_TIMEOUT_SEC,
         METHOD_INVOKE_MIN_TIMEOUT_SEC,
@@ -1405,7 +1411,12 @@ def iot_device_method(
                 method_payload, argument_name="method-payload"
             )
 
-        method = CloudToDeviceMethod(method_name, timeout, timeout, method_payload)
+        method = CloudToDeviceMethod(
+            method_name=method_name,
+            response_timeout_in_seconds=timeout,
+            connect_timeout_in_seconds=timeout,
+            payload=method_payload,
+        )
         return service_sdk.device_method.invoke_device_method(
             device_id=device_id, direct_method_request=method, timeout=timeout
         )
@@ -1427,7 +1438,7 @@ def iot_device_module_method(
     resource_group_name=None,
     login=None,
 ):
-    from azext_iot.sdk.service.models.cloud_to_device_method import CloudToDeviceMethod
+    from azext_iot.sdk.iothub.service.models import CloudToDeviceMethod
     from azext_iot.constants import (
         METHOD_INVOKE_MAX_TIMEOUT_SEC,
         METHOD_INVOKE_MIN_TIMEOUT_SEC,
@@ -1457,7 +1468,12 @@ def iot_device_module_method(
                 method_payload, argument_name="method-payload"
             )
 
-        method = CloudToDeviceMethod(method_name, timeout, timeout, method_payload)
+        method = CloudToDeviceMethod(
+            method_name=method_name,
+            response_timeout_in_seconds=timeout,
+            connect_timeout_in_seconds=timeout,
+            payload=method_payload,
+        )
         return service_sdk.device_method.invoke_module_method(
             device_id=device_id,
             module_id=module_id,
@@ -2432,6 +2448,91 @@ def iot_hub_distributed_tracing_update(
     return _customize_device_tracing_output(
         result.device_id, result.properties.desired, result.properties.reported
     )
+
+
+def iot_hub_connection_string_show(
+    cmd,
+    hub_name=None,
+    resource_group_name=None,
+    policy_name="iothubowner",
+    key_type=KeyType.primary.value,
+    show_all=False,
+    default_eventhub=False,
+):
+    discovery = IotHubDiscovery(cmd)
+
+    if hub_name is None:
+        hubs = discovery.get_iothubs(resource_group_name)
+        if hubs is None:
+            raise CLIError("No IoT Hub found.")
+
+        def conn_str_getter(hub):
+            return _get_hub_connection_string(
+                discovery, hub, policy_name, key_type, show_all, default_eventhub
+            )
+
+        return [
+            {
+                "name": hub.name,
+                "connectionString": conn_str_getter(hub)
+                if show_all
+                else conn_str_getter(hub)[0],
+            }
+            for hub in hubs
+        ]
+    hub = discovery.find_iothub(hub_name, resource_group_name)
+    if hub:
+        conn_str = _get_hub_connection_string(
+            discovery, hub, policy_name, key_type, show_all, default_eventhub
+        )
+        return {"connectionString": conn_str if show_all else conn_str[0]}
+
+
+def _get_hub_connection_string(
+    discovery, hub, policy_name, key_type, show_all, default_eventhub
+):
+
+    policies = []
+    if show_all:
+        policies.extend(
+            discovery.get_policies(hub.name, hub.additional_properties["resourcegroup"])
+        )
+    else:
+        policies.append(
+            discovery.find_policy(
+                hub.name, hub.additional_properties["resourcegroup"], policy_name
+            )
+        )
+
+    if default_eventhub:
+        cs_template_eventhub = (
+            "Endpoint={};SharedAccessKeyName={};SharedAccessKey={};EntityPath={}"
+        )
+        endpoint = hub.properties.event_hub_endpoints["events"].endpoint
+        entityPath = hub.properties.event_hub_endpoints["events"].path
+        return [
+            cs_template_eventhub.format(
+                endpoint,
+                p.key_name,
+                p.secondary_key
+                if key_type == KeyType.secondary.value
+                else p.primary_key,
+                entityPath,
+            )
+            for p in policies
+            if "serviceconnect" in p.rights.value.lower()
+        ]
+
+    hostname = hub.properties.host_name
+    cs_template = "HostName={};SharedAccessKeyName={};SharedAccessKey={}"
+    return [
+        cs_template.format(
+            hostname,
+            p.key_name,
+            p.secondary_key if key_type == KeyType.secondary.value else p.primary_key,
+        )
+        for p in policies
+    ]
 
 
 def _iot_hub_monitor_feedback(target, device_id, wait_on_id):

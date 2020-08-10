@@ -34,7 +34,7 @@ class Issue:
             logger.info(to_log)
 
         if self.severity == Severity.warning:
-            logger.warn(to_log)
+            logger.warning(to_log)
 
         if self.severity == Severity.error:
             logger.error(to_log)

@@ -97,6 +97,39 @@ helps[
 """
 
 helps[
+    "iot hub connection-string"
+] = """
+    type: group
+    short-summary: Manage IoT Hub connection strings.
+"""
+
+helps[
+    "iot hub connection-string show"
+] = """
+    type: command
+    short-summary: Show the connection strings for an IoT Hub.
+    examples:
+    - name: Show the connection string for all IoT Hubs in a subscription using the default policy and primary key.
+      text: >
+          az iot hub connection-string show
+    - name: Show the connection string for all IoT Hubs in a resource group using the default policy and primary key.
+      text: >
+          az iot hub connection-string show --resource-group MyResourceGroup
+    - name: Show all the connection string of an IoT Hub using primary key.
+      text: >
+          az iot hub connection-string show -n MyIotHub --all
+    - name: Show the connection string of an IoT Hub using default policy and primary key.
+      text: >
+          az iot hub connection-string show -n MyIotHub
+    - name: Show the connection string of an IoT Hub using policy 'service' and secondary key.
+      text: >
+          az iot hub connection-string show -n MyIotHub --policy-name service --key-type secondary
+    - name: Show the eventhub compatible connection string of an IoT Hub\'s default eventhub.
+      text: >
+          az iot hub connection-string show -n MyIotHub --default-eventhub
+"""
+
+helps[
     "iot hub device-identity"
 ] = """
     type: group
@@ -185,6 +218,20 @@ helps[
 
 helps[
     "iot hub device-identity show-connection-string"
+] = """
+    type: command
+    short-summary: Show a given IoT Hub device connection string.
+"""
+
+helps[
+    "iot hub device-identity connection-string"
+] = """
+    type: group
+    short-summary: Manage IoT device\'s connection string.
+"""
+
+helps[
+    "iot hub device-identity connection-string show"
 ] = """
     type: command
     short-summary: Show a given IoT Hub device connection string.
@@ -395,6 +442,20 @@ helps[
 ] = """
     type: command
     short-summary: Delete a device in an IoT Hub.
+"""
+
+helps[
+    "iot hub module-identity connection-string"
+] = """
+    type: group
+    short-summary: Manage IoT device module\'s connection string.
+"""
+
+helps[
+    "iot hub module-identity connection-string show"
+] = """
+    type: command
+    short-summary: Show a target IoT device module connection string.
 """
 
 helps[

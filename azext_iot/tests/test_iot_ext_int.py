@@ -71,6 +71,38 @@ class TestIoTHub(IoTLiveScenarioTest):
             expect_failure=True,
         )
 
+        # Test 'az iot hub connection-string show'
+        conn_str_pattern = r'^HostName={0}.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey='.format(
+            LIVE_HUB)
+        conn_str_eventhub_pattern = r'^Endpoint=sb://'
+
+        hubs_in_sub = self.cmd('iot hub connection-string show').get_output_in_json()
+        hubs_in_rg = self.cmd('iot hub connection-string show -g {}'.format(LIVE_RG)).get_output_in_json()
+        assert len(hubs_in_sub) >= len(hubs_in_rg)
+
+        self.cmd('iot hub connection-string show -n {0}'.format(LIVE_HUB), checks=[
+            self.check_pattern('connectionString', conn_str_pattern)
+        ])
+
+        self.cmd('iot hub connection-string show -n {0} --eh'.format(LIVE_HUB), checks=[
+            self.check_pattern('connectionString', conn_str_eventhub_pattern)
+        ])
+
+        self.cmd('iot hub connection-string show -n {0} -g {1}'.format(LIVE_HUB, LIVE_RG), checks=[
+            self.check('length(@)', 1),
+            self.check_pattern('connectionString', conn_str_pattern)
+        ])
+
+        self.cmd('iot hub connection-string show -n {0} -g {1} --all'.format(LIVE_HUB, LIVE_RG), checks=[
+            self.greater_than('length(connectionString[*])', 0),
+            self.check_pattern('connectionString[0]', conn_str_pattern)
+        ])
+
+        self.cmd('iot hub connection-string show -n {0} -g {1} --all --eh'.format(LIVE_HUB, LIVE_RG), checks=[
+            self.greater_than('length(connectionString[*])', 0),
+            self.check_pattern('connectionString[0]', conn_str_eventhub_pattern)
+        ])
+
         # With connection string
         # Error can't change key for a sas token with conn string
         self.cmd(
@@ -437,6 +469,27 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
         )
 
         self.cmd(
+            "iot hub device-identity connection-string show -d {} -n {} -g {}".format(
+                edge_device_ids[0], LIVE_HUB, LIVE_RG
+            ),
+            checks=[self.check_pattern("connectionString", sym_conn_str_pattern)],
+        )
+
+        self.cmd(
+            "iot hub device-identity connection-string show -d {} -n {} -g {} --kt {}".format(
+                edge_device_ids[0], LIVE_HUB, LIVE_RG, "secondary"
+            ),
+            checks=[self.check_pattern("connectionString", sym_conn_str_pattern)],
+        )
+
+        self.cmd(
+            "iot hub device-identity connection-string show -d {} -n {} -g {}".format(
+                device_ids[2], LIVE_HUB, LIVE_RG
+            ),
+            checks=[self.check_pattern("connectionString", cer_conn_str_pattern)],
+        )
+
+        self.cmd(
             "iot hub generate-sas-token -n {} -g {} -d {}".format(
                 LIVE_HUB, LIVE_RG, edge_device_ids[0]
             ),
@@ -666,9 +719,7 @@ class TestIoTHubDeviceTwins(IoTLiveScenarioTest):
 
         # Region specific test
         if self.region not in ["West US 2", "North Europe", "Southeast Asia"]:
-            warnings.warn(
-                "Skipping distributed-tracing tests. IoT Hub not in supported region!"
-            )
+            warnings.warn(UserWarning("Skipping distributed-tracing tests. IoT Hub not in supported region!"))
         else:
             self.cmd(
                 "iot hub distributed-tracing show -d {} -n {} -g {}".format(
@@ -955,6 +1006,28 @@ class TestIoTHubModules(IoTLiveScenarioTest):
 
         self.cmd(
             "iot hub module-identity show-connection-string -d {} -n {} -g {} -m {} --kt {}".format(
+                edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0], "secondary"
+            ),
+            checks=[self.check_pattern("connectionString", mod_sym_conn_str_pattern)],
+        )
+
+        self.cmd(
+            "iot hub module-identity connection-string show -d {} -n {} -g {} -m {}".format(
+                edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0]
+            ),
+            checks=[self.check_pattern("connectionString", mod_sym_conn_str_pattern)],
+        )
+
+        # With connection string
+        self.cmd(
+            "iot hub module-identity connection-string show -d {} --login {} -m {}".format(
+                edge_device_ids[0], self.connection_string, module_ids[0]
+            ),
+            checks=[self.check_pattern("connectionString", mod_sym_conn_str_pattern)],
+        )
+
+        self.cmd(
+            "iot hub module-identity connection-string show -d {} -n {} -g {} -m {} --kt {}".format(
                 edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0], "secondary"
             ),
             checks=[self.check_pattern("connectionString", mod_sym_conn_str_pattern)],
