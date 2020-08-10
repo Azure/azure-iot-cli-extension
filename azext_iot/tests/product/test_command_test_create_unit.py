@@ -7,7 +7,7 @@
 import unittest
 import mock
 from knack.util import CLIError
-from azext_iot.product.test.command_tests import create
+from azext_iot.product.test.command_tests import create, _process_models_directory as process_models
 from azext_iot.product.shared import BadgeType, AttestationType, DeviceType, ValidationType
 
 
@@ -283,3 +283,20 @@ class TestTestCreateUnit(unittest.TestCase):
         create(self, configuration_file="somefile")
         mock_from_file.assert_called_with("somefile")
         mock_sdk_create.assert_called_with(provisioning=True, body=mock_file_data)
+
+    @mock.patch("os.scandir")
+    @mock.patch("os.path.isfile")
+    @mock.patch("azext_iot.common.utility.read_file_content")
+    def test_process_models_directory_as_file(self, mock_file_content, mock_is_file, mock_scan_tree):
+        mock_file_content.return_value = {"id": "my file"}
+        mock_is_file.return_value = True
+
+        results = process_models("myPath.dtdl")
+
+        self.assertEqual(len(results), 1)
+        mock_scan_tree.assert_not_called()
+
+        results = process_models("myPath.json")
+
+        self.assertEqual(len(results), 1)
+        mock_scan_tree.assert_not_called()

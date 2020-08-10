@@ -252,9 +252,14 @@ def _build_test_configuration(
 
 
 def _process_models_directory(from_directory):
-    from azext_iot.common.utility import scantree, process_json_arg
+    from azext_iot.common.utility import scantree, process_json_arg, read_file_content
+    # we need to double-encode the JSON string
+    from json import dumps
 
     models = []
+    if os.path.isfile(from_directory) and (from_directory.endswith(".json") or from_directory.endswith(".dtdl")):
+        models.append(dumps(read_file_content(file_path=from_directory)))
+        return models
     for entry in scantree(from_directory):
         if not any([entry.name.endswith(".json"), entry.name.endswith(".dtdl")]):
             logger.debug(
@@ -264,8 +269,7 @@ def _process_models_directory(from_directory):
             )
             continue
         entry_json = process_json_arg(content=entry.path, argument_name=entry.name)
-        # we need to double-encode the JSON string
-        from json import dumps
+
 
         models.append(dumps(entry_json))
     return models
