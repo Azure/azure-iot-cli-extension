@@ -382,7 +382,7 @@ def _load_central_cde_help():
     examples:
       - name: List of continuous data exports
         text: >
-          az iot central app api-token list
+          az iot central app cde list
           --app-id {appid}
 
     """
