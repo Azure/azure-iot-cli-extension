@@ -49,7 +49,6 @@ def load_central_arguments(self, _):
         context.argument("app_id", options_list=["--app-id", "-n"], help="Target App.")
         context.argument("minimum_severity", arg_type=severity_type)
         context.argument("role", arg_type=role_type)
-        context.argument("sources", arg_type=sources)
         context.argument(
             "instance_of",
             options_list=["--instance-of"],
@@ -107,6 +106,8 @@ def load_central_arguments(self, _):
         context.argument(
             "module_id", options_list=["--module-id", "-m"], help="Iot Edge Module ID",
         )
+
+    with self.argument_context("iot central app user") as context:
         context.argument(
             "assignee",
             options_list=["--user-id", "--assignee"],
@@ -128,48 +129,46 @@ def load_central_arguments(self, _):
             help="Tenant ID for service principal to be added to the app. Object ID must also be specified. ",
         )
 
+    with self.argument_context("iot central app api-token") as context:
         context.argument(
             "token_id",
             options_list=["--token-id", "--tkid"],
             help="Unique ID for the API token. ",
         )
 
+    with self.argument_context("iot central app cde") as context:
+        context.argument("sources", arg_type=sources)
         context.argument(
-            "export_id",
-            options_list=["--export-id", "-d"],
-            help="Unique ID for the continuous data export. ",
+            "display_name",
+            options_list=["--display-name", "--dn"],
+            help="Display name of the continuous data export.",
         )
-
-        context.argument(
-            "ep_type",
-            options_list=["--ep-type", "-t"],
-            arg_type=get_enum_type(EndpointType),
-            help="Type of endpoint where exported data should be sent to. ",
-        )
-
-        context.argument(
-            "ep_conn",
-            options_list=["--ep-conn", "-c"],
-            help="Connection string for the endpoint. ",
-        )
-
-        context.argument(
-            "entity_name",
-            options_list=["--entity-name", "--en"],
-            help="Name of entity pointing at Eg: container_name, queue_name, etc.. ",
-        )
-
         context.argument(
             "enable",
             options_list=["--enable", "-e"],
             arg_type=get_three_state_flag(),
             help="Boolean indicating whether the continuous data export should be running or not. ",
         )
-
         context.argument(
-            "display_name",
-            options_list=["--display-name", "--dn"],
-            help="Display name of the continuous data export.",
+            "ep_conn",
+            options_list=["--ep-conn", "-c"],
+            help="Connection string for the endpoint. ",
+        )
+        context.argument(
+            "entity_name",
+            options_list=["--entity-name", "--en"],
+            help="Name of entity pointing at Eg: container_name, queue_name, etc.. ",
+        )
+        context.argument(
+            "export_id",
+            options_list=["--export-id", "-d"],
+            help="Unique ID for the continuous data export. ",
+        )
+        context.argument(
+            "ep_type",
+            options_list=["--ep-type", "-t"],
+            arg_type=get_enum_type(EndpointType),
+            help="Type of endpoint where exported data should be sent to. ",
         )
 
     with self.argument_context("iot central app monitor-events") as context:

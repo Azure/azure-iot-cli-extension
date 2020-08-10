@@ -326,6 +326,7 @@ def _load_central_cde_help():
     ] = """
         type: group
         short-summary: Create and Manage Continuous Data Export (CDE) for an application.
+        long-summary: Continuous Data Export enables exporting IoT Central measurements, devices, and device templates data to storage account .
     """
 
     helps[
