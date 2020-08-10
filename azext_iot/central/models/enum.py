@@ -45,7 +45,7 @@ class UserType(Enum):
 
 class EndpointType(Enum):
     """
-    Type of Endpoint 
+    Type of Endpoint
     """
 
     StorageEndpoint = "StorageEndpoint"
@@ -62,4 +62,3 @@ class DataSourceType(Enum):
     devices = "devices"
     deviceTemplates = "deviceTemplates"
     telemetry = "telemetry"
-

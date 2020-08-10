@@ -8,8 +8,6 @@
 
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.providers import CentralContDataExportProvider
-from azext_iot.common import utility
-from azext_iot.common.utility import process_json_arg
 from azext_iot.central.models.enum import EndpointType
 
 

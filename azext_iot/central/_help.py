@@ -350,7 +350,7 @@ def _load_central_cde_help():
         "iot central app cde show"
     ] = """
     type: command
-    short-summary: Get continuous data export by ID    
+    short-summary: Get continuous data export by ID
     examples:
       - name: Get continuous data export information
         text: >
@@ -376,7 +376,7 @@ def _load_central_cde_help():
         "iot central app cde list"
     ] = """
     type: command
-    short-summary: Get the list of continuous data exports in an application.    
+    short-summary: Get the list of continuous data exports in an application.
     examples:
       - name: List of continuous data exports
         text: >
@@ -389,7 +389,7 @@ def _load_central_cde_help():
         "iot central app cde update"
     ] = """
     type: command
-    short-summary: Update continuous data export in an application.    
+    short-summary: Update continuous data export in an application.
     examples:
       - name: update continuous data export
         text: >

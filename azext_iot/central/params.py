@@ -156,7 +156,7 @@ def load_central_arguments(self, _):
         context.argument(
             "entity_name",
             options_list=["--entity-name", "--en"],
-            help="Name of entity pointing at Eg: container_name, queue_name, etc..",
+            help="Name of entity pointing at Eg: container_name, queue_name, etc.. ",
         )
 
         context.argument(

@@ -34,19 +34,18 @@ def add_cde(
 
     Args:
         cmd: command passed into az
-        app_id: name of app (used for forming request URL)        
+        app_id: name of app (used for forming request URL)
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
         sources: Data sources to export to the endpoint.
         display_name: Display name of the continuous data export
         export_id: Unique ID for the continuous data export.
-        ep_type: Type of endpoint where exported data should be sent.
-        ep_conn: Connections string for the endpoint. 
+        ep_type: Type of endpoint where exported data should be sent to.
+        ep_conn: Connection string for the endpoint.
         entity_name: Name of entity pointing at Eg: container_name, queue_name, etc..
-        enable: Boolean indicating whether the continuous data export should be running or not. 
+        enable: Boolean indicating whether the continuous data export should be running or not.
         central_dns_suffix: {centralDnsSuffixInPath} as found in docs
 
-        
 
     Returns:
     cde: dict
@@ -56,7 +55,6 @@ def add_cde(
         "connectionString": ep_conn,
         "name": entity_name,
     }
-    # data = sources.split(",")
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, export_id)
 
     payload = {
