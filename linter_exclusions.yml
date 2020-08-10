@@ -18,5 +18,3 @@ iot central app cde update:
     central_dns_suffix:
       rule_exclusions:
       - no_parameter_defaults_for_update_commands
-
-      
