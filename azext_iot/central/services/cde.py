@@ -30,7 +30,7 @@ def add_cde(
     central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     """
-    Add an API token to a Central app
+    Add an CDE to a Central app
 
     Args:
         cmd: command passed into az
@@ -122,7 +122,7 @@ def delete_cde(
     cmd, app_id: str, token: str, export_id: str, central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     """
-    delete API token from the app.
+    delete CDE from the app.
 
     Args:
         cmd: command passed into az

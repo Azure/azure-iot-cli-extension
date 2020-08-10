@@ -338,12 +338,14 @@ def _load_central_cde_help():
           text: >
             az iot central app cde create
             --app-id {appid}
+            --display-name {displayName}
             --sources "devices, deviceTemplates, telemetry"
             --enable True,
             --ep-type {epType}
             --ep-conn {epConnStr}
-            --name {name}
+            --entity-name {entityName}
             --export-id {exportId}
+            
     """
 
     helps[
@@ -399,8 +401,9 @@ def _load_central_cde_help():
           --enable True,
           --ep-type {epType}
           --ep-conn {epConnStr}
-          --name {name}
-          --export-id {exportId}
+          --entity-name {entityName}
+          --export-id {exportId}          
+
 
 
     """

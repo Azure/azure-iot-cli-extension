@@ -29,7 +29,7 @@ severity_type = CLIArgumentType(
 
 role_type = CLIArgumentType(
     options_list=["--role", "-r"],
-    choices=([role.name for role in Role]),
+    choices=CaseInsensitiveList([role.name for role in Role]),
     help="Role for the user/service-principal you are adding to the app.",
 )
 
