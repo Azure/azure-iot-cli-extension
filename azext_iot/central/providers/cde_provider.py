@@ -13,7 +13,7 @@ from azext_iot.central import services as central_services
 logger = get_logger(__name__)
 
 
-class CentralContDataExportProvider:
+class CentralContinuousDataExportProvider:
     def __init__(self, cmd, app_id: str, token=None):
         """
         Provider for continuous data export

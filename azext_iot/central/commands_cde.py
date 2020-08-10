@@ -7,7 +7,7 @@
 
 
 from azext_iot.constants import CENTRAL_ENDPOINT
-from azext_iot.central.providers import CentralContDataExportProvider
+from azext_iot.central.providers import CentralContinuousDataExportProvider
 from azext_iot.central.models.enum import EndpointType
 
 
@@ -24,7 +24,7 @@ def add_cde(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ):
-    provider = CentralContDataExportProvider(cmd=cmd, app_id=app_id, token=token)
+    provider = CentralContinuousDataExportProvider(cmd=cmd, app_id=app_id, token=token)
     return provider.add_cde(
         sources=sources,
         ep_type=ep_type,
@@ -40,7 +40,7 @@ def add_cde(
 def list_cdes(
     cmd, app_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
 ):
-    provider = CentralContDataExportProvider(cmd=cmd, app_id=app_id, token=token)
+    provider = CentralContinuousDataExportProvider(cmd=cmd, app_id=app_id, token=token)
 
     return provider.get_cde_list(central_dns_suffix=central_dns_suffix,)
 
@@ -48,7 +48,7 @@ def list_cdes(
 def get_cde(
     cmd, app_id: str, export_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
 ):
-    provider = CentralContDataExportProvider(cmd=cmd, app_id=app_id, token=token)
+    provider = CentralContinuousDataExportProvider(cmd=cmd, app_id=app_id, token=token)
 
     return provider.get_cde(export_id=export_id, central_dns_suffix=central_dns_suffix)
 
@@ -56,7 +56,7 @@ def get_cde(
 def delete_cde(
     cmd, app_id: str, export_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
 ):
-    provider = CentralContDataExportProvider(cmd=cmd, app_id=app_id, token=token)
+    provider = CentralContinuousDataExportProvider(cmd=cmd, app_id=app_id, token=token)
 
     return provider.delete_cde(
         export_id=export_id, central_dns_suffix=central_dns_suffix
@@ -65,6 +65,7 @@ def delete_cde(
 
 def update_cde(
     cmd,
+    central_dns_suffix,
     export_id,
     enable,
     ep_type: EndpointType,
@@ -73,9 +74,8 @@ def update_cde(
     sources,
     app_id: str,
     token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
 ):
-    provider = CentralContDataExportProvider(cmd=cmd, app_id=app_id, token=token)
+    provider = CentralContinuousDataExportProvider(cmd=cmd, app_id=app_id, token=token)
 
     # Check to see if the resource is present before we perform an update
     cde_info = provider.get_cde(
