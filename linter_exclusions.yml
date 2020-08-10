@@ -13,3 +13,10 @@ dt endpoint create eventhub:
     eventhub_resource_group:
       rule_exclusions:
       - parameter_should_not_end_in_resource_group
+central app cde create:
+  parameters:
+    central_dns_suffix:
+      rule_exclusions:
+      - no_parameter_defaults_for_update_commands
+
+      

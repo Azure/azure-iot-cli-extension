@@ -65,7 +65,6 @@ def delete_cde(
 
 def update_cde(
     cmd,
-    central_dns_suffix,
     export_id,
     enable,
     ep_type: EndpointType,
@@ -74,6 +73,7 @@ def update_cde(
     sources,
     app_id: str,
     token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     provider = CentralContinuousDataExportProvider(cmd=cmd, app_id=app_id, token=token)
 

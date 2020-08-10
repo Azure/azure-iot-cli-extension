@@ -21,7 +21,7 @@ from azext_iot.central.models.enum import (
     EndpointType,
 )
 from azext_iot.monitor.parsers import strings
-from azext_iot.constants import CENTRAL_ENDPOINT
+
 from . import CaptureOutputLiveScenarioTest, helpers
 
 APP_ID = os.environ.get("azext_iot_central_app_id")
@@ -292,22 +292,20 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         ).get_output_in_json()
         cde_list = result.get("value")
 
+        update_command = "iot central app cde update --app-id {} -d {} -s {} -e True -t {} -c {}  --en {}".format(
+            APP_ID,
+            cdes[0].get("id"),
+            cdes[0].get("sources")[0],
+            cdes[0].get("endpoint").get("type"),
+            STORAGE_CS,
+            STORAGE_CONTRAINER,
+        )
+
         checks = [
             self.check("id", cdes[0].get("id")),
         ]
 
-        self.cmd(
-            "iot central app cde update --app-id {} -d {} -s {} -e True -t {} -c {}  --en {} --central-dns-suffix {}".format(
-                APP_ID,
-                cdes[0].get("id"),
-                cdes[0].get("sources")[0],
-                cdes[0].get("endpoint").get("type"),
-                STORAGE_CS,
-                STORAGE_CONTRAINER,
-                CENTRAL_ENDPOINT,
-            ),
-            checks=checks,
-        )
+        self.cmd(update_command, checks=checks)
 
         for cde in cdes:
             self._delete_cde(cde.get("id"))
