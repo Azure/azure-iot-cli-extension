@@ -333,7 +333,7 @@ def _load_central_cde_help():
         "iot central app cde create"
     ] = """
         type: command
-        short-summary: Create a new continuous data export. 
+        short-summary: Create a new continuous data export.
         long-summary: Create a new continuous data export to Azure Event Hubs, Azure Service Bus, or Azure Blob storage instances. Data export uses the JSON format and can include telemetry, device information, and device template information.
                       Export destination must exist before configuring data export.TODO add the aka.ms link
         examples:
