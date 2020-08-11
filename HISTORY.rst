@@ -3,6 +3,34 @@
 Release History
 ===============
 
+0.9.7
++++++++++++++++
+Refreshes commands for the Azure IoT Plug & Play summer refresh
+
+* The existing Plug & Play preview commands across Azure CLI and the IoT extension have been removed and replaced with a completely new commands. If you still need the legacy preview experience, then you can leverage older versions of the CLI and extension.
+* The new commands exist entirely in the extension with the following command groups:
+
+  * az iot pnp repo ## For tenant repository configuration
+  * az iot pnp model ## For managing repository models and related content
+  * az iot pnp role-assignment ## For managing role assignments for model repo assets
+  * az iot pnp twin ## For interacting with the digital twin of a Plug & Play device
+
+Introduces new preview Azure IoT Central commands
+
+* az iot central app monitor-properties
+* az iot central app validate-properties
+* az iot central app device run-command
+* az iot central app device show-command-history
+* az iot central app device show-credentials
+
+Device Provisioning Service update
+
+* DPS enrollments now support the custom allocation policy resolving issue #200
+
+0.9.6
++++++++++++++++
+* Fixes event monitor initialization issue.
+
 0.9.5
 +++++++++++++++
 * IoT Hub commands now support dynamic privileged policy discovery. `iothubhowner` is no longer relied on. Instead any policy that has `RegistryWrite`, `ServiceConnect` and `DeviceConnect` permissions will be used.
