@@ -214,3 +214,12 @@ def service_client_generic_errors(mocked_response, fixture_ghcs, request):
             url=re.compile(any_endpoint),
         )
         yield rsps
+
+
+@pytest.fixture()
+def fixture_mock_aics_token(mocker):
+    patch = mocker.patch(
+        "azext_iot.product.providers.auth.AICSAuthentication.generate_token"
+    )
+    patch.return_value = "Bearer token"
+    return patch
