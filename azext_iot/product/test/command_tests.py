@@ -270,7 +270,6 @@ def _process_models_directory(from_directory):
             continue
         entry_json = process_json_arg(content=entry.path, argument_name=entry.name)
 
-
         models.append(dumps(entry_json))
     return models
 
