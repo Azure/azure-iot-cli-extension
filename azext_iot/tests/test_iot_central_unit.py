@@ -7,13 +7,13 @@
 import mock
 import pytest
 import json
+import responses
 import ast
 from datetime import datetime
 from knack.util import CLIError
 from azure.cli.core.mock import DummyCli
 from azext_iot.central import commands_device_twin
 from azext_iot.central import commands_monitor
-from azext_iot.common.shared import SdkType
 from azext_iot.central.providers import (
     CentralDeviceProvider,
     CentralDeviceTemplateProvider,
@@ -28,7 +28,7 @@ from .test_constants import FileNames
 
 device_id = "mydevice"
 app_id = "myapp"
-device_twin_result = "{device twin result}"
+device_twin_result = {"deviceId": "{}".format(device_id)}
 resource = "shared_resource"
 
 
@@ -38,17 +38,6 @@ def fixture_cmd(mocker):
     cmd = mock.MagicMock()
     cmd.cli_ctx = DummyCli()
     return cmd
-
-
-@pytest.fixture()
-def fixture_bind_sdk(mocker):
-    class mock_service_sdk:
-        def get_twin(self, device_id):
-            return device_twin_result
-
-    mock = mocker.patch("azext_iot.central.providers.devicetwin_provider._bind_sdk")
-    mock.return_value = (mock_service_sdk(), None)
-    return mock
 
 
 @pytest.fixture()
@@ -135,18 +124,24 @@ class TestCentralHelpers:
 
 
 class TestDeviceTwinShow:
+    @pytest.fixture
+    def service_client(self, mocked_response, fixture_cmd, fixture_get_iot_central_tokens):
+        mocked_response.add(
+            method=responses.GET,
+            url="https://{}/twins/{}".format(resource, device_id),
+            body=json.dumps(device_twin_result),
+            status=200,
+            content_type="application/json",
+            match_querystring=False,
+        )
+
+        yield mocked_response
+
     def test_device_twin_show_calls_get_twin(
-        self, fixture_bind_sdk, fixture_cmd, fixture_get_iot_central_tokens
+        self, service_client
     ):
         result = commands_device_twin.device_twin_show(fixture_cmd, device_id, app_id)
-
-        # Ensure get_twin is called and result is returned
-        assert result is device_twin_result
-
-        # Ensure _bind_sdk is called with correct parameters
-        assert fixture_bind_sdk.called is True
-        args = fixture_bind_sdk.call_args
-        assert args[0] == ({"entity": resource}, SdkType.service_sdk)
+        assert result == device_twin_result
 
 
 class TestMonitorEvents:

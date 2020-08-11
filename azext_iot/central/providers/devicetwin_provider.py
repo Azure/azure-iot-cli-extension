@@ -7,7 +7,7 @@
 from knack.util import CLIError
 from knack.log import get_logger
 from azext_iot.common.utility import find_between
-from azext_iot._factory import _bind_sdk
+from azext_iot._factory import SdkResolver, CloudError
 from azext_iot.common.shared import SdkType
 from azext_iot.common.utility import unpack_msrest_error
 from azext_iot.common.sas_token_auth import BasicSasTokenAuthentication
@@ -50,10 +50,10 @@ class CentralDeviceTwinProvider:
             endpoint = find_between(sas_token, "SharedAccessSignature sr=", "&sig=")
             target = {"entity": endpoint}
             auth = BasicSasTokenAuthentication(sas_token=sas_token)
-            service_sdk, errors = _bind_sdk(target, SdkType.service_sdk, auth=auth)
+            service_sdk = SdkResolver(target=target, auth_override=auth).get_sdk(SdkType.service_sdk)
             try:
-                return service_sdk.get_twin(self._device_id)
-            except errors.CloudError as e:
+                return service_sdk.twin.get_device_twin(id=self._device_id, raw=True).response.json()
+            except CloudError as e:
                 if exception is None:
                     exception = CLIError(unpack_msrest_error(e))
 

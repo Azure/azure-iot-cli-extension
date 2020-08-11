@@ -109,7 +109,7 @@ class DigitalTwinsOperations(object):
         path_format_arguments = {
             'subscriptionId': self._serialize.url("self.config.subscription_id", self.config.subscription_id, 'str'),
             'resourceGroupName': self._serialize.url("resource_group_name", resource_group_name, 'str', max_length=64, min_length=1),
-            'resourceName': self._serialize.url("resource_name", resource_name, 'str', max_length=64, min_length=1)
+            'resourceName': self._serialize.url("resource_name", resource_name, 'str', max_length=63, min_length=1)
         }
         url = self._client.format_url(url, **path_format_arguments)
 

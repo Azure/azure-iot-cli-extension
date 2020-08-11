@@ -106,7 +106,7 @@ def get_device_registration_summary(
 
     url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
     headers = _utility.get_headers(token, cmd)
-    logger.warn(
+    logger.warning(
         "This command may take a long time to complete if your app contains a lot of devices"
     )
     while url:
