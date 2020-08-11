@@ -18,10 +18,10 @@ def add_cde(
     ep_type: EndpointType,
     ep_conn,
     entity_name,
-    enable,
     export_id,
     app_id: str,
     token=None,
+    enable=False,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     provider = CentralContinuousDataExportProvider(cmd=cmd, app_id=app_id, token=token)

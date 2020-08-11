@@ -26,7 +26,7 @@ from . import CaptureOutputLiveScenarioTest, helpers
 
 APP_ID = os.environ.get("azext_iot_central_app_id")
 STORAGE_CS = os.environ.get("azext_iot_central_sa_cs")
-STORAGE_CONTRAINER = os.environ.get("azext_iot_central_sa_cn")
+STORAGE_CONTAINER = os.environ.get("azext_iot_central_sa_cn")
 device_template_path = get_context_path(
     __file__, "central/json/device_template_int_test.json"
 )
@@ -276,7 +276,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
     @pytest.mark.skipif(not STORAGE_CS, reason="empty azext_iot_central_sa_cs env var")
     @pytest.mark.skipif(
-        not STORAGE_CONTRAINER, reason="empty azext_iot_central_sa_cn env var"
+        not STORAGE_CONTAINER, reason="empty azext_iot_central_sa_cn env var"
     )
     def test_central_cde_methods_CRUD(self):
         cdes = self._create_cde()
@@ -298,7 +298,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             cdes[0].get("sources")[0],
             cdes[0].get("endpoint").get("type"),
             STORAGE_CS,
-            STORAGE_CONTRAINER,
+            STORAGE_CONTAINER,
         )
 
         checks = [
@@ -534,7 +534,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
                 source.name,
                 EndpointType.StorageEndpoint.name,
                 STORAGE_CS,
-                STORAGE_CONTRAINER,
+                STORAGE_CONTAINER,
             )
 
             checks = [
@@ -545,6 +545,30 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             ]
 
             cde.append(self.cmd(command, checks=checks).get_output_in_json())
+
+        display_name = self.create_random_name(prefix="aztest", length=24)
+        export_id = display_name
+        command = "iot central app cde create --app-id {} --dn {} -d {} -s {} {} {} -e False -t {} -c {}  --en {} ".format(
+            APP_ID,
+            display_name,
+            export_id,
+            DataSourceType.devices.name,
+            DataSourceType.deviceTemplates.name,
+            DataSourceType.telemetry.name,
+            EndpointType.StorageEndpoint.name,
+            STORAGE_CS,
+            STORAGE_CONTAINER,
+        )
+
+        checks = [
+            self.check("id", export_id),
+            self.check("displayName", display_name),
+            self.check("enabled", False),
+            self.check("sources[0]", DataSourceType.devices.name),
+        ]
+
+        cde.append(self.cmd(command, checks=checks).get_output_in_json())
+
         return cde
 
     def _delete_cde(self, cde_id) -> None:

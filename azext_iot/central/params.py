@@ -155,11 +155,6 @@ def load_central_arguments(self, _):
             help="Connection string for the endpoint. ",
         )
         context.argument(
-            "entity_name",
-            options_list=["--entity-name", "--en"],
-            help="Name of entity pointing at Eg: container_name, queue_name, etc.. ",
-        )
-        context.argument(
             "export_id",
             options_list=["--export-id", "-d"],
             help="Unique ID for the continuous data export. ",
@@ -169,6 +164,15 @@ def load_central_arguments(self, _):
             options_list=["--ep-type", "-t"],
             arg_type=get_enum_type(EndpointType),
             help="Type of endpoint where exported data should be sent to. ",
+        )
+        context.argument(
+            "entity_name",
+            options_list=["--entity-name", "--en"],
+            help="Name of the storage entity. "
+            "For StorageEndpoint this represents the name of the container in the endpoint. "
+            "For EventHubsEndpoint this represents the name of the eventhub in the endpoint. "
+            "For ServiceBusQueueEndpoint this represents the name of the queue in the endpoint. "
+            "For ServiceBusTopicEndpoint this represents the name of the topic in the endpoint. ",
         )
 
     with self.argument_context("iot central app monitor-events") as context:

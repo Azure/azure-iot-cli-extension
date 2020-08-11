@@ -333,18 +333,32 @@ def _load_central_cde_help():
         "iot central app cde create"
     ] = """
         type: command
-        short-summary: Create a new continuous data export
+        short-summary: Create a new continuous data export. 
+        long-summary: Create a new continuous data export to Azure Event Hubs, Azure Service Bus, or Azure Blob storage instances. Data export uses the JSON format and can include telemetry, device information, and device template information.
+                      Export destination must exist before configuring data export.TODO add the aka.ms link
         examples:
-        - name: Add new continuous data export
+        - name: Add new continuous data export with StorageEndpoint (entity-name is the name of container in the storage account).
           text: >
             az iot central app cde create
             --app-id {appid}
             --display-name {displayName}
             --sources "devices, deviceTemplates, telemetry"
-            --enable True,
-            --ep-type {epType}
+            --enable
+            --ep-type StorageEndpoint
             --ep-conn {epConnStr}
-            --entity-name {entityName}
+            --entity-name {containerName}
+            --export-id {exportId}
+
+        - name: Add new continuous data export - with ServiceBusQueueEndpoint a(entity-name is the name of queue in the endpoint).
+          text: >
+            az iot central app cde create
+            --app-id {appid}
+            --display-name {displayName}
+            --sources "devices, deviceTemplates, telemetry"
+            --enable
+            --ep-type ServiceBusQueueEndpoint
+            --ep-conn {epConnStr}
+            --entity-name {queueNName}
             --export-id {exportId}
     """
 
@@ -393,11 +407,11 @@ def _load_central_cde_help():
     type: command
     short-summary: Update continuous data export in an application.
     examples:
-      - name: update continuous data export
+      - name: Update continuous data export
         text: >
           az iot central app cde update
           --app-id {appid}
-          --sources "devices,deviceTemplates,telemetry"
+          --sources "devices" "deviceTemplates" "telemetry"
           --enable True,
           --ep-type {epType}
           --ep-conn {epConnStr}
