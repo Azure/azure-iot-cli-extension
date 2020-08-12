@@ -3,6 +3,36 @@
 Release History
 ===============
 
+0.9.8
++++++++++++++++
+Introducing commands for the Azure IoT Product Certification service
+
+* A new IoT root command group 'az iot product' has been added
+
+  * Use 'az iot product requirement' to manage product certification requirements
+  * Use 'az iot product test' to manage device tests for certification
+  
+    * The product test command group encompasses test cases, runs and tasks
+
+IoT Central updates
+
+* Introduces the 'az iot central app user' command group for managing application users and service principals
+* Introduces the 'az iot central app api-token' command group for managing application api tokens
+* Removal of deprecated command groups and commands
+
+IoT Hub updates
+
+* All "... show-connection-string" based commands are deprecated in favor of "... connection-string show" canonical Az CLI style.
+
+  * The show connection string command for a target IoT Hub has moved to the IoT extension.
+  * 'az iot hub connection-string show' supports a --default-eventhub flag which indicates the operation will construct a connection string for the default eventhub endpoint of the target IoT Hub.
+* Export/Import device identity commands support reading blob container SAS URI's via file
+
+Azure Digital Twins updates
+
+* The 'location' argument for 'az dt create' is now optional. If no location is provided, the location of the target resource group is used.
+
+
 0.9.7
 +++++++++++++++
 Refreshes commands for the Azure IoT Plug & Play summer refresh
