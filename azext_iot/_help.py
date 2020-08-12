@@ -949,7 +949,10 @@ helps[
     examples:
     - name: Evaluate the 'appliedCount' system metric
       text: >
-        az iot edge deployment show-metric -m appliedCount -d {deployment_name} -n {iothub_name}
+        az iot edge deployment show-metric -m appliedCount -d {deployment_name} -n {iothub_name} --mt system
+    - name: Evaluate the 'myCustomMetric' user metric
+      text: >
+        az iot edge deployment show-metric -m myCustomMetric -d {deployment_name} -n {iothub_name}
 """
 
 helps[
