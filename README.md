@@ -3,7 +3,6 @@
 ![Python](https://img.shields.io/pypi/pyversions/azure-cli.svg?maxAge=2592000)
 ![Build Status](https://dev.azure.com/azureiotdevxp/aziotcli/_apis/build/status/Merge%20-%20Azure.azure-iot-cli-extension?branchName=dev)
 
-
 The **Azure IoT extension for Azure CLI** aims to accelerate the development, management and automation of Azure IoT solutions. It does this via addition of rich features and functionality to the official [Azure CLI](https://docs.microsoft.com/en-us/cli/azure).
 
 ## News
@@ -20,8 +19,7 @@ cliextensions/azure-cli-iot-ext/azext_iot/_factory.py, ln 29, in iot_hub_service
 ModuleNotFoundError: No module named 'azure.mgmt.iothub.iot_hub_client'
 ```
 
-The resolution is to remove the deprecated `azure-cli-iot-ext` and install any version of the `azure-iot` extension. 
-
+The resolution is to remove the deprecated `azure-cli-iot-ext` and install any version of the `azure-iot` extension.
 
 ## Commands
 
@@ -42,22 +40,75 @@ Please refer to the [Installation Troubleshooting Guide](docs/install-help.md) i
 
 After installing the Azure IoT extension your CLI environment is augmented with the addition of `central`, `device`, `dps`, `dt`, `edge`, `hub` and `pnp` commands.
 
-For usage and help content for any command or command group, pass in the `-h` parameter, for example:
+For usage and help content for any command or command group, pass in the `-h` parameter. Root command group details are shown for following IoT services (click to expand).
+
+<details>
+  <summary>IoT Central</summary>
 
 ```
-$ az iot hub -h
+$ az iot central app -h
+Group
+    az iot central app : Manage Azure IoT Central applications.
+
+    To use this command group, the user must be logged through the `az login` command,
+    have the correct tenant set (the users home tenant) and
+    have access to the application through http://apps.azureiotcentral.com".
+
+Subgroups:
+    api-token           [Preview] : Create and Manage API tokens .
+    device              [Preview] : Manage and configure IoT Central devices.
+    device-template     [Preview] : Manage and configure IoT Central device templates.
+    device-twin                   : Manage IoT Central device twins.
+    user                [Preview] : Manage and configure IoT Central users.
+
+Commands:
+    create                        : Create an IoT Central application.
+    delete                        : Delete an IoT Central application.
+    list                          : List IoT Central applications.
+    monitor-events                : Monitor device telemetry & messages sent to the IoT Hub for an
+                                    IoT Central app.
+    monitor-properties  [Preview] : Monitor desired and reported properties sent to/from
+                                    the IoT Hub for an IoT Central app.
+    show                          : Get the details of an IoT Central application.
+    update                        : Update metadata for an IoT Central application.
+    validate-messages   [Preview] : Validate messages sent to the IoT Hub for an IoT
+                                    Central app.
+    validate-properties [Preview] : Validate reported properties sent to IoT Central app.
+```
+</details>
+
+<details>
+  <summary>IoT Edge</summary>
+
+```
+Group
+    az iot edge : Manage IoT solutions on the Edge.
+
+Subgroups:
+    deployment  : Manage IoT Edge deployments at scale.
+
+Commands:
+    set-modules : Set edge modules on a single device.
+```
+</details>
+
+<details>
+  <summary>IoT Hub</summary>
+
+```
 Group
     az iot hub : Manage entities in an Azure IoT Hub.
 
 Subgroups:
     certificate                   : Manage IoT Hub certificates.
-    configuration                 : Manage IoT device configurations at scale.
+    configuration                 : Manage IoT automatic device management configuration at scale.
+    connection-string             : Manage IoT Hub connection strings.
     consumer-group                : Manage the event hub consumer groups of an IoT hub.
     device-identity               : Manage IoT devices.
     device-twin                   : Manage IoT device twin configuration.
     devicestream                  : Manage device streams of an IoT hub.
     distributed-tracing [Preview] : Manage distributed settings per-device.
-    job                           : Manage jobs in an IoT hub.
+    job                           : Manage IoT Hub jobs (v2).
     message-enrichment            : Manage message enrichments for endpoints of an IoT Hub.
     module-identity               : Manage IoT device modules.
     module-twin                   : Manage IoT device module twin configuration.
@@ -85,6 +136,7 @@ Commands:
     show-stats                    : Get the statistics for an IoT hub.
     update                        : Update metadata for an IoT hub.
 ```
+</details>
 
 ## Scenario Automation
 
