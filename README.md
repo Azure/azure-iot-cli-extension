@@ -78,9 +78,36 @@ Commands:
 </details>
 
 <details>
+  <summary>IoT Device Provisioning Service</summary>
+
+```
+$ az iot dps -h
+Group
+    az iot dps : Manage entities in an Azure IoT Hub Device Provisioning Service. Augmented with the
+    IoT extension.
+
+Subgroups:
+    access-policy    : Manage Azure IoT Hub Device Provisioning Service access policies.
+    certificate      : Manage Azure IoT Hub Device Provisioning Service certificates.
+    enrollment       : Manage enrollments in an Azure IoT Hub Device Provisioning Service.
+    enrollment-group : Manage Azure IoT Hub Device Provisioning Service.
+    linked-hub       : Manage Azure IoT Hub Device Provisioning Service linked IoT hubs.
+    registration     : Manage Azure IoT Hub Device Provisioning Service registrations.
+
+Commands:
+    create           : Create an Azure IoT Hub device provisioning service.
+    delete           : Delete an Azure IoT Hub device provisioning service.
+    list             : List Azure IoT Hub device provisioning services.
+    show             : Get the details of an Azure IoT Hub device provisioning service.
+    update           : Update an Azure IoT Hub device provisioning service.
+```
+</details>
+
+<details>
   <summary>IoT Edge</summary>
 
 ```
+$ az iot edge -h
 Group
     az iot edge : Manage IoT solutions on the Edge.
 
@@ -96,6 +123,7 @@ Commands:
   <summary>IoT Hub</summary>
 
 ```
+$ az iot hub -h
 Group
     az iot hub : Manage entities in an Azure IoT Hub.
 
@@ -135,6 +163,50 @@ Commands:
     show-quota-metrics            : Get the quota metrics for an IoT hub.
     show-stats                    : Get the statistics for an IoT hub.
     update                        : Update metadata for an IoT hub.
+```
+</details>
+
+<details>
+  <summary>IoT Plug & Play</summary>
+
+```
+$ az iot pnp -h
+Group
+    az iot pnp : Manage Azure IoT Plug-and-Play repositories and models.
+
+Subgroups:
+    model           [Preview] : Create, view, and publish device models in your company
+                                repository.
+    repo            [Preview] : Create and view Azure IoT Plug-and-Play tenant
+                                repositories.
+    role-assignment [Preview] : Manage and configure PnP repository and model role
+                                assignments.
+    twin            [Preview] : Manipulate and interact with the digital twin of an IoT
+                                Hub device.
+```
+</details>
+
+<details>
+  <summary>Digital Twins</summary>
+
+```
+$ az dt -h
+Group
+    az dt : Manage Azure Digital Twins solutions & infrastructure.
+        This command group is in preview. It may be changed/removed in a future release.
+Subgroups:
+    endpoint        : Manage and configure Digital Twins instance endpoints.
+    model           : Manage DTDL models and definitions on a Digital Twins instance.
+    role-assignment : Manage RBAC role assignments for a Digital Twins instance.
+    route           : Manage and configure event routes.
+    twin            : Manage and configure the digital twins of a Digital Twins instance.
+
+Commands:
+    create          : Create a new Digital Twins instance.
+    delete          : Delete an existing Digital Twins instance.
+    list            : List the collection of Digital Twins instances by subscription or resource
+                      group.
+    show            : Show an existing Digital Twins instance.
 ```
 </details>
 
