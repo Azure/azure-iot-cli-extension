@@ -40,7 +40,7 @@ Please refer to the [Installation Troubleshooting Guide](docs/install-help.md) i
 
 After installing the Azure IoT extension your CLI environment is augmented with the addition of `central`, `device`, `dps`, `dt`, `edge`, `hub` and `pnp` commands.
 
-For usage and help content of any command or command group, pass in the `-h` parameter. Root command group details are shown for following IoT services.
+For usage and help content of any command or command group, pass in the `-h` parameter. Root command group details are shown for the following IoT services.
 
 > **Click** a section to expand or collapse
 
