@@ -40,7 +40,33 @@ Please refer to the [Installation Troubleshooting Guide](docs/install-help.md) i
 
 After installing the Azure IoT extension your CLI environment is augmented with the addition of `central`, `device`, `dps`, `dt`, `edge`, `hub` and `pnp` commands.
 
-For usage and help content of any command or command group, pass in the `-h` parameter. Root command group details are shown for following IoT services (**click** to expand).
+For usage and help content of any command or command group, pass in the `-h` parameter. Root command group details are shown for following IoT services.
+
+> **Click** a section expand or collapse
+
+<details>
+  <summary>Digital Twins</summary>
+
+```
+$ az dt -h
+Group
+    az dt : Manage Azure Digital Twins solutions & infrastructure.
+        This command group is in preview. It may be changed/removed in a future release.
+Subgroups:
+    endpoint        : Manage and configure Digital Twins instance endpoints.
+    model           : Manage DTDL models and definitions on a Digital Twins instance.
+    role-assignment : Manage RBAC role assignments for a Digital Twins instance.
+    route           : Manage and configure event routes.
+    twin            : Manage and configure the digital twins of a Digital Twins instance.
+
+Commands:
+    create          : Create a new Digital Twins instance.
+    delete          : Delete an existing Digital Twins instance.
+    list            : List the collection of Digital Twins instances by subscription or resource
+                      group.
+    show            : Show an existing Digital Twins instance.
+```
+</details>
 
 <details open>
   <summary>IoT Central</summary>
@@ -183,30 +209,6 @@ Subgroups:
                                 assignments.
     twin            [Preview] : Manipulate and interact with the digital twin of an IoT
                                 Hub device.
-```
-</details>
-
-<details>
-  <summary>Digital Twins</summary>
-
-```
-$ az dt -h
-Group
-    az dt : Manage Azure Digital Twins solutions & infrastructure.
-        This command group is in preview. It may be changed/removed in a future release.
-Subgroups:
-    endpoint        : Manage and configure Digital Twins instance endpoints.
-    model           : Manage DTDL models and definitions on a Digital Twins instance.
-    role-assignment : Manage RBAC role assignments for a Digital Twins instance.
-    route           : Manage and configure event routes.
-    twin            : Manage and configure the digital twins of a Digital Twins instance.
-
-Commands:
-    create          : Create a new Digital Twins instance.
-    delete          : Delete an existing Digital Twins instance.
-    list            : List the collection of Digital Twins instances by subscription or resource
-                      group.
-    show            : Show an existing Digital Twins instance.
 ```
 </details>
 
