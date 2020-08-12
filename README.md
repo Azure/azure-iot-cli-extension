@@ -42,7 +42,7 @@ After installing the Azure IoT extension your CLI environment is augmented with 
 
 For usage and help content of any command or command group, pass in the `-h` parameter. Root command group details are shown for following IoT services.
 
-> **Click** a section expand or collapse
+> **Click** a section to expand or collapse
 
 <details>
   <summary>Digital Twins</summary>
