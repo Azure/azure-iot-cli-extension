@@ -20,6 +20,11 @@ requirements_ops = CliCommandType(
 
 def load_product_commands(self, _):
     with self.command_group(
+        "iot product", command_type=requirements_ops, is_preview=True
+    ) as g:
+        pass
+
+    with self.command_group(
         "iot product requirement", command_type=requirements_ops
     ) as g:
         g.command("list", "list")
