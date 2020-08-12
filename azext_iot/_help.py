@@ -867,20 +867,22 @@ helps[
         az iot edge deployment create -d {deployment_name} -n {iothub_name}
         --content modules_content.json
         --labels '{"key0":"value0", "key1":"value1"}'
-        --target-condition "tags.building=9 and tags.environment='test'" --priority 3
+        --target-condition "tags.building=9 and tags.environment='test'"
+        --priority 3
     - name: Create a deployment with labels (powershell syntax example) that applies for devices tagged with environment 'dev'.
       text: >
         az iot edge deployment create -d {deployment_name} -n {iothub_name}
         --content modules_content.json
-        --labels '{\\"key\\":\\"value\\"}'
+        --labels "{'key':'value'}"
         --target-condition "tags.environment='dev'"
     - name: Create a layered deployment that applies for devices tagged with environment 'dev'.
             Both user metrics and modules content defined inline (powershell syntax example).
       text: >
-        az --% iot edge deployment create -d {deployment_name} -n {iothub_name}
-        --content "{\\"modulesContent\\":{\\"$edgeAgent\\":{\\"properties.desired.modules.mymodule0\\":{ }},\\"$edgeHub\\":{\\"properties.desired.routes.myroute0\\":\\"FROM /messages/* INTO $upstream\\"}}}"
-        --target-condition "tags.environment='dev'" --priority 10
-        --metrics "{\\"queries\\":{\\"mymetrik\\":\\"SELECT deviceId from devices where properties.reported.lastDesiredStatus.code = 200\\"}}"
+        az iot edge deployment create -d {deployment_name} -n {iothub_name}
+        --content "{'modulesContent':{'`$edgeAgent':{'properties.desired.modules.mymodule0':{ }},'`$edgeHub':{'properties.desired.routes.myroute0':'FROM /messages/* INTO `$upstream'}}}"
+        --target-condition "tags.environment='dev'"
+        --priority 10
+        --metrics "{'queries':{'mymetrik':'SELECT deviceId from devices where properties.reported.lastDesiredStatus.code = 200'}}"
         --layered
     - name: Create a layered deployment that applies for devices in 'building 9' and environment 'test'.
             Both user metrics and modules content defined inline (bash syntax example).
