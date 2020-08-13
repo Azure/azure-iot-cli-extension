@@ -5,7 +5,11 @@ Release History
 
 0.9.8
 +++++++++++++++
-Introducing commands for the Azure IoT Product Certification service
+General changes
+
+* Starting with v0.9.8 of the IoT extension, the minCliCoreVersion has been bumped to 2.3.1. This sets a comfortable minimum desired experience we want for our users.
+
+Introducing preview commands for the Azure IoT Product Certification service
 
 * A new IoT root command group 'az iot product' has been added
 
@@ -16,8 +20,8 @@ Introducing commands for the Azure IoT Product Certification service
 
 IoT Central updates
 
-* Introduces the 'az iot central app user' command group for managing application users and service principals
-* Introduces the 'az iot central app api-token' command group for managing application api tokens
+* Introduces the 'az iot central app user' preview command group for managing application users and service principals
+* Introduces the 'az iot central app api-token' preview command group for managing application api tokens
 * Removal of deprecated command groups and commands
 
 IoT Hub updates
