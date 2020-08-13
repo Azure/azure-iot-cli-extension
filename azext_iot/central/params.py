@@ -38,7 +38,7 @@ def load_central_arguments(self, _):
     """
     Load CLI Args for Knack parser
     """
-    with self.argument_context("iot central app") as context:
+    with self.argument_context("iot central") as context:
         context.argument("app_id", options_list=["--app-id", "-n"], help="Target App.")
         context.argument("minimum_severity", arg_type=severity_type)
         context.argument("role", arg_type=role_type)
@@ -130,7 +130,14 @@ def load_central_arguments(self, _):
         context.argument("timeout", arg_type=event_timeout_type)
         context.argument("properties", arg_type=event_msg_prop_type)
 
-    with self.argument_context("iot central app validate-messages") as context:
+    with self.argument_context("iot central diagnostics monitor-events") as context:
+        context.argument("timeout", arg_type=event_timeout_type)
+        context.argument("properties", arg_type=event_msg_prop_type)
+        context.argument(
+            "module_id", options_list=["--module-id", "-m"], help="Iot Edge Module ID",
+        )
+
+    with self.argument_context("iot central diagnostics validate-messages") as context:
         context.argument("timeout", arg_type=event_timeout_type)
         context.argument("properties", arg_type=event_msg_prop_type)
         context.argument("style", arg_type=style_type)
