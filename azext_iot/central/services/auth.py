@@ -10,7 +10,7 @@ import hashlib
 
 def generate_device_key(masterkey, device_id):
     """
-    Generate device key
+    Generate device SAS key
 
     Args:
         masterkey: Primary group SAS token to generate device keys
@@ -19,9 +19,9 @@ def generate_device_key(masterkey, device_id):
         device key
     """
     secret = base64.b64decode(masterkey)
-    signature = base64.b64encode(
+    device_key = base64.b64encode(
         hmac.new(
             secret, msg=device_id.encode("utf8"), digestmod=hashlib.sha256
         ).digest()
     )
-    return signature
+    return device_key
