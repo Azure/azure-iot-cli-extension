@@ -864,25 +864,39 @@ helps[
     - name: Create a deployment with labels (bash syntax example) that applies for devices in 'building 9' and
             the environment is 'test'.
       text: >
-        az iot edge deployment create -d {deployment_name} -n {iothub_name} --content modules_content.json
+        az iot edge deployment create -d {deployment_name} -n {iothub_name}
+        --content modules_content.json
         --labels '{"key0":"value0", "key1":"value1"}'
-        --target-condition "tags.building=9 and tags.environment='test'" --priority 3
+        --target-condition "tags.building=9 and tags.environment='test'"
+        --priority 3
     - name: Create a deployment with labels (powershell syntax example) that applies for devices tagged with environment 'dev'.
       text: >
-        az iot edge deployment create -d {deployment_name} -n {iothub_name} --content modules_content.json
-        --labels '{\\"key\\":\\"value\\"}'
+        az iot edge deployment create -d {deployment_name} -n {iothub_name}
+        --content modules_content.json
+        --labels "{'key':'value'}"
         --target-condition "tags.environment='dev'"
     - name: Create a layered deployment that applies for devices tagged with environment 'dev'.
-            Both user metrics and modules content defined inline (cmd syntax example).
+            Both user metrics and modules content defined inline (powershell syntax example).
       text: >
         az iot edge deployment create -d {deployment_name} -n {iothub_name}
-        --content "{\\"modulesContent\\":{\\"$edgeAgent\\":{\\"properties.desired.modules.mymodule0\\":{ }},\\"$edgeHub\\":{\\"properties.desired.routes.myroute0\\":\\"FROM /messages/* INTO $upstream\\"}}}"
-        --target-condition "tags.environment='dev'" --priority 10
-        --metrics "{\\"queries\\":{\\"mymetrik\\":\\"SELECT deviceId from devices where properties.reported.lastDesiredStatus.code = 200\\"}}"
+        --content "{'modulesContent':{'`$edgeAgent':{'properties.desired.modules.mymodule0':{ }},'`$edgeHub':{'properties.desired.routes.myroute0':'FROM /messages/* INTO `$upstream'}}}"
+        --target-condition "tags.environment='dev'"
+        --priority 10
+        --metrics "{'queries':{'mymetrik':'SELECT deviceId from devices where properties.reported.lastDesiredStatus.code = 200'}}"
         --layered
-    - name: Create a layered deployment that applies for devices in 'building 9' and the environment is 'test'.
+    - name: Create a layered deployment that applies for devices in 'building 9' and environment 'test'.
+            Both user metrics and modules content defined inline (bash syntax example).
       text: >
-        az iot edge deployment create -d {deployment_name} -n {iothub_name} --content layered_modules_content.json
+        az iot edge deployment create -d {deployment_name} -n {iothub_name}
+        --content '{"modulesContent":{"$edgeAgent":{"properties.desired.modules.mymodule0":{ }},"$edgeHub":{"properties.desired.routes.myroute0":"FROM /messages/* INTO $upstream"}}}'
+        --target-condition "tags.building=9 and tags.environment='test'"
+        --metrics '{"queries":{"mymetrik":"SELECT deviceId from devices where properties.reported.lastDesiredStatus.code = 200"}}'
+        --layered
+    - name: Create a layered deployment that applies for devices in 'building 9' and environment 'test'.
+            Both user metrics and modules content defined from file.
+      text: >
+        az iot edge deployment create -d {deployment_name} -n {iothub_name}
+        --content layered_modules_content.json
         --target-condition "tags.building=9 and tags.environment='test'"
         --metrics metrics_content.json
         --layered
@@ -935,7 +949,10 @@ helps[
     examples:
     - name: Evaluate the 'appliedCount' system metric
       text: >
-        az iot edge deployment show-metric -m appliedCount -d {deployment_name} -n {iothub_name}
+        az iot edge deployment show-metric -m appliedCount -d {deployment_name} -n {iothub_name} --mt system
+    - name: Evaluate the 'myCustomMetric' user metric
+      text: >
+        az iot edge deployment show-metric -m myCustomMetric -d {deployment_name} -n {iothub_name}
 """
 
 helps[

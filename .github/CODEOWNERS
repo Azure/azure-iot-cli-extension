@@ -6,13 +6,21 @@
 
 # Central Code Owner(s)
 azext_iot/central/   @prbans
+azext_iot/tests/central/   @prbans
+azext_iot/tests/test_iot_central_int.py   @prbans
+azext_iot/tests/test_iot_central_unit.py   @prbans
 
 # Monitor Code Owner(s)
 azext_iot/monitor/   @prbans @digimaun
 
-# Tests Code Owners
-azext_iot/tests/central/   @prbans
-azext_iot/tests/test_iot_central_int.py   @prbans
-azext_iot/tests/test_iot_central_unit.py   @prbans
+# AICS Code Owner(s)
+azext_iot/product/   @montgomp @c-ryan-k
+azext_iot/tests/product/   @montgomp @c-ryan-k
+
+# PnP Repository Code Owners(s)
+azext_iot/pnp/   @c-ryan-k
+azext_iot/tests/pnp/   @c-ryan-k
+
+# Test Code Owners
 azext_iot/tests/test_monitor_parsers_unit.py   @prbans @digimaun
 azext_iot/tests/test_uamqp_import.py   @prbans @digimaun

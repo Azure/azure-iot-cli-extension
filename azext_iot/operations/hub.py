@@ -1254,8 +1254,8 @@ def iot_hub_configuration_metric_show(
 
         if metric_id not in metric_collection:
             raise CLIError(
-                "the metric '{}' is not defined in the device configuration '{}'".format(
-                    metric_id, config_id
+                "The {} metric '{}' is not defined in the configuration '{}'".format(
+                    metric_type, metric_id, config_id
                 )
             )
 
