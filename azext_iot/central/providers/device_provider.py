@@ -240,3 +240,10 @@ class CentralDeviceProvider:
             "error": error.get(device_status),
         }
         return filtered_dps_info
+
+    def generate_device_key(
+        self, masterkey, device_id,
+    ):
+        return central_services.auth.generate_device_key(
+            masterkey=masterkey, device_id=device_id
+        )

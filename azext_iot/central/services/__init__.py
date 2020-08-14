@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from azext_iot.central.services import device, device_template, user, api_token
+from azext_iot.central.services import device, device_template, user, api_token, auth
 
 
-__all__ = ["device", "device_template", "user", "api_token"]
+__all__ = ["device", "device_template", "user", "api_token", "auth"]

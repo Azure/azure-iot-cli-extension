@@ -402,15 +402,15 @@ def _load_central_dps_keygen_help():
         "iot central dps-keygen"
     ] = """
         type: group
-        short-summary: Generate device keys
+        short-summary: Generate device key
     """
 
     helps[
         "iot central dps-keygen create"
     ] = """
         type: command
-        short-summary: Create device key
-        Long-summary: Generate device key from primary group SAS token. Generated SAS key is used to connect the device to central.
+        short-summary: Create a device key
+        Long-summary: Generate device key from primary group SAS token. Generated device key is used to connect the device to central.
         examples:
         - name: Basic usage
           text: >

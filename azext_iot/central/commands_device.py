@@ -125,13 +125,5 @@ def get_credentials(
 def generate_device_key(
     cmd, masterkey, device_id,
 ):
-    from hashlib import sha256
-    import hmac
-    import base64
-
-    secret = base64.b64decode(masterkey)
-    signature = base64.b64encode(
-        hmac.new(secret, msg=device_id.encode("utf8"), digestmod=sha256).digest()
-    )
-
-    return signature
+    provider = CentralDeviceProvider(cmd=cmd, app_id=None, token=None,)
+    return provider.generate_device_key(masterkey=masterkey, device_id=device_id)

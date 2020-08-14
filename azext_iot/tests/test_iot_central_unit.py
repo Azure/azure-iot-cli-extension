@@ -25,7 +25,7 @@ from azext_iot.monitor.models.enum import Severity
 from .helpers import load_json
 from .test_constants import FileNames
 
-
+masterkey = "mymasterkeyhnubGlhn83q6qh8JctHhU7E=="
 device_id = "mydevice"
 app_id = "myapp"
 device_twin_result = {"deviceId": "{}".format(device_id)}
@@ -123,9 +123,21 @@ class TestCentralHelpers:
         }
 
 
+class TestCentralDeviceAuth:
+    def test_generate_device_key(self,):
+        from azext_iot.central.services.auth import generate_device_key
+
+        assert (
+            generate_device_key(masterkey=masterkey, device_id=device_id).decode()
+            == "PHrzo1mdYDharwsTjtKWK3YgTjKXEqd/cqnloU/F168="
+        )
+
+
 class TestDeviceTwinShow:
     @pytest.fixture
-    def service_client(self, mocked_response, fixture_cmd, fixture_get_iot_central_tokens):
+    def service_client(
+        self, mocked_response, fixture_cmd, fixture_get_iot_central_tokens
+    ):
         mocked_response.add(
             method=responses.GET,
             url="https://{}/twins/{}".format(resource, device_id),
@@ -137,9 +149,7 @@ class TestDeviceTwinShow:
 
         yield mocked_response
 
-    def test_device_twin_show_calls_get_twin(
-        self, service_client
-    ):
+    def test_device_twin_show_calls_get_twin(self, service_client):
         result = commands_device_twin.device_twin_show(fixture_cmd, device_id, app_id)
         assert result == device_twin_result
 
