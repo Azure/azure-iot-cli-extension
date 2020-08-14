@@ -93,3 +93,8 @@ def load_central_commands(self, _):
         "iot central app device-twin", command_type=central_device_twin_ops
     ) as cmd_group:
         cmd_group.command("show", "device_twin_show")
+
+    with self.command_group(
+        "iot central dps-keygen", command_type=central_device_ops
+    ) as cmd_group:
+        cmd_group.command("create", "generate_device_key")

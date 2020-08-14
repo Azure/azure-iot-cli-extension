@@ -120,3 +120,18 @@ def get_credentials(
     return provider.get_device_credentials(
         device_id=device_id, central_dns_suffix=central_dns_suffix,
     )
+
+
+def generate_device_key(
+    cmd, masterkey, device_id,
+):
+    from hashlib import sha256
+    import hmac
+    import base64
+
+    secret = base64.b64decode(masterkey)
+    signature = base64.b64encode(
+        hmac.new(secret, msg=device_id.encode("utf8"), digestmod=sha256).digest()
+    )
+
+    return signature

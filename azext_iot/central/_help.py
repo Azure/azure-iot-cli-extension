@@ -33,6 +33,7 @@ def load_central_help():
     _load_central_device_templates_help()
     _load_central_device_twin_help()
     _load_central_monitors_help()
+    _load_central_dps_keygen_help()
 
 
 def _load_central_devices_help():
@@ -393,6 +394,28 @@ def _load_central_device_twin_help():
     ] = """
         type: command
         short-summary: Get the device twin from IoT Hub.
+    """
+
+
+def _load_central_dps_keygen_help():
+    helps[
+        "iot central dps-keygen"
+    ] = """
+        type: group
+        short-summary: Generate device keys
+    """
+
+    helps[
+        "iot central dps-keygen create"
+    ] = """
+        type: command
+        short-summary: Create device key
+        Long-summary: Generate device key from primary group SAS token. Generated SAS key is used to connect the device to central.
+        examples:
+        - name: Basic usage
+          text: >
+            az iot central dps-keygen create --masterkey {masterKey} --d {deviceId}
+
     """
 
 

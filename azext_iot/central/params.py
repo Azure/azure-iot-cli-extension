@@ -148,3 +148,11 @@ def load_central_arguments(self, _):
             help="Maximum number of messages to recieve from target device before terminating connection."
             "Use 0 for infinity.",
         )
+
+    with self.argument_context("iot central dps-keygen") as context:
+
+        context.argument(
+            "masterkey",
+            options_list=["--masterkey", "-k"],
+            help="Masterkey - Primary group SAS token to generate device keys",
+        )
