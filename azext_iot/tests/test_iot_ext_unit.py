@@ -44,9 +44,9 @@ module_id = "mymod"
 config_id = "myconfig"
 message_etag = "3k28zb44-0d00-4ddd-ade3-6110eb94c476"
 c2d_purge_response = {
-  "deviceId": device_id,
-  "moduleId": None,
-  "totalMessagesPurged": 3
+    "deviceId": device_id,
+    "moduleId": None,
+    "totalMessagesPurged": 3
 }
 
 generic_cs_template = "HostName={};SharedAccessKeyName={};SharedAccessKey={}"
@@ -1626,7 +1626,10 @@ class TestCloudToDeviceMessaging:
             assert result["properties"]["system"]["iothub-expiry"] == sample_c2d_receive["headers"]["iothub-expiry"]
             assert result["properties"]["system"]["iothub-enqueuedtime"] == sample_c2d_receive["headers"]["iothub-enqueuedtime"]
             assert result["properties"]["system"]["iothub-messageid"] == sample_c2d_receive["headers"]["iothub-messageid"]
-            assert result["properties"]["system"]["iothub-sequencenumber"] == sample_c2d_receive["headers"]["iothub-sequencenumber"]
+            assert (
+                result["properties"]["system"]["iothub-sequencenumber"]
+                == sample_c2d_receive["headers"]["iothub-sequencenumber"]
+            )
             assert result["properties"]["system"]["iothub-userid"] == sample_c2d_receive["headers"]["iothub-userid"]
             assert result["properties"]["system"]["iothub-to"] == sample_c2d_receive["headers"]["iothub-to"]
 
@@ -1744,12 +1747,13 @@ class TestCloudToDeviceMessaging:
 
         assert method == "DELETE"
         assert "https://{}/devices/{}/commands".format(
-                mock_target["entity"], device_id
-            ) in url
+            mock_target["entity"], device_id
+        ) in url
         assert result
         assert result.total_messages_purged == 3
         assert result.device_id == device_id
         assert not result.module_id
+
 
 class TestSasTokenAuth:
     def test_generate_sas_token(self):
