@@ -12,19 +12,18 @@ def load_central_help():
         "iot central"
     ] = """
         type: group
-        short-summary: Manage Azure Central (IoT Central) solutions & infrastructure
-    """
+        short-summary: Manage IoT Central resources.
+        long-summary: |
+            IoT Central is an IoT application platform that reduces the burden and cost of developing, managing, and maintaining enterprise-grade IoT solutions. Choosing to build with IoT Central gives you the opportunity to focus time, money, and energy on transforming your business with IoT data, rather than just maintaining and updating a complex and continually evolving IoT infrastructure.
+            IoT Central documentation is available at https://aka.ms/iotcentral-documentation
+        """
 
     helps[
         "iot central app"
     ] = """
         type: group
-        short-summary: |
-                    Manage Azure IoT Central applications.
-
-                    To use this command group, the user must be logged through the `az login` command,
-                    have the correct tenant set (the users home tenant) and
-                    have access to the application through http://apps.azureiotcentral.com"
+        short-summary: Manage IoT Central applications.
+        long-summary: Create, delete, view, and update your IoT Central apps.
         """
 
     _load_central_devices_help()
@@ -103,7 +102,7 @@ def _load_central_devices_help():
 
         examples:
         - name: Get device credentials for a device
-          text: > 
+          text: >
             az iot central device show-credentials
             --app-id {appid}
             --device-id {deviceid}
