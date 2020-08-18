@@ -16,6 +16,7 @@ def load_central_help():
         long-summary: |
             IoT Central is an IoT application platform that reduces the burden and cost of developing, managing, and maintaining enterprise-grade IoT solutions. Choosing to build with IoT Central gives you the opportunity to focus time, money, and energy on transforming your business with IoT data, rather than just maintaining and updating a complex and continually evolving IoT infrastructure.
             IoT Central documentation is available at https://aka.ms/iotcentral-documentation
+            For more information on command usage, see: aka.ms/azure-cli-iot-ext
         """
 
     helps[

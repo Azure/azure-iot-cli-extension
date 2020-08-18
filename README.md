@@ -90,7 +90,8 @@ Subgroups:
     diagnostics     [Preview] : Perform application and device level diagnostics.
     user            [Preview] : Manage and configure IoT Central users.
 
-For more specific examples, use: az find "az iot central"```
+For more specific examples, use: az find "az iot central"
+```
 </details>
 
 <details>
