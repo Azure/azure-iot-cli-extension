@@ -761,3 +761,20 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         # one additional floating message still in queue
         assert purge_result['totalMessagesPurged'] == num_messages
         assert not purge_result['moduleId']
+
+        # Receive with auto-ack
+        for ack_test in ['complete', 'abandon', 'reject']:
+            self.cmd(
+                "iot device c2d-message send -d {} --login {}".format(
+                    device_ids[0], self.connection_string
+                ),
+                checks=self.is_empty(),
+            )
+            result = self.cmd(
+                "iot device c2d-message receive -d {} --login {} --ack {}".format(
+                    device_ids[0], self.connection_string, ack_test
+                )
+            ).get_output_in_json()
+            assert result["ack"] == ack_test
+            assert json.dumps(result['data'])
+            assert json.dumps(result['properties']['system'])
