@@ -1455,6 +1455,21 @@ class TestCloudToDeviceMessaging:
 
         yield (mocked_response, payload)
 
+
+    @pytest.fixture()
+    def c2d_purge_scenario(self, fixture_ghcs, mocked_response):
+        import json
+        mocked_response.add(
+            method=responses.DELETE,
+            url="https://{}/devices/{}/commands".format(
+                mock_target["entity"], device_id
+            ),
+            body=json.dumps(c2d_purge_response),
+            content_type='application/json',
+            status=200,
+        )
+        yield mocked_response
+
     def test_c2d_receive(self, c2d_receive_scenario):
         service_client = c2d_receive_scenario[0]
         sample_c2d_receive = c2d_receive_scenario[1]
@@ -1572,6 +1587,20 @@ class TestCloudToDeviceMessaging:
                 fixture_cmd, device_id, hub_name=mock_target["entity"], etag=""
             )
 
+    def test_c2d_message_purge(self, c2d_purge_scenario):
+        result = subject.iot_c2d_message_purge(fixture_cmd, device_id)
+        request = c2d_purge_scenario.calls[0].request
+        url = request.url
+        method = request.method
+
+        assert method == "DELETE"
+        assert "https://{}/devices/{}/commands".format(
+                mock_target["entity"], device_id
+            ) in url
+        assert result
+        assert result.total_messages_purged == 3
+        assert result.device_id == device_id
+        assert not result.module_id
 
 class TestSasTokenAuth:
     def test_generate_sas_token(self):

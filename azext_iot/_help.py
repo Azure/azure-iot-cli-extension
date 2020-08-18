@@ -737,6 +737,13 @@ helps[
 """
 
 helps[
+    "iot device c2d-message purge"
+] = """
+    type: command
+    short-summary: Purge cloud-to-device message queue for a target device.
+"""
+
+helps[
     "iot device c2d-message send"
 ] = """
     type: command

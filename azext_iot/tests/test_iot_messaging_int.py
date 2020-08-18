@@ -742,3 +742,22 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             "iot hub monitor-feedback --login {} -w {} -y".format(self.connection_string, msg_id),
             ["description: Message rejected"],
         )
+
+        # purge messages
+        num_messages = 3
+        for i in range(num_messages):
+            self.cmd(
+                "iot device c2d-message send -d {} --login {}".format(
+                    device_ids[0], self.connection_string
+                ),
+                checks=self.is_empty(),
+            )
+        purge_result = self.cmd(
+            "iot device c2d-message purge -d {} --login {}".format(
+                device_ids[0], self.connection_string
+            )
+        ).get_output_in_json()
+        assert purge_result['deviceId'] == device_ids[0]
+        # one additional floating message still in queue
+        assert purge_result['totalMessagesPurged'] == num_messages
+        assert not purge_result['moduleId']

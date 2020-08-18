@@ -2069,6 +2069,19 @@ def iot_simulate_device(
             token.set()
 
 
+def iot_c2d_message_purge(
+    cmd, device_id, hub_name=None, resource_group_name=None, login=None,
+):
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+    )
+    resolver = SdkResolver(target=target)
+    service_sdk = resolver.get_sdk(SdkType.service_sdk)
+
+    return service_sdk.registry_manager.purge_command_queue(device_id)
+
+
 def _iot_simulate_get_default_properties(protocol):
     default_properties = {}
     is_mqtt = protocol == ProtocolType.mqtt.name
