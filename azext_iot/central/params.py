@@ -43,16 +43,6 @@ def load_central_arguments(self, _):
         context.argument("minimum_severity", arg_type=severity_type)
         context.argument("role", arg_type=role_type)
         context.argument(
-            "instance_of",
-            options_list=["--instance-of"],
-            help="Central template id. Example: urn:ojpkindbz:modelDefinition:iild3tm_uo",
-        )
-        context.argument(
-            "device_name",
-            options_list=["--device-name"],
-            help="Human readable device name. Example: Fridge",
-        )
-        context.argument(
             "interface_id",
             options_list=["--interface-id", "-i"],
             help="Interface name as specified in the device template. Example: c2dTestingTemplate_356",
@@ -61,13 +51,6 @@ def load_central_arguments(self, _):
             "command_name",
             options_list=["--command-name", "--cn"],
             help="Command name as specified in device template. Example: run_firmware_update",
-        )
-        context.argument(
-            "simulated",
-            options_list=["--simulated"],
-            arg_type=get_three_state_flag(),
-            help="Add this flag if you would like IoT Central to set this up as a simulated device. "
-            "--instance-of is required if this is true",
         )
         context.argument(
             "device_template_id",
@@ -97,27 +80,9 @@ def load_central_arguments(self, _):
             "This enables running cli commands against non public/prod environments",
         )
         context.argument(
-            "module_id", options_list=["--module-id", "-m"], help="Iot Edge Module ID",
-        )
-        context.argument(
             "assignee",
             options_list=["--user-id", "--assignee"],
             help="ID associated with the user. ",
-        )
-        context.argument(
-            "email",
-            options_list=["--email"],
-            help="Email address of user to be added to the app. ",
-        )
-        context.argument(
-            "object_id",
-            options_list=["--object-id", "--oid"],
-            help="Object ID for service principal to be added to the app. Tenant ID must also be specified. ",
-        )
-        context.argument(
-            "tenant_id",
-            options_list=["--tenant-id", "--tnid"],
-            help="Tenant ID for service principal to be added to the app. Object ID must also be specified. ",
         )
 
         context.argument(
@@ -126,13 +91,57 @@ def load_central_arguments(self, _):
             help="Unique ID for the API token. ",
         )
 
+    with self.argument_context("iot central device create") as context:
+        context.argument(
+            "instance_of",
+            options_list=["--instance-of"],
+            help="Central template id. Example: urn:ojpkindbz:modelDefinition:iild3tm_uo",
+        )
+        context.argument(
+            "simulated",
+            options_list=["--simulated"],
+            arg_type=get_three_state_flag(),
+            help="Add this flag if you would like IoT Central to set this up as a simulated device. "
+            "--instance-of is required if this is true",
+        )
+
+    with self.argument_context("iot central user create") as context:
+        context.argument(
+            "tenant_id",
+            options_list=["--tenant-id", "--tnid"],
+            help="Tenant ID for service principal to be added to the app. Object ID must also be specified. ",
+        )
+        context.argument(
+            "object_id",
+            options_list=["--object-id", "--oid"],
+            help="Object ID for service principal to be added to the app. Tenant ID must also be specified. ",
+        )
+        context.argument(
+            "email",
+            options_list=["--email"],
+            help="Email address of user to be added to the app. ",
+        )
+
+    with self.argument_context("iot central device create") as context:
+        context.argument(
+            "device_name",
+            options_list=["--device-name"],
+            help="Human readable device name. Example: Fridge",
+        )
+
     with self.argument_context("iot central app monitor-events") as context:
         context.argument("timeout", arg_type=event_timeout_type)
         context.argument("properties", arg_type=event_msg_prop_type)
+        context.argument(
+            "module_id", options_list=["--module-id", "-m"], help="Iot Edge Module ID",
+        )
 
     with self.argument_context("iot central diagnostics monitor-events") as context:
         context.argument("timeout", arg_type=event_timeout_type)
         context.argument("properties", arg_type=event_msg_prop_type)
+        context.argument(
+            "module_id", options_list=["--module-id", "-m"], help="Iot Edge Module ID",
+        )
         context.argument(
             "module_id", options_list=["--module-id", "-m"], help="Iot Edge Module ID",
         )
@@ -154,4 +163,7 @@ def load_central_arguments(self, _):
             type=int,
             help="Maximum number of messages to recieve from target device before terminating connection."
             "Use 0 for infinity.",
+        )
+        context.argument(
+            "module_id", options_list=["--module-id", "-m"], help="Iot Edge Module ID",
         )

@@ -83,7 +83,7 @@ Group
         IoT Central documentation is available at https://aka.ms/iotcentral-documentation.
 
 Subgroups:
-    api-token       [Preview] : Create and Manage API tokens .
+    api-token       [Preview] : Create and Manage API tokens.
     app                       : Manage IoT Central applications.
     device          [Preview] : Manage and configure IoT Central devices.
     device-template [Preview] : Manage and configure IoT Central device templates.
