@@ -1604,7 +1604,13 @@ class TestCloudToDeviceMessaging:
         timeout = 120
         for ack in ["complete", "reject", "abandon"]:
             result = subject.iot_c2d_message_receive(
-                fixture_cmd, device_id, mock_target["entity"], timeout, ack=ack
+                fixture_cmd,
+                device_id,
+                mock_target["entity"],
+                timeout,
+                complete=(ack == 'complete'),
+                reject=(ack == 'reject'),
+                abandon=(ack == 'abandon')
             )
             retrieve, action = service_client.calls[0], service_client.calls[1]
 
@@ -1663,6 +1669,31 @@ class TestCloudToDeviceMessaging:
                 assert method == "POST"
                 assert "/abandon" in url
             service_client.calls.reset()
+
+    def test_c2d_receive_ack_errors(self):
+        with pytest.raises(CLIError):
+            subject.iot_c2d_message_receive(
+                fixture_cmd,
+                device_id,
+                hub_name=mock_target["entity"],
+                abandon=True,
+                complete=True,
+            )
+            subject.iot_c2d_message_receive(
+                fixture_cmd,
+                device_id,
+                hub_name=mock_target["entity"],
+                abandon=False,
+                complete=True,
+                reject=True,
+            )
+            subject.iot_c2d_message_receive(
+                fixture_cmd,
+                device_id,
+                hub_name=mock_target["entity"],
+                complete=True,
+                reject=True,
+            )
 
     def test_c2d_complete(self, c2d_ack_complete_scenario):
         service_client = c2d_ack_complete_scenario

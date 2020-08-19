@@ -727,6 +727,21 @@ helps[
 ] = """
     type: command
     short-summary: Receive a cloud-to-device message.
+    long-summary: |
+      Note: Only one message ack argument [--complete, --reject, --abandon] will be accepted.
+    examples:
+    - name: Basic usage
+      text: >
+        az iot device c2d-message receive -d {device_id} -n {hub_name} -g {resource_group}
+    - name: Receive a message and set a lock timeout of 30 seconds for that message
+      text: >
+        az iot device c2d-message receive -d {device_id} -n {hub_name} -g {resource_group} --lt {30}
+    - name: Receive a message and ack it as 'complete' after it is received
+      text: >
+        az iot device c2d-message receive -d {device_id} -n {hub_name} -g {resource_group} --complete
+    - name: Receive a message and reject it after it is received
+      text: >
+        az iot device c2d-message receive -d {device_id} -n {hub_name} -g {resource_group} --reject
 """
 
 helps[

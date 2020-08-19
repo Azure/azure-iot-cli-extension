@@ -616,10 +616,25 @@ def load_arguments(self, _):
 
     with self.argument_context("iot device c2d-message receive") as context:
         context.argument(
-            "ack",
-            options_list=["--ack"],
-            arg_type=get_enum_type(SettleType),
-            help="If set, the c2d receive operation will also ack the message after receipt.",
+            "abandon",
+            arg_group="Message Ack",
+            options_list=["--abandon"],
+            arg_type=get_three_state_flag(),
+            help="Abandon the cloud-to-device message after receipt.",
+        )
+        context.argument(
+            "complete",
+            arg_group="Message Ack",
+            options_list=["--complete"],
+            arg_type=get_three_state_flag(),
+            help="Complete the cloud-to-device message after receipt.",
+        )
+        context.argument(
+            "reject",
+            arg_group="Message Ack",
+            options_list=["--reject"],
+            arg_type=get_three_state_flag(),
+            help="Reject the cloud-to-device message after receipt.",
         )
 
     with self.argument_context("iot device upload-file") as context:
