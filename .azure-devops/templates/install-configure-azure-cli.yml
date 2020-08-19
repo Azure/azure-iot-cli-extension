@@ -7,7 +7,7 @@ steps:
         pip install virtualenv
         python -m virtualenv $(iot_ext_venv)/
         source ./$(iot_ext_venv)/bin/activate
-        git clone --single-branch -b master https://github.com/Azure/azure-cli.git ../azure-cli
+        git clone --single-branch -b dev https://github.com/Azure/azure-cli.git ../azure-cli
         pip install azdev
         azdev --version
         azdev setup -c ../azure-cli
