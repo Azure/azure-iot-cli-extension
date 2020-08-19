@@ -3,6 +3,68 @@
 Release History
 ===============
 
+0.9.8
++++++++++++++++
+General changes
+
+* Starting with v0.9.8 of the IoT extension, the minCliCoreVersion has been bumped to 2.3.1. This sets a comfortable minimum desired experience we want for our users.
+
+Introducing preview commands for the Azure IoT Product Certification service
+
+* A new IoT root command group 'az iot product' has been added
+
+  * Use 'az iot product requirement' to manage product certification requirements
+  * Use 'az iot product test' to manage device tests for certification
+  
+    * The product test command group encompasses test cases, runs and tasks
+
+IoT Central updates
+
+* Introduces the 'az iot central app user' preview command group for managing application users and service principals
+* Introduces the 'az iot central app api-token' preview command group for managing application api tokens
+* Removal of deprecated command groups and commands
+
+IoT Hub updates
+
+* All "... show-connection-string" based commands are deprecated in favor of "... connection-string show" canonical Az CLI style.
+
+  * The show connection string command for a target IoT Hub has moved to the IoT extension.
+  * 'az iot hub connection-string show' supports a --default-eventhub flag which indicates the operation will construct a connection string for the default eventhub endpoint of the target IoT Hub.
+* Export/Import device identity commands support reading blob container SAS URI's via file
+
+Azure Digital Twins updates
+
+* The 'location' argument for 'az dt create' is now optional. If no location is provided, the location of the target resource group is used.
+
+
+0.9.7
++++++++++++++++
+Refreshes commands for the Azure IoT Plug & Play summer refresh
+
+* The existing Plug & Play preview commands across Azure CLI and the IoT extension have been removed and replaced with a completely new commands. If you still need the legacy preview experience, then you can leverage older versions of the CLI and extension.
+* The new commands exist entirely in the extension with the following command groups:
+
+  * az iot pnp repo ## For tenant repository configuration
+  * az iot pnp model ## For managing repository models and related content
+  * az iot pnp role-assignment ## For managing role assignments for model repo assets
+  * az iot pnp twin ## For interacting with the digital twin of a Plug & Play device
+
+Introduces new preview Azure IoT Central commands
+
+* az iot central app monitor-properties
+* az iot central app validate-properties
+* az iot central app device run-command
+* az iot central app device show-command-history
+* az iot central app device show-credentials
+
+Device Provisioning Service update
+
+* DPS enrollments now support the custom allocation policy resolving issue #200
+
+0.9.6
++++++++++++++++
+* Fixes event monitor initialization issue.
+
 0.9.5
 +++++++++++++++
 * IoT Hub commands now support dynamic privileged policy discovery. `iothubhowner` is no longer relied on. Instead any policy that has `RegistryWrite`, `ServiceConnect` and `DeviceConnect` permissions will be used.
