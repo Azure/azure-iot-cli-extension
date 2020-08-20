@@ -72,34 +72,25 @@ Commands:
   <summary>IoT Central</summary>
 
 ```
-$ az iot central app -h
+$ az iot central -h
 Group
-    az iot central app : Manage Azure IoT Central applications.
-
-    To use this command group, the user must be logged through the `az login` command,
-    have the correct tenant set (the users home tenant) and
-    have access to the application through http://apps.azureiotcentral.com".
+    az iot central : Manage IoT Central resources.
+        IoT Central is an IoT application platform that reduces the burden and cost of developing,
+        managing, and maintaining enterprise-grade IoT solutions. Choosing to build with IoT Central
+        gives you the opportunity to focus time, money, and energy on transforming your business
+        with IoT data, rather than just maintaining and updating a complex and continually evolving
+        IoT infrastructure.
+        IoT Central documentation is available at https://aka.ms/iotcentral-documentation.
 
 Subgroups:
-    api-token           [Preview] : Create and Manage API tokens .
-    device              [Preview] : Manage and configure IoT Central devices.
-    device-template     [Preview] : Manage and configure IoT Central device templates.
-    device-twin                   : Manage IoT Central device twins.
-    user                [Preview] : Manage and configure IoT Central users.
+    api-token       [Preview] : Create and Manage API tokens.
+    app                       : Manage IoT Central applications.
+    device          [Preview] : Manage and configure IoT Central devices.
+    device-template [Preview] : Manage and configure IoT Central device templates.
+    diagnostics     [Preview] : Perform application and device level diagnostics.
+    user            [Preview] : Manage and configure IoT Central users.
 
-Commands:
-    create                        : Create an IoT Central application.
-    delete                        : Delete an IoT Central application.
-    list                          : List IoT Central applications.
-    monitor-events                : Monitor device telemetry & messages sent to the IoT Hub for an
-                                    IoT Central app.
-    monitor-properties  [Preview] : Monitor desired and reported properties sent to/from
-                                    the IoT Hub for an IoT Central app.
-    show                          : Get the details of an IoT Central application.
-    update                        : Update metadata for an IoT Central application.
-    validate-messages   [Preview] : Validate messages sent to the IoT Hub for an IoT
-                                    Central app.
-    validate-properties [Preview] : Validate reported properties sent to IoT Central app.
+For more specific examples, use: az find "az iot central"
 ```
 </details>
 

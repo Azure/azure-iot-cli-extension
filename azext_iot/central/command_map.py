@@ -37,16 +37,30 @@ def load_central_commands(self, _):
     """
     Load CLI commands
     """
-    with self.command_group(
-        "iot central app", command_type=central_monitor_ops,
-    ) as cmd_group:
-        cmd_group.command("monitor-events", "monitor_events")
-        cmd_group.command("validate-messages", "validate_messages", is_preview=True)
-        cmd_group.command("monitor-properties", "monitor_properties", is_preview=True)
-        cmd_group.command("validate-properties", "validate_properties", is_preview=True)
 
     with self.command_group(
-        "iot central app user", command_type=central_user_ops, is_preview=True,
+        "iot central diagnostics", command_type=central_monitor_ops, is_preview=True
+    ) as cmd_group:
+        cmd_group.command("monitor-events", "monitor_events")
+        cmd_group.command(
+            "validate-messages", "validate_messages",
+        )
+        cmd_group.command(
+            "monitor-properties", "monitor_properties",
+        )
+        cmd_group.command(
+            "validate-properties", "validate_properties",
+        )
+
+    with self.command_group(
+        "iot central diagnostics", command_type=central_device_ops, is_preview=True
+    ) as cmd_group:
+        cmd_group.command(
+            "registration-summary", "registration_summary",
+        )
+
+    with self.command_group(
+        "iot central user", command_type=central_user_ops, is_preview=True,
     ) as cmd_group:
         cmd_group.command("create", "add_user")
         cmd_group.command("list", "list_users")
@@ -54,9 +68,7 @@ def load_central_commands(self, _):
         cmd_group.command("delete", "delete_user")
 
     with self.command_group(
-        "iot central app api-token",
-        command_type=central_api_token_ops,
-        is_preview=True,
+        "iot central api-token", command_type=central_api_token_ops, is_preview=True,
     ) as cmd_group:
         cmd_group.command("create", "add_api_token")
         cmd_group.command("list", "list_api_tokens")
@@ -64,22 +76,23 @@ def load_central_commands(self, _):
         cmd_group.command("delete", "delete_api_token")
 
     with self.command_group(
-        "iot central app device", command_type=central_device_ops, is_preview=True,
+        "iot central device", command_type=central_device_ops, is_preview=True,
     ) as cmd_group:
         # cmd_group.command("list", "list_devices")
         cmd_group.command("show", "get_device")
         cmd_group.command("create", "create_device")
         cmd_group.command("delete", "delete_device")
-        cmd_group.command("run-command", "run_command")
-        cmd_group.command("show-command-history", "get_command_history")
         cmd_group.command("registration-info", "registration_info")
-        cmd_group.command(
-            "registration-summary", "registration_summary",
-        )
         cmd_group.command("show-credentials", "get_credentials")
 
     with self.command_group(
-        "iot central app device-template",
+        "iot central device command", command_type=central_device_ops, is_preview=True,
+    ) as cmd_group:
+        cmd_group.command("run", "run_command")
+        cmd_group.command("history", "get_command_history")
+
+    with self.command_group(
+        "iot central device-template",
         command_type=central_device_templates_ops,
         is_preview=True,
     ) as cmd_group:
@@ -90,6 +103,33 @@ def load_central_commands(self, _):
         cmd_group.command("delete", "delete_device_template")
 
     with self.command_group(
-        "iot central app device-twin", command_type=central_device_twin_ops
+        "iot central device twin", command_type=central_device_twin_ops, is_preview=True
     ) as cmd_group:
-        cmd_group.command("show", "device_twin_show")
+        cmd_group.command(
+            "show", "device_twin_show",
+        )
+
+    # TODO: Delete this by end of Dec 2020
+    _load_central_deprecated_commands(self, _)
+
+
+def _load_central_deprecated_commands(self, _):
+    with self.command_group(
+        "iot central app device-twin",
+        command_type=central_device_twin_ops,
+        deprecate_info=self.deprecate(redirect="iot central device twin"),
+    ) as cmd_group:
+        cmd_group.command(
+            "show", "device_twin_show",
+        )
+
+    with self.command_group(
+        "iot central app", command_type=central_monitor_ops,
+    ) as cmd_group:
+        cmd_group.command(
+            "monitor-events",
+            "monitor_events",
+            deprecate_info=self.deprecate(
+                redirect="iot central diagnostics monitor-events"
+            ),
+        )

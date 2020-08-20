@@ -51,6 +51,22 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             expect_failure=True,
         )
 
+        # Verify incorrect app-id throws error
+        self.cmd(
+            "iot central device twin show --app-id incorrect-app --device-id {}".format(
+                device_id
+            ),
+            expect_failure=True,
+        )
+
+        # Verify incorrect device-id throws error
+        self.cmd(
+            "iot central device twin show --app-id {} --device-id incorrect-device".format(
+                APP_ID
+            ),
+            expect_failure=True,
+        )
+
         self._delete_device(device_id)
 
     def test_central_device_twin_show_success(self):
@@ -67,8 +83,47 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             checks=[self.check("deviceId", device_id)],
         )
 
+        self.cmd(
+            "iot central device twin show --app-id {} --device-id {}".format(
+                APP_ID, device_id
+            ),
+            checks=[self.check("deviceId", device_id)],
+        )
+
         self._delete_device(device_id)
         self._delete_device_template(template_id)
+
+    # TODO: Delete this by end of Dec 2020
+    def test_central_monitor_events_deprecated(self):
+        (template_id, _) = self._create_device_template()
+        (device_id, _) = self._create_device(instance_of=template_id)
+        credentials = self._get_credentials(device_id)
+
+        device_client = helpers.dps_connect_device(device_id, credentials)
+
+        payload = {"Bool": True}
+        msg = Message(
+            data=json.dumps(payload),
+            content_encoding="utf-8",
+            content_type="application/json",
+        )
+        device_client.send_message(msg)
+
+        enqueued_time = utility.calculate_millisec_since_unix_epoch_utc() - 10000
+
+        # Test with invalid app-id
+        self.cmd(
+            "iot central app monitor-events --app-id {} -y".format(APP_ID + "zzz"),
+            expect_failure=True,
+        )
+
+        # Ensure no failure
+        output = self._get_monitor_events_output_deprecated(device_id, enqueued_time)
+
+        self._delete_device(device_id)
+        self._delete_device_template(template_id)
+        assert '"Bool": true' in output
+        assert device_id in output
 
     def test_central_monitor_events(self):
         (template_id, _) = self._create_device_template()
@@ -89,7 +144,9 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
         # Test with invalid app-id
         self.cmd(
-            "iot central app monitor-events --app-id {} -y".format(APP_ID + "zzz"),
+            "iot central diagnostics monitor-events --app-id {} -y".format(
+                APP_ID + "zzz"
+            ),
             expect_failure=True,
         )
 
@@ -209,7 +266,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         (device_id, device_name) = self._create_device()
 
         self.cmd(
-            "iot central app device show --app-id {} -d {}".format(APP_ID, device_id),
+            "iot central device show --app-id {} -d {}".format(APP_ID, device_id),
             checks=[
                 self.check("approved", True),
                 self.check("displayName", device_name),
@@ -224,13 +281,13 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         users = self._create_users()
 
         self.cmd(
-            "iot central app user show --app-id {} --user-id {}".format(
+            "iot central user show --app-id {} --user-id {}".format(
                 APP_ID, users[0].get("id")
             ),
         )
 
         result = self.cmd(
-            "iot central app user list --app-id {}".format(APP_ID,),
+            "iot central user list --app-id {}".format(APP_ID,),
         ).get_output_in_json()
 
         user_list = result.get("value")
@@ -245,13 +302,13 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         tokens = self._create_api_tokens()
 
         self.cmd(
-            "iot central app api-token show --app-id {} --token-id {}".format(
+            "iot central api-token show --app-id {} --token-id {}".format(
                 APP_ID, tokens[0].get("id")
             ),
         )
 
         result = self.cmd(
-            "iot central app api-token list --app-id {}".format(APP_ID,),
+            "iot central api-token list --app-id {}".format(APP_ID,),
         ).get_output_in_json()
 
         token_list = result.get("value")
@@ -272,7 +329,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         (template_id, template_name) = self._create_device_template()
 
         self.cmd(
-            "iot central app device-template show --app-id {} --device-template-id {}".format(
+            "iot central device-template show --app-id {} --device-template-id {}".format(
                 APP_ID, template_id
             ),
             checks=[
@@ -290,7 +347,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         )
 
         result = self.cmd(
-            "iot central app device registration-info --app-id {} -d {}".format(
+            "iot central device registration-info --app-id {} -d {}".format(
                 APP_ID, device_id
             )
         )
@@ -331,7 +388,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         self._wait_for_provisioned(device_id)
 
         run_command_result = self.cmd(
-            "iot central app device run-command"
+            "iot central device command run"
             " -n {}"
             " -d {}"
             " -i {}"
@@ -343,7 +400,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         )
 
         show_command_result = self.cmd(
-            "iot central app device show-command-history"
+            "iot central device command history"
             " -n {}"
             " -d {}"
             " -i {}"
@@ -368,7 +425,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         (device_id, device_name) = self._create_device()
 
         result = self.cmd(
-            "iot central app device registration-info --app-id {} -d {}".format(
+            "iot central device registration-info --app-id {} -d {}".format(
                 APP_ID, device_id
             )
         )
@@ -405,7 +462,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
     def test_central_device_registration_summary(self):
 
         result = self.cmd(
-            "iot central app device registration-summary --app-id {}".format(APP_ID)
+            "iot central diagnostics registration-summary --app-id {}".format(APP_ID)
         )
 
         json_result = result.get_output_in_json()
@@ -424,7 +481,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         device_id = self.create_random_name(prefix="aztest", length=24)
         device_name = self.create_random_name(prefix="aztest", length=24)
 
-        command = "iot central app device create --app-id {} -d {} --device-name {}".format(
+        command = "iot central device create --app-id {} -d {} --device-name {}".format(
             APP_ID, device_id, device_name
         )
         checks = [
@@ -453,7 +510,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         for role in Role:
             user_id = self.create_random_name(prefix="aztest", length=24)
             email = user_id + "@microsoft.com"
-            command = "iot central app user create --app-id {} --user-id {} -r {} --email {}".format(
+            command = "iot central user create --app-id {} --user-id {} -r {} --email {}".format(
                 APP_ID, user_id, role.name, email,
             )
 
@@ -469,9 +526,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
     def _delete_user(self, user_id) -> None:
         self.cmd(
-            "iot central app user delete --app-id {} --user-id {}".format(
-                APP_ID, user_id
-            ),
+            "iot central user delete --app-id {} --user-id {}".format(APP_ID, user_id),
             checks=[self.check("result", "success")],
         )
 
@@ -480,7 +535,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         tokens = []
         for role in Role:
             token_id = self.create_random_name(prefix="aztest", length=24)
-            command = "iot central app api-token create --app-id {} --token-id {} -r {}".format(
+            command = "iot central api-token create --app-id {} --token-id {} -r {}".format(
                 APP_ID, token_id, role.name,
             )
 
@@ -494,16 +549,14 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
     def _delete_api_token(self, token_id) -> None:
         self.cmd(
-            "iot central app api-token delete --app-id {} --token-id {}".format(
+            "iot central api-token delete --app-id {} --token-id {}".format(
                 APP_ID, token_id
             ),
             checks=[self.check("result", "success")],
         )
 
     def _wait_for_provisioned(self, device_id):
-        command = "iot central app device show --app-id {} -d {}".format(
-            APP_ID, device_id
-        )
+        command = "iot central device show --app-id {} -d {}".format(APP_ID, device_id)
         while True:
             result = self.cmd(command)
             device = result.get_output_in_json()
@@ -517,7 +570,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
     def _delete_device(self, device_id) -> None:
         self.cmd(
-            "iot central app device delete --app-id {} -d {}".format(APP_ID, device_id),
+            "iot central device delete --app-id {} -d {}".format(APP_ID, device_id),
             checks=[self.check("result", "success")],
         )
 
@@ -529,7 +582,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         template_id = template_name + "id"
 
         self.cmd(
-            "iot central app device-template create --app-id {} --device-template-id {} -k '{}'".format(
+            "iot central device-template create --app-id {} --device-template-id {} -k '{}'".format(
                 APP_ID, template_id, device_template_path
             ),
             checks=[
@@ -542,7 +595,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
     def _delete_device_template(self, template_id):
         attempts = range(0, 10)
-        command = "iot central app device-template delete --app-id {} --device-template-id {}".format(
+        command = "iot central device-template delete --app-id {} --device-template-id {}".format(
             APP_ID, template_id
         )
 
@@ -556,7 +609,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
     def _get_credentials(self, device_id):
         return self.cmd(
-            "iot central app device show-credentials --app-id {} -d {}".format(
+            "iot central device show-credentials --app-id {} -d {}".format(
                 APP_ID, device_id
             )
         ).get_output_in_json()
@@ -568,7 +621,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             asserts = []
 
         output = self.command_execute_assert(
-            "iot central app validate-messages --app-id {} -d {} --et {} --duration {} --mm {} -y --style json".format(
+            "iot central diagnostics validate-messages --app-id {} -d {} --et {} --duration {} --mm {} -y --style json".format(
                 APP_ID, device_id, enqueued_time, duration, max_messages
             ),
             asserts,
@@ -580,6 +633,25 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         return output
 
     def _get_monitor_events_output(self, device_id, enqueued_time, asserts=None):
+        if not asserts:
+            asserts = []
+
+        output = self.command_execute_assert(
+            "iot central diagnostics monitor-events -n {} -d {} --et {} --to 1 -y".format(
+                APP_ID, device_id, enqueued_time
+            ),
+            asserts,
+        )
+
+        if not output:
+            output = ""
+
+        return output
+
+    # TODO: Delete this by end of Dec 2020
+    def _get_monitor_events_output_deprecated(
+        self, device_id, enqueued_time, asserts=None
+    ):
         if not asserts:
             asserts = []
 

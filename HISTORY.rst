@@ -3,6 +3,24 @@
 Release History
 ===============
 
+0.9.9
++++++++++++++++
+
+IoT Central updates
+* Current release involves re-grouping of IoT central commands.
+  * 'az iot central app device-twin' deprecated use 'az iot central device twin' instead. Deprecated command group is planned to be removed by December 2020
+  * 'az iot central app monitor-events' deprecated use 'az iot central diagnostics monitor-events' instead. Deprecated command is planned to be removed by December 2020
+  * commands listed below are in preview
+    * Introduces 'az iot central diagnostics' preview command group to perform application and device level diagnostics
+      * 'az iot central app device registration-summary' moved to 'az iot central diagnostics registration-summary'
+      * 'az iot central app monitor-properties' moved to 'az iot central diagnostics monitor-properties'
+      * 'az iot central app validate-messages' moved to 'az iot central diagnostics validate-messages'
+      * 'az iot central app validate-properties' moved to 'az iot central diagnostics validate-properties'
+      * 'az iot central diagnostics monitor-events' added to support deprecation of 'az iot central app monitor-events'
+    * 'az iot central app device run-command' moved to 'az iot central device command run'
+    * 'az iot central app device show-command-history' moved to 'az iot central device command history'
+    * 'az iot central device twin' added to support deprecation of 'az iot central app device-twin' command group
+  
 0.9.8
 +++++++++++++++
 General changes
