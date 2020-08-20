@@ -30,7 +30,7 @@ style_type = CLIArgumentType(
     options_list=["--style"],
     choices=CaseInsensitiveList(["scroll", "json", "csv"]),
     help="Indicate output style"
-    "scroll = deliver errors as they arrive, json = summarize results as json, csv = summarize results as json",
+    "scroll = deliver errors as they arrive, json = summarize results as json, csv = summarize results as csv",
 )
 
 
@@ -38,14 +38,58 @@ def load_central_arguments(self, _):
     """
     Load CLI Args for Knack parser
     """
-    with self.argument_context("iot central app") as context:
+    with self.argument_context("iot central") as context:
         context.argument("app_id", options_list=["--app-id", "-n"], help="Target App.")
-        context.argument("minimum_severity", arg_type=severity_type)
+        context.argument(
+            "token",
+            options_list=["--token"],
+            help="Authorization token for request. "
+            "More info available here: https://docs.microsoft.com/en-us/learn/modules/manage-iot-central-apps-with-rest-api/ "
+            "MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...'). "
+            "Example: 'Bearer someBearerTokenHere'",
+        )
+        context.argument(
+            "central_dns_suffix",
+            options_list=["--central-dns-suffix", "--central-api-uri"],
+            help="Central dns suffix. "
+            "This enables running cli commands against non public/prod environments",
+        )
+
+    with self.argument_context("iot central device-template") as context:
+        context.argument(
+            "device_template_id",
+            options_list=["--device-template-id", "--dtid"],
+            help="Device template id. Example: somedevicetemplate",
+        )
+        context.argument(
+            "content",
+            options_list=["--content", "-k"],
+            help="Configuration for request. "
+            "Provide path to JSON file or raw stringified JSON. "
+            "[File Path Example: ./path/to/file.json] "
+            "[Stringified JSON Example: {'a': 'b'}] ",
+        )
+
+    with self.argument_context("iot central api-token") as context:
+        context.argument(
+            "token_id",
+            options_list=["--token-id", "--tkid"],
+            help="Unique ID for the API token. ",
+        )
         context.argument("role", arg_type=role_type)
+
+    with self.argument_context("iot central device") as context:
         context.argument(
             "instance_of",
             options_list=["--instance-of"],
             help="Central template id. Example: urn:ojpkindbz:modelDefinition:iild3tm_uo",
+        )
+        context.argument(
+            "simulated",
+            options_list=["--simulated"],
+            arg_type=get_three_state_flag(),
+            help="Add this flag if you would like IoT Central to set this up as a simulated device. "
+            "--instance-of is required if this is true",
         )
         context.argument(
             "device_name",
@@ -63,18 +107,6 @@ def load_central_arguments(self, _):
             help="Command name as specified in device template. Example: run_firmware_update",
         )
         context.argument(
-            "simulated",
-            options_list=["--simulated"],
-            arg_type=get_three_state_flag(),
-            help="Add this flag if you would like IoT Central to set this up as a simulated device. "
-            "--instance-of is required if this is true",
-        )
-        context.argument(
-            "device_template_id",
-            options_list=["--device-template-id", "--dtid"],
-            help="Device template id. Example: somedevicetemplate",
-        )
-        context.argument(
             "content",
             options_list=["--content", "-k"],
             help="Configuration for request. "
@@ -82,32 +114,12 @@ def load_central_arguments(self, _):
             "[File Path Example: ./path/to/file.json] "
             "[Stringified JSON Example: {'a': 'b'}] ",
         )
+
+    with self.argument_context("iot central user") as context:
         context.argument(
-            "token",
-            options_list=["--token"],
-            help="Authorization token for request. "
-            "More info available here: https://docs.microsoft.com/en-us/learn/modules/manage-iot-central-apps-with-rest-api/ "
-            "MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...'). "
-            "Example: 'Bearer someBearerTokenHere'",
-        )
-        context.argument(
-            "central_dns_suffix",
-            options_list=["--central-dns-suffix", "--central-api-uri"],
-            help="Central dns suffix. "
-            "This enables running cli commands against non public/prod environments",
-        )
-        context.argument(
-            "module_id", options_list=["--module-id", "-m"], help="Iot Edge Module ID",
-        )
-        context.argument(
-            "assignee",
-            options_list=["--user-id", "--assignee"],
-            help="ID associated with the user. ",
-        )
-        context.argument(
-            "email",
-            options_list=["--email"],
-            help="Email address of user to be added to the app. ",
+            "tenant_id",
+            options_list=["--tenant-id", "--tnid"],
+            help="Tenant ID for service principal to be added to the app. Object ID must also be specified. ",
         )
         context.argument(
             "object_id",
@@ -115,24 +127,24 @@ def load_central_arguments(self, _):
             help="Object ID for service principal to be added to the app. Tenant ID must also be specified. ",
         )
         context.argument(
-            "tenant_id",
-            options_list=["--tenant-id", "--tnid"],
-            help="Tenant ID for service principal to be added to the app. Object ID must also be specified. ",
+            "email",
+            options_list=["--email"],
+            help="Email address of user to be added to the app. ",
         )
-
         context.argument(
-            "token_id",
-            options_list=["--token-id", "--tkid"],
-            help="Unique ID for the API token. ",
+            "assignee",
+            options_list=["--user-id", "--assignee"],
+            help="ID associated with the user. ",
         )
+        context.argument("role", arg_type=role_type)
 
-    with self.argument_context("iot central app monitor-events") as context:
+    with self.argument_context("iot central diagnostics") as context:
         context.argument("timeout", arg_type=event_timeout_type)
         context.argument("properties", arg_type=event_msg_prop_type)
-
-    with self.argument_context("iot central app validate-messages") as context:
-        context.argument("timeout", arg_type=event_timeout_type)
-        context.argument("properties", arg_type=event_msg_prop_type)
+        context.argument(
+            "module_id", options_list=["--module-id", "-m"], help="Iot Edge Module ID",
+        )
+        context.argument("minimum_severity", arg_type=severity_type)
         context.argument("style", arg_type=style_type)
         context.argument(
             "duration",
@@ -148,3 +160,18 @@ def load_central_arguments(self, _):
             help="Maximum number of messages to recieve from target device before terminating connection."
             "Use 0 for infinity.",
         )
+        context.argument(
+            "module_id", options_list=["--module-id", "-m"], help="Iot Edge Module ID",
+        )
+    # TODO: Delete this by end of Dec 2020
+    load_deprecated_params(self, _)
+
+
+def load_deprecated_params(self, _):
+    with self.argument_context("iot central app monitor-events") as context:
+        context.argument("timeout", arg_type=event_timeout_type)
+        context.argument("properties", arg_type=event_msg_prop_type)
+        context.argument(
+            "module_id", options_list=["--module-id", "-m"], help="Iot Edge Module ID",
+        )
+        context.argument("minimum_severity", arg_type=severity_type)

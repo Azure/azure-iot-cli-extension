@@ -12,39 +12,46 @@ def load_central_help():
         "iot central"
     ] = """
         type: group
-        short-summary: Manage Azure Central (IoT Central) solutions & infrastructure
-    """
+        short-summary: Manage IoT Central resources.
+        long-summary: |
+            IoT Central is an IoT application platform that reduces the burden and cost of developing,
+            managing, and maintaining enterprise-grade IoT solutions. Choosing to build with IoT Central
+            gives you the opportunity to focus time, money, and energy on transforming your business
+            with IoT data, rather than just maintaining and updating a complex and continually evolving
+            IoT infrastructure.
+
+            IoT Central documentation is available at https://aka.ms/iotcentral-documentation
+            For more information on command usage, see: aka.ms/azure-cli-iot-ext
+        """
 
     helps[
         "iot central app"
     ] = """
         type: group
-        short-summary: |
-                    Manage Azure IoT Central applications.
-
-                    To use this command group, the user must be logged through the `az login` command,
-                    have the correct tenant set (the users home tenant) and
-                    have access to the application through http://apps.azureiotcentral.com"
+        short-summary: Manage IoT Central applications.
+        long-summary: Create, delete, view, and update your IoT Central apps.
         """
 
     _load_central_devices_help()
     _load_central_users_help()
     _load_central_api_token_help()
     _load_central_device_templates_help()
-    _load_central_device_twin_help()
     _load_central_monitors_help()
+    _load_central_command_help()
+    # TODO: Delete this by end of Dec 2020
+    _load_central_deprecated_commands()
 
 
 def _load_central_devices_help():
     helps[
-        "iot central app device"
+        "iot central device"
     ] = """
         type: group
         short-summary: Manage and configure IoT Central devices
     """
 
     helps[
-        "iot central app device create"
+        "iot central device create"
     ] = """
         type: command
         short-summary: Create a device in IoT Central
@@ -52,13 +59,13 @@ def _load_central_devices_help():
         examples:
         - name: Create a device
           text: >
-            az iot central app device create
+            az iot central device create
             --app-id {appid}
             --device-id {deviceid}
 
         - name: Create a simulated device
           text: >
-            az iot central app device create
+            az iot central device create
             --app-id {appid}
             --device-id {deviceid}
             --instance-of {devicetemplateid}
@@ -66,7 +73,7 @@ def _load_central_devices_help():
     """
 
     helps[
-        "iot central app device show"
+        "iot central device show"
     ] = """
         type: command
         short-summary: Get a device from IoT Central
@@ -74,13 +81,13 @@ def _load_central_devices_help():
         examples:
         - name: Get a device
           text: >
-            az iot central app device show
+            az iot central device show
             --app-id {appid}
             --device-id {deviceid}
     """
 
     helps[
-        "iot central app device delete"
+        "iot central device delete"
     ] = """
         type: command
         short-summary: Delete a device from IoT Central
@@ -88,13 +95,13 @@ def _load_central_devices_help():
         examples:
         - name: Delete a device
           text: >
-            az iot central app device delete
+            az iot central device delete
             --app-id {appid}
             --device-id {deviceid}
     """
 
     helps[
-        "iot central app device show-credentials"
+        "iot central device show-credentials"
     ] = """
         type: command
         short-summary: Get device credentials from IoT Central
@@ -102,13 +109,13 @@ def _load_central_devices_help():
         examples:
         - name: Get device credentials for a device
           text: >
-            az iot central app device show-credentials
+            az iot central device show-credentials
             --app-id {appid}
             --device-id {deviceid}
     """
 
     helps[
-        "iot central app device registration-info"
+        "iot central device registration-info"
     ] = """
         type: command
         short-summary: Get registration info on device(s) from IoT Central
@@ -119,25 +126,35 @@ def _load_central_devices_help():
         examples:
         - name: Get registration info on specified device
           text: >
-            az iot central app device registration-info --app-id {appid} --device-id {deviceid}
+            az iot central device registration-info --app-id {appid} --device-id {deviceid}
     """
 
+
+def _load_central_command_help():
     helps[
-        "iot central app device registration-summary"
+        "iot central device command"
+    ] = """
+          type: group
+          short-summary: Run device commands.
+      """
+
+    helps[
+        "iot central device command history"
     ] = """
             type: command
-            short-summary: Provides a registration summary of all the devices in an app.
-            long-summary: |
-                Note: This command can take a significant amount of time to return
-                if your app contains a lot of devices
+            short-summary: Get most recent command-response request and response payload.
             examples:
-            - name: Registration summary
+            - name: Show command response
               text: >
-                az iot central app device registration-summary --app-id {appid}
+                az iot central device command history
+                --app-id {appid}
+                --device-id {deviceid}
+                --interface-id {interfaceid}
+                --command-name {commandname}
         """
 
     helps[
-        "iot central app device run-command"
+        "iot central device command run"
     ] = """
             type: command
             short-summary: Run a command on a device and view associated response. Does NOT monitor property updates that the command may perform.
@@ -149,7 +166,7 @@ def _load_central_devices_help():
             examples:
             - name: Run command response
               text: >
-                az iot central app device run-command
+                az iot central device command run
                 --app-id {appid}
                 --device-id {deviceid}
                 --interface-id {interfaceid}
@@ -158,7 +175,7 @@ def _load_central_devices_help():
 
             - name: Short Run command response
               text: >
-                az iot central app device run-command
+                az iot central device command run
                 -n {appid}
                 -d {deviceid}
                 -i {interfaceid}
@@ -166,39 +183,24 @@ def _load_central_devices_help():
                 -k {payload}
         """
 
-    helps[
-        "iot central app device show-command-history"
-    ] = """
-            type: command
-            short-summary: Get most recent command-response request and response payload.
-            examples:
-            - name: Show command response
-              text: >
-                az iot central app device show-command-history
-                --app-id {appid}
-                --device-id {deviceid}
-                --interface-id {interfaceid}
-                --command-name {commandname}
-        """
-
 
 def _load_central_users_help():
     helps[
-        "iot central app user"
+        "iot central user"
     ] = """
         type: group
         short-summary: Manage and configure IoT Central users
     """
 
     helps[
-        "iot central app user create"
+        "iot central user create"
     ] = """
         type: command
         short-summary: Add a user to the application
         examples:
         - name: Add a user by email to the application
           text: >
-            az iot central app user create
+            az iot central user create
             --user-id {userId}
             --app-id {appId}
             --email {emailAddress}
@@ -206,7 +208,7 @@ def _load_central_users_help():
 
         - name: Add a service-principal to the application
           text: >
-            az iot central app user create
+            az iot central user create
             --user-id {userId}
             --app-id {appId}
             --tenant-id {tenantId}
@@ -214,41 +216,41 @@ def _load_central_users_help():
             --role operator
     """
     helps[
-        "iot central app user show"
+        "iot central user show"
     ] = """
     type: command
     short-summary: Get the details of a user by ID
     examples:
       - name: Get details of user
         text: >
-          az iot central app user show
+          az iot central user show
           --app-id {appid}
           --user-id {userId}
     """
 
     helps[
-        "iot central app user delete"
+        "iot central user delete"
     ] = """
     type: command
     short-summary: Delete a user from the application
     examples:
       - name: Delete a user
         text: >
-          az iot central app user delete
+          az iot central user delete
           --app-id {appid}
           --user-id {userId}
 
     """
 
     helps[
-        "iot central app user list"
+        "iot central user list"
     ] = """
     type: command
     short-summary: Get list of users in an application
     examples:
       - name: List of users
         text: >
-          az iot central app user list
+          az iot central user list
           --app-id {appid}
 
     """
@@ -256,14 +258,14 @@ def _load_central_users_help():
 
 def _load_central_api_token_help():
     helps[
-        "iot central app api-token"
+        "iot central api-token"
     ] = """
         type: group
-        short-summary: Create and Manage API tokens .
+        short-summary: Create and Manage API tokens.
     """
 
     helps[
-        "iot central app api-token create"
+        "iot central api-token create"
     ] = """
         type: command
         short-summary: Create a new API token in the application
@@ -271,14 +273,14 @@ def _load_central_api_token_help():
         examples:
         - name: Add new API token
           text: >
-            az iot central app api-token create
+            az iot central api-token create
             --token-id {tokenId}
             --app-id {appId}
             --role admin
 
     """
     helps[
-        "iot central app api-token show"
+        "iot central api-token show"
     ] = """
     type: command
     short-summary: Get token meta data (e.g. role as a GUID, expiration)
@@ -286,26 +288,26 @@ def _load_central_api_token_help():
     examples:
       - name: Get API token
         text: >
-          az iot central app api-token show
+          az iot central api-token show
           --app-id {appid}
           --token-id {tokenId}
     """
 
     helps[
-        "iot central app api-token delete"
+        "iot central api-token delete"
     ] = """
     type: command
     short-summary: Delete an API token from the application
     examples:
       - name: Delete an API token
         text: >
-          az iot central app api-token delete
+          az iot central api-token delete
           --app-id {appid}
           --token-id {tokenId}
     """
 
     helps[
-        "iot central app api-token list"
+        "iot central api-token list"
     ] = """
     type: command
     short-summary: Get a list of all token meta data (e.g. Role as a GUID and expiration)
@@ -313,7 +315,7 @@ def _load_central_api_token_help():
     examples:
       - name: List of API tokens
         text: >
-          az iot central app api-token list
+          az iot central api-token list
           --app-id {appid}
 
     """
@@ -321,14 +323,14 @@ def _load_central_api_token_help():
 
 def _load_central_device_templates_help():
     helps[
-        "iot central app device-template"
+        "iot central device-template"
     ] = """
         type: group
         short-summary: Manage and configure IoT Central device templates
     """
 
     helps[
-        "iot central app device-template create"
+        "iot central device-template create"
     ] = """
         type: command
         short-summary: Create a device template in IoT Central
@@ -336,21 +338,21 @@ def _load_central_device_templates_help():
         examples:
         - name: Create a device template with payload read from a file
           text: >
-            az iot central app device-template create
+            az iot central device-template create
             --app-id {appid}
             --content {pathtofile}
             --device-template-id {devicetemplateid}
 
         - name: Create a device template with payload read from raw json
           text: >
-            az iot central app device-template create
+            az iot central device-template create
             --app-id {appid}
             --content {json}
             --device-template-id {devicetemplateid}
     """
 
     helps[
-        "iot central app device-template show"
+        "iot central device-template show"
     ] = """
         type: command
         short-summary: Get a device template from IoT Central
@@ -358,13 +360,13 @@ def _load_central_device_templates_help():
         examples:
         - name: Get a device template
           text: >
-            az iot central app device-template show
+            az iot central device-template show
             --app-id {appid}
             --device-template-id {devicetemplateid}
     """
 
     helps[
-        "iot central app device-template delete"
+        "iot central device-template delete"
     ] = """
         type: command
         short-summary: Delete a device template from IoT Central
@@ -374,13 +376,144 @@ def _load_central_device_templates_help():
         examples:
         - name: Delete a device template from IoT Central
           text: >
-            az iot central app device-template delete
+            az iot central device-template delete
             --app-id {appid}
             --device-template-id {devicetemplateid}
     """
 
 
-def _load_central_device_twin_help():
+def _load_central_monitors_help():
+
+    helps[
+        "iot central diagnostics"
+    ] = """
+        type: group
+        short-summary: Perform application and device level diagnostics.
+    """
+
+    helps[
+        "iot central diagnostics monitor-events"
+    ] = """
+        type: command
+        short-summary: Monitor device telemetry & messages sent to the IoT Hub for an IoT Central app.
+        long-summary: |
+                    EXPERIMENTAL requires Python 3.5+
+                    This command relies on and may install dependent Cython package (uamqp) upon first execution.
+                    https://github.com/Azure/azure-uamqp-python
+        examples:
+        - name: Basic usage
+          text: >
+            az iot central diagnostics monitor-events --app-id {app_id}
+        - name: Basic usage when filtering on target device
+          text: >
+            az iot central diagnostics monitor-events --app-id {app_id} -d {device_id}
+        - name: Basic usage when filtering targeted devices with a wildcard in the ID
+          text: >
+            az iot central diagnostics monitor-events --app-id {app_id} -d Device*d
+        - name: Basic usage when filtering on module.
+          text: >
+            az iot central diagnostics monitor-events --app-id {app_id} -m {module_id}
+        - name: Basic usage when filtering targeted modules with a wildcard in the ID
+          text: >
+            az iot central diagnostics monitor-events --app-id {app_id} -m Module*
+        - name: Filter device and specify an Event Hub consumer group to bind to.
+          text: >
+            az iot central diagnostics monitor-events --app-id {app_id} -d {device_id} --cg {consumer_group_name}
+        - name: Receive message annotations (message headers)
+          text: >
+            az iot central diagnostics monitor-events --app-id {app_id} -d {device_id} --properties anno
+        - name: Receive message annotations + system properties. Never time out.
+          text: >
+            az iot central diagnostics monitor-events --app-id {app_id} -d {device_id} --properties anno sys --timeout 0
+        - name: Receive all message attributes from all device messages
+          text: >
+            az iot central diagnostics monitor-events --app-id {app_id} --props all
+        - name: Receive all messages and parse message payload as JSON
+          text: >
+            az iot central diagnostics monitor-events --app-id {app_id} --output json
+    """
+
+    helps[
+        "iot central diagnostics validate-messages"
+    ] = """
+        type: command
+        short-summary: Validate messages sent to the IoT Hub for an IoT Central app.
+        long-summary: |
+                    EXPERIMENTAL requires Python 3.5+
+                    This command relies on and may install dependent Cython package (uamqp) upon first execution.
+                    https://github.com/Azure/azure-uamqp-python
+        examples:
+        - name: Basic usage
+          text: >
+            az iot central diagnostics validate-messages --app-id {app_id}
+        - name: Output errors as they are detected
+          text: >
+            az iot central diagnostics validate-messages --app-id {app_id} --style scroll
+        - name: Basic usage when filtering on target device
+          text: >
+            az iot central diagnostics validate-messages --app-id {app_id} -d {device_id}
+        - name: Basic usage when filtering targeted devices with a wildcard in the ID
+          text: >
+            az iot central diagnostics validate-messages --app-id {app_id} -d Device*
+        - name: Basic usage when filtering on module.
+          text: >
+            az iot central diagnostics validate-messages --app-id {app_id} -m {module_id}
+        - name: Basic usage when filtering targeted modules with a wildcard in the ID
+          text: >
+            az iot central diagnostics validate-messages --app-id {app_id} -m Module*
+        - name: Filter device and specify an Event Hub consumer group to bind to.
+          text: >
+            az iot central diagnostics validate-messages --app-id {app_id} -d {device_id} --cg {consumer_group_name}
+    """
+
+    helps[
+        "iot central diagnostics monitor-properties"
+    ] = """
+        type: command
+        short-summary: Monitor desired and reported properties sent to/from the IoT Hub for an IoT Central app.
+        long-summary: |
+                    Polls device-twin from central and compares it to the last device-twin
+                    Parses out properties from device-twin, and detects if changes were made
+                    Prints subset of properties that were changed within the polling interval
+        examples:
+        - name: Basic usage
+          text: >
+            az iot central diagnostics monitor-properties --app-id {app_id} -d {device_id}
+    """
+
+    helps[
+        "iot central diagnostics validate-properties"
+    ] = """
+        type: command
+        short-summary: Validate reported properties sent to IoT Central app.
+        long-summary: |
+                    Performs validations on reported property updates:
+                    1) Warning - Properties sent by device that are not modeled in central.
+                    2) Warning - Properties with same name declared in multiple interfaces
+                       should have interface name included as part of the property update.
+        examples:
+        - name: Basic usage
+          text: >
+            az iot central diagnostics validate-properties --app-id {app_id} -d {device_id}
+    """
+
+    helps[
+        "iot central diagnostics registration-summary"
+    ] = """
+            type: command
+            short-summary: Provides a registration summary of all the devices in an app.
+            long-summary: |
+                Note: This command can take a significant amount of time to return
+                if your app contains a lot of devices
+            examples:
+            - name: Registration summary
+              text: >
+                az iot central diagnostics registration-summary --app-id {appid}
+        """
+
+
+# TODO: Delete this by end of Dec 2020
+def _load_central_deprecated_commands():
     helps[
         "iot central app device-twin"
     ] = """
@@ -395,8 +528,20 @@ def _load_central_device_twin_help():
         short-summary: Get the device twin from IoT Hub.
     """
 
+    helps[
+        "iot central device twin"
+    ] = """
+        type: group
+        short-summary: Manage IoT Central device twins.
+    """
 
-def _load_central_monitors_help():
+    helps[
+        "iot central device twin show"
+    ] = """
+        type: command
+        short-summary: Get the device twin from IoT Hub.
+    """
+
     helps[
         "iot central app monitor-events"
     ] = """
@@ -437,68 +582,4 @@ def _load_central_monitors_help():
         - name: Receive all messages and parse message payload as JSON
           text: >
             az iot central app monitor-events --app-id {app_id} --output json
-    """
-
-    helps[
-        "iot central app validate-messages"
-    ] = """
-        type: command
-        short-summary: Validate messages sent to the IoT Hub for an IoT Central app.
-        long-summary: |
-                    EXPERIMENTAL requires Python 3.5+
-                    This command relies on and may install dependent Cython package (uamqp) upon first execution.
-                    https://github.com/Azure/azure-uamqp-python
-        examples:
-        - name: Basic usage
-          text: >
-            az iot central app validate-messages --app-id {app_id}
-        - name: Output errors as they are detected
-          text: >
-            az iot central app validate-messages --app-id {app_id} --style scroll
-        - name: Basic usage when filtering on target device
-          text: >
-            az iot central app validate-messages --app-id {app_id} -d {device_id}
-        - name: Basic usage when filtering targeted devices with a wildcard in the ID
-          text: >
-            az iot central app validate-messages --app-id {app_id} -d Device*
-        - name: Basic usage when filtering on module.
-          text: >
-            az iot central app validate-messages --app-id {app_id} -m {module_id}
-        - name: Basic usage when filtering targeted modules with a wildcard in the ID
-          text: >
-            az iot central app validate-messages --app-id {app_id} -m Module*
-        - name: Filter device and specify an Event Hub consumer group to bind to.
-          text: >
-            az iot central app validate-messages --app-id {app_id} -d {device_id} --cg {consumer_group_name}
-    """
-
-    helps[
-        "iot central app monitor-properties"
-    ] = """
-        type: command
-        short-summary: Monitor desired and reported properties sent to/from the IoT Hub for an IoT Central app.
-        long-summary: |
-                    Polls device-twin from central and compares it to the last device-twin
-                    Parses out properties from device-twin, and detects if changes were made
-                    Prints subset of properties that were changed within the polling interval
-        examples:
-        - name: Basic usage
-          text: >
-            az iot central app monitor-properties --app-id {app_id} -d {device_id}
-    """
-
-    helps[
-        "iot central app validate-properties"
-    ] = """
-        type: command
-        short-summary: Validate reported properties sent to IoT Central app.
-        long-summary: |
-                    Performs validations on reported property updates:
-                    1) Warning - Properties sent by device that are not modeled in central.
-                    2) Warning - Properties with same name declared in multiple interfaces
-                       should have interface name included as part of the property update.
-        examples:
-        - name: Basic usage
-          text: >
-            az iot central app validate-properties --app-id {app_id} -d {device_id}
     """
