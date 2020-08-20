@@ -1895,17 +1895,17 @@ def _iot_c2d_message_receive(target, device_id, lock_timeout=60, ack=None):
                 if ack:
                     ack_response = {}
                     if ack == SettleType.abandon.value:
-                        six.print_("__Abandoning message__")
+                        logger.debug("__Abandoning message__")
                         ack_response = device_sdk.device.abandon_device_bound_notification(
                             id=device_id, etag=eTag, raw=True
                         )
                     elif ack == SettleType.reject.value:
-                        six.print_("__Rejecting message__")
+                        logger.debug("__Rejecting message__")
                         ack_response = device_sdk.device.complete_device_bound_notification(
                             id=device_id, etag=eTag, reject="", raw=True
                         )
                     else:
-                        six.print_("__Completing message__")
+                        logger.debug("__Completing message__")
                         ack_response = device_sdk.device.complete_device_bound_notification(
                             id=device_id, etag=eTag, raw=True
                         )
