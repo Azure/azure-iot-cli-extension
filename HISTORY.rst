@@ -27,6 +27,9 @@ Cloud-to-Device message enhancements
   * Options are `--complete`, `--abandon`, and `--reject`, and only one can be used per command.
   * `az iot device c2d-message receive` with no ack arguments remains unchanged and will not ack the message.
 
+Edge device creation enhancements
+* Enabled x509 self-signed certificate authentication types (`x509_thumbprint` and `x509_ca`) for edge device creation with `az iot hub device-identity create --ee`
+
 0.9.8
 +++++++++++++++
 General changes
