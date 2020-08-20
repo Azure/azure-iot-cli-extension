@@ -3,6 +3,16 @@
 Release History
 ===============
 
+0.9.9
++++++++++++++++
+Cloud-to-Device message enhancements
+
+* Introduced new `az iot device c2d-message purge` command to purge the message queue for a device.
+* Added message ack arguments to `az iot c2d-message receive` to ack the message after it is received:
+  * Options are `--complete`, `--abandon`, and `--reject`, and only one can be used per command.
+  * `az iot device c2d-message receive` with no ack arguments remains unchanged and will not ack the message.
+
+
 0.9.8
 +++++++++++++++
 General changes
