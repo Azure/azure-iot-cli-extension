@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 """
-utility: Define helper functions for 'common' scripts.
+utility: Defines common utility functions and components.
 
 """
 
@@ -15,6 +15,7 @@ import isodate
 import json
 import os
 import sys
+import re
 
 from threading import Event, Thread
 from datetime import datetime
@@ -480,3 +481,17 @@ def scantree(path):
 
 def find_between(s, start, end):
     return (s.split(start))[1].split(end)[0]
+
+
+def valid_hostname(host_name):
+    """
+    Approximate validation
+    Reference: https://en.wikipedia.org/wiki/Hostname
+    """
+
+    if len(host_name) > 253:
+        return False
+
+    valid_label = re.compile(r"(?!-)[A-Z\d-]{1,63}(?<!-)$", re.IGNORECASE)
+    label_parts = host_name.split(".")
+    return all(valid_label.match(label) for label in label_parts)
