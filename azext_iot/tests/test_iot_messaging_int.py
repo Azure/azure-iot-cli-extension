@@ -763,15 +763,21 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # Errors with multiple ack arguments
         self.cmd(
-            "iot device c2d-message receive -d {} --login {} --complete --abandon",
+            "iot device c2d-message receive -d {} --login {} --complete --abandon".format(
+                device_ids[0], self.connection_string
+            ),
             expect_failure=True,
         )
         self.cmd(
-            "iot device c2d-message receive -d {} --login {} --reject --abandon",
+            "iot device c2d-message receive -d {} --login {} --reject --abandon".format(
+                device_ids[0], self.connection_string
+            ),
             expect_failure=True,
         )
         self.cmd(
-            "iot device c2d-message receive -d {} --login {} --reject --complete --abandon",
+            "iot device c2d-message receive -d {} --login {} --reject --complete --abandon".format(
+                device_ids[0], self.connection_string
+            ),
             expect_failure=True,
         )
 

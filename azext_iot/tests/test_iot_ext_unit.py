@@ -100,6 +100,9 @@ class TestDeviceCreate:
         [
             (generate_device_create_req()),
             (generate_device_create_req(ee=True)),
+            (generate_device_create_req(ee=True, auth="x509_ca")),
+            (generate_device_create_req(ee=True, auth="x509_thumbprint")),
+            (generate_device_create_req(ee=True, auth="x509_thumbprint", stp=None)),
             (generate_device_create_req(auth="x509_ca")),
             (generate_device_create_req(auth="x509_thumbprint")),
             (generate_device_create_req(auth="x509_thumbprint", stp=None)),
@@ -317,8 +320,7 @@ class TestDeviceCreate:
     @pytest.mark.parametrize(
         "req, exp",
         [
-            (generate_device_create_req(ee=True, auth="x509_thumbprint"), CLIError),
-            (generate_device_create_req(ee=True, auth="x509_ca"), CLIError),
+            (generate_device_create_req(ee=True, auth="x509_thumbprint", ptp=None), ValueError),
             (generate_device_create_req(auth="doesnotexist"), ValueError),
             (
                 generate_device_create_req(auth="x509_thumbprint", ptp=None, stp=""),

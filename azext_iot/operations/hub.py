@@ -140,8 +140,6 @@ def iot_device_create(
 
     deviceScope = None
     if edge_enabled:
-        if auth_method != DeviceAuthType.shared_private_key.name:
-            raise CLIError("currently edge devices are limited to symmetric key auth")
         if add_children:
             for non_edge_device_id in add_children.split(","):
                 nonedge_device = _iot_device_show(target, non_edge_device_id.strip())
