@@ -933,4 +933,3 @@ def load_arguments(self, _):
             options_list=["--primarykey", "-k"],
             help="Primarykey - Primary group SAS token to generate device keys",
         )
-
