@@ -22,7 +22,7 @@ from . import CaptureOutputLiveScenarioTest, helpers
 
 APP_ID = os.environ.get("azext_iot_central_app_id")
 APP_PRIMARY_KEY = os.environ.get("azext_iot_central_primarykey")
-APP_IDSCOPE = os.environ.get("azext_iot_central_idscope")
+APP_SCOPE_ID = os.environ.get("azext_iot_central_scope_id")
 device_template_path = get_context_path(
     __file__, "central/json/device_template_int_test.json"
 )
@@ -189,7 +189,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         assert "No errors detected" in output
 
     @pytest.mark.skipif(
-        not APP_IDSCOPE, reason="empty azext_iot_central_idscope env var"
+        not APP_SCOPE_ID, reason="empty azext_iot_central_scope_id env var"
     )
     @pytest.mark.skipif(
         not APP_PRIMARY_KEY, reason="empty azext_iot_central_primarykey env var"
@@ -201,7 +201,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         ).decode()
 
         credentials = {
-            "idScope": APP_IDSCOPE,
+            "idScope": APP_SCOPE_ID,
             "symmetricKey": {"primaryKey": device_primary_key},
         }
         device_client = helpers.dps_connect_device(device_id, credentials)
