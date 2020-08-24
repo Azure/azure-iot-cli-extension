@@ -742,3 +742,58 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             "iot hub monitor-feedback --login {} -w {} -y".format(self.connection_string, msg_id),
             ["description: Message rejected"],
         )
+
+        # purge messages
+        num_messages = 3
+        for i in range(num_messages):
+            self.cmd(
+                "iot device c2d-message send -d {} --login {}".format(
+                    device_ids[0], self.connection_string
+                ),
+                checks=self.is_empty(),
+            )
+        purge_result = self.cmd(
+            "iot device c2d-message purge -d {} --login {}".format(
+                device_ids[0], self.connection_string
+            )
+        ).get_output_in_json()
+        assert purge_result["deviceId"] == device_ids[0]
+        assert purge_result["totalMessagesPurged"] == num_messages
+        assert not purge_result["moduleId"]
+
+        # Errors with multiple ack arguments
+        self.cmd(
+            "iot device c2d-message receive -d {} --login {} --complete --abandon".format(
+                device_ids[0], self.connection_string
+            ),
+            expect_failure=True,
+        )
+        self.cmd(
+            "iot device c2d-message receive -d {} --login {} --reject --abandon".format(
+                device_ids[0], self.connection_string
+            ),
+            expect_failure=True,
+        )
+        self.cmd(
+            "iot device c2d-message receive -d {} --login {} --reject --complete --abandon".format(
+                device_ids[0], self.connection_string
+            ),
+            expect_failure=True,
+        )
+
+        # Receive with auto-ack
+        for ack_test in ["complete", "abandon", "reject"]:
+            self.cmd(
+                "iot device c2d-message send -d {} --login {}".format(
+                    device_ids[0], self.connection_string
+                ),
+                checks=self.is_empty(),
+            )
+            result = self.cmd(
+                "iot device c2d-message receive -d {} --login {} --{}".format(
+                    device_ids[0], self.connection_string, ack_test
+                )
+            ).get_output_in_json()
+            assert result["ack"] == ack_test
+            assert json.dumps(result["data"])
+            assert json.dumps(result["properties"]["system"])

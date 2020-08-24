@@ -290,17 +290,17 @@ def load_digitaltwins_help():
         examples:
         - name: Create a digital twin from an existing (prior-created) model.
           text: >
-            az dt twin create -n {instance_name} --dtmi urn:azureiot:DeviceManagement:DeviceInformation:1
+            az dt twin create -n {instance_name} --dtmi dtmi:example:Room;1
             --twin-id {twin_id}
 
         - name: Create a digital twin from an existing (prior-created) model. Instantiate with property values.
           text: >
-            az dt twin create -n {instance_name} --dtmi urn:azureiot:DeviceManagement:DeviceInformation:1
+            az dt twin create -n {instance_name} --dtmi dtmi:com:example:DeviceInformation;1
             --twin-id {twin_id} --properties '{"manufacturer": "Microsoft"}'
 
         - name: Create a digital twin with component from existing (prior-created) models. Instantiate with property values.
           text: >
-            az dt twin create -n {instance_name} --dtmi dtmi:example:Room;1 --twin-id {twin_id} --properties '{
+            az dt twin create -n {instance_name} --dtmi dtmi:com:example:TemperatureController;1 --twin-id {twin_id} --properties '{
                 "Temperature": 10.2,
                 "Thermostat": {
                     "$metadata": {},

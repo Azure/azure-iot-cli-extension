@@ -7,20 +7,45 @@ Release History
 +++++++++++++++
 
 IoT Central updates
+
 * Current release involves re-grouping of IoT central commands.
+  
   * 'az iot central app device-twin' deprecated use 'az iot central device twin' instead. Deprecated command group is planned to be removed by December 2020
   * 'az iot central app monitor-events' deprecated use 'az iot central diagnostics monitor-events' instead. Deprecated command is planned to be removed by December 2020
-  * commands listed below are in preview
+  * Note all commands listed below are in preview
+
     * Introduces 'az iot central diagnostics' preview command group to perform application and device level diagnostics
+
       * 'az iot central app device registration-summary' moved to 'az iot central diagnostics registration-summary'
       * 'az iot central app monitor-properties' moved to 'az iot central diagnostics monitor-properties'
       * 'az iot central app validate-messages' moved to 'az iot central diagnostics validate-messages'
       * 'az iot central app validate-properties' moved to 'az iot central diagnostics validate-properties'
       * 'az iot central diagnostics monitor-events' added to support deprecation of 'az iot central app monitor-events'
+
     * 'az iot central app device run-command' moved to 'az iot central device command run'
     * 'az iot central app device show-command-history' moved to 'az iot central device command history'
     * 'az iot central device twin' added to support deprecation of 'az iot central app device-twin' command group
-  
+
+Cloud-to-Device message enhancements
+
+* Introduced new `az iot device c2d-message purge` command to purge the message queue for a device.
+* Added message ack arguments to `az iot c2d-message receive` to ack the message after it is received:
+
+  * Options are `--complete`, `--abandon`, and `--reject`, and only one can be used per command.
+  * `az iot device c2d-message receive` with no ack arguments remains unchanged and will not ack the message.
+
+Edge device creation enhancements
+
+* Enabled x509 self-signed certificate authentication types (`x509_thumbprint` and `x509_ca`) for edge device creation with `az iot hub device-identity create --ee`
+
+Digital Twins updates
+
+* The 'az dt route | model | twin' command groups support passing in a DT instance hostname directly.
+
+  * If an instance name is provided, the user subscription is first queried for the target instance to retrieve the hostname.
+  * If a hostname is provided, the subscription query is skipped and the provided value is used for subsequent interaction.
+
+
 0.9.8
 +++++++++++++++
 General changes
