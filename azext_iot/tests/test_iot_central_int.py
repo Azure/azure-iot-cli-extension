@@ -16,7 +16,6 @@ from azure.iot.device import Message
 from azext_iot.common import utility
 from azext_iot.central.models.enum import DeviceStatus, Role
 from azext_iot.monitor.parsers import strings
-from azext_iot.common.auth import generate_device_key
 
 from . import CaptureOutputLiveScenarioTest, helpers
 
@@ -196,9 +195,10 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
     )
     def test_device_conect(self):
         device_id = "testDevice"
-        device_primary_key = generate_device_key(
-            device_id=device_id, primarykey=APP_PRIMARY_KEY,
-        ).decode()
+
+        device_primary_key = self.cmd(
+            "iot dps device-key create -k {} -d {}".format(APP_PRIMARY_KEY, device_id),
+        ).get_output_in_json()
 
         credentials = {
             "idScope": APP_SCOPE_ID,
