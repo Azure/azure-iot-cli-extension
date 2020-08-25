@@ -1255,5 +1255,5 @@ helps[
     examples:
     - name: basic usage
       text: >
-        az iot dps compute-device-key create --pk {primaryKey} --device-id {deviceid}
+        az iot dps compute-device-key create --pk {primaryKey}  --registration-id {registrationId}
 """
