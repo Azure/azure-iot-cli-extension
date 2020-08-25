@@ -8,6 +8,7 @@
 import json
 import os
 import time
+import pytest
 
 from .conftest import get_context_path
 
@@ -19,7 +20,8 @@ from azext_iot.monitor.parsers import strings
 from . import CaptureOutputLiveScenarioTest, helpers
 
 APP_ID = os.environ.get("azext_iot_central_app_id")
-
+APP_PRIMARY_KEY = os.environ.get("azext_iot_central_primarykey")
+APP_SCOPE_ID = os.environ.get("azext_iot_central_scope_id")
 device_template_path = get_context_path(
     __file__, "central/json/device_template_int_test.json"
 )
@@ -184,6 +186,36 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         assert output
         assert "Successfully parsed 1 message(s)" in output
         assert "No errors detected" in output
+
+    @pytest.mark.skipif(
+        not APP_SCOPE_ID, reason="empty azext_iot_central_scope_id env var"
+    )
+    @pytest.mark.skipif(
+        not APP_PRIMARY_KEY, reason="empty azext_iot_central_primarykey env var"
+    )
+    def test_device_connect(self):
+        device_id = "testDevice"
+
+        device_primary_key = self.cmd(
+            "iot central device compute-device-key create --pk {} -d {}".format(
+                APP_PRIMARY_KEY, device_id
+            ),
+        ).get_output_in_json()
+
+        credentials = {
+            "idScope": APP_SCOPE_ID,
+            "symmetricKey": {"primaryKey": device_primary_key},
+        }
+        device_client = helpers.dps_connect_device(device_id, credentials)
+
+        self.cmd(
+            "iot central device show --app-id {} -d {}".format(APP_ID, device_id),
+            checks=[self.check("id", device_id)],
+        )
+
+        self._delete_device(device_id)
+
+        assert device_client.connected
 
     def test_central_validate_messages_issues_detected(self):
         expected_messages = []

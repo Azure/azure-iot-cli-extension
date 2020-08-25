@@ -40,7 +40,9 @@ def load_command_table(self, _):
         cmd_group.command(
             "show-connection-string",
             "iot_get_device_connection_string",
-            deprecate_info=self.deprecate(redirect='az iot hub device-identity connection-string show')
+            deprecate_info=self.deprecate(
+                redirect="az iot hub device-identity connection-string show"
+            ),
         )
         cmd_group.command("import", "iot_device_import")
         cmd_group.command("export", "iot_device_export")
@@ -71,7 +73,9 @@ def load_command_table(self, _):
         cmd_group.command(
             "show-connection-string",
             "iot_get_module_connection_string",
-            deprecate_info=self.deprecate(redirect='az iot hub module-identity connection-string show')
+            deprecate_info=self.deprecate(
+                redirect="az iot hub module-identity connection-string show"
+            ),
         )
 
     with self.command_group(
@@ -184,3 +188,8 @@ def load_command_table(self, _):
         cmd_group.command("list", "iot_dps_registration_list")
         cmd_group.command("show", "iot_dps_registration_get")
         cmd_group.command("delete", "iot_dps_registration_delete")
+
+    with self.command_group(
+        "iot dps compute-device-key", command_type=iotdps_ops, is_preview=True
+    ) as cmd_group:
+        cmd_group.command("create", "iot_dps_compute_device_key")

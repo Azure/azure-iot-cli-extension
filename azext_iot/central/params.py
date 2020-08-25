@@ -78,6 +78,13 @@ def load_central_arguments(self, _):
         )
         context.argument("role", arg_type=role_type)
 
+    with self.argument_context("iot central device compute-device-key") as context:
+        context.argument(
+            "primary_key",
+            options_list=["--primary-key", "--pk"],
+            help="The primary symmetric shared access key stored in base64 format. ",
+        )
+
     with self.argument_context("iot central device") as context:
         context.argument(
             "instance_of",

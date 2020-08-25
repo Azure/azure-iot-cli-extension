@@ -92,6 +92,13 @@ def load_central_commands(self, _):
         cmd_group.command("history", "get_command_history")
 
     with self.command_group(
+        "iot central device compute-device-key",
+        command_type=central_device_ops,
+        is_preview=True,
+    ) as cmd_group:
+        cmd_group.command("create", "compute_device_key")
+
+    with self.command_group(
         "iot central device-template",
         command_type=central_device_templates_ops,
         is_preview=True,

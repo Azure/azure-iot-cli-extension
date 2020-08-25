@@ -267,13 +267,13 @@ def load_arguments(self, _):
         context.argument(
             "show_all",
             options_list=["--show-all", "--all"],
-            help="Allow to show all shared access policies."
+            help="Allow to show all shared access policies.",
         )
         context.argument(
             "default_eventhub",
             arg_type=get_three_state_flag(),
             options_list=["--default-eventhub", "--eh"],
-            help="Flag indicating the connection string returned is for the default EventHub endpoint. Default: false"
+            help="Flag indicating the connection string returned is for the default EventHub endpoint. Default: false",
         )
 
     with self.argument_context("iot hub job") as context:
@@ -809,8 +809,16 @@ def load_arguments(self, _):
             "api_version",
             options_list=["--api-version", "--av"],
             help="The API version of the provisioning service types sent in the custom allocation"
-                 " request. Minimum supported version: 2018-09-01-preview."
+            " request. Minimum supported version: 2018-09-01-preview.",
         )
+
+    with self.argument_context("iot dps compute-device-key") as context:
+        context.argument(
+            "primary_key",
+            options_list=["--primary-key", "--pk"],
+            help="The primary symmetric shared access key stored in base64 format. ",
+        )
+        context.argument("registration_id", help="ID of device registration")
 
     with self.argument_context("iot dps enrollment") as context:
         context.argument("enrollment_id", help="ID of device enrollment record")

@@ -120,3 +120,9 @@ def get_credentials(
     return provider.get_device_credentials(
         device_id=device_id, central_dns_suffix=central_dns_suffix,
     )
+
+
+def compute_device_key(cmd, primary_key, device_id):
+    return utility.compute_device_key(
+        primary_key=primary_key, registration_id=device_id
+    )
