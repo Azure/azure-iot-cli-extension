@@ -1240,16 +1240,20 @@ helps[
 """
 
 helps[
-    "iot dps device-key"
+    "iot dps compute-device-key"
 ] = """
     type: group
-    short-summary: Create device SAS key
+    short-summary:  Generate a derived device SAS key
 """
 
 helps[
-    "iot dps device-key create"
+    "iot dps compute-device-key create"
 ] = """
     type: command
-    short-summary: Generate a device SAS key.
-    Long-summary: Generate device key from primary group SAS token.
+    short-summary: Generate a derived device SAS key.
+    Long-summary: Generate a derived device key from a DPS enrollment group SAS token.
+    examples:
+    - name: basic usage
+      text: >
+        az iot dps compute-device-key create --pk {primaryKey} --device-id {deviceid}
 """

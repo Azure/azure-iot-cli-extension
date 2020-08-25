@@ -812,6 +812,14 @@ def load_arguments(self, _):
             " request. Minimum supported version: 2018-09-01-preview.",
         )
 
+    with self.argument_context("iot dps compute-device-key") as context:
+        context.argument(
+            "primary_key",
+            options_list=["--primary-key", "--pk"],
+            help="The primary symmetric shared access key stored in base64 format. ",
+        )
+        context.argument("registration_id", help="ID of device registration")
+
     with self.argument_context("iot dps enrollment") as context:
         context.argument("enrollment_id", help="ID of device enrollment record")
         context.argument("device_id", help="IoT Hub Device ID")
@@ -949,10 +957,3 @@ def load_arguments(self, _):
     with self.argument_context("iot dt monitor-events") as context:
         context.argument("timeout", arg_type=event_timeout_type)
         context.argument("properties", arg_type=event_msg_prop_type)
-
-    with self.argument_context("iot dps device-key") as context:
-        context.argument(
-            "primarykey",
-            options_list=["--primarykey", "-k"],
-            help="Primarykey - Primary group SAS token to generate device keys",
-        )

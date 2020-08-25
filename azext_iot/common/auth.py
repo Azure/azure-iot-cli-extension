@@ -5,9 +5,6 @@
 # --------------------------------------------------------------------------------------------
 
 from azure.cli.core._profile import Profile
-import base64
-import hmac
-import hashlib
 
 
 def get_aad_token(cmd, resource=None):
@@ -28,21 +25,3 @@ def get_aad_token(cmd, resource=None):
         "subscription": subscription,
         "tenant": tenant,
     }
-
-
-def generate_device_key(primarykey, device_id):
-    """
-    Generate device SAS key
-    Args:
-        primarykey: Primary group SAS token to generate device keys
-        device_id: unique case-sensitive device id
-    Returns:
-        device key
-    """
-    secret = base64.b64decode(primarykey)
-    device_key = base64.b64encode(
-        hmac.new(
-            secret, msg=device_id.encode("utf8"), digestmod=hashlib.sha256
-        ).digest()
-    )
-    return device_key

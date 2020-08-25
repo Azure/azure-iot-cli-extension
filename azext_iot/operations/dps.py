@@ -15,7 +15,7 @@ from azext_iot.common.shared import (
 from azext_iot.common._azure import get_iot_dps_connection_string
 from azext_iot.common.utility import shell_safe_json_parse
 from azext_iot.common.certops import open_certificate
-from azext_iot.common.auth import generate_device_key
+from azext_iot.common.utility import compute_device_key
 from azext_iot.operations.generic import _execute_query
 from azext_iot._factory import SdkResolver
 from azext_iot.sdk.dps.models.individual_enrollment import IndividualEnrollment
@@ -543,10 +543,10 @@ def iot_dps_device_enrollment_group_delete(
         raise CLIError(e)
 
 
-def iot_dps_generate_device_key(
-    cmd, primarykey, device_id,
+def iot_dps_compute_device_key(
+    cmd, primary_key, registration_id,
 ):
-    return generate_device_key(primarykey=primarykey, device_id=device_id)
+    return compute_device_key(primary_key=primary_key, registration_id=registration_id)
 
 
 # DPS Registration

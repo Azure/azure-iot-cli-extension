@@ -16,6 +16,8 @@ import json
 import os
 import sys
 import re
+import hmac
+import hashlib
 
 from threading import Event, Thread
 from datetime import datetime
@@ -495,3 +497,21 @@ def valid_hostname(host_name):
     valid_label = re.compile(r"(?!-)[A-Z\d-]{1,63}(?<!-)$", re.IGNORECASE)
     label_parts = host_name.split(".")
     return all(valid_label.match(label) for label in label_parts)
+
+
+def compute_device_key(primary_key, registration_id):
+    """
+    Compute device SAS key
+    Args:
+        primary_key: Primary group SAS token to compute device keys
+        registration_id: Registration ID is alphanumeric, lowercase, and may contain hyphens.
+    Returns:
+        device key
+    """
+    secret = base64.b64decode(primary_key)
+    device_key = base64.b64encode(
+        hmac.new(
+            secret, msg=registration_id.encode("utf8"), digestmod=hashlib.sha256
+        ).digest()
+    )
+    return device_key

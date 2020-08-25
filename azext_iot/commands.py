@@ -189,5 +189,7 @@ def load_command_table(self, _):
         cmd_group.command("show", "iot_dps_registration_get")
         cmd_group.command("delete", "iot_dps_registration_delete")
 
-    with self.command_group("iot dps device-key", command_type=iotdps_ops) as cmd_group:
-        cmd_group.command("create", "iot_dps_generate_device_key")
+    with self.command_group(
+        "iot dps compute-device-key", command_type=iotdps_ops, is_preview=True
+    ) as cmd_group:
+        cmd_group.command("create", "iot_dps_compute_device_key")
