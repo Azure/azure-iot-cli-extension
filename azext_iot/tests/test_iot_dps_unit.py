@@ -187,11 +187,12 @@ class TestEnrollmentCreate():
                                                  req['webhook_url'],
                                                  req['api_version'])
         args = serviceclient.call_args
-        url = args[0][0].url
+        request = args[0][0]
+        url = request.url
         assert "{}/enrollments/{}?".format(mock_target['entity'], enrollment_id) in url
-        assert args[0][0].method == 'PUT'
+        assert request.method == 'PUT'
 
-        body = args[0][2]
+        body = json.loads(request.data)
         assert body['registrationId'] == req['enrollment_id']
         if req['attestation_type'] == 'tpm':
             assert body['attestation']['type'] == req['attestation_type']
@@ -406,12 +407,13 @@ class TestEnrollmentUpdate():
                                                  req['api_version'])
         # Index 1 is the update args
         args = serviceclient.call_args_list[1]
-        url = args[0][0].url
+        request = args[0][0]
+        url = request.url
 
         assert "{}/enrollments/{}?".format(mock_target['entity'], enrollment_id) in url
-        assert args[0][0].method == 'PUT'
+        assert request.method == 'PUT'
 
-        body = args[0][2]
+        body = json.loads(request.data)
         if not req['certificate_path']:
             if req['remove_certificate_path']:
                 assert body['attestation']['x509']['clientCertificates'].get('primary') is None
@@ -487,9 +489,10 @@ class TestEnrollmentList():
     def test_enrollment_list(self, serviceclient, top):
         result = subject.iot_dps_device_enrollment_list(None, mock_target['entity'], resource_group, top)
         args = serviceclient.call_args_list[0]
-        headers = args[0][1]
-        url = args[0][0].url
-        method = args[0][0].method
+        request = args[0][0]
+        headers = request.headers
+        url = request.url
+        method = request.method
 
         assert str(headers.get("x-ms-max-item-count")) == str(top)
         assert "{}/enrollments/query?".format(mock_target['entity']) in url
@@ -628,11 +631,12 @@ class TestEnrollmentGroupCreate():
                                                        req['webhook_url'],
                                                        req['api_version'])
         args = serviceclient.call_args
-        url = args[0][0].url
+        request = args[0][0]
+        url = request.url
         assert "{}/enrollmentGroups/{}?".format(mock_target['entity'], enrollment_id) in url
-        assert args[0][0].method == 'PUT'
+        assert request.method == 'PUT'
 
-        body = args[0][2]
+        body = json.loads(request.data)
         assert body['enrollmentGroupId'] == req['enrollment_id']
         if req['certificate_path']:
             assert body['attestation']['type'] == 'x509'
@@ -866,12 +870,13 @@ class TestEnrollmentGroupUpdate():
                                                        req['api_version'])
         # Index 1 is the update args
         args = serviceclient.call_args_list[1]
-        url = args[0][0].url
+        request = args[0][0]
+        url = request.url
 
         assert "{}/enrollmentGroups/{}?".format(mock_target['entity'], enrollment_id) in url
-        assert args[0][0].method == 'PUT'
+        assert request.method == 'PUT'
 
-        body = args[0][2]
+        body = json.loads(request.data)
         if not req['certificate_path']:
             if not req['root_ca_name'] and not req['secondary_root_ca_name']:
                 assert body['attestation']['x509']['signingCertificates']['primary']['info'] is not None
@@ -994,9 +999,10 @@ class TestEnrollmentGroupList():
         result = subject.iot_dps_device_enrollment_group_list(None, mock_target['entity'],
                                                               resource_group, top)
         args = serviceclient.call_args_list[0]
-        headers = args[0][1]
-        url = args[0][0].url
-        method = args[0][0].method
+        request = args[0][0]
+        headers = request.headers
+        url = request.url
+        method = request.method
         assert "{}/enrollmentGroups/query?".format(mock_target['entity']) in url
         assert method == 'POST'
         assert json.dumps(result)
