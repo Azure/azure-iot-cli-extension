@@ -15,6 +15,7 @@ from azext_iot.common.shared import (
 from azext_iot.common._azure import get_iot_dps_connection_string
 from azext_iot.common.utility import shell_safe_json_parse
 from azext_iot.common.certops import open_certificate
+from azext_iot.common.utility import compute_device_key
 from azext_iot.operations.generic import _execute_query
 from azext_iot._factory import SdkResolver
 from azext_iot.sdk.dps.service.models.individual_enrollment import IndividualEnrollment
@@ -550,6 +551,12 @@ def iot_dps_device_enrollment_group_delete(
         raise CLIError(e)
 
 
+def iot_dps_compute_device_key(
+    cmd, primary_key, registration_id,
+):
+    return compute_device_key(primary_key=primary_key, registration_id=registration_id)
+
+
 # DPS Registration
 
 
@@ -882,4 +889,3 @@ def _validate_allocation_policy_for_enrollment(
     else:
         if iot_hub_list:
             raise CLIError("Please provide allocation policy.")
-

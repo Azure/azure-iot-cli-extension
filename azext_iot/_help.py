@@ -1252,3 +1252,22 @@ helps[
     type: command
     short-summary: Delete a device registration in an Azure IoT Hub Device Provisioning Service.
 """
+
+helps[
+    "iot dps compute-device-key"
+] = """
+    type: group
+    short-summary:  Generate a derived device SAS key
+"""
+
+helps[
+    "iot dps compute-device-key create"
+] = """
+    type: command
+    short-summary: Generate a derived device SAS key.
+    Long-summary: Generate a derived device key from a DPS enrollment group SAS token.
+    examples:
+    - name: basic usage
+      text: >
+        az iot dps compute-device-key create --pk {primaryKey}  --registration-id {registrationId}
+"""
