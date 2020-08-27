@@ -16,7 +16,6 @@ from azure.iot.device import Message
 from azext_iot.common import utility
 from azext_iot.central.models.enum import DeviceStatus, Role
 from azext_iot.monitor.parsers import strings
-from azext_iot.common.auth import generate_device_key
 
 from . import CaptureOutputLiveScenarioTest, helpers
 
