@@ -559,7 +559,7 @@ def iot_dps_registration_list(client, dps_name, resource_group_name, enrollment_
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
-        return sdk.query_device_registration_states(enrollment_id)
+        return sdk.query_device_registration_states(enrollment_id, raw=True).response.json()
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
@@ -570,7 +570,7 @@ def iot_dps_registration_get(client, dps_name, resource_group_name, registration
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
-        return sdk.get_device_registration_state(registration_id)
+        return sdk.get_device_registration_state(registration_id, raw=True).response.json()
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 

@@ -1066,7 +1066,7 @@ class TestRegistrationShow():
     def test_registration_show(self, serviceclient):
         result = subject.iot_dps_registration_get(None, mock_target['entity'],
                                                   resource_group, registration_id)
-        assert result.registration_id == registration_id
+        assert result['registrationId'] == registration_id
         args = serviceclient.call_args
         url = args[0][0].url
         method = args[0][0].method
