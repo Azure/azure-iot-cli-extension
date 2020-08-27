@@ -460,6 +460,7 @@ class TestEnrollmentShow():
         service_client = mocker.patch(path_service_client)
         service_client.return_value = build_mock_response(mocker, request.param, generate_enrollment_show())
         return service_client
+
     @pytest.mark.parametrize('show_attestation', [True, False])
     def test_enrollment_show(self, serviceclient, show_attestation):
         result = subject.iot_dps_device_enrollment_get(None, enrollment_id,
@@ -992,7 +993,6 @@ class TestEnrollmentGroupShow():
         else:
             assert "{}/enrollmentGroups/{}?".format(mock_target['entity'], enrollment_id) in url
             assert method == 'GET'
-
 
     def test_enrollment_group_show_error(self, serviceclient_generic_error):
         with pytest.raises(CLIError):
