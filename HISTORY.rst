@@ -31,6 +31,8 @@ IoT Central updates
     * 'az iot central app device show-command-history' moved to 'az iot central device command history'
     * 'az iot central device twin' added to support deprecation of 'az iot central app device-twin' command group
 
+IoT Hub updates
+
 Cloud-to-Device message enhancements
 
 * Introduced new `az iot device c2d-message purge` command to purge the message queue for a device.
@@ -42,6 +44,10 @@ Cloud-to-Device message enhancements
 Edge device creation enhancements
 
 * Enabled x509 self-signed certificate authentication types (`x509_thumbprint` and `x509_ca`) for edge device creation with `az iot hub device-identity create --ee`
+
+Bug fixes
+
+* Fixes issue #243 where providing a connection string via --login still required "az login".
 
 Digital Twins updates
 
