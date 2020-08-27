@@ -373,4 +373,4 @@ class TestCliInit(object):
                 invalid_directories.append("Directory: '{}' missing __init__.py".format(directory))
 
         if invalid_directories:
-            pytest.fail(", ".join(directory))
+            pytest.fail(", ".join(invalid_directories))

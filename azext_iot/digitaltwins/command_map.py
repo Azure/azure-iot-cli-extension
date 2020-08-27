@@ -43,14 +43,14 @@ def load_digitaltwins_commands(self, _):
         is_preview=True,
     ) as cmd_group:
         cmd_group.command("create", "create_instance")
-        cmd_group.command("show", "show_instance")
+        cmd_group.show_command("show", "show_instance")
         cmd_group.command("list", "list_instances")
         cmd_group.command("delete", "delete_instance")
 
     with self.command_group(
         "dt endpoint", command_type=digitaltwins_resource_ops
     ) as cmd_group:
-        cmd_group.command(
+        cmd_group.show_command(
             "show",
             "show_endpoint",
             table_transformer=(
@@ -78,7 +78,7 @@ def load_digitaltwins_commands(self, _):
     with self.command_group(
         "dt route", command_type=digitaltwins_route_ops
     ) as cmd_group:
-        cmd_group.command(
+        cmd_group.show_command(
             "show",
             "show_route",
             table_transformer="{RouteName:id,EndpointName:endpointName,Filter:filter}",
@@ -101,21 +101,21 @@ def load_digitaltwins_commands(self, _):
     with self.command_group("dt twin", command_type=digitaltwins_twin_ops) as cmd_group:
         cmd_group.command("query", "query_twins")
         cmd_group.command("create", "create_twin")
-        cmd_group.command("show", "show_twin")
+        cmd_group.show_command("show", "show_twin")
         cmd_group.command("update", "update_twin")
         cmd_group.command("delete", "delete_twin")
 
     with self.command_group(
         "dt twin component", command_type=digitaltwins_twin_ops
     ) as cmd_group:
-        cmd_group.command("show", "show_component")
+        cmd_group.show_command("show", "show_component")
         cmd_group.command("update", "update_component")
 
     with self.command_group(
         "dt twin relationship", command_type=digitaltwins_twin_ops
     ) as cmd_group:
         cmd_group.command("create", "create_relationship")
-        cmd_group.command("show", "show_relationship")
+        cmd_group.show_command("show", "show_relationship")
         cmd_group.command("list", "list_relationships")
         cmd_group.command("update", "update_relationship")
         cmd_group.command("delete", "delete_relationship")
@@ -129,7 +129,7 @@ def load_digitaltwins_commands(self, _):
         "dt model", command_type=digitaltwins_model_ops
     ) as cmd_group:
         cmd_group.command("create", "add_models")
-        cmd_group.command(
+        cmd_group.show_command(
             "show",
             "show_model",
             table_transformer="{ModelId:id,UploadTime:uploadTime,Decommissioned:decommissioned}",

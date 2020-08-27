@@ -38,6 +38,7 @@ def load_central_help():
     _load_central_device_templates_help()
     _load_central_monitors_help()
     _load_central_command_help()
+    _load_central_compute_device_key()
     # TODO: Delete this by end of Dec 2020
     _load_central_deprecated_commands()
 
@@ -128,6 +129,20 @@ def _load_central_devices_help():
           text: >
             az iot central device registration-info --app-id {appid} --device-id {deviceid}
     """
+
+
+def _load_central_compute_device_key():
+    helps[
+        "iot central device compute-device-key"
+    ] = """
+        type: command
+        short-summary: Generate a derived device SAS key.
+        long-summary: Generate a derived device key from a group-level SAS key.
+        examples:
+        - name: Basic usage
+          text: >
+            az iot central device compute-device-key --pk {primaryKey} --device-id {deviceid}
+      """
 
 
 def _load_central_command_help():

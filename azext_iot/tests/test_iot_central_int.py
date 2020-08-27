@@ -194,11 +194,14 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
     @pytest.mark.skipif(
         not APP_PRIMARY_KEY, reason="empty azext_iot_central_primarykey env var"
     )
-    def test_device_conect(self):
+    def test_device_connect(self):
         device_id = "testDevice"
-        device_primary_key = generate_device_key(
-            device_id=device_id, primarykey=APP_PRIMARY_KEY,
-        ).decode()
+
+        device_primary_key = self.cmd(
+            "iot central device compute-device-key --pk {} -d {}".format(
+                APP_PRIMARY_KEY, device_id
+            ),
+        ).get_output_in_json()
 
         credentials = {
             "idScope": APP_SCOPE_ID,

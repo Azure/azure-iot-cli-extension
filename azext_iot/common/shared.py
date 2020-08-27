@@ -153,16 +153,6 @@ class PnPModelType(Enum):
     capabilityModel = "capabilityModel"
 
 
-class ModelSourceType(Enum):
-    """
-    Type of source to get model definition.
-    """
-
-    public = "public"
-    private = "private"
-    device = "device"
-
-
 class ConfigType(Enum):
     """
     Type of configuration deployment.
