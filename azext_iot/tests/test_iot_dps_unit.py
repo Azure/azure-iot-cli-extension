@@ -460,17 +460,22 @@ class TestEnrollmentShow():
         service_client = mocker.patch(path_service_client)
         service_client.return_value = build_mock_response(mocker, request.param, generate_enrollment_show())
         return service_client
-
-    def test_enrollment_show(self, serviceclient):
+    @pytest.mark.parametrize('show_attestation', [True, False])
+    def test_enrollment_show(self, serviceclient, show_attestation):
         result = subject.iot_dps_device_enrollment_get(None, enrollment_id,
-                                                       mock_target['entity'], resource_group)
+                                                       mock_target['entity'], resource_group, show_keys=show_attestation)
 
-        assert result.registration_id == enrollment_id
+        assert result['registrationId'] == enrollment_id
+        assert result['attestation']
         args = serviceclient.call_args
         url = args[0][0].url
         method = args[0][0].method
-        assert "{}/enrollments/{}?".format(mock_target['entity'], enrollment_id) in url
-        assert method == 'GET'
+        if show_attestation:
+            assert "{}/enrollments/{}/attestationmechanism?".format(mock_target['entity'], enrollment_id) in url
+            assert method == 'POST'
+        else:
+            assert "{}/enrollments/{}?".format(mock_target['entity'], enrollment_id) in url
+            assert method == 'GET'
 
     def test_enrollment_show_error(self, serviceclient_generic_error):
         with pytest.raises(CLIError):
@@ -971,15 +976,23 @@ class TestEnrollmentGroupShow():
         service_client.return_value = build_mock_response(mocker, request.param, generate_enrollment_group_show())
         return service_client
 
-    def test_enrollment_group_show(self, serviceclient):
+    @pytest.mark.parametrize('show_attestation', [True, False])
+    def test_enrollment_group_show(self, serviceclient, show_attestation):
         result = subject.iot_dps_device_enrollment_group_get(None, enrollment_id,
-                                                             mock_target['entity'], resource_group)
-        assert result.enrollment_group_id == enrollment_id
+                                                             mock_target['entity'], resource_group, show_keys=show_attestation)
+        assert result['enrollmentGroupId'] == enrollment_id
+        assert result['attestation']
         args = serviceclient.call_args
         url = args[0][0].url
         method = args[0][0].method
-        assert "{}/enrollmentGroups/{}?".format(mock_target['entity'], enrollment_id) in url
-        assert method == 'GET'
+
+        if show_attestation:
+            assert "{}/enrollmentGroups/{}/attestationmechanism?".format(mock_target['entity'], enrollment_id) in url
+            assert method == 'POST'
+        else:
+            assert "{}/enrollmentGroups/{}?".format(mock_target['entity'], enrollment_id) in url
+            assert method == 'GET'
+
 
     def test_enrollment_group_show_error(self, serviceclient_generic_error):
         with pytest.raises(CLIError):

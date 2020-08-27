@@ -66,13 +66,17 @@ def iot_dps_device_enrollment_list(client, dps_name, resource_group_name, top=No
         raise CLIError(e)
 
 
-def iot_dps_device_enrollment_get(client, enrollment_id, dps_name, resource_group_name):
+def iot_dps_device_enrollment_get(client, enrollment_id, dps_name, resource_group_name, show_keys=None):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
-        return sdk.get_individual_enrollment(enrollment_id)
+        enrollment = sdk.get_individual_enrollment(enrollment_id, raw=True).response.json()
+        if show_keys:
+            attestation = sdk.get_individual_enrollment_attestation_mechanism(enrollment_id, raw=True).response.json()
+            enrollment['attestation'] = attestation
+        return enrollment
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
@@ -302,14 +306,18 @@ def iot_dps_device_enrollment_group_list(
 
 
 def iot_dps_device_enrollment_group_get(
-    client, enrollment_id, dps_name, resource_group_name
+    client, enrollment_id, dps_name, resource_group_name, show_keys=None
 ):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
-        return sdk.get_enrollment_group(enrollment_id)
+        enrollment_group = sdk.get_enrollment_group(enrollment_id, raw=True).response.json()
+        if show_keys:
+            attestation = sdk.get_enrollment_group_attestation_mechanism(enrollment_id, raw=True).response.json()
+            enrollment_group['attestation'] = attestation
+        return enrollment_group
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 

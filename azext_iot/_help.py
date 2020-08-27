@@ -1004,6 +1004,13 @@ helps[
 ] = """
     type: command
     short-summary: Get device enrollment details in an Azure IoT Hub Device Provisioning Service.
+    examples:
+    - name: Basic usage
+      text: >
+        az iot dps enrollment show --dps-name {dps_name} -g {resource_group} --enrollment-id {enrollment_id}
+    - name: Include attestation information in results
+      text: >
+        az iot dps enrollment show --dps-name {dps_name} -g {resource_group} --enrollment-id {enrollment_id} --show-keys
 """
 
 helps[
@@ -1130,6 +1137,13 @@ helps[
 ] = """
     type: command
     short-summary: Get the details of an enrollment group in an Azure IoT Hub Device Provisioning Service.
+    examples:
+    - name: Basic usage
+      text: >
+        az iot dps enrollment-group show --dps-name {dps_name} -g {resource_group} --enrollment-id {enrollment_id}
+    - name: Include attestation information in results
+      text: >
+        az iot dps enrollment-group show --dps-name {dps_name} -g {resource_group} --enrollment-id {enrollment_id} --show-keys
 """
 
 helps[

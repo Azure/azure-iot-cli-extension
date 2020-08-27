@@ -81,6 +81,12 @@ class IoTDpsTest(LiveScenarioTest):
                  .format(rg, dps, enrollment_id),
                  checks=[self.check('registrationId', enrollment_id)])
 
+        self.cmd('iot dps enrollment show -g {} --dps-name {} --enrollment-id {} --show-keys'
+                 .format(rg, dps, enrollment_id),
+                 checks=[self.check('registrationId', enrollment_id),
+                         self.check('attestation.type', attestation_type),
+                         self.exists('attestation.{}'.format(attestation_type))])
+
         self.cmd('iot dps enrollment update -g {} --dps-name {} --enrollment-id {}'
                  ' --provisioning-status {} --etag {}'
                  .format(rg, dps, enrollment_id, self.provisioning_status_new, etag),
@@ -281,6 +287,12 @@ class IoTDpsTest(LiveScenarioTest):
         self.cmd('iot dps enrollment-group show -g {} --dps-name {} --enrollment-id {}'
                  .format(rg, dps, enrollment_id),
                  checks=[self.check('enrollmentGroupId', enrollment_id)])
+
+        self.cmd('iot dps enrollment-group show -g {} --dps-name {} --enrollment-id {} --show-keys'
+                 .format(rg, dps, enrollment_id),
+                 checks=[self.check('registrationId', enrollment_id),
+                         self.check('attestation.type', attestation_type),
+                         self.exists('attestation.{}'.format(attestation_type))])
 
         etag = self.cmd('iot dps enrollment-group update -g {} --dps-name {} --enrollment-id {}'
                         ' --provisioning-status {} --rsc --etag {} --rp {} --allocation-policy {}'
