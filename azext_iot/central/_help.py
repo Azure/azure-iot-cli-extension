@@ -21,7 +21,7 @@ def load_central_help():
             IoT infrastructure.
 
             IoT Central documentation is available at https://aka.ms/iotcentral-documentation
-            For more information on command usage, see: aka.ms/azure-cli-iot-ext
+            Additional information on CLI commands is available at https://aka.ms/azure-cli-iot-ext
         """
 
     helps[
