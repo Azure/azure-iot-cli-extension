@@ -6,9 +6,9 @@ Release History
 0.9.9
 +++++++++++++++
 
-IoT dps updates
-    * Introduces 'az iot dps compute-device-key' preview command group to generate derived device SAS key
+IoT DPS updates
 
+* Introduces 'az iot dps compute-device-key' preview command to generate derived device SAS key
 
 IoT Central updates
 
@@ -19,16 +19,19 @@ IoT Central updates
   * Note all commands listed below are in preview
 
     * Introduces 'az iot central diagnostics' preview command group to perform application and device level diagnostics
-    * Introduces 'az iot central device compute-device-key' preview command group to generate derived device SAS key
-      * 'az iot central app device registration-summary' moved to 'az iot central diagnostics registration-summary'
-      * 'az iot central app monitor-properties' moved to 'az iot central diagnostics monitor-properties'
-      * 'az iot central app validate-messages' moved to 'az iot central diagnostics validate-messages'
-      * 'az iot central app validate-properties' moved to 'az iot central diagnostics validate-properties'
-      * 'az iot central diagnostics monitor-events' added to support deprecation of 'az iot central app monitor-events'
+    * Introduces 'az iot central device compute-device-key' preview command to generate derived device SAS key
+
+    * 'az iot central app device registration-summary' moved to 'az iot central diagnostics registration-summary'
+    * 'az iot central app monitor-properties' moved to 'az iot central diagnostics monitor-properties'
+    * 'az iot central app validate-messages' moved to 'az iot central diagnostics validate-messages'
+    * 'az iot central app validate-properties' moved to 'az iot central diagnostics validate-properties'
+    * 'az iot central diagnostics monitor-events' added to support deprecation of 'az iot central app monitor-events'
 
     * 'az iot central app device run-command' moved to 'az iot central device command run'
     * 'az iot central app device show-command-history' moved to 'az iot central device command history'
     * 'az iot central device twin' added to support deprecation of 'az iot central app device-twin' command group
+
+IoT Hub updates
 
 Cloud-to-Device message enhancements
 
@@ -41,6 +44,10 @@ Cloud-to-Device message enhancements
 Edge device creation enhancements
 
 * Enabled x509 self-signed certificate authentication types (`x509_thumbprint` and `x509_ca`) for edge device creation with `az iot hub device-identity create --ee`
+
+Bug fixes
+
+* Fixes issue #243 where providing a connection string via --login still required "az login".
 
 Digital Twins updates
 

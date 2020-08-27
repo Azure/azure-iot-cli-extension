@@ -30,7 +30,7 @@ def load_command_table(self, _):
         "iot hub device-identity", command_type=iothub_ops
     ) as cmd_group:
         cmd_group.command("create", "iot_device_create")
-        cmd_group.command("show", "iot_device_show")
+        cmd_group.show_command("show", "iot_device_show")
         cmd_group.command("list", "iot_device_list")
         cmd_group.command("delete", "iot_device_delete")
         cmd_group.generic_update_command(
@@ -55,13 +55,13 @@ def load_command_table(self, _):
     with self.command_group(
         "iot hub device-identity connection-string", command_type=iothub_ops
     ) as cmd_group:
-        cmd_group.command("show", "iot_get_device_connection_string")
+        cmd_group.show_command("show", "iot_get_device_connection_string")
 
     with self.command_group(
         "iot hub module-identity", command_type=iothub_ops
     ) as cmd_group:
         cmd_group.command("create", "iot_device_module_create")
-        cmd_group.command("show", "iot_device_module_show")
+        cmd_group.show_command("show", "iot_device_module_show")
         cmd_group.command("list", "iot_device_module_list")
         cmd_group.command("delete", "iot_device_module_delete")
         cmd_group.generic_update_command(
@@ -70,7 +70,7 @@ def load_command_table(self, _):
             setter_name="iot_device_module_update",
         )
 
-        cmd_group.command(
+        cmd_group.show_command(
             "show-connection-string",
             "iot_get_module_connection_string",
             deprecate_info=self.deprecate(
@@ -81,12 +81,12 @@ def load_command_table(self, _):
     with self.command_group(
         "iot hub module-identity connection-string", command_type=iothub_ops
     ) as cmd_group:
-        cmd_group.command("show", "iot_get_module_connection_string")
+        cmd_group.show_command("show", "iot_get_module_connection_string")
 
     with self.command_group(
         "iot hub module-twin", command_type=iothub_ops
     ) as cmd_group:
-        cmd_group.command("show", "iot_device_module_twin_show")
+        cmd_group.show_command("show", "iot_device_module_twin_show")
         cmd_group.command("replace", "iot_device_module_twin_replace")
         cmd_group.generic_update_command(
             "update",
@@ -99,7 +99,7 @@ def load_command_table(self, _):
     with self.command_group(
         "iot hub device-twin", command_type=iothub_ops
     ) as cmd_group:
-        cmd_group.command("show", "iot_device_twin_show")
+        cmd_group.show_command("show", "iot_device_twin_show")
         cmd_group.command("replace", "iot_device_twin_replace")
         cmd_group.generic_update_command(
             "update",
@@ -114,7 +114,7 @@ def load_command_table(self, _):
     ) as cmd_group:
         cmd_group.command("show-metric", "iot_hub_configuration_metric_show")
         cmd_group.command("create", "iot_hub_configuration_create")
-        cmd_group.command("show", "iot_hub_configuration_show")
+        cmd_group.show_command("show", "iot_hub_configuration_show")
         cmd_group.command("list", "iot_hub_configuration_list")
         cmd_group.command("delete", "iot_hub_configuration_delete")
         cmd_group.generic_update_command(
@@ -126,13 +126,13 @@ def load_command_table(self, _):
     with self.command_group(
         "iot hub distributed-tracing", command_type=iothub_ops, is_preview=True
     ) as cmd_group:
-        cmd_group.command("show", "iot_hub_distributed_tracing_show")
+        cmd_group.show_command("show", "iot_hub_distributed_tracing_show")
         cmd_group.command("update", "iot_hub_distributed_tracing_update")
 
     with self.command_group(
         "iot hub connection-string", command_type=iothub_ops
     ) as cmd_group:
-        cmd_group.command("show", "iot_hub_connection_string_show")
+        cmd_group.show_command("show", "iot_hub_connection_string_show")
 
     with self.command_group("iot edge", command_type=iothub_ops) as cmd_group:
         cmd_group.command("set-modules", "iot_edge_set_modules")
@@ -142,7 +142,7 @@ def load_command_table(self, _):
     ) as cmd_group:
         cmd_group.command("show-metric", "iot_edge_deployment_metric_show")
         cmd_group.command("create", "iot_edge_deployment_create")
-        cmd_group.command("show", "iot_hub_configuration_show")
+        cmd_group.show_command("show", "iot_hub_configuration_show")
         cmd_group.command("list", "iot_edge_deployment_list")
         cmd_group.command("delete", "iot_hub_configuration_delete")
         cmd_group.generic_update_command(
@@ -166,10 +166,13 @@ def load_command_table(self, _):
         cmd_group.command("send", "iot_c2d_message_send")
         cmd_group.command("purge", "iot_c2d_message_purge")
 
+    with self.command_group("iot dps", command_type=iotdps_ops) as cmd_group:
+        cmd_group.command("compute-device-key", "iot_dps_compute_device_key", is_preview=True)
+
     with self.command_group("iot dps enrollment", command_type=iotdps_ops) as cmd_group:
         cmd_group.command("create", "iot_dps_device_enrollment_create")
         cmd_group.command("list", "iot_dps_device_enrollment_list")
-        cmd_group.command("show", "iot_dps_device_enrollment_get")
+        cmd_group.show_command("show", "iot_dps_device_enrollment_get")
         cmd_group.command("update", "iot_dps_device_enrollment_update")
         cmd_group.command("delete", "iot_dps_device_enrollment_delete")
 
@@ -178,7 +181,7 @@ def load_command_table(self, _):
     ) as cmd_group:
         cmd_group.command("create", "iot_dps_device_enrollment_group_create")
         cmd_group.command("list", "iot_dps_device_enrollment_group_list")
-        cmd_group.command("show", "iot_dps_device_enrollment_group_get")
+        cmd_group.show_command("show", "iot_dps_device_enrollment_group_get")
         cmd_group.command("update", "iot_dps_device_enrollment_group_update")
         cmd_group.command("delete", "iot_dps_device_enrollment_group_delete")
 
@@ -186,10 +189,5 @@ def load_command_table(self, _):
         "iot dps registration", command_type=iotdps_ops
     ) as cmd_group:
         cmd_group.command("list", "iot_dps_registration_list")
-        cmd_group.command("show", "iot_dps_registration_get")
+        cmd_group.show_command("show", "iot_dps_registration_get")
         cmd_group.command("delete", "iot_dps_registration_delete")
-
-    with self.command_group(
-        "iot dps compute-device-key", command_type=iotdps_ops, is_preview=True
-    ) as cmd_group:
-        cmd_group.command("create", "iot_dps_compute_device_key")

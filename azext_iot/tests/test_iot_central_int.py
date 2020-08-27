@@ -197,7 +197,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         device_id = "testDevice"
 
         device_primary_key = self.cmd(
-            "iot central device compute-device-key create --pk {} -d {}".format(
+            "iot central device compute-device-key --pk {} -d {}".format(
                 APP_PRIMARY_KEY, device_id
             ),
         ).get_output_in_json()
