@@ -137,7 +137,7 @@ def _load_central_compute_device_key():
     ] = """
         type: command
         short-summary: Generate a derived device SAS key.
-        long-summary: Generate a derived device key from a primary group symmetric key.
+        long-summary: Generate a derived device key from a group-level SAS key.
         examples:
         - name: Basic usage
           text: >
