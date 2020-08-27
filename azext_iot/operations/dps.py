@@ -544,9 +544,9 @@ def iot_dps_device_enrollment_group_delete(
 
 
 def iot_dps_compute_device_key(
-    cmd, primary_key, registration_id,
+    cmd, symmetric_key, registration_id,
 ):
-    return compute_device_key(primary_key=primary_key, registration_id=registration_id)
+    return compute_device_key(primary_key=symmetric_key, registration_id=registration_id)
 
 
 # DPS Registration
