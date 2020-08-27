@@ -291,8 +291,7 @@ class IoTDpsTest(LiveScenarioTest):
         self.cmd('iot dps enrollment-group show -g {} --dps-name {} --enrollment-id {} --show-keys'
                  .format(rg, dps, enrollment_id),
                  checks=[self.check('registrationId', enrollment_id),
-                         self.check('attestation.type', attestation_type),
-                         self.exists('attestation.{}'.format(attestation_type))])
+                         self.exists('attestation.type.x509')])
 
         etag = self.cmd('iot dps enrollment-group update -g {} --dps-name {} --enrollment-id {}'
                         ' --provisioning-status {} --rsc --etag {} --rp {} --allocation-policy {}'
