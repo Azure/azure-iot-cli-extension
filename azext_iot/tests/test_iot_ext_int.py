@@ -149,10 +149,14 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
     def test_hub_devices(self):
         device_count = 5
         edge_device_count = 2
+        edge_x509_device_count = 2
+        total_edge_device_count = edge_x509_device_count + edge_device_count
 
         device_ids = self.generate_device_names(device_count)
         edge_device_ids = self.generate_device_names(edge_device_count, edge=True)
-        total_devices = device_count + edge_device_count
+        edge_x509_device_ids = self.generate_device_names(edge_x509_device_count, edge=True)
+
+        total_devices = device_count + total_edge_device_count
 
         self.cmd(
             "iot hub device-identity create -d {} -n {} -g {}".format(
@@ -199,25 +203,51 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
             )
 
         # All edge devices + child device
-        query_checks = [self.check("length([*])", edge_device_count + 1)]
+        query_checks = [self.check("length([*])", total_edge_device_count + 1)]
         for i in edge_device_ids:
             query_checks.append(self.exists("[?deviceId==`{}`]".format(i)))
         query_checks.append(self.exists("[?deviceId==`{}`]".format(device_ids[4])))
 
-        # Not currently supported
+        # Edge x509_thumbprint
         self.cmd(
-            "iot hub device-identity create -d {} -n {} -g {} --auth-method x509_thumbprint --ee".format(
-                "willnotwork", LIVE_HUB, LIVE_RG
+            "iot hub device-identity create -d {} -n {} -g {} --auth-method x509_thumbprint --ptp {} --stp {} --ee".format(
+                edge_x509_device_ids[0], LIVE_HUB, LIVE_RG, PRIMARY_THUMBPRINT, SECONDARY_THUMBPRINT
             ),
-            expect_failure=True,
+            checks=[
+                self.check("deviceId", edge_x509_device_ids[0]),
+                self.check("status", "enabled"),
+                self.check("statusReason", None),
+                self.check("capabilities.iotEdge", True),
+                self.check("connectionState", "Disconnected"),
+                self.check("authentication.symmetricKey.primaryKey", None),
+                self.check("authentication.symmetricKey.secondaryKey", None),
+                self.check(
+                    "authentication.x509Thumbprint.primaryThumbprint",
+                    PRIMARY_THUMBPRINT,
+                ),
+                self.check(
+                    "authentication.x509Thumbprint.secondaryThumbprint",
+                    SECONDARY_THUMBPRINT,
+                ),
+            ]
         )
 
-        # Not currently supported
+        # Edge x509_ca
         self.cmd(
             "iot hub device-identity create -d {} -n {} -g {} --auth-method x509_ca --ee".format(
-                "willnotwork", LIVE_HUB, LIVE_RG
+                edge_x509_device_ids[1], LIVE_HUB, LIVE_RG
             ),
-            expect_failure=True,
+            checks=[
+                self.check("deviceId", edge_x509_device_ids[1]),
+                self.check("status", "enabled"),
+                self.check("capabilities.iotEdge", True),
+                self.check("connectionState", "Disconnected"),
+                self.check("authentication.symmetricKey.primaryKey", None),
+                self.check("authentication.symmetricKey.secondaryKey", None),
+                self.check("authentication.x509Thumbprint.primaryThumbprint", None),
+                self.check("authentication.x509Thumbprint.secondaryThumbprint", None),
+                self.check("authentication.type", "certificateAuthority")
+            ]
         )
 
         self.cmd(
@@ -383,13 +413,13 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
         # List only edge devices
         self.cmd(
             "iot hub device-identity list -n {} -g {} --ee".format(LIVE_HUB, LIVE_RG),
-            checks=[self.check("length([*])", edge_device_count)],
+            checks=[self.check("length([*])", total_edge_device_count)],
         )
 
         # With connection string
         self.cmd(
             "iot hub device-identity list --ee --login {}".format(self.connection_string),
-            checks=[self.check("length([*])", edge_device_count)],
+            checks=[self.check("length([*])", total_edge_device_count)],
         )
 
         self.cmd(

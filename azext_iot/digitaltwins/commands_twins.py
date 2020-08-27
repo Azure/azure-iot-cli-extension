@@ -10,38 +10,40 @@ from knack.log import get_logger
 logger = get_logger(__name__)
 
 
-def query_twins(cmd, name, query_command, show_cost=False, resource_group_name=None):
-    twin_provider = TwinProvider(cmd=cmd, name=name, rg=resource_group_name)
+def query_twins(
+    cmd, name_or_hostname, query_command, show_cost=False, resource_group_name=None
+):
+    twin_provider = TwinProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
     return twin_provider.invoke_query(query=query_command, show_cost=show_cost)
 
 
 def create_twin(
-    cmd, name, twin_id, model_id, properties=None, resource_group_name=None
+    cmd, name_or_hostname, twin_id, model_id, properties=None, resource_group_name=None
 ):
-    twin_provider = TwinProvider(cmd=cmd, name=name, rg=resource_group_name)
+    twin_provider = TwinProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
     return twin_provider.create(
         twin_id=twin_id, model_id=model_id, properties=properties
     )
 
 
-def show_twin(cmd, name, twin_id, resource_group_name=None):
-    twin_provider = TwinProvider(cmd=cmd, name=name, rg=resource_group_name)
+def show_twin(cmd, name_or_hostname, twin_id, resource_group_name=None):
+    twin_provider = TwinProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
     return twin_provider.get(twin_id)
 
 
-def update_twin(cmd, name, twin_id, json_patch, resource_group_name=None):
-    twin_provider = TwinProvider(cmd=cmd, name=name, rg=resource_group_name)
+def update_twin(cmd, name_or_hostname, twin_id, json_patch, resource_group_name=None):
+    twin_provider = TwinProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
     return twin_provider.update(twin_id=twin_id, json_patch=json_patch)
 
 
-def delete_twin(cmd, name, twin_id, resource_group_name=None):
-    twin_provider = TwinProvider(cmd=cmd, name=name, rg=resource_group_name)
+def delete_twin(cmd, name_or_hostname, twin_id, resource_group_name=None):
+    twin_provider = TwinProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
     return twin_provider.delete(twin_id)
 
 
 def create_relationship(
     cmd,
-    name,
+    name_or_hostname,
     twin_id,
     target_twin_id,
     relationship_id,
@@ -49,7 +51,7 @@ def create_relationship(
     properties=None,
     resource_group_name=None,
 ):
-    twin_provider = TwinProvider(cmd=cmd, name=name, rg=resource_group_name)
+    twin_provider = TwinProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
     return twin_provider.add_relationship(
         twin_id=twin_id,
         target_twin_id=target_twin_id,
@@ -60,18 +62,23 @@ def create_relationship(
 
 
 def show_relationship(
-    cmd, name, twin_id, relationship_id, resource_group_name=None,
+    cmd, name_or_hostname, twin_id, relationship_id, resource_group_name=None,
 ):
-    twin_provider = TwinProvider(cmd=cmd, name=name, rg=resource_group_name)
+    twin_provider = TwinProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
     return twin_provider.get_relationship(
         twin_id=twin_id, relationship_id=relationship_id
     )
 
 
 def update_relationship(
-    cmd, name, twin_id, relationship_id, json_patch, resource_group_name=None
+    cmd,
+    name_or_hostname,
+    twin_id,
+    relationship_id,
+    json_patch,
+    resource_group_name=None,
 ):
-    twin_provider = TwinProvider(cmd=cmd, name=name, rg=resource_group_name)
+    twin_provider = TwinProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
     return twin_provider.update_relationship(
         twin_id=twin_id, relationship_id=relationship_id, json_patch=json_patch,
     )
@@ -79,13 +86,13 @@ def update_relationship(
 
 def list_relationships(
     cmd,
-    name,
+    name_or_hostname,
     twin_id,
     incoming_relationships=False,
     relationship=None,
     resource_group_name=None,
 ):
-    twin_provider = TwinProvider(cmd=cmd, name=name, rg=resource_group_name)
+    twin_provider = TwinProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
     return twin_provider.list_relationships(
         twin_id=twin_id,
         incoming_relationships=incoming_relationships,
@@ -94,9 +101,9 @@ def list_relationships(
 
 
 def delete_relationship(
-    cmd, name, twin_id, relationship_id, resource_group_name=None,
+    cmd, name_or_hostname, twin_id, relationship_id, resource_group_name=None,
 ):
-    twin_provider = TwinProvider(cmd=cmd, name=name, rg=resource_group_name)
+    twin_provider = TwinProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
     return twin_provider.delete_relationship(
         twin_id=twin_id, relationship_id=relationship_id
     )
@@ -104,28 +111,30 @@ def delete_relationship(
 
 def send_telemetry(
     cmd,
-    name,
+    name_or_hostname,
     twin_id,
     dt_id=None,
     component_path=None,
     telemetry=None,
     resource_group_name=None,
 ):
-    twin_provider = TwinProvider(cmd=cmd, name=name, rg=resource_group_name)
+    twin_provider = TwinProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
     return twin_provider.send_telemetry(
         twin_id=twin_id, dt_id=dt_id, component_path=component_path, telemetry=telemetry
     )
 
 
-def show_component(cmd, name, twin_id, component_path, resource_group_name=None):
-    twin_provider = TwinProvider(cmd=cmd, name=name, rg=resource_group_name)
+def show_component(
+    cmd, name_or_hostname, twin_id, component_path, resource_group_name=None
+):
+    twin_provider = TwinProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
     return twin_provider.get_component(twin_id=twin_id, component_path=component_path)
 
 
 def update_component(
-    cmd, name, twin_id, component_path, json_patch, resource_group_name=None
+    cmd, name_or_hostname, twin_id, component_path, json_patch, resource_group_name=None
 ):
-    twin_provider = TwinProvider(cmd=cmd, name=name, rg=resource_group_name)
+    twin_provider = TwinProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
     twin_provider.update_component(
         twin_id=twin_id, component_path=component_path, json_patch=json_patch
     )

@@ -40,6 +40,13 @@ def load_digitaltwins_arguments(self, _):
             help="Digital Twins instance name.",
         )
         context.argument(
+            "name_or_hostname",
+            options_list=["-n", "--dtn", "--dt-name"],
+            help="Digital Twins instance name or hostname. If an instance name is provided, the user subscription is "
+            "first queried for the target instance to retrieve the hostname. If a hostname is provided, the "
+            "subscription query is skipped and the provided value is used for subsequent interaction.",
+        )
+        context.argument(
             "location",
             options_list=["--location", "-l"],
             help="Digital Twins instance location. If no location is provided the resource group location is used."

@@ -23,6 +23,7 @@ from azext_iot.common.shared import (
     ProtocolType,
     ConfigType,
     KeyType,
+    SettleType,
 )
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
@@ -139,8 +140,6 @@ def iot_device_create(
 
     deviceScope = None
     if edge_enabled:
-        if auth_method != DeviceAuthType.shared_private_key.name:
-            raise CLIError("currently edge devices are limited to symmetric key auth")
         if add_children:
             for non_edge_device_id in add_children.split(","):
                 nonedge_device = _iot_device_show(target, non_edge_device_id.strip())
@@ -1838,16 +1837,38 @@ def _iot_c2d_message_abandon(target, device_id, etag):
 
 
 def iot_c2d_message_receive(
-    cmd, device_id, hub_name=None, lock_timeout=60, resource_group_name=None, login=None
+    cmd,
+    device_id,
+    hub_name=None,
+    lock_timeout=60,
+    resource_group_name=None,
+    login=None,
+    abandon=None,
+    complete=None,
+    reject=None
 ):
+    ack = None
+    ack_vals = [abandon, complete, reject]
+    if any(ack_vals):
+        if len(list(filter(lambda val: val, ack_vals))) > 1:
+            raise CLIError(
+                "Only one c2d-message ack argument can be used [--complete, --abandon, --reject]"
+            )
+        if abandon:
+            ack = SettleType.abandon.value
+        elif complete:
+            ack = SettleType.complete.value
+        elif reject:
+            ack = SettleType.reject.value
+
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
-    return _iot_c2d_message_receive(target, device_id, lock_timeout)
+    return _iot_c2d_message_receive(target, device_id, lock_timeout, ack)
 
 
-def _iot_c2d_message_receive(target, device_id, lock_timeout=60):
+def _iot_c2d_message_receive(target, device_id, lock_timeout=60, ack=None):
     from azext_iot.constants import MESSAGING_HTTP_C2D_SYSTEM_PROPERTIES
 
     resolver = SdkResolver(target=target, device_id=device_id)
@@ -1866,7 +1887,32 @@ def _iot_c2d_message_receive(target, device_id, lock_timeout=60):
             payload = {"properties": {}}
 
             if "etag" in result.headers:
-                payload["etag"] = result.headers["etag"].strip('"')
+                eTag = result.headers["etag"].strip('"')
+                payload["etag"] = eTag
+
+                if ack:
+                    ack_response = {}
+                    if ack == SettleType.abandon.value:
+                        logger.debug("__Abandoning message__")
+                        ack_response = device_sdk.device.abandon_device_bound_notification(
+                            id=device_id, etag=eTag, raw=True
+                        )
+                    elif ack == SettleType.reject.value:
+                        logger.debug("__Rejecting message__")
+                        ack_response = device_sdk.device.complete_device_bound_notification(
+                            id=device_id, etag=eTag, reject="", raw=True
+                        )
+                    else:
+                        logger.debug("__Completing message__")
+                        ack_response = device_sdk.device.complete_device_bound_notification(
+                            id=device_id, etag=eTag, raw=True
+                        )
+
+                    payload["ack"] = (
+                        ack
+                        if (ack_response and ack_response.response.status_code == 204)
+                        else None
+                    )
 
             app_prop_prefix = "iothub-app-"
             app_prop_keys = [
@@ -2069,6 +2115,19 @@ def iot_simulate_device(
             token.set()
 
 
+def iot_c2d_message_purge(
+    cmd, device_id, hub_name=None, resource_group_name=None, login=None,
+):
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+    )
+    resolver = SdkResolver(target=target)
+    service_sdk = resolver.get_sdk(SdkType.service_sdk)
+
+    return service_sdk.registry_manager.purge_command_queue(device_id)
+
+
 def _iot_simulate_get_default_properties(protocol):
     default_properties = {}
     is_mqtt = protocol == ProtocolType.mqtt.name
@@ -2079,8 +2138,8 @@ def _iot_simulate_get_default_properties(protocol):
     return default_properties
 
 
-def _handle_c2d_msg(target, device_id, receive_settle):
-    result = _iot_c2d_message_receive(target, device_id)
+def _handle_c2d_msg(target, device_id, receive_settle, lock_timeout=60):
+    result = _iot_c2d_message_receive(target, device_id, lock_timeout)
     if result:
         six.print_()
         six.print_("__Received C2D Message__")

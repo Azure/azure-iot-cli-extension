@@ -552,17 +552,6 @@ def load_arguments(self, _):
 
     with self.argument_context("iot device c2d-message") as context:
         context.argument(
-            "ack",
-            options_list=["--ack"],
-            arg_type=get_enum_type(AckType),
-            help="Request the delivery of per-message feedback regarding the final state of that message. "
-            "The description of ack values is as follows. "
-            "Positive: If the c2d message reaches the Completed state, IoT Hub generates a feedback message. "
-            "Negative: If the c2d message reaches the Dead lettered state, IoT Hub generates a feedback message. "
-            "Full: IoT Hub generates a feedback message in either case. "
-            "By default, no ack is requested.",
-        )
-        context.argument(
             "correlation_id",
             options_list=["--correlation-id", "--cid"],
             help="The correlation Id associated with the C2D message.",
@@ -608,10 +597,44 @@ def load_arguments(self, _):
 
     with self.argument_context("iot device c2d-message send") as context:
         context.argument(
+            "ack",
+            options_list=["--ack"],
+            arg_type=get_enum_type(AckType),
+            help="Request the delivery of per-message feedback regarding the final state of that message. "
+            "The description of ack values is as follows. "
+            "Positive: If the c2d message reaches the Completed state, IoT Hub generates a feedback message. "
+            "Negative: If the c2d message reaches the Dead lettered state, IoT Hub generates a feedback message. "
+            "Full: IoT Hub generates a feedback message in either case. "
+            "By default, no ack is requested.",
+        )
+        context.argument(
             "wait_on_feedback",
             options_list=["--wait", "-w"],
             arg_type=get_three_state_flag(),
             help="If set the c2d send operation will block until device feedback has been received.",
+        )
+
+    with self.argument_context("iot device c2d-message receive") as context:
+        context.argument(
+            "abandon",
+            arg_group="Message Ack",
+            options_list=["--abandon"],
+            arg_type=get_three_state_flag(),
+            help="Abandon the cloud-to-device message after receipt.",
+        )
+        context.argument(
+            "complete",
+            arg_group="Message Ack",
+            options_list=["--complete"],
+            arg_type=get_three_state_flag(),
+            help="Complete the cloud-to-device message after receipt.",
+        )
+        context.argument(
+            "reject",
+            arg_group="Message Ack",
+            options_list=["--reject"],
+            arg_type=get_three_state_flag(),
+            help="Reject the cloud-to-device message after receipt.",
         )
 
     with self.argument_context("iot device upload-file") as context:

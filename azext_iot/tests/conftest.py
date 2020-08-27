@@ -17,7 +17,9 @@ from azure.cli.core.mock import DummyCli
 path_iot_hub_service_factory = "azext_iot._factory.iot_hub_service_factory"
 path_service_client = "msrest.service_client.ServiceClient.send"
 path_ghcs = "azext_iot.iothub.providers.discovery.IotHubDiscovery.get_target"
-path_discovery_init = "azext_iot.iothub.providers.discovery.IotHubDiscovery._initialize_client"
+path_discovery_init = (
+    "azext_iot.iothub.providers.discovery.IotHubDiscovery._initialize_client"
+)
 path_sas = "azext_iot._factory.SasTokenAuthentication"
 path_mqtt_client = "azext_iot.operations._mqtt.mqtt.Client"
 path_iot_hub_monitor_events_entrypoint = (
@@ -175,6 +177,28 @@ def get_context_path(base_path, *paths):
         return os.path.join(base_path, *paths)
 
     return base_path
+
+
+''' TODO: Possibly expand for future use
+fake_oauth_response = responses.Response(
+    method=responses.POST,
+    url=re.compile("https://login.microsoftonline.com/(.+)/oauth2/token"),
+    body=json.dumps({
+        "token_type": "Bearer",
+        "scope": "user_impersonation",
+        "expires_in": "90000",
+        "ext_expires_in": "90000",
+        "expires_on": "979778250",
+        "not_before": "979739250",
+        "resource": "localhost",
+        "access_token": "totally_fake_access_token",
+        "refresh_token": "totally_fake_refresh_token",
+        "foci": "1"
+    }),
+    status=200,
+    content_type="application/json",
+)
+'''
 
 
 @pytest.fixture
