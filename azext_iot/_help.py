@@ -241,14 +241,16 @@ helps[
     "iot hub device-identity export"
 ] = """
     type: command
-    short-summary: Export all device identities from an IoT Hub to an Azure Storage blob container.
+    short-summary: Export all device identities from an IoT Hub to an Azure Storage blob container. For inline
+                   blob container SAS uri input, please review the input rules of your environment.
     long-summary: For more information, see
                   https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
     examples:
-    - name: Export all device identities to a configured blob container using an inline SAS uri.
+    - name: Export all device identities to a configured blob container and include device keys. Uses an inline SAS uri example.
       text: >
-        az iot hub device-identity export -n {iothub_name} --bcu {sas_uri}
-    - name: Export all device identities to a configured blob container using a file path which contains SAS uri.
+        az iot hub device-identity export -n {iothub_name} --ik --bcu
+        'https://mystorageaccount.blob.core.windows.net/devices?sv=2019-02-02&st=2020-08-23T22%3A35%3A00Z&se=2020-08-24T22%3A35%3A00Z&sr=c&sp=rwd&sig=VrmJ5sQtW3kLzYg10VqmALGCp4vtYKSLNjZDDJBSh9s%3D'
+    - name: Export all device identities to a configured blob container using a file path which contains the SAS uri.
       text: >
         az iot hub device-identity export -n {iothub_name} --bcu {sas_uri_filepath}
 """
@@ -257,7 +259,8 @@ helps[
     "iot hub device-identity import"
 ] = """
     type: command
-    short-summary: Import device identities to an IoT Hub from a blob.
+    short-summary: Import device identities to an IoT Hub from a blob. For inline
+                   blob container SAS uri input, please review the input rules of your environment.
     long-summary: For more information, see
                   https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
     examples:
