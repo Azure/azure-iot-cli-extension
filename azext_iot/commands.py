@@ -34,7 +34,11 @@ def load_command_table(self, _):
         cmd_group.command("list", "iot_device_list")
         cmd_group.command("delete", "iot_device_delete")
         cmd_group.generic_update_command(
-            "update", getter_name="iot_device_show", setter_name="iot_device_update"
+            "update",
+            getter_name="iot_device_show",
+            custom_func_type=iothub_ops,
+            setter_name="iot_device_update",
+            custom_func_name="update_iot_device_custom"
         )
 
         cmd_group.command(
