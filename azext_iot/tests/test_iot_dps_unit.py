@@ -1086,7 +1086,7 @@ class TestEnrollmentGroupShow():
             url="https://{}/enrollmentGroups/{}/attestationmechanism".format(mock_target['entity'], enrollment_id),
             body=json.dumps({"attestation": {
                 "type": "symmetricKey",
-                "symmetricKey":{
+                "symmetricKey": {
                     "primaryKey": 'primary_key',
                     "secondaryKey": 'secondary_key'
                 }
@@ -1128,7 +1128,6 @@ class TestEnrollmentGroupShow():
 
         assert "{}/enrollmentGroups/{}/attestationmechanism?".format(mock_target['entity'], enrollment_id) in url
         assert method == 'POST'
-       
 
     def test_enrollment_group_show_error(self, serviceclient_generic_error):
         with pytest.raises(CLIError):
