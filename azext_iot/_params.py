@@ -27,7 +27,6 @@ from azext_iot.common.shared import (
     ReprovisionType,
     AllocationType,
     DistributedTracingSamplingModeType,
-    ModelSourceType,
     JobType,
     JobCreateType,
     JobStatusType,
@@ -814,11 +813,11 @@ def load_arguments(self, _):
 
     with self.argument_context("iot dps compute-device-key") as context:
         context.argument(
-            "primary_key",
-            options_list=["--primary-key", "--pk"],
-            help="The primary symmetric shared access key stored in base64 format. ",
+            "symmetric_key",
+            options_list=["--symmetric-key", "--key"],
+            help="The symmetric shared access key for the enrollment group. ",
         )
-        context.argument("registration_id", help="ID of device registration")
+        context.argument("registration_id", help="ID of device registration. ")
 
     with self.argument_context("iot dps enrollment") as context:
         context.argument("enrollment_id", help="ID of device enrollment record")
@@ -927,49 +926,3 @@ def load_arguments(self, _):
 
     with self.argument_context("iot dps registration list") as context:
         context.argument("enrollment_id", help="ID of enrollment group")
-
-    with self.argument_context("iot dt") as context:
-        context.argument(
-            "repo_login",
-            options_list=["--repo-login", "--rl"],
-            help="This command supports an entity connection string with rights to perform action. "
-            "Use to avoid PnP endpoint and repository name if repository is private. "
-            "If both an entity connection string and name are provided the connection string takes priority.",
-        )
-        context.argument(
-            "interface",
-            options_list=["--interface", "-i"],
-            help="Target interface name. This should be the name of the interface not the urn-id.",
-        )
-        context.argument(
-            "command_name",
-            options_list=["--command-name", "--cn"],
-            help="IoT Plug and Play interface command name.",
-        )
-        context.argument(
-            "command_payload",
-            options_list=["--command-payload", "--cp", "--cv"],
-            help="IoT Plug and Play interface command payload. "
-            "Content can be directly input or extracted from a file path.",
-        )
-        context.argument(
-            "interface_payload",
-            options_list=["--interface-payload", "--ip", "--iv"],
-            help="IoT Plug and Play interface payload. "
-            "Content can be directly input or extracted from a file path.",
-        )
-        context.argument(
-            "source_model",
-            options_list=["--source", "-s"],
-            help="Choose your option to get model definition from specified source. ",
-            arg_type=get_enum_type(ModelSourceType),
-        )
-        context.argument(
-            "schema",
-            options_list=["--schema"],
-            help="Show interface with entity schema.",
-        )
-
-    with self.argument_context("iot dt monitor-events") as context:
-        context.argument("timeout", arg_type=event_timeout_type)
-        context.argument("properties", arg_type=event_msg_prop_type)

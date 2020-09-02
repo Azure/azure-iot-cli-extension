@@ -93,7 +93,6 @@ class TestProductDeviceTestTasks(AICSLiveScenarioTest):
         test_task = self.cmd(
             "iot product test task show -t {device_test_id} --task-id {generate_task_id} --base-url {BASE_URL}"
         ).get_output_in_json()
-        assert test_task.get("status") == DeviceTestTaskStatus.completed.value
         assert test_task.get("error") is None
         assert test_task.get("type") == TaskType.GenerateTestCases.value
 

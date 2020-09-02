@@ -21,7 +21,7 @@ def load_central_help():
             IoT infrastructure.
 
             IoT Central documentation is available at https://aka.ms/iotcentral-documentation
-            For more information on command usage, see: aka.ms/azure-cli-iot-ext
+            Additional information on CLI commands is available at https://aka.ms/azure-cli-iot-ext
         """
 
     helps[
@@ -135,20 +135,13 @@ def _load_central_compute_device_key():
     helps[
         "iot central device compute-device-key"
     ] = """
-          type: group
-          short-summary:  Generate a derived device SAS key
-      """
-
-    helps[
-        "iot central device compute-device-key create"
-    ] = """
         type: command
         short-summary: Generate a derived device SAS key.
-        Long-summary: Generate a derived device key from primary group SAS token.
+        long-summary: Generate a derived device key from a group-level SAS key.
         examples:
-        - name: basic usage
+        - name: Basic usage
           text: >
-            az iot central device compute-device-key create --pk {primaryKey} --device-id {deviceid}
+            az iot central device compute-device-key --pk {primaryKey} --device-id {deviceid}
       """
 
 

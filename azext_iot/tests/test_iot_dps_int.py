@@ -79,6 +79,12 @@ class TestDPSEnrollments(LiveScenarioTest):
         if os.path.exists(cert_path):
             os.remove(cert_path)
 
+    def test_dps_compute_device_key(self):
+        device_key = self.cmd('az iot dps compute-device-key --key "{}" '
+                              '--registration-id myarbitrarydeviceId'.format(test_endorsement_key)).output
+        device_key = device_key.strip("\"'\n")
+        assert device_key == "cT/EXZvsplPEpT//p98Pc6sKh8mY3kYgSxavHwMkl7w="
+
     def test_dps_enrollment_tpm_lifecycle(self):
         enrollment_id = self.create_random_name("enrollment-for-test", length=48)
         endorsement_key = (

@@ -240,10 +240,10 @@ def load_digitaltwins_help():
         examples:
         - name: Adds an event route for an existing endpoint on target instance with default filter of "true".
           text: >
-            az dt route create -n {instance_name} --endpoint-name {endpoint_name} --route-name {route_name}
+            az dt route create -n {instance_or_hostname} --endpoint-name {endpoint_name} --route-name {route_name}
         - name: Adds an event route for an existing endpoint on target instance with custom filter.
           text: >
-            az dt route create -n {instance_name} --endpoint-name {endpoint_name} --route-name {route_name}
+            az dt route create -n {instance_or_hostname} --endpoint-name {endpoint_name} --route-name {route_name}
             --filter "type = 'Microsoft.DigitalTwins.Twin.Create'"
     """
 
@@ -254,7 +254,7 @@ def load_digitaltwins_help():
         examples:
         - name: List configured event routes of a target instance.
           text: >
-            az dt route list -n {instance_name}
+            az dt route list -n {instance_or_hostname}
     """
 
     helps["dt route delete"] = """
@@ -264,7 +264,7 @@ def load_digitaltwins_help():
         examples:
         - name: Remove an event route from a target instance.
           text: >
-            az dt route delete -n {instance_name} --route-name {route_name}
+            az dt route delete -n {instance_or_hostname} --route-name {route_name}
     """
 
     helps["dt route show"] = """
@@ -274,7 +274,7 @@ def load_digitaltwins_help():
         examples:
         - name: Show an event route on a target instance.
           text: >
-            az dt route show -n {instance_name} --route-name {route_name}
+            az dt route show -n {instance_or_hostname} --route-name {route_name}
     """
 
     helps["dt twin"] = """
@@ -290,17 +290,17 @@ def load_digitaltwins_help():
         examples:
         - name: Create a digital twin from an existing (prior-created) model.
           text: >
-            az dt twin create -n {instance_name} --dtmi dtmi:example:Room;1
+            az dt twin create -n {instance_or_hostname} --dtmi dtmi:example:Room;1
             --twin-id {twin_id}
 
         - name: Create a digital twin from an existing (prior-created) model. Instantiate with property values.
           text: >
-            az dt twin create -n {instance_name} --dtmi dtmi:com:example:DeviceInformation;1
+            az dt twin create -n {instance_or_hostname} --dtmi dtmi:com:example:DeviceInformation;1
             --twin-id {twin_id} --properties '{"manufacturer": "Microsoft"}'
 
         - name: Create a digital twin with component from existing (prior-created) models. Instantiate with property values.
           text: >
-            az dt twin create -n {instance_name} --dtmi dtmi:com:example:TemperatureController;1 --twin-id {twin_id} --properties '{
+            az dt twin create -n {instance_or_hostname} --dtmi dtmi:com:example:TemperatureController;1 --twin-id {twin_id} --properties '{
                 "Temperature": 10.2,
                 "Thermostat": {
                     "$metadata": {},
@@ -318,12 +318,12 @@ def load_digitaltwins_help():
         examples:
         - name: Update a digital twin via JSON patch specification.
           text: >
-            az dt twin update -n {instance_name} --twin-id {twin_id}
+            az dt twin update -n {instance_or_hostname} --twin-id {twin_id}
             --json-patch '{"op":"replace", "path":"/Temperature", "value": 20.5}'
 
         - name: Update a digital twin via JSON patch specification.
           text: >
-            az dt twin update -n {instance_name} --twin-id {twin_id}
+            az dt twin update -n {instance_or_hostname} --twin-id {twin_id}
             --json-patch '[
               {"op":"replace", "path":"/Temperature", "value": 20.5},
               {"op":"add", "path":"/Areas", "value": ["ControlSystem"]}
@@ -331,7 +331,7 @@ def load_digitaltwins_help():
 
         - name: Update a digital twin via JSON patch specification defined in a file.
           text: >
-            az dt twin update -n {instance_name} --twin-id {twin_id}
+            az dt twin update -n {instance_or_hostname} --twin-id {twin_id}
             --json-patch ./my/patch/document.json
     """
 
@@ -342,7 +342,7 @@ def load_digitaltwins_help():
         examples:
         - name: Show the details of a digital twin.
           text: >
-            az dt twin show -n {instance_name} --twin-id {twin_id}
+            az dt twin show -n {instance_or_hostname} --twin-id {twin_id}
     """
 
     helps["dt twin query"] = """
@@ -352,11 +352,11 @@ def load_digitaltwins_help():
         examples:
         - name: Query all digital twins in target instance and project all attributes. Also show cost in query units.
           text: >
-            az dt twin query -n {instance_name} -q "select * from digitaltwins" --show-cost
+            az dt twin query -n {instance_or_hostname} -q "select * from digitaltwins" --show-cost
 
         - name: Query by model and project all attributes.
           text: >
-            az dt twin query -n {instance_name} -q "select * from digitaltwins T where IS_OF_MODEL(T, 'dtmi:example:Room;2')"
+            az dt twin query -n {instance_or_hostname} -q "select * from digitaltwins T where IS_OF_MODEL(T, 'dtmi:example:Room;2')"
     """
 
     helps["dt twin delete"] = """
@@ -366,7 +366,7 @@ def load_digitaltwins_help():
         examples:
         - name: Remove a digital twin by Id.
           text: >
-            az dt twin delete -n {instance_name} --twin-id {twin_id}
+            az dt twin delete -n {instance_or_hostname} --twin-id {twin_id}
     """
 
     helps["dt twin relationship"] = """
@@ -382,12 +382,12 @@ def load_digitaltwins_help():
         examples:
         - name: Create a relationship between two digital twins.
           text: >
-            az dt twin relationship create -n {instance_name} --relationship-id {relationship_id} --relationship contains
+            az dt twin relationship create -n {instance_or_hostname} --relationship-id {relationship_id} --relationship contains
             --twin-id {source_twin_id} --target {target_twin_id}
 
         - name: Create a relationship with initialized properties between two digital twins.
           text: >
-            az dt twin relationship create -n {instance_name} --relationship-id {relationship_id} --relationship contains
+            az dt twin relationship create -n {instance_or_hostname} --relationship-id {relationship_id} --relationship contains
             --twin-id {source_twin_id} --target {target_twin_id}
             --properties '{"ownershipUser": "me", "ownershipDepartment": "Computer Science"}'
     """
@@ -399,7 +399,7 @@ def load_digitaltwins_help():
         examples:
         - name: Show details of a digital twin relationship.
           text: >
-            az dt twin relationship show -n {instance_name} --twin-id {twin_id} --relationship-id {relationship_id}
+            az dt twin relationship show -n {instance_or_hostname} --twin-id {twin_id} --relationship-id {relationship_id}
     """
 
     helps["dt twin relationship list"] = """
@@ -409,19 +409,19 @@ def load_digitaltwins_help():
         examples:
         - name: List outgoing relationships of a digital twin.
           text: >
-            az dt twin relationship list -n {instance_name} --twin-id {twin_id}
+            az dt twin relationship list -n {instance_or_hostname} --twin-id {twin_id}
 
         - name: List outgoing relationships of a digital twin and filter on relationship 'contains'
           text: >
-            az dt twin relationship list -n {instance_name} --twin-id {twin_id} --relationship contains
+            az dt twin relationship list -n {instance_or_hostname} --twin-id {twin_id} --relationship contains
 
         - name: List incoming relationships of a digital twin.
           text: >
-            az dt twin relationship list -n {instance_name} --twin-id {twin_id} --incoming
+            az dt twin relationship list -n {instance_or_hostname} --twin-id {twin_id} --incoming
 
         - name: List incoming relationships of a digital twin and filter on relationship 'contains'.
           text: >
-            az dt twin relationship list -n {instance_name} --twin-id {twin_id} --relationship contains --incoming
+            az dt twin relationship list -n {instance_or_hostname} --twin-id {twin_id} --relationship contains --incoming
     """
 
     helps["dt twin relationship update"] = """
@@ -433,12 +433,12 @@ def load_digitaltwins_help():
         examples:
         - name: Update a digital twin relationship via JSON patch specification.
           text: >
-            az dt twin relationship update -n {instance_name} --twin-id {twin_id} --relationship-id {relationship_id}
+            az dt twin relationship update -n {instance_or_hostname} --twin-id {twin_id} --relationship-id {relationship_id}
             --relationship contains --json-patch '{"op":"replace", "path":"/Temperature", "value": 20.5}'
 
         - name: Update a digital twin relationship via JSON patch specification.
           text: >
-            az dt twin relationship update -n {instance_name} --twin-id {twin_id} --relationship-id {relationship_id}
+            az dt twin relationship update -n {instance_or_hostname} --twin-id {twin_id} --relationship-id {relationship_id}
             --relationship contains --json-patch '[
               {"op":"replace", "path":"/Temperature", "value": 20.5},
               {"op":"add", "path":"/Areas", "value": ["ControlSystem"]}
@@ -446,7 +446,7 @@ def load_digitaltwins_help():
 
         - name: Update a digital twin relationship via JSON patch specification defined in a file.
           text: >
-            az dt twin relationship update -n {instance_name} --twin-id {twin_id} --relationship-id {relationship_id}
+            az dt twin relationship update -n {instance_or_hostname} --twin-id {twin_id} --relationship-id {relationship_id}
             --relationship contains --json-patch ./my/patch/document.json
     """
 
@@ -457,7 +457,7 @@ def load_digitaltwins_help():
         examples:
         - name: Delete a digital twin relationship.
           text: >
-            az dt twin relationship delete -n {instance_name} --twin-id {twin_id} --relationship-id {relationship_id}
+            az dt twin relationship delete -n {instance_or_hostname} --twin-id {twin_id} --relationship-id {relationship_id}
     """
 
     helps["dt twin telemetry"] = """
@@ -473,12 +473,7 @@ def load_digitaltwins_help():
         examples:
         - name: Send twin telemetry
           text: >
-            az dt twin telemetry send -n {instance_name} --twin-id {twin_id}
-    """
-
-    helps["dt model"] = """
-        type: group
-        short-summary: Manage DTDL models and definitions on a Digital Twins instance.
+            az dt twin telemetry send -n {instance_or_hostname} --twin-id {twin_id}
     """
 
     helps["dt twin component"] = """
@@ -493,7 +488,7 @@ def load_digitaltwins_help():
         examples:
         - name: Show details of a digital twin component
           text: >
-            az dt twin component show -n {instance_name} --twin-id {twin_id} --component Thermostat
+            az dt twin component show -n {instance_or_hostname} --twin-id {twin_id} --component Thermostat
     """
 
     helps["dt twin component update"] = """
@@ -505,12 +500,12 @@ def load_digitaltwins_help():
         examples:
         - name: Update a digital twin component via JSON patch specification.
           text: >
-            az dt twin component update -n {instance_name} --twin-id {twin_id} --component {component_path}
+            az dt twin component update -n {instance_or_hostname} --twin-id {twin_id} --component {component_path}
             --json-patch '{"op":"replace", "path":"/Temperature", "value": 20.5}'
 
         - name: Update a digital twin component via JSON patch specification.
           text: >
-            az dt twin component update -n {instance_name} --twin-id {twin_id} --component {component_path}
+            az dt twin component update -n {instance_or_hostname} --twin-id {twin_id} --component {component_path}
             --json-patch '[
               {"op":"replace", "path":"/Temperature", "value": 20.5},
               {"op":"add", "path":"/Areas", "value": ["ControlSystem"]}
@@ -518,8 +513,13 @@ def load_digitaltwins_help():
 
         - name: Update a digital twin component via JSON patch specification defined in a file.
           text: >
-            az dt twin component update -n {instance_name} --twin-id {twin_id} --component {component_path}
+            az dt twin component update -n {instance_or_hostname} --twin-id {twin_id} --component {component_path}
             --json-patch ./my/patch/document.json
+    """
+
+    helps["dt model"] = """
+        type: group
+        short-summary: Manage DTDL models and definitions on a Digital Twins instance.
     """
 
     helps["dt model create"] = """
@@ -530,11 +530,11 @@ def load_digitaltwins_help():
         examples:
         - name: Bulk upload all .json or .dtdl model files from a target directory. Model processing is recursive.
           text: >
-            az dt model create -n {instance_name} --from-directory {directory_path}
+            az dt model create -n {instance_or_hostname} --from-directory {directory_path}
 
         - name: Upload model json inline or from file path.
           text: >
-            az dt model create -n {instance_name} --models {file_path_or_inline_json}
+            az dt model create -n {instance_or_hostname} --models {file_path_or_inline_json}
     """
 
     helps["dt model show"] = """
@@ -544,11 +544,11 @@ def load_digitaltwins_help():
         examples:
         - name: Show model meta data
           text: >
-            az dt model show -n {instance_name} --dtmi "dtmi:example:Floor;1"
+            az dt model show -n {instance_or_hostname} --dtmi "dtmi:example:Floor;1"
 
         - name: Show model meta data and definition
           text: >
-            az dt model show -n {instance_name} --dtmi "dtmi:example:Floor;1" --definition
+            az dt model show -n {instance_or_hostname} --dtmi "dtmi:example:Floor;1" --definition
     """
 
     helps["dt model list"] = """
@@ -558,15 +558,15 @@ def load_digitaltwins_help():
         examples:
         - name: List model metadata
           text: >
-            az dt model list -n {instance_name}
+            az dt model list -n {instance_or_hostname}
 
         - name: List model definitions
           text: >
-            az dt model list -n {instance_name} --definition
+            az dt model list -n {instance_or_hostname} --definition
 
         - name: List dependencies of particular pre-existing model(s). Space seperate dtmi values.
           text: >
-            az dt model list -n {instance_name} --dependencies-for {model_id0} {model_id1}
+            az dt model list -n {instance_or_hostname} --dependencies-for {model_id0} {model_id1}
     """
 
     helps["dt model update"] = """
@@ -576,7 +576,7 @@ def load_digitaltwins_help():
         examples:
         - name: Decommision a target model
           text: >
-            az dt model update -n {instance_name} --dtmi "dtmi:example:Floor;1" --decommission
+            az dt model update -n {instance_or_hostname} --dtmi "dtmi:example:Floor;1" --decommission
     """
 
     helps["dt model delete"] = """
@@ -586,5 +586,5 @@ def load_digitaltwins_help():
         examples:
         - name: Delete a target model.
           text: >
-            az dt model delete -n {instance_name} --dtmi "dtmi:example:Floor;1"
+            az dt model delete -n {instance_or_hostname} --dtmi "dtmi:example:Floor;1"
     """

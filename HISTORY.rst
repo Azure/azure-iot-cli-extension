@@ -6,29 +6,34 @@ Release History
 0.9.9
 +++++++++++++++
 
-IoT dps updates
-    * Introduces 'az iot dps compute-device-key' preview command group to generate derived device SAS key
+**IoT DPS updates**
 
+* Introduces 'az iot dps compute-device-key' preview command to generate derived device SAS key
 
-IoT Central updates
+**IoT Central updates**
 
-* Current release involves re-grouping of IoT central commands.
+* Introduces 'az iot central diagnostics' preview command group to perform application and device level diagnostics
+* Introduces 'az iot central device compute-device-key' preview command to generate derived device SAS key
+
+* This release involves a re-grouping of IoT Central commands.
   
-  * 'az iot central app device-twin' deprecated use 'az iot central device twin' instead. Deprecated command group is planned to be removed by December 2020
-  * 'az iot central app monitor-events' deprecated use 'az iot central diagnostics monitor-events' instead. Deprecated command is planned to be removed by December 2020
-  * Note all commands listed below are in preview
+  Set of changes for GA commands
+  
+  * 'az iot central app device-twin' is deprecated use 'az iot central device twin' instead. Deprecated command group is planned to be removed by December 2020
+  * 'az iot central app monitor-events' is deprecated use 'az iot central diagnostics monitor-events' instead. Deprecated command is planned to be removed by December 2020
 
-    * Introduces 'az iot central diagnostics' preview command group to perform application and device level diagnostics
-    * Introduces 'az iot central device compute-device-key' preview command group to generate derived device SAS key
-      * 'az iot central app device registration-summary' moved to 'az iot central diagnostics registration-summary'
-      * 'az iot central app monitor-properties' moved to 'az iot central diagnostics monitor-properties'
-      * 'az iot central app validate-messages' moved to 'az iot central diagnostics validate-messages'
-      * 'az iot central app validate-properties' moved to 'az iot central diagnostics validate-properties'
-      * 'az iot central diagnostics monitor-events' added to support deprecation of 'az iot central app monitor-events'
+  Set of changes for preview commands
 
-    * 'az iot central app device run-command' moved to 'az iot central device command run'
-    * 'az iot central app device show-command-history' moved to 'az iot central device command history'
-    * 'az iot central device twin' added to support deprecation of 'az iot central app device-twin' command group
+  * 'az iot central app device registration-summary' moved to 'az iot central diagnostics registration-summary'
+  * 'az iot central app monitor-properties' moved to 'az iot central diagnostics monitor-properties'
+  * 'az iot central app validate-messages' moved to 'az iot central diagnostics validate-messages'
+  * 'az iot central app validate-properties' moved to 'az iot central diagnostics validate-properties'
+  * 'az iot central diagnostics monitor-events' added to support deprecation of 'az iot central app monitor-events'
+  * 'az iot central app device run-command' moved to 'az iot central device command run'
+  * 'az iot central app device show-command-history' moved to 'az iot central device command history'
+  * 'az iot central device twin' added to support deprecation of 'az iot central app device-twin' command group
+
+**IoT Hub updates**
 
 Cloud-to-Device message enhancements
 
@@ -40,14 +45,22 @@ Cloud-to-Device message enhancements
 
 Edge device creation enhancements
 
-* Enabled x509 self-signed certificate authentication types (`x509_thumbprint` and `x509_ca`) for edge device creation with `az iot hub device-identity create --ee`
+* Enabled x509 certificate authentication types (`x509_thumbprint` and `x509_ca`) for edge device creation with `az iot hub device-identity create --ee`
 
-Digital Twins updates
+Bug fixes
 
-* The 'az dt route | model | twin' command groups support passing in a DT instance hostname directly.
+* Fixes issue #243 where providing a connection string via --login still required "az login".
 
-  * If an instance name is provided, the user subscription is first queried for the target instance to retrieve the hostname.
-  * If a hostname is provided, the subscription query is skipped and the provided value is used for subsequent interaction.
+**Digital Twins updates**
+
+The following command groups support passing in a DT instance hostname directly.
+
+  * az dt route
+  * az dt model
+  * az dt twin
+
+* Like before, if an instance name is provided, the user subscription is first queried for the target instance to retrieve the hostname.
+* If a hostname is provided, the subscription query is skipped and the provided value is used for subsequent interaction.
 
 
 0.9.8

@@ -25,7 +25,6 @@ class IotHubDiscovery(object):
         self.cmd = cmd
         self.client = None
         self.sub_id = "unknown"
-        self._initialize_client()
 
     def _initialize_client(self):
         if not self.client:
@@ -36,6 +35,8 @@ class IotHubDiscovery(object):
             self.sub_id = self.client.config.subscription_id
 
     def get_iothubs(self, rg: str = None) -> List:
+        self._initialize_client()
+
         hubs_list = []
 
         if not rg:
@@ -52,6 +53,8 @@ class IotHubDiscovery(object):
         return hubs_list
 
     def get_policies(self, hub_name: str, rg: str) -> List:
+        self._initialize_client()
+
         policy_pager = self.client.list_keys(
             resource_group_name=rg, resource_name=hub_name
         )
@@ -66,6 +69,8 @@ class IotHubDiscovery(object):
         return policy_list
 
     def find_iothub(self, hub_name: str, rg: str = None):
+        self._initialize_client()
+
         from azure.mgmt.iothub.models import ErrorDetailsException
 
         if rg:
@@ -94,6 +99,8 @@ class IotHubDiscovery(object):
         )
 
     def find_policy(self, hub_name: str, rg: str, policy_name: str = "auto"):
+        self._initialize_client()
+
         if policy_name.lower() != "auto":
             return self.client.get_keys_for_key_name(
                 resource_group_name=rg, resource_name=hub_name, key_name=policy_name

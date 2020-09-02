@@ -64,7 +64,7 @@ def load_central_commands(self, _):
     ) as cmd_group:
         cmd_group.command("create", "add_user")
         cmd_group.command("list", "list_users")
-        cmd_group.command("show", "get_user")
+        cmd_group.show_command("show", "get_user")
         cmd_group.command("delete", "delete_user")
 
     with self.command_group(
@@ -72,18 +72,19 @@ def load_central_commands(self, _):
     ) as cmd_group:
         cmd_group.command("create", "add_api_token")
         cmd_group.command("list", "list_api_tokens")
-        cmd_group.command("show", "get_api_token")
+        cmd_group.show_command("show", "get_api_token")
         cmd_group.command("delete", "delete_api_token")
 
     with self.command_group(
         "iot central device", command_type=central_device_ops, is_preview=True,
     ) as cmd_group:
         # cmd_group.command("list", "list_devices")
-        cmd_group.command("show", "get_device")
+        cmd_group.show_command("show", "get_device")
         cmd_group.command("create", "create_device")
         cmd_group.command("delete", "delete_device")
         cmd_group.command("registration-info", "registration_info")
         cmd_group.command("show-credentials", "get_credentials")
+        cmd_group.command("compute-device-key", "compute_device_key")
 
     with self.command_group(
         "iot central device command", command_type=central_device_ops, is_preview=True,
@@ -92,27 +93,20 @@ def load_central_commands(self, _):
         cmd_group.command("history", "get_command_history")
 
     with self.command_group(
-        "iot central device compute-device-key",
-        command_type=central_device_ops,
-        is_preview=True,
-    ) as cmd_group:
-        cmd_group.command("create", "compute_device_key")
-
-    with self.command_group(
         "iot central device-template",
         command_type=central_device_templates_ops,
         is_preview=True,
     ) as cmd_group:
         # cmd_group.command("list", "list_device_templates")
         # cmd_group.command("map", "map_device_templates")
-        cmd_group.command("show", "get_device_template")
+        cmd_group.show_command("show", "get_device_template")
         cmd_group.command("create", "create_device_template")
         cmd_group.command("delete", "delete_device_template")
 
     with self.command_group(
         "iot central device twin", command_type=central_device_twin_ops, is_preview=True
     ) as cmd_group:
-        cmd_group.command(
+        cmd_group.show_command(
             "show", "device_twin_show",
         )
 
@@ -126,7 +120,7 @@ def _load_central_deprecated_commands(self, _):
         command_type=central_device_twin_ops,
         deprecate_info=self.deprecate(redirect="iot central device twin"),
     ) as cmd_group:
-        cmd_group.command(
+        cmd_group.show_command(
             "show", "device_twin_show",
         )
 
