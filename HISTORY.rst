@@ -3,6 +3,20 @@
 Release History
 ===============
 
+0.10.0
++++++++++++++++
+
+**Breaking Changes**
+
+* `az iot dps enrollment show` and `az iot dps enrollment-group show` now return raw service results instead of deserialized models. 
+  This means that some properties that were previously returned as `null` for these commands will no longer be returned, possibly causing a breaking change.
+
+**IoT DPS updates**
+
+* Added --show-keys argument to `dps enrollment show` and `dps enrollment-group show` to include full attestation information for enrollments and enrollment groups
+* Regenerated 2019-01-31 DPS Service and Device SDKs
+
+
 0.9.9
 +++++++++++++++
 
