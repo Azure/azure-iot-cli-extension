@@ -18,32 +18,24 @@ from azext_iot.common.certops import open_certificate
 from azext_iot.common.utility import compute_device_key
 from azext_iot.operations.generic import _execute_query
 from azext_iot._factory import SdkResolver
-from azext_iot.sdk.dps.service.models.individual_enrollment import IndividualEnrollment
-from azext_iot.sdk.dps.service.models.custom_allocation_definition import (
-    CustomAllocationDefinition,
-)
-from azext_iot.sdk.dps.service.models.attestation_mechanism import AttestationMechanism
-from azext_iot.sdk.dps.service.models.tpm_attestation import TpmAttestation
-from azext_iot.sdk.dps.service.models.symmetric_key_attestation import (
-    SymmetricKeyAttestation,
-)
-from azext_iot.sdk.dps.service.models.x509_attestation import X509Attestation
-from azext_iot.sdk.dps.service.models.x509_certificates import X509Certificates
-from azext_iot.sdk.dps.service.models.x509_certificate_with_info import (
-    X509CertificateWithInfo,
-)
-from azext_iot.sdk.dps.service.models.initial_twin import InitialTwin
-from azext_iot.sdk.dps.service.models.twin_collection import TwinCollection
-from azext_iot.sdk.dps.service.models.initial_twin_properties import (
-    InitialTwinProperties,
-)
-from azext_iot.sdk.dps.service.models.enrollment_group import EnrollmentGroup
-from azext_iot.sdk.dps.service.models.x509_ca_references import X509CAReferences
-from azext_iot.sdk.dps.service.models.reprovision_policy import ReprovisionPolicy
-from azext_iot.sdk.dps.service.models import DeviceCapabilities
 from azext_iot.sdk.dps.service.models import (
+    IndividualEnrollment,
+    CustomAllocationDefinition,
+    AttestationMechanism,
+    TpmAttestation,
+    SymmetricKeyAttestation,
+    X509Attestation,
+    X509Certificates,
+    X509CertificateWithInfo,
+    InitialTwin,
+    TwinCollection,
+    InitialTwinProperties,
+    EnrollmentGroup,
+    X509CAReferences,
+    ReprovisionPolicy,
+    DeviceCapabilities,
     ProvisioningServiceErrorDetailsException,
-)  # TODO: Regen SDK
+)
 
 logger = get_logger(__name__)
 

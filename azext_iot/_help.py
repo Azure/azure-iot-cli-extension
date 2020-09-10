@@ -1011,9 +1011,9 @@ helps[
     - name: Basic usage
       text: >
         az iot dps enrollment show --dps-name {dps_name} -g {resource_group} --enrollment-id {enrollment_id}
-    - name: Include attestation information in results
+    - name: Include full attestation information in results for a symmetric key enrollment
       text: >
-        az iot dps enrollment show --dps-name {dps_name} -g {resource_group} --enrollment-id {enrollment_id} --show-keys
+        az iot dps enrollment show --dps-name {dps_name} -g {resource_group} --enrollment-id {symmetric_key_enrollment_id} --show-keys
 """
 
 helps[
@@ -1144,9 +1144,9 @@ helps[
     - name: Basic usage
       text: >
         az iot dps enrollment-group show --dps-name {dps_name} -g {resource_group} --enrollment-id {enrollment_id}
-    - name: Include attestation information in results
+    - name: Include full attestation information in results for a symmetric key enrollment-group
       text: >
-        az iot dps enrollment-group show --dps-name {dps_name} -g {resource_group} --enrollment-id {enrollment_id} --show-keys
+        az iot dps enrollment-group show --dps-name {dps_name} -g {resource_group} --enrollment-id {symmetric_key_enrollment_id} --show-keys
 """
 
 helps[

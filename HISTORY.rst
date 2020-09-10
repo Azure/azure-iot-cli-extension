@@ -13,8 +13,8 @@ Release History
 
 **IoT DPS updates**
 
-* Added --show-keys argument to `dps enrollment show` and `dps enrollment-group show` to include full attestation information for enrollments and enrollment groups
-* Regenerated 2019-01-31 DPS Service and Device SDKs
+* Added --show-keys argument to `dps enrollment show` and `dps enrollment-group show` to include full attestation information for symmetric key enrollments and enrollment groups
+* Regenerated 2019-03-31 DPS Service SDK
 
 
 0.9.9
