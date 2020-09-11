@@ -8,6 +8,9 @@ import os
 from azure.cli.testsdk import LiveScenarioTest
 from azext_iot.common.shared import EntityStatusType, AttestationType, AllocationType
 from azext_iot.common.certops import create_self_signed_certificate
+from azext_iot.common import embedded_cli
+from azext_iot.iothub.providers.discovery import IotHubDiscovery
+from .settings import Setting
 
 # Set these to the proper IoT Hub DPS, IoT Hub and Resource Group for Integration Tests.
 dps = os.environ.get("azext_iot_testdps")
@@ -68,9 +71,37 @@ def _cleanup_enrollments(self, dps, rg):
     )
 
 
+def _ensure_dps_hub_link(self, dps, rg, hub):
+    cli = embedded_cli.EmbeddedCLI()
+    hubs = cli.invoke(
+        "iot dps linked-hub list --dps-name {} -g {}".format(dps, rg)
+    ).as_json()
+    if not len(hubs) or not len(
+        list(
+            filter(
+                lambda linked_hub: linked_hub["name"]
+                == "{}.azure-devices.net".format(hub),
+                hubs,
+            )
+        )
+    ):
+        discovery = IotHubDiscovery(self.cmd_shell)
+        target_hub = discovery.get_target(hub, rg)
+        cli.invoke(
+            "iot dps linked-hub create --dps-name {} -g {} --connection-string {} --location {}".format(
+                dps, rg, target_hub.get("cs"), target_hub.get("location")
+            )
+        )
+
+
 class TestDPSEnrollments(LiveScenarioTest):
     def __init__(self, test_method):
         super(TestDPSEnrollments, self).__init__(test_method)
+        self.cmd_shell = Setting()
+        setattr(self.cmd_shell, "cli_ctx", self.cli_ctx)
+
+        _ensure_dps_hub_link(self, dps, rg, hub)
+
         output_dir = os.getcwd()
         create_self_signed_certificate(cert_name, 200, output_dir, True)
         self.kwargs["generic_dict"] = {
