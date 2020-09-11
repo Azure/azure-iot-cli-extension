@@ -31,6 +31,13 @@ mock_target['secondarykey'] = 'aCd/6rJ6rmG4ak890+eW5MYGH+A0uzRvjGNjg3Ve8sfo='
 mock_target['policy'] = 'provisioningserviceowner'
 mock_target['subscription'] = "5952cff8-bcd1-4235-9554-af2c0348bf23"
 
+mock_symmetric_key_attestation = {
+    "type": "symmetricKey",
+    "symmetricKey": {
+        "primaryKey": "primary_key",
+        "secondaryKey": "secondary_key"
+    },
+}
 
 # Patch Paths #
 path_service_client = 'msrest.service_client.ServiceClient.send'
@@ -494,22 +501,25 @@ class TestEnrollmentShow():
         yield mocked_response
 
     @pytest.fixture()
-    def serviceclient_attestation(self, serviceclient):
-        serviceclient.add(
-            method=responses.POST,
-            url="https://{}/enrollments/{}/attestationmechanism".format(mock_target['entity'], enrollment_id),
-            body=json.dumps({"attestation": {
-                "type": "symmetricKey",
-                "symmetricKey": {
-                    "primaryKey": 'primary_key',
-                    "secondaryKey": 'secondary_key'
-                }
-            }}),
+    def serviceclient_attestation(self, mocked_response, fixture_gdcs, fixture_sas):
+        mocked_response.add(
+            method=responses.GET,
+            url="https://{}/enrollments/{}".format(mock_target['entity'], enrollment_id),
+            body=json.dumps(generate_enrollment_show(attestation=mock_symmetric_key_attestation)),
             status=200,
             content_type="application/json",
             match_querystring=False,
         )
-        yield serviceclient
+
+        mocked_response.add(
+            method=responses.POST,
+            url="https://{}/enrollments/{}/attestationmechanism".format(mock_target['entity'], enrollment_id),
+            body=json.dumps(mock_symmetric_key_attestation),
+            status=200,
+            content_type="application/json",
+            match_querystring=False,
+        )
+        yield mocked_response
 
     def test_enrollment_show(self, serviceclient):
         result = subject.iot_dps_device_enrollment_get(None, enrollment_id,
@@ -1080,22 +1090,25 @@ class TestEnrollmentGroupShow():
         yield mocked_response
 
     @pytest.fixture()
-    def serviceclient_attestation(self, serviceclient):
-        serviceclient.add(
-            method=responses.POST,
-            url="https://{}/enrollmentGroups/{}/attestationmechanism".format(mock_target['entity'], enrollment_id),
-            body=json.dumps({"attestation": {
-                "type": "symmetricKey",
-                "symmetricKey": {
-                    "primaryKey": 'primary_key',
-                    "secondaryKey": 'secondary_key'
-                }
-            }}),
+    def serviceclient_attestation(self, mocked_response, fixture_gdcs, fixture_sas):
+        mocked_response.add(
+            method=responses.GET,
+            url="https://{}/enrollmentGroups/{}".format(mock_target['entity'], enrollment_id),
+            body=json.dumps(generate_enrollment_group_show(attestation=mock_symmetric_key_attestation)),
             status=200,
             content_type="application/json",
             match_querystring=False,
         )
-        yield serviceclient
+
+        mocked_response.add(
+            method=responses.POST,
+            url="https://{}/enrollmentGroups/{}/attestationmechanism".format(mock_target['entity'], enrollment_id),
+            body=json.dumps(mock_symmetric_key_attestation),
+            status=200,
+            content_type="application/json",
+            match_querystring=False,
+        )
+        yield mocked_response
 
     def test_enrollment_group_show(self, serviceclient):
         result = subject.iot_dps_device_enrollment_group_get(None, enrollment_id,

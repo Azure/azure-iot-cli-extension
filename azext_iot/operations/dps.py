@@ -59,16 +59,31 @@ def iot_dps_device_enrollment_list(client, dps_name, resource_group_name, top=No
         raise CLIError(e)
 
 
-def iot_dps_device_enrollment_get(client, enrollment_id, dps_name, resource_group_name, show_keys=None):
+def iot_dps_device_enrollment_get(
+    client, enrollment_id, dps_name, resource_group_name, show_keys=None
+):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
-        enrollment = sdk.get_individual_enrollment(enrollment_id, raw=True).response.json()
+        enrollment = sdk.get_individual_enrollment(
+            enrollment_id, raw=True
+        ).response.json()
         if show_keys:
-            attestation = sdk.get_individual_enrollment_attestation_mechanism(enrollment_id, raw=True).response.json()
-            enrollment['attestation'] = attestation
+            enrollment_type = enrollment["attestation"]["type"]
+            if enrollment_type == AttestationType.symmetricKey.value:
+                attestation = sdk.get_individual_enrollment_attestation_mechanism(
+                    enrollment_id, raw=True
+                ).response.json()
+                enrollment["attestation"] = attestation
+            else:
+                logger.warn(
+                    "--show-keys argument was provided, but requested enrollment has an attestation type of '{}'."
+                    " Currently, --show-keys is only supported for symmetric key enrollments".format(
+                        enrollment_type
+                    )
+                )
         return enrollment
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
@@ -306,10 +321,23 @@ def iot_dps_device_enrollment_group_get(
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
-        enrollment_group = sdk.get_enrollment_group(enrollment_id, raw=True).response.json()
+        enrollment_group = sdk.get_enrollment_group(
+            enrollment_id, raw=True
+        ).response.json()
         if show_keys:
-            attestation = sdk.get_enrollment_group_attestation_mechanism(enrollment_id, raw=True).response.json()
-            enrollment_group['attestation'] = attestation
+            enrollment_type = enrollment_group["attestation"]["type"]
+            if enrollment_type == AttestationType.symmetricKey.value:
+                attestation = sdk.get_enrollment_group_attestation_mechanism(
+                    enrollment_id, raw=True
+                ).response.json()
+                enrollment_group["attestation"] = attestation
+            else:
+                logger.warn(
+                    "--show-keys argument was provided, but requested enrollment group has an attestation type of '{}'."
+                    " Currently, --show-keys is only supported for symmetric key enrollment groups".format(
+                        enrollment_type
+                    )
+                )
         return enrollment_group
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
@@ -560,7 +588,9 @@ def iot_dps_registration_list(client, dps_name, resource_group_name, enrollment_
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
-        return sdk.query_device_registration_states(enrollment_id, raw=True).response.json()
+        return sdk.query_device_registration_states(
+            enrollment_id, raw=True
+        ).response.json()
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
@@ -571,7 +601,9 @@ def iot_dps_registration_get(client, dps_name, resource_group_name, registration
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
-        return sdk.get_device_registration_state(registration_id, raw=True).response.json()
+        return sdk.get_device_registration_state(
+            registration_id, raw=True
+        ).response.json()
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
