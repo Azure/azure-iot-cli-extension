@@ -861,6 +861,14 @@ def load_arguments(self, _):
             "When choosing tpm as attestation type, endorsement key is required.",
         )
 
+    with self.argument_context("iot dps enrollment show") as context:
+        context.argument(
+            "show_keys",
+            options_list=["--show-keys", "--keys"],
+            arg_type=get_three_state_flag(),
+            help="Include attestation keys and information in enrollment results"
+        )
+
     with self.argument_context("iot dps enrollment update") as context:
         context.argument(
             "endorsement_key",
@@ -903,6 +911,14 @@ def load_arguments(self, _):
             options_list=["--secondary-root-ca-name", "--secondary-ca-name", "--scn"],
             help="The name of the secondary root CA certificate. "
             "If attestation with a root CA certificate is desired then a root ca name must be provided.",
+        )
+
+    with self.argument_context("iot dps enrollment-group show") as context:
+        context.argument(
+            "show_keys",
+            options_list=["--show-keys", "--keys"],
+            arg_type=get_three_state_flag(),
+            help="Include attestation keys and information in enrollment group results"
         )
 
     with self.argument_context("iot dps registration") as context:

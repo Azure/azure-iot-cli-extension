@@ -118,7 +118,7 @@ class SdkResolver(object):
         return IotHubGatewayServiceAPIs(credentials=credentials, base_url=self.endpoint)
 
     def _get_dps_service_sdk(self):
-        from azext_iot.sdk.dps import ProvisioningServiceClient
+        from azext_iot.sdk.dps.service import ProvisioningServiceClient
 
         credentials = SasTokenAuthentication(
             uri=self.sas_uri,

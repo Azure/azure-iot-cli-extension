@@ -18,27 +18,24 @@ from azext_iot.common.certops import open_certificate
 from azext_iot.common.utility import compute_device_key
 from azext_iot.operations.generic import _execute_query
 from azext_iot._factory import SdkResolver
-from azext_iot.sdk.dps.models.individual_enrollment import IndividualEnrollment
-from azext_iot.sdk.dps.models.custom_allocation_definition import (
+from azext_iot.sdk.dps.service.models import (
+    IndividualEnrollment,
     CustomAllocationDefinition,
-)
-from azext_iot.sdk.dps.models.attestation_mechanism import AttestationMechanism
-from azext_iot.sdk.dps.models.tpm_attestation import TpmAttestation
-from azext_iot.sdk.dps.models.symmetric_key_attestation import SymmetricKeyAttestation
-from azext_iot.sdk.dps.models.x509_attestation import X509Attestation
-from azext_iot.sdk.dps.models.x509_certificates import X509Certificates
-from azext_iot.sdk.dps.models.x509_certificate_with_info import X509CertificateWithInfo
-from azext_iot.sdk.dps.models.initial_twin import InitialTwin
-from azext_iot.sdk.dps.models.twin_collection import TwinCollection
-from azext_iot.sdk.dps.models.initial_twin_properties import InitialTwinProperties
-from azext_iot.sdk.dps.models.enrollment_group import EnrollmentGroup
-from azext_iot.sdk.dps.models.x509_ca_references import X509CAReferences
-from azext_iot.sdk.dps.models.reprovision_policy import ReprovisionPolicy
-from azext_iot.sdk.dps.models import DeviceCapabilities
-from azext_iot.sdk.dps.models import (
+    AttestationMechanism,
+    TpmAttestation,
+    SymmetricKeyAttestation,
+    X509Attestation,
+    X509Certificates,
+    X509CertificateWithInfo,
+    InitialTwin,
+    TwinCollection,
+    InitialTwinProperties,
+    EnrollmentGroup,
+    X509CAReferences,
+    ReprovisionPolicy,
+    DeviceCapabilities,
     ProvisioningServiceErrorDetailsException,
-)  # TODO: Regen SDK
-
+)
 
 logger = get_logger(__name__)
 
@@ -47,7 +44,7 @@ logger = get_logger(__name__)
 
 
 def iot_dps_device_enrollment_list(client, dps_name, resource_group_name, top=None):
-    from azext_iot.sdk.dps.models.query_specification import QuerySpecification
+    from azext_iot.sdk.dps.service.models.query_specification import QuerySpecification
 
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
 
@@ -56,19 +53,38 @@ def iot_dps_device_enrollment_list(client, dps_name, resource_group_name, top=No
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
         query_command = "SELECT *"
-        query = [QuerySpecification(query_command)]
-        return _execute_query(query, sdk.device_enrollment.query, top)
+        query = [QuerySpecification(query=query_command)]
+        return _execute_query(query, sdk.query_individual_enrollments, top)
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
 
-def iot_dps_device_enrollment_get(client, enrollment_id, dps_name, resource_group_name):
+def iot_dps_device_enrollment_get(
+    client, enrollment_id, dps_name, resource_group_name, show_keys=None
+):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
-        return sdk.device_enrollment.get(enrollment_id)
+        enrollment = sdk.get_individual_enrollment(
+            enrollment_id, raw=True
+        ).response.json()
+        if show_keys:
+            enrollment_type = enrollment["attestation"]["type"]
+            if enrollment_type == AttestationType.symmetricKey.value:
+                attestation = sdk.get_individual_enrollment_attestation_mechanism(
+                    enrollment_id, raw=True
+                ).response.json()
+                enrollment["attestation"] = attestation
+            else:
+                logger.warn(
+                    "--show-keys argument was provided, but requested enrollment has an attestation type of '{}'."
+                    " Currently, --show-keys is only supported for symmetric key enrollments".format(
+                        enrollment_type
+                    )
+                )
+        return enrollment
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
@@ -105,7 +121,8 @@ def iot_dps_device_enrollment_create(
             if not endorsement_key:
                 raise CLIError("Endorsement key is requried")
             attestation = AttestationMechanism(
-                AttestationType.tpm.value, TpmAttestation(endorsement_key)
+                type=AttestationType.tpm.value,
+                tpm=TpmAttestation(endorsement_key=endorsement_key),
             )
         if attestation_type == AttestationType.x509.value:
             attestation = _get_attestation_with_x509_client_cert(
@@ -113,10 +130,10 @@ def iot_dps_device_enrollment_create(
             )
         if attestation_type == AttestationType.symmetricKey.value:
             attestation = AttestationMechanism(
-                AttestationType.symmetricKey.value,
-                None,
-                None,
-                SymmetricKeyAttestation(primary_key, secondary_key),
+                type=AttestationType.symmetricKey.value,
+                symmetric_key=SymmetricKeyAttestation(
+                    primary_key=primary_key, secondary_key=secondary_key
+                ),
             )
         reprovision = _get_reprovision_policy(reprovision_policy)
         initial_twin = _get_initial_twin(initial_twin_tags, initial_twin_properties)
@@ -129,26 +146,24 @@ def iot_dps_device_enrollment_create(
             iot_hub_list = iot_hub_host_name.split()
 
         custom_allocation_definition = (
-            CustomAllocationDefinition(webhook_url, api_version)
+            CustomAllocationDefinition(webhook_url=webhook_url, api_version=api_version)
             if allocation_policy == AllocationType.custom.value
             else None
         )
         capabilities = DeviceCapabilities(iot_edge=edge_enabled)
         enrollment = IndividualEnrollment(
-            enrollment_id,
-            attestation,
-            capabilities,
-            device_id,
-            None,
-            initial_twin,
-            None,
-            provisioning_status,
-            reprovision,
-            allocation_policy,
-            iot_hub_list,
-            custom_allocation_definition,
+            registration_id=enrollment_id,
+            attestation=attestation,
+            capabilities=capabilities,
+            device_id=device_id,
+            initial_twin=initial_twin,
+            provisioning_status=provisioning_status,
+            reprovision_policy=reprovision,
+            allocation_policy=allocation_policy,
+            iot_hubs=iot_hub_list,
+            custom_allocation_definition=custom_allocation_definition,
         )
-        return sdk.device_enrollment.create_or_update(enrollment_id, enrollment)
+        return sdk.create_or_update_individual_enrollment(enrollment_id, enrollment)
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
@@ -183,7 +198,7 @@ def iot_dps_device_enrollment_update(
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
-        enrollment_record = sdk.device_enrollment.get(enrollment_id)
+        enrollment_record = sdk.get_individual_enrollment(enrollment_id)
         # Verify etag
         if (
             etag
@@ -217,7 +232,7 @@ def iot_dps_device_enrollment_update(
                 remove_secondary_certificate,
             )
         else:
-            enrollment_record.attestation = sdk.device_enrollment.attestation_mechanism_method(
+            enrollment_record.attestation = sdk.get_individual_enrollment_attestation_mechanism(
                 enrollment_id
             )
             if primary_key:
@@ -253,12 +268,12 @@ def iot_dps_device_enrollment_update(
             enrollment_record.iot_hub_host_name = None
             if allocation_policy == AllocationType.custom.value:
                 enrollment_record.custom_allocation_definition = CustomAllocationDefinition(
-                    webhook_url, api_version
+                    webhook_url=webhook_url, api_version=api_version
                 )
         if edge_enabled is not None:
             enrollment_record.capabilities = DeviceCapabilities(iot_edge=edge_enabled)
 
-        return sdk.device_enrollment.create_or_update(
+        return sdk.create_or_update_individual_enrollment(
             enrollment_id, enrollment_record, etag
         )
     except ProvisioningServiceErrorDetailsException as e:
@@ -273,7 +288,7 @@ def iot_dps_device_enrollment_delete(
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
-        return sdk.device_enrollment.delete(enrollment_id)
+        return sdk.delete_individual_enrollment(enrollment_id)
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
@@ -284,7 +299,7 @@ def iot_dps_device_enrollment_delete(
 def iot_dps_device_enrollment_group_list(
     client, dps_name, resource_group_name, top=None
 ):
-    from azext_iot.sdk.dps.models.query_specification import QuerySpecification
+    from azext_iot.sdk.dps.service.models.query_specification import QuerySpecification
 
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
@@ -292,21 +307,38 @@ def iot_dps_device_enrollment_group_list(
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
         query_command = "SELECT *"
-        query1 = [QuerySpecification(query_command)]
-        return _execute_query(query1, sdk.device_enrollment_group.query, top)
+        query1 = [QuerySpecification(query=query_command)]
+        return _execute_query(query1, sdk.query_enrollment_groups, top)
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
 
 def iot_dps_device_enrollment_group_get(
-    client, enrollment_id, dps_name, resource_group_name
+    client, enrollment_id, dps_name, resource_group_name, show_keys=None
 ):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
-        return sdk.device_enrollment_group.get(enrollment_id)
+        enrollment_group = sdk.get_enrollment_group(
+            enrollment_id, raw=True
+        ).response.json()
+        if show_keys:
+            enrollment_type = enrollment_group["attestation"]["type"]
+            if enrollment_type == AttestationType.symmetricKey.value:
+                attestation = sdk.get_enrollment_group_attestation_mechanism(
+                    enrollment_id, raw=True
+                ).response.json()
+                enrollment_group["attestation"] = attestation
+            else:
+                logger.warn(
+                    "--show-keys argument was provided, but requested enrollment group has an attestation type of '{}'."
+                    " Currently, --show-keys is only supported for symmetric key enrollment groups".format(
+                        enrollment_type
+                    )
+                )
+        return enrollment_group
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
@@ -341,10 +373,10 @@ def iot_dps_device_enrollment_group_create(
         if not certificate_path and not secondary_certificate_path:
             if not root_ca_name and not secondary_root_ca_name:
                 attestation = AttestationMechanism(
-                    AttestationType.symmetricKey.value,
-                    None,
-                    None,
-                    SymmetricKeyAttestation(primary_key, secondary_key),
+                    type=AttestationType.symmetricKey.value,
+                    symmetric_key=SymmetricKeyAttestation(
+                        primary_key=primary_key, secondary_key=secondary_key
+                    ),
                 )
         if certificate_path or secondary_certificate_path:
             if root_ca_name or secondary_root_ca_name:
@@ -373,28 +405,24 @@ def iot_dps_device_enrollment_group_create(
             iot_hub_list = iot_hub_host_name.split()
 
         custom_allocation_definition = (
-            CustomAllocationDefinition(webhook_url, api_version)
+            CustomAllocationDefinition(webhook_url=webhook_url, api_version=api_version)
             if allocation_policy == AllocationType.custom.value
             else None
         )
 
         capabilities = DeviceCapabilities(iot_edge=edge_enabled)
         group_enrollment = EnrollmentGroup(
-            enrollment_id,
-            attestation,
-            capabilities,
-            None,
-            initial_twin,
-            None,
-            provisioning_status,
-            reprovision,
-            allocation_policy,
-            iot_hub_list,
-            custom_allocation_definition,
+            enrollment_group_id=enrollment_id,
+            attestation=attestation,
+            capabilities=capabilities,
+            initial_twin=initial_twin,
+            provisioning_status=provisioning_status,
+            reprovision_policy=reprovision,
+            allocation_policy=allocation_policy,
+            iot_hubs=iot_hub_list,
+            custom_allocation_definition=custom_allocation_definition,
         )
-        return sdk.device_enrollment_group.create_or_update(
-            enrollment_id, group_enrollment
-        )
+        return sdk.create_or_update_enrollment_group(enrollment_id, group_enrollment)
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
@@ -429,7 +457,7 @@ def iot_dps_device_enrollment_group_update(
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
-        enrollment_record = sdk.device_enrollment_group.get(enrollment_id)
+        enrollment_record = sdk.get_enrollment_group(enrollment_id)
         # Verify etag
         if (
             etag
@@ -441,7 +469,7 @@ def iot_dps_device_enrollment_group_update(
             etag = enrollment_record.etag.replace('"', "")
         # Update enrollment information
         if enrollment_record.attestation.type == AttestationType.symmetricKey.value:
-            enrollment_record.attestation = sdk.device_enrollment_group.attestation_mechanism_method(
+            enrollment_record.attestation = sdk.get_enrollment_group_attestation_mechanism(
                 enrollment_id
             )
             if primary_key:
@@ -519,11 +547,11 @@ def iot_dps_device_enrollment_group_update(
             enrollment_record.iot_hub_host_name = None
             if allocation_policy == AllocationType.custom.value:
                 enrollment_record.custom_allocation_definition = CustomAllocationDefinition(
-                    webhook_url, api_version
+                    webhook_url=webhook_url, api_version=api_version
                 )
         if edge_enabled is not None:
             enrollment_record.capabilities = DeviceCapabilities(iot_edge=edge_enabled)
-        return sdk.device_enrollment_group.create_or_update(
+        return sdk.create_or_update_enrollment_group(
             enrollment_id, enrollment_record, etag
         )
     except ProvisioningServiceErrorDetailsException as e:
@@ -538,7 +566,7 @@ def iot_dps_device_enrollment_group_delete(
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
-        return sdk.device_enrollment_group.delete(enrollment_id)
+        return sdk.delete_enrollment_group(enrollment_id)
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
@@ -560,7 +588,9 @@ def iot_dps_registration_list(client, dps_name, resource_group_name, enrollment_
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
-        return sdk.registration_state.query_registration_state(enrollment_id)
+        return sdk.query_device_registration_states(
+            enrollment_id, raw=True
+        ).response.json()
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
@@ -571,7 +601,9 @@ def iot_dps_registration_get(client, dps_name, resource_group_name, registration
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
-        return sdk.registration_state.get_registration_state(registration_id)
+        return sdk.get_device_registration_state(
+            registration_id, raw=True
+        ).response.json()
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
@@ -582,7 +614,7 @@ def iot_dps_registration_delete(client, dps_name, resource_group_name, registrat
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
-        return sdk.registration_state.delete_registration_state(registration_id)
+        return sdk.delete_device_registration_state(registration_id)
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
@@ -601,9 +633,12 @@ def _get_initial_twin(initial_twin_tags=None, initial_twin_properties=None):
         initial_twin_properties = dict_clean(
             shell_safe_json_parse(str(initial_twin_properties))
         )
+
     return InitialTwin(
-        TwinCollection(initial_twin_tags),
-        InitialTwinProperties(TwinCollection(initial_twin_properties)),
+        tags=TwinCollection(additional_properties=initial_twin_tags),
+        properties=InitialTwinProperties(
+            desired=TwinCollection(additional_properties=initial_twin_properties)
+        ),
     )
 
 
@@ -626,8 +661,8 @@ def _get_updated_inital_twin(
 
 def _get_x509_certificate(certificate_path, secondary_certificate_path):
     x509certificate = X509Certificates(
-        _get_certificate_info(certificate_path),
-        _get_certificate_info(secondary_certificate_path),
+        primary=_get_certificate_info(certificate_path),
+        secondary=_get_certificate_info(secondary_certificate_path),
     )
     return x509certificate
 
@@ -636,7 +671,7 @@ def _get_certificate_info(certificate_path):
     if not certificate_path:
         return None
     certificate_content = open_certificate(certificate_path)
-    certificate_with_info = X509CertificateWithInfo(certificate_content)
+    certificate_with_info = X509CertificateWithInfo(certificate=certificate_content)
     return certificate_with_info
 
 
@@ -648,9 +683,9 @@ def _get_attestation_with_x509_client_cert(
     certificate = _get_x509_certificate(
         primary_certificate_path, secondary_certificate_path
     )
-    x509Attestation = X509Attestation(certificate)
+    x509Attestation = X509Attestation(client_certificates=certificate)
     attestation = AttestationMechanism(
-        AttestationType.x509.value, None, x509Attestation
+        type=AttestationType.x509.value, x509=x509Attestation
     )
     return attestation
 
@@ -683,18 +718,20 @@ def _get_attestation_with_x509_signing_cert(
     certificate = _get_x509_certificate(
         primary_certificate_path, secondary_certificate_path
     )
-    x509Attestation = X509Attestation(None, certificate)
+    x509Attestation = X509Attestation(signing_certificates=certificate)
     attestation = AttestationMechanism(
-        AttestationType.x509.value, None, x509Attestation
+        type=AttestationType.x509.value, x509=x509Attestation
     )
     return attestation
 
 
 def _get_attestation_with_x509_ca_cert(root_ca_name, secondary_root_ca_name):
-    certificate = X509CAReferences(root_ca_name, secondary_root_ca_name)
-    x509Attestation = X509Attestation(None, None, certificate)
+    certificate = X509CAReferences(
+        primary=root_ca_name, secondary=secondary_root_ca_name
+    )
+    x509Attestation = X509Attestation(ca_references=certificate)
     attestation = AttestationMechanism(
-        AttestationType.x509.value, None, x509Attestation
+        type=AttestationType.x509.value, x509=x509Attestation
     )
     return attestation
 
@@ -785,15 +822,23 @@ def _can_remove_secondary_certificate(remove_certificate, attestation):
 def _get_reprovision_policy(reprovision_policy):
     if reprovision_policy:
         if reprovision_policy == ReprovisionType.reprovisionandmigratedata.value:
-            reprovision = ReprovisionPolicy(True, True)
+            reprovision = ReprovisionPolicy(
+                update_hub_assignment=True, migrate_device_data=True
+            )
         elif reprovision_policy == ReprovisionType.reprovisionandresetdata.value:
-            reprovision = ReprovisionPolicy(True, False)
+            reprovision = ReprovisionPolicy(
+                update_hub_assignment=True, migrate_device_data=False
+            )
         elif reprovision_policy == ReprovisionType.never.value:
-            reprovision = ReprovisionPolicy(False, False)
+            reprovision = ReprovisionPolicy(
+                update_hub_assignment=False, migrate_device_data=False
+            )
         else:
             raise CLIError("Invalid Reprovision Policy.")
     else:
-        reprovision = ReprovisionPolicy(True, True)
+        reprovision = ReprovisionPolicy(
+            update_hub_assignment=True, migrate_device_data=True
+        )
     return reprovision
 
 
