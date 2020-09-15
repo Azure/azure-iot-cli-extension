@@ -46,7 +46,7 @@ jobs:
   - template: templates/run-tests.yml
     parameters:
       pythonVersion: '3.6.x'
-      runUnitTestsOnly: $[coalesce(variables['runUnitTestsOnly'], 'false')]
+      runUnitTestsOnly: 'false'
 
   - script: 'pip install .'
     displayName: 'Install the whl locally'

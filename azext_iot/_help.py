@@ -200,9 +200,15 @@ helps[
       text: >
         az iot hub device-identity update -d {device_id} -n {iothub_name}
         --set capabilities.iotEdge=true
+    - name: Turn on edge capabilities for device using convenience argument.
+      text: >
+        az iot hub device-identity update -d {device_id} -n {iothub_name} --ee
     - name: Disable device status
       text: >
         az iot hub device-identity update -d {device_id} -n {iothub_name} --set status=disabled
+    - name: Disable device status using convenience argument.
+      text: >
+        az iot hub device-identity update -d {device_id} -n {iothub_name} --status disabled
     - name: In one command
       text: >
         az iot hub device-identity update -d {device_id} -n {iothub_name}
@@ -1007,6 +1013,13 @@ helps[
 ] = """
     type: command
     short-summary: Get device enrollment details in an Azure IoT Hub Device Provisioning Service.
+    examples:
+    - name: Basic usage
+      text: >
+        az iot dps enrollment show --dps-name {dps_name} -g {resource_group} --enrollment-id {enrollment_id}
+    - name: Include full attestation information in results for a symmetric key enrollment
+      text: >
+        az iot dps enrollment show --dps-name {dps_name} -g {resource_group} --enrollment-id {symmetric_key_enrollment_id} --show-keys
 """
 
 helps[
@@ -1133,6 +1146,13 @@ helps[
 ] = """
     type: command
     short-summary: Get the details of an enrollment group in an Azure IoT Hub Device Provisioning Service.
+    examples:
+    - name: Basic usage
+      text: >
+        az iot dps enrollment-group show --dps-name {dps_name} -g {resource_group} --enrollment-id {enrollment_id}
+    - name: Include full attestation information in results for a symmetric key enrollment-group
+      text: >
+        az iot dps enrollment-group show --dps-name {dps_name} -g {resource_group} --enrollment-id {symmetric_key_enrollment_id} --show-keys
 """
 
 helps[

@@ -3,6 +3,24 @@
 Release History
 ===============
 
+0.10.0
++++++++++++++++
+
+**IoT Hub updates**
+
+* Add convenience arguments for device update.
+
+**IoT DPS updates**
+
+* Added --show-keys argument to `dps enrollment show` and `dps enrollment-group show` to include full attestation information for symmetric key enrollments and enrollment groups
+* Regenerated 2019-03-31 DPS Service SDK
+
+**Breaking Changes**
+
+* `az iot dps enrollment show` and `az iot dps enrollment-group show` now return raw service results instead of deserialized models. 
+  This means that some properties that were previously returned as `null` for these commands will no longer be returned, possibly causing a breaking change.
+
+
 0.9.9
 +++++++++++++++
 

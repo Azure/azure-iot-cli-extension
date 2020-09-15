@@ -359,18 +359,42 @@ class TestDeviceCreate:
 def generate_device_show(**kvp):
     payload = {
         "authentication": {
-            "symmetricKey": {"primaryKey": "123", "secondaryKey": "321"},
-            "type": "sas",
+            "symmetricKey": {"primaryKey": None, "secondaryKey": None},
+            "x509Thumbprint": {"primaryThumbprint": None, "secondaryThumbprint": None},
+            "type": "sas"
         },
         "etag": "abcd",
         "capabilities": {"iotEdge": True},
         "deviceId": device_id,
         "status": "disabled",
+        "statusReason": "unknown reason",
     }
     for k in kvp:
         if payload.get(k):
             payload[k] = kvp[k]
     return payload
+
+
+def device_update_con_arg(
+    edge_enabled=None,
+    status=None,
+    status_reason=None,
+    auth_method=None,
+    primary_thumbprint=None,
+    secondary_thumbprint=None,
+    primary_key=None,
+    secondary_key=None
+):
+    return {
+        "edge_enabled": edge_enabled,
+        "status": status,
+        "status_reason": status_reason,
+        "auth_method": auth_method,
+        "primary_thumbprint": primary_thumbprint,
+        "secondary_thumbprint": secondary_thumbprint,
+        "primary_key": primary_key,
+        "secondary_key": secondary_key
+    }
 
 
 class TestDeviceUpdate:
@@ -384,6 +408,8 @@ class TestDeviceUpdate:
     @pytest.mark.parametrize(
         "req",
         [
+            (generate_device_show(capabilities={"iotEdge": False})),
+            (generate_device_show(status="enabled")),
             (
                 generate_device_show(
                     authentication={
@@ -430,6 +456,149 @@ class TestDeviceUpdate:
 
         headers = args[0][0].headers
         assert headers["If-Match"] == '"{}"'.format(req["etag"])
+
+    @pytest.mark.parametrize(
+        "req, arg",
+        [
+            (
+                generate_device_show(
+                    capabilities={"iotEdge": False}
+                ),
+                device_update_con_arg(
+                    edge_enabled=True
+                )
+            ),
+            (
+                generate_device_show(
+                    status="disabled"
+                ),
+                device_update_con_arg(
+                    status="enabled"
+                )
+            ),
+            (
+                generate_device_show(),
+                device_update_con_arg(
+                    status_reason="test"
+                )
+            ),
+            (
+                generate_device_show(),
+                device_update_con_arg(
+                    auth_method="shared_private_key",
+                    primary_key="primarykeyUpdated",
+                    secondary_key="secondarykeyUpdated"
+                )
+            ),
+            (
+                generate_device_show(
+                    authentication={
+                        "type": "selfSigned",
+                        "symmetricKey": {"primaryKey": None, "secondaryKey": None},
+                        "x509Thumbprint": {"primaryThumbprint": "123", "secondaryThumbprint": "321"},
+                    }
+                ),
+                device_update_con_arg(
+                    auth_method="shared_private_key",
+                    primary_key="primary_key",
+                    secondary_key="secondary_key"
+                )
+            ),
+            (
+                generate_device_show(
+                    authentication={
+                        "type": "certificateAuthority",
+                        "symmetricKey": {"primaryKey": None, "secondaryKey": None},
+                        "x509Thumbprint": {"primaryThumbprint": None, "secondaryThumbprint": None},
+                    }
+                ),
+                device_update_con_arg(
+                    auth_method="x509_thumbprint",
+                    primary_thumbprint="primary_thumbprint",
+                    secondary_thumbprint="secondary_thumbprint"
+                )
+            ),
+            (
+                generate_device_show(),
+                device_update_con_arg(
+                    auth_method="x509_ca",
+                )
+            ),
+        ]
+    )
+    def test_iot_device_custom(self, fixture_cmd, serviceclient, req, arg):
+        instance = subject.update_iot_device_custom(
+            req,
+            arg["edge_enabled"],
+            arg["status"],
+            arg["status_reason"],
+            arg['auth_method'],
+            arg['primary_thumbprint'],
+            arg['secondary_thumbprint'],
+            arg['primary_key'],
+            arg["secondary_key"]
+        )
+
+        if arg["edge_enabled"]:
+            assert instance["capabilities"]["iotEdge"] == arg["edge_enabled"]
+        if arg["status"]:
+            assert instance["status"] == arg["status"]
+        if arg["status_reason"]:
+            assert instance['statusReason'] == arg["status_reason"]
+        if arg["auth_method"]:
+            if arg["auth_method"] == "shared_private_key":
+                assert instance['authentication']['type'] == "sas"
+                instance['authentication']['symmetricKey']['primaryKey'] == arg['primary_key']
+                instance['authentication']['symmetricKey']['secondaryKey'] == arg['secondary_key']
+            if arg["auth_method"] == "x509_thumbprint":
+                assert instance['authentication']['type'] == "selfSigned"
+                if arg['primary_thumbprint']:
+                    instance['authentication']['x509Thumbprint']['primaryThumbprint'] = arg['primary_thumbprint']
+                if arg['secondary_thumbprint']:
+                    instance['authentication']['x509Thumbprint']['secondaryThumbprint'] = arg['secondary_thumbprint']
+            if arg['auth_method'] == "x509_ca":
+                assert instance['authentication']['type'] == "certificateAuthority"
+
+    @pytest.mark.parametrize(
+        "req, arg, exp",
+        [
+            (
+                generate_device_show(),
+                device_update_con_arg(
+                    auth_method="shared_private_key",
+                    primary_key="primarykeyUpdated",
+                ),
+                CLIError
+            ),
+            (
+                generate_device_show(),
+                device_update_con_arg(
+                    auth_method="x509_thumbprint",
+                ),
+                CLIError
+            ),
+            (
+                generate_device_show(),
+                device_update_con_arg(
+                    auth_method="Unknown",
+                ),
+                ValueError
+            ),
+        ]
+    )
+    def test_iot_device_custom_invalid_args(self, serviceclient, req, arg, exp):
+        with pytest.raises(exp):
+            subject.update_iot_device_custom(
+                req,
+                arg["edge_enabled"],
+                arg["status"],
+                arg["status_reason"],
+                arg['auth_method'],
+                arg['primary_thumbprint'],
+                arg['secondary_thumbprint'],
+                arg['primary_key'],
+                arg["secondary_key"]
+            )
 
     @pytest.mark.parametrize(
         "req, exp",
