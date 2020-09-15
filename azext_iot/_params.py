@@ -370,6 +370,18 @@ def load_arguments(self, _):
             help="Description for device status.",
         )
 
+    with self.argument_context('iot hub device-identity update') as context:
+        context.argument(
+            "primary_key",
+            options_list=["--primary-key", "--pk"],
+            help="The primary symmetric shared access key stored in base64 format.",
+        )
+        context.argument(
+            "secondary_key",
+            options_list=["--secondary-key", "--sk"],
+            help="The secondary symmetric shared access key stored in base64 format.",
+        )
+
     with self.argument_context("iot hub device-identity create") as context:
         context.argument(
             "force",

@@ -3,6 +3,11 @@
 Release History
 ===============
 
+**IoT Hub updates**
+
+* Add convenience arguments for device update.
+
+
 0.10.0
 +++++++++++++++
 
