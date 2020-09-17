@@ -103,6 +103,8 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
         device_client = helpers.dps_connect_device(device_id, credentials)
 
+        enqueued_time = utility.calculate_millisec_since_unix_epoch_utc() - 10000
+
         payload = {"Bool": True}
         msg = Message(
             data=json.dumps(payload),
@@ -110,8 +112,6 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             content_type="application/json",
         )
         device_client.send_message(msg)
-
-        enqueued_time = utility.calculate_millisec_since_unix_epoch_utc() - 10000
 
         # Test with invalid app-id
         self.cmd(
@@ -134,6 +134,8 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
         device_client = helpers.dps_connect_device(device_id, credentials)
 
+        enqueued_time = utility.calculate_millisec_since_unix_epoch_utc() - 10000
+
         payload = {"Bool": True}
         msg = Message(
             data=json.dumps(payload),
@@ -141,8 +143,6 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             content_type="application/json",
         )
         device_client.send_message(msg)
-
-        enqueued_time = utility.calculate_millisec_since_unix_epoch_utc() - 10000
 
         # Test with invalid app-id
         self.cmd(
