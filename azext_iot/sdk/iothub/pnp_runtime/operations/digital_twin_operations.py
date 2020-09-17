@@ -23,7 +23,7 @@ class DigitalTwinOperations(object):
     :param config: Configuration of service client.
     :param serializer: An object model serializer.
     :param deserializer: An object model deserializer.
-    :ivar api_version: Version of the Api. Constant value: "2020-06-30-preview".
+    :ivar api_version: The API version to use for the request. Constant value: "2020-09-30".
     """
 
     def __init__(self, client, config, serializer, deserializer):
@@ -31,7 +31,7 @@ class DigitalTwinOperations(object):
         self._client = client
         self._serialize = serializer
         self._deserialize = deserializer
-        self.api_version = "2020-06-30-preview"
+        self.api_version = "2020-09-30"
 
         self.config = config
 
