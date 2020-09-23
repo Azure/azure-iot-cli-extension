@@ -517,6 +517,34 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
             ],
         )
 
+        # Test 'az iot hub device renew-key'
+        device = self.cmd(
+            '''iot hub device-identity renew-key -d {} -n {} -g {} --rk Primary
+                    '''.format(
+                edge_device_ids[1], LIVE_HUB, LIVE_RG
+            ),
+            checks=[
+                self.check("deviceId", edge_device_ids[1])
+            ]
+        ).get_output_in_json()
+
+        # Test swap keys 'az iot hub device renew-key'
+        self.cmd(
+            '''iot hub device-identity renew-key -d {} -n {} -g {} --rk swap
+                    '''.format(
+                edge_device_ids[1], LIVE_HUB, LIVE_RG
+            ),
+            checks=[
+                self.check("authentication.symmetricKey.primaryKey", device['authentication']['symmetricKey']['secondaryKey']),
+                self.check("authentication.symmetricKey.secondaryKey", device['authentication']['symmetricKey']['primaryKey'])
+            ],
+        )
+
+        # Test 'az iot hub device renew-key' with non sas authentication
+        self.cmd("iot hub device-identity renew-key -d {} -n {} -g {} --rk Secondary"
+                 .format(device_ids[0], LIVE_HUB, LIVE_RG),
+                 expect_failure=True)
+
         sym_conn_str_pattern = r"^HostName={}\.azure-devices\.net;DeviceId={};SharedAccessKey=".format(
             LIVE_HUB, edge_device_ids[0]
         )

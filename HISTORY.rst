@@ -9,6 +9,7 @@ Release History
 **IoT Hub updates**
 
 * Add convenience arguments for device update.
+* Add command to regenerate keys for the device.
 
 **IoT DPS updates**
 

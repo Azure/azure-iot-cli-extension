@@ -24,6 +24,7 @@ from azext_iot.common.shared import (
     ConfigType,
     KeyType,
     SettleType,
+    RenewKeyType
 )
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
@@ -285,31 +286,18 @@ def iot_device_update(
     target = discovery.get_target(
         hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
-    resolver = SdkResolver(target=target)
-    service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
-    try:
-        auth, pk, sk = _parse_auth(parameters)
-        updated_device = _assemble_device(
-            parameters['deviceId'],
-            auth, parameters['capabilities']['iotEdge'],
-            pk,
-            sk,
-            parameters['status'].lower(),
-            parameters.get('statusReason')
-        )
-        etag = parameters.get("etag", None)
-        if etag:
-            headers = {}
-            headers["If-Match"] = '"{}"'.format(etag)
-            return service_sdk.registry_manager.create_or_update_device(
-                id=device_id, device=updated_device, custom_headers=headers
-            )
-        raise LookupError("device etag not found.")
-    except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
-    except LookupError as err:
-        raise CLIError(err)
+    auth, pk, sk = _parse_auth(parameters)
+    updated_device = _assemble_device(
+        parameters['deviceId'],
+        auth, parameters['capabilities']['iotEdge'],
+        pk,
+        sk,
+        parameters['status'].lower(),
+        parameters.get('statusReason')
+    )
+    updated_device.etag = parameters.get("etag", None)
+    return _iot_device_update(target, device_id, updated_device)
 
 
 def iot_device_delete(
@@ -338,6 +326,66 @@ def iot_device_delete(
         raise CLIError(unpack_msrest_error(e))
     except LookupError as err:
         raise CLIError(err)
+
+
+def iot_device_key_renew(cmd, hub_name, device_id, regenerate_key, resource_group_name=None, login=None):
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+    )
+    device = _iot_device_show(target, device_id)
+    if (device["authentication"]["type"] == "sas"):
+        pk = device["authentication"]["symmetricKey"]["primaryKey"]
+        sk = device["authentication"]["symmetricKey"]["secondaryKey"]
+        if regenerate_key == RenewKeyType.Primary.value:
+            pk = _generateKey()
+        if regenerate_key == RenewKeyType.Secondary.value:
+            sk = _generateKey()
+        if regenerate_key == RenewKeyType.Swap.value:
+            temp = pk
+            pk = sk
+            sk = temp
+
+        updated_device = _assemble_device(
+            device["deviceId"],
+            device["authentication"]["type"],
+            device["capabilities"]["iotEdge"],
+            pk,
+            sk,
+            device["status"].lower(),
+            device["statusReason"],
+            device.get("deviceScope", None)
+        )
+        updated_device.etag = device["etag"]
+        return _iot_device_update(target, device_id, updated_device)
+    else:
+        raise CLIError("Device authentication should be of type sas")
+
+
+def _generateKey(byteLength=32):
+    import random
+    import base64
+    key = ""
+    while byteLength > 0:
+        key += chr(random.randrange(1, 128))
+        byteLength -= 1
+    return base64.b64encode(key.encode()).decode("utf-8")
+
+
+def _iot_device_update(target, device_id, device):
+    resolver = SdkResolver(target=target)
+    service_sdk = resolver.get_sdk(SdkType.service_sdk)
+
+    try:
+        headers = {}
+        headers["If-Match"] = '"{}"'.format(device.etag)
+        return service_sdk.registry_manager.create_or_update_device(
+            id=device_id,
+            device=device,
+            custom_headers=headers
+        )
+    except CloudError as e:
+        raise CLIError(unpack_msrest_error(e))
 
 
 def iot_device_get_parent(
