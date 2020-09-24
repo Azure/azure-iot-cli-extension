@@ -3,6 +3,14 @@
 Release History
 ===============
 
+0.11.0
++++++++++++++++
+
+**IoT Plug-and-Play updates**
+
+* Regenerated runtime SDK for API version 2020-09-30
+
+
 0.10.0
 +++++++++++++++
 
