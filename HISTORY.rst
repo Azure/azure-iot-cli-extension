@@ -10,6 +10,10 @@ Release History
 
 * Regenerated runtime SDK for API version 2020-09-30
 
+**IoT Hub updates**
+
+* Add command to regenerate keys for the device.
+
 
 0.10.0
 +++++++++++++++
@@ -17,7 +21,6 @@ Release History
 **IoT Hub updates**
 
 * Add convenience arguments for device update.
-* Add command to regenerate keys for the device.
 
 **IoT DPS updates**
 
