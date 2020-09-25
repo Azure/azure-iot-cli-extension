@@ -36,6 +36,7 @@ from azext_iot.common.utility import (
     init_monitoring,
     process_json_arg,
     ensure_min_version,
+    generateKey
 )
 from azext_iot._factory import SdkResolver, CloudError
 from azext_iot.operations.generic import _execute_query, _process_top
@@ -296,8 +297,24 @@ def iot_device_update(
         parameters['status'].lower(),
         parameters.get('statusReason')
     )
-    updated_device.etag = parameters.get("etag", None)
+    updated_device.etag = parameters.get("etag", "*")
     return _iot_device_update(target, device_id, updated_device)
+
+
+def _iot_device_update(target, device_id, device):
+    resolver = SdkResolver(target=target)
+    service_sdk = resolver.get_sdk(SdkType.service_sdk)
+
+    try:
+        headers = {}
+        headers["If-Match"] = '"{}"'.format(device.etag)
+        return service_sdk.registry_manager.create_or_update_device(
+            id=device_id,
+            device=device,
+            custom_headers=headers
+        )
+    except CloudError as e:
+        raise CLIError(unpack_msrest_error(e))
 
 
 def iot_device_delete(
@@ -334,58 +351,32 @@ def iot_device_key_renew(cmd, hub_name, device_id, regenerate_key, resource_grou
         hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     device = _iot_device_show(target, device_id)
-    if (device["authentication"]["type"] == "sas"):
-        pk = device["authentication"]["symmetricKey"]["primaryKey"]
-        sk = device["authentication"]["symmetricKey"]["secondaryKey"]
-        if regenerate_key == RenewKeyType.Primary.value:
-            pk = _generateKey()
-        if regenerate_key == RenewKeyType.Secondary.value:
-            sk = _generateKey()
-        if regenerate_key == RenewKeyType.Swap.value:
-            temp = pk
-            pk = sk
-            sk = temp
-
-        updated_device = _assemble_device(
-            device["deviceId"],
-            device["authentication"]["type"],
-            device["capabilities"]["iotEdge"],
-            pk,
-            sk,
-            device["status"].lower(),
-            device["statusReason"],
-            device.get("deviceScope", None)
-        )
-        updated_device.etag = device["etag"]
-        return _iot_device_update(target, device_id, updated_device)
-    else:
+    if (device["authentication"]["type"] != "sas"):
         raise CLIError("Device authentication should be of type sas")
 
+    pk = device["authentication"]["symmetricKey"]["primaryKey"]
+    sk = device["authentication"]["symmetricKey"]["secondaryKey"]
+    if regenerate_key == RenewKeyType.primary.value:
+        pk = generateKey()
+    if regenerate_key == RenewKeyType.secondary.value:
+        sk = generateKey()
+    if regenerate_key == RenewKeyType.swap.value:
+        temp = pk
+        pk = sk
+        sk = temp
 
-def _generateKey(byteLength=32):
-    import random
-    import base64
-    key = ""
-    while byteLength > 0:
-        key += chr(random.randrange(1, 128))
-        byteLength -= 1
-    return base64.b64encode(key.encode()).decode("utf-8")
-
-
-def _iot_device_update(target, device_id, device):
-    resolver = SdkResolver(target=target)
-    service_sdk = resolver.get_sdk(SdkType.service_sdk)
-
-    try:
-        headers = {}
-        headers["If-Match"] = '"{}"'.format(device.etag)
-        return service_sdk.registry_manager.create_or_update_device(
-            id=device_id,
-            device=device,
-            custom_headers=headers
-        )
-    except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+    updated_device = _assemble_device(
+        device["deviceId"],
+        device["authentication"]["type"],
+        device["capabilities"]["iotEdge"],
+        pk,
+        sk,
+        device["status"].lower(),
+        device["statusReason"],
+        device.get("deviceScope", None)
+    )
+    updated_device.etag = device["etag"]
+    return _iot_device_update(target, device_id, updated_device)
 
 
 def iot_device_get_parent(

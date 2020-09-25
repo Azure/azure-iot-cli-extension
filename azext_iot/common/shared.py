@@ -220,6 +220,6 @@ class RenewKeyType(Enum):
     """
     Type of the RegenerateKey for the device.
     """
-    Primary = "primary"
-    Secondary = "secondary"
-    Swap = "swap"
+    primary = "primary"
+    secondary = "secondary"
+    swap = "swap"
