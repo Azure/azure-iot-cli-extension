@@ -388,9 +388,9 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
             expect_failure=True,
         )
 
-        # Error max top of 100 with configurations
+        # Error max top of 1000 with configurations
         self.cmd(
-            "iot edge deployment list -n {} -g {} --top 101".format(LIVE_HUB, LIVE_RG),
+            "iot edge deployment list -n {} -g {} --top 1001".format(LIVE_HUB, LIVE_RG),
             expect_failure=True,
         )
 
@@ -691,9 +691,9 @@ class TestIoTHubConfigurations(IoTLiveScenarioTest):
             expect_failure=True,
         )
 
-        # Error max top of 100 with configurations
+        # Error max top of 1000 with configurations
         self.cmd(
-            "iot hub configuration list -n {} -g {} --top 101".format(LIVE_HUB, LIVE_RG),
+            "iot hub configuration list -n {} -g {} --top 1001".format(LIVE_HUB, LIVE_RG),
             expect_failure=True,
         )
 
