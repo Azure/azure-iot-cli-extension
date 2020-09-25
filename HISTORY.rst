@@ -3,12 +3,16 @@
 Release History
 ===============
 
-0.11.0
+0.10.1
 +++++++++++++++
 
 **IoT Plug-and-Play updates**
 
 * Regenerated runtime SDK for API version 2020-09-30
+
+**IoT Hub updates**
+
+* Increased `--top` limit of `hub configuration list` and `edge deployment list` to 1000, and added check for empty `deviceContent`, `moduleContent`, or `modulesContent` objects.
 
 
 0.10.0
