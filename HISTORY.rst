@@ -9,6 +9,7 @@ Release History
 **IoT Plug-and-Play updates**
 
 * Regenerated runtime SDK for API version 2020-09-30
+* GA release for `az iot pnp twin` command group
 
 **IoT Hub updates**
 
