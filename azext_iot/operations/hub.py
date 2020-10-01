@@ -36,7 +36,7 @@ from azext_iot.common.utility import (
     init_monitoring,
     process_json_arg,
     ensure_min_version,
-    generateKey
+    generate_key
 )
 from azext_iot._factory import SdkResolver, CloudError
 from azext_iot.operations.generic import _execute_query, _process_top
@@ -248,35 +248,51 @@ def _create_self_signed_cert(subject, valid_days, output_path=None):
     return create_self_signed_certificate(subject, valid_days, output_path)
 
 
-def update_iot_device_custom(instance, edge_enabled=None, status=None, status_reason=None,
-                             auth_method=None, primary_thumbprint=None, secondary_thumbprint=None,
-                             primary_key=None, secondary_key=None):
+def update_iot_device_custom(
+    instance,
+    edge_enabled=None,
+    status=None,
+    status_reason=None,
+    auth_method=None,
+    primary_thumbprint=None,
+    secondary_thumbprint=None,
+    primary_key=None,
+    secondary_key=None,
+):
     if edge_enabled is not None:
-        instance['capabilities']['iotEdge'] = edge_enabled
+        instance["capabilities"]["iotEdge"] = edge_enabled
     if status is not None:
-        instance['status'] = status
+        instance["status"] = status
     if status_reason is not None:
-        instance['statusReason'] = status_reason
+        instance["statusReason"] = status_reason
     if auth_method is not None:
         if auth_method == DeviceAuthType.shared_private_key.name:
-            auth = 'sas'
-            if (primary_key and not secondary_key) or (not primary_key and secondary_key):
+            auth = "sas"
+            if (primary_key and not secondary_key) or (
+                not primary_key and secondary_key
+            ):
                 raise CLIError("primary + secondary Key required with sas auth")
-            instance['authentication']['symmetricKey']['primaryKey'] = primary_key
-            instance['authentication']['symmetricKey']['secondaryKey'] = secondary_key
+            instance["authentication"]["symmetricKey"]["primaryKey"] = primary_key
+            instance["authentication"]["symmetricKey"]["secondaryKey"] = secondary_key
         elif auth_method == DeviceAuthType.x509_thumbprint.name:
-            auth = 'selfSigned'
+            auth = "selfSigned"
             if not any([primary_thumbprint, secondary_thumbprint]):
-                raise CLIError("primary or secondary Thumbprint required with selfSigned auth")
+                raise CLIError(
+                    "primary or secondary Thumbprint required with selfSigned auth"
+                )
             if primary_thumbprint:
-                instance['authentication']['x509Thumbprint']['primaryThumbprint'] = primary_thumbprint
+                instance["authentication"]["x509Thumbprint"][
+                    "primaryThumbprint"
+                ] = primary_thumbprint
             if secondary_thumbprint:
-                instance['authentication']['x509Thumbprint']['secondaryThumbprint'] = secondary_thumbprint
+                instance["authentication"]["x509Thumbprint"][
+                    "secondaryThumbprint"
+                ] = secondary_thumbprint
         elif auth_method == DeviceAuthType.x509_ca.name:
-            auth = 'certificateAuthority'
+            auth = "certificateAuthority"
         else:
-            raise ValueError('Authorization method {} invalid.'.format(auth_method))
-        instance['authentication']['type'] = auth
+            raise ValueError("Authorization method {} invalid.".format(auth_method))
+        instance["authentication"]["type"] = auth
     return instance
 
 
@@ -357,9 +373,9 @@ def iot_device_key_renew(cmd, hub_name, device_id, regenerate_key, resource_grou
     pk = device["authentication"]["symmetricKey"]["primaryKey"]
     sk = device["authentication"]["symmetricKey"]["secondaryKey"]
     if regenerate_key == RenewKeyType.primary.value:
-        pk = generateKey()
+        pk = generate_key()
     if regenerate_key == RenewKeyType.secondary.value:
-        sk = generateKey()
+        sk = generate_key()
     if regenerate_key == RenewKeyType.swap.value:
         temp = pk
         pk = sk
@@ -1183,7 +1199,7 @@ def _iot_hub_configuration_show(target, config_id):
 
 
 def iot_hub_configuration_list(
-    cmd, hub_name=None, top=10, resource_group_name=None, login=None
+    cmd, hub_name=None, top=None, resource_group_name=None, login=None
 ):
     result = _iot_hub_configuration_list(
         cmd,
@@ -1195,13 +1211,16 @@ def iot_hub_configuration_list(
     filtered = [
         c
         for c in result
-        if (c["content"].get("deviceContent") or c["content"].get("moduleContent"))
+        if (
+            c["content"].get("deviceContent") is not None
+            or c["content"].get("moduleContent") is not None
+        )
     ]
-    return filtered[:top]
+    return filtered[:top]  # list[:None] == list[:len(list)]
 
 
 def iot_edge_deployment_list(
-    cmd, hub_name=None, top=10, resource_group_name=None, login=None
+    cmd, hub_name=None, top=None, resource_group_name=None, login=None
 ):
     result = _iot_hub_configuration_list(
         cmd,
@@ -1211,14 +1230,14 @@ def iot_edge_deployment_list(
         login=login,
     )
 
-    filtered = [c for c in result if c["content"].get("modulesContent")]
-    return filtered[:top]
+    filtered = [c for c in result if c["content"].get("modulesContent") is not None]
+    return filtered[:top]  # list[:None] == list[:len(list)]
 
 
 def _iot_hub_configuration_list(
-    cmd, hub_name=None, top=10, resource_group_name=None, login=None
+    cmd, hub_name=None, top=None, resource_group_name=None, login=None
 ):
-    top = _process_top(top, upper_limit=100)
+    top = _process_top(top)
 
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
@@ -1902,7 +1921,7 @@ def iot_c2d_message_receive(
     login=None,
     abandon=None,
     complete=None,
-    reject=None
+    reject=None,
 ):
     ack = None
     ack_vals = [abandon, complete, reject]

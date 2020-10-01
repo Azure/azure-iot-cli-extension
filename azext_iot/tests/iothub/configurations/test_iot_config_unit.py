@@ -678,7 +678,7 @@ class TestConfigUpdate:
 
 
 class TestConfigList:
-    @pytest.fixture(params=[10, 0, 20])
+    @pytest.fixture(params=[10, 0, 1000])
     def service_client(self, mocked_response, fixture_ghcs, request):
         result = []
         size = request.param
@@ -711,7 +711,7 @@ class TestConfigList:
         mocked_response.expected_size = size
         yield mocked_response
 
-    @pytest.mark.parametrize("top", [1, 100])
+    @pytest.mark.parametrize("top", [1, 100, 1000, None])
     def test_config_list(self, fixture_cmd, service_client, top):
         result = subject.iot_hub_configuration_list(
             cmd=fixture_cmd, hub_name=mock_target["entity"], top=top
@@ -722,9 +722,13 @@ class TestConfigList:
         assert len(result) == top or len(result) == service_client.expected_size * 2
 
         list_request = service_client.calls[0].request
-        assert "top={}".format(top) in list_request.url
 
-    @pytest.mark.parametrize("top", [1, 10])
+        if top:
+            assert "top={}".format(top) in list_request.url
+        else:
+            assert not "top={}".format(top) in list_request.url
+
+    @pytest.mark.parametrize("top", [1, 100, 1000, None])
     def test_deployment_list(self, fixture_cmd, service_client, top):
         result = subject.iot_edge_deployment_list(
             cmd=fixture_cmd, hub_name=mock_target["entity"], top=top
@@ -734,7 +738,11 @@ class TestConfigList:
         assert len(result) == top or len(result) == service_client.expected_size
 
         list_request = service_client.calls[0].request
-        assert "top={}".format(top) in list_request.url
+
+        if top:
+            assert "top={}".format(top) in list_request.url
+        else:
+            assert not "top={}".format(top) in list_request.url
 
     @pytest.mark.parametrize("top", [-1, 0, 101])
     def test_config_list_invalid_args(self, fixture_cmd, top):

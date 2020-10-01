@@ -518,7 +518,7 @@ def compute_device_key(primary_key, registration_id):
     return device_key
 
 
-def generateKey(byte_length=32):
+def generate_key(byte_length=32):
     key = ""
     while byte_length > 0:
         key += chr(random.randrange(1, 128))
