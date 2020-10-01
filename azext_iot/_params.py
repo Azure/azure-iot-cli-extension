@@ -696,7 +696,7 @@ def load_arguments(self, _):
             "top",
             options_list=["--top"],
             type=int,
-            help="Maximum number of configurations to return.",
+            help="Maximum number of configurations to return. By default all configurations are returned.",
         )
 
     with self.argument_context("iot edge") as context:
@@ -735,7 +735,7 @@ def load_arguments(self, _):
             "top",
             options_list=["--top"],
             type=int,
-            help="Maximum number of deployments to return.",
+            help="Maximum number of deployments to return. By default all deployments are returned.",
         )
         context.argument(
             "layered",

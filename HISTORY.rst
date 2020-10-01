@@ -8,8 +8,13 @@ Release History
 
 **IoT Plug-and-Play updates**
 
-* Regenerated runtime SDK for API version 2020-09-30
-* GA release for `az iot pnp twin` command group
+* Regenerated PnP runtime SDK to API version 2020-09-30
+* All `az iot pnp` commands still remain under preview and are subject to change or deletion.
+
+** IoT Hub updates**
+
+* All configuration/edge deployment list operations no longer have a default top. By default all configuration entities will be returned.
+  Existing --top input should not be affected.
 
 
 0.10.0
