@@ -382,18 +382,6 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
             checks=config_list_check,
         )
 
-        # Error top of -1 does not work with configurations
-        self.cmd(
-            "iot edge deployment list -n {} -g {} --top -1".format(LIVE_HUB, LIVE_RG),
-            expect_failure=True,
-        )
-
-        # Error max top of 100 with configurations
-        self.cmd(
-            "iot edge deployment list -n {} -g {} --top 101".format(LIVE_HUB, LIVE_RG),
-            expect_failure=True,
-        )
-
         # Explicitly delete an edge deployment
         self.cmd(
             "iot edge deployment delete -d {} -n {} -g {}".format(
@@ -683,18 +671,6 @@ class TestIoTHubConfigurations(IoTLiveScenarioTest):
         self.cmd(
             "iot hub configuration list --login {}".format(self.connection_string),
             checks=config_list_check,
-        )
-
-        # Error top of -1 does not work with configurations
-        self.cmd(
-            "iot hub configuration list -n {} -g {} --top -1".format(LIVE_HUB, LIVE_RG),
-            expect_failure=True,
-        )
-
-        # Error max top of 100 with configurations
-        self.cmd(
-            "iot hub configuration list -n {} -g {} --top 101".format(LIVE_HUB, LIVE_RG),
-            expect_failure=True,
         )
 
         # Explicitly delete an ADM configuration
