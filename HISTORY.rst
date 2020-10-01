@@ -3,6 +3,14 @@
 Release History
 ===============
 
+0.10.2
++++++++++++++++
+
+**IoT Hub updates**
+
+* Add command to regenerate keys for the device.
+
+
 0.10.1
 +++++++++++++++
 
