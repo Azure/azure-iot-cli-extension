@@ -216,13 +216,15 @@ helps[
 """
 
 helps[
-    "iot hub device-identity renew-key"
+    "iot hub device-identity regenerate-key"
 ] = """
     type: command
-    short-summary: Regenerate keys of a device with sas authentication of an IoT hub.
+    short-summary: Regenerate target keys of an IoT Hub device with sas authentication.
     examples:
-      - name: Regenerate primary key of a device of an IoT hub.
-        text: az iot hub device-identity renew-key -d {device_id} -n {iothub_name} --rk Primary
+      - name: Regenerate the primary key.
+        text: az iot hub device-identity regenerate-key -d {device_id} -n {iothub_name} --kt primary
+      - name: Swap the primary and secondary keys.
+        text: az iot hub device-identity regenerate-key -d {device_id} -n {iothub_name} --kt swap
 """
 
 helps[

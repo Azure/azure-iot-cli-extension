@@ -8,7 +8,7 @@ Release History
 
 **IoT Hub updates**
 
-* Add command to regenerate keys for the device.
+* Adds `az iot hub device-identity regenerate-key`.
 
 
 0.10.1

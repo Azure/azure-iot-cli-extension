@@ -31,7 +31,7 @@ from azext_iot.common.shared import (
     JobCreateType,
     JobStatusType,
     AuthenticationType,
-    RenewKeyType,
+    RegenerateKeyType,
 )
 from azext_iot._validators import mode2_iot_login_handler
 from azext_iot.assets.user_messages import info_param_properties_device
@@ -400,12 +400,12 @@ def load_arguments(self, _):
             help="Child device list (comma separated) includes only non-edge devices.",
         )
 
-    with self.argument_context('iot hub device-identity renew-key') as context:
+    with self.argument_context('iot hub device-identity regenerate-key') as context:
         context.argument(
             "regenerate_key",
-            options_list=["--renew-key", "--rk"],
-            arg_type=get_enum_type(RenewKeyType),
-            help="Regenerate keys"
+            options_list=["--key-type", "--kt"],
+            arg_type=get_enum_type(RegenerateKeyType),
+            help="Target key type to regenerate."
         )
 
     with self.argument_context("iot hub device-identity export") as context:
