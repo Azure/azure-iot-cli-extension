@@ -517,9 +517,9 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
             ],
         )
 
-        # Test 'az iot hub device renew-key'
+        # Test 'az iot hub device regenerate-key'
         device = self.cmd(
-            '''iot hub device-identity renew-key -d {} -n {} -g {} --rk primary
+            '''iot hub device-identity regenerate-key -d {} -n {} -g {} --kt primary
                     '''.format(
                 edge_device_ids[1], LIVE_HUB, LIVE_RG
             ),
@@ -528,9 +528,9 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
             ]
         ).get_output_in_json()
 
-        # Test swap keys 'az iot hub device renew-key'
+        # Test swap keys 'az iot hub device regenerate-key'
         self.cmd(
-            '''iot hub device-identity renew-key -d {} -n {} -g {} --rk swap
+            '''iot hub device-identity regenerate-key -d {} -n {} -g {} --kt swap
                     '''.format(
                 edge_device_ids[1], LIVE_HUB, LIVE_RG
             ),
@@ -540,8 +540,8 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
             ],
         )
 
-        # Test 'az iot hub device renew-key' with non sas authentication
-        self.cmd("iot hub device-identity renew-key -d {} -n {} -g {} --rk secondary"
+        # Test 'az iot hub device regenerate-key' with non sas authentication
+        self.cmd("iot hub device-identity regenerate-key -d {} -n {} -g {} --kt secondary"
                  .format(device_ids[0], LIVE_HUB, LIVE_RG),
                  expect_failure=True)
 

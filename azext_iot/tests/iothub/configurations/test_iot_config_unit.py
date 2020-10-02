@@ -722,11 +722,7 @@ class TestConfigList:
         assert len(result) == top or len(result) == service_client.expected_size * 2
 
         list_request = service_client.calls[0].request
-
-        if top:
-            assert "top={}".format(top) in list_request.url
-        else:
-            assert not "top={}".format(top) in list_request.url
+        assert "top=" not in list_request.url
 
     @pytest.mark.parametrize("top", [1, 100, 1000, None])
     def test_deployment_list(self, fixture_cmd, service_client, top):
@@ -738,11 +734,7 @@ class TestConfigList:
         assert len(result) == top or len(result) == service_client.expected_size
 
         list_request = service_client.calls[0].request
-
-        if top:
-            assert "top={}".format(top) in list_request.url
-        else:
-            assert not "top={}".format(top) in list_request.url
+        assert "top=" not in list_request.url
 
     @pytest.mark.parametrize("top", [-1, 0, 101])
     def test_config_list_invalid_args(self, fixture_cmd, top):

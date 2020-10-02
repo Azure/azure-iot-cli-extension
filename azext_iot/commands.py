@@ -40,8 +40,7 @@ def load_command_table(self, _):
             setter_name="iot_device_update",
             custom_func_name="update_iot_device_custom"
         )
-        cmd_group.command('renew-key', 'iot_device_key_renew')
-
+        cmd_group.command("regenerate-key", 'iot_device_key_regenerate')
         cmd_group.command(
             "show-connection-string",
             "iot_get_device_connection_string",

@@ -661,8 +661,8 @@ class TestDeviceRegenerateKey:
         return service_client
 
     @pytest.mark.parametrize("req", ["primary", "secondary", "swap"])
-    def test_device_key_renew(self, fixture_cmd, serviceclient, req):
-        subject.iot_device_key_renew(
+    def test_device_key_regenerate(self, fixture_cmd, serviceclient, req):
+        subject.iot_device_key_regenerate(
             fixture_cmd, mock_target["entity"], device_id, req
         )
         args = serviceclient.call_args
@@ -699,16 +699,16 @@ class TestDeviceRegenerateKey:
             ("swap", CLIError)
         ]
     )
-    def test_device_key_renew_invalid_args(self, fixture_cmd, serviceclient_invalid_args, req, exp):
+    def test_device_key_regenerate_invalid_args(self, fixture_cmd, serviceclient_invalid_args, req, exp):
         with pytest.raises(exp):
-            subject.iot_device_key_renew(
+            subject.iot_device_key_regenerate(
                 fixture_cmd, mock_target["entity"], device_id, req
             )
 
     @pytest.mark.parametrize("req", ["primary", "secondary", "swap"])
-    def test_device_key_renew_error(self, serviceclient_generic_error, req):
+    def test_device_key_regenerate_error(self, serviceclient_generic_error, req):
         with pytest.raises(CLIError):
-            subject.iot_device_key_renew(
+            subject.iot_device_key_regenerate(
                 fixture_cmd, mock_target["entity"], device_id, req
             )
 

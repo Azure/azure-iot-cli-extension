@@ -24,7 +24,7 @@ from azext_iot.common.shared import (
     ConfigType,
     KeyType,
     SettleType,
-    RenewKeyType
+    RegenerateKeyType
 )
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
@@ -361,7 +361,7 @@ def iot_device_delete(
         raise CLIError(err)
 
 
-def iot_device_key_renew(cmd, hub_name, device_id, regenerate_key, resource_group_name=None, login=None):
+def iot_device_key_regenerate(cmd, hub_name, device_id, regenerate_key, resource_group_name=None, login=None):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         hub_name=hub_name, resource_group_name=resource_group_name, login=login
@@ -372,11 +372,11 @@ def iot_device_key_renew(cmd, hub_name, device_id, regenerate_key, resource_grou
 
     pk = device["authentication"]["symmetricKey"]["primaryKey"]
     sk = device["authentication"]["symmetricKey"]["secondaryKey"]
-    if regenerate_key == RenewKeyType.primary.value:
+    if regenerate_key == RegenerateKeyType.primary.value:
         pk = generate_key()
-    if regenerate_key == RenewKeyType.secondary.value:
+    if regenerate_key == RegenerateKeyType.secondary.value:
         sk = generate_key()
-    if regenerate_key == RenewKeyType.swap.value:
+    if regenerate_key == RegenerateKeyType.swap.value:
         temp = pk
         pk = sk
         sk = temp
@@ -1204,7 +1204,6 @@ def iot_hub_configuration_list(
     result = _iot_hub_configuration_list(
         cmd,
         hub_name=hub_name,
-        top=top,
         resource_group_name=resource_group_name,
         login=login,
     )
@@ -1225,7 +1224,6 @@ def iot_edge_deployment_list(
     result = _iot_hub_configuration_list(
         cmd,
         hub_name=hub_name,
-        top=top,
         resource_group_name=resource_group_name,
         login=login,
     )
@@ -1235,10 +1233,8 @@ def iot_edge_deployment_list(
 
 
 def _iot_hub_configuration_list(
-    cmd, hub_name=None, top=None, resource_group_name=None, login=None
+    cmd, hub_name=None, resource_group_name=None, login=None
 ):
-    top = _process_top(top)
-
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         hub_name=hub_name, resource_group_name=resource_group_name, login=login
@@ -1247,9 +1243,7 @@ def _iot_hub_configuration_list(
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
     try:
-        result = service_sdk.configuration.get_configurations(
-            top=top, raw=True
-        ).response.json()
+        result = service_sdk.configuration.get_configurations(raw=True).response.json()
         if not result:
             logger.info('No configurations found on hub "%s".', hub_name)
         return result
