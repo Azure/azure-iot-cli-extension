@@ -38,7 +38,7 @@ Please refer to the [Installation Troubleshooting Guide](docs/install-help.md) i
 
 ## Usage
 
-After installing the Azure IoT extension your CLI environment is augmented with the addition of `central`, `device`, `dps`, `dt`, `edge`, `hub` and `pnp` commands.
+After installing the Azure IoT extension your CLI environment is augmented with the addition of `hub`, `central`, `dps`, `dt`, `edge` and `device` commands.
 
 For usage and help content of any command or command group, pass in the `-h` parameter. Root command group details are shown for the following IoT services.
 
@@ -95,7 +95,7 @@ For more specific examples, use: az find "az iot central"
 </details>
 
 <details>
-  <summary>IoT Device Provisioning Service</summary>
+  <summary>IoT Device Provisioning</summary>
 
 ```
 $ az iot dps -h
@@ -136,7 +136,7 @@ Commands:
 ```
 </details>
 
-<details>
+<details open>
   <summary>IoT Hub</summary>
 
 ```
@@ -180,26 +180,6 @@ Commands:
     show-quota-metrics            : Get the quota metrics for an IoT hub.
     show-stats                    : Get the statistics for an IoT hub.
     update                        : Update metadata for an IoT hub.
-```
-</details>
-
-<details>
-  <summary>IoT Plug & Play</summary>
-
-```
-$ az iot pnp -h
-Group
-    az iot pnp : Manage Azure IoT Plug-and-Play repositories and models.
-
-Subgroups:
-    model           [Preview] : Create, view, and publish device models in your company
-                                repository.
-    repo            [Preview] : Create and view Azure IoT Plug-and-Play tenant
-                                repositories.
-    role-assignment [Preview] : Manage and configure PnP repository and model role
-                                assignments.
-    twin            [Preview] : Manipulate and interact with the digital twin of an IoT
-                                Hub device.
 ```
 </details>
 
