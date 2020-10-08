@@ -3,6 +3,19 @@
 Release History
 ===============
 
+0.10.3
++++++++++++++++
+
+**General updates**
+
+* Python 3.5 support will soon be dropped corresponding with the official end of life date.
+* Formal python requires constraint added to constrain installs to Py 3.5+. 
+
+**IoT Plug-and-Play updates**
+
+* The in preview `az iot pnp` command group has been removed. PnP CLI functionality will be re-imagined at a future point in time.
+
+
 0.10.2
 +++++++++++++++
 

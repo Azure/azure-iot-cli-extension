@@ -69,6 +69,7 @@ short_description = "The Azure IoT extension for Azure CLI."
 setup(
     name=PACKAGE_NAME,
     version=VERSION,
+    python_requires=">=3.5,<4",
     description=short_description,
     long_description="{} Intended for power users and/or automation of IoT solutions at scale.".format(short_description),
     license="MIT",
