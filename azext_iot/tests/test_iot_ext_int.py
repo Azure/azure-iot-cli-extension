@@ -493,10 +493,10 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
         self.cmd(
             '''iot hub device-identity update -d {} -n {} -g {} --primary-key=""
                     --secondary-key=""'''.format(
-                edge_device_ids[1], LIVE_HUB, LIVE_RG
+                device_ids[4], LIVE_HUB, LIVE_RG
             ),
             checks=[
-                self.check("deviceId", edge_device_ids[1]),
+                self.check("deviceId", device_ids[4]),
                 self.check("status", "enabled"),
                 self.exists("authentication.symmetricKey.primaryKey"),
                 self.exists("authentication.symmetricKey.secondaryKey"),
@@ -507,10 +507,10 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
         self.cmd(
             '''iot hub device-identity update -d {} --login {} --set authentication.symmetricKey.primaryKey=""
                  authentication.symmetricKey.secondaryKey=""'''.format(
-                edge_device_ids[1], self.connection_string
+                device_ids[4], self.connection_string
             ),
             checks=[
-                self.check("deviceId", edge_device_ids[1]),
+                self.check("deviceId", device_ids[4]),
                 self.check("status", "enabled"),
                 self.exists("authentication.symmetricKey.primaryKey"),
                 self.exists("authentication.symmetricKey.secondaryKey"),
