@@ -14,6 +14,7 @@ from azext_iot.common.embedded_cli import EmbeddedCLI
 
 MOCK_RESOURCE_TAGS = "a=b;c=d"
 MOCK_ENDPOINT_TAGS = "key0=value0;key1=value1;"
+MOCK_DEAD_LETTER_SECRET = 'https://accountname.blob.core.windows.net/containerName?sasToken'
 
 
 def generate_resource_id():

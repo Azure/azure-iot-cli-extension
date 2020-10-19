@@ -4,8 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from azext_iot.sdk.digitaltwins_arm import AzureDigitalTwinsManagementClient
-from azext_iot.sdk.digitaltwins_arm.models import ErrorResponseException
+from azext_iot.sdk.digitaltwins.controlplane import AzureDigitalTwinsManagementClient
+from azext_iot.sdk.digitaltwins.controlplane.models import ErrorResponseException
 from msrestazure.azure_exceptions import CloudError
 
 __all__ = [

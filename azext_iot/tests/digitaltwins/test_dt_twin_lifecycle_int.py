@@ -24,9 +24,9 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
     def test_dt_twin(self):
         instance_name = generate_resource_id()
         models_directory = "./models"
-        floor_dtmi = "dtmi:example:Floor;1"
+        floor_dtmi = "dtmi:com:example:Floor;1"
         floor_twin_id = "myfloor"
-        room_dtmi = "dtmi:example:Room;1"
+        room_dtmi = "dtmi:com:example:Room;1"
         room_twin_id = "myroom"
         thermostat_component_id = "Thermostat"
 
@@ -42,7 +42,7 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
             )
         )
         # Wait for RBAC to catch-up
-        sleep(10)
+        sleep(15)
 
         self.cmd(
             "dt model create -n {} --from-directory '{}'".format(
@@ -332,7 +332,7 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
                     else "",
                 )
             )
-        sleep(4)  # Wait for API to catch up
+        sleep(10)  # Wait for API to catch up
         twin_query_result = self.cmd(
             "dt twin query -n {} -g {} -q 'select * from digitaltwins' --cost".format(
                 instance_name, self.dt_resource_group
@@ -358,20 +358,12 @@ def assert_twin_attributes(
 
     if properties:
         properties = json.loads(properties)
+        assert properties
 
         for key in properties:
             if key != component_name:
-                assert metadata[key]["desiredValue"] == properties[key]
+                assert properties[key] == twin[key]
 
-        if component_name:
-            component_metadata = twin[component_name]["$metadata"]
-            component_props = properties[component_name]
-
-            for key in component_props:
-                if key != "$metadata":
-                    assert (
-                        component_metadata[key]["desiredValue"] == component_props[key]
-                    )
 
 
 def assert_twin_relationship_attributes(

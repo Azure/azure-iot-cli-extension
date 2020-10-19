@@ -285,12 +285,14 @@ def load_digitaltwins_help():
     helps["dt twin create"] = """
         type: command
         short-summary: Create a digital twin on an instance.
-        long-summary: --properties can be inline JSON or file path.
+        long-summary: |
+                      --properties can be inline JSON or file path.
+                      Note: --properties are required for twins that contain components.
 
         examples:
         - name: Create a digital twin from an existing (prior-created) model.
           text: >
-            az dt twin create -n {instance_or_hostname} --dtmi dtmi:example:Room;1
+            az dt twin create -n {instance_or_hostname} --dtmi dtmi:com:example:Room;1
             --twin-id {twin_id}
 
         - name: Create a digital twin from an existing (prior-created) model. Instantiate with property values.
@@ -356,7 +358,7 @@ def load_digitaltwins_help():
 
         - name: Query by model and project all attributes.
           text: >
-            az dt twin query -n {instance_or_hostname} -q "select * from digitaltwins T where IS_OF_MODEL(T, 'dtmi:example:Room;2')"
+            az dt twin query -n {instance_or_hostname} -q "select * from digitaltwins T where IS_OF_MODEL(T, 'dtmi:com:example:Room;2')"
     """
 
     helps["dt twin delete"] = """
@@ -544,11 +546,11 @@ def load_digitaltwins_help():
         examples:
         - name: Show model meta data
           text: >
-            az dt model show -n {instance_or_hostname} --dtmi "dtmi:example:Floor;1"
+            az dt model show -n {instance_or_hostname} --dtmi "dtmi:com:example:Floor;1"
 
         - name: Show model meta data and definition
           text: >
-            az dt model show -n {instance_or_hostname} --dtmi "dtmi:example:Floor;1" --definition
+            az dt model show -n {instance_or_hostname} --dtmi "dtmi:com:example:Floor;1" --definition
     """
 
     helps["dt model list"] = """
@@ -576,7 +578,7 @@ def load_digitaltwins_help():
         examples:
         - name: Decommision a target model
           text: >
-            az dt model update -n {instance_or_hostname} --dtmi "dtmi:example:Floor;1" --decommission
+            az dt model update -n {instance_or_hostname} --dtmi "dtmi:com:example:Floor;1" --decommission
     """
 
     helps["dt model delete"] = """
@@ -586,5 +588,5 @@ def load_digitaltwins_help():
         examples:
         - name: Delete a target model.
           text: >
-            az dt model delete -n {instance_or_hostname} --dtmi "dtmi:example:Floor;1"
+            az dt model delete -n {instance_or_hostname} --dtmi "dtmi:com:example:Floor;1"
     """

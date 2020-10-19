@@ -25,7 +25,7 @@ class RouteProvider(DigitalTwinsProvider):
             raise CLIError(unpack_msrest_error(e))
 
     def list(self, top=None):  # top is guarded for int() in arg def
-        from azext_iot.sdk.digitaltwins.models import EventRoutesListOptions
+        from azext_iot.sdk.digitaltwins.dataplane.models import EventRoutesListOptions
 
         list_options = EventRoutesListOptions(max_item_count=top)
 
@@ -40,7 +40,7 @@ class RouteProvider(DigitalTwinsProvider):
 
         # TODO: Adding routes does not return an object
         try:
-            self.sdk.add(id=route_name, endpoint_id=endpoint_name, filter=filter)
+            self.sdk.add(id=route_name, endpoint_name=endpoint_name, filter=filter)
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
 
