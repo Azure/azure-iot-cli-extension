@@ -485,7 +485,6 @@ def assert_common_endpoint_attributes(
     assert endpoint_output["properties"]["provisioningState"]
     assert endpoint_output["properties"]["createdTime"]
     if dead_letter_secret:
-        import pdb; pdb.set_trace()
         assert endpoint_output["properties"]["deadLetterSecret"]
 
     if endpoint_type == ADTEndpointType.eventgridtopic:

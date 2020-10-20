@@ -67,6 +67,14 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
             }
         )
 
+        self.kwargs["emptyThermostatComponentJson"] = json.dumps(
+            {
+                "Thermostat":{
+                    "$metadata":{}
+                }
+            }
+        )
+
         floor_twin = self.cmd(
             "dt twin create -n {} --dtmi {} --twin-id {}".format(
                 instance_name, floor_dtmi, floor_twin_id
@@ -77,6 +85,38 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
             twin=floor_twin,
             expected_twin_id=floor_twin_id,
             expected_dtmi=floor_dtmi,
+        )
+
+        # twin create with component - example of bare minimum --properties
+
+        # create twin will fail without --properties
+        self.cmd(
+            "dt twin create -n {} -g {} --dtmi {} --twin-id {}".format(
+                instance_name,
+                self.dt_resource_group,
+                room_dtmi,
+                room_twin_id
+            ),
+            expect_failure=True
+        )
+
+        # minimum component object with empty $metadata object
+        min_room_twin = self.cmd(
+            "dt twin create -n {} -g {} --dtmi {} --twin-id {} --properties '{}'".format(
+                instance_name,
+                self.dt_resource_group,
+                room_dtmi,
+                room_twin_id,
+                "{emptyThermostatComponentJson}",
+            )
+        ).get_output_in_json()
+
+        assert_twin_attributes(
+            twin=min_room_twin,
+            expected_twin_id=room_twin_id,
+            expected_dtmi=room_dtmi,
+            properties=self.kwargs["emptyThermostatComponentJson"],
+            component_name=thermostat_component_id,
         )
 
         room_twin = self.cmd(
