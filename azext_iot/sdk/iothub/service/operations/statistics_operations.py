@@ -16,14 +16,14 @@ from msrestazure.azure_exceptions import CloudError
 from .. import models
 
 
-class FaultInjectionOperations(object):
-    """FaultInjectionOperations operations.
+class StatisticsOperations(object):
+    """StatisticsOperations operations.
 
     :param client: Client for service requests.
     :param config: Configuration of service client.
     :param serializer: An object model serializer.
     :param deserializer: An object model deserializer.
-    :ivar api_version: Version of the Api. Constant value: "2019-10-01".
+    :ivar api_version: Version of the Api. Constant value: "2020-09-30".
     """
 
     models = models
@@ -33,26 +33,27 @@ class FaultInjectionOperations(object):
         self._client = client
         self._serialize = serializer
         self._deserialize = deserializer
-        self.api_version = "2019-10-01"
+        self.api_version = "2020-09-30"
 
         self.config = config
 
-    def get(
+    def get_device_statistics(
             self, custom_headers=None, raw=False, **operation_config):
-        """Get FaultInjection entity.
+        """Gets device statistics of the IoT Hub identity registry, such as total
+        device count.
 
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
          deserialized response
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
-        :return: FaultInjectionProperties or ClientRawResponse if raw=true
-        :rtype: ~service.models.FaultInjectionProperties or
+        :return: RegistryStatistics or ClientRawResponse if raw=true
+        :rtype: ~service.models.RegistryStatistics or
          ~msrest.pipeline.ClientRawResponse
         :raises: :class:`CloudError<msrestazure.azure_exceptions.CloudError>`
         """
         # Construct URL
-        url = self.get.metadata['url']
+        url = self.get_device_statistics.metadata['url']
 
         # Construct parameters
         query_parameters = {}
@@ -80,32 +81,32 @@ class FaultInjectionOperations(object):
         deserialized = None
 
         if response.status_code == 200:
-            deserialized = self._deserialize('FaultInjectionProperties', response)
+            deserialized = self._deserialize('RegistryStatistics', response)
 
         if raw:
             client_raw_response = ClientRawResponse(deserialized, response)
             return client_raw_response
 
         return deserialized
-    get.metadata = {'url': '/faultInjection'}
+    get_device_statistics.metadata = {'url': '/statistics/devices'}
 
-    def set(
-            self, value, custom_headers=None, raw=False, **operation_config):
-        """Create or update FaultInjection entity.
+    def get_service_statistics(
+            self, custom_headers=None, raw=False, **operation_config):
+        """Gets service statistics of the IoT Hub identity registry, such as
+        connected device count.
 
-        :param value:
-        :type value: ~service.models.FaultInjectionProperties
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
          deserialized response
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
-        :return: None or ClientRawResponse if raw=true
-        :rtype: None or ~msrest.pipeline.ClientRawResponse
+        :return: ServiceStatistics or ClientRawResponse if raw=true
+        :rtype: ~service.models.ServiceStatistics or
+         ~msrest.pipeline.ClientRawResponse
         :raises: :class:`CloudError<msrestazure.azure_exceptions.CloudError>`
         """
         # Construct URL
-        url = self.set.metadata['url']
+        url = self.get_service_statistics.metadata['url']
 
         # Construct parameters
         query_parameters = {}
@@ -113,7 +114,7 @@ class FaultInjectionOperations(object):
 
         # Construct headers
         header_parameters = {}
-        header_parameters['Content-Type'] = 'application/json; charset=utf-8'
+        header_parameters['Accept'] = 'application/json'
         if self.config.generate_client_request_id:
             header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
         if custom_headers:
@@ -121,11 +122,8 @@ class FaultInjectionOperations(object):
         if self.config.accept_language is not None:
             header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
 
-        # Construct body
-        body_content = self._serialize.body(value, 'FaultInjectionProperties')
-
         # Construct and send request
-        request = self._client.put(url, query_parameters, header_parameters, body_content)
+        request = self._client.get(url, query_parameters, header_parameters)
         response = self._client.send(request, stream=False, **operation_config)
 
         if response.status_code not in [200]:
@@ -133,7 +131,14 @@ class FaultInjectionOperations(object):
             exp.request_id = response.headers.get('x-ms-request-id')
             raise exp
 
+        deserialized = None
+
+        if response.status_code == 200:
+            deserialized = self._deserialize('ServiceStatistics', response)
+
         if raw:
-            client_raw_response = ClientRawResponse(None, response)
+            client_raw_response = ClientRawResponse(deserialized, response)
             return client_raw_response
-    set.metadata = {'url': '/faultInjection'}
+
+        return deserialized
+    get_service_statistics.metadata = {'url': '/statistics/service'}
