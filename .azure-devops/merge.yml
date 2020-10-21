@@ -117,16 +117,10 @@ jobs:
   steps:
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.x'
+      versionSpec: '3.6'
       architecture: 'x64'
 
   - template: templates/install-configure-azure-cli.yml
-  - template: templates/download-install-local-azure-iot-cli-extension.yml
-  - bash: |
-      set -ev
-      source ./$(iot_ext_venv)/bin/activate
-      cp ./linter_exclusions.yml $AZURE_EXTENSION_DIR/$(iot_ext_package)/
-      azdev linter --include-whl-extensions $(iot_ext_package) --min-severity medium
 
 - job: CredScan
   displayName: "Credential Scan"
