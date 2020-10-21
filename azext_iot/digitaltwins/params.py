@@ -236,7 +236,7 @@ def load_digitaltwins_arguments(self, _):
             options_list=["--properties", "-p"],
             help="Initial property values for instantiating a digital twin or related components. "
             "Provide file path or inline JSON. Properties are required for twins that contain components, "
-            "at the minimum you must provide an object for each component that contains an empty $metadata object.",
+            "at the minimum you must provide an empty $metadata object for each component.",
         )
 
     with self.argument_context("dt twin telemetry") as context:
