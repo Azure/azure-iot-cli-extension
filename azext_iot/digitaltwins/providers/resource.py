@@ -121,12 +121,10 @@ class ResourceProvider(DigitalTwinsResourceManager):
         if not resource_group_name:
             resource_group_name = self.get_rg(target_instance)
 
-        # TODO: Don't return result. Issue in service related to status code and polling.
         try:
-            self.mgmt_sdk.digital_twins.delete(
+            return self.mgmt_sdk.digital_twins.delete(
                 resource_name=name,
                 resource_group_name=resource_group_name,
-                polling=False,
             )
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
@@ -212,12 +210,10 @@ class ResourceProvider(DigitalTwinsResourceManager):
             resource_group_name = self.get_rg(target_instance)
 
         try:
-            # TODO: Polling set to false
             return self.mgmt_sdk.digital_twins_endpoint.delete(
                 resource_name=target_instance.name,
                 endpoint_name=endpoint_name,
                 resource_group_name=resource_group_name,
-                polling=False,
             )
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))

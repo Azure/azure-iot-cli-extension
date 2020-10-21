@@ -13,7 +13,6 @@ from ..settings import DynamoSettings
 from . import DTLiveScenarioTest
 from . import (
     MOCK_RESOURCE_TAGS,
-    MOCK_ENDPOINT_TAGS,
     MOCK_DEAD_LETTER_SECRET,
     generate_resource_id,
 )
@@ -430,11 +429,6 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
                     "-g {}".format(self.dt_resource_group) if is_last else "",
                 )
             )
-            # DT endpoint delete does not currently return data
-            # ).get_output_in_json()
-            # assert delete_ep_output["properties"]["provisioningState"] == "Deleting"
-            # assert delete_ep_output["id"].endswith("/{}".format(endpoint_name))
-            sleep(10)  # Wait for service to catch-up. Service will fix at some point.
 
         list_endpoint_output = self.cmd(
             "dt endpoint list -n {} -g {}".format(

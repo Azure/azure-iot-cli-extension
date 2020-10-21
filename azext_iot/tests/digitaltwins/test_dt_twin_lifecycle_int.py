@@ -69,8 +69,8 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
 
         self.kwargs["emptyThermostatComponentJson"] = json.dumps(
             {
-                "Thermostat":{
-                    "$metadata":{}
+                "Thermostat": {
+                    "$metadata": {}
                 }
             }
         )
@@ -403,7 +403,6 @@ def assert_twin_attributes(
         for key in properties:
             if key != component_name:
                 assert properties[key] == twin[key]
-
 
 
 def assert_twin_relationship_attributes(
