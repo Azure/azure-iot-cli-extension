@@ -73,7 +73,7 @@ def start_multiple_monitors(
         result = loop.run_until_complete(future)
     except KeyboardInterrupt:
         print("Stopping event monitor...", flush=True)
-        for t in asyncio.Task.all_tasks():
+        for t in asyncio.Task.all_tasks():  # pylint: disable=no-member
             t.cancel()
         loop.run_forever()
     finally:
