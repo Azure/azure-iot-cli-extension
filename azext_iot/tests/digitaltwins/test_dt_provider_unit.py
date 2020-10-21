@@ -19,7 +19,7 @@ qualified_hostname = "{}.subdomain.domain".format(instance_name)
 
 @pytest.fixture
 def get_mgmt_client(mocker, fixture_cmd):
-    from azext_iot.sdk.digitaltwins_arm import AzureDigitalTwinsManagementClient
+    from azext_iot.sdk.digitaltwins.controlplane import AzureDigitalTwinsManagementClient
     from azext_iot.digitaltwins.providers.auth import DigitalTwinAuthentication
 
     patched_get_raw_token = mocker.patch(

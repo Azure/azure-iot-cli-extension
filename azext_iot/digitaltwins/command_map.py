@@ -40,7 +40,6 @@ def load_digitaltwins_commands(self, _):
         "dt",
         command_type=digitaltwins_resource_ops,
         resource_type=ResourceType.MGMT_RESOURCE_RESOURCES,
-        is_preview=True,
     ) as cmd_group:
         cmd_group.command("create", "create_instance")
         cmd_group.show_command("show", "show_instance")

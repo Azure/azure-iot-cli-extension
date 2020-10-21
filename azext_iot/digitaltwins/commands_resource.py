@@ -63,6 +63,7 @@ def add_endpoint_eventgrid(
     eventgrid_resource_group,
     resource_group_name=None,
     endpoint_subscription=None,
+    dead_letter_endpoint=None,
     tags=None,
 ):
     return _add_endpoint_eventgrid(
@@ -73,6 +74,7 @@ def add_endpoint_eventgrid(
         eventgrid_topic_name=eventgrid_topic_name,
         resource_group_name=resource_group_name,
         endpoint_subscription=endpoint_subscription,
+        dead_letter_endpoint=dead_letter_endpoint,
         tags=tags,
     )
 
@@ -85,6 +87,7 @@ def _add_endpoint_eventgrid(
     eventgrid_resource_group,
     resource_group_name=None,
     endpoint_subscription=None,
+    dead_letter_endpoint=None,
     tags=None,
 ):
     rp = ResourceProvider(cmd)
@@ -96,6 +99,7 @@ def _add_endpoint_eventgrid(
         endpoint_resource_name=eventgrid_topic_name,
         endpoint_resource_group=eventgrid_resource_group,
         endpoint_subscription=endpoint_subscription,
+        dead_letter_endpoint=dead_letter_endpoint,
         tags=tags,
     )
 
@@ -110,6 +114,7 @@ def add_endpoint_servicebus(
     servicebus_namespace,
     resource_group_name=None,
     endpoint_subscription=None,
+    dead_letter_endpoint=None,
     tags=None,
 ):
     return _add_endpoint_servicebus(
@@ -122,6 +127,7 @@ def add_endpoint_servicebus(
         servicebus_namespace=servicebus_namespace,
         resource_group_name=resource_group_name,
         endpoint_subscription=endpoint_subscription,
+        dead_letter_endpoint=dead_letter_endpoint,
         tags=tags,
     )
 
@@ -136,6 +142,7 @@ def _add_endpoint_servicebus(
     servicebus_namespace,
     resource_group_name=None,
     endpoint_subscription=None,
+    dead_letter_endpoint=None,
     tags=None,
 ):
     rp = ResourceProvider(cmd)
@@ -149,6 +156,7 @@ def _add_endpoint_servicebus(
         endpoint_resource_namespace=servicebus_namespace,
         endpoint_resource_policy=servicebus_policy,
         endpoint_subscription=endpoint_subscription,
+        dead_letter_endpoint=dead_letter_endpoint,
         tags=tags,
     )
 
@@ -163,6 +171,7 @@ def add_endpoint_eventhub(
     eventhub_namespace,
     resource_group_name=None,
     endpoint_subscription=None,
+    dead_letter_endpoint=None,
     tags=None,
 ):
     return _add_endpoint_eventhub(
@@ -175,6 +184,7 @@ def add_endpoint_eventhub(
         eventhub_namespace=eventhub_namespace,
         resource_group_name=resource_group_name,
         endpoint_subscription=endpoint_subscription,
+        dead_letter_endpoint=dead_letter_endpoint,
         tags=tags,
     )
 
@@ -189,6 +199,7 @@ def _add_endpoint_eventhub(
     eventhub_namespace,
     resource_group_name=None,
     endpoint_subscription=None,
+    dead_letter_endpoint=None,
     tags=None,
 ):
     rp = ResourceProvider(cmd)
@@ -202,5 +213,6 @@ def _add_endpoint_eventhub(
         endpoint_resource_namespace=eventhub_namespace,
         endpoint_resource_policy=eventhub_policy,
         endpoint_subscription=endpoint_subscription,
+        dead_letter_endpoint=dead_letter_endpoint,
         tags=tags,
     )

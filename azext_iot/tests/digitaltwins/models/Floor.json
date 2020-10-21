@@ -1,11 +1,11 @@
 {
-  "@id": "dtmi:example:Floor;1",
+  "@id": "dtmi:com:example:Floor;1",
   "@type": "Interface",
   "@context": "dtmi:dtdl:context;2",
   "displayName": "Floor",
   "contents": [{
     "@type": "Relationship",
-    "@id": "dtmi:contosocom:DigitalTwins:contains;1",
+    "target": "dtmi:com:example:Room;1",
     "name": "contains",
     "properties": [{
         "@type": "Property",
