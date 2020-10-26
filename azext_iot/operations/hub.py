@@ -929,10 +929,12 @@ def iot_edge_deployment_create(
     labels=None,
     metrics=None,
     layered=False,
+    no_validation=False,
     resource_group_name=None,
     login=None,
 ):
-    config_type = ConfigType.layered if layered else ConfigType.edge
+    # Short-term fix for --no-validation
+    config_type = ConfigType.layered if layered or no_validation else ConfigType.edge
     return _iot_hub_configuration_create(
         cmd=cmd,
         config_id=config_id,
