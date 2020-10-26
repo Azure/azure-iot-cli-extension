@@ -755,6 +755,12 @@ def load_arguments(self, _):
             "deployment will merge with routes of the base deployment. Routes with the same name will be "
             "overwritten based on deployment priority.",
         )
+        context.argument(
+            "no_validation",
+            options_list=["--no-validation"],
+            arg_type=get_three_state_flag(),
+            help="Disables client side schema validation for edge deployment creation.",
+        )
 
     with self.argument_context("iot dps") as context:
         context.argument(
