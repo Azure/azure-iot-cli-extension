@@ -3,6 +3,23 @@
 Release History
 ===============
 
+0.10.4
++++++++++++++++
+
+**General updates**
+
+* IoT extension installation constrained to Python 3.6 or greater.
+
+**Azure Digital Twins updates**
+
+* ADT GA updates and release.
+
+**IoT Edge**
+
+* Validation schema updated with $edgeHub 1.1 route option.
+* Introduces `--no-validation` to skip client side schema based validation for edge deployments.
+
+
 0.10.3
 +++++++++++++++
 
