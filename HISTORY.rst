@@ -2,6 +2,13 @@
 
 Release History
 ===============
+0.10.3
++++++++++++++++
+
+**IoT Hub updates**
+
+* SDK refresh. IoT Hub service calls point to api-version 2020-09-30.
+* Updated edge offline commands to support parentScopes.
 
 0.10.6
 +++++++++++++++
