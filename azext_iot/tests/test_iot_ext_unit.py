@@ -87,6 +87,7 @@ def generate_device_create_req(
         "force": force,
     }
 
+
 class TestDeviceCreate:
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
@@ -276,7 +277,10 @@ class TestDeviceCreate:
         assert "{}/devices/{}?".format(mock_target["entity"], child_device_id) in url
         assert args[0][0].method == "PUT"
         assert body["deviceId"] == child_device_id
-        assert body["deviceScope"] == generate_parent_device().get("deviceScope") or body["parentScopes"] == [generate_parent_device().get("deviceScope")]
+        assert (
+            body["deviceScope"] == generate_parent_device().get("deviceScope") or
+            body["parentScopes"] == [generate_parent_device().get("deviceScope")]
+        )
 
     @pytest.fixture(params=[(200, 0)])
     def sc_invalid_args_device_create_addchildren(
@@ -352,6 +356,7 @@ class TestDeviceCreate:
                 req["stp"],
                 req["status"],
             )
+
 
 def generate_device_show(**kvp):
     payload = {
@@ -2501,7 +2506,10 @@ class TestEdgeOffline:
         assert "{}/devices/{}?".format(mock_target["entity"], child_device_id) in url
         assert args[0][0].method == "PUT"
         assert body["deviceId"] == child_device_id
-        assert body["deviceScope"] == generate_parent_device().get("deviceScope") or body["parentScopes"] == [generate_parent_device().get("deviceScope")]
+        assert (
+            body["deviceScope"] == generate_parent_device().get("deviceScope") or
+            body["parentScopes"] == [generate_parent_device().get("deviceScope")]
+        )
 
     @pytest.fixture(params=[(200, 0), (200, 1)])
     def sc_invalid_args_addchildren(self, mocker, fixture_ghcs, fixture_sas, request):

@@ -601,7 +601,7 @@ def _validate_child_device(device):
             )
         )
     if device["parentScopes"] == []:
-            raise CLIError(
+        raise CLIError(
             'Device "{}" doesn\'t have any parent device.'.format(
                 device["deviceId"]
             )

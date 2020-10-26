@@ -511,11 +511,22 @@ class JobsOperations(object):
 
         deserialized = None
 
+        # @digimaun
+        header_dict = {}
+
         if response.status_code == 200:
-            deserialized = self._deserialize('QueryResult', response)
+            # @digimaun - changed from 'QueryResult' to [object]. Also note link tokens are in the headers.
+            deserialized = self._deserialize('[object]', response)
+            # @digimaun - Consistent querying change (twin vs job query)
+            header_dict = {
+                'x-ms-item-type': 'str',
+                'x-ms-continuation': 'str',
+            }
 
         if raw:
             client_raw_response = ClientRawResponse(deserialized, response)
+            # @digimaun - Consistent querying change (twin vs job query)
+            client_raw_response.add_headers(header_dict)
             return client_raw_response
 
         return deserialized

@@ -264,8 +264,7 @@ class TestJobCreate:
 
         if job_type == JobType.scheduleUpdateTwin.value:
             assert body["type"] == JobType.scheduleUpdateTwin.value
-            payload["etag"] = "*"
-            assert body["updateTwin"] == payload
+            assert body["updateTwin"] == {'etag': '*'}
         elif job_type == JobType.scheduleDeviceMethod.value:
             assert body["type"] == JobType.scheduleDeviceMethod.value
             assert body["cloudToDeviceMethod"]["methodName"] == method_name
