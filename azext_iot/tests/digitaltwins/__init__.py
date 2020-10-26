@@ -23,8 +23,8 @@ def generate_resource_id():
 
 class DTLiveScenarioTest(LiveScenarioTest):
     role_map = {
-        "owner": "Azure Digital Twins Owner (Preview)",
-        "reader": "Azure Digital Twins Reader (Preview)",
+        "owner": "Azure Digital Twins Data Owner",
+        "reader": "Azure Digital Twins Data Reader",
     }
 
     def __init__(self, test_scenario):

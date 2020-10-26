@@ -5,8 +5,10 @@
 # --------------------------------------------------------------------------------------------
 
 from azure.cli.testsdk import LiveScenarioTest
+import pytest
 
 
+@pytest.mark.skipif(True, reason="Skipping AICS tests due to environment inconsistencies")
 class AICSLiveScenarioTest(LiveScenarioTest):
     def __init__(self, test_scenario):
         assert test_scenario
