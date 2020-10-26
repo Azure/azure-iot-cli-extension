@@ -17,7 +17,7 @@ Release History
 **IoT Edge**
 
 * Validation schema updated with $edgeHub 1.1 route option.
-* Introduces `--no-validation` to skip client side schema based validation for edge deployments.
+* Introduces `--no-validation` to skip client side schema based validation for edge deployment creation.
 
 
 0.10.3
