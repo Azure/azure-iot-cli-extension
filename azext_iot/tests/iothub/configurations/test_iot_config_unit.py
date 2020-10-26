@@ -32,11 +32,12 @@ def sample_config_edge_malformed(set_cwd):
     return result
 
 
-@pytest.fixture(params=["file", "inlineA", "inlineB", "layered", "v1"])
+@pytest.fixture(params=["file", "inlineA", "inlineB", "layered", "v1", "v11"])
 def sample_config_edge(set_cwd, request):
     path = "test_edge_deployment.json"
     layered_path = "test_edge_deployment_layered.json"
     v1_path = "test_edge_deployment_v1.json"
+    v11_path = "test_edge_deployment_v11.json"
 
     payload = None
     if request.param == "inlineA":
@@ -49,6 +50,8 @@ def sample_config_edge(set_cwd, request):
         payload = json.dumps(json.loads(read_file_content(layered_path)))
     elif request.param == "v1":
         payload = json.dumps(json.loads(read_file_content(v1_path)))
+    elif request.param == "v11":
+        payload = json.dumps(json.loads(read_file_content(v11_path)))
 
     return (request.param, payload)
 
@@ -289,7 +292,7 @@ class TestConfigCreate:
         assert body.get("priority") == priority
         assert body.get("labels") == evaluate_literal(labels, dict)
 
-        if sample_config_edge[0] == "inlineB":
+        if sample_config_edge[0] == "inlineB" or sample_config_edge[0] == "v11":
             assert (
                 body["content"]["modulesContent"]
                 == json.loads(sample_config_edge[1])["modulesContent"]
@@ -792,7 +795,7 @@ class TestConfigApply:
             in url
         )
 
-        if sample_config_edge[0] == "inlineB":
+        if sample_config_edge[0] == "inlineB" or sample_config_edge[0] == "v11":
             assert (
                 body["modulesContent"]
                 == json.loads(sample_config_edge[1])["modulesContent"]

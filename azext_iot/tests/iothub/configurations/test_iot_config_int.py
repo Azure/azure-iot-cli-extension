@@ -20,6 +20,7 @@ edge_content_path = get_context_path(__file__, "test_edge_deployment.json")
 edge_content_layered_path = get_context_path(
     __file__, "test_edge_deployment_layered.json"
 )
+edge_content_v11_path = get_context_path(__file__, "test_edge_deployment_v11.json")
 edge_content_v1_path = get_context_path(__file__, "test_edge_deployment_v1.json")
 edge_content_malformed_path = get_context_path(
     __file__, "test_edge_deployment_malformed.json"
@@ -87,7 +88,7 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
         )
 
     def test_edge_deployments(self):
-        config_count = 4
+        config_count = 5
         config_ids = self.generate_config_names(config_count)
 
         self.kwargs["generic_metrics"] = read_file_content(generic_metrics_path)
@@ -250,6 +251,31 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
             expect_failure=True,
         )
 
+        # Uses IoT Edge hub schema version 1.1
+        self.cmd(
+            """iot edge deployment create --deployment-id {} --hub-name {} --resource-group {} --priority {}
+            --target-condition \"{}\" --labels '{}' --content '{}'""".format(
+                config_ids[4],
+                LIVE_HUB,
+                LIVE_RG,
+                priority,
+                condition,
+                "{labels}",
+                edge_content_v11_path,
+            ),
+            checks=[
+                self.check("id", config_ids[4]),
+                self.check("priority", priority),
+                self.check("targetCondition", condition),
+                self.check("labels", json.loads(self.kwargs["labels"])),
+                self.check(
+                    "content.modulesContent",
+                    json.loads(read_file_content(edge_content_v11_path))["modulesContent"],
+                ),
+                self.check("metrics.queries", {}),
+            ],
+        )
+
         # Show deployment
         self.cmd(
             "iot edge deployment show --deployment-id {} --hub-name {} --resource-group {}".format(
@@ -363,7 +389,7 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
         )
 
         config_list_check = [
-            self.check("length([*])", 4),
+            self.check("length([*])", config_count),
             self.exists("[?id=='{}']".format(config_ids[0])),
             self.exists("[?id=='{}']".format(config_ids[1])),
             self.exists("[?id=='{}']".format(config_ids[2])),
@@ -655,7 +681,7 @@ class TestIoTHubConfigurations(IoTLiveScenarioTest):
         )
 
         config_list_check = [
-            self.check("length([*])", 3),
+            self.check("length([*])", config_count),
             self.exists("[?id=='{}']".format(config_ids[0])),
             self.exists("[?id=='{}']".format(config_ids[1])),
             self.exists("[?id=='{}']".format(config_ids[2]))
