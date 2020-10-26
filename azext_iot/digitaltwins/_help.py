@@ -184,11 +184,11 @@ def load_digitaltwins_help():
         examples:
         - name: Assign a user (by email) the built-in Digital Twins Owner role against a target instance.
           text: >
-            az dt role-assignment create -n {instance_name} --assignee "owneruser@microsoft.com" --role "Azure Digital Twins Owner (Preview)"
+            az dt role-assignment create -n {instance_name} --assignee "owneruser@microsoft.com" --role "Azure Digital Twins Data Owner"
 
         - name: Assign a user (by object Id) the built-in Digital Twins Reader role against a target instance.
           text: >
-            az dt role-assignment create -n {instance_name} --assignee "97a89267-0966-4054-a156-b7d86ef8e216" --role "Azure Digital Twins Reader (Preview)"
+            az dt role-assignment create -n {instance_name} --assignee "97a89267-0966-4054-a156-b7d86ef8e216" --role "Azure Digital Twins Data Reader"
 
         - name: Assign a service principal a custom role against a target instance.
           text: >
@@ -205,7 +205,7 @@ def load_digitaltwins_help():
         examples:
         - name: Remove a user from a specific role assignment of a Digital Twins instance.
           text: >
-            az dt role-assignment delete -n {instance_name} --assignee "removeuser@microsoft.com" --role "Azure Digital Twins Reader (Preview)"
+            az dt role-assignment delete -n {instance_name} --assignee "removeuser@microsoft.com" --role "Azure Digital Twins Data Reader"
 
         - name: Remove a user from all assigned roles of a Digital Twins instance.
           text: >
