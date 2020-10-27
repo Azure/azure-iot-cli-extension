@@ -67,7 +67,7 @@ jobs:
   steps:
   - template: templates/run-tests.yml
     parameters:
-      pythonVersion: '3.x'
+      pythonVersion: '3.8.x'
 
 - job: 'run_unit_tests_windows'
   dependsOn : [ 'build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']
@@ -82,7 +82,7 @@ jobs:
 
   - template: templates/run-tests.yml
     parameters:
-      pythonVersion: '3.x'
+      pythonVersion: '3.8.x'
 
 - job: 'run_style_check'
   dependsOn: ['build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']
@@ -92,7 +92,7 @@ jobs:
   steps:
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.x'
+      versionSpec: '3.8.x'
       architecture: 'x64'
 
   - template: templates/install-azure-cli-released.yml
@@ -117,7 +117,7 @@ jobs:
   steps:
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.6'
+      versionSpec: '3.6.x'
       architecture: 'x64'
 
   - template: templates/install-configure-azure-cli.yml
