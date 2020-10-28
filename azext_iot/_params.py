@@ -387,17 +387,26 @@ def load_arguments(self, _):
         context.argument(
             "force",
             options_list=["--force", "-f"],
-            help="Overwrites the device's parent device.",
+            help="Overwrites the device's parent device. "
+            "This command parameter has been deprecated and will be removed "
+            "in a future release. Use 'az iot hub device-identity parent set' instead.",
+            deprecate_info=context.deprecate()
         )
         context.argument(
             "set_parent_id",
             options_list=["--set-parent", "--pd"],
-            help="Id of edge device.",
+            help="Id of edge device. "
+            "This command parameter has been deprecated and will be removed "
+            "in a future release. Use 'az iot hub device-identity parent set' instead.",
+            deprecate_info=context.deprecate()
         )
         context.argument(
             "add_children",
             options_list=["--add-children", "--cl"],
-            help="Child device list (comma separated).",
+            help="Child device list (comma separated). "
+            "This command parameter has been deprecated and will be removed "
+            "in a future release. Use 'az iot hub device-identity children add' instead.",
+            deprecate_info=context.deprecate()
         )
 
     with self.argument_context('iot hub device-identity regenerate-key') as context:
@@ -501,6 +510,40 @@ def load_arguments(self, _):
 
     with self.argument_context("iot hub device-identity list-children") as context:
         context.argument("device_id", help="Id of edge device.")
+
+    with self.argument_context("iot hub device-identity parent set") as context:
+        context.argument(
+            "parent_id",
+            options_list=["--parent-device-id", "--pd"],
+            help="Id of edge device.",
+        )
+        context.argument(
+            "force",
+            options_list=["--force", "-f"],
+            help="Overwrites the device's parent device.",
+        )
+
+    with self.argument_context("iot hub device-identity children") as context:
+        context.argument("device_id", help="Id of edge device.")
+        context.argument(
+            "child_list",
+            options_list=["--child-list", "--cl"],
+            help="Child device list (comma separated).",
+        )
+
+    with self.argument_context("iot hub device-identity children add") as context:
+        context.argument(
+            "force",
+            options_list=["--force", "-f"],
+            help="Overwrites the child device's parent device.",
+        )
+
+    with self.argument_context("iot hub device-identity children remove") as context:
+        context.argument(
+            "remove_all",
+            options_list=["--remove-all", "-a"],
+            help="To remove all children.",
+        )
 
     with self.argument_context("iot hub distributed-tracing update") as context:
         context.argument(

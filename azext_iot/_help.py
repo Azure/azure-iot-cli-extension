@@ -317,6 +317,39 @@ helps[
 """
 
 helps[
+    "iot hub device-identity parent"
+] = """
+    type: group
+    short-summary: Manage IoT device\'s parent device.
+"""
+
+helps[
+    "iot hub device-identity parent show"
+] = """
+    type: command
+    short-summary: Get the parent device of the specified device.
+    examples:
+    - name: Get the parent device of the specified device.
+      text: >
+        az iot hub device-identity parent show -d {device_id} -n {iothub_name}
+"""
+
+helps[
+    "iot hub device-identity parent set"
+] = """
+    type: command
+    short-summary: Set the parent device of the specified device.
+    examples:
+    - name: Set the parent device of the specified device.
+      text: >
+        az iot hub device-identity parent set -d {device_id} --pd {edge_device_id} -n {iothub_name}
+    - name: Set the parent device of the specified device irrespectively the device is
+            already a child of other edge device.
+      text: >
+        az iot hub device-identity parent set -d {device_id} --pd {edge_device_id} --force -n {iothub_name}
+"""
+
+helps[
     "iot hub device-identity add-children"
 ] = """
     type: command
@@ -357,6 +390,56 @@ helps[
     - name: Remove all devices as children specified edge device.
       text: >
         az iot hub device-identity remove-children -d {edge_device_id} --remove-all
+"""
+
+helps[
+    "iot hub device-identity children"
+] = """
+    type: group
+    short-summary: Manage IoT device\'s children device.
+"""
+
+helps[
+    "iot hub device-identity children add"
+] = """
+    type: command
+    short-summary: Add specified comma-separated list of device ids as children of specified edge device.
+    examples:
+    - name: Add devices as a children to the edge device.
+      text: >
+        az iot hub device-identity children add -d {edge_device_id} --child-list {comma_separated_device_id}
+        -n {iothub_name}
+    - name: Add devices as a children to the edge device irrespectively the device is
+            already a child of other edge device.
+      text: >
+        az iot hub device-identity children add -d {edge_device_id} --child-list {comma_separated_device_id}
+        -n {iothub_name} -f
+"""
+
+helps[
+    "iot hub device-identity children list"
+] = """
+    type: command
+    short-summary: Print comma-separated list of assigned child devices.
+    examples:
+    - name: Show all assigned devices as comma-separated list.
+      text: >
+        az iot hub device-identity children list -d {edge_device_id} -n {iothub_name}
+"""
+
+helps[
+    "iot hub device-identity children remove"
+] = """
+    type: command
+    short-summary: Remove devices as children from specified edge device.
+    examples:
+    - name: Remove all mentioned devices as children of specified device.
+      text: >
+        az iot hub device-identity children remove -d {edge_device_id} --child-list {comma_separated_device_id}
+        -n {iothub_name}
+    - name: Remove all devices as children specified edge device.
+      text: >
+        az iot hub device-identity children remove -d {edge_device_id} --remove-all
 """
 
 helps[
