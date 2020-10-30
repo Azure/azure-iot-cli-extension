@@ -28,7 +28,7 @@ def load_digitaltwins_help():
 
         - name: Create instance in target resource group with specified location and tags.
           text: >
-            az dt create -n {instance_name} -g {resouce_group} -l westcentralus --tags "a=b;c=d"
+            az dt create -n {instance_name} -g {resouce_group} -l westcentralus --tags a=b c=d
     """
 
     helps["dt show"] = """

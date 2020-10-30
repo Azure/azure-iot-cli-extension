@@ -12,6 +12,7 @@ from knack.arguments import CLIArgumentType
 from azure.cli.core.commands.parameters import (
     resource_group_name_type,
     get_three_state_flag,
+    tags_type
 )
 
 depfor_type = CLIArgumentType(
@@ -55,7 +56,8 @@ def load_digitaltwins_arguments(self, _):
         context.argument(
             "tags",
             options_list=["--tags"],
-            help="Digital Twins instance tags. Property bag in key-value pairs with the following format: a=b;c=d.",
+            arg_type=tags_type,
+            help="Digital Twins instance tags. Property bag in key-value pairs with the following format: a=b c=d",
         )
         context.argument(
             "endpoint_name",

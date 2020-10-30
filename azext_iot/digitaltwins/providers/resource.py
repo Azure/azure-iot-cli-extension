@@ -15,7 +15,7 @@ from azext_iot.sdk.digitaltwins.controlplane.models import (
     EventHub as EventHubEndpointProperties,
     ServiceBus as ServiceBusEndpointProperties,
 )
-from azext_iot.common.utility import validate_key_value_pairs, unpack_msrest_error
+from azext_iot.common.utility import unpack_msrest_error
 from knack.util import CLIError
 
 
@@ -26,8 +26,6 @@ class ResourceProvider(DigitalTwinsResourceManager):
         self.rbac = RbacProvider()
 
     def create(self, name, resource_group_name, location=None, tags=None, timeout=60):
-        if tags:
-            tags = validate_key_value_pairs(tags)
 
         if not location:
             from azext_iot.common.embedded_cli import EmbeddedCLI
