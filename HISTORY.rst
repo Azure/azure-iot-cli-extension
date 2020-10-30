@@ -3,6 +3,15 @@
 Release History
 ===============
 
+0.10.5
++++++++++++++++
+
+**Azure Digital Twins updates**
+
+* Breaking change on the `--tags` parameter for `az dt create`. The prior input format of --tags "a=b;c=d" has been
+  changed to  --tags a=b c=d to be more consistent with other Az CLI tag formats. 
+
+
 0.10.4
 +++++++++++++++
 
