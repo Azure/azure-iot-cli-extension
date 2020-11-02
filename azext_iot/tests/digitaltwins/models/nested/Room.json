@@ -1,5 +1,5 @@
 {
-  "@id": "dtmi:example:Room;1",
+  "@id": "dtmi:com:example:Room;1",
   "@type": "Interface",
   "@context": "dtmi:dtdl:context;2",
   "displayName": "Room",

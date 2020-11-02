@@ -12,6 +12,7 @@ from knack.arguments import CLIArgumentType
 from azure.cli.core.commands.parameters import (
     resource_group_name_type,
     get_three_state_flag,
+    tags_type
 )
 
 depfor_type = CLIArgumentType(
@@ -55,7 +56,8 @@ def load_digitaltwins_arguments(self, _):
         context.argument(
             "tags",
             options_list=["--tags"],
-            help="Digital Twins instance tags. Property bag in key-value pairs with the following format: a=b;c=d.",
+            arg_type=tags_type,
+            help="Digital Twins instance tags. Property bag in key-value pairs with the following format: a=b c=d",
         )
         context.argument(
             "endpoint_name",
@@ -82,7 +84,7 @@ def load_digitaltwins_arguments(self, _):
         context.argument(
             "model_id",
             options_list=["--model-id", "--dtmi", "-m"],
-            help="Digital Twins model Id. Example: dtmi:example:Room;2",
+            help="Digital Twins model Id. Example: dtmi:com:example:Room;2",
         )
         context.argument(
             "twin_id", options_list=["--twin-id", "-t"], help="The digital twin Id.",
@@ -102,9 +104,10 @@ def load_digitaltwins_arguments(self, _):
 
     with self.argument_context("dt endpoint create") as context:
         context.argument(
-            "tags",
-            options_list=["--tags"],
-            help="Digital Twins endpoint tags. Property bag in key-value pairs with the following format: a=b;c=d.",
+            "dead_letter_endpoint",
+            options_list=["--deadletter-sas-uri", "--dsu"],
+            help="Dead-letter storage container URL with SAS token",
+            arg_group="Dead-letter Endpoint"
         )
 
     with self.argument_context("dt endpoint create eventgrid") as context:
@@ -234,7 +237,8 @@ def load_digitaltwins_arguments(self, _):
             "properties",
             options_list=["--properties", "-p"],
             help="Initial property values for instantiating a digital twin or related components. "
-            "Provide file path or inline JSON.",
+            "Provide file path or inline JSON. Properties are required for twins that contain components, "
+            "at the minimum you must provide an empty $metadata object for each component.",
         )
 
     with self.argument_context("dt twin telemetry") as context:

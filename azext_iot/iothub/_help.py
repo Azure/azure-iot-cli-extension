@@ -87,6 +87,7 @@ def load_iothub_help():
             az iot hub job cancel --hub-name {iothub_name} --job-id {job_id}
     """
 
+    '''
     helps["iot pnp twin"] = """
         type: group
         short-summary: Manipulate and interact with the digital twin of an IoT Hub device.
@@ -140,3 +141,4 @@ def load_iothub_help():
             az iot pnp twin update -n {iothub_name} -d {device_id}
             --json-patch ./my/patch/document.json
     """
+    '''

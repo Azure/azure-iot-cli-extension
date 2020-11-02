@@ -6,8 +6,8 @@
 
 from azext_iot.digitaltwins.providers.resource import ResourceProvider
 from azext_iot.digitaltwins.providers.auth import DigitalTwinAuthentication
-from azext_iot.sdk.digitaltwins import AzureDigitalTwinsAPI
-from azext_iot.sdk.digitaltwins.models import ErrorResponseException
+from azext_iot.sdk.digitaltwins.dataplane import AzureDigitalTwinsAPI
+from azext_iot.sdk.digitaltwins.dataplane.models import ErrorResponseException
 from azext_iot.constants import DIGITALTWINS_RESOURCE_ID
 from azext_iot.common.utility import valid_hostname
 from knack.cli import CLIError

@@ -31,7 +31,7 @@ class TwinProvider(DigitalTwinsProvider):
 
         accumulated_result, cost = accumulate_result(
             self.query_sdk.query_twins,
-            values_name="items",
+            values_name="value",
             token_name="continuationToken",
             token_arg_name="continuation_token",
             query=query,
@@ -48,7 +48,7 @@ class TwinProvider(DigitalTwinsProvider):
         target_model = self.model_provider.get(id=model_id)
         twin_request = {
             "$dtId": twin_id,
-            "$metadata": {"$model": target_model["id"], "$kind": "DigitalTwin"},
+            "$metadata": {"$model": target_model["id"]},
         }
 
         if properties:
@@ -237,7 +237,7 @@ class TwinProvider(DigitalTwinsProvider):
         if component_path:
             self.twins_sdk.send_component_telemetry(
                 id=twin_id,
-                dt_id=dt_id,
+                message_id=dt_id,
                 dt_timestamp=dt_timestamp,
                 component_path=component_path,
                 telemetry=telemetry_request,
@@ -245,7 +245,7 @@ class TwinProvider(DigitalTwinsProvider):
 
         self.twins_sdk.send_telemetry(
             id=twin_id,
-            dt_id=dt_id,
+            message_id=dt_id,
             dt_timestamp=dt_timestamp,
             telemetry=telemetry_request,
         )

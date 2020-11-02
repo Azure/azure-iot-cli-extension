@@ -10,7 +10,12 @@ from azext_iot.digitaltwins.providers import (
     ErrorResponseException,
 )
 from azext_iot.digitaltwins.providers.rbac import RbacProvider
-from azext_iot.common.utility import validate_key_value_pairs, unpack_msrest_error
+from azext_iot.sdk.digitaltwins.controlplane.models import (
+    EventGrid as EventGridEndpointProperties,
+    EventHub as EventHubEndpointProperties,
+    ServiceBus as ServiceBusEndpointProperties,
+)
+from azext_iot.common.utility import unpack_msrest_error
 from knack.util import CLIError
 
 
@@ -20,13 +25,16 @@ class ResourceProvider(DigitalTwinsResourceManager):
         self.mgmt_sdk = self.get_mgmt_sdk()
         self.rbac = RbacProvider()
 
-    def create(self, name, resource_group_name, location=None, tags=None, timeout=20):
-        if tags:
-            tags = validate_key_value_pairs(tags)
+    def create(self, name, resource_group_name, location=None, tags=None, timeout=60):
 
         if not location:
             from azext_iot.common.embedded_cli import EmbeddedCLI
-            resource_group_meta = EmbeddedCLI().invoke("group show --name {}".format(resource_group_name)).as_json()
+
+            resource_group_meta = (
+                EmbeddedCLI()
+                .invoke("group show --name {}".format(resource_group_name))
+                .as_json()
+            )
             location = resource_group_meta["location"]
 
         try:
@@ -111,12 +119,10 @@ class ResourceProvider(DigitalTwinsResourceManager):
         if not resource_group_name:
             resource_group_name = self.get_rg(target_instance)
 
-        # TODO: Don't return result. Issue in service related to status code and polling.
         try:
-            self.mgmt_sdk.digital_twins.delete(
+            return self.mgmt_sdk.digital_twins.delete(
                 resource_name=name,
                 resource_group_name=resource_group_name,
-                polling=False,
             )
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
@@ -202,12 +208,10 @@ class ResourceProvider(DigitalTwinsResourceManager):
             resource_group_name = self.get_rg(target_instance)
 
         try:
-            # TODO: Polling set to false
             return self.mgmt_sdk.digital_twins_endpoint.delete(
                 resource_name=target_instance.name,
                 endpoint_name=endpoint_name,
                 resource_group_name=resource_group_name,
-                polling=False,
             )
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
@@ -223,6 +227,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
         endpoint_resource_policy=None,
         endpoint_resource_namespace=None,
         endpoint_subscription=None,
+        dead_letter_endpoint=None,
         tags=None,
         resource_group_name=None,
         timeout=20,
@@ -246,24 +251,23 @@ class ResourceProvider(DigitalTwinsResourceManager):
                     )
                 )
 
-        if tags:
-            tags = validate_key_value_pairs(tags)
-
         target_instance = self.find_instance(
             name=name, resource_group_name=resource_group_name
         )
         if not resource_group_name:
             resource_group_name = self.get_rg(target_instance)
 
-        payload = {"tags": tags}
         cli = EmbeddedCLI()
         error_prefix = "Could not create ADT instance endpoint. Unable to retrieve"
+
+        properties = {}
+
         if endpoint_resource_type == ADTEndpointType.eventgridtopic:
             eg_topic_keys_op = cli.invoke(
                 "eventgrid topic key list -n {} -g {}".format(
                     endpoint_resource_name, endpoint_resource_group
                 ),
-                subscription=endpoint_subscription
+                subscription=endpoint_subscription,
             )
             if not eg_topic_keys_op.success():
                 raise CLIError("{} Event Grid topic keys.".format(error_prefix))
@@ -273,16 +277,18 @@ class ResourceProvider(DigitalTwinsResourceManager):
                 "eventgrid topic show -n {} -g {}".format(
                     endpoint_resource_name, endpoint_resource_group
                 ),
-                subscription=endpoint_subscription
+                subscription=endpoint_subscription,
             )
             if not eg_topic_endpoint_op.success():
                 raise CLIError("{} Event Grid topic endpoint.".format(error_prefix))
             eg_topic_endpoint = eg_topic_endpoint_op.as_json()
 
-            payload["endpointType"] = "EventGrid"
-            payload["accessKey1"] = eg_topic_keys["key1"]
-            payload["accessKey2"] = eg_topic_keys["key2"]
-            payload["TopicEndpoint"] = eg_topic_endpoint["endpoint"]
+            properties = EventGridEndpointProperties(
+                access_key1=eg_topic_keys["key1"],
+                access_key2=eg_topic_keys["key2"],
+                dead_letter_secret=dead_letter_endpoint,
+                topic_endpoint=eg_topic_endpoint["endpoint"],
+            )
 
         elif endpoint_resource_type == ADTEndpointType.servicebus:
             sb_topic_keys_op = cli.invoke(
@@ -293,19 +299,17 @@ class ResourceProvider(DigitalTwinsResourceManager):
                     endpoint_resource_group,
                     endpoint_resource_name,
                 ),
-                subscription=endpoint_subscription
+                subscription=endpoint_subscription,
             )
             if not sb_topic_keys_op.success():
                 raise CLIError("{} Service Bus topic keys.".format(error_prefix))
             sb_topic_keys = sb_topic_keys_op.as_json()
 
-            payload["endpointType"] = "ServiceBus"
-            payload["primaryConnectionString"] = sb_topic_keys[
-                "primaryConnectionString"
-            ]
-            payload["secondaryConnectionString"] = sb_topic_keys[
-                "secondaryConnectionString"
-            ]
+            properties = ServiceBusEndpointProperties(
+                primary_connection_string=sb_topic_keys["primaryConnectionString"],
+                secondary_connection_string=sb_topic_keys["secondaryConnectionString"],
+                dead_letter_secret=dead_letter_endpoint,
+            )
 
         elif endpoint_resource_type == ADTEndpointType.eventhub:
             eventhub_topic_keys_op = cli.invoke(
@@ -316,21 +320,21 @@ class ResourceProvider(DigitalTwinsResourceManager):
                     endpoint_resource_group,
                     endpoint_resource_name,
                 ),
-                subscription=endpoint_subscription
+                subscription=endpoint_subscription,
             )
             if not eventhub_topic_keys_op.success():
                 raise CLIError("{} Event Hub keys.".format(error_prefix))
             eventhub_topic_keys = eventhub_topic_keys_op.as_json()
 
-            payload["endpointType"] = "EventHub"
-            payload["connectionString-PrimaryKey"] = eventhub_topic_keys[
-                "primaryConnectionString"
-            ]
-            payload["connectionString-SecondaryKey"] = eventhub_topic_keys[
-                "secondaryConnectionString"
-            ]
-
-        properties = {"properties": payload}
+            properties = EventHubEndpointProperties(
+                connection_string_primary_key=eventhub_topic_keys[
+                    "primaryConnectionString"
+                ],
+                connection_string_secondary_key=eventhub_topic_keys[
+                    "secondaryConnectionString"
+                ],
+                dead_letter_secret=dead_letter_endpoint,
+            )
 
         try:
             return self.mgmt_sdk.digital_twins_endpoint.create_or_update(

@@ -278,7 +278,7 @@ def _read_certificate_from_file(certificate_path):
     with open(file=certificate_path, mode="rb") as f:
         data = f.read()
 
-        from base64 import encodestring
+        from base64 import encodestring  # pylint: disable=no-name-in-module
 
         return encodestring(data)
 

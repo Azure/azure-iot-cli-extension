@@ -67,7 +67,7 @@ jobs:
   steps:
   - template: templates/run-tests.yml
     parameters:
-      pythonVersion: '3.x'
+      pythonVersion: '3.8.x'
 
 - job: 'run_unit_tests_windows'
   dependsOn : [ 'build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']
@@ -82,7 +82,7 @@ jobs:
 
   - template: templates/run-tests.yml
     parameters:
-      pythonVersion: '3.x'
+      pythonVersion: '3.8.x'
 
 - job: 'run_style_check'
   dependsOn: ['build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']
@@ -92,7 +92,7 @@ jobs:
   steps:
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.x'
+      versionSpec: '3.8.x'
       architecture: 'x64'
 
   - template: templates/install-azure-cli-released.yml
@@ -117,16 +117,10 @@ jobs:
   steps:
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.x'
+      versionSpec: '3.6.x'
       architecture: 'x64'
 
   - template: templates/install-configure-azure-cli.yml
-  - template: templates/download-install-local-azure-iot-cli-extension.yml
-  - bash: |
-      set -ev
-      source ./$(iot_ext_venv)/bin/activate
-      cp ./linter_exclusions.yml $AZURE_EXTENSION_DIR/$(iot_ext_package)/
-      azdev linter --include-whl-extensions $(iot_ext_package) --min-severity medium
 
 - job: CredScan
   displayName: "Credential Scan"

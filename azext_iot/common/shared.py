@@ -214,3 +214,12 @@ class AuthenticationType(Enum):
 
     keyBased = "key"
     identityBased = "identity"
+
+
+class RegenerateKeyType(Enum):
+    """
+    Target key type for regeneration.
+    """
+    primary = KeyType.primary.value
+    secondary = KeyType.secondary.value
+    swap = "swap"

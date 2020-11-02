@@ -31,6 +31,7 @@ from azext_iot.common.shared import (
     JobCreateType,
     JobStatusType,
     AuthenticationType,
+    RegenerateKeyType,
 )
 from azext_iot._validators import mode2_iot_login_handler
 from azext_iot.assets.user_messages import info_param_properties_device
@@ -399,6 +400,14 @@ def load_arguments(self, _):
             help="Child device list (comma separated) includes only non-edge devices.",
         )
 
+    with self.argument_context('iot hub device-identity regenerate-key') as context:
+        context.argument(
+            "regenerate_key",
+            options_list=["--key-type", "--kt"],
+            arg_type=get_enum_type(RegenerateKeyType),
+            help="Target key type to regenerate."
+        )
+
     with self.argument_context("iot hub device-identity export") as context:
         context.argument(
             "blob_container_uri",
@@ -696,7 +705,7 @@ def load_arguments(self, _):
             "top",
             options_list=["--top"],
             type=int,
-            help="Maximum number of configurations to return.",
+            help="Maximum number of configurations to return. By default all configurations are returned.",
         )
 
     with self.argument_context("iot edge") as context:
@@ -735,7 +744,7 @@ def load_arguments(self, _):
             "top",
             options_list=["--top"],
             type=int,
-            help="Maximum number of deployments to return.",
+            help="Maximum number of deployments to return. By default all deployments are returned.",
         )
         context.argument(
             "layered",
@@ -745,6 +754,12 @@ def load_arguments(self, _):
             "modules that will layer on top of a base deployment. For example the routes specified in a layered "
             "deployment will merge with routes of the base deployment. Routes with the same name will be "
             "overwritten based on deployment priority.",
+        )
+        context.argument(
+            "no_validation",
+            options_list=["--no-validation"],
+            arg_type=get_three_state_flag(),
+            help="Disables client side schema validation for edge deployment creation.",
         )
 
     with self.argument_context("iot dps") as context:

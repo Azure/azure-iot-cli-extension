@@ -24,9 +24,9 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
     def test_dt_twin(self):
         instance_name = generate_resource_id()
         models_directory = "./models"
-        floor_dtmi = "dtmi:example:Floor;1"
+        floor_dtmi = "dtmi:com:example:Floor;1"
         floor_twin_id = "myfloor"
-        room_dtmi = "dtmi:example:Room;1"
+        room_dtmi = "dtmi:com:example:Room;1"
         room_twin_id = "myroom"
         thermostat_component_id = "Thermostat"
 
@@ -42,7 +42,7 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
             )
         )
         # Wait for RBAC to catch-up
-        sleep(10)
+        sleep(15)
 
         self.cmd(
             "dt model create -n {} --from-directory '{}'".format(
@@ -67,6 +67,14 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
             }
         )
 
+        self.kwargs["emptyThermostatComponentJson"] = json.dumps(
+            {
+                "Thermostat": {
+                    "$metadata": {}
+                }
+            }
+        )
+
         floor_twin = self.cmd(
             "dt twin create -n {} --dtmi {} --twin-id {}".format(
                 instance_name, floor_dtmi, floor_twin_id
@@ -77,6 +85,38 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
             twin=floor_twin,
             expected_twin_id=floor_twin_id,
             expected_dtmi=floor_dtmi,
+        )
+
+        # twin create with component - example of bare minimum --properties
+
+        # create twin will fail without --properties
+        self.cmd(
+            "dt twin create -n {} -g {} --dtmi {} --twin-id {}".format(
+                instance_name,
+                self.dt_resource_group,
+                room_dtmi,
+                room_twin_id
+            ),
+            expect_failure=True
+        )
+
+        # minimum component object with empty $metadata object
+        min_room_twin = self.cmd(
+            "dt twin create -n {} -g {} --dtmi {} --twin-id {} --properties '{}'".format(
+                instance_name,
+                self.dt_resource_group,
+                room_dtmi,
+                room_twin_id,
+                "{emptyThermostatComponentJson}",
+            )
+        ).get_output_in_json()
+
+        assert_twin_attributes(
+            twin=min_room_twin,
+            expected_twin_id=room_twin_id,
+            expected_dtmi=room_dtmi,
+            properties=self.kwargs["emptyThermostatComponentJson"],
+            component_name=thermostat_component_id,
         )
 
         room_twin = self.cmd(
@@ -332,7 +372,7 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
                     else "",
                 )
             )
-        sleep(4)  # Wait for API to catch up
+        sleep(10)  # Wait for API to catch up
         twin_query_result = self.cmd(
             "dt twin query -n {} -g {} -q 'select * from digitaltwins' --cost".format(
                 instance_name, self.dt_resource_group
@@ -358,20 +398,11 @@ def assert_twin_attributes(
 
     if properties:
         properties = json.loads(properties)
+        assert properties
 
         for key in properties:
             if key != component_name:
-                assert metadata[key]["desiredValue"] == properties[key]
-
-        if component_name:
-            component_metadata = twin[component_name]["$metadata"]
-            component_props = properties[component_name]
-
-            for key in component_props:
-                if key != "$metadata":
-                    assert (
-                        component_metadata[key]["desiredValue"] == component_props[key]
-                    )
+                assert properties[key] == twin[key]
 
 
 def assert_twin_relationship_attributes(

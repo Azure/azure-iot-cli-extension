@@ -28,7 +28,7 @@ def load_digitaltwins_help():
 
         - name: Create instance in target resource group with specified location and tags.
           text: >
-            az dt create -n {instance_name} -g {resouce_group} -l westcentralus --tags "a=b;c=d"
+            az dt create -n {instance_name} -g {resouce_group} -l westcentralus --tags a=b c=d
     """
 
     helps["dt show"] = """
@@ -184,11 +184,11 @@ def load_digitaltwins_help():
         examples:
         - name: Assign a user (by email) the built-in Digital Twins Owner role against a target instance.
           text: >
-            az dt role-assignment create -n {instance_name} --assignee "owneruser@microsoft.com" --role "Azure Digital Twins Owner (Preview)"
+            az dt role-assignment create -n {instance_name} --assignee "owneruser@microsoft.com" --role "Azure Digital Twins Data Owner"
 
         - name: Assign a user (by object Id) the built-in Digital Twins Reader role against a target instance.
           text: >
-            az dt role-assignment create -n {instance_name} --assignee "97a89267-0966-4054-a156-b7d86ef8e216" --role "Azure Digital Twins Reader (Preview)"
+            az dt role-assignment create -n {instance_name} --assignee "97a89267-0966-4054-a156-b7d86ef8e216" --role "Azure Digital Twins Data Reader"
 
         - name: Assign a service principal a custom role against a target instance.
           text: >
@@ -205,7 +205,7 @@ def load_digitaltwins_help():
         examples:
         - name: Remove a user from a specific role assignment of a Digital Twins instance.
           text: >
-            az dt role-assignment delete -n {instance_name} --assignee "removeuser@microsoft.com" --role "Azure Digital Twins Reader (Preview)"
+            az dt role-assignment delete -n {instance_name} --assignee "removeuser@microsoft.com" --role "Azure Digital Twins Data Reader"
 
         - name: Remove a user from all assigned roles of a Digital Twins instance.
           text: >
@@ -285,22 +285,32 @@ def load_digitaltwins_help():
     helps["dt twin create"] = """
         type: command
         short-summary: Create a digital twin on an instance.
-        long-summary: --properties can be inline JSON or file path.
+        long-summary: |
+                      --properties can be inline JSON or file path.
+                      Note: --properties are required for twins that contain components.
 
         examples:
         - name: Create a digital twin from an existing (prior-created) model.
           text: >
-            az dt twin create -n {instance_or_hostname} --dtmi dtmi:example:Room;1
+            az dt twin create -n {instance_or_hostname} --dtmi "dtmi:com:example:Room;1"
             --twin-id {twin_id}
 
         - name: Create a digital twin from an existing (prior-created) model. Instantiate with property values.
           text: >
-            az dt twin create -n {instance_or_hostname} --dtmi dtmi:com:example:DeviceInformation;1
+            az dt twin create -n {instance_or_hostname} --dtmi "dtmi:com:example:DeviceInformation;1"
             --twin-id {twin_id} --properties '{"manufacturer": "Microsoft"}'
+
+        - name: Create a digital twin with component from existing (prior-created) models. Instantiate component with minimum properties.
+          text: >
+            az dt twin create -n {instance_or_hostname} --dtmi "dtmi:com:example:TemperatureController;1" --twin-id {twin_id} --properties '{
+                "Thermostat": {
+                    "$metadata": {},
+                }
+            }'
 
         - name: Create a digital twin with component from existing (prior-created) models. Instantiate with property values.
           text: >
-            az dt twin create -n {instance_or_hostname} --dtmi dtmi:com:example:TemperatureController;1 --twin-id {twin_id} --properties '{
+            az dt twin create -n {instance_or_hostname} --dtmi "dtmi:com:example:TemperatureController;1" --twin-id {twin_id} --properties '{
                 "Temperature": 10.2,
                 "Thermostat": {
                     "$metadata": {},
@@ -356,7 +366,7 @@ def load_digitaltwins_help():
 
         - name: Query by model and project all attributes.
           text: >
-            az dt twin query -n {instance_or_hostname} -q "select * from digitaltwins T where IS_OF_MODEL(T, 'dtmi:example:Room;2')"
+            az dt twin query -n {instance_or_hostname} -q "select * from digitaltwins T where IS_OF_MODEL(T, 'dtmi:com:example:Room;2')"
     """
 
     helps["dt twin delete"] = """
@@ -544,11 +554,11 @@ def load_digitaltwins_help():
         examples:
         - name: Show model meta data
           text: >
-            az dt model show -n {instance_or_hostname} --dtmi "dtmi:example:Floor;1"
+            az dt model show -n {instance_or_hostname} --dtmi "dtmi:com:example:Floor;1"
 
         - name: Show model meta data and definition
           text: >
-            az dt model show -n {instance_or_hostname} --dtmi "dtmi:example:Floor;1" --definition
+            az dt model show -n {instance_or_hostname} --dtmi "dtmi:com:example:Floor;1" --definition
     """
 
     helps["dt model list"] = """
@@ -576,7 +586,7 @@ def load_digitaltwins_help():
         examples:
         - name: Decommision a target model
           text: >
-            az dt model update -n {instance_or_hostname} --dtmi "dtmi:example:Floor;1" --decommission
+            az dt model update -n {instance_or_hostname} --dtmi "dtmi:com:example:Floor;1" --decommission
     """
 
     helps["dt model delete"] = """
@@ -586,5 +596,5 @@ def load_digitaltwins_help():
         examples:
         - name: Delete a target model.
           text: >
-            az dt model delete -n {instance_or_hostname} --dtmi "dtmi:example:Floor;1"
+            az dt model delete -n {instance_or_hostname} --dtmi "dtmi:com:example:Floor;1"
     """

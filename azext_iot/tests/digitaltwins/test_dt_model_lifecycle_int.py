@@ -30,7 +30,7 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
         models_directory = "./models"
         inline_model = "./models/Floor.json"
         component_dtmi = "dtmi:com:example:Thermostat;1"
-        room_dtmi = "dtmi:example:Room;1"
+        room_dtmi = "dtmi:com:example:Room;1"
 
         self.cmd(
             "dt create -n {} -g {} -l {}".format(
@@ -45,7 +45,7 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
         )
 
         # Wait for RBAC to catch-up
-        sleep(10)
+        sleep(15)
 
         create_models_output = self.cmd(
             "dt model create -n {} --from-directory '{}'".format(

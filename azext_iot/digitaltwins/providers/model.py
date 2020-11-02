@@ -84,7 +84,7 @@ class ModelProvider(DigitalTwinsProvider):
     def list(
         self, get_definition=False, dependencies_for=None, top=None
     ):  # top is guarded for int() in arg def
-        from azext_iot.sdk.digitaltwins.models import DigitalTwinModelsListOptions
+        from azext_iot.sdk.digitaltwins.dataplane.models import DigitalTwinModelsListOptions
 
         list_options = DigitalTwinModelsListOptions(max_item_count=top)
 

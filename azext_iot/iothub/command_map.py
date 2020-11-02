@@ -25,7 +25,9 @@ def load_iothub_commands(self, _):
         cmd_group.command("list", "job_list")
         cmd_group.command("cancel", "job_cancel")
 
-    with self.command_group("iot pnp twin", command_type=pnp_runtime_ops, is_preview=True) as cmd_group:
+    '''
+    with self.command_group("iot pnp twin", command_type=pnp_runtime_ops) as cmd_group:
         cmd_group.command("invoke-command", "invoke_device_command")
         cmd_group.show_command("show", "get_digital_twin")
         cmd_group.command("update", "patch_digital_twin")
+    '''
