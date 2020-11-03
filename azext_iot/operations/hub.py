@@ -2609,7 +2609,7 @@ def iot_hub_connection_string_show(
                 if show_all
                 else conn_str_getter(hub)[0],
             }
-            for hub in hubs
+            for hub in hubs if hub.properties.state == 'Active'
         ]
     hub = discovery.find_iothub(hub_name, resource_group_name)
     if hub:
