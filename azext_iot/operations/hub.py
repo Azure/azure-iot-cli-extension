@@ -24,7 +24,8 @@ from azext_iot.common.shared import (
     ConfigType,
     KeyType,
     SettleType,
-    RegenerateKeyType
+    RegenerateKeyType,
+    IoTHubStateType
 )
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
@@ -2609,7 +2610,7 @@ def iot_hub_connection_string_show(
                 if show_all
                 else conn_str_getter(hub)[0],
             }
-            for hub in hubs if hub.properties.state == 'Active'
+            for hub in hubs if hub.properties.state == IoTHubStateType.Active.value
         ]
     hub = discovery.find_iothub(hub_name, resource_group_name)
     if hub:
