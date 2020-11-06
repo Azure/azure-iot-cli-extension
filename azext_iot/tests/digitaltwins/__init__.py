@@ -13,7 +13,10 @@ from azext_iot.common.embedded_cli import EmbeddedCLI
 
 
 MOCK_RESOURCE_TAGS = "a=b c=d"
-MOCK_DEAD_LETTER_SECRET = 'https://accountname.blob.core.windows.net/containerName?sasToken'
+MOCK_RESOURCE_TAGS_DICT = {"a": "b", "c": "d"}
+MOCK_DEAD_LETTER_SECRET = (
+    "https://accountname.blob.core.windows.net/containerName?sasToken"
+)
 
 
 def generate_resource_id():
@@ -64,7 +67,9 @@ class DTLiveScenarioTest(LiveScenarioTest):
                 "Digital Twins CLI tests requires at least 'azext_iot_testrg' for resource deployment."
             )
 
-        self._rg_loc = self.embedded_cli.invoke("group show --name {}".format(self._rg)).as_json()["location"]
+        self._rg_loc = self.embedded_cli.invoke(
+            "group show --name {}".format(self._rg)
+        ).as_json()["location"]
 
     @property
     def current_user(self):
