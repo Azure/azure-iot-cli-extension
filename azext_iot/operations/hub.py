@@ -142,14 +142,14 @@ def iot_device_create(
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
     if add_children:
-        if edge_enabled:
-            for child_device_id in add_children.split(","):
-                child_device = _iot_device_show(target, child_device_id.strip())
-                _validate_parent_child_relation(child_device, force)
-        else:
+        if not edge_enabled:
             raise CLIError(
                 'The device "{}" should be edge device in order to add children.'.format(device_id)
             )
+
+        for child_device_id in add_children.split(","):
+            child_device = _iot_device_show(target, child_device_id.strip())
+            _validate_parent_child_relation(child_device, force)
 
     deviceScope = None
     if set_parent_id:

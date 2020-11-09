@@ -343,8 +343,7 @@ helps[
     - name: Set the parent device of the specified device.
       text: >
         az iot hub device-identity parent set -d {device_id} --pd {edge_device_id} -n {iothub_name}
-    - name: Set the parent device of the specified device irrespectively the device is
-            already a child of other edge device.
+    - name: Set the parent device of the specified device and overwrites its original parent.
       text: >
         az iot hub device-identity parent set -d {device_id} --pd {edge_device_id} --force -n {iothub_name}
 """
@@ -409,8 +408,8 @@ helps[
       text: >
         az iot hub device-identity children add -d {edge_device_id} --child-list {space_separated_device_id}
         -n {iothub_name}
-    - name: Add devices as a children to the edge device irrespectively the device is
-            already a child of other edge device.
+    - name: Add devices as children to the edge device and overwrites children devices'
+            original parent.
       text: >
         az iot hub device-identity children add -d {edge_device_id} --child-list {space_separated_device_id}
         -n {iothub_name} -f
