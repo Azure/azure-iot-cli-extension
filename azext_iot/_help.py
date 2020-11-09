@@ -370,7 +370,7 @@ helps[
     "iot hub device-identity list-children"
 ] = """
     type: command
-    short-summary: Print comma-separated list of assigned child devices.
+    short-summary: Outputs comma-separated list of assigned child devices.
     examples:
     - name: Show all assigned devices as comma-separated list.
       text: >
@@ -403,16 +403,16 @@ helps[
     "iot hub device-identity children add"
 ] = """
     type: command
-    short-summary: Add specified comma-separated list of device ids as children of specified edge device.
+    short-summary: Add specified space-separated list of device ids as children of specified edge device.
     examples:
     - name: Add devices as a children to the edge device.
       text: >
-        az iot hub device-identity children add -d {edge_device_id} --child-list {comma_separated_device_id}
+        az iot hub device-identity children add -d {edge_device_id} --child-list {space_separated_device_id}
         -n {iothub_name}
     - name: Add devices as a children to the edge device irrespectively the device is
             already a child of other edge device.
       text: >
-        az iot hub device-identity children add -d {edge_device_id} --child-list {comma_separated_device_id}
+        az iot hub device-identity children add -d {edge_device_id} --child-list {space_separated_device_id}
         -n {iothub_name} -f
 """
 
@@ -420,11 +420,14 @@ helps[
     "iot hub device-identity children list"
 ] = """
     type: command
-    short-summary: Print comma-separated list of assigned child devices.
+    short-summary: Outputs list of assigned child devices.
     examples:
-    - name: Show all assigned devices as comma-separated list.
+    - name: Show all assigned children devices as list.
       text: >
         az iot hub device-identity children list -d {edge_device_id} -n {iothub_name}
+    - name: Show all assigned children devices as list whose device ID contains substring of 'test'.
+      text: >
+        az iot hub device-identity children list -d {edge_device_id} -n {iothub_name} --query "[?contains(@,'test')]"
 """
 
 helps[
@@ -435,7 +438,7 @@ helps[
     examples:
     - name: Remove all mentioned devices as children of specified device.
       text: >
-        az iot hub device-identity children remove -d {edge_device_id} --child-list {comma_separated_device_id}
+        az iot hub device-identity children remove -d {edge_device_id} --child-list {space_separated_device_id}
         -n {iothub_name}
     - name: Remove all devices as children specified edge device.
       text: >

@@ -49,6 +49,12 @@ event_msg_prop_type = CLIArgumentType(
     "sys = system properties, app = application properties, anno = annotations",
 )
 
+children_list_prop_type = CLIArgumentType(
+    options_list=["--child-list", "--cl"],
+    nargs="*",
+    help="Child device list (space separated).",
+)
+
 # There is a bug in CLI core preventing treating --qos as an integer.
 # Until its resolved, ensure casting of value to integer
 # TODO: azure.cli.core.parser line 180 difflib.get_close_matches
@@ -387,6 +393,7 @@ def load_arguments(self, _):
         context.argument(
             "force",
             options_list=["--force", "-f"],
+            arg_type=get_three_state_flag(),
             help="Overwrites the device's parent device. "
             "This command parameter has been deprecated and will be removed "
             "in a future release. Use 'az iot hub device-identity parent set' instead.",
@@ -525,11 +532,7 @@ def load_arguments(self, _):
 
     with self.argument_context("iot hub device-identity children") as context:
         context.argument("device_id", help="Id of edge device.")
-        context.argument(
-            "child_list",
-            options_list=["--child-list", "--cl"],
-            help="Child device list (comma separated).",
-        )
+        context.argument("child_list", arg_type=children_list_prop_type)
 
     with self.argument_context("iot hub device-identity children add") as context:
         context.argument(

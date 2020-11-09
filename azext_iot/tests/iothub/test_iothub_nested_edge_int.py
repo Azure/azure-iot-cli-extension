@@ -101,8 +101,8 @@ class TestIoTNestedEdge(IoTLiveScenarioTest):
 
         # add device list as children of edge device
         self.cmd(
-            "iot hub device-identity children add -d {} --child-list '{}' -n {} -g {}".format(
-                edge_device_ids[0], ", ".join(device_ids), LIVE_HUB, LIVE_RG
+            "iot hub device-identity children add -d {} --child-list {} -n {} -g {}".format(
+                edge_device_ids[0], " ".join(device_ids), LIVE_HUB, LIVE_RG
             ),
             checks=self.is_empty(),
         )
@@ -166,8 +166,7 @@ class TestIoTNestedEdge(IoTLiveScenarioTest):
             expect_failure=False,
         )
 
-        expected_output = "{}".format(device_ids[1])
-        assert output.get_output_in_json() == expected_output
+        assert output.get_output_in_json() == [device_ids[1]]
 
         # removing all child devices of non-edge device
         self.cmd(
@@ -234,9 +233,11 @@ class TestIoTNestedEdge(IoTLiveScenarioTest):
         )
 
         # list child devices of edge device which doesn't have any children
-        self.cmd(
+        output = self.cmd(
             "iot hub device-identity children list -d {} -n {} -g {}".format(
                 edge_device_ids[1], LIVE_HUB, LIVE_RG
             ),
-            expect_failure=True,
+            expect_failure=False,
         )
+
+        assert output.get_output_in_json() == []

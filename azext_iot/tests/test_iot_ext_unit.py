@@ -2603,7 +2603,7 @@ class TestEdgeOffline:
         url = args[0][0].url
         assert "{}/devices/query?".format(mock_target["entity"]) in url
         assert args[0][0].method == "POST"
-        assert result == child_device_id
+        assert result == [child_device_id]
 
     @pytest.fixture(params=[(200, 0), (200, 1)])
     def sc_invalid_args_listchildren(self, mocker, fixture_ghcs, fixture_sas, request):
@@ -2621,13 +2621,6 @@ class TestEdgeOffline:
         ]
         service_client.side_effect = test_side_effect
         return service_client
-
-    @pytest.mark.parametrize("exp", [CLIError])
-    def test_device_listchildren_invalid_args(self, sc_invalid_args_listchildren, exp):
-        with pytest.raises(exp):
-            subject.iot_device_children_list(
-                fixture_cmd, device_id, mock_target["entity"]
-            )
 
     def test_device_listchildren_error(self, serviceclient_generic_error):
         with pytest.raises(CLIError):

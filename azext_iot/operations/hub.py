@@ -466,7 +466,10 @@ def iot_device_children_add(
     devices = []
     edge_device = _iot_device_show(target, device_id)
     _validate_edge_device(edge_device)
-    for child_device_id in child_list.split(","):
+    converted_child_list = child_list
+    if isinstance(child_list, str):  # this check would be removed once add-children command is deprecated
+        converted_child_list = child_list.split(",")
+    for child_device_id in converted_child_list:
         child_device = _iot_device_show(target, child_device_id.strip())
         _validate_parent_child_relation(
             child_device, force
@@ -507,7 +510,10 @@ def iot_device_children_remove(
     elif child_list:
         edge_device = _iot_device_show(target, device_id)
         _validate_edge_device(edge_device)
-        for child_device_id in child_list.split(","):
+        converted_child_list = child_list
+        if isinstance(child_list, str):  # this check would be removed once remove-children command is deprecated
+            converted_child_list = child_list.split(",")
+        for child_device_id in converted_child_list:
             child_device = _iot_device_show(target, child_device_id.strip())
             _validate_child_device(child_device)
             if child_device["parentScopes"] == [edge_device["deviceScope"]]:
@@ -520,7 +526,7 @@ def iot_device_children_remove(
                 )
     else:
         raise CLIError(
-            "Please specify comma-separated child list or use --remove-all to remove all children."
+            "Please specify child list or use --remove-all to remove all children."
         )
 
     for device in devices:
@@ -528,6 +534,17 @@ def iot_device_children_remove(
 
 
 def iot_device_children_list(
+    cmd, device_id, hub_name=None, resource_group_name=None, login=None
+):
+    result = _iot_device_children_list(
+        cmd, device_id, hub_name, resource_group_name, login
+    )
+
+    return [device["deviceId"] for device in result]
+
+
+# this method would be removed once remove-children command is deprecated
+def iot_device_children_list_comma_separated(
     cmd, device_id, hub_name=None, resource_group_name=None, login=None
 ):
     result = _iot_device_children_list(
@@ -549,7 +566,7 @@ def _iot_device_children_list(
     )
     device = _iot_device_show(target, device_id)
     _validate_edge_device(device)
-    query = "select * from devices where array_contains(parentScopes, '{}')".format(
+    query = "select deviceId from devices where array_contains(parentScopes, '{}')".format(
         device["deviceScope"]
     )
     return iot_query(cmd, query, hub_name, None, resource_group_name, login=login)
@@ -600,7 +617,7 @@ def _validate_child_device(device):
                 device["deviceId"]
             )
         )
-    if device["parentScopes"] == []:
+    if not device["parentScopes"]:
         raise CLIError(
             'Device "{}" doesn\'t have any parent device.'.format(
                 device["deviceId"]

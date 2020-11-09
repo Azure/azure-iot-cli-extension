@@ -1608,7 +1608,6 @@ class TestIoTEdgeOffline(IoTLiveScenarioTest):
             expect_failure=False,
         )
 
-        # TODO: Result should be JSON
         expected_output = "{}".format(device_ids[1])
         assert output.get_output_in_json() == expected_output
 

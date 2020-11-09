@@ -66,7 +66,7 @@ def load_command_table(self, _):
         )
         cmd_group.command(
             "list-children",
-            "iot_device_children_list",
+            "iot_device_children_list_comma_separated",
             deprecate_info=self.deprecate(
                 redirect="az iot hub device-identity children list"
             ),
