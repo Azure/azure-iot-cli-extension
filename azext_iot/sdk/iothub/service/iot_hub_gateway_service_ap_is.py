@@ -14,12 +14,14 @@ from msrest import Serializer, Deserializer
 from msrestazure import AzureConfiguration
 from .version import VERSION
 from .operations.configuration_operations import ConfigurationOperations
-from .operations.registry_manager_operations import RegistryManagerOperations
-from .operations.job_client_operations import JobClientOperations
-from .operations.fault_injection_operations import FaultInjectionOperations
-from .operations.twin_operations import TwinOperations
+from .operations.statistics_operations import StatisticsOperations
+from .operations.devices_operations import DevicesOperations
+from .operations.bulk_registry_operations import BulkRegistryOperations
+from .operations.query_operations import QueryOperations
+from .operations.jobs_operations import JobsOperations
+from .operations.cloud_to_device_messages_operations import CloudToDeviceMessagesOperations
+from .operations.modules_operations import ModulesOperations
 from .operations.digital_twin_operations import DigitalTwinOperations
-from .operations.device_method_operations import DeviceMethodOperations
 from . import models
 from azext_iot.constants import USER_AGENT
 
@@ -59,18 +61,24 @@ class IotHubGatewayServiceAPIs(SDKClient):
 
     :ivar configuration: Configuration operations
     :vartype configuration: service.operations.ConfigurationOperations
-    :ivar registry_manager: RegistryManager operations
-    :vartype registry_manager: service.operations.RegistryManagerOperations
-    :ivar job_client: JobClient operations
-    :vartype job_client: service.operations.JobClientOperations
-    :ivar fault_injection: FaultInjection operations
-    :vartype fault_injection: service.operations.FaultInjectionOperations
-    :ivar twin: Twin operations
-    :vartype twin: service.operations.TwinOperations
+    :vartype configuration: azure.operations.ConfigurationOperations
+    :ivar statistics: Statistics operations
+    :vartype statistics: azure.operations.StatisticsOperations
+    :ivar devices: Devices operations
+    :vartype devices: azure.operations.DevicesOperations
+    :ivar bulk_registry: BulkRegistry operations
+    :vartype bulk_registry: azure.operations.BulkRegistryOperations
+    :ivar query: Query operations
+    :vartype query: azure.operations.QueryOperations
+    :ivar jobs: Jobs operations
+    :vartype jobs: azure.operations.JobsOperations
+    :ivar cloud_to_device_messages: CloudToDeviceMessages operations
+    :vartype cloud_to_device_messages: azure.operations.CloudToDeviceMessagesOperations
+    :ivar modules: Modules operations
+    :vartype modules: azure.operations.ModulesOperations
     :ivar digital_twin: DigitalTwin operations
+    :vartype digital_twin: azure.operations.DigitalTwinOperations
     :vartype digital_twin: service.operations.DigitalTwinOperations
-    :ivar device_method: DeviceMethod operations
-    :vartype device_method: service.operations.DeviceMethodOperations
 
     :param credentials: Credentials needed for the client to connect to Azure.
     :type credentials: :mod:`A msrestazure Credentials
@@ -85,21 +93,25 @@ class IotHubGatewayServiceAPIs(SDKClient):
         super(IotHubGatewayServiceAPIs, self).__init__(self.config.credentials, self.config)
 
         client_models = {k: v for k, v in models.__dict__.items() if isinstance(v, type)}
-        self.api_version = '2019-10-01'
+        self.api_version = '2020-09-30'
         self._serialize = Serializer(client_models)
         self._deserialize = Deserializer(client_models)
 
         self.configuration = ConfigurationOperations(
             self._client, self.config, self._serialize, self._deserialize)
-        self.registry_manager = RegistryManagerOperations(
+        self.statistics = StatisticsOperations(
             self._client, self.config, self._serialize, self._deserialize)
-        self.job_client = JobClientOperations(
+        self.devices = DevicesOperations(
             self._client, self.config, self._serialize, self._deserialize)
-        self.fault_injection = FaultInjectionOperations(
+        self.bulk_registry = BulkRegistryOperations(
             self._client, self.config, self._serialize, self._deserialize)
-        self.twin = TwinOperations(
+        self.query = QueryOperations(
+            self._client, self.config, self._serialize, self._deserialize)
+        self.jobs = JobsOperations(
+            self._client, self.config, self._serialize, self._deserialize)
+        self.cloud_to_device_messages = CloudToDeviceMessagesOperations(
+            self._client, self.config, self._serialize, self._deserialize)
+        self.modules = ModulesOperations(
             self._client, self.config, self._serialize, self._deserialize)
         self.digital_twin = DigitalTwinOperations(
-            self._client, self.config, self._serialize, self._deserialize)
-        self.device_method = DeviceMethodOperations(
             self._client, self.config, self._serialize, self._deserialize)

@@ -360,6 +360,7 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
                 self.exists("authentication.x509Thumbprint.primaryThumbprint"),
                 self.check("authentication.x509Thumbprint.secondaryThumbprint", None),
                 self.exists("deviceScope"),
+                self.exists("parentScopes"),
                 self.check_pattern("deviceScope", child_device_scope_str_pattern),
             ],
         )
@@ -1529,7 +1530,7 @@ class TestIoTEdgeOffline(IoTLiveScenarioTest):
             "iot hub device-identity set-parent -d {} --pd {} -n {} -g {}".format(
                 edge_device_ids[0], edge_device_ids[1], LIVE_HUB, LIVE_RG
             ),
-            expect_failure=True,
+            checks=self.is_empty(),
         )
 
         # add device as a child of non-edge device
@@ -1580,7 +1581,7 @@ class TestIoTEdgeOffline(IoTLiveScenarioTest):
             "iot hub device-identity add-children -d {} --child-list {} -n {} -g {}".format(
                 edge_device_ids[0], device_ids[0], LIVE_HUB, LIVE_RG
             ),
-            checks=self.is_empty(),
+            expect_failure=True,
         )
 
         # add same device as a child of another edge device
@@ -1607,7 +1608,6 @@ class TestIoTEdgeOffline(IoTLiveScenarioTest):
             expect_failure=False,
         )
 
-        # TODO: Result should be JSON
         expected_output = "{}".format(device_ids[1])
         assert output.get_output_in_json() == expected_output
 

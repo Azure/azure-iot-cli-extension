@@ -49,6 +49,12 @@ event_msg_prop_type = CLIArgumentType(
     "sys = system properties, app = application properties, anno = annotations",
 )
 
+children_list_prop_type = CLIArgumentType(
+    options_list=["--child-list", "--cl"],
+    nargs="*",
+    help="Child device list (space separated).",
+)
+
 # There is a bug in CLI core preventing treating --qos as an integer.
 # Until its resolved, ensure casting of value to integer
 # TODO: azure.cli.core.parser line 180 difflib.get_close_matches
@@ -387,17 +393,27 @@ def load_arguments(self, _):
         context.argument(
             "force",
             options_list=["--force", "-f"],
-            help="Overwrites the non-edge device's parent device.",
+            arg_type=get_three_state_flag(),
+            help="Overwrites the device's parent device. "
+            "This command parameter has been deprecated and will be removed "
+            "in a future release. Use 'az iot hub device-identity parent set' instead.",
+            deprecate_info=context.deprecate()
         )
         context.argument(
             "set_parent_id",
             options_list=["--set-parent", "--pd"],
-            help="Id of edge device.",
+            help="Id of edge device. "
+            "This command parameter has been deprecated and will be removed "
+            "in a future release. Use 'az iot hub device-identity parent set' instead.",
+            deprecate_info=context.deprecate()
         )
         context.argument(
             "add_children",
             options_list=["--add-children", "--cl"],
-            help="Child device list (comma separated) includes only non-edge devices.",
+            help="Child device list (comma separated). "
+            "This command parameter has been deprecated and will be removed "
+            "in a future release. Use 'az iot hub device-identity children add' instead.",
+            deprecate_info=context.deprecate()
         )
 
     with self.argument_context('iot hub device-identity regenerate-key') as context:
@@ -458,10 +474,10 @@ def load_arguments(self, _):
         )
 
     with self.argument_context("iot hub device-identity get-parent") as context:
-        context.argument("device_id", help="Id of non-edge device.")
+        context.argument("device_id", help="Id of device.")
 
     with self.argument_context("iot hub device-identity set-parent") as context:
-        context.argument("device_id", help="Id of non-edge device.")
+        context.argument("device_id", help="Id of device.")
         context.argument(
             "parent_id",
             options_list=["--parent-device-id", "--pd"],
@@ -470,7 +486,7 @@ def load_arguments(self, _):
         context.argument(
             "force",
             options_list=["--force", "-f"],
-            help="Overwrites the non-edge device's parent device.",
+            help="Overwrites the device's parent device.",
         )
 
     with self.argument_context("iot hub device-identity add-children") as context:
@@ -478,12 +494,12 @@ def load_arguments(self, _):
         context.argument(
             "child_list",
             options_list=["--child-list", "--cl"],
-            help="Child device list (comma separated) includes only non-edge devices.",
+            help="Child device list (comma separated).",
         )
         context.argument(
             "force",
             options_list=["--force", "-f"],
-            help="Overwrites the non-edge device's parent device.",
+            help="Overwrites the child device's parent device.",
         )
 
     with self.argument_context("iot hub device-identity remove-children") as context:
@@ -491,8 +507,41 @@ def load_arguments(self, _):
         context.argument(
             "child_list",
             options_list=["--child-list", "--cl"],
-            help="Child device list (comma separated) includes only non-edge devices.",
+            help="Child device list (comma separated).",
         )
+        context.argument(
+            "remove_all",
+            options_list=["--remove-all", "-a"],
+            help="To remove all children.",
+        )
+
+    with self.argument_context("iot hub device-identity list-children") as context:
+        context.argument("device_id", help="Id of edge device.")
+
+    with self.argument_context("iot hub device-identity parent set") as context:
+        context.argument(
+            "parent_id",
+            options_list=["--parent-device-id", "--pd"],
+            help="Id of edge device.",
+        )
+        context.argument(
+            "force",
+            options_list=["--force", "-f"],
+            help="Overwrites the device's parent device.",
+        )
+
+    with self.argument_context("iot hub device-identity children") as context:
+        context.argument("device_id", help="Id of edge device.")
+        context.argument("child_list", arg_type=children_list_prop_type)
+
+    with self.argument_context("iot hub device-identity children add") as context:
+        context.argument(
+            "force",
+            options_list=["--force", "-f"],
+            help="Overwrites the child device's parent device.",
+        )
+
+    with self.argument_context("iot hub device-identity children remove") as context:
         context.argument(
             "remove_all",
             options_list=["--remove-all", "-a"],
@@ -512,9 +561,6 @@ def load_arguments(self, _):
             help="Controls the amount of messages sampled for adding trace context. This value is"
             "a percentage. Only values from 0 to 100 (inclusive) are permitted.",
         )
-
-    with self.argument_context("iot hub device-identity list-children") as context:
-        context.argument("device_id", help="Id of edge device.")
 
     with self.argument_context("iot hub query") as context:
         context.argument(

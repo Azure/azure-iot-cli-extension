@@ -16,8 +16,8 @@ from msrestazure.azure_exceptions import CloudError
 from .. import models
 
 
-class DigitalTwinOperations(object):
-    """DigitalTwinOperations operations.
+class CloudToDeviceMessagesOperations(object):
+    """CloudToDeviceMessagesOperations operations.
 
     :param client: Client for service requests.
     :param config: Configuration of service client.
@@ -37,23 +37,24 @@ class DigitalTwinOperations(object):
 
         self.config = config
 
-    def get_digital_twin(
+    def purge_cloud_to_device_message_queue(
             self, id, custom_headers=None, raw=False, **operation_config):
-        """Gets a digital twin.
+        """Deletes all the pending commands for a device in the IoT Hub.
 
-        :param id: Digital Twin ID.
+        :param id: The unique identifier of the device.
         :type id: str
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
          deserialized response
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
-        :return: object or ClientRawResponse if raw=true
-        :rtype: object or ~msrest.pipeline.ClientRawResponse
+        :return: PurgeMessageQueueResult or ClientRawResponse if raw=true
+        :rtype: ~service.models.PurgeMessageQueueResult or
+         ~msrest.pipeline.ClientRawResponse
         :raises: :class:`CloudError<msrestazure.azure_exceptions.CloudError>`
         """
         # Construct URL
-        url = self.get_digital_twin.metadata['url']
+        url = self.purge_cloud_to_device_message_queue.metadata['url']
         path_format_arguments = {
             'id': self._serialize.url("id", id, 'str')
         }
@@ -66,6 +67,60 @@ class DigitalTwinOperations(object):
         # Construct headers
         header_parameters = {}
         header_parameters['Accept'] = 'application/json'
+        if self.config.generate_client_request_id:
+            header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
+        if custom_headers:
+            header_parameters.update(custom_headers)
+        if self.config.accept_language is not None:
+            header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
+
+        # Construct and send request
+        request = self._client.delete(url, query_parameters, header_parameters)
+        response = self._client.send(request, stream=False, **operation_config)
+
+        if response.status_code not in [200]:
+            exp = CloudError(response)
+            exp.request_id = response.headers.get('x-ms-request-id')
+            raise exp
+
+        deserialized = None
+
+        if response.status_code == 200:
+            deserialized = self._deserialize('PurgeMessageQueueResult', response)
+
+        if raw:
+            client_raw_response = ClientRawResponse(deserialized, response)
+            return client_raw_response
+
+        return deserialized
+    purge_cloud_to_device_message_queue.metadata = {'url': '/devices/{id}/commands'}
+
+    def receive_feedback_notification(
+            self, custom_headers=None, raw=False, **operation_config):
+        """Gets the feedback for cloud-to-device messages. See
+        https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging for
+        more information. This capability is only available in the standard
+        tier IoT Hub. For more information, see [Choose the right IoT Hub
+        tier](https://aka.ms/scaleyouriotsolution).
+
+        :param dict custom_headers: headers that will be added to the request
+        :param bool raw: returns the direct response alongside the
+         deserialized response
+        :param operation_config: :ref:`Operation configuration
+         overrides<msrest:optionsforoperations>`.
+        :return: None or ClientRawResponse if raw=true
+        :rtype: None or ~msrest.pipeline.ClientRawResponse
+        :raises: :class:`CloudError<msrestazure.azure_exceptions.CloudError>`
+        """
+        # Construct URL
+        url = self.receive_feedback_notification.metadata['url']
+
+        # Construct parameters
+        query_parameters = {}
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+
+        # Construct headers
+        header_parameters = {}
         if self.config.generate_client_request_id:
             header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
         if custom_headers:
@@ -77,38 +132,27 @@ class DigitalTwinOperations(object):
         request = self._client.get(url, query_parameters, header_parameters)
         response = self._client.send(request, stream=False, **operation_config)
 
-        if response.status_code not in [200]:
+        if response.status_code not in [200, 204]:
             exp = CloudError(response)
             exp.request_id = response.headers.get('x-ms-request-id')
             raise exp
 
-        deserialized = None
-        header_dict = {}
-
-        if response.status_code == 200:
-            deserialized = self._deserialize('object', response)
-            header_dict = {
-                'ETag': 'str',
-            }
-
         if raw:
-            client_raw_response = ClientRawResponse(deserialized, response)
-            client_raw_response.add_headers(header_dict)
+            client_raw_response = ClientRawResponse(None, response)
             return client_raw_response
+    receive_feedback_notification.metadata = {'url': '/messages/serviceBound/feedback'}
 
-        return deserialized
-    get_digital_twin.metadata = {'url': '/digitaltwins/{id}'}
+    def complete_feedback_notification(
+            self, lock_token, custom_headers=None, raw=False, **operation_config):
+        """Completes the cloud-to-device feedback message. A completed message is
+        deleted from the feedback queue of the service. See
+        https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging for
+        more information.
 
-    def update_digital_twin(
-            self, id, digital_twin_patch, if_match=None, custom_headers=None, raw=False, **operation_config):
-        """Updates a digital twin.
-
-        :param id: Digital Twin ID.
-        :type id: str
-        :param digital_twin_patch: json-patch contents to update.
-        :type digital_twin_patch: list[object]
-        :param if_match:
-        :type if_match: str
+        :param lock_token: The lock token obtained when the cloud-to-device
+         message is received. This is used to resolve race conditions when
+         completing a feedback message.
+        :type lock_token: str
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
          deserialized response
@@ -119,9 +163,9 @@ class DigitalTwinOperations(object):
         :raises: :class:`CloudError<msrestazure.azure_exceptions.CloudError>`
         """
         # Construct URL
-        url = self.update_digital_twin.metadata['url']
+        url = self.complete_feedback_notification.metadata['url']
         path_format_arguments = {
-            'id': self._serialize.url("id", id, 'str')
+            'lockToken': self._serialize.url("lock_token", lock_token, 'str')
         }
         url = self._client.format_url(url, **path_format_arguments)
 
@@ -131,84 +175,58 @@ class DigitalTwinOperations(object):
 
         # Construct headers
         header_parameters = {}
-        header_parameters['Content-Type'] = 'application/json; charset=utf-8'
         if self.config.generate_client_request_id:
             header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
         if custom_headers:
             header_parameters.update(custom_headers)
-        if if_match is not None:
-            header_parameters['If-Match'] = self._serialize.header("if_match", if_match, 'str')
         if self.config.accept_language is not None:
             header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
 
-        # Construct body
-        body_content = self._serialize.body(digital_twin_patch, '[object]')
-
         # Construct and send request
-        request = self._client.patch(url, query_parameters, header_parameters, body_content)
+        request = self._client.delete(url, query_parameters, header_parameters)
         response = self._client.send(request, stream=False, **operation_config)
 
-        if response.status_code not in [202]:
+        if response.status_code not in [204]:
             exp = CloudError(response)
             exp.request_id = response.headers.get('x-ms-request-id')
             raise exp
 
         if raw:
             client_raw_response = ClientRawResponse(None, response)
-            client_raw_response.add_headers({
-                'ETag': 'str',
-                'Location': 'str',
-            })
             return client_raw_response
-    update_digital_twin.metadata = {'url': '/digitaltwins/{id}'}
+    complete_feedback_notification.metadata = {'url': '/messages/serviceBound/feedback/{lockToken}'}
 
-    def invoke_root_level_command(
-            self, id, command_name, payload, connect_timeout_in_seconds=None, response_timeout_in_seconds=None, custom_headers=None, raw=False, **operation_config):
-        """Invoke a digital twin root level command.
+    def abandon_feedback_notification(
+            self, lock_token, custom_headers=None, raw=False, **operation_config):
+        """Abandons the lock on a cloud-to-device feedback message. See
+        https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging for
+        more information.
 
-        Invoke a digital twin root level command.
-
-        :param id:
-        :type id: str
-        :param command_name:
-        :type command_name: str
-        :param payload:
-        :type payload: object
-        :param connect_timeout_in_seconds: Maximum interval of time, in
-         seconds, that the digital twin command will wait for the answer.
-        :type connect_timeout_in_seconds: int
-        :param response_timeout_in_seconds: Maximum interval of time, in
-         seconds, that the digital twin command will wait for the answer.
-        :type response_timeout_in_seconds: int
+        :param lock_token: The lock token obtained when the cloud-to-device
+         message is received.
+        :type lock_token: str
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
          deserialized response
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
-        :return: object or ClientRawResponse if raw=true
-        :rtype: object or ~msrest.pipeline.ClientRawResponse
+        :return: None or ClientRawResponse if raw=true
+        :rtype: None or ~msrest.pipeline.ClientRawResponse
         :raises: :class:`CloudError<msrestazure.azure_exceptions.CloudError>`
         """
         # Construct URL
-        url = self.invoke_root_level_command.metadata['url']
+        url = self.abandon_feedback_notification.metadata['url']
         path_format_arguments = {
-            'id': self._serialize.url("id", id, 'str'),
-            'commandName': self._serialize.url("command_name", command_name, 'str')
+            'lockToken': self._serialize.url("lock_token", lock_token, 'str')
         }
         url = self._client.format_url(url, **path_format_arguments)
 
         # Construct parameters
         query_parameters = {}
         query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
-        if connect_timeout_in_seconds is not None:
-            query_parameters['connectTimeoutInSeconds'] = self._serialize.query("connect_timeout_in_seconds", connect_timeout_in_seconds, 'int')
-        if response_timeout_in_seconds is not None:
-            query_parameters['responseTimeoutInSeconds'] = self._serialize.query("response_timeout_in_seconds", response_timeout_in_seconds, 'int')
 
         # Construct headers
         header_parameters = {}
-        header_parameters['Accept'] = 'application/json'
-        header_parameters['Content-Type'] = 'application/json; charset=utf-8'
         if self.config.generate_client_request_id:
             header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
         if custom_headers:
@@ -216,119 +234,16 @@ class DigitalTwinOperations(object):
         if self.config.accept_language is not None:
             header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
 
-        # Construct body
-        body_content = self._serialize.body(payload, 'object')
-
         # Construct and send request
-        request = self._client.post(url, query_parameters, header_parameters, body_content)
+        request = self._client.post(url, query_parameters, header_parameters)
         response = self._client.send(request, stream=False, **operation_config)
 
-        if response.status_code not in [200]:
+        if response.status_code not in [204]:
             exp = CloudError(response)
             exp.request_id = response.headers.get('x-ms-request-id')
             raise exp
 
-        deserialized = None
-        header_dict = {}
-
-        if response.status_code == 200:
-            deserialized = self._deserialize('object', response)
-            header_dict = {
-                'x-ms-command-statuscode': 'int',
-                'x-ms-request-id': 'str',
-            }
-
         if raw:
-            client_raw_response = ClientRawResponse(deserialized, response)
-            client_raw_response.add_headers(header_dict)
+            client_raw_response = ClientRawResponse(None, response)
             return client_raw_response
-
-        return deserialized
-    invoke_root_level_command.metadata = {'url': '/digitaltwins/{id}/commands/{commandName}'}
-
-    def invoke_component_command(
-            self, id, component_path, command_name, payload, connect_timeout_in_seconds=None, response_timeout_in_seconds=None, custom_headers=None, raw=False, **operation_config):
-        """Invoke a digital twin command.
-
-        Invoke a digital twin command.
-
-        :param id:
-        :type id: str
-        :param component_path:
-        :type component_path: str
-        :param command_name:
-        :type command_name: str
-        :param payload:
-        :type payload: object
-        :param connect_timeout_in_seconds: Maximum interval of time, in
-         seconds, that the digital twin command will wait for the answer.
-        :type connect_timeout_in_seconds: int
-        :param response_timeout_in_seconds: Maximum interval of time, in
-         seconds, that the digital twin command will wait for the answer.
-        :type response_timeout_in_seconds: int
-        :param dict custom_headers: headers that will be added to the request
-        :param bool raw: returns the direct response alongside the
-         deserialized response
-        :param operation_config: :ref:`Operation configuration
-         overrides<msrest:optionsforoperations>`.
-        :return: object or ClientRawResponse if raw=true
-        :rtype: object or ~msrest.pipeline.ClientRawResponse
-        :raises: :class:`CloudError<msrestazure.azure_exceptions.CloudError>`
-        """
-        # Construct URL
-        url = self.invoke_component_command.metadata['url']
-        path_format_arguments = {
-            'id': self._serialize.url("id", id, 'str'),
-            'componentPath': self._serialize.url("component_path", component_path, 'str'),
-            'commandName': self._serialize.url("command_name", command_name, 'str')
-        }
-        url = self._client.format_url(url, **path_format_arguments)
-
-        # Construct parameters
-        query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
-        if connect_timeout_in_seconds is not None:
-            query_parameters['connectTimeoutInSeconds'] = self._serialize.query("connect_timeout_in_seconds", connect_timeout_in_seconds, 'int')
-        if response_timeout_in_seconds is not None:
-            query_parameters['responseTimeoutInSeconds'] = self._serialize.query("response_timeout_in_seconds", response_timeout_in_seconds, 'int')
-
-        # Construct headers
-        header_parameters = {}
-        header_parameters['Accept'] = 'application/json'
-        header_parameters['Content-Type'] = 'application/json; charset=utf-8'
-        if self.config.generate_client_request_id:
-            header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
-        if custom_headers:
-            header_parameters.update(custom_headers)
-        if self.config.accept_language is not None:
-            header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
-
-        # Construct body
-        body_content = self._serialize.body(payload, 'object')
-
-        # Construct and send request
-        request = self._client.post(url, query_parameters, header_parameters, body_content)
-        response = self._client.send(request, stream=False, **operation_config)
-
-        if response.status_code not in [200]:
-            exp = CloudError(response)
-            exp.request_id = response.headers.get('x-ms-request-id')
-            raise exp
-
-        deserialized = None
-        header_dict = {}
-
-        if response.status_code == 200:
-            deserialized = self._deserialize('object', response)
-            header_dict = {
-                'x-ms-command-statuscode': 'int',
-                'x-ms-request-id': 'str',
-            }
-
-        if raw:
-            client_raw_response = ClientRawResponse(deserialized, response)
-            client_raw_response.add_headers(header_dict)
-            return client_raw_response
-
-        return deserialized
-    invoke_component_command.metadata = {'url': '/digitaltwins/{id}/components/{componentPath}/commands/{commandName}'}
+    abandon_feedback_notification.metadata = {'url': '/messages/serviceBound/feedback/{lockToken}/abandon'}

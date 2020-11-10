@@ -2,13 +2,27 @@
 
 Release History
 ===============
-
 0.10.6
 +++++++++++++++
 
 **Azure IoT Product Certification service**
 
 * Fix bug for `az iot product test create` not specifying query parameter "GenerateProvisioningConfiguration" appropriately.
+
+
+**IoT Hub updates**
+
+* SDK refresh. IoT Hub service calls point to api-version 2020-09-30.
+
+* Updated nested edge (edge offline) commands to support parentScopes.
+
+  Set of changes
+
+  * 'az iot hub device-identity get-parent' is deprecated use 'az iot hub device-identity parent show' instead. Deprecated command group is planned to be removed by December 2021
+  * 'az iot hub device-identity set-parent' is deprecated use 'az iot hub device-identity parent set' instead. Deprecated command is planned to be removed by December 2021
+  * 'az iot hub device-identity add-children' is deprecated use 'az iot hub device-identity children add' instead. Deprecated command group is planned to be removed by December 2021
+  * 'az iot hub device-identity remove-children' is deprecated use 'az iot hub device-identity children remove' instead. Deprecated command is planned to be removed by December 2021
+  * 'az iot hub device-identity list-children' is deprecated use 'az iot hub device-identity children list' instead. Deprecated command group is planned to be removed by December 2021
 
 0.10.5
 +++++++++++++++
