@@ -170,6 +170,7 @@ def iot_device_create(
 
     try:
         device = _assemble_device(
+            False,
             device_id,
             auth_method,
             edge_enabled,
@@ -194,6 +195,7 @@ def iot_device_create(
 
 
 def _assemble_device(
+    is_update,
     device_id,
     auth_method,
     edge_enabled,
@@ -207,6 +209,16 @@ def _assemble_device(
 
     auth = _assemble_auth(auth_method, pk, sk)
     cap = DeviceCapabilities(iot_edge=edge_enabled)
+    if is_update:
+        device = Device(
+            device_id=device_id,
+            authentication=auth,
+            capabilities=cap,
+            status=status,
+            status_reason=status_reason,
+            device_scope=device_scope,
+        )
+        return device
     if edge_enabled:
         parent_scope = []
         if device_scope:
@@ -324,12 +336,15 @@ def iot_device_update(
 
     auth, pk, sk = _parse_auth(parameters)
     updated_device = _assemble_device(
+        True,
         parameters['deviceId'],
-        auth, parameters['capabilities']['iotEdge'],
+        auth,
+        parameters['capabilities']['iotEdge'],
         pk,
         sk,
         parameters['status'].lower(),
-        parameters.get('statusReason')
+        parameters.get('statusReason'),
+        parameters.get('deviceScope')
     )
     updated_device.etag = parameters.get("etag", "*")
     return _iot_device_update(target, device_id, updated_device)
