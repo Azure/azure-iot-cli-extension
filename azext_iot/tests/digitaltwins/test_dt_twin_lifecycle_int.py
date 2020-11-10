@@ -42,7 +42,7 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
             )
         )
         # Wait for RBAC to catch-up
-        sleep(15)
+        sleep(20)
 
         self.cmd(
             "dt model create -n {} --from-directory '{}'".format(
