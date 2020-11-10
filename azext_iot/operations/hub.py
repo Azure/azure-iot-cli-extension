@@ -379,6 +379,29 @@ def iot_device_delete(
         raise CLIError(err)
 
 
+def _update_device_key(target, device, auth_method, pk, sk):
+    resolver = SdkResolver(target=target)
+    service_sdk = resolver.get_sdk(SdkType.service_sdk)
+
+    try:
+        auth = _assemble_auth(auth_method, pk, sk)
+        device["authentication"] = auth
+        etag = device.get("etag", None)
+        if etag:
+            headers = {}
+            headers["If-Match"] = '"{}"'.format(etag)
+            return service_sdk.devices.create_or_update_identity(
+                id=device["deviceId"],
+                device=device,
+                custom_headers=headers,
+            )
+        raise LookupError("device etag not found.")
+    except CloudError as e:
+        raise CLIError(unpack_msrest_error(e))
+    except LookupError as err:
+        raise CLIError(err)
+
+
 def iot_device_key_regenerate(cmd, hub_name, device_id, regenerate_key, resource_group_name=None, login=None):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
@@ -399,18 +422,7 @@ def iot_device_key_regenerate(cmd, hub_name, device_id, regenerate_key, resource
         pk = sk
         sk = temp
 
-    updated_device = _assemble_device(
-        device["deviceId"],
-        device["authentication"]["type"],
-        device["capabilities"]["iotEdge"],
-        pk,
-        sk,
-        device["status"].lower(),
-        device["statusReason"],
-        device.get("deviceScope", None)
-    )
-    updated_device.etag = device["etag"]
-    return _iot_device_update(target, device_id, updated_device)
+    return _update_device_key(target, device, device["authentication"]["type"], pk, sk)
 
 
 def iot_device_get_parent(
