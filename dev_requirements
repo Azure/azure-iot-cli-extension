@@ -5,6 +5,7 @@ pytest-env
 uamqp~=1.2
 mock;python_version<'3.3'
 responses
+urllib3[secure]>=1.21.1,<=1.25
 black;python_version>='3.6'
 wheel==0.30.0
 pre-commit
