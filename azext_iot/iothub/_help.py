@@ -43,6 +43,11 @@ def load_iothub_help():
           text: >
             az iot hub job create --job-id {job_name} --job-type scheduleDeviceMethod -n {iothub_name} --method-name setSyncIntervalSec --method-payload 30
             --query-condition "properties.reported.settings.syncIntervalSec != 30"
+
+        - name:  Create and schedule a job to invoke a device method for all devices.
+          text: >
+            az iot hub job create --job-id {job_name} --job-type scheduleDeviceMethod -q "*" -n {iothub_name}
+            --method-name setSyncIntervalSec --method-payload '{"version":"1.0"}'
     """
 
     helps["iot hub job show"] = """
