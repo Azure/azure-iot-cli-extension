@@ -96,7 +96,7 @@ jobs:
 
   - task: GitHubRelease@0
     inputs:
-      gitHubConnection: AzIoTCLIGitHub
+      gitHubConnection: aziotcli
       repositoryName: $(Build.Repository.Name)
       action: 'create'
       target: '$(Build.SourceVersion)'
