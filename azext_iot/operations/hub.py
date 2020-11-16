@@ -24,7 +24,6 @@ from azext_iot.common.shared import (
     ConfigType,
     KeyType,
     SettleType,
-    RegenerateKeyType,
     IoTHubStateType
 )
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
@@ -37,7 +36,6 @@ from azext_iot.common.utility import (
     init_monitoring,
     process_json_arg,
     ensure_min_version,
-    generate_key
 )
 from azext_iot._factory import SdkResolver, CloudError
 from azext_iot.operations.generic import _execute_query, _process_top
@@ -401,43 +399,38 @@ def _update_device_key(target, device, auth_method, pk, sk):
     try:
         auth = _assemble_auth(auth_method, pk, sk)
         device["authentication"] = auth
-        etag = device.get("etag", None)
-        if etag:
-            headers = {}
-            headers["If-Match"] = '"{}"'.format(etag)
-            return service_sdk.devices.create_or_update_identity(
-                id=device["deviceId"],
-                device=device,
-                custom_headers=headers,
-            )
-        raise LookupError("device etag not found.")
+        etag = device.get("etag", "*")
+        headers = {}
+        headers["If-Match"] = '"{}"'.format(etag)
+        return service_sdk.devices.create_or_update_identity(
+            id=device["deviceId"],
+            device=device,
+            custom_headers=headers,
+        )
     except CloudError as e:
         raise CLIError(unpack_msrest_error(e))
-    except LookupError as err:
-        raise CLIError(err)
 
 
-def iot_device_key_regenerate(cmd, hub_name, device_id, regenerate_key, resource_group_name=None, login=None):
+def iot_device_keys_regenerate(cmd, hub_name, device_id, swap=False, resource_group_name=None, login=None):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     device = _iot_device_show(target, device_id)
     if (device["authentication"]["type"] != "sas"):
-        raise CLIError("Device authentication should be of type sas")
+        raise CLIError("Device authentication must be of type sas (symmetricKey).")
 
-    pk = device["authentication"]["symmetricKey"]["primaryKey"]
-    sk = device["authentication"]["symmetricKey"]["secondaryKey"]
-    if regenerate_key == RegenerateKeyType.primary.value:
-        pk = generate_key()
-    if regenerate_key == RegenerateKeyType.secondary.value:
-        sk = generate_key()
-    if regenerate_key == RegenerateKeyType.swap.value:
+    if swap:
+        pk = device["authentication"]["symmetricKey"]["primaryKey"]
+        sk = device["authentication"]["symmetricKey"]["secondaryKey"]
+
         temp = pk
         pk = sk
         sk = temp
 
-    return _update_device_key(target, device, device["authentication"]["type"], pk, sk)
+        return _update_device_key(target, device, device["authentication"]["type"], pk, sk)
+
+    return _update_device_key(target, device, device["authentication"]["type"], "", "")
 
 
 def iot_device_get_parent(

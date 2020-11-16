@@ -640,7 +640,7 @@ class TestDeviceUpdate:
             )
 
 
-class TestDeviceRegenerateKey:
+class TestDeviceRegenerateKeys:
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
@@ -662,10 +662,10 @@ class TestDeviceRegenerateKey:
         service_client.side_effect = test_side_effect
         return service_client
 
-    @pytest.mark.parametrize("req", ["primary", "secondary", "swap"])
-    def test_device_key_regenerate(self, fixture_cmd, serviceclient, req):
-        subject.iot_device_key_regenerate(
-            fixture_cmd, mock_target["entity"], device_id, req
+    @pytest.mark.parametrize("swap", [False, True])
+    def test_device_keys_regenerate(self, fixture_cmd, serviceclient, swap):
+        subject.iot_device_keys_regenerate(
+            fixture_cmd, mock_target["entity"], device_id, swap=swap
         )
         args = serviceclient.call_args
         assert (
@@ -674,16 +674,17 @@ class TestDeviceRegenerateKey:
         assert args[0][0].method == "PUT"
 
         body = json.loads(args[0][0].body)
-        if(req == "primary"):
-            assert body["authentication"]["symmetricKey"]["primaryKey"] != "123"
-        if(req == "secondary"):
-            assert body["authentication"]["symmetricKey"]["secondaryKey"] != "321"
-        if(req == "swap"):
+
+        if(swap):
             assert body["authentication"]["symmetricKey"]["primaryKey"] == "321"
             assert body["authentication"]["symmetricKey"]["secondaryKey"] == "123"
+            return
+
+        assert body["authentication"]["symmetricKey"]["primaryKey"] == ""
+        assert body["authentication"]["symmetricKey"]["secondaryKey"] == ""
 
     @pytest.fixture(params=[200])
-    def serviceclient_invalid_args(self, mocker, fixture_ghcs, fixture_sas, request):
+    def serviceclient_invalid_auth(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
         kvp = {}
         kvp.setdefault("authentication", {"type": "test"})
@@ -693,25 +694,18 @@ class TestDeviceRegenerateKey:
         service_client.side_effect = test_side_effect
         return service_client
 
-    @pytest.mark.parametrize(
-        "req, exp",
-        [
-            ("primary", CLIError),
-            ("secondary", CLIError),
-            ("swap", CLIError)
-        ]
-    )
-    def test_device_key_regenerate_invalid_args(self, fixture_cmd, serviceclient_invalid_args, req, exp):
-        with pytest.raises(exp):
-            subject.iot_device_key_regenerate(
-                fixture_cmd, mock_target["entity"], device_id, req
+    @pytest.mark.parametrize("swap", [False, True])
+    def test_device_keys_regenerate_invalid_auth(self, serviceclient_invalid_auth, swap):
+        with pytest.raises(CLIError):
+            subject.iot_device_keys_regenerate(
+                fixture_cmd, mock_target["entity"], device_id, swap=swap
             )
 
-    @pytest.mark.parametrize("req", ["primary", "secondary", "swap"])
-    def test_device_key_regenerate_error(self, serviceclient_generic_error, req):
+    @pytest.mark.parametrize("swap", [False, True])
+    def test_device_keys_regenerate_error(self, serviceclient_generic_error, swap):
         with pytest.raises(CLIError):
-            subject.iot_device_key_regenerate(
-                fixture_cmd, mock_target["entity"], device_id, req
+            subject.iot_device_keys_regenerate(
+                fixture_cmd, mock_target["entity"], device_id, swap=swap
             )
 
 
