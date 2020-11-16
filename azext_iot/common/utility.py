@@ -18,7 +18,6 @@ import sys
 import re
 import hmac
 import hashlib
-import random
 
 from threading import Event, Thread
 from datetime import datetime
