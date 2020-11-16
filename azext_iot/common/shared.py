@@ -216,16 +216,6 @@ class AuthenticationType(Enum):
     identityBased = "identity"
 
 
-class RegenerateKeyType(Enum):
-    """
-    Target key type for regeneration.
-    """
-
-    primary = KeyType.primary.value
-    secondary = KeyType.secondary.value
-    swap = "swap"
-
-
 class IoTHubStateType(Enum):
     """
     IoT Hub State Property

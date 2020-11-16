@@ -518,10 +518,9 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
             ],
         )
 
-        # Test 'az iot hub device regenerate-key'
+        # Test 'az iot hub device regenerate-keys'
         device = self.cmd(
-            '''iot hub device-identity regenerate-key -d {} -n {} -g {} --kt primary
-                    '''.format(
+            '''iot hub device-identity regenerate-keys -d {} -n {} -g {}'''.format(
                 edge_device_ids[1], LIVE_HUB, LIVE_RG
             ),
             checks=[
@@ -529,10 +528,9 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
             ]
         ).get_output_in_json()
 
-        # Test swap keys 'az iot hub device regenerate-key'
+        # Test swap keys 'az iot hub device regenerate-keys'
         self.cmd(
-            '''iot hub device-identity regenerate-key -d {} -n {} -g {} --kt swap
-                    '''.format(
+            '''iot hub device-identity regenerate-keys -d {} -n {} -g {} --swap'''.format(
                 edge_device_ids[1], LIVE_HUB, LIVE_RG
             ),
             checks=[
@@ -541,10 +539,9 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
             ],
         )
 
-        # Test 'az iot hub device regenerate-key' with non sas authentication
-        self.cmd("iot hub device-identity regenerate-key -d {} -n {} -g {} --kt secondary"
-                 .format(device_ids[0], LIVE_HUB, LIVE_RG),
-                 expect_failure=True)
+        # Test 'az iot hub device regenerate-keys' with non sas authentication
+        self.cmd("iot hub device-identity regenerate-keys -d {} -n {} -g {}".format(
+            device_ids[0], LIVE_HUB, LIVE_RG), expect_failure=True)
 
         sym_conn_str_pattern = r"^HostName={}\.azure-devices\.net;DeviceId={};SharedAccessKey=".format(
             LIVE_HUB, edge_device_ids[0]

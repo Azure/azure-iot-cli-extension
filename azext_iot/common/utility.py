@@ -516,11 +516,3 @@ def compute_device_key(primary_key, registration_id):
         ).digest()
     )
     return device_key
-
-
-def generate_key(byte_length=32):
-    key = ""
-    while byte_length > 0:
-        key += chr(random.randrange(1, 128))
-        byte_length -= 1
-    return base64.b64encode(key.encode()).decode("utf-8")

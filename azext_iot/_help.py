@@ -228,6 +228,18 @@ helps[
 """
 
 helps[
+    "iot hub device-identity regenerate-keys"
+] = """
+    type: command
+    short-summary: Regenerate keys of an IoT Hub device with symmetric key authentication.
+    examples:
+      - name: Regenerates the primary and secondary keys.
+        text: az iot hub device-identity regenerate-key -d {device_id} -n {iothub_name}
+      - name: Swaps the primary and secondary keys. No key generation occurs.
+        text: az iot hub device-identity regenerate-key -d {device_id} -n {iothub_name} --swap
+"""
+
+helps[
     "iot hub device-identity delete"
 ] = """
     type: command
