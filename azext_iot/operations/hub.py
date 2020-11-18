@@ -24,7 +24,7 @@ from azext_iot.common.shared import (
     ConfigType,
     KeyType,
     SettleType,
-    RegenerateKeyType,
+    RenewKeyType,
     IoTHubStateType
 )
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
@@ -417,7 +417,7 @@ def _update_device_key(target, device, auth_method, pk, sk):
         raise CLIError(err)
 
 
-def iot_device_key_regenerate(cmd, hub_name, device_id, regenerate_key, resource_group_name=None, login=None):
+def iot_device_key_regenerate(cmd, hub_name, device_id, renew_key_type, resource_group_name=None, login=None):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         hub_name=hub_name, resource_group_name=resource_group_name, login=login
@@ -428,11 +428,12 @@ def iot_device_key_regenerate(cmd, hub_name, device_id, regenerate_key, resource
 
     pk = device["authentication"]["symmetricKey"]["primaryKey"]
     sk = device["authentication"]["symmetricKey"]["secondaryKey"]
-    if regenerate_key == RegenerateKeyType.primary.value:
+
+    if renew_key_type == RenewKeyType.primary.value:
         pk = generate_key()
-    if regenerate_key == RegenerateKeyType.secondary.value:
+    if renew_key_type == RenewKeyType.secondary.value:
         sk = generate_key()
-    if regenerate_key == RegenerateKeyType.swap.value:
+    if renew_key_type == RenewKeyType.swap.value:
         temp = pk
         pk = sk
         sk = temp
