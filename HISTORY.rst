@@ -2,6 +2,15 @@
 
 Release History
 ===============
+
+0.10.7
++++++++++++++++
+
+**IoT Hub updates**
+
+* Change command name from az iot hub device-identity `regenerate-key` to `renew-key` to better align with az cli core verbs.
+
+
 0.10.6
 +++++++++++++++
 
@@ -23,6 +32,7 @@ Release History
   * 'az iot hub device-identity add-children' is deprecated use 'az iot hub device-identity children add' instead. Deprecated command group is planned to be removed by December 2021
   * 'az iot hub device-identity remove-children' is deprecated use 'az iot hub device-identity children remove' instead. Deprecated command is planned to be removed by December 2021
   * 'az iot hub device-identity list-children' is deprecated use 'az iot hub device-identity children list' instead. Deprecated command group is planned to be removed by December 2021
+
 
 0.10.5
 +++++++++++++++
