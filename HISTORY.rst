@@ -2,13 +2,6 @@
 
 Release History
 ===============
-0.10.7
-+++++++++++++++
-
-**IoT Hub updates**
-
-* Breaking Change - removes and replaces "az iot hub device-identity regenerate-key" with the new "az iot hub device-identity regenerate-keys".
-
 0.10.6
 +++++++++++++++
 

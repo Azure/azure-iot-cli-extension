@@ -31,6 +31,7 @@ from azext_iot.common.shared import (
     JobCreateType,
     JobStatusType,
     AuthenticationType,
+    RegenerateKeyType,
 )
 from azext_iot._validators import mode2_iot_login_handler
 from azext_iot.assets.user_messages import info_param_properties_device
@@ -415,12 +416,12 @@ def load_arguments(self, _):
             deprecate_info=context.deprecate()
         )
 
-    with self.argument_context('iot hub device-identity regenerate-keys') as context:
+    with self.argument_context('iot hub device-identity regenerate-key') as context:
         context.argument(
-            "swap",
-            options_list=["--swap"],
-            arg_type=get_three_state_flag(),
-            help="Flag indicating the operation should swap primary and secondary keys only. No new keys will be generated. ",
+            "regenerate_key",
+            options_list=["--key-type", "--kt"],
+            arg_type=get_enum_type(RegenerateKeyType),
+            help="Target key type to regenerate."
         )
 
     with self.argument_context("iot hub device-identity export") as context:
