@@ -31,7 +31,7 @@ from azext_iot.common.shared import (
     JobCreateType,
     JobStatusType,
     AuthenticationType,
-    RegenerateKeyType,
+    RenewKeyType,
 )
 from azext_iot._validators import mode2_iot_login_handler
 from azext_iot.assets.user_messages import info_param_properties_device
@@ -416,11 +416,11 @@ def load_arguments(self, _):
             deprecate_info=context.deprecate()
         )
 
-    with self.argument_context('iot hub device-identity regenerate-key') as context:
+    with self.argument_context('iot hub device-identity renew-key') as context:
         context.argument(
-            "regenerate_key",
+            "renew_key_type",
             options_list=["--key-type", "--kt"],
-            arg_type=get_enum_type(RegenerateKeyType),
+            arg_type=get_enum_type(RenewKeyType),
             help="Target key type to regenerate."
         )
 
