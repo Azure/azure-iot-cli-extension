@@ -216,7 +216,7 @@ class AuthenticationType(Enum):
     identityBased = "identity"
 
 
-class RegenerateKeyType(Enum):
+class RenewKeyType(Enum):
     """
     Target key type for regeneration.
     """

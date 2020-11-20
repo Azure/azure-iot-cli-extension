@@ -216,15 +216,15 @@ helps[
 """
 
 helps[
-    "iot hub device-identity regenerate-key"
+    "iot hub device-identity renew-key"
 ] = """
     type: command
-    short-summary: Regenerate target keys of an IoT Hub device with sas authentication.
+    short-summary: Renew target keys of an IoT Hub device with sas authentication.
     examples:
-      - name: Regenerate the primary key.
-        text: az iot hub device-identity regenerate-key -d {device_id} -n {iothub_name} --kt primary
+      - name: Renew the primary key.
+        text: az iot hub device-identity renew-key -d {device_id} -n {iothub_name} --kt primary
       - name: Swap the primary and secondary keys.
-        text: az iot hub device-identity regenerate-key -d {device_id} -n {iothub_name} --kt swap
+        text: az iot hub device-identity renew-key -d {device_id} -n {iothub_name} --kt swap
 """
 
 helps[
@@ -298,38 +298,70 @@ helps[
     examples:
     - name: Get the parent device of the specified device.
       text: >
-        az iot hub device-identity get-parent -d {non_edge_device_id} -n {iothub_name}
+        az iot hub device-identity get-parent -d {device_id} -n {iothub_name}
 """
 
 helps[
     "iot hub device-identity set-parent"
 ] = """
     type: command
-    short-summary: Set the parent device of the specified non-edge device.
+    short-summary: Set the parent device of the specified device.
     examples:
-    - name: Set the parent device of the specified non-edge device.
+    - name: Set the parent device of the specified device.
       text: >
-        az iot hub device-identity set-parent -d {non_edge_device_id} --pd {edge_device_id} -n {iothub_name}
-    - name: Set the parent device of the specified non-edge device irrespectively the non-edge device is
+        az iot hub device-identity set-parent -d {device_id} --pd {edge_device_id} -n {iothub_name}
+    - name: Set the parent device of the specified device irrespectively the device is
             already a child of other edge device.
       text: >
-        az iot hub device-identity set-parent -d {non_edge_device_id} --pd {edge_device_id} --force -n {iothub_name}
+        az iot hub device-identity set-parent -d {device_id} --pd {edge_device_id} --force -n {iothub_name}
+"""
+
+helps[
+    "iot hub device-identity parent"
+] = """
+    type: group
+    short-summary: Manage IoT device\'s parent device.
+"""
+
+helps[
+    "iot hub device-identity parent show"
+] = """
+    type: command
+    short-summary: Get the parent device of the specified device.
+    examples:
+    - name: Get the parent device of the specified device.
+      text: >
+        az iot hub device-identity parent show -d {device_id} -n {iothub_name}
+"""
+
+helps[
+    "iot hub device-identity parent set"
+] = """
+    type: command
+    short-summary: Set the parent device of the specified device.
+    examples:
+    - name: Set the parent device of the specified device.
+      text: >
+        az iot hub device-identity parent set -d {device_id} --pd {edge_device_id} -n {iothub_name}
+    - name: Set the parent device of the specified device and overwrites its original parent.
+      text: >
+        az iot hub device-identity parent set -d {device_id} --pd {edge_device_id} --force -n {iothub_name}
 """
 
 helps[
     "iot hub device-identity add-children"
 ] = """
     type: command
-    short-summary: Add specified comma-separated list of non edge device ids as children of specified edge device.
+    short-summary: Add specified comma-separated list of device ids as children of specified edge device.
     examples:
-    - name: Add non-edge devices as a children to the edge device.
+    - name: Add devices as a children to the edge device.
       text: >
-        az iot hub device-identity add-children -d {edge_device_id} --child-list {comma_separated_non_edge_device_id}
+        az iot hub device-identity add-children -d {edge_device_id} --child-list {comma_separated_device_id}
         -n {iothub_name}
-    - name: Add non-edge devices as a children to the edge device irrespectively the non-edge device is
+    - name: Add devices as a children to the edge device irrespectively the device is
             already a child of other edge device.
       text: >
-        az iot hub device-identity add-children -d {edge_device_id} --child-list {comma_separated_non_edge_device_id}
+        az iot hub device-identity add-children -d {edge_device_id} --child-list {comma_separated_device_id}
         -n {iothub_name} -f
 """
 
@@ -337,9 +369,9 @@ helps[
     "iot hub device-identity list-children"
 ] = """
     type: command
-    short-summary: Print comma-separated list of assigned child devices.
+    short-summary: Outputs comma-separated list of assigned child devices.
     examples:
-    - name: Show all assigned non-edge devices as comma-separated list.
+    - name: Show all assigned devices as comma-separated list.
       text: >
         az iot hub device-identity list-children -d {edge_device_id} -n {iothub_name}
 """
@@ -348,15 +380,68 @@ helps[
     "iot hub device-identity remove-children"
 ] = """
     type: command
-    short-summary: Remove non edge devices as children from specified edge device.
+    short-summary: Remove devices as children from specified edge device.
     examples:
     - name: Remove all mentioned devices as children of specified device.
       text: >
-        az iot hub device-identity remove-children -d {edge_device_id} --child-list {comma_separated_non_edge_device_id}
+        az iot hub device-identity remove-children -d {edge_device_id} --child-list {comma_separated_device_id}
         -n {iothub_name}
-    - name: Remove all non-edge devices as children specified edge device.
+    - name: Remove all devices as children specified edge device.
       text: >
         az iot hub device-identity remove-children -d {edge_device_id} --remove-all
+"""
+
+helps[
+    "iot hub device-identity children"
+] = """
+    type: group
+    short-summary: Manage IoT device\'s children device.
+"""
+
+helps[
+    "iot hub device-identity children add"
+] = """
+    type: command
+    short-summary: Add specified space-separated list of device ids as children of specified edge device.
+    examples:
+    - name: Add devices as a children to the edge device.
+      text: >
+        az iot hub device-identity children add -d {edge_device_id} --child-list {space_separated_device_id}
+        -n {iothub_name}
+    - name: Add devices as children to the edge device and overwrites children devices'
+            original parent.
+      text: >
+        az iot hub device-identity children add -d {edge_device_id} --child-list {space_separated_device_id}
+        -n {iothub_name} -f
+"""
+
+helps[
+    "iot hub device-identity children list"
+] = """
+    type: command
+    short-summary: Outputs list of assigned child devices.
+    examples:
+    - name: Show all assigned children devices as list.
+      text: >
+        az iot hub device-identity children list -d {edge_device_id} -n {iothub_name}
+    - name: Show all assigned children devices as list whose device ID contains substring of 'test'.
+      text: >
+        az iot hub device-identity children list -d {edge_device_id} -n {iothub_name} --query "[?contains(@,'test')]"
+"""
+
+helps[
+    "iot hub device-identity children remove"
+] = """
+    type: command
+    short-summary: Remove devices as children from specified edge device.
+    examples:
+    - name: Remove all mentioned devices as children of specified device.
+      text: >
+        az iot hub device-identity children remove -d {edge_device_id} --child-list {space_separated_device_id}
+        -n {iothub_name}
+    - name: Remove all devices as children specified edge device.
+      text: >
+        az iot hub device-identity children remove -d {edge_device_id} --remove-all
 """
 
 helps[
@@ -558,6 +643,11 @@ helps[
 ] = """
     type: command
     short-summary: Invoke an Edge module method.
+    examples:
+    - name: Invoke a direct method on edge device using a module from the cloud.
+      text: >
+        az iot hub invoke-module-method -n {iothub_name} -d {device_id}
+        -m '$edgeAgent' --method-name 'RestartModule' --method-payload '{"schemaVersion": "1.0"}'
 """
 
 helps[
@@ -565,6 +655,11 @@ helps[
 ] = """
     type: command
     short-summary: Invoke a device method.
+    examples:
+    - name: Invoke a direct method on device from the cloud.
+      text: >
+        az iot hub invoke-device-method --hub-name {iothub_name} --device-id {device_id}
+        --method-name Reboot --method-payload '{"version":"1.0"}'
 """
 
 helps[
@@ -1049,14 +1144,15 @@ helps[
     - name: Create an enrollment '{enrollment_id}' with attestation type 'x509' in the Azure
             IoT Device Provisioning Service '{dps_name}' in the resource group
             '{resource_group_name}' with provisioning status 'disabled', target IoT Hub
-            '{iothub_host_name}', device id '{device_id}' and initial twin
-            properties '{"location":{"region":"US"}}'.
+            '{iothub_host_name}', device id '{device_id}', initial twin properties
+            '{"location":{"region":"US"}}' and initial twin tags '{"version":"1"}'.
       text: >
         az iot dps enrollment create -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --attestation-type x509
         --certificate-path /certificates/Certificate.pem --provisioning-status disabled
         --iot-hub-host-name {iothub_host_name}
-        --initial-twin-properties "{'location':{'region':'US'}}" --device-id {device_id}
+        --initial-twin-properties "{'location':{'region':'US'}}"
+        --initial-twin-tags "{'version':'1'}" --device-id {device_id}
     - name: Create an enrollment 'MyEnrollment' with attestation type 'tpm' in the Azure IoT
             Device Provisioning Service '{dps_name}' in the resource group '{resource_group_name}'.
       text: >
@@ -1130,6 +1226,13 @@ helps[
         az iot dps enrollment update -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --allocation-policy geolatency
         --etag AAAAAAAAAAA= --iot-hubs "{iot_hub_host_name1} {iot_hub_host_name2} {iot_hub_host_name3}"
+    - name: Update enrollment '{enrollment_id}' in the Azure IoT Device Provisioning Service '{dps_name}'
+            in the resource group '{resource_group_name}' with
+            initial twin properties '{"location":{"region":"USA"}}' and initial twin tags '{"version":"2"}'.
+      text: >
+        az iot dps enrollment update -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id} --initial-twin-properties "{'location':{'region':'USA'}}"
+        --initial-twin-tags "{'version1':'2'}"
 """
 
 helps[
@@ -1186,13 +1289,15 @@ helps[
         --enrollment-id {enrollment_id} --secondary-ca-name {certificate_name}
     - name: Create an enrollment group '{enrollment_id}' in the Azure IoT provisioning service
             'MyDps' in the resource group '{resource_group_name}' with provisioning status
-            'enabled', target IoT Hub '{iothub_host_name}' and initial twin
-            tags '{"location":{"region":"US"}} using an intermediate certificate as primary certificate'.
+            'enabled', target IoT Hub '{iothub_host_name}', initial twin properties
+            '{"location":{"region":"US"}}' and initial twin tags '{"version_dps":"1"}'
+            using an intermediate certificate as primary certificate'.
       text: >
         az iot dps enrollment-group create -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --certificate-path /certificates/Certificate.pem
         --provisioning-status enabled --iot-hub-host-name {iothub_host_name}
-        --initial-twin-tags "{'location':{'region':'US'}}"
+        --initial-twin-properties "{'location':{'region':'US'}}"
+        --initial-twin-tags "{'version_dps':'1'}"
     - name: Create an enrollment group '{enrollment_id}' in the Azure IoT provisioning service
             '{dps_name}' in the resource group '{resource_group_name} with attestation type 'symmetrickey'.
       text: >
@@ -1213,10 +1318,11 @@ helps[
     short-summary: Update an enrollment group in an Azure IoT Hub Device Provisioning Service.
     examples:
     - name: Update enrollment group '{enrollment_id}' in the Azure IoT provisioning service '{dps_name}'
-            in the resource group '{resource_group_name}' with new initial twin tags.
+            in the resource group '{resource_group_name}' with initial twin properties and initial twin tags.
       text: >
         az iot dps enrollment-group update -g {resource_group_name} --dps-name {dps_name}
-        --enrollment-id {enrollment_id} --initial-twin-tags "{'location':{'region':'US2'}}" --etag AAAAAAAAAAA=
+        --enrollment-id {enrollment_id} --initial-twin-properties "{'location':{'region':'USA'}}"
+        --initial-twin-tags "{'version_dps':'2'}" --etag AAAAAAAAAAA=
     - name: Update enrollment group '{enrollment_id}' in the Azure IoT provisioning service '{dps_name}'
             in the resource group '{resource_group_name}' with new primary intermediate certificate
             and remove existing secondary intermediate certificate.
