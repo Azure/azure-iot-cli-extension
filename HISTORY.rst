@@ -3,6 +3,12 @@
 Release History
 ===============
 
+0.10.8
++++++++++++++++
+**IoT Central fixes**
+* Align SSL certificate verification with core behavior
+
+
 0.10.7
 +++++++++++++++
 
