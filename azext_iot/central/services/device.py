@@ -24,6 +24,7 @@ BASE_PATH = "api/preview/devices"
 http = requests.Session()
 http.verify = not should_disable_connection_verify()
 
+
 def get_device(
     cmd, app_id: str, device_id: str, token: str, central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> Device:

@@ -18,6 +18,7 @@ BASE_PATH = "api/preview/users"
 http = requests.Session()
 http.verify = not should_disable_connection_verify()
 
+
 def add_service_principal(
     cmd,
     app_id: str,

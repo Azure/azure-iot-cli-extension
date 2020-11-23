@@ -18,6 +18,7 @@ BASE_PATH = "api/preview/apiTokens"
 http = requests.Session()
 http.verify = not should_disable_connection_verify()
 
+
 def add_api_token(
     cmd,
     app_id: str,

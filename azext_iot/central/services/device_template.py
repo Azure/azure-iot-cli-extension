@@ -23,6 +23,7 @@ BASE_PATH = "api/preview/deviceTemplates"
 http = requests.Session()
 http.verify = not should_disable_connection_verify()
 
+
 def get_device_template(
     cmd,
     app_id: str,
