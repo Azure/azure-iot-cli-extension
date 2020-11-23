@@ -15,11 +15,14 @@ from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
 from azext_iot.central.models.device import Device
 from azext_iot.central.models.enum import DeviceStatus
+from azure.cli.core.util import should_disable_connection_verify
+
 
 logger = get_logger(__name__)
 
 BASE_PATH = "api/preview/devices"
-
+http = requests.Session()
+http.verify = not should_disable_connection_verify()
 
 def get_device(
     cmd, app_id: str, device_id: str, token: str, central_dns_suffix=CENTRAL_ENDPOINT,
@@ -42,7 +45,7 @@ def get_device(
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, device_id)
     headers = _utility.get_headers(token, cmd)
 
-    response = requests.get(url, headers=headers)
+    response = http.get(url, headers=headers)
     result = _utility.try_extract_result(response)
     return Device(result)
 
@@ -71,7 +74,7 @@ def list_devices(
 
     pages_processed = 0
     while (pages_processed <= max_pages) and url:
-        response = requests.get(url, headers=headers)
+        response = http.get(url, headers=headers)
         result = _utility.try_extract_result(response)
 
         if "value" not in result:
@@ -110,7 +113,7 @@ def get_device_registration_summary(
         "This command may take a long time to complete if your app contains a lot of devices"
     )
     while url:
-        response = requests.get(url, headers=headers)
+        response = http.get(url, headers=headers)
         result = _utility.try_extract_result(response)
 
         if "value" not in result:
@@ -166,7 +169,7 @@ def create_device(
     if instance_of:
         payload["instanceOf"] = instance_of
 
-    response = requests.put(url, headers=headers, json=payload)
+    response = http.put(url, headers=headers, json=payload)
     result = _utility.try_extract_result(response)
     return Device(result)
 
@@ -192,7 +195,7 @@ def delete_device(
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, device_id)
     headers = _utility.get_headers(token, cmd)
 
-    response = requests.delete(url, headers=headers)
+    response = http.delete(url, headers=headers)
     return _utility.try_extract_result(response)
 
 
@@ -218,7 +221,7 @@ def get_device_credentials(
     )
     headers = _utility.get_headers(token, cmd)
 
-    response = requests.get(url, headers=headers)
+    response = http.get(url, headers=headers)
     return _utility.try_extract_result(response)
 
 
@@ -254,7 +257,7 @@ def run_component_command(
     )
     headers = _utility.get_headers(token, cmd)
 
-    response = requests.post(url, headers=headers, json=payload)
+    response = http.post(url, headers=headers, json=payload)
 
     # execute command response has caveats in it due to Async/Sync device methods
     # return the response if we get 201, otherwise try to apply generic logic
@@ -294,5 +297,5 @@ def get_component_command_history(
     )
     headers = _utility.get_headers(token, cmd)
 
-    response = requests.get(url, headers=headers)
+    response = http.get(url, headers=headers)
     return _utility.try_extract_result(response)

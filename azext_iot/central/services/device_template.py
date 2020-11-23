@@ -14,11 +14,14 @@ from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
 from azext_iot.central.models.template import Template
+from azure.cli.core.util import should_disable_connection_verify
+
 
 logger = get_logger(__name__)
 
 BASE_PATH = "api/preview/deviceTemplates"
-
+http = requests.Session()
+http.verify = not should_disable_connection_verify()
 
 def get_device_template(
     cmd,
@@ -45,7 +48,6 @@ def get_device_template(
         app_id, central_dns_suffix, BASE_PATH, device_template_id
     )
     headers = _utility.get_headers(token, cmd)
-
     response = requests.get(url, headers=headers)
     return Template(_utility.try_extract_result(response))
 
@@ -70,7 +72,7 @@ def list_device_templates(
     url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
     headers = _utility.get_headers(token, cmd)
 
-    response = requests.get(url, headers=headers)
+    response = http.get(url, headers=headers)
 
     result = _utility.try_extract_result(response)
 
@@ -112,7 +114,7 @@ def create_device_template(
     )
     headers = _utility.get_headers(token, cmd, has_json_payload=True)
 
-    response = requests.put(url, headers=headers, json=payload)
+    response = http.put(url, headers=headers, json=payload)
     return Template(_utility.try_extract_result(response))
 
 
@@ -142,5 +144,5 @@ def delete_device_template(
     )
     headers = _utility.get_headers(token, cmd)
 
-    response = requests.delete(url, headers=headers)
+    response = http.delete(url, headers=headers)
     return _utility.try_extract_result(response)
