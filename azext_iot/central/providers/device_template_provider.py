@@ -55,7 +55,7 @@ class CentralDeviceTemplateProvider:
         self, central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         templates = central_services.device_template.list_device_templates(
-            cmd=self._cmd, app_id=self._app_id, token=self._token
+            cmd=self._cmd, app_id=self._app_id, token=self._token, central_dns_suffix=central_dns_suffix
         )
 
         self._device_templates.update({template.id: template for template in templates})
