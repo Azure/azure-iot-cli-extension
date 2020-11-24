@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 # This is largely derived from https://docs.microsoft.com/en-us/rest/api/iotcentral/devices
 
-import requests
+from requests import Session
 
 from knack.util import CLIError
 from knack.log import get_logger
@@ -21,7 +21,7 @@ from azure.cli.core.util import should_disable_connection_verify
 logger = get_logger(__name__)
 
 BASE_PATH = "api/preview/devices"
-http = requests.Session()
+http = Session()
 http.verify = not should_disable_connection_verify()
 
 

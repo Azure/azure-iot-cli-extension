@@ -6,7 +6,7 @@ Release History
 0.10.8
 +++++++++++++++
 **IoT Central fixes**
-* Align SSL certificate verification with core behavior
+* Align SSL certificate verification with core behavior. "AZURE_CLI_DISABLE_CONNECTION_VERIFICATION" environment variable is now honored.
 
 
 0.10.7

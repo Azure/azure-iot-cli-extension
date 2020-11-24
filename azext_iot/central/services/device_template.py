@@ -5,9 +5,8 @@
 # --------------------------------------------------------------------------------------------
 # This is largely derived from https://docs.microsoft.com/en-us/rest/api/iotcentral/devicetemplates
 
-import requests
-
 from typing import List
+from requests import Session
 
 from knack.util import CLIError
 from knack.log import get_logger
@@ -20,7 +19,7 @@ from azure.cli.core.util import should_disable_connection_verify
 logger = get_logger(__name__)
 
 BASE_PATH = "api/preview/deviceTemplates"
-http = requests.Session()
+http = Session()
 http.verify = not should_disable_connection_verify()
 
 
@@ -49,7 +48,7 @@ def get_device_template(
         app_id, central_dns_suffix, BASE_PATH, device_template_id
     )
     headers = _utility.get_headers(token, cmd)
-    response = requests.get(url, headers=headers)
+    response = http.get(url, headers=headers)
     return Template(_utility.try_extract_result(response))
 
 
