@@ -123,7 +123,6 @@ def get_iot_central_tokens(cmd, app_id, token, central_dns_suffix):
     from requests import post
     from azure.cli.core.util import should_disable_connection_verify
 
-
     if not token:
         aad_token = get_aad_token(cmd, resource="https://apps.azureiotcentral.com")[
             "accessToken"
@@ -133,7 +132,7 @@ def get_iot_central_tokens(cmd, app_id, token, central_dns_suffix):
     url = "https://{}.{}/system/iothubs/generateSasTokens".format(
         app_id, central_dns_suffix
     )
-    response = post(url, headers={"Authorization": token}, verify = not should_disable_connection_verify())
+    response = post(url, headers={"Authorization": token}, verify=not should_disable_connection_verify())
     tokens = response.json()
 
     additional_help = (

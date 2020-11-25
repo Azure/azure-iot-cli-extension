@@ -6,7 +6,7 @@
 # This is largely derived from https://docs.microsoft.com/en-us/rest/api/iotcentral/devicetemplates
 
 from typing import List
-from requests import Session
+import requests
 
 from knack.util import CLIError
 from knack.log import get_logger
@@ -19,8 +19,6 @@ from azure.cli.core.util import should_disable_connection_verify
 logger = get_logger(__name__)
 
 BASE_PATH = "api/preview/deviceTemplates"
-http = Session()
-http.verify = not should_disable_connection_verify()
 
 
 def get_device_template(
@@ -48,7 +46,7 @@ def get_device_template(
         app_id, central_dns_suffix, BASE_PATH, device_template_id
     )
     headers = _utility.get_headers(token, cmd)
-    response = http.get(url, headers=headers)
+    response = requests.get(url, headers=headers, verify=not should_disable_connection_verify())
     return Template(_utility.try_extract_result(response))
 
 
@@ -72,7 +70,7 @@ def list_device_templates(
     url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
     headers = _utility.get_headers(token, cmd)
 
-    response = http.get(url, headers=headers)
+    response = requests.get(url, headers=headers, verify=not should_disable_connection_verify())
 
     result = _utility.try_extract_result(response)
 
@@ -114,7 +112,7 @@ def create_device_template(
     )
     headers = _utility.get_headers(token, cmd, has_json_payload=True)
 
-    response = http.put(url, headers=headers, json=payload)
+    response = requests.put(url, headers=headers, json=payload, verify=not should_disable_connection_verify())
     return Template(_utility.try_extract_result(response))
 
 
@@ -144,5 +142,5 @@ def delete_device_template(
     )
     headers = _utility.get_headers(token, cmd)
 
-    response = http.delete(url, headers=headers)
+    response = requests.delete(url, headers=headers, verify=not should_disable_connection_verify())
     return _utility.try_extract_result(response)

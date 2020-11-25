@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from requests import Session
+import requests
 
 from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
@@ -15,8 +15,6 @@ from azure.cli.core.util import should_disable_connection_verify
 logger = get_logger(__name__)
 
 BASE_PATH = "api/preview/users"
-http = Session()
-http.verify = not should_disable_connection_verify()
 
 
 def add_service_principal(
@@ -55,7 +53,7 @@ def add_service_principal(
 
     headers = _utility.get_headers(token, cmd, has_json_payload=True)
 
-    response = http.put(url, headers=headers, json=payload)
+    response = requests.put(url, headers=headers, json=payload, verify=not should_disable_connection_verify())
     return _utility.try_extract_result(response)
 
 
@@ -92,7 +90,7 @@ def add_email(
 
     headers = _utility.get_headers(token, cmd, has_json_payload=True)
 
-    response = http.put(url, headers=headers, json=payload)
+    response = requests.put(url, headers=headers, json=payload, verify=not should_disable_connection_verify())
     return _utility.try_extract_result(response)
 
 
@@ -116,7 +114,7 @@ def get_user_list(
 
     headers = _utility.get_headers(token, cmd)
 
-    response = http.get(url, headers=headers)
+    response = requests.get(url, headers=headers, verify=not should_disable_connection_verify())
     return _utility.try_extract_result(response)
 
 
@@ -141,7 +139,7 @@ def get_user(
 
     headers = _utility.get_headers(token, cmd)
 
-    response = http.get(url, headers=headers)
+    response = requests.get(url, headers=headers, verify=not should_disable_connection_verify())
     return _utility.try_extract_result(response)
 
 
@@ -166,5 +164,5 @@ def delete_user(
 
     headers = _utility.get_headers(token, cmd)
 
-    response = http.delete(url, headers=headers)
+    response = requests.delete(url, headers=headers, verify=not should_disable_connection_verify())
     return _utility.try_extract_result(response)
