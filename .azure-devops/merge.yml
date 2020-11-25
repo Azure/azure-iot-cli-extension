@@ -123,8 +123,30 @@ jobs:
   - template: templates/install-configure-azure-cli.yml
 
 - job: CredScan
-  displayName: "Credential Scan"
+  displayName: 'Credential Scan'
+  pool:
+    vmImage: 'vs2017-win2016'
+
   steps:
   - task: CredScan@3
     inputs:
+      outputFormat: 'pre'
       scanFolder: '$(Build.SourcesDirectory)'
+      suppressionsFile: '$(Build.SourcesDirectory)/CredScanSuppressions.json'
+
+  - task: PostAnalysis@1
+    inputs:
+      AllTools: false
+      APIScan: false
+      BinSkim: false
+      CodesignValidation: false
+      CredScan: true
+      FortifySCA: false
+      FxCop: false
+      ModernCop: false
+      PoliCheck: false
+      RoslynAnalyzers: false
+      SDLNativeRules: false
+      Semmle: false
+      TSLint: false
+      ToolLogsNotFoundAction: 'Standard'
