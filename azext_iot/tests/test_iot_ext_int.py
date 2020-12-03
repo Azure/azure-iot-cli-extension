@@ -13,7 +13,7 @@ from . import IoTLiveScenarioTest
 from .settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC
 from azext_iot.constants import DEVICE_DEVICESCOPE_PREFIX
 
-opt_env_set = ["azext_iot_teststorageuri", "azext_iot_testidentity"]
+opt_env_set = ["azext_iot_teststorageuri", "azext_iot_identity_teststorageid"]
 
 settings = DynamoSettings(
     req_env_set=ENV_SET_TEST_IOTHUB_BASIC, opt_env_set=opt_env_set
@@ -27,8 +27,8 @@ LIVE_RG = settings.env.azext_iot_testrg
 LIVE_STORAGE = settings.env.azext_iot_teststorageuri
 
 # Set this environment variable to enable identity-based integration tests
-# You will need to have configured your IoT Hub and Storage Account before running.
-LIVE_IDENTITY = settings.env.azext_iot_testidentity
+# You will need permissions to add and remove role assignments for this storage account
+LIVE_STORAGE_ID = settings.env.azext_iot_identity_teststorageid
 
 LIVE_CONSUMER_GROUPS = ["test1", "test2", "test3"]
 
@@ -1437,9 +1437,51 @@ class TestIoTStorage(IoTLiveScenarioTest):
         )
 
     @pytest.mark.skipif(
-        not LIVE_IDENTITY, reason="azext_iot_testidentity env var not set"
+        not LIVE_STORAGE_ID or not LIVE_STORAGE,
+        reason="azext_iot_identity_teststorageid and azext_iot_teststorageuri env vars not set",
     )
     def test_identity_storage(self):
+        identity_type_enable = "SystemAssigned"
+        identity_type_disable = "None"
+        storage_role = "Storage Blob Data Contributor"
+
+        # check hub identity
+        identity_enabled = True
+
+        hub_identity = self.cmd(
+            "iot hub show -n {}".format(LIVE_HUB)
+        ).get_output_in_json()["identity"]
+
+        if hub_identity.get("type", None) != identity_type_enable:
+            # enable hub identity and get ID
+            hub_identity = self.cmd(
+                'iot hub update -n {} --set identity.type="{}"'.format(
+                    LIVE_HUB, identity_type_enable
+                )
+            ).get_output_in_json()["identity"]
+
+            identity_enabled = True
+
+        hub_id = hub_identity.get("principalId", None)
+        assert hub_id
+
+        # setup RBAC for storage account
+        storage_account_roles = self.cmd(
+            'role assignment list --scope "{}" --role "{}" --query "[].principalId"'.format(
+                LIVE_STORAGE_ID, storage_role
+            )
+        ).get_output_in_json()
+
+        if hub_id not in storage_account_roles:
+            self.cmd(
+                'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
+                    hub_id, storage_role, LIVE_STORAGE_ID
+                )
+            )
+            # give RBAC time to catch up
+            from time import sleep
+            sleep(30)
+
         # identity-based device-identity export
         self.cmd(
             'iot hub device-identity export -n {} --bcu "{}" --auth-type {}'.format(
@@ -1452,6 +1494,20 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 self.exists("jobId"),
             ],
         )
+
+        # if we enabled identity for this hub, undo identity and RBAC
+        if identity_enabled:
+            # delete role assignment first, disabling identity removes the assignee ID from AAD
+            self.cmd(
+                'role assignment delete --assignee "{}" --role "{}" --scope "{}"'.format(
+                    hub_id, storage_role, LIVE_STORAGE_ID
+                )
+            )
+            self.cmd(
+                "iot hub update -n {} --set 'identity.type=\"{}\"'".format(
+                    LIVE_HUB, identity_type_disable
+                )
+            )
 
 
 class TestIoTEdgeOffline(IoTLiveScenarioTest):

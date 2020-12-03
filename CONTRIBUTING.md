@@ -130,12 +130,12 @@ You can either manually set the environment variables or use the `pytest.ini.exa
     azext_iot_testhub_cs="IoT Hub Connection String"
     azext_iot_testdps="IoT Hub DPS Name"
     azext_iot_teststorageuri="Blob Container SAS Uri"
-    azext_iot_testidentity=True
+    azext_iot_identity_teststorageid="Storage Account ID"
 ```
 
 `azext_iot_teststorageuri` is optional and only required when you want to test device export and file upload functionality. You can generate a SAS Uri for your Blob container using the [Azure Storage Explorer](https://azure.microsoft.com/en-us/features/storage-explorer/).  You must also configure your IoT Hub's File Upload storage container via the Azure Portal for this test to pass.
 
-`azext_iot_testidentity` is optional and only required when you want to test Identity-Based device export and file upload functionality. You must ensure that your IoT Hub has been created with a [Managed Service Identity](https://docs.microsoft.com/en-us/azure/iot-hub/virtual-network-support#create-an-iot-hub-with-managed-service-identity). Also, you must ensure that your hub has been granted the `Storage Blob Data Contributor` role on your storage account, and it is configured as your IoT Hub's File Upload storage container as described above.
+`azext_iot_identity_teststorageid` is optional and only required when you want to test Identity-Based device export and file upload functionality. During this test, your hub will be assigned a System-Assigned AAD identity, and will be granted the role of "Storage Blob Data Contributor" on the storage account you provide. Both the hub's identity and the RBAC role will be removed once the test completes.
 
 ##### IoT Hub
 
