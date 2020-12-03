@@ -415,11 +415,11 @@ def _load_central_monitors_help():
         type: command
         short-summary: View device telemetry messages sent to the IoT Central app.
         long-summary: |
-                    Shows the telemetry data sent to IoT Central application. By default, 
+                    Shows the telemetry data sent to IoT Central application. By default,
                     it shows all the data sent by all devices. Use the --device-id parameter
                     to filter to a specific device.
-                    Requires Python 3.5+. This command relies on and may install dependent 
-                    Cython package (uamqp) upon first execution. 
+                    Requires Python 3.5+. This command relies on and may install dependent
+                    Cython package (uamqp) upon first execution.
                     https://github.com/Azure/azure-uamqp-python
         examples:
         - name: Basic usage
@@ -508,7 +508,7 @@ def _load_central_monitors_help():
         long-summary: |
                     Performs validations on reported property updates:
                     1) Warning - Properties sent by device that are not modeled in central.
-                    2) Warning - Properties with same name declared in multiple interfaces 
+                    2) Warning - Properties with same name declared in multiple interfaces
                     should have interface name included as part of the property update.
         examples:
         - name: Basic usage
