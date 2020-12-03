@@ -35,12 +35,28 @@ class Template:
 
     def _extract_interfaces(self, template: dict) -> dict:
         try:
+
+            interfaces = []
             dcm = template.get("capabilityModel", {})
-            interfaces = dcm.get("implements", {})
-            return {
-                interface["name"]: self._extract_schemas(interface)
-                for interface in interfaces
-            }
+            if dcm.get("contents"):
+                rootInterface = {
+                    "@id": dcm.get("@id", {}),
+                    "contents": dcm.get("contents", {}),
+                }
+                interfaces.append(rootInterface)
+            if dcm.get("@type") == "CapabilityModel":
+                interfaces.extend(dcm.get("implements"))
+                return {
+                    interface["@id"]: self._extract_schemas(interface)
+                    for interface in interfaces
+                }
+            else:
+                interfaces.extend(dcm.get("extends"))
+                return {
+                    interface["@id"]: self._extract_schemas(interface)
+                    for interface in interfaces
+                }
+
         except Exception:
             details = "Unable to extract device schema from template '{}'.".format(
                 self.id
@@ -48,7 +64,12 @@ class Template:
             raise CLIError(details)
 
     def _extract_schemas(self, interface: dict) -> dict:
-        return {schema["name"]: schema for schema in interface["schema"]["contents"]}
+        if interface.get("schema"):
+            return {
+                schema["name"]: schema for schema in interface["schema"]["contents"]
+            }
+        else:
+            return {schema["name"]: schema for schema in interface["contents"]}
 
     def _extract_schema_names(self, interfaces: dict) -> dict:
         return {
