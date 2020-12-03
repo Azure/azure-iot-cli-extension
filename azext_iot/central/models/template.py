@@ -46,17 +46,13 @@ class Template:
                 interfaces.append(rootInterface)
             if dcm.get("@type") == "CapabilityModel":
                 interfaces.extend(dcm.get("implements"))
-                return {
-                    interface["@id"]: self._extract_schemas(interface)
-                    for interface in interfaces
-                }
             else:
                 interfaces.extend(dcm.get("extends"))
-                return {
-                    interface["@id"]: self._extract_schemas(interface)
-                    for interface in interfaces
-                }
 
+            return {
+                interface["@id"]: self._extract_schemas(interface)
+                for interface in interfaces
+            }
         except Exception:
             details = "Unable to extract device schema from template '{}'.".format(
                 self.id
