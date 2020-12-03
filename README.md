@@ -9,6 +9,8 @@ The **Azure IoT extension for Azure CLI** aims to accelerate the development, ma
 
 The legacy IoT extension Id `azure-cli-iot-ext` is deprecated in favor of the new modern Id `azure-iot`. `azure-iot` is a superset of `azure-cli-iot-ext` and any new features or fixes will apply to `azure-iot` only. Also the legacy and modern IoT extension should **never** co-exist in the same CLI environment.
 
+Uninstall the legacy extension with the following command: `az extension remove --name azure-cli-iot-ext`.
+
 Related - if you see an error with a stacktrace similar to:
 ```
 ...

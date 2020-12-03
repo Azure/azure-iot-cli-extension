@@ -16,14 +16,14 @@ from msrestazure.azure_exceptions import CloudError
 from .. import models
 
 
-class TwinOperations(object):
-    """TwinOperations operations.
+class DevicesOperations(object):
+    """DevicesOperations operations.
 
     :param client: Client for service requests.
     :param config: Configuration of service client.
     :param serializer: An object model serializer.
     :param deserializer: An object model deserializer.
-    :ivar api_version: Version of the Api. Constant value: "2019-10-01".
+    :ivar api_version: Version of the Api. Constant value: "2020-09-30".
     """
 
     models = models
@@ -33,19 +33,266 @@ class TwinOperations(object):
         self._client = client
         self._serialize = serializer
         self._deserialize = deserializer
-        self.api_version = "2019-10-01"
+        self.api_version = "2020-09-30"
 
         self.config = config
 
-    def get_device_twin(
+    def get_devices(
+            self, top=None, custom_headers=None, raw=False, **operation_config):
+        """Gets the identities of multiple devices from the IoT Hub identity
+        registry. Not recommended. Use the IoT Hub query API to retrieve device
+        twin and device identity information. See
+        https://docs.microsoft.com/en-us/rest/api/iothub/service/queryiothub
+        and
+        https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-query-language
+        for more information.
+
+        :param top: The maximum number of device identities returned by the
+         query. Any value outside the range of 1-1000 is considered to be 1000.
+        :type top: int
+        :param dict custom_headers: headers that will be added to the request
+        :param bool raw: returns the direct response alongside the
+         deserialized response
+        :param operation_config: :ref:`Operation configuration
+         overrides<msrest:optionsforoperations>`.
+        :return: list or ClientRawResponse if raw=true
+        :rtype: list[~service.models.Device] or
+         ~msrest.pipeline.ClientRawResponse
+        :raises: :class:`CloudError<msrestazure.azure_exceptions.CloudError>`
+        """
+        # Construct URL
+        url = self.get_devices.metadata['url']
+
+        # Construct parameters
+        query_parameters = {}
+        if top is not None:
+            query_parameters['top'] = self._serialize.query("top", top, 'int')
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+
+        # Construct headers
+        header_parameters = {}
+        header_parameters['Accept'] = 'application/json'
+        if self.config.generate_client_request_id:
+            header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
+        if custom_headers:
+            header_parameters.update(custom_headers)
+        if self.config.accept_language is not None:
+            header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
+
+        # Construct and send request
+        request = self._client.get(url, query_parameters, header_parameters)
+        response = self._client.send(request, stream=False, **operation_config)
+
+        if response.status_code not in [200]:
+            exp = CloudError(response)
+            exp.request_id = response.headers.get('x-ms-request-id')
+            raise exp
+
+        deserialized = None
+
+        if response.status_code == 200:
+            deserialized = self._deserialize('[Device]', response)
+
+        if raw:
+            client_raw_response = ClientRawResponse(deserialized, response)
+            return client_raw_response
+
+        return deserialized
+    get_devices.metadata = {'url': '/devices'}
+
+    def get_identity(
             self, id, custom_headers=None, raw=False, **operation_config):
-        """Gets a device twin.
+        """Gets a device from the identity registry of the IoT Hub.
 
-        Gets a device twin. See
+        :param id: The unique identifier of the device.
+        :type id: str
+        :param dict custom_headers: headers that will be added to the request
+        :param bool raw: returns the direct response alongside the
+         deserialized response
+        :param operation_config: :ref:`Operation configuration
+         overrides<msrest:optionsforoperations>`.
+        :return: Device or ClientRawResponse if raw=true
+        :rtype: ~service.models.Device or ~msrest.pipeline.ClientRawResponse
+        :raises: :class:`CloudError<msrestazure.azure_exceptions.CloudError>`
+        """
+        # Construct URL
+        url = self.get_identity.metadata['url']
+        path_format_arguments = {
+            'id': self._serialize.url("id", id, 'str')
+        }
+        url = self._client.format_url(url, **path_format_arguments)
+
+        # Construct parameters
+        query_parameters = {}
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+
+        # Construct headers
+        header_parameters = {}
+        header_parameters['Accept'] = 'application/json'
+        if self.config.generate_client_request_id:
+            header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
+        if custom_headers:
+            header_parameters.update(custom_headers)
+        if self.config.accept_language is not None:
+            header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
+
+        # Construct and send request
+        request = self._client.get(url, query_parameters, header_parameters)
+        response = self._client.send(request, stream=False, **operation_config)
+
+        if response.status_code not in [200]:
+            exp = CloudError(response)
+            exp.request_id = response.headers.get('x-ms-request-id')
+            raise exp
+
+        deserialized = None
+
+        if response.status_code == 200:
+            deserialized = self._deserialize('Device', response)
+
+        if raw:
+            client_raw_response = ClientRawResponse(deserialized, response)
+            return client_raw_response
+
+        return deserialized
+    get_identity.metadata = {'url': '/devices/{id}'}
+
+    def create_or_update_identity(
+            self, id, device, if_match=None, custom_headers=None, raw=False, **operation_config):
+        """Creates or updates the identity of a device in the identity registry of
+        the IoT Hub.
+
+        :param id: The unique identifier of the device.
+        :type id: str
+        :param device: The contents of the device identity.
+        :type device: ~service.models.Device
+        :param if_match: The string representing a weak ETag for the device
+         identity, as per RFC7232. This should not be set when creating a
+         device, but may be set when updating a device.
+        :type if_match: str
+        :param dict custom_headers: headers that will be added to the request
+        :param bool raw: returns the direct response alongside the
+         deserialized response
+        :param operation_config: :ref:`Operation configuration
+         overrides<msrest:optionsforoperations>`.
+        :return: Device or ClientRawResponse if raw=true
+        :rtype: ~service.models.Device or ~msrest.pipeline.ClientRawResponse
+        :raises: :class:`CloudError<msrestazure.azure_exceptions.CloudError>`
+        """
+        # Construct URL
+        url = self.create_or_update_identity.metadata['url']
+        path_format_arguments = {
+            'id': self._serialize.url("id", id, 'str')
+        }
+        url = self._client.format_url(url, **path_format_arguments)
+
+        # Construct parameters
+        query_parameters = {}
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+
+        # Construct headers
+        header_parameters = {}
+        header_parameters['Accept'] = 'application/json'
+        header_parameters['Content-Type'] = 'application/json; charset=utf-8'
+        if self.config.generate_client_request_id:
+            header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
+        if custom_headers:
+            header_parameters.update(custom_headers)
+        if if_match is not None:
+            header_parameters['If-Match'] = self._serialize.header("if_match", if_match, 'str')
+        if self.config.accept_language is not None:
+            header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
+
+        # Construct body
+        body_content = self._serialize.body(device, 'Device')
+
+        # Construct and send request
+        request = self._client.put(url, query_parameters, header_parameters, body_content)
+        response = self._client.send(request, stream=False, **operation_config)
+
+        if response.status_code not in [200]:
+            exp = CloudError(response)
+            exp.request_id = response.headers.get('x-ms-request-id')
+            raise exp
+
+        deserialized = None
+
+        if response.status_code == 200:
+            deserialized = self._deserialize('Device', response)
+
+        if raw:
+            client_raw_response = ClientRawResponse(deserialized, response)
+            return client_raw_response
+
+        return deserialized
+    create_or_update_identity.metadata = {'url': '/devices/{id}'}
+
+    def delete_identity(
+            self, id, if_match=None, custom_headers=None, raw=False, **operation_config):
+        """Deletes the identity of a device from the identity registry of the IoT
+        Hub.
+
+        :param id: The unique identifier of the device.
+        :type id: str
+        :param if_match: The string representing a weak ETag for the device
+         identity, as per RFC7232. The delete operation is performed only if
+         this ETag matches the value maintained by the server, indicating that
+         the device identity has not been modified since it was last retrieved.
+         To force an unconditional delete, set If-Match to the wildcard
+         character (*).
+        :type if_match: str
+        :param dict custom_headers: headers that will be added to the request
+        :param bool raw: returns the direct response alongside the
+         deserialized response
+        :param operation_config: :ref:`Operation configuration
+         overrides<msrest:optionsforoperations>`.
+        :return: None or ClientRawResponse if raw=true
+        :rtype: None or ~msrest.pipeline.ClientRawResponse
+        :raises: :class:`CloudError<msrestazure.azure_exceptions.CloudError>`
+        """
+        # Construct URL
+        url = self.delete_identity.metadata['url']
+        path_format_arguments = {
+            'id': self._serialize.url("id", id, 'str')
+        }
+        url = self._client.format_url(url, **path_format_arguments)
+
+        # Construct parameters
+        query_parameters = {}
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+
+        # Construct headers
+        header_parameters = {}
+        if self.config.generate_client_request_id:
+            header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
+        if custom_headers:
+            header_parameters.update(custom_headers)
+        if if_match is not None:
+            header_parameters['If-Match'] = self._serialize.header("if_match", if_match, 'str')
+        if self.config.accept_language is not None:
+            header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
+
+        # Construct and send request
+        request = self._client.delete(url, query_parameters, header_parameters)
+        response = self._client.send(request, stream=False, **operation_config)
+
+        if response.status_code not in [204]:
+            exp = CloudError(response)
+            exp.request_id = response.headers.get('x-ms-request-id')
+            raise exp
+
+        if raw:
+            client_raw_response = ClientRawResponse(None, response)
+            return client_raw_response
+    delete_identity.metadata = {'url': '/devices/{id}'}
+
+    def get_twin(
+            self, id, custom_headers=None, raw=False, **operation_config):
+        """Gets the device twin. See
         https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-device-twins
         for more information.
 
-        :param id: Device ID.
+        :param id: The unique identifier of the device.
         :type id: str
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
@@ -57,7 +304,7 @@ class TwinOperations(object):
         :raises: :class:`CloudError<msrestazure.azure_exceptions.CloudError>`
         """
         # Construct URL
-        url = self.get_device_twin.metadata['url']
+        url = self.get_twin.metadata['url']
         path_format_arguments = {
             'id': self._serialize.url("id", id, 'str')
         }
@@ -96,21 +343,22 @@ class TwinOperations(object):
             return client_raw_response
 
         return deserialized
-    get_device_twin.metadata = {'url': '/twins/{id}'}
+    get_twin.metadata = {'url': '/twins/{id}'}
 
-    def replace_device_twin(
+    def replace_twin(
             self, id, device_twin_info, if_match=None, custom_headers=None, raw=False, **operation_config):
-        """Replaces tags and desired properties of a device twin.
-
-        Replaces a device twin. See
+        """Replaces the tags and desired properties of a device twin. See
         https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-device-twins
         for more information.
 
-        :param id: Device ID.
+        :param id: The unique identifier of the device.
         :type id: str
-        :param device_twin_info: Device twin info
+        :param device_twin_info: The device twin info that will replace the
+         existing info.
         :type device_twin_info: ~service.models.Twin
-        :param if_match:
+        :param if_match: The string representing a weak ETag for the device
+         twin, as per RFC7232. It determines if the replace operation should be
+         carried out.
         :type if_match: str
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
@@ -122,7 +370,7 @@ class TwinOperations(object):
         :raises: :class:`CloudError<msrestazure.azure_exceptions.CloudError>`
         """
         # Construct URL
-        url = self.replace_device_twin.metadata['url']
+        url = self.replace_twin.metadata['url']
         path_format_arguments = {
             'id': self._serialize.url("id", id, 'str')
         }
@@ -168,21 +416,22 @@ class TwinOperations(object):
             return client_raw_response
 
         return deserialized
-    replace_device_twin.metadata = {'url': '/twins/{id}'}
+    replace_twin.metadata = {'url': '/twins/{id}'}
 
-    def update_device_twin(
+    def update_twin(
             self, id, device_twin_info, if_match=None, custom_headers=None, raw=False, **operation_config):
-        """Updates tags and desired properties of a device twin.
-
-        Updates a device twin. See
+        """Updates the tags and desired properties of a device twin. See
         https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-device-twins
         for more information.
 
-        :param id: Device ID.
+        :param id: The unique identifier of the device.
         :type id: str
-        :param device_twin_info: Device twin info
+        :param device_twin_info: The device twin info containing the tags and
+         desired properties to be updated.
         :type device_twin_info: ~service.models.Twin
-        :param if_match:
+        :param if_match: The string representing a weak ETag for the device
+         twin, as per RFC7232. It determines if the update operation should be
+         carried out.
         :type if_match: str
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
@@ -194,7 +443,7 @@ class TwinOperations(object):
         :raises: :class:`CloudError<msrestazure.azure_exceptions.CloudError>`
         """
         # Construct URL
-        url = self.update_device_twin.metadata['url']
+        url = self.update_twin.metadata['url']
         path_format_arguments = {
             'id': self._serialize.url("id", id, 'str')
         }
@@ -239,102 +488,33 @@ class TwinOperations(object):
             return client_raw_response
 
         return deserialized
-    update_device_twin.metadata = {'url': '/twins/{id}'}
+    update_twin.metadata = {'url': '/twins/{id}'}
 
-    def get_module_twin(
-            self, id, mid, custom_headers=None, raw=False, **operation_config):
-        """Gets a module twin.
-
-        Gets a module twin. See
-        https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-device-twins
+    def invoke_method(
+            self, device_id, direct_method_request, custom_headers=None, raw=False, **operation_config):
+        """Invokes a direct method on a device. See
+        https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-direct-methods
         for more information.
 
-        :param id: Device ID.
-        :type id: str
-        :param mid: Module ID.
-        :type mid: str
+        :param device_id: The unique identifier of the device.
+        :type device_id: str
+        :param direct_method_request: The parameters to execute a direct
+         method on the device.
+        :type direct_method_request: ~service.models.CloudToDeviceMethod
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
          deserialized response
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
-        :return: Twin or ClientRawResponse if raw=true
-        :rtype: ~service.models.Twin or ~msrest.pipeline.ClientRawResponse
+        :return: CloudToDeviceMethodResult or ClientRawResponse if raw=true
+        :rtype: ~service.models.CloudToDeviceMethodResult or
+         ~msrest.pipeline.ClientRawResponse
         :raises: :class:`CloudError<msrestazure.azure_exceptions.CloudError>`
         """
         # Construct URL
-        url = self.get_module_twin.metadata['url']
+        url = self.invoke_method.metadata['url']
         path_format_arguments = {
-            'id': self._serialize.url("id", id, 'str'),
-            'mid': self._serialize.url("mid", mid, 'str')
-        }
-        url = self._client.format_url(url, **path_format_arguments)
-
-        # Construct parameters
-        query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
-
-        # Construct headers
-        header_parameters = {}
-        header_parameters['Accept'] = 'application/json'
-        if self.config.generate_client_request_id:
-            header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
-        if custom_headers:
-            header_parameters.update(custom_headers)
-        if self.config.accept_language is not None:
-            header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
-
-        # Construct and send request
-        request = self._client.get(url, query_parameters, header_parameters)
-        response = self._client.send(request, stream=False, **operation_config)
-
-        if response.status_code not in [200]:
-            exp = CloudError(response)
-            exp.request_id = response.headers.get('x-ms-request-id')
-            raise exp
-
-        deserialized = None
-
-        if response.status_code == 200:
-            deserialized = self._deserialize('Twin', response)
-
-        if raw:
-            client_raw_response = ClientRawResponse(deserialized, response)
-            return client_raw_response
-
-        return deserialized
-    get_module_twin.metadata = {'url': '/twins/{id}/modules/{mid}'}
-
-    def replace_module_twin(
-            self, id, mid, device_twin_info, if_match=None, custom_headers=None, raw=False, **operation_config):
-        """Replaces tags and desired properties of a module twin.
-
-        Replaces a module twin. See
-        https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-device-twins
-        for more information.
-
-        :param id: Device ID.
-        :type id: str
-        :param mid: Module ID.
-        :type mid: str
-        :param device_twin_info: Device twin info
-        :type device_twin_info: ~service.models.Twin
-        :param if_match:
-        :type if_match: str
-        :param dict custom_headers: headers that will be added to the request
-        :param bool raw: returns the direct response alongside the
-         deserialized response
-        :param operation_config: :ref:`Operation configuration
-         overrides<msrest:optionsforoperations>`.
-        :return: Twin or ClientRawResponse if raw=true
-        :rtype: ~service.models.Twin or ~msrest.pipeline.ClientRawResponse
-        :raises: :class:`CloudError<msrestazure.azure_exceptions.CloudError>`
-        """
-        # Construct URL
-        url = self.replace_module_twin.metadata['url']
-        path_format_arguments = {
-            'id': self._serialize.url("id", id, 'str'),
-            'mid': self._serialize.url("mid", mid, 'str')
+            'deviceId': self._serialize.url("device_id", device_id, 'str')
         }
         url = self._client.format_url(url, **path_format_arguments)
 
@@ -350,17 +530,14 @@ class TwinOperations(object):
             header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
         if custom_headers:
             header_parameters.update(custom_headers)
-        if if_match is not None:
-            header_parameters['If-Match'] = self._serialize.header("if_match", if_match, 'str')
         if self.config.accept_language is not None:
             header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
 
         # Construct body
-        # @digimaun - Change deserialize type to {object} from Twin
-        body_content = self._serialize.body(device_twin_info, '{object}')
+        body_content = self._serialize.body(direct_method_request, 'CloudToDeviceMethod')
 
         # Construct and send request
-        request = self._client.put(url, query_parameters, header_parameters, body_content)
+        request = self._client.post(url, query_parameters, header_parameters, body_content)
         response = self._client.send(request, stream=False, **operation_config)
 
         if response.status_code not in [200]:
@@ -371,85 +548,11 @@ class TwinOperations(object):
         deserialized = None
 
         if response.status_code == 200:
-            deserialized = self._deserialize('Twin', response)
+            deserialized = self._deserialize('CloudToDeviceMethodResult', response)
 
         if raw:
             client_raw_response = ClientRawResponse(deserialized, response)
             return client_raw_response
 
         return deserialized
-    replace_module_twin.metadata = {'url': '/twins/{id}/modules/{mid}'}
-
-    def update_module_twin(
-            self, id, mid, device_twin_info, if_match=None, custom_headers=None, raw=False, **operation_config):
-        """Updates tags and desired properties of a module twin.
-
-        Updates a module twin. See
-        https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-device-twins
-        for more information.
-
-        :param id: Device ID.
-        :type id: str
-        :param mid: Module ID.
-        :type mid: str
-        :param device_twin_info: Device twin information
-        :type device_twin_info: ~service.models.Twin
-        :param if_match:
-        :type if_match: str
-        :param dict custom_headers: headers that will be added to the request
-        :param bool raw: returns the direct response alongside the
-         deserialized response
-        :param operation_config: :ref:`Operation configuration
-         overrides<msrest:optionsforoperations>`.
-        :return: Twin or ClientRawResponse if raw=true
-        :rtype: ~service.models.Twin or ~msrest.pipeline.ClientRawResponse
-        :raises: :class:`CloudError<msrestazure.azure_exceptions.CloudError>`
-        """
-        # Construct URL
-        url = self.update_module_twin.metadata['url']
-        path_format_arguments = {
-            'id': self._serialize.url("id", id, 'str'),
-            'mid': self._serialize.url("mid", mid, 'str')
-        }
-        url = self._client.format_url(url, **path_format_arguments)
-
-        # Construct parameters
-        query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
-
-        # Construct headers
-        header_parameters = {}
-        header_parameters['Accept'] = 'application/json'
-        header_parameters['Content-Type'] = 'application/json; charset=utf-8'
-        if self.config.generate_client_request_id:
-            header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
-        if custom_headers:
-            header_parameters.update(custom_headers)
-        if if_match is not None:
-            header_parameters['If-Match'] = self._serialize.header("if_match", if_match, 'str')
-        if self.config.accept_language is not None:
-            header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
-
-        # Construct body
-        body_content = self._serialize.body(device_twin_info, 'Twin')
-
-        # Construct and send request
-        request = self._client.patch(url, query_parameters, header_parameters, body_content)
-        response = self._client.send(request, stream=False, **operation_config)
-
-        if response.status_code not in [200]:
-            exp = CloudError(response)
-            exp.request_id = response.headers.get('x-ms-request-id')
-            raise exp
-
-        deserialized = None
-
-        if response.status_code == 200:
-            deserialized = self._deserialize('Twin', response)
-
-        if raw:
-            client_raw_response = ClientRawResponse(deserialized, response)
-            return client_raw_response
-
-        return deserialized
-    update_module_twin.metadata = {'url': '/twins/{id}/modules/{mid}'}
+    invoke_method.metadata = {'url': '/twins/{deviceId}/methods'}

@@ -9,6 +9,7 @@ from azure.cli.testsdk import LiveScenarioTest
 from azext_iot.common.shared import EntityStatusType, AttestationType, AllocationType
 from azext_iot.common.certops import create_self_signed_certificate
 from azext_iot.common import embedded_cli
+from azext_iot.common.utility import generate_key
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from .settings import Setting
 
@@ -300,8 +301,8 @@ class TestDPSEnrollments(LiveScenarioTest):
         enrollment_id = self.create_random_name("enrollment-for-test", length=48)
         enrollment_id2 = self.create_random_name("enrollment-for-test", length=48)
         attestation_type = AttestationType.symmetricKey.value
-        primary_key = "x3XNu1HeSw93rmtDXduRUZjhqdGbcqR/zloWYiyPUzw="
-        secondary_key = "PahMnOSBblv9CRn5B765iK35jTvnjDUjYP9hKBZa4Ug="
+        primary_key = generate_key()
+        secondary_key = generate_key()
         device_id = self.create_random_name("device-id-for-test", length=48)
         reprovisionPolicy_reprovisionandresetdata = "reprovisionandresetdata"
         hub_host_name = "{}.azure-devices.net".format(hub)

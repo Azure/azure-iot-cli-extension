@@ -31,8 +31,8 @@ class JobProvider(IoTHubProvider):
 
         try:
             if job_version == JobVersionType.v2:
-                return service_sdk.job_client.get_job(id=job_id, raw=True).response.json()
-            return self._convert_v1_to_v2(service_sdk.job_client.get_import_export_job(id=job_id))
+                return service_sdk.jobs.get_scheduled_job(id=job_id, raw=True).response.json()
+            return self._convert_v1_to_v2(service_sdk.jobs.get_import_export_job(id=job_id))
         except CloudError as e:
             raise CLIError(unpack_msrest_error(e))
 
@@ -50,8 +50,8 @@ class JobProvider(IoTHubProvider):
 
         try:
             if job_version == JobVersionType.v2:
-                return service_sdk.job_client.cancel_job(id=job_id, raw=True).response.json()
-            return service_sdk.job_client.cancel_import_export_job(id=job_id)
+                return service_sdk.jobs.cancel_scheduled_job(id=job_id, raw=True).response.json()
+            return service_sdk.jobs.cancel_import_export_job(id=job_id)
         except CloudError as e:
             raise CLIError(unpack_msrest_error(e))
 
@@ -92,10 +92,10 @@ class JobProvider(IoTHubProvider):
         try:
             if job_version == JobVersionType.v2:
                 query = [job_type, job_status]
-                query_method = service_sdk.job_client.query_jobs
+                query_method = service_sdk.jobs.query_scheduled_jobs
                 jobs_collection.extend(_execute_query(query, query_method, top))
             elif job_version == JobVersionType.v1:
-                jobs_collection.extend(service_sdk.job_client.get_import_export_jobs())
+                jobs_collection.extend(service_sdk.jobs.get_import_export_jobs())
                 jobs_collection = [self._convert_v1_to_v2(job) for job in jobs_collection]
 
             return jobs_collection
@@ -191,7 +191,7 @@ class JobProvider(IoTHubProvider):
         service_sdk = self.get_sdk(SdkType.service_sdk)
 
         try:
-            job_result = service_sdk.job_client.create_job(id=job_id, job_request=job_request, raw=True).response.json()
+            job_result = service_sdk.jobs.create_scheduled_job(id=job_id, job_request=job_request, raw=True).response.json()
             if wait:
                 logger.info("Waiting for job finished state...")
                 current_datetime = datetime.now()
