@@ -3,13 +3,44 @@
 Release History
 ===============
 
+0.10.7
++++++++++++++++
+
+**IoT Hub updates**
+
+* Change command name from az iot hub device-identity `regenerate-key` to `renew-key` to better align with az cli core verbs.
+
+
+0.10.6
++++++++++++++++
+
+**Azure IoT Product Certification service**
+
+* Fix bug for `az iot product test create` not specifying query parameter "GenerateProvisioningConfiguration" appropriately.
+
+
+**IoT Hub updates**
+
+* SDK refresh. IoT Hub service calls point to api-version 2020-09-30.
+
+* Updated nested edge (edge offline) commands to support parentScopes.
+
+  Set of changes
+
+  * 'az iot hub device-identity get-parent' is deprecated use 'az iot hub device-identity parent show' instead. Deprecated command group is planned to be removed by December 2021
+  * 'az iot hub device-identity set-parent' is deprecated use 'az iot hub device-identity parent set' instead. Deprecated command is planned to be removed by December 2021
+  * 'az iot hub device-identity add-children' is deprecated use 'az iot hub device-identity children add' instead. Deprecated command group is planned to be removed by December 2021
+  * 'az iot hub device-identity remove-children' is deprecated use 'az iot hub device-identity children remove' instead. Deprecated command is planned to be removed by December 2021
+  * 'az iot hub device-identity list-children' is deprecated use 'az iot hub device-identity children list' instead. Deprecated command group is planned to be removed by December 2021
+
+
 0.10.5
 +++++++++++++++
 
 **Azure Digital Twins updates**
 
 * Breaking change on the `--tags` parameter for `az dt create`. The prior input format of --tags "a=b;c=d" has been
-  changed to  --tags a=b c=d to be more consistent with other Az CLI tag formats. 
+  changed to  --tags a=b c=d to be more consistent with other Az CLI tag formats.
 
 
 0.10.4
@@ -35,7 +66,7 @@ Release History
 **General updates**
 
 * Python 3.5 support will soon be dropped corresponding with the official end of life date.
-* Formal python requires constraint added to constrain installs to Py 3.5+. 
+* Formal python requires constraint added to constrain installs to Py 3.5+.
 
 **IoT Plug-and-Play updates**
 
@@ -78,7 +109,7 @@ Release History
 
 **Breaking Changes**
 
-* `az iot dps enrollment show` and `az iot dps enrollment-group show` now return raw service results instead of deserialized models. 
+* `az iot dps enrollment show` and `az iot dps enrollment-group show` now return raw service results instead of deserialized models.
   This means that some properties that were previously returned as `null` for these commands will no longer be returned, possibly causing a breaking change.
 
 
@@ -95,9 +126,9 @@ Release History
 * Introduces 'az iot central device compute-device-key' preview command to generate derived device SAS key
 
 * This release involves a re-grouping of IoT Central commands.
-  
+
   Set of changes for GA commands
-  
+
   * 'az iot central app device-twin' is deprecated use 'az iot central device twin' instead. Deprecated command group is planned to be removed by December 2020
   * 'az iot central app monitor-events' is deprecated use 'az iot central diagnostics monitor-events' instead. Deprecated command is planned to be removed by December 2020
 
@@ -154,7 +185,7 @@ Introducing preview commands for the Azure IoT Product Certification service
 
   * Use 'az iot product requirement' to manage product certification requirements
   * Use 'az iot product test' to manage device tests for certification
-  
+
     * The product test command group encompasses test cases, runs and tasks
 
 IoT Central updates
@@ -464,27 +495,27 @@ Known issues
 * Significant restructing of CLI, prioritizes pure Python solutions where possible
 * Provides IoT Edge capabilities
 * Adds following new commands:
-* iot query 
-* iot device show 
-* iot device list 
-* iot device create 
-* iot device update 
-* iot device delete 
-* iot device twin show 
-* iot device twin update 
-* iot device module show 
-* iot device module list 
-* iot device module create 
-* iot device module update 
-* iot device module delete 
-* iot device module twin show 
-* iot device module twin update 
-* iot device module twin replace 
-* iot configuration apply 
-* iot configuration create 
-* iot configuration update 
-* iot configuration delete 
-* iot configuration show 
+* iot query
+* iot device show
+* iot device list
+* iot device create
+* iot device update
+* iot device delete
+* iot device twin show
+* iot device twin update
+* iot device module show
+* iot device module list
+* iot device module create
+* iot device module update
+* iot device module delete
+* iot device module twin show
+* iot device module twin update
+* iot device module twin replace
+* iot configuration apply
+* iot configuration create
+* iot configuration update
+* iot configuration delete
+* iot configuration show
 * iot configuration list
 * Bug fixes
 
@@ -499,6 +530,6 @@ Known issues
 * Show and update device twin
 * Invoke device method
 * Device simulation
-* Hub message send (Cloud-to-device) 
+* Hub message send (Cloud-to-device)
 * New device message send (Device-to-cloud) supports http, amqp, mqtt
 * Get SAS token

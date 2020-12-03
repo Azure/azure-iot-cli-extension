@@ -94,7 +94,7 @@ class AICSProvider(AICSServiceProvider):
         self, test_configuration, provisioning=True,
     ):
         return self.mgmt_sdk.create_device_test(
-            provisioning=provisioning, body=test_configuration
+            generate_provisioning_configuration=provisioning, body=test_configuration
         )
 
     # Test runs

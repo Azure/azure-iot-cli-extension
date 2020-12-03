@@ -45,7 +45,7 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
         )
 
         # Wait for RBAC to catch-up
-        sleep(15)
+        sleep(20)
 
         create_models_output = self.cmd(
             "dt model create -n {} --from-directory '{}'".format(

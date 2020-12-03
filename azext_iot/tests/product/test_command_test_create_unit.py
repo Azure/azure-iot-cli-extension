@@ -124,7 +124,7 @@ class TestTestCreateUnit(unittest.TestCase):
 
         mock_process_models.assert_not_called()
         mock_service.assert_called_with(
-            provisioning=True,
+            generate_provisioning_configuration=True,
             body={
                 "validationType": "Test",
                 "productId": None,
@@ -157,7 +157,7 @@ class TestTestCreateUnit(unittest.TestCase):
 
         mock_process_models.assert_called_with("models_folder")
         mock_service.assert_called_with(
-            provisioning=True,
+            generate_provisioning_configuration=True,
             body={
                 "validationType": "Test",
                 "productId": None,
@@ -205,7 +205,7 @@ class TestTestCreateUnit(unittest.TestCase):
         mock_read_certificate.assert_called_with("mycertificate.cer")
         mock_process_models.assert_called_with("models_folder")
         mock_service.assert_called_with(
-            provisioning=True,
+            generate_provisioning_configuration=True,
             body={
                 "validationType": "Certification",
                 "productId": "ABC123",
@@ -253,7 +253,7 @@ class TestTestCreateUnit(unittest.TestCase):
         mock_read_certificate.assert_not_called()
         mock_process_models.assert_called_with("models_folder")
         mock_service.assert_called_with(
-            provisioning=True,
+            generate_provisioning_configuration=True,
             body={
                 "validationType": "Test",
                 "productId": None,
@@ -282,7 +282,7 @@ class TestTestCreateUnit(unittest.TestCase):
         mock_from_file.return_value = mock_file_data
         create(self, configuration_file="somefile")
         mock_from_file.assert_called_with("somefile")
-        mock_sdk_create.assert_called_with(provisioning=True, body=mock_file_data)
+        mock_sdk_create.assert_called_with(generate_provisioning_configuration=True, body=mock_file_data)
 
     @mock.patch("os.scandir")
     @mock.patch("os.path.isfile")

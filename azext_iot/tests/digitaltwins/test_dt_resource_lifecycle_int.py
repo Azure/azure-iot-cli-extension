@@ -7,12 +7,12 @@
 import pytest
 from time import sleep
 from knack.log import get_logger
-from azext_iot.common.utility import validate_key_value_pairs
 from azext_iot.digitaltwins.common import ADTEndpointType
 from ..settings import DynamoSettings
 from . import DTLiveScenarioTest
 from . import (
     MOCK_RESOURCE_TAGS,
+    MOCK_RESOURCE_TAGS_DICT,
     MOCK_DEAD_LETTER_SECRET,
     generate_resource_id,
 )
@@ -72,7 +72,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             instance_names[0],
             self.dt_resource_group,
             self.dt_location,
-            MOCK_RESOURCE_TAGS,
+            MOCK_RESOURCE_TAGS_DICT,
         )
 
         # Explictly assert create prevents provisioning on a name conflict (across regions)
@@ -110,7 +110,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             instance_names[0],
             self.dt_resource_group,
             self.dt_location,
-            MOCK_RESOURCE_TAGS,
+            MOCK_RESOURCE_TAGS_DICT,
         )
 
         show_output = self.cmd(
@@ -246,7 +246,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             )
         )
 
-        sleep(10)  # Wait for service to catch-up
+        sleep(20)  # Wait for service to catch-up
 
         list_ep_output = self.cmd(
             "dt endpoint list -n {}".format(endpoints_instance_name)
@@ -455,7 +455,7 @@ def assert_common_resource_attributes(
     assert instance_output["provisioningState"] == "Succeeded"
     assert instance_output["resourceGroup"] == group_id
     assert instance_output["type"] == "Microsoft.DigitalTwins/digitalTwinsInstances"
-    assert instance_output["tags"] == validate_key_value_pairs(tags)
+    assert instance_output["tags"] == tags
 
 
 def assert_common_route_attributes(

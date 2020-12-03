@@ -216,10 +216,36 @@ class AuthenticationType(Enum):
     identityBased = "identity"
 
 
-class RegenerateKeyType(Enum):
+class RenewKeyType(Enum):
     """
     Target key type for regeneration.
     """
+
     primary = KeyType.primary.value
     secondary = KeyType.secondary.value
     swap = "swap"
+
+
+class IoTHubStateType(Enum):
+    """
+    IoT Hub State Property
+    """
+
+    Activating = "Activating"
+    Active = "Active"
+    Deleting = "Deleting"
+    Deleted = "Deleted"
+    ActivationFailed = "ActivationFailed"
+    DeletionFailed = "DeletionFailed"
+    Transitioning = "Transitioning"
+    Suspending = "Suspending"
+    Suspended = "Suspended"
+    Resuming = "Resuming"
+    FailingOver = "FailingOver"
+    FailoverFailed = "FailoverFailed"
+    TenantCommitted = "TenantCommitted"
+    Restoring = "Restoring"
+    IdentityCreated = "IdentityCreated"
+    KeyEncryptionKeyRevoking = "KeyEncryptionKeyRevoking"
+    KeyEncryptionKeyRevoked = "KeyEncryptionKeyRevoked"
+    ReActivating = "ReActivating"

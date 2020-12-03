@@ -40,7 +40,7 @@ def load_command_table(self, _):
             setter_name="iot_device_update",
             custom_func_name="update_iot_device_custom"
         )
-        cmd_group.command("regenerate-key", 'iot_device_key_regenerate')
+        cmd_group.command("renew-key", 'iot_device_key_regenerate')
         cmd_group.command(
             "show-connection-string",
             "iot_get_device_connection_string",
@@ -50,11 +50,54 @@ def load_command_table(self, _):
         )
         cmd_group.command("import", "iot_device_import")
         cmd_group.command("export", "iot_device_export")
-        cmd_group.command("add-children", "iot_device_children_add")
-        cmd_group.command("remove-children", "iot_device_children_remove")
-        cmd_group.command("list-children", "iot_device_children_list")
-        cmd_group.command("get-parent", "iot_device_get_parent")
-        cmd_group.command("set-parent", "iot_device_set_parent")
+        cmd_group.command(
+            "add-children",
+            "iot_device_children_add",
+            deprecate_info=self.deprecate(
+                redirect="az iot hub device-identity children add"
+            ),
+        )
+        cmd_group.command(
+            "remove-children",
+            "iot_device_children_remove",
+            deprecate_info=self.deprecate(
+                redirect="az iot hub device-identity children remove"
+            ),
+        )
+        cmd_group.command(
+            "list-children",
+            "iot_device_children_list_comma_separated",
+            deprecate_info=self.deprecate(
+                redirect="az iot hub device-identity children list"
+            ),
+        )
+        cmd_group.command(
+            "get-parent",
+            "iot_device_get_parent",
+            deprecate_info=self.deprecate(
+                redirect="az iot hub device-identity parent show"
+            ),
+        )
+        cmd_group.command(
+            "set-parent",
+            "iot_device_set_parent",
+            deprecate_info=self.deprecate(
+                redirect="az iot hub device-identity parent set"
+            ),
+        )
+
+    with self.command_group(
+        "iot hub device-identity children", command_type=iothub_ops
+    ) as cmd_group:
+        cmd_group.show_command("add", "iot_device_children_add")
+        cmd_group.show_command("remove", "iot_device_children_remove")
+        cmd_group.show_command("list", "iot_device_children_list")
+
+    with self.command_group(
+        "iot hub device-identity parent", command_type=iothub_ops
+    ) as cmd_group:
+        cmd_group.show_command("show", "iot_device_get_parent")
+        cmd_group.show_command("set", "iot_device_set_parent")
 
     with self.command_group(
         "iot hub device-identity connection-string", command_type=iothub_ops
