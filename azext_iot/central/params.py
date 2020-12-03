@@ -23,7 +23,9 @@ severity_type = CLIArgumentType(
 role_type = CLIArgumentType(
     options_list=["--role", "-r"],
     choices=CaseInsensitiveList([role.name for role in Role]),
-    help="The role that will be associated with this token. You can specify one of the built-in roles, or specify the role ID of a custom role. See more at https://aka.ms/iotcentral-customrolesdocs",
+    help="The role that will be associated with this token."
+    " You can specify one of the built-in roles, or specify the role ID of a custom role."
+    " See more at https://aka.ms/iotcentral-customrolesdocs",
 )
 
 style_type = CLIArgumentType(
@@ -39,11 +41,18 @@ def load_central_arguments(self, _):
     Load CLI Args for Knack parser
     """
     with self.argument_context("iot central") as context:
-        context.argument("app_id", options_list=["--app-id", "-n"], help="The App ID of the IoT Central app you want to manage. You can find the App ID in the \"About\" page for your application under the help menu.")
+        context.argument(
+            "app_id",
+            options_list=["--app-id", "-n"],
+            help="The App ID of the IoT Central app you want to manage."
+            " You can find the App ID in the \"About\" page for your application under the help menu."
+        )
         context.argument(
             "token",
             options_list=["--token"],
-            help="If you'd prefer to submit your request without authenticating against the Azure CLI, you can specify a valid user token to authenticate your request. You must specify the type of key as part of the request. Learn more at https://aka.ms/iotcentraldocsapi",
+            help="If you'd prefer to submit your request without authenticating against the Azure CLI, you can specify a valid"
+            " user token to authenticate your request. You must specify the type of key as part of the request."
+            " Learn more at https://aka.ms/iotcentraldocsapi",
         )
         context.argument(
             "central_dns_suffix",
@@ -60,7 +69,9 @@ def load_central_arguments(self, _):
         context.argument(
             "content",
             options_list=["--content", "-k"],
-            help="The device template definition. Provide path to JSON file or raw stringified JSON. [File Path Example: ./path/to/file.json] [Example of stringified JSON: {<Device Template JSON>}]. The request body must contain CapabilityModel.",
+            help="The device template definition. Provide path to JSON file or raw stringified JSON."
+            " [File Path Example: ./path/to/file.json] [Example of stringified JSON: {<Device Template JSON>}]."
+            " The request body must contain CapabilityModel.",
         )
 
     with self.argument_context("iot central device-template create") as context:
@@ -69,14 +80,14 @@ def load_central_arguments(self, _):
             options_list=["--device-template-id", "--dtid"],
             help="Unique ID for the Device template.",
         )
-    
+
     with self.argument_context("iot central device-template delete") as context:
         context.argument(
             "device_template_id",
             options_list=["--device-template-id", "--dtid"],
             help="ID of the Device template that you want to delete.",
         )
-    
+
     with self.argument_context("iot central device-template show") as context:
         context.argument(
             "device_template_id",
@@ -88,7 +99,8 @@ def load_central_arguments(self, _):
         context.argument(
             "token_id",
             options_list=["--token-id", "--tkid"],
-            help="The IoT Central ID associated with this token. Specify an alphanumeric ID that you'll then use when modifying or deleting this token later via the CLI or API.",
+            help="The IoT Central ID associated with this token. Specify an alphanumeric ID that you'll then use when modifying"
+            " or deleting this token later via the CLI or API.",
         )
         context.argument("role", arg_type=role_type)
 
@@ -120,12 +132,14 @@ def load_central_arguments(self, _):
         context.argument(
             "interface_id",
             options_list=["--interface-id", "-i"],
-            help="The name of the interface as specified in the device template. You can find it by navigating to Device Template and view the interface identity under the corresponding device capability.",
+            help="The name of the interface as specified in the device template. You can find it by navigating to Device"
+            " Template and view the interface identity under the corresponding device capability.",
         )
         context.argument(
             "command_name",
             options_list=["--command-name", "--cn"],
-            help="The command name as specified in the device template. Command name could be different from the Display Name of the command.",
+            help="The command name as specified in the device template. Command name could be different from the Display"
+            " Name of the command.",
         )
         context.argument(
             "content",
@@ -135,26 +149,29 @@ def load_central_arguments(self, _):
             "[File Path Example: ./path/to/file.json] "
             "[Stringified JSON Example: {'a': 'b'}] ",
         )
-    
+
     with self.argument_context("iot central device command history") as context:
         context.argument(
             "device_id",
             options_list=["--device-id", "-d"],
-            help="The ID of the device for which you want to get the command history. You can find the Device Id by clicking on the Connect button on the Device Details page.",
+            help="The ID of the device for which you want to get the command history. You can find the Device Id by clicking"
+            " on the Connect button on the Device Details page.",
         )
     
     with self.argument_context("iot central device command run") as context:
         context.argument(
             "device_id",
             options_list=["--device-id", "-d"],
-            help="The ID of the device for which you want to run the command. You can find the Device Id by clicking on the Connect button on the Device Details page.",
+            help="The ID of the device for which you want to run the command. You can find the Device Id by clicking on the"
+            " Connect button on the Device Details page.",
         )
 
     with self.argument_context("iot central device twin show") as context:
         context.argument(
             "device_id",
             options_list=["--device-id", "-d"],
-            help="The ID of the device for which you want to view the device twin that includes the reported and the desired device properties. You can find the Device Id by clicking on the Connect button on the Device Details page.",
+            help="The ID of the device for which you want to view the device twin that includes the reported and the desired"
+            " device properties. You can find the Device Id by clicking on the Connect button on the Device Details page.",
         )
 
     with self.argument_context("iot central device create") as context:
@@ -168,14 +185,16 @@ def load_central_arguments(self, _):
         context.argument(
             "device_id",
             options_list=["--device-id", "-d"],
-            help="The ID of the device that you want to delete. You can find the Device Id by clicking on the Connect button on the Device Details page.",
+            help="The ID of the device that you want to delete."
+            "You can find the Device Id by clicking on the Connect button on the Device Details page.",
         )
 
     with self.argument_context("iot central device show") as context:
         context.argument(
             "device_id",
             options_list=["--device-id", "-d"],
-            help="The ID of the device for which you want to get the details. You can find the Device Id by clicking on the Connect button on the Device Details page.",
+            help="The ID of the device for which you want to get the details."
+            "You can find the Device Id by clicking on the Connect button on the Device Details page.",
         )
 
     with self.argument_context("iot central user") as context:
@@ -228,14 +247,14 @@ def load_central_arguments(self, _):
             options_list=["--device-id", "-d"],
             help="Provide Device ID if you want to view the data from a particular device.",
         )
-    
+
     with self.argument_context("iot central diagnostics validate-messages") as context:
         context.argument(
             "device_id",
             options_list=["--device-id", "-d"],
             help="Provide Device ID for which you want to validate the telemetry messages.",
         )
-    
+
     with self.argument_context("iot central diagnostics validate-properties") as context:
         context.argument(
             "device_id",
