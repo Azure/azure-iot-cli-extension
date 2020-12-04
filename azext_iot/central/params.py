@@ -157,7 +157,7 @@ def load_central_arguments(self, _):
             help="The ID of the device for which you want to get the command history. You can find the Device Id by clicking"
             " on the Connect button on the Device Details page.",
         )
-    
+
     with self.argument_context("iot central device command run") as context:
         context.argument(
             "device_id",
