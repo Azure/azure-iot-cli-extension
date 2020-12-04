@@ -1437,7 +1437,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
         )
 
     @pytest.mark.skipif(
-        not LIVE_STORAGE_ID or not LIVE_STORAGE,
+        not all([LIVE_STORAGE_ID, LIVE_STORAGE]),
         reason="azext_iot_identity_teststorageid and azext_iot_teststorageuri env vars not set",
     )
     def test_identity_storage(self):
@@ -1446,7 +1446,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
         storage_role = "Storage Blob Data Contributor"
 
         # check hub identity
-        identity_enabled = True
+        identity_enabled = False
 
         hub_identity = self.cmd(
             "iot hub show -n {}".format(LIVE_HUB)
