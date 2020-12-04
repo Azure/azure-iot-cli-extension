@@ -59,6 +59,12 @@ def load_central_arguments(self, _):
             options_list=["--central-dns-suffix", "--central-api-uri"],
             help="The IoT Central DNS suffix associated with your application. Default value is: azureiotcentral.com",
         )
+        context.argument(
+            "device_id",
+            options_list=["--device-id", "-d"],
+            help="The ID of the target device, "
+            "You can find the Device Id by clicking on the Connect button on the Device Details page.",
+        )
 
     with self.argument_context("iot central device-template") as context:
         context.argument(
@@ -150,51 +156,13 @@ def load_central_arguments(self, _):
             "[Stringified JSON Example: {'a': 'b'}] ",
         )
 
-    with self.argument_context("iot central device command history") as context:
-        context.argument(
-            "device_id",
-            options_list=["--device-id", "-d"],
-            help="The ID of the device for which you want to get the command history. You can find the Device Id by clicking"
-            " on the Connect button on the Device Details page.",
-        )
-
-    with self.argument_context("iot central device command run") as context:
-        context.argument(
-            "device_id",
-            options_list=["--device-id", "-d"],
-            help="The ID of the device for which you want to run the command. You can find the Device Id by clicking on the"
-            " Connect button on the Device Details page.",
-        )
-
-    with self.argument_context("iot central device twin show") as context:
-        context.argument(
-            "device_id",
-            options_list=["--device-id", "-d"],
-            help="The ID of the device for which you want to view the device twin that includes the reported and the desired"
-            " device properties. You can find the Device Id by clicking on the Connect button on the Device Details page.",
-        )
-
     with self.argument_context("iot central device create") as context:
         context.argument(
             "device_id",
             options_list=["--device-id", "-d"],
-            help="Provide a unique identifier for the device.",
-        )
-
-    with self.argument_context("iot central device delete") as context:
-        context.argument(
-            "device_id",
-            options_list=["--device-id", "-d"],
-            help="The ID of the device that you want to delete."
-            "You can find the Device Id by clicking on the Connect button on the Device Details page.",
-        )
-
-    with self.argument_context("iot central device show") as context:
-        context.argument(
-            "device_id",
-            options_list=["--device-id", "-d"],
-            help="The ID of the device for which you want to get the details."
-            "You can find the Device Id by clicking on the Connect button on the Device Details page.",
+            help="Provide a unique identifier for the device."
+            " A case-sensitive string (up to 128 characters long) of ASCII 7-bit alphanumeric characters plus"
+            " certain special characters: - . + % _ # * ? ! ( ) , : = @ $ '",
         )
 
     with self.argument_context("iot central user") as context:
@@ -241,25 +209,6 @@ def load_central_arguments(self, _):
         )
         context.argument(
             "module_id", options_list=["--module-id", "-m"], help="Provide IoT Edge Module ID if the device type is IoT Edge.",
-        )
-        context.argument(
-            "device_id",
-            options_list=["--device-id", "-d"],
-            help="Provide Device ID if you want to view the data from a particular device.",
-        )
-
-    with self.argument_context("iot central diagnostics validate-messages") as context:
-        context.argument(
-            "device_id",
-            options_list=["--device-id", "-d"],
-            help="Provide Device ID for which you want to validate the telemetry messages.",
-        )
-
-    with self.argument_context("iot central diagnostics validate-properties") as context:
-        context.argument(
-            "device_id",
-            options_list=["--device-id", "-d"],
-            help="Provide Device ID for which you want to validate the reported property payload.",
         )
     # TODO: Delete this by end of Dec 2020
     load_deprecated_params(self, _)
