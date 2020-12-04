@@ -25,7 +25,7 @@ The resolution is to remove the deprecated `azure-cli-iot-ext` and install any v
 
 ## Commands
 
-Please refer to the official `az iot` reference on [Microsoft Docs](https://docs.microsoft.com/en-us/cli/azure/ext/azure-iot/iot?view=azure-cli-latest) for a complete list of supported commands.  You can also find IoT CLI usage tips on the [wiki](https://github.com/Azure/azure-iot-cli-extension/wiki/Tips).
+Please refer to the official `az iot` reference on [Microsoft Docs](https://docs.microsoft.com/en-us/cli/azure/ext/azure-iot/iot) for a complete list of supported commands.  You can also find IoT CLI usage tips on the [wiki](https://github.com/Azure/azure-iot-cli-extension/wiki/Tips).
 
 ## Installation
 
