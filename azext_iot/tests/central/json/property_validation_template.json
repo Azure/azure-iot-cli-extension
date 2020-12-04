@@ -7,9 +7,7 @@
   "displayName": "property-validation",
   "capabilityModel": {
     "@id": "urn:sampleApp:groupOne_bz:2",
-    "@type": [
-      "CapabilityModel"
-    ],
+    "@type": "CapabilityModel",
     "implements": [
       {
         "@id": "urn:sampleApp:groupOne_bz:_rpgcmdpo:1",

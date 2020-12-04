@@ -125,7 +125,9 @@ class TestCentralHelpers:
 
 class TestDeviceTwinShow:
     @pytest.fixture
-    def service_client(self, mocked_response, fixture_cmd, fixture_get_iot_central_tokens):
+    def service_client(
+        self, mocked_response, fixture_cmd, fixture_get_iot_central_tokens
+    ):
         mocked_response.add(
             method=responses.GET,
             url="https://{}/twins/{}".format(resource, device_id),
@@ -137,9 +139,7 @@ class TestDeviceTwinShow:
 
         yield mocked_response
 
-    def test_device_twin_show_calls_get_twin(
-        self, service_client
-    ):
+    def test_device_twin_show_calls_get_twin(self, service_client):
         result = commands_device_twin.device_twin_show(fixture_cmd, device_id, app_id)
         assert result == device_twin_result
 
@@ -300,7 +300,7 @@ class TestCentralPropertyMonitor:
 
         assert (
             issues[0].details == "Duplicate property: 'Model' found under following "
-            "interfaces ['groupOne_g4', 'groupTwo_ed', 'groupThree_ed'] "
+            "interfaces ['urn:sampleApp:groupOne_bz:_rpgcmdpo:1', 'urn:sampleApp:groupTwo_bz:myxqftpsr:2', 'urn:sampleApp:groupThree_bz:myxqftpsr:2'] "
             "in the device model. Either provide the interface name as part "
             "of the device payload or make the propery name unique in the device model"
         )
@@ -344,8 +344,8 @@ class TestCentralPropertyMonitor:
             == "Device is sending data that has not been defined in the device "
             "template. Following capabilities have NOT been defined in the device template "
             "'['definition']'. Following capabilities have been defined in the device template "
-            "(grouped by interface) '{'groupOne_g4': ['Model', 'Version', 'TotalStorage'], "
-            "'groupTwo_ed': ['Model', 'Manufacturer'], 'groupThree_ed': ['Manufacturer', "
+            "(grouped by interface) '{'urn:sampleApp:groupOne_bz:_rpgcmdpo:1': ['Model', 'Version', 'TotalStorage'], "
+            "'urn:sampleApp:groupTwo_bz:myxqftpsr:2': ['Model', 'Manufacturer'], 'urn:sampleApp:groupThree_bz:myxqftpsr:2': ['Manufacturer', "
             "'Version', 'Model', 'OsName']}'. "
         )
 
@@ -357,7 +357,9 @@ class TestCentralPropertyMonitor:
         }
 
         issues = monitor._validate_payload_against_interfaces(
-            property_collection, "groupOne_g4", Severity.warning,
+            property_collection,
+            "urn:sampleApp:groupOne_bz:_rpgcmdpo:1",
+            Severity.warning,
         )
 
         assert (
@@ -365,8 +367,8 @@ class TestCentralPropertyMonitor:
             == "Device is sending data that has not been defined in the device "
             "template. Following capabilities have NOT been defined in the device template "
             "'['Manufacturer', 'OsName']'. Following capabilities have been defined in the device template "
-            "(grouped by interface) '{'groupOne_g4': ['Model', 'Version', 'TotalStorage'], "
-            "'groupTwo_ed': ['Model', 'Manufacturer'], 'groupThree_ed': ['Manufacturer', "
+            "(grouped by interface) '{'urn:sampleApp:groupOne_bz:_rpgcmdpo:1': ['Model', 'Version', 'TotalStorage'], "
+            "'urn:sampleApp:groupTwo_bz:myxqftpsr:2': ['Model', 'Manufacturer'], 'urn:sampleApp:groupThree_bz:myxqftpsr:2': ['Manufacturer', "
             "'Version', 'Model', 'OsName']}'. "
         )
 
@@ -401,8 +403,8 @@ class TestCentralPropertyMonitor:
             == "Device is sending data that has not been defined in the device "
             "template. Following capabilities have NOT been defined in the device template "
             "'['definition']'. Following capabilities have been defined in the device template "
-            "(grouped by interface) '{'groupOne_g4': ['Model', 'Version', 'TotalStorage'], "
-            "'groupTwo_ed': ['Model', 'Manufacturer'], 'groupThree_ed': ['Manufacturer', "
+            "(grouped by interface) '{'urn:sampleApp:groupOne_bz:_rpgcmdpo:1': ['Model', 'Version', 'TotalStorage'], "
+            "'urn:sampleApp:groupTwo_bz:myxqftpsr:2': ['Model', 'Manufacturer'], 'urn:sampleApp:groupThree_bz:myxqftpsr:2': ['Manufacturer', "
             "'Version', 'Model', 'OsName']}'. "
         )
 
