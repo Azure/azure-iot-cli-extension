@@ -300,7 +300,8 @@ class TestCentralPropertyMonitor:
 
         assert (
             issues[0].details == "Duplicate property: 'Model' found under following "
-            "interfaces ['urn:sampleApp:groupOne_bz:_rpgcmdpo:1', 'urn:sampleApp:groupTwo_bz:myxqftpsr:2', 'urn:sampleApp:groupThree_bz:myxqftpsr:2'] "
+            "interfaces ['urn:sampleApp:groupOne_bz:_rpgcmdpo:1', 'urn:sampleApp:groupTwo_bz:myxqftpsr:2', "
+            "'urn:sampleApp:groupThree_bz:myxqftpsr:2'] "
             "in the device model. Either provide the interface name as part "
             "of the device payload or make the propery name unique in the device model"
         )
@@ -345,7 +346,8 @@ class TestCentralPropertyMonitor:
             "template. Following capabilities have NOT been defined in the device template "
             "'['definition']'. Following capabilities have been defined in the device template "
             "(grouped by interface) '{'urn:sampleApp:groupOne_bz:_rpgcmdpo:1': ['Model', 'Version', 'TotalStorage'], "
-            "'urn:sampleApp:groupTwo_bz:myxqftpsr:2': ['Model', 'Manufacturer'], 'urn:sampleApp:groupThree_bz:myxqftpsr:2': ['Manufacturer', "
+            "'urn:sampleApp:groupTwo_bz:myxqftpsr:2': ['Model', 'Manufacturer'],"
+            " 'urn:sampleApp:groupThree_bz:myxqftpsr:2': ['Manufacturer', "
             "'Version', 'Model', 'OsName']}'. "
         )
 
@@ -368,7 +370,8 @@ class TestCentralPropertyMonitor:
             "template. Following capabilities have NOT been defined in the device template "
             "'['Manufacturer', 'OsName']'. Following capabilities have been defined in the device template "
             "(grouped by interface) '{'urn:sampleApp:groupOne_bz:_rpgcmdpo:1': ['Model', 'Version', 'TotalStorage'], "
-            "'urn:sampleApp:groupTwo_bz:myxqftpsr:2': ['Model', 'Manufacturer'], 'urn:sampleApp:groupThree_bz:myxqftpsr:2': ['Manufacturer', "
+            "'urn:sampleApp:groupTwo_bz:myxqftpsr:2': ['Model', 'Manufacturer'],"
+            " 'urn:sampleApp:groupThree_bz:myxqftpsr:2': ['Manufacturer', "
             "'Version', 'Model', 'OsName']}'. "
         )
 
@@ -404,7 +407,8 @@ class TestCentralPropertyMonitor:
             "template. Following capabilities have NOT been defined in the device template "
             "'['definition']'. Following capabilities have been defined in the device template "
             "(grouped by interface) '{'urn:sampleApp:groupOne_bz:_rpgcmdpo:1': ['Model', 'Version', 'TotalStorage'], "
-            "'urn:sampleApp:groupTwo_bz:myxqftpsr:2': ['Model', 'Manufacturer'], 'urn:sampleApp:groupThree_bz:myxqftpsr:2': ['Manufacturer', "
+            "'urn:sampleApp:groupTwo_bz:myxqftpsr:2': ['Model', 'Manufacturer'],"
+            " 'urn:sampleApp:groupThree_bz:myxqftpsr:2': ['Manufacturer', "
             "'Version', 'Model', 'OsName']}'. "
         )
 

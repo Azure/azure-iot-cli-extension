@@ -2,6 +2,12 @@
 
 Release History
 ===============
+0.10.8
++++++++++++++++
+
+**IoT Central updates**
+
+* update parsing template logic to support  DTDLV2 models.
 
 0.10.7
 +++++++++++++++
