@@ -380,22 +380,6 @@ def init_monitoring(cmd, timeout, properties, enqueued_time, repair, yes):
     return (enqueued_time, properties, timeout, output)
 
 
-def get_sas_token(target):
-    from azext_iot.common.digitaltwin_sas_token_auth import (
-        DigitalTwinSasTokenAuthentication,
-    )
-
-    token = ""
-    if target.get("repository_id"):
-        token = DigitalTwinSasTokenAuthentication(
-            target["repository_id"],
-            target["entity"],
-            target["policy"],
-            target["primarykey"],
-        ).generate_sas_token()
-    return {"Authorization": "{}".format(token)}
-
-
 def dict_clean(d):
     """ Remove None from dictionary """
     if not isinstance(d, dict):

@@ -114,7 +114,10 @@ def load_arguments(self, _):
             help="Valid token duration in seconds.",
         )
         context.argument(
-            "etag", options_list=["--etag", "-e"], help="Entity tag value."
+            "etag",
+            options_list=["--etag", "-e"],
+            help="Etag or entity tag corresponding to the last state of the resource. "
+            "If no etag is provided the value '*' is used."
         )
         context.argument(
             "top",
@@ -179,16 +182,6 @@ def load_arguments(self, _):
             options_list=["--repair", "-r"],
             arg_type=get_three_state_flag(),
             help="Reinstall uamqp dependency compatible with extension version. Default: false",
-        )
-        context.argument(
-            "repo_endpoint",
-            options_list=["--endpoint", "-e"],
-            help="IoT Plug and Play endpoint.",
-        )
-        context.argument(
-            "repo_id",
-            options_list=["--repo-id", "-r"],
-            help="IoT Plug and Play repository Id.",
         )
         context.argument(
             "consumer_group",
