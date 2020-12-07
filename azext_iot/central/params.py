@@ -91,8 +91,8 @@ def load_central_arguments(self, _):
         context.argument(
             "token_id",
             options_list=["--token-id", "--tkid"],
-            help="The IoT Central ID associated with this token, [0-9a-zA-Z\\-] allowed, max length limit to 40. Specify an ID that you'll then use when modifying"
-            " or deleting this token later via the CLI or API.",
+            help="The IoT Central ID associated with this token, [0-9a-zA-Z\\-] allowed, max length limit to 40."
+            " Specify an ID that you'll then use when modifying or deleting this token later via the CLI or API.",
         )
         context.argument("role", arg_type=role_type)
 
