@@ -3,6 +3,28 @@
 Release History
 ===============
 
+0.10.8
++++++++++++++++
+
+**IoT Hub updates**
+
+The following commands support an explicit etag parameter. If no etag arg is passed the value "*" is used.
+
+* az iot hub device-identity update
+* az iot hub device-identity delete
+* az iot hub device-identity renew-key
+* az iot hub device-twin update
+* az iot hub device-twin delete
+* az iot hub module-identity update
+* az iot hub module-identity delete
+* az iot hub module-twin update
+* az iot hub module-twin delete
+* az iot hub configuration update
+* az iot hub configuration delete
+* az iot edge deployment update
+* az iot edge deployment update
+
+
 0.10.7
 +++++++++++++++
 
