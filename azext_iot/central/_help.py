@@ -287,7 +287,8 @@ def _load_central_api_token_help():
     ] = """
         type: command
         short-summary: Generate an API token associated with your IoT Central application.
-        long-summary: Note: Write down your token once it's been generated as you won't be able to retrieve it again.
+        long-summary: |
+          Note: Write down your token once it's been generated as you won't be able to retrieve it again.
         examples:
         - name: Add new API token
           text: >
@@ -387,7 +388,8 @@ def _load_central_device_templates_help():
     ] = """
         type: command
         short-summary: Delete a device template from IoT Central.
-        long-summary: Note: this is expected to fail if any devices are still associated to this template.
+        long-summary: |
+          Note: this is expected to fail if any devices are still associated to this template.
 
         examples:
         - name: Delete a device template from IoT Central
