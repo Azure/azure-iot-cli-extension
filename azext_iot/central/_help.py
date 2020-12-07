@@ -55,7 +55,7 @@ def _load_central_devices_help():
         "iot central device create"
     ] = """
         type: command
-        short-summary: Create a device in IoT Central
+        short-summary: Create a device in IoT Central.
 
         examples:
         - name: Create a device
@@ -77,7 +77,7 @@ def _load_central_devices_help():
         "iot central device show"
     ] = """
         type: command
-        short-summary: Get a device from IoT Central
+        short-summary: Get a device from IoT Central.
 
         examples:
         - name: Get a device
@@ -91,7 +91,7 @@ def _load_central_devices_help():
         "iot central device delete"
     ] = """
         type: command
-        short-summary: Delete a device from IoT Central
+        short-summary: Delete a device from IoT Central.
 
         examples:
         - name: Delete a device
@@ -105,7 +105,7 @@ def _load_central_devices_help():
         "iot central device show-credentials"
     ] = """
         type: command
-        short-summary: Get device credentials from IoT Central
+        short-summary: Get device credentials from IoT Central.
 
         examples:
         - name: Get device credentials for a device
@@ -119,10 +119,9 @@ def _load_central_devices_help():
         "iot central device registration-info"
     ] = """
         type: command
-        short-summary: Get registration info on device(s) from IoT Central
+        short-summary: Get registration info on device(s) from IoT Central.
         long-summary: |
-            Note: This command can take a significant amount of time to return
-            if no device id is specified and your app contains a lot of devices
+            Note: This command can take a significant amount of time to return if no device id is specified and your app contains a lot of devices.
 
         examples:
         - name: Get registration info on specified device
@@ -157,7 +156,10 @@ def _load_central_command_help():
         "iot central device command history"
     ] = """
             type: command
-            short-summary: Get most recent command-response request and response payload.
+            short-summary: Get the details for the latest command request and response sent to the device.
+            long-summary: |
+              Lists the most recent command request and response that was sent to the device from IoT Central.
+              Any update that the device performs to the device properties as a result of the command execution are not included in the response.
             examples:
             - name: Show command response
               text: >
@@ -177,7 +179,7 @@ def _load_central_command_help():
                 Note: payload should be nested under "request".
                 i.e. if your device expects the payload in a shape {"key": "value"}
                 payload should be {"request": {"key": "value"}}.
-                --content can be pointed at a filepath too (.../path/to/payload.json)
+                --content can also be pointed at a filepath like this (.../path/to/payload.json)
             examples:
             - name: Run command response
               text: >
@@ -276,15 +278,17 @@ def _load_central_api_token_help():
         "iot central api-token"
     ] = """
         type: group
-        short-summary: Create and Manage API tokens.
+        short-summary: Manage API tokens for your IoT Central application.
+        long-summary: IoT Central allows you to generate and manage API tokens to be used to access the IoT Central API. More information about APIs can be found at https://aka.ms/iotcentraldocsapi.
     """
 
     helps[
         "iot central api-token create"
     ] = """
         type: command
-        short-summary: Create a new API token in the application
-        long-summary: The only time you will see the value of this token is when creating the token. Ensure you store this token somewhere securely, as if you lose it, you will need to create another.
+        short-summary: Generate an API token associated with your IoT Central application.
+        long-summary: |
+          Note: Write down your token once it's been generated as you won't be able to retrieve it again.
         examples:
         - name: Add new API token
           text: >
@@ -292,14 +296,13 @@ def _load_central_api_token_help():
             --token-id {tokenId}
             --app-id {appId}
             --role admin
-
     """
     helps[
         "iot central api-token show"
     ] = """
     type: command
-    short-summary: Get token meta data (e.g. role as a GUID, expiration)
-    long-summary: API token information contains basic information about the token and does not include the value of the token.
+    short-summary: Get details for an API token associated with your IoT Central application.
+    long-summary: List details, like its associated role, for an API token in your IoT Central app.
     examples:
       - name: Get API token
         text: >
@@ -312,7 +315,7 @@ def _load_central_api_token_help():
         "iot central api-token delete"
     ] = """
     type: command
-    short-summary: Delete an API token from the application
+    short-summary: Delete an API token associated with your IoT Central application.
     examples:
       - name: Delete an API token
         text: >
@@ -325,7 +328,7 @@ def _load_central_api_token_help():
         "iot central api-token list"
     ] = """
     type: command
-    short-summary: Get a list of all token meta data (e.g. Role as a GUID and expiration)
+    short-summary: List all API tokens associated with your IoT Central application.
     long-summary: Information in the list contains basic information about the tokens in the application and does not include token values.
     examples:
       - name: List of API tokens
@@ -348,7 +351,7 @@ def _load_central_device_templates_help():
         "iot central device-template create"
     ] = """
         type: command
-        short-summary: Create a device template in IoT Central
+        short-summary: Create a device template in IoT Central.
 
         examples:
         - name: Create a device template with payload read from a file
@@ -370,7 +373,7 @@ def _load_central_device_templates_help():
         "iot central device-template show"
     ] = """
         type: command
-        short-summary: Get a device template from IoT Central
+        short-summary: Get a device template from IoT Central.
 
         examples:
         - name: Get a device template
@@ -384,9 +387,9 @@ def _load_central_device_templates_help():
         "iot central device-template delete"
     ] = """
         type: command
-        short-summary: Delete a device template from IoT Central
+        short-summary: Delete a device template from IoT Central.
         long-summary: |
-            Note: this is expected to fail if any devices are still associated to this template.
+          Note: this is expected to fail if any devices are still associated to this template.
 
         examples:
         - name: Delete a device template from IoT Central
@@ -410,11 +413,12 @@ def _load_central_monitors_help():
         "iot central diagnostics monitor-events"
     ] = """
         type: command
-        short-summary: Monitor device telemetry & messages sent to the IoT Hub for an IoT Central app.
+        short-summary: View device telemetry messages sent to the IoT Central app.
         long-summary: |
-                    EXPERIMENTAL requires Python 3.5+
-                    This command relies on and may install dependent Cython package (uamqp) upon first execution.
-                    https://github.com/Azure/azure-uamqp-python
+                    Shows the telemetry data sent to IoT Central application. By default,
+                    it shows all the data sent by all devices. Use the --device-id parameter
+                    to filter to a specific device.
+
         examples:
         - name: Basic usage
           text: >
@@ -454,9 +458,7 @@ def _load_central_monitors_help():
         type: command
         short-summary: Validate messages sent to the IoT Hub for an IoT Central app.
         long-summary: |
-                    EXPERIMENTAL requires Python 3.5+
-                    This command relies on and may install dependent Cython package (uamqp) upon first execution.
-                    https://github.com/Azure/azure-uamqp-python
+                    Performs validations on the telemetry messages and reports back data that is not modeled in the device template or data where the data type doesn’t match what is defined in the device template.
         examples:
         - name: Basic usage
           text: >
@@ -485,7 +487,7 @@ def _load_central_monitors_help():
         "iot central diagnostics monitor-properties"
     ] = """
         type: command
-        short-summary: Monitor desired and reported properties sent to/from the IoT Hub for an IoT Central app.
+        short-summary: View desired and reported properties sent to/from the IoT Central app.
         long-summary: |
                     Polls device-twin from central and compares it to the last device-twin
                     Parses out properties from device-twin, and detects if changes were made
@@ -500,12 +502,12 @@ def _load_central_monitors_help():
         "iot central diagnostics validate-properties"
     ] = """
         type: command
-        short-summary: Validate reported properties sent to IoT Central app.
+        short-summary: Validate reported properties sent to the IoT Central application.
         long-summary: |
                     Performs validations on reported property updates:
                     1) Warning - Properties sent by device that are not modeled in central.
                     2) Warning - Properties with same name declared in multiple interfaces
-                       should have interface name included as part of the property update.
+                    should have interface name included as part of the property update.
         examples:
         - name: Basic usage
           text: >
@@ -516,7 +518,7 @@ def _load_central_monitors_help():
         "iot central diagnostics registration-summary"
     ] = """
             type: command
-            short-summary: Provides a registration summary of all the devices in an app.
+            short-summary: View the registration summary of all the devices in an app.
             long-summary: |
                 Note: This command can take a significant amount of time to return
                 if your app contains a lot of devices
@@ -554,7 +556,8 @@ def _load_central_deprecated_commands():
         "iot central device twin show"
     ] = """
         type: command
-        short-summary: Get the device twin from IoT Hub.
+        short-summary: Get the device twin from IoT Central application.
+        long-summary: Returns back the desired and reported device properties from the IoT Central application.
     """
 
     helps[
