@@ -70,7 +70,7 @@ def load_central_arguments(self, _):
         context.argument(
             "device_template_id",
             options_list=["--device-template-id", "--dtid"],
-            help="Device template id. Example: somedevicetemplate",
+            help="The ID of the target device template. Example: somedevicetemplate",
         )
         context.argument(
             "content",
@@ -87,25 +87,11 @@ def load_central_arguments(self, _):
             help="Unique ID for the Device template.",
         )
 
-    with self.argument_context("iot central device-template delete") as context:
-        context.argument(
-            "device_template_id",
-            options_list=["--device-template-id", "--dtid"],
-            help="ID of the Device template that you want to delete.",
-        )
-
-    with self.argument_context("iot central device-template show") as context:
-        context.argument(
-            "device_template_id",
-            options_list=["--device-template-id", "--dtid"],
-            help="ID of the Device template that you want to show details",
-        )
-
     with self.argument_context("iot central api-token") as context:
         context.argument(
             "token_id",
             options_list=["--token-id", "--tkid"],
-            help="The IoT Central ID associated with this token. Specify an alphanumeric ID that you'll then use when modifying"
+            help="The IoT Central ID associated with this token, [0-9a-zA-Z\\-] allowed, max length limit to 40. Specify an ID that you'll then use when modifying"
             " or deleting this token later via the CLI or API.",
         )
         context.argument("role", arg_type=role_type)
@@ -219,6 +205,6 @@ def load_deprecated_params(self, _):
         context.argument("timeout", arg_type=event_timeout_type)
         context.argument("properties", arg_type=event_msg_prop_type)
         context.argument(
-            "module_id", options_list=["--module-id", "-m"], help="IoT Edge Module ID",
+            "module_id", options_list=["--module-id", "-m"], help="Iot Edge Module ID",
         )
         context.argument("minimum_severity", arg_type=severity_type)

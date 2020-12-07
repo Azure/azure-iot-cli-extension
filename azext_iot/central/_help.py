@@ -287,8 +287,7 @@ def _load_central_api_token_help():
     ] = """
         type: command
         short-summary: Generate an API token associated with your IoT Central application.
-        long-summary: |
-            Note: Write down your token once it's been generated as you won't be able to retrieve it again.
+        long-summary: Note: Write down your token once it's been generated as you won't be able to retrieve it again.
         examples:
         - name: Add new API token
           text: >
@@ -388,8 +387,7 @@ def _load_central_device_templates_help():
     ] = """
         type: command
         short-summary: Delete a device template from IoT Central.
-        long-summary: |
-            Note: this is expected to fail if any devices are still associated to this template.
+        long-summary: Note: this is expected to fail if any devices are still associated to this template.
 
         examples:
         - name: Delete a device template from IoT Central
@@ -418,9 +416,7 @@ def _load_central_monitors_help():
                     Shows the telemetry data sent to IoT Central application. By default,
                     it shows all the data sent by all devices. Use the --device-id parameter
                     to filter to a specific device.
-                    Requires Python 3.5+. This command relies on and may install dependent
-                    Cython package (uamqp) upon first execution.
-                    https://github.com/Azure/azure-uamqp-python
+
         examples:
         - name: Basic usage
           text: >
