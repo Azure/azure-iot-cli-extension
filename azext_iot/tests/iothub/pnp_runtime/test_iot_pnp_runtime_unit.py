@@ -59,17 +59,21 @@ class TestPnPRuntimeInvokeCommand(object):
         yield mocked_response
 
     @pytest.mark.parametrize(
-        "request_payload", [("{}"), (json.dumps({"key": str(generate_generic_id())}))],
+        "request_payload, arbitrary_timeout",
+        [
+            ("{}", randint(10, 30)),
+            (json.dumps({"key": str(generate_generic_id())}), None),
+        ],
     )
     def test_pnp_runtime_invoke_root_command(
-        self, fixture_cmd, service_client_root, request_payload
+        self, fixture_cmd, service_client_root, request_payload, arbitrary_timeout
     ):
-        arbitrary_timeout_int = randint(10, 30)
         result = subject.invoke_device_command(
             cmd=fixture_cmd,
             device_id=device_id,
             command_name=command_id,
-            timeout=arbitrary_timeout_int,
+            connect_timeout=arbitrary_timeout,
+            response_timeout=arbitrary_timeout,
             payload=request_payload,
             hub_name=mock_target["entity"],
         )
@@ -78,21 +82,26 @@ class TestPnPRuntimeInvokeCommand(object):
             request_payload=request_payload,
             executed_client=service_client_root,
             result=result,
-            timeout=arbitrary_timeout_int,
+            connect_timeout=arbitrary_timeout,
+            response_timeout=arbitrary_timeout,
         )
 
     @pytest.mark.parametrize(
-        "request_payload", [("{}"), (json.dumps({"key": str(generate_generic_id())}))],
+        "request_payload, arbitrary_timeout",
+        [
+            ("{}", randint(10, 30)),
+            (json.dumps({"key": str(generate_generic_id())}), None),
+        ],
     )
     def test_pnp_runtime_invoke_component_command(
-        self, fixture_cmd, service_client_component, request_payload
+        self, fixture_cmd, service_client_component, request_payload, arbitrary_timeout
     ):
-        arbitrary_timeout_int = randint(10, 30)
         result = subject.invoke_device_command(
             cmd=fixture_cmd,
             device_id=device_id,
             command_name=command_id,
-            timeout=arbitrary_timeout_int,
+            connect_timeout=arbitrary_timeout,
+            response_timeout=arbitrary_timeout,
             payload=request_payload,
             hub_name=mock_target["entity"],
             component_path=component_id,
@@ -102,18 +111,20 @@ class TestPnPRuntimeInvokeCommand(object):
             request_payload=request_payload,
             executed_client=service_client_component,
             result=result,
-            timeout=arbitrary_timeout_int,
+            connect_timeout=arbitrary_timeout,
+            response_timeout=arbitrary_timeout,
         )
 
     def test_pnp_runtime_invoke_command_error(
-        self, fixture_cmd, service_client_generic_errors,
+        self,
+        fixture_cmd,
+        service_client_generic_errors,
     ):
         with pytest.raises(CLIError):
             subject.invoke_device_command(
                 cmd=fixture_cmd,
                 device_id=device_id,
                 command_name=command_id,
-                timeout=10,
                 payload=json.dumps({}),
                 hub_name=mock_target["entity"],
             )
@@ -123,23 +134,30 @@ class TestPnPRuntimeInvokeCommand(object):
                 cmd=fixture_cmd,
                 device_id=device_id,
                 command_name=command_id,
-                timeout=10,
                 payload=json.dumps({}),
                 hub_name=mock_target["entity"],
                 component_path=component_id,
             )
 
     def _assert_common_attributes(
-        self, request_payload, executed_client, result, timeout=None
+        self,
+        request_payload,
+        executed_client,
+        result,
+        connect_timeout=None,
+        response_timeout=None,
     ):
-        assert (
-            "connectTimeoutInSeconds={}".format(timeout)
-            in executed_client.calls[0].request.url
-        )
-        assert (
-            "responseTimeoutInSeconds={}".format(timeout)
-            in executed_client.calls[0].request.url
-        )
+        if connect_timeout:
+            assert (
+                "connectTimeoutInSeconds={}".format(connect_timeout)
+                in executed_client.calls[0].request.url
+            )
+
+        if response_timeout:
+            assert (
+                "responseTimeoutInSeconds={}".format(response_timeout)
+                in executed_client.calls[0].request.url
+            )
 
         assert request_payload == executed_client.calls[0].request.body
         assert (
@@ -156,7 +174,10 @@ class TestPnPRuntimeShowDigitalTwin(object):
     def service_client(self, mocked_response, fixture_ghcs, request):
         mocked_response.add(
             method=responses.GET,
-            url="https://{}/digitaltwins/{}".format(mock_target["entity"], device_id,),
+            url="https://{}/digitaltwins/{}".format(
+                mock_target["entity"],
+                device_id,
+            ),
             body=generic_result,
             status=200,
             content_type="application/json",
@@ -167,7 +188,9 @@ class TestPnPRuntimeShowDigitalTwin(object):
 
     def test_pnp_runtime_show_digital_twin(self, fixture_cmd, service_client):
         result = subject.get_digital_twin(
-            cmd=fixture_cmd, device_id=device_id, hub_name=mock_target["entity"],
+            cmd=fixture_cmd,
+            device_id=device_id,
+            hub_name=mock_target["entity"],
         )
 
         # Validates simple endpoint behavior.
@@ -180,7 +203,10 @@ class TestPnPRuntimeUpdateDigitalTwin(object):
     def service_client(self, mocked_response, fixture_ghcs, request):
         mocked_response.add(
             method=responses.PATCH,
-            url="https://{}/digitaltwins/{}".format(mock_target["entity"], device_id,),
+            url="https://{}/digitaltwins/{}".format(
+                mock_target["entity"],
+                device_id,
+            ),
             body=None,
             status=202,
             content_type="application/json",
@@ -191,7 +217,10 @@ class TestPnPRuntimeUpdateDigitalTwin(object):
         # because the update operation does not return anything.
         mocked_response.add(
             method=responses.GET,
-            url="https://{}/digitaltwins/{}".format(mock_target["entity"], device_id,),
+            url="https://{}/digitaltwins/{}".format(
+                mock_target["entity"],
+                device_id,
+            ),
             body=generic_result,
             status=200,
             content_type="application/json",
@@ -201,17 +230,21 @@ class TestPnPRuntimeUpdateDigitalTwin(object):
         yield mocked_response
 
     @pytest.mark.parametrize(
-        "request_json_patch",
+        "request_json_patch, etag",
         [
             (
                 '[{"op":"remove", "path":"/thermostat1/targetTemperature"}, '
-                '{"op":"add", "path":"/thermostat2/targetTemperature", "value": 22}]'
+                '{"op":"add", "path":"/thermostat2/targetTemperature", "value": 22}]',
+                generate_generic_id(),
             ),
-            ('{"op":"add", "path":"/thermostat1/targetTemperature", "value": 54}'),
+            (
+                '{"op":"add", "path":"/thermostat1/targetTemperature", "value": 54}',
+                None,
+            ),
         ],
     )
     def test_pnp_runtime_update_digital_twin(
-        self, fixture_cmd, service_client, request_json_patch
+        self, fixture_cmd, service_client, request_json_patch, etag
     ):
         json_patch = json.loads(request_json_patch)
 
@@ -228,12 +261,13 @@ class TestPnPRuntimeUpdateDigitalTwin(object):
             device_id=device_id,
             hub_name=mock_target["entity"],
             json_patch=request_json_patch,
+            etag=etag,
         )
 
         # First call for patch
         patch_request = service_client.calls[0].request
         assert patch_request.body == expected_request_body
-        assert patch_request.headers["If-Match"] == "*"
+        assert patch_request.headers["If-Match"] == etag if etag else "*"
 
         # Result from get twin
         assert result == json.loads(generic_result)
