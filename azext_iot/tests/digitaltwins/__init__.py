@@ -6,8 +6,8 @@
 
 import pytest
 import os
-from ..generators import generate_generic_id
-from ..settings import DynamoSettings
+from azext_iot.tests.generators import generate_generic_id
+from azext_iot.tests.settings import DynamoSettings
 from azure.cli.testsdk import LiveScenarioTest
 from azext_iot.common.embedded_cli import EmbeddedCLI
 

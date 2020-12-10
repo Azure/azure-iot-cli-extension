@@ -22,8 +22,8 @@ from azext_iot.central.models.devicetwin import DeviceTwin
 from azext_iot.central.models.template import Template
 from azext_iot.monitor.property import PropertyMonitor
 from azext_iot.monitor.models.enum import Severity
-from .helpers import load_json
-from .test_constants import FileNames
+from azext_iot.tests.helpers import load_json
+from azext_iot.tests.test_constants import FileNames
 
 
 device_id = "mydevice"

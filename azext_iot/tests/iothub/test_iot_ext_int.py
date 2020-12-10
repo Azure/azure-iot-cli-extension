@@ -9,8 +9,8 @@ import pytest
 import warnings
 
 from azext_iot.common.utility import read_file_content
-from . import IoTLiveScenarioTest
-from .settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC
+from azext_iot.tests import IoTLiveScenarioTest
+from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC
 from azext_iot.constants import DEVICE_DEVICESCOPE_PREFIX
 
 opt_env_set = ["azext_iot_teststorageuri", "azext_iot_identity_teststorageid"]

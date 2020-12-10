@@ -9,8 +9,8 @@ import pytest
 from azext_iot.central.models.template import Template
 from azext_iot.monitor.central_validator import validate, extract_schema_type
 
-from .helpers import load_json
-from .test_constants import FileNames
+from azext_iot.tests.helpers import load_json
+from azext_iot.tests.test_constants import FileNames
 
 
 class TestExtractSchemaType:

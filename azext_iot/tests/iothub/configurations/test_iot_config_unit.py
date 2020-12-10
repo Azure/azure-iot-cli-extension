@@ -14,7 +14,7 @@ from random import randint
 from knack.cli import CLIError
 from azext_iot.operations import hub as subject
 from azext_iot.common.utility import read_file_content, evaluate_literal
-from ...conftest import build_mock_response, path_service_client, mock_target, get_context_path
+from azext_iot.tests.conftest import build_mock_response, path_service_client, mock_target, get_context_path
 
 config_id = "myconfig-{}".format(str(uuid4()).replace("-", ""))
 

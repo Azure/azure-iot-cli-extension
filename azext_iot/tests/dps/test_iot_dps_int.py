@@ -11,7 +11,7 @@ from azext_iot.common.certops import create_self_signed_certificate
 from azext_iot.common import embedded_cli
 from azext_iot.common.utility import generate_key
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
-from .settings import Setting
+from azext_iot.tests.settings import Setting
 
 # Set these to the proper IoT Hub DPS, IoT Hub and Resource Group for Integration Tests.
 dps = os.environ.get("azext_iot_testdps")

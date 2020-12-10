@@ -2,109 +2,135 @@ pr: none
 
 trigger: none
 
-jobs:
+stages:
+  - stage: 'build'
+    displayName: 'Build and Publish Artifacts'
+    jobs:
 
-  # track deployment in environments
-- deployment: 'StageGitHub'
-  displayName: 'Stage CLI extension on GitHub'
-  environment: 'production'
+    - job: 'Build_Publish_Azure_IoT_CLI_Extension'
+      pool:
+        vmImage: 'Ubuntu-16.04'
 
-- job: 'Build_Publish_Azure_IoT_CLI_Extension'
-  pool:
-    vmImage: 'Ubuntu-16.04'
+      steps:
+      - task: UsePythonVersion@0
+        inputs:
+          versionSpec: '3.6.x'
+          architecture: 'x64'
 
-  steps:
-  - task: UsePythonVersion@0
-    inputs:
-      versionSpec: '3.6.x'
-      architecture: 'x64'
+      - template: templates/setup-ci-machine.yml
 
-  - template: templates/setup-ci-machine.yml
+      - template: templates/build-publish-azure-iot-cli-extension.yml
 
-  - template: templates/build-publish-azure-iot-cli-extension.yml
+    - job: 'Build_Publish_Azure_CLI_Test_SDK'
+      pool:
+        vmImage: 'Ubuntu-16.04'
 
-- job: 'Build_Publish_Azure_CLI_Test_SDK'
-  pool:
-    vmImage: 'Ubuntu-16.04'
+      steps:
+      - task: UsePythonVersion@0
+        inputs:
+          versionSpec: '3.6.x'
+          architecture: 'x64'
 
-  steps:
-  - task: UsePythonVersion@0
-    inputs:
-      versionSpec: '3.6.x'
-      architecture: 'x64'
+      - template: templates/setup-ci-machine.yml
 
-  - template: templates/setup-ci-machine.yml
+      - template: templates/build-publish-azure-cli-test-sdk.yml
 
-  - template: templates/build-publish-azure-cli-test-sdk.yml
+  - stage: 'test'
+    displayName: 'Run tests'
+    pool:
+      vmImage: 'Ubuntu-16.04'
+    dependsOn: build
+    jobs:
+    - job: 'testCentral'
+      displayName: 'Test IoT Central'
+      steps:
+      - template: templates/run-tests.yml
+        parameters:
+          pythonVersion: '3.6.x'
+          path: 'azext_iot/tests/central'
+          name: 'IoT-Central'
+    - job: 'testADT'
+      displayName: 'Test Azure DigitalTwins'
+      steps:
+      - template: templates/run-tests.yml
+        parameters:
+          pythonVersion: '3.6.x'
+          path: 'azext_iot/tests/digitaltwins'
+          name: 'Azure-DigitalTwins'
+    - job: 'testDPS'
+      displayName: 'Test DPS'
+      steps:
+      - template: templates/run-tests.yml
+        parameters:
+          pythonVersion: '3.6.x'
+          path: 'azext_iot/tests/dps'
+          name: 'Device-Provisioning-Service'
+    - job: 'testHub'
+      displayName: 'Test IoT Hub'
+      steps:
+      - template: templates/run-tests.yml
+        parameters:
+          pythonVersion: '3.6.x'
+          path: 'azext_iot/tests/iothub'
+          name: 'IoT-Hub'
+    - job: 'unitTests'
+      displayName: 'Unit tests and code coverage'
+      steps:
+      - template: templates/run-tests.yml
+        parameters:
+          pythonVersion: '3.6.x'
+          runIntTests: 'false'
+          runUnitTests: 'true'
 
-- job: 'Run_Tests'
-  dependsOn : Build_Publish_Azure_CLI_Test_SDK
-  pool:
-    vmImage: 'Ubuntu-16.04'
+  - stage: 'release'
+    displayName: 'Stage GitHub release'
+    dependsOn: 'test'
+    jobs:
+    - deployment: 'StageGitHub'
+      displayName: 'Stage CLI extension on GitHub'
+      environment: 'production'
 
-  steps:
-  - template: templates/run-tests.yml
-    parameters:
-      pythonVersion: '3.6.x'
-      runUnitTestsOnly: 'true'
+    - job: 'Calculate_Sha_And_Create_Release'
+      pool:
+        vmImage: 'vs2017-win2016'
+      variables:
+        CLIVersion: $[dependencies.Run_Tests.outputs['setupVersion.CLIVersion']]
+        ReleaseTitle: $[dependencies.Run_Tests.outputs['setupVersion.ReleaseTitle']]
 
-  - script: 'pip install .'
-    displayName: 'Install the whl locally'
-    workingDirectory: '.'
+      steps:
+      - task: DownloadBuildArtifacts@0
+        displayName : 'Download Extension wheel from Build Artifacts'
+        inputs:
+          buildType: 'current'
+          downloadType: 'single'
+          artifactName: 'azure-iot'
+          downloadPath: '$(System.ArtifactsDirectory)/extension'
 
-  - task: PythonScript@0
-    displayName : 'setupVersion'
-    name: 'setupVersion'
-    inputs:
-      scriptSource: 'inline'
-      script: |
-        from azext_iot.constants import VERSION
-        print("Version is " + VERSION)
-        print("##vso[task.setvariable variable=CLIVersion;isOutput=true]"+VERSION)
-        print("##vso[task.setvariable variable=ReleaseTitle;isOutput=true]"+"azure-iot "+VERSION)
+      - task: PowerShell@2
+        displayName: 'Calculate sha for downloaded extension'
+        inputs:
+          targetType: 'inline'
+          script: |
+            $extensions = Get-ChildItem -Filter "*.whl" -Recurse | Select-Object FullName
+            Foreach ($extension in $extensions)
+            {
+                Write-Host "calculating sha256 for " $extension.FullName   
+                (Get-Filehash -Path $extension.Fullname -Algorithm SHA256).Hash.ToLower()
+            }
+            Write-Host "done"
+          workingDirectory: '$(System.ArtifactsDirectory)/extension'
 
-- job: 'Calculate_Sha_And_Create_Release'
-  dependsOn : Run_Tests
-  pool:
-    vmImage: 'vs2017-win2016'
-  variables:
-    CLIVersion: $[dependencies.Run_Tests.outputs['setupVersion.CLIVersion']]
-    ReleaseTitle: $[dependencies.Run_Tests.outputs['setupVersion.ReleaseTitle']]
-
-  steps:
-  - task: DownloadBuildArtifacts@0
-    displayName : 'Download Extension wheel from Build Artifacts'
-    inputs:
-      buildType: 'current'
-      downloadType: 'single'
-      artifactName: 'azure-iot'
-      downloadPath: '$(System.ArtifactsDirectory)/extension'
-
-  - task: PowerShell@2
-    displayName: 'Calculate sha for downloaded extension'
-    inputs:
-      targetType: 'inline'
-      script: |
-        $extensions = Get-ChildItem -Filter "*.whl" -Recurse | Select-Object FullName
-        Foreach ($extension in $extensions)
-        {
-            Write-Host "calculating sha256 for " $extension.FullName   
-            (Get-Filehash -Path $extension.Fullname -Algorithm SHA256).Hash.ToLower()
-        }
-        Write-Host "done"
-      workingDirectory: '$(System.ArtifactsDirectory)/extension'
-
-  - task: GitHubRelease@0
-    inputs:
-      gitHubConnection: AzIoTCLIGitHub
-      repositoryName: $(Build.Repository.Name)
-      action: 'create'
-      target: '$(Build.SourceVersion)'
-      tagSource: manual
-      tag: 'v$(CLIVersion)'
-      title: $(ReleaseTitle)
-      assets: '$(System.ArtifactsDirectory)/extension/**/*.whl' 
-      assetUploadMode: 'replace'
-      isDraft: true
-      isPreRelease: false
-      addChangeLog: false
+      - task: GitHubRelease@0
+        inputs:
+          gitHubConnection: AzIoTCLIGitHub
+          repositoryName: $(Build.Repository.Name)
+          action: 'create'
+          target: '$(Build.SourceVersion)'
+          tagSource: manual
+          tag: 'v$(CLIVersion)'
+          title: $(ReleaseTitle)
+          assets: '$(System.ArtifactsDirectory)/extension/**/*.whl' 
+          assetUploadMode: 'replace'
+          isDraft: true
+          isPreRelease: false
+          addChangeLog: false

@@ -8,7 +8,7 @@ import pytest
 from time import sleep
 from knack.log import get_logger
 from azext_iot.digitaltwins.common import ADTEndpointType
-from ..settings import DynamoSettings
+from azext_iot.tests.settings import DynamoSettings
 from . import DTLiveScenarioTest
 from . import (
     MOCK_RESOURCE_TAGS,

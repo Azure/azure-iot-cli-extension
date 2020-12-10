@@ -10,22 +10,22 @@ import os
 import time
 import pytest
 
-from .conftest import get_context_path
+from azext_iot.tests.conftest import get_context_path
 
 from azure.iot.device import Message
 from azext_iot.common import utility
 from azext_iot.central.models.enum import DeviceStatus, Role
 from azext_iot.monitor.parsers import strings
 
-from . import CaptureOutputLiveScenarioTest, helpers
+from azext_iot.tests import CaptureOutputLiveScenarioTest, helpers
 
 APP_ID = os.environ.get("azext_iot_central_app_id")
 APP_PRIMARY_KEY = os.environ.get("azext_iot_central_primarykey")
 APP_SCOPE_ID = os.environ.get("azext_iot_central_scope_id")
 device_template_path = get_context_path(
-    __file__, "central/json/device_template_int_test.json"
+    __file__, "json/device_template_int_test.json"
 )
-sync_command_params = get_context_path(__file__, "central/json/sync_command_args.json")
+sync_command_params = get_context_path(__file__, "json/sync_command_args.json")
 
 if not all([APP_ID]):
     raise ValueError("Set azext_iot_central_app_id to run central integration tests.")
