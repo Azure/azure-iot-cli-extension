@@ -13,7 +13,6 @@ from azext_iot.constants import (
     CENTRAL_ENDPOINT,
     DEVICETWIN_POLLING_INTERVAL_SEC,
     DEVICETWIN_MONITOR_TIME_SEC,
-    CENTRAL_PNP_INTERFACE_PREFIX,
 )
 
 from azext_iot.central.models.devicetwin import DeviceTwin, Property
@@ -77,10 +76,12 @@ class PropertyMonitor:
         return last_updated.timestamp() >= updated_within.timestamp()
 
     def _changed_props(self, prop, metadata, property_name):
+
         # not an interface - whole thing is change log
-        if not self._is_interface(property_name):
+        if not self._is_component(prop):
             return prop
-        # iterate over property in the interface
+
+        # iterate over properties in the component
         # if the property is not an exact match for what is present in the previous set of properties
         # track it as a change
         diff = {
@@ -90,34 +91,31 @@ class PropertyMonitor:
         }
         return diff
 
+    def _is_component(self, prop):
+        return type(prop) == dict and prop.get("__t") == "c"
+
     def _validate_payload(self, changes, minimum_severity):
         for value in changes:
-            issues = self._validate_payload_against_interfaces(
+            issues = self._validate_payload_against_interfaces_components(
                 changes[value], value, minimum_severity
             )
             for issue in issues:
                 issue.log()
 
-    def _validate_payload_against_interfaces(
+    def _validate_payload_against_interfaces_components(
         self, payload: dict, name, minimum_severity
     ):
         name_miss = []
         issues_handler = IssueHandler()
-        interface_name = name.replace(CENTRAL_PNP_INTERFACE_PREFIX, "")
-        if self._is_interface(interface_name):
-            # if the payload is an interface then iterate thru the properties under the interface
-            for property_name in payload:
-                schema = self._template.get_schema(
-                    name=property_name, interface_name=interface_name
-                )
-                if not schema:
-                    name_miss.append(property_name)
-        else:
-            # if the payload is a property then process the payload as a single unit.
-            schema = self._template.get_schema(name=name)
 
+        if not self._is_component(payload):
+            # update is not part of a component check under interfaces
+            schema = self._template.get_schema(name=name)
             if not schema:
                 name_miss.append(name)
+                details = strings.invalid_field_name_mismatch_template(
+                    name_miss, self._template.schema_names
+                )
 
             interfaces_with_specified_property = self._template._get_interface_list_property(
                 name
@@ -134,11 +132,22 @@ class PropertyMonitor:
                     device_id=self._device_id,
                     template_id=self._template.id,
                 )
+        else:
+            # Property update is part of a component perform additional validations under component list.
+            component_property_updates = [
+                property_name for property_name in payload if property_name != "__t"
+            ]
+            for property_name in component_property_updates:
+                schema = self._template.get_schema(
+                    name=property_name, identifier=name, is_component=True
+                )
+                if not schema:
+                    name_miss.append(property_name)
+                    details = strings.invalid_field_name_component_mismatch_template(
+                        name_miss, self._template.component_schema_names
+                    )
 
         if name_miss:
-            details = strings.invalid_field_name_mismatch_template(
-                name_miss, self._template.schema_names
-            )
             issues_handler.add_central_issue(
                 severity=Severity.warning,
                 details=details,
@@ -148,13 +157,6 @@ class PropertyMonitor:
             )
 
         return issues_handler.get_issues_with_minimum_severity(minimum_severity)
-
-    def _is_interface(self, interface_name):
-        # Remove PNP interface prefix to get the actual interface name
-        interface_name_modified = interface_name.replace(
-            CENTRAL_PNP_INTERFACE_PREFIX, ""
-        )
-        return interface_name_modified in self._template.interfaces
 
     def _get_device_template(self):
         device = self._central_device_provider.get_device(self._device_id)

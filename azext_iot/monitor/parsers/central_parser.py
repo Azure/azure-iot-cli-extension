@@ -92,17 +92,29 @@ class CentralParser(CommonParser):
         if not isinstance(template, Template):
             return
 
-        # pnp device is sending data to an unrecognized interface
-        if self.interface_name and (self.interface_name not in template.interfaces):
-            details = strings.invalid_interface_name(
-                self.interface_name, list(template.interfaces.keys())
+        # if component name is not defined then data should be mapped to root/inherited interfaces
+        if not self.component_name:
+            self._validate_payload(
+                payload=payload, template=template, is_component=False
+            )
+            return
+
+        if not template.components:
+            # tempate does not have any valid components
+            details = strings.invalid_component_name(self.component_name, list())
+            self._add_central_issue(severity=Severity.warning, details=details)
+            return
+
+        # if component name is defined check to see if its a valid name
+        if self.component_name not in template.components:
+            details = strings.invalid_component_name(
+                self.component_name, list(template.components.keys())
             )
             self._add_central_issue(severity=Severity.warning, details=details)
             return
 
-        self._validate_payload_against_interfaces(
-            payload=payload, template=template,
-        )
+        # if component name is valid check to see if payload is valid
+        self._validate_payload(payload=payload, template=template, is_component=True)
 
     def _get_template(self):
         try:
@@ -119,13 +131,13 @@ class CentralParser(CommonParser):
     # currently validates:
     # 1) primitive types match (e.g. boolean is indeed bool etc)
     # 2) names match (i.e. Humidity vs humidity etc)
-    def _validate_payload_against_interfaces(
-        self, payload: dict, template: Template,
-    ):
+    def _validate_payload(self, payload: dict, template: Template, is_component: bool):
         name_miss = []
         for telemetry_name, telemetry in payload.items():
             schema = template.get_schema(
-                name=telemetry_name, interface_name=self.interface_name
+                name=telemetry_name,
+                identifier=self.component_name,
+                is_component=is_component,
             )
             if not schema:
                 name_miss.append(telemetry_name)
@@ -133,9 +145,14 @@ class CentralParser(CommonParser):
                 self._process_telemetry(telemetry_name, schema, telemetry)
 
         if name_miss:
-            details = strings.invalid_field_name_mismatch_template(
-                name_miss, template.schema_names
-            )
+            if is_component:
+                details = strings.invalid_field_name_component_mismatch_template(
+                    name_miss, template.component_schema_names
+                )
+            else:
+                details = strings.invalid_field_name_mismatch_template(
+                    name_miss, template.schema_names,
+                )
             self._add_central_issue(severity=Severity.warning, details=details)
 
     def _process_telemetry(self, telemetry_name: str, schema, telemetry):

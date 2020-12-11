@@ -294,7 +294,7 @@ class TestCentralPropertyMonitor:
 
         model = {"Model": "test_model"}
 
-        issues = monitor._validate_payload_against_interfaces(
+        issues = monitor._validate_payload_against_interfaces_components(
             model, list(model.keys())[0], Severity.warning,
         )
 
@@ -308,7 +308,7 @@ class TestCentralPropertyMonitor:
 
         version = {"OsName": "test_osName"}
 
-        issues = monitor._validate_payload_against_interfaces(
+        issues = monitor._validate_payload_against_interfaces_components(
             version, list(version.keys())[0], Severity.warning,
         )
 
@@ -316,7 +316,7 @@ class TestCentralPropertyMonitor:
 
     @mock.patch("azext_iot.central.services.device_template")
     @mock.patch("azext_iot.central.services.device")
-    def test_validate_properties_name_miss(
+    def test_validate_properties_name_miss_under_interface(
         self, mock_device_svc, mock_device_template_svc
     ):
 
@@ -336,43 +336,19 @@ class TestCentralPropertyMonitor:
         # invalid interface / property
         definition = {"definition": "test_definition"}
 
-        issues = monitor._validate_payload_against_interfaces(
+        issues = monitor._validate_payload_against_interfaces_components(
             definition, list(definition.keys())[0], Severity.warning,
         )
 
         assert (
             issues[0].details
-            == "Device is sending data that has not been defined in the device "
-            "template. Following capabilities have NOT been defined in the device template "
-            "'['definition']'. Following capabilities have been defined in the device template "
-            "(grouped by interface) '{'urn:sampleApp:groupOne_bz:_rpgcmdpo:1': ['Model', 'Version', 'TotalStorage'], "
-            "'urn:sampleApp:groupTwo_bz:myxqftpsr:2': ['Model', 'Manufacturer'],"
-            " 'urn:sampleApp:groupThree_bz:myxqftpsr:2': ['Manufacturer', "
-            "'Version', 'Model', 'OsName']}'. "
-        )
-
-        # invalid and valid property with valid interface
-        property_collection = {
-            "Model": "test_model",
-            "Manufacturer": "test_manufacturer",
-            "OsName": "test_osName",
-        }
-
-        issues = monitor._validate_payload_against_interfaces(
-            property_collection,
-            "urn:sampleApp:groupOne_bz:_rpgcmdpo:1",
-            Severity.warning,
-        )
-
-        assert (
-            issues[0].details
-            == "Device is sending data that has not been defined in the device "
-            "template. Following capabilities have NOT been defined in the device template "
-            "'['Manufacturer', 'OsName']'. Following capabilities have been defined in the device template "
-            "(grouped by interface) '{'urn:sampleApp:groupOne_bz:_rpgcmdpo:1': ['Model', 'Version', 'TotalStorage'], "
-            "'urn:sampleApp:groupTwo_bz:myxqftpsr:2': ['Model', 'Manufacturer'],"
-            " 'urn:sampleApp:groupThree_bz:myxqftpsr:2': ['Manufacturer', "
-            "'Version', 'Model', 'OsName']}'. "
+            == "Device is sending data that has not been defined in the device template."
+            " Following capabilities have NOT been defined in the device template '['definition']'."
+            " Following capabilities have been defined in the device template (grouped by interface)"
+            " '{'urn:sampleApp:groupOne_bz:2': ['addRootProperty', 'addRootPropertyReadOnly', 'addRootProperty2'],"
+            " 'urn:sampleApp:groupOne_bz:_rpgcmdpo:1': ['Model', 'Version', 'TotalStorage'],"
+            " 'urn:sampleApp:groupTwo_bz:myxqftpsr:2': ['Model', 'Manufacturer'],"
+            " 'urn:sampleApp:groupThree_bz:myxqftpsr:2': ['Manufacturer', 'Version', 'Model', 'OsName']}'. "
         )
 
     @mock.patch("azext_iot.central.services.device_template")
@@ -397,24 +373,64 @@ class TestCentralPropertyMonitor:
         # severity level info
         definition = {"definition": "test_definition"}
 
-        issues = monitor._validate_payload_against_interfaces(
+        issues = monitor._validate_payload_against_interfaces_components(
             definition, list(definition.keys())[0], Severity.info,
         )
 
         assert (
             issues[0].details
-            == "Device is sending data that has not been defined in the device "
-            "template. Following capabilities have NOT been defined in the device template "
+            == "Device is sending data that has not been defined in the device template. "
+            "Following capabilities have NOT been defined in the device template "
             "'['definition']'. Following capabilities have been defined in the device template "
-            "(grouped by interface) '{'urn:sampleApp:groupOne_bz:_rpgcmdpo:1': ['Model', 'Version', 'TotalStorage'], "
-            "'urn:sampleApp:groupTwo_bz:myxqftpsr:2': ['Model', 'Manufacturer'],"
-            " 'urn:sampleApp:groupThree_bz:myxqftpsr:2': ['Manufacturer', "
-            "'Version', 'Model', 'OsName']}'. "
+            "(grouped by interface) '{'urn:sampleApp:groupOne_bz:2': "
+            "['addRootProperty', 'addRootPropertyReadOnly', 'addRootProperty2'], "
+            "'urn:sampleApp:groupOne_bz:_rpgcmdpo:1': ['Model', 'Version', 'TotalStorage'], "
+            "'urn:sampleApp:groupTwo_bz:myxqftpsr:2': ['Model', 'Manufacturer'], "
+            "'urn:sampleApp:groupThree_bz:myxqftpsr:2': ['Manufacturer', 'Version', 'Model', 'OsName']}'. "
         )
 
         # severity level error
-        issues = monitor._validate_payload_against_interfaces(
+        issues = monitor._validate_payload_against_interfaces_components(
             definition, list(definition.keys())[0], Severity.error,
         )
 
         assert len(issues) == 0
+
+    @mock.patch("azext_iot.central.services.device_template")
+    @mock.patch("azext_iot.central.services.device")
+    def test_validate_properties_name_miss_under_component(
+        self, mock_device_svc, mock_device_template_svc
+    ):
+
+        # setup
+        mock_device_template_svc.get_device_template.return_value = Template(
+            self._duplicate_property_template
+        )
+
+        monitor = PropertyMonitor(
+            cmd=None,
+            app_id=app_id,
+            device_id=device_id,
+            token=None,
+            central_dns_suffix=None,
+        )
+
+        # invalid component property
+        definition = {
+            "__t": "c",
+            "data": {"definition": "test_definition"},
+        }
+
+        issues = monitor._validate_payload_against_interfaces_components(
+            definition, list(definition.keys())[0], Severity.warning,
+        )
+
+        assert (
+            issues[0].details
+            == "Device is sending data that has not been defined in the device template. "
+            "Following capabilities have NOT been defined in the device template '['data']'. "
+            "Following capabilities have been defined in the device template (grouped by components) "
+            "'{'_rpgcmdpo': ['component1Prop', 'testComponent', 'component1PropReadonly', 'component1Prop2'], "
+            "'RS40OccupancySensorV36fy': ['component2prop', 'testComponent', 'component2PropReadonly', "
+            "'component2Prop2', 'component1Telemetry']}'. "
+        )
