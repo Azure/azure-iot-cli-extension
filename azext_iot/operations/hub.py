@@ -327,7 +327,7 @@ def update_iot_device_custom(
 
 
 def iot_device_update(
-    cmd, device_id, parameters, hub_name=None, resource_group_name=None, login=None
+    cmd, device_id, parameters, hub_name=None, resource_group_name=None, login=None, etag=None
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
@@ -346,7 +346,7 @@ def iot_device_update(
         parameters.get('statusReason'),
         parameters.get('deviceScope')
     )
-    updated_device.etag = parameters.get("etag", "*")
+    updated_device.etag = etag if etag else "*"
     return _iot_device_update(target, device_id, updated_device)
 
 
@@ -367,7 +367,7 @@ def _iot_device_update(target, device_id, device):
 
 
 def iot_device_delete(
-    cmd, device_id, hub_name=None, resource_group_name=None, login=None
+    cmd, device_id, hub_name=None, resource_group_name=None, login=None, etag=None
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
@@ -377,47 +377,35 @@ def iot_device_delete(
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
     try:
-        device = _iot_device_show(target=target, device_id=device_id)
-        etag = device.get("etag")
-
-        if etag:
-            headers = {}
-            headers["If-Match"] = '"{}"'.format(etag)
-            service_sdk.devices.delete_identity(
-                id=device_id, custom_headers=headers
-            )
-            return
-        raise LookupError("device etag not found")
+        headers = {}
+        headers["If-Match"] = '"{}"'.format(etag if etag else "*")
+        service_sdk.devices.delete_identity(
+            id=device_id, custom_headers=headers
+        )
+        return
     except CloudError as e:
         raise CLIError(unpack_msrest_error(e))
-    except LookupError as err:
-        raise CLIError(err)
 
 
-def _update_device_key(target, device, auth_method, pk, sk):
+def _update_device_key(target, device, auth_method, pk, sk, etag=None):
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
     try:
         auth = _assemble_auth(auth_method, pk, sk)
         device["authentication"] = auth
-        etag = device.get("etag", None)
-        if etag:
-            headers = {}
-            headers["If-Match"] = '"{}"'.format(etag)
-            return service_sdk.devices.create_or_update_identity(
-                id=device["deviceId"],
-                device=device,
-                custom_headers=headers,
-            )
-        raise LookupError("device etag not found.")
+        headers = {}
+        headers["If-Match"] = '"{}"'.format(etag if etag else "*")
+        return service_sdk.devices.create_or_update_identity(
+            id=device["deviceId"],
+            device=device,
+            custom_headers=headers,
+        )
     except CloudError as e:
         raise CLIError(unpack_msrest_error(e))
-    except LookupError as err:
-        raise CLIError(err)
 
 
-def iot_device_key_regenerate(cmd, hub_name, device_id, renew_key_type, resource_group_name=None, login=None):
+def iot_device_key_regenerate(cmd, hub_name, device_id, renew_key_type, resource_group_name=None, login=None, etag=None):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         hub_name=hub_name, resource_group_name=resource_group_name, login=login
@@ -438,7 +426,7 @@ def iot_device_key_regenerate(cmd, hub_name, device_id, renew_key_type, resource
         pk = sk
         sk = temp
 
-    return _update_device_key(target, device, device["authentication"]["type"], pk, sk)
+    return _update_device_key(target, device, device["authentication"]["type"], pk, sk, etag)
 
 
 def iot_device_get_parent(
@@ -731,6 +719,7 @@ def iot_device_module_update(
     hub_name=None,
     resource_group_name=None,
     login=None,
+    etag=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
@@ -741,21 +730,16 @@ def iot_device_module_update(
 
     try:
         updated_module = _handle_module_update_params(parameters)
-        etag = parameters.get("etag")
-        if etag:
-            headers = {}
-            headers["If-Match"] = '"{}"'.format(etag)
-            return service_sdk.modules.create_or_update_identity(
-                id=device_id,
-                mid=module_id,
-                module=updated_module,
-                custom_headers=headers,
-            )
-        raise LookupError("module etag not found.")
+        headers = {}
+        headers["If-Match"] = '"{}"'.format(etag if etag else "*")
+        return service_sdk.modules.create_or_update_identity(
+            id=device_id,
+            mid=module_id,
+            module=updated_module,
+            custom_headers=headers,
+        )
     except CloudError as e:
         raise CLIError(unpack_msrest_error(e))
-    except LookupError as err:
-        raise CLIError(err)
 
 
 def _handle_module_update_params(parameters):
@@ -829,7 +813,7 @@ def _iot_device_module_show(target, device_id, module_id):
 
 
 def iot_device_module_delete(
-    cmd, device_id, module_id, hub_name=None, resource_group_name=None, login=None
+    cmd, device_id, module_id, hub_name=None, resource_group_name=None, login=None, etag=None
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
@@ -839,22 +823,14 @@ def iot_device_module_delete(
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
     try:
-        module = _iot_device_module_show(
-            target=target, device_id=device_id, module_id=module_id
+        headers = {}
+        headers["If-Match"] = '"{}"'.format(etag if etag else "*")
+        service_sdk.modules.delete_identity(
+            id=device_id, mid=module_id, custom_headers=headers
         )
-        etag = module.get("etag")
-        if etag:
-            headers = {}
-            headers["If-Match"] = '"{}"'.format(etag)
-            service_sdk.modules.delete_identity(
-                id=device_id, mid=module_id, custom_headers=headers
-            )
-            return
-        raise LookupError("module etag not found")
+        return
     except CloudError as e:
         raise CLIError(unpack_msrest_error(e))
-    except LookupError as err:
-        raise CLIError(err)
 
 
 def iot_device_module_twin_show(
@@ -889,6 +865,7 @@ def iot_device_module_twin_update(
     hub_name=None,
     resource_group_name=None,
     login=None,
+    etag=None
 ):
     from azext_iot.common.utility import verify_transform
 
@@ -901,7 +878,7 @@ def iot_device_module_twin_update(
 
     try:
         headers = {}
-        headers["If-Match"] = '"*"'
+        headers["If-Match"] = '"{}"'.format(etag if etag else "*")
         verify = {}
         if parameters.get("properties"):
             if parameters["properties"].get("desired"):
@@ -929,6 +906,7 @@ def iot_device_module_twin_replace(
     hub_name=None,
     resource_group_name=None,
     login=None,
+    etag=None
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
@@ -939,24 +917,16 @@ def iot_device_module_twin_replace(
 
     try:
         target_json = process_json_arg(target_json, argument_name="json")
-        module = _iot_device_module_twin_show(
-            target=target, device_id=device_id, module_id=module_id
+        headers = {}
+        headers["If-Match"] = '"{}"'.format(etag if etag else "*")
+        return service_sdk.modules.replace_twin(
+            id=device_id,
+            mid=module_id,
+            device_twin_info=target_json,
+            custom_headers=headers,
         )
-        etag = module.get("etag")
-        if etag:
-            headers = {}
-            headers["If-Match"] = '"{}"'.format(etag)
-            return service_sdk.modules.replace_twin(
-                id=device_id,
-                mid=module_id,
-                device_twin_info=target_json,
-                custom_headers=headers,
-            )
-        raise LookupError("module twin etag not found")
     except CloudError as e:
         raise CLIError(unpack_msrest_error(e))
-    except LookupError as err:
-        raise CLIError(err)
 
 
 def iot_edge_set_modules(
@@ -1204,7 +1174,7 @@ def _validate_payload_schema(content):
 
 
 def iot_hub_configuration_update(
-    cmd, config_id, parameters, hub_name=None, resource_group_name=None, login=None
+    cmd, config_id, parameters, hub_name=None, resource_group_name=None, login=None, etag=None
 ):
     from azext_iot.sdk.iothub.service.models import Configuration
     from azext_iot.common.utility import verify_transform
@@ -1217,11 +1187,8 @@ def iot_hub_configuration_update(
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
     try:
-        etag = parameters.get("etag")
-        if not etag:
-            raise LookupError("invalid request, configuration etag not found")
         headers = {}
-        headers["If-Match"] = '"{}"'.format(etag)
+        headers["If-Match"] = '"{}"'.format(etag if etag else "*")
         verify = {"metrics": dict, "metrics.queries": dict, "content": dict}
         if parameters.get("labels"):
             verify["labels"] = dict
@@ -1233,15 +1200,14 @@ def iot_hub_configuration_update(
             content=parameters["content"],
             metrics=parameters.get("metrics", None),
             target_condition=parameters["targetCondition"],
-            priority=parameters["priority"],
-            content_type="assignment",
+            priority=parameters["priority"]
         )
         return service_sdk.configuration.create_or_update(
             id=config_id, configuration=config, custom_headers=headers
         )
     except CloudError as e:
         raise CLIError(unpack_msrest_error(e))
-    except (AttributeError, LookupError, TypeError) as err:
+    except (AttributeError, TypeError) as err:
         raise CLIError(err)
 
 
@@ -1319,7 +1285,7 @@ def _iot_hub_configuration_list(
 
 
 def iot_hub_configuration_delete(
-    cmd, config_id, hub_name=None, resource_group_name=None, login=None
+    cmd, config_id, hub_name=None, resource_group_name=None, login=None, etag=None
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
@@ -1329,18 +1295,11 @@ def iot_hub_configuration_delete(
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
     try:
-        config = _iot_hub_configuration_show(target=target, config_id=config_id)
-        etag = config.get("etag")
-        if etag:
-            headers = {}
-            headers["If-Match"] = '"{}"'.format(etag)
-            service_sdk.configuration.delete(id=config_id, custom_headers=headers)
-            return
-        raise LookupError("configuration etag not found")
+        headers = {}
+        headers["If-Match"] = '"{}"'.format(etag if etag else "*")
+        service_sdk.configuration.delete(id=config_id, custom_headers=headers)
     except CloudError as e:
         raise CLIError(unpack_msrest_error(e))
-    except LookupError as err:
-        raise CLIError(err)
 
 
 def iot_edge_deployment_metric_show(
@@ -1450,7 +1409,7 @@ def iot_twin_update_custom(instance, desired=None, tags=None):
 
 
 def iot_device_twin_update(
-    cmd, device_id, parameters, hub_name=None, resource_group_name=None, login=None
+    cmd, device_id, parameters, hub_name=None, resource_group_name=None, login=None, etag=None
 ):
     from azext_iot.common.utility import verify_transform
 
@@ -1463,7 +1422,7 @@ def iot_device_twin_update(
 
     try:
         headers = {}
-        headers["If-Match"] = '"*"'
+        headers["If-Match"] = '"{}"'.format(etag if etag else "*")
         verify = {}
         if parameters.get("properties"):
             if parameters["properties"].get("desired"):
@@ -1481,7 +1440,7 @@ def iot_device_twin_update(
 
 
 def iot_device_twin_replace(
-    cmd, device_id, target_json, hub_name=None, resource_group_name=None, login=None
+    cmd, device_id, target_json, hub_name=None, resource_group_name=None, login=None, etag=None
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
@@ -1492,19 +1451,13 @@ def iot_device_twin_replace(
 
     try:
         target_json = process_json_arg(target_json, argument_name="json")
-        device = _iot_device_twin_show(target=target, device_id=device_id)
-        etag = device.get("etag")
-        if etag:
-            headers = {}
-            headers["If-Match"] = '"{}"'.format(etag)
-            return service_sdk.devices.replace_twin(
-                id=device_id, device_twin_info=target_json, custom_headers=headers
-            )
-        raise LookupError("device twin etag not found")
+        headers = {}
+        headers["If-Match"] = '"{}"'.format(etag if etag else "*")
+        return service_sdk.devices.replace_twin(
+            id=device_id, device_twin_info=target_json, custom_headers=headers
+        )
     except CloudError as e:
         raise CLIError(unpack_msrest_error(e))
-    except LookupError as err:
-        raise CLIError(err)
 
 
 def iot_device_method(

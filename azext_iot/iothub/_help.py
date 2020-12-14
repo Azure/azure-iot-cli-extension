@@ -92,37 +92,36 @@ def load_iothub_help():
             az iot hub job cancel --hub-name {iothub_name} --job-id {job_id}
     """
 
-    '''
-    helps["iot pnp twin"] = """
+    helps["iot hub digital-twin"] = """
         type: group
         short-summary: Manipulate and interact with the digital twin of an IoT Hub device.
     """
 
-    helps["iot pnp twin invoke-command"] = """
+    helps["iot hub digital-twin invoke-command"] = """
         type: command
         short-summary: Invoke a root or component level command of a digital twin device.
 
         examples:
         - name: Invoke root level command "reboot" which takes a payload that includes the "delay" property.
           text: >
-            az iot pnp twin invoke-command --command-name reboot -n {iothub_name} -d {device_id} --payload '{"delay":5}'
+            az iot hub digital-twin invoke-command --command-name reboot -n {iothub_name} -d {device_id} --payload '{"delay":5}'
 
         - name: Invoke command "getMaxMinReport" on component "thermostat1" that takes no input.
           text: >
-            az iot pnp twin invoke-command --cn getMaxMinReport -n {iothub_name} -d {device_id} --component-path thermostat1
+            az iot hub digital-twin invoke-command --cn getMaxMinReport -n {iothub_name} -d {device_id} --component-path thermostat1
     """
 
-    helps["iot pnp twin show"] = """
+    helps["iot hub digital-twin show"] = """
         type: command
         short-summary: Show the digital twin of an IoT Hub device.
 
         examples:
         - name: Show the target device digital twin.
           text: >
-            az iot pnp twin show -n {iothub_name} -d {device_id}
+            az iot hub digital-twin show -n {iothub_name} -d {device_id}
     """
 
-    helps["iot pnp twin update"] = """
+    helps["iot hub digital-twin update"] = """
         type: command
         short-summary: Update the read-write properties of a digital twin device via JSON patch specification.
         long-summary: Currently operations are limited to add, replace and remove.
@@ -130,12 +129,12 @@ def load_iothub_help():
         examples:
         - name: Update a digital twin via JSON patch specification.
           text: >
-            az iot pnp twin update --hub-name {iothub_name} --device-id {device_id}
+            az iot hub digital-twin update --hub-name {iothub_name} --device-id {device_id}
             --json-patch '{"op":"add", "path":"/thermostat1/targetTemperature", "value": 54}'
 
         - name: Update a digital twin via JSON patch specification.
           text: >
-            az iot pnp twin update -n {iothub_name} -d {device_id}
+            az iot hub digital-twin update -n {iothub_name} -d {device_id}
             --json-patch '[
               {"op":"remove", "path":"/thermostat1/targetTemperature"},
               {"op":"add", "path":"/thermostat2/targetTemperature", "value": 22}
@@ -143,7 +142,6 @@ def load_iothub_help():
 
         - name: Update a digital twin property via JSON patch specification defined in a file.
           text: >
-            az iot pnp twin update -n {iothub_name} -d {device_id}
+            az iot hub digital-twin update -n {iothub_name} -d {device_id}
             --json-patch ./my/patch/document.json
     """
-    '''

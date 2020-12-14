@@ -25,7 +25,6 @@ class SdkType(Enum):
     dps_sdk = 5
     device_sdk = 6
     service_sdk = 7
-    pnp_sdk = 8
 
 
 class EntityStatusType(Enum):
