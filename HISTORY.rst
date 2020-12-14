@@ -3,6 +3,38 @@
 Release History
 ===============
 
+0.10.8
++++++++++++++++
+
+**IoT Central updates**
+
+* az iot central device|device-template|api-token|diagnostic help strings updated with improved language.
+
+**IoT Hub updates**
+
+The following commands support an explicit etag parameter. If no etag arg is passed the value "*" is used.
+
+* az iot hub device-identity update
+* az iot hub device-identity delete
+* az iot hub device-identity renew-key
+* az iot hub device-twin update
+* az iot hub device-twin delete
+* az iot hub module-identity update
+* az iot hub module-identity delete
+* az iot hub module-twin update
+* az iot hub module-twin delete
+* az iot hub configuration update
+* az iot hub configuration delete
+* az iot edge deployment update
+* az iot edge deployment update
+
+Re-introduce prior in-preview IoT Hub device digital twin/pnp runtime commands under the "az iot hub digital-twin" root command group.
+
+* az iot hub digital-twin show
+* az iot hub digital-twin update
+* az iot hub digital-twin invoke-command
+
+
 0.10.7
 +++++++++++++++
 

@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 
+from azext_iot.tests.generators import generate_generic_id
 import pytest
 import responses
 import json
@@ -563,21 +564,21 @@ class TestConfigCreate:
 
 
 class TestConfigDelete:
-    @pytest.fixture(params=[(200, 204)])
+    @pytest.fixture(params=[204])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
-        etag = str(uuid4())
-        service_client.expected_etag = etag
         side_effect = [
-            build_mock_response(mocker, request.param[0], {"etag": etag}),
-            build_mock_response(mocker, request.param[1]),
+            build_mock_response(mocker, request.param),
         ]
         service_client.side_effect = side_effect
         return service_client
 
-    def test_config_delete(self, serviceclient, fixture_cmd):
+    @pytest.mark.parametrize(
+        "etag", [generate_generic_id(), None],
+    )
+    def test_config_delete(self, serviceclient, fixture_cmd, etag):
         subject.iot_hub_configuration_delete(
-            fixture_cmd, config_id=config_id, hub_name=mock_target["entity"]
+            fixture_cmd, config_id=config_id, hub_name=mock_target["entity"], etag=etag
         )
         args = serviceclient.call_args
         url = args[0][0].url
@@ -586,19 +587,7 @@ class TestConfigDelete:
 
         assert method == "DELETE"
         assert "{}/configurations/{}?".format(mock_target["entity"], config_id) in url
-        assert headers["If-Match"] == '"{}"'.format(serviceclient.expected_etag)
-
-    @pytest.mark.parametrize("expected_error", [CLIError])
-    def test_config_delete_invalid_args(
-        self,
-        fixture_cmd,
-        serviceclient_generic_invalid_or_missing_etag,
-        expected_error,
-    ):
-        with pytest.raises(expected_error):
-            subject.iot_hub_configuration_delete(
-                fixture_cmd, config_id=config_id, hub_name=mock_target["entity"]
-            )
+        assert headers["If-Match"] == '"{}"'.format(etag if etag else "*")
 
     def test_config_delete_error(self, fixture_cmd, serviceclient_generic_error):
         with pytest.raises(CLIError):
@@ -614,12 +603,16 @@ class TestConfigUpdate:
         service_client.return_value = build_mock_response(mocker, request.param, {})
         return service_client
 
-    def test_config_update(self, fixture_cmd, serviceclient, sample_config_show):
+    @pytest.mark.parametrize(
+        "etag", [generate_generic_id(), None],
+    )
+    def test_config_update(self, fixture_cmd, serviceclient, sample_config_show, etag):
         subject.iot_hub_configuration_update(
             cmd=fixture_cmd,
             config_id=config_id,
             hub_name=mock_target["entity"],
             parameters=sample_config_show,
+            etag=etag
         )
         args = serviceclient.call_args
         url = args[0][0].url
@@ -630,29 +623,19 @@ class TestConfigUpdate:
         assert "{}/configurations/{}?".format(mock_target["entity"], config_id) in url
         assert method == "PUT"
 
-        assert headers["If-Match"] == '"{}"'.format(sample_config_show["etag"])
-
         assert body["id"] == sample_config_show["id"]
         assert body.get("metrics") == sample_config_show.get("metrics")
         assert body.get("targetCondition") == sample_config_show.get("targetCondition")
         assert body.get("priority") == sample_config_show.get("priority")
         assert body.get("labels") == sample_config_show.get("labels")
 
+        headers = args[0][0].headers
+        assert headers["If-Match"] == '"{}"'.format(etag if etag else "*")
+
     def test_config_update_invalid_args(
         self, fixture_cmd, serviceclient, sample_config_show
     ):
         from copy import deepcopy
-
-        request = deepcopy(sample_config_show)
-        request["etag"] = None
-
-        with pytest.raises(CLIError):
-            subject.iot_hub_configuration_update(
-                cmd=fixture_cmd,
-                config_id=config_id,
-                hub_name=mock_target["entity"],
-                parameters=request,
-            )
 
         request = deepcopy(sample_config_show)
         request["labels"] = "not a dictionary"
