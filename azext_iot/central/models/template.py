@@ -25,28 +25,17 @@ class Template:
             raise CLIError("Could not parse iot central device template.")
 
     def get_schema(self, name, is_component=False, identifier="") -> dict:
-        if is_component:
-            if identifier:
-                # identifier specified, do a pointed lookup
-                component = self.components.get(identifier, {})
-                return component.get(name)
-
-            # find first matching name in any component
-            for component in self.components.values():
-                schema = component.get(name)
-                if schema:
-                    return schema
-        else:
+        entities = self.components if is_component else self.interfaces
+        if identifier:
             # identifier specified, do a pointed lookup
-            if identifier:
-                interface = self.interfaces.get(identifier, {})
-                return interface.get(name)
+            entry = entities.get(identifier, {})
+            return entry.get(name)
 
-            # find first matching name in any interface
-            for interface in self.interfaces.values():
-                schema = interface.get(name)
-                if schema:
-                    return schema
+        # find first matching name in any component
+        for entry in entities.values():
+            schema = entry.get(name)
+            if schema:
+                return schema
 
         # not found
         return None

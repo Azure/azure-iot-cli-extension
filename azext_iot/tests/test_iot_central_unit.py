@@ -24,7 +24,7 @@ from azext_iot.monitor.property import PropertyMonitor
 from azext_iot.monitor.models.enum import Severity
 from .helpers import load_json
 from .test_constants import FileNames
-from azext_iot.constants import COMPONENT_MARKER
+from azext_iot.constants import PNP_DTDLV2_COMPONENT_MARKER
 
 device_id = "mydevice"
 app_id = "myapp"
@@ -294,7 +294,7 @@ class TestCentralPropertyMonitor:
 
         model = {"Model": "test_model"}
 
-        issues = monitor._validate_payload_against_interfaces_components(
+        issues = monitor._validate_payload_against_entities(
             model, list(model.keys())[0], Severity.warning,
         )
 
@@ -308,7 +308,7 @@ class TestCentralPropertyMonitor:
 
         version = {"OsName": "test_osName"}
 
-        issues = monitor._validate_payload_against_interfaces_components(
+        issues = monitor._validate_payload_against_entities(
             version, list(version.keys())[0], Severity.warning,
         )
 
@@ -336,7 +336,7 @@ class TestCentralPropertyMonitor:
         # invalid interface / property
         definition = {"definition": "test_definition"}
 
-        issues = monitor._validate_payload_against_interfaces_components(
+        issues = monitor._validate_payload_against_entities(
             definition, list(definition.keys())[0], Severity.warning,
         )
 
@@ -373,7 +373,7 @@ class TestCentralPropertyMonitor:
         # severity level info
         definition = {"definition": "test_definition"}
 
-        issues = monitor._validate_payload_against_interfaces_components(
+        issues = monitor._validate_payload_against_entities(
             definition, list(definition.keys())[0], Severity.info,
         )
 
@@ -390,7 +390,7 @@ class TestCentralPropertyMonitor:
         )
 
         # severity level error
-        issues = monitor._validate_payload_against_interfaces_components(
+        issues = monitor._validate_payload_against_entities(
             definition, list(definition.keys())[0], Severity.error,
         )
 
@@ -417,11 +417,11 @@ class TestCentralPropertyMonitor:
 
         # invalid component property
         definition = {
-            COMPONENT_MARKER: "c",
+            PNP_DTDLV2_COMPONENT_MARKER: "c",
             "data": {"definition": "test_definition"},
         }
 
-        issues = monitor._validate_payload_against_interfaces_components(
+        issues = monitor._validate_payload_against_entities(
             definition, list(definition.keys())[0], Severity.warning,
         )
 

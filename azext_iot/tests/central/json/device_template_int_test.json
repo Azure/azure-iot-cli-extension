@@ -5,9 +5,7 @@
     "displayName": "int-test-device-template",
     "capabilityModel": {
         "@id": "urn:sampleApp:modelOne_bz:2",
-        "@type": [
-            "CapabilityModel"
-        ],
+        "@type": "CapabilityModel",
         "contents": [
             {
                 "@id": "urn:testazuresphere:AzureSphereSampleDevice_614:testDefaultCapability:2",

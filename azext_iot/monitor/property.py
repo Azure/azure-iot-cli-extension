@@ -13,7 +13,7 @@ from azext_iot.constants import (
     CENTRAL_ENDPOINT,
     DEVICETWIN_POLLING_INTERVAL_SEC,
     DEVICETWIN_MONITOR_TIME_SEC,
-    COMPONENT_MARKER,
+    PNP_DTDLV2_COMPONENT_MARKER,
 )
 
 from azext_iot.central.models.devicetwin import DeviceTwin, Property
@@ -93,19 +93,17 @@ class PropertyMonitor:
         return diff
 
     def _is_component(self, prop):
-        return type(prop) == dict and prop.get(COMPONENT_MARKER) == "c"
+        return type(prop) == dict and prop.get(PNP_DTDLV2_COMPONENT_MARKER) == "c"
 
     def _validate_payload(self, changes, minimum_severity):
         for value in changes:
-            issues = self._validate_payload_against_interfaces_components(
+            issues = self._validate_payload_against_entities(
                 changes[value], value, minimum_severity
             )
             for issue in issues:
                 issue.log()
 
-    def _validate_payload_against_interfaces_components(
-        self, payload: dict, name, minimum_severity
-    ):
+    def _validate_payload_against_entities(self, payload: dict, name, minimum_severity):
         name_miss = []
         issues_handler = IssueHandler()
 
@@ -138,7 +136,7 @@ class PropertyMonitor:
             component_property_updates = [
                 property_name
                 for property_name in payload
-                if property_name != COMPONENT_MARKER
+                if property_name != PNP_DTDLV2_COMPONENT_MARKER
             ]
             for property_name in component_property_updates:
                 schema = self._template.get_schema(

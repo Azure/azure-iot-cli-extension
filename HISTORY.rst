@@ -2,13 +2,6 @@
 
 Release History
 ===============
-0.10.8
-+++++++++++++++
-
-**IoT Central updates**
-
-* update parsing template logic to support  DTDLV2 models.
-* remove deprecated commands  1) iot central app device-twin 2) iot central app monitor-events
 
 0.10.8
 +++++++++++++++
@@ -16,6 +9,9 @@ Release History
 **IoT Central updates**
 
 * az iot central device|device-template|api-token|diagnostic help strings updated with improved language.
+* update parsing template logic to support  DTDLV2 models.
+* remove deprecated commands  1) iot central app device-twin 2) iot central app monitor-events
+
 
 **IoT Hub updates**
 

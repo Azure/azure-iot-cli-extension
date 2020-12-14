@@ -44,7 +44,7 @@ DEVICETWIN_POLLING_INTERVAL_SEC = 10
 DEVICETWIN_MONITOR_TIME_SEC = 15
 # (Lib name, minimum version (including), maximum version (excluding))
 EVENT_LIB = ("uamqp", "1.2", "1.3")
-COMPONENT_MARKER = "__t"
+PNP_DTDLV2_COMPONENT_MARKER = "__t"
 
 # Config Key's
 CONFIG_KEY_UAMQP_EXT_VERSION = "uamqp_ext_version"
