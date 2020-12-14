@@ -647,4 +647,3 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             output = ""
 
         return output
-

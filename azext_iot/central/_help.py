@@ -523,4 +523,3 @@ def _load_central_monitors_help():
               text: >
                 az iot central diagnostics registration-summary --app-id {appid}
         """
-

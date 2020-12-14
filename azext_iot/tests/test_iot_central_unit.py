@@ -24,7 +24,7 @@ from azext_iot.monitor.property import PropertyMonitor
 from azext_iot.monitor.models.enum import Severity
 from .helpers import load_json
 from .test_constants import FileNames
-
+from azext_iot.constants import COMPONENT_MARKER
 
 device_id = "mydevice"
 app_id = "myapp"
@@ -417,7 +417,7 @@ class TestCentralPropertyMonitor:
 
         # invalid component property
         definition = {
-            "__t": "c",
+            COMPONENT_MARKER: "c",
             "data": {"definition": "test_definition"},
         }
 
