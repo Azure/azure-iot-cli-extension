@@ -170,15 +170,3 @@ def load_central_arguments(self, _):
         context.argument(
             "module_id", options_list=["--module-id", "-m"], help="Iot Edge Module ID",
         )
-    # TODO: Delete this by end of Dec 2020
-    load_deprecated_params(self, _)
-
-
-def load_deprecated_params(self, _):
-    with self.argument_context("iot central app monitor-events") as context:
-        context.argument("timeout", arg_type=event_timeout_type)
-        context.argument("properties", arg_type=event_msg_prop_type)
-        context.argument(
-            "module_id", options_list=["--module-id", "-m"], help="Iot Edge Module ID",
-        )
-        context.argument("minimum_severity", arg_type=severity_type)

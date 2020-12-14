@@ -109,28 +109,3 @@ def load_central_commands(self, _):
         cmd_group.show_command(
             "show", "device_twin_show",
         )
-
-    # TODO: Delete this by end of Dec 2020
-    _load_central_deprecated_commands(self, _)
-
-
-def _load_central_deprecated_commands(self, _):
-    with self.command_group(
-        "iot central app device-twin",
-        command_type=central_device_twin_ops,
-        deprecate_info=self.deprecate(redirect="iot central device twin"),
-    ) as cmd_group:
-        cmd_group.show_command(
-            "show", "device_twin_show",
-        )
-
-    with self.command_group(
-        "iot central app", command_type=central_monitor_ops,
-    ) as cmd_group:
-        cmd_group.command(
-            "monitor-events",
-            "monitor_events",
-            deprecate_info=self.deprecate(
-                redirect="iot central diagnostics monitor-events"
-            ),
-        )

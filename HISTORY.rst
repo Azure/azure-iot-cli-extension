@@ -8,6 +8,7 @@ Release History
 **IoT Central updates**
 
 * update parsing template logic to support  DTDLV2 models.
+* remove deprecated commands  1) iot central app device-twin 2) iot central app monitor-events
 
 0.10.7
 +++++++++++++++
