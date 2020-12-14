@@ -24,7 +24,7 @@ class Template:
         except:
             raise CLIError("Could not parse iot central device template.")
 
-    def get_schema(self, name, is_component=False, identifier=""):
+    def get_schema(self, name, is_component=False, identifier="") -> dict:
         if is_component:
             if identifier:
                 # identifier specified, do a pointed lookup
