@@ -56,7 +56,8 @@ class Template:
                         component["name"]: self._extract_schemas(component)
                         for component in components
                     }
-
+                return {}
+            return {}
         except Exception:
             details = "Unable to extract schema for component from template '{}'.".format(
                 self.id

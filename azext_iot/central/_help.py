@@ -525,3 +525,17 @@ def _load_central_monitors_help():
               text: >
                 az iot central diagnostics registration-summary --app-id {appid}
         """
+
+    helps[
+        "iot central device twin"
+    ] = """
+        type: group
+        short-summary: Manage IoT Central device twins.
+    """
+
+    helps[
+        "iot central device twin show"
+    ] = """
+        type: command
+        short-summary: Get the device twin from IoT Hub.
+    """
