@@ -7,9 +7,7 @@
     "displayName": "duplicate-field-name",
     "capabilityModel": {
         "@id": "urn:sampleApp:modelOne_bz:2",
-        "@type": [
-            "CapabilityModel"
-        ],
+        "@type": "CapabilityModel",
         "implements": [
             {
                 "@id": "urn:sampleApp:modelOne_bz:_rpgcmdpo:1",

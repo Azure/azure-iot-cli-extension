@@ -56,10 +56,10 @@ def invalid_custom_headers():
 
 
 # warning
-def invalid_interface_name(interface_name: str, allowed_interfaces: list):
+def invalid_component_name(component_name: str, allowed_components: list):
     return (
-        "Device is specifying an interface that is unknown. Device specified interface: '{}'. Allowed interfaces: '{}'."
-    ).format(interface_name, allowed_interfaces)
+        "Device is specifying a component that is unknown. Device specified component: '{}'. Allowed components: '{}'."
+    ).format(component_name, allowed_components)
 
 
 # warning
@@ -70,6 +70,17 @@ def invalid_field_name_mismatch_template(
         "Device is sending data that has not been defined in the device template. "
         "Following capabilities have NOT been defined in the device template '{}'. "
         "Following capabilities have been defined in the device template (grouped by interface) '{}'. "
+    ).format(unmodeled_capabilities, modeled_capabilities)
+
+
+# warning
+def invalid_field_name_component_mismatch_template(
+    unmodeled_capabilities: list, modeled_capabilities: list
+):
+    return (
+        "Device is sending data that has not been defined in the device template. "
+        "Following capabilities have NOT been defined in the device template '{}'. "
+        "Following capabilities have been defined in the device template (grouped by components) '{}'. "
     ).format(unmodeled_capabilities, modeled_capabilities)
 
 

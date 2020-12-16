@@ -15,30 +15,79 @@ class Template:
             self.name = template.get("displayName")
             self.interfaces = self._extract_interfaces(template)
             self.schema_names = self._extract_schema_names(self.interfaces)
+            self.components = self._extract_components(template)
+            if self.components:
+                self.component_schema_names = self._extract_schema_names(
+                    self.components
+                )
+
         except:
             raise CLIError("Could not parse iot central device template.")
 
-    def get_schema(self, name, interface_name=""):
-        # interface_name has been specified, do a pointed lookup
-        if interface_name:
-            interface = self.interfaces.get(interface_name, {})
-            return interface.get(name)
+    def get_schema(self, name, is_component=False, identifier="") -> dict:
+        entities = self.components if is_component else self.interfaces
+        if identifier:
+            # identifier specified, do a pointed lookup
+            entry = entities.get(identifier, {})
+            return entry.get(name)
 
-        # find first matching name in any interface
-        for interface in self.interfaces.values():
-            schema = interface.get(name)
+        # find first matching name in any component
+        for entry in entities.values():
+            schema = entry.get(name)
             if schema:
                 return schema
 
         # not found
         return None
 
-    def _extract_interfaces(self, template: dict) -> dict:
+    def _extract_components(self, template: dict) -> dict:
         try:
             dcm = template.get("capabilityModel", {})
-            interfaces = dcm.get("implements", {})
+            if dcm.get("contents"):
+                rootContents = dcm.get("contents", {})
+                components = [
+                    entity
+                    for entity in rootContents
+                    if entity.get("@type") == "Component"
+                ]
+
+                if components:
+                    return {
+                        component["name"]: self._extract_schemas(component)
+                        for component in components
+                    }
+                return {}
+            return {}
+        except Exception:
+            details = "Unable to extract schema for component from template '{}'.".format(
+                self.id
+            )
+            raise CLIError(details)
+
+    def _extract_root_interface_contents(self, dcm: dict):
+        rootContents = dcm.get("contents", {})
+        contents = [
+            entity for entity in rootContents if entity.get("@type") != "Component"
+        ]
+
+        return {"@id": dcm.get("@id", {}), "schema": {"contents": contents}}
+
+    def _extract_interfaces(self, template: dict) -> dict:
+        try:
+
+            interfaces = []
+            dcm = template.get("capabilityModel", {})
+
+            if dcm.get("contents"):
+                interfaces.append(self._extract_root_interface_contents(dcm))
+
+            if dcm.get("@type") == "CapabilityModel":
+                interfaces.extend(dcm.get("implements"))
+            else:
+                interfaces.extend(dcm.get("extends"))
+
             return {
-                interface["name"]: self._extract_schemas(interface)
+                interface["@id"]: self._extract_schemas(interface)
                 for interface in interfaces
             }
         except Exception:
@@ -47,13 +96,13 @@ class Template:
             )
             raise CLIError(details)
 
-    def _extract_schemas(self, interface: dict) -> dict:
-        return {schema["name"]: schema for schema in interface["schema"]["contents"]}
+    def _extract_schemas(self, entity: dict) -> dict:
+        return {schema["name"]: schema for schema in entity["schema"]["contents"]}
 
-    def _extract_schema_names(self, interfaces: dict) -> dict:
+    def _extract_schema_names(self, entity: dict) -> dict:
         return {
-            interface_name: list(interface_schemas.keys())
-            for interface_name, interface_schemas in interfaces.items()
+            entity_name: list(entity_schemas.keys())
+            for entity_name, entity_schemas in entity.items()
         }
 
     def _get_interface_list_property(self, property_name):
