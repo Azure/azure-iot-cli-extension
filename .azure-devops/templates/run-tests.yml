@@ -2,7 +2,7 @@ parameters:
   pythonVersion: ''
   runUnitTests: 'false'
   runIntTests: 'true'
-  runWithAzureCliReleased: 'false'
+  runWithAzureCliReleased: 'true'
   path: 'azext_iot/tests'
   name: 'All'
 

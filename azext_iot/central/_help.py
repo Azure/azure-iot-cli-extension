@@ -39,8 +39,6 @@ def load_central_help():
     _load_central_monitors_help()
     _load_central_command_help()
     _load_central_compute_device_key()
-    # TODO: Delete this by end of Dec 2020
-    _load_central_deprecated_commands()
 
 
 def _load_central_devices_help():
@@ -528,23 +526,6 @@ def _load_central_monitors_help():
                 az iot central diagnostics registration-summary --app-id {appid}
         """
 
-
-# TODO: Delete this by end of Dec 2020
-def _load_central_deprecated_commands():
-    helps[
-        "iot central app device-twin"
-    ] = """
-        type: group
-        short-summary: Manage IoT Central device twins.
-    """
-
-    helps[
-        "iot central app device-twin show"
-    ] = """
-        type: command
-        short-summary: Get the device twin from IoT Hub.
-    """
-
     helps[
         "iot central device twin"
     ] = """
@@ -556,48 +537,5 @@ def _load_central_deprecated_commands():
         "iot central device twin show"
     ] = """
         type: command
-        short-summary: Get the device twin from IoT Central application.
-        long-summary: Returns back the desired and reported device properties from the IoT Central application.
-    """
-
-    helps[
-        "iot central app monitor-events"
-    ] = """
-        type: command
-        short-summary: Monitor device telemetry & messages sent to the IoT Hub for an IoT Central app.
-        long-summary: |
-                    EXPERIMENTAL requires Python 3.5+
-                    This command relies on and may install dependent Cython package (uamqp) upon first execution.
-                    https://github.com/Azure/azure-uamqp-python
-        examples:
-        - name: Basic usage
-          text: >
-            az iot central app monitor-events --app-id {app_id}
-        - name: Basic usage when filtering on target device
-          text: >
-            az iot central app monitor-events --app-id {app_id} -d {device_id}
-        - name: Basic usage when filtering targeted devices with a wildcard in the ID
-          text: >
-            az iot central app monitor-events --app-id {app_id} -d Device*d
-        - name: Basic usage when filtering on module.
-          text: >
-            az iot central app monitor-events --app-id {app_id} -m {module_id}
-        - name: Basic usage when filtering targeted modules with a wildcard in the ID
-          text: >
-            az iot central app monitor-events --app-id {app_id} -m Module*
-        - name: Filter device and specify an Event Hub consumer group to bind to.
-          text: >
-            az iot central app monitor-events --app-id {app_id} -d {device_id} --cg {consumer_group_name}
-        - name: Receive message annotations (message headers)
-          text: >
-            az iot central app monitor-events --app-id {app_id} -d {device_id} --properties anno
-        - name: Receive message annotations + system properties. Never time out.
-          text: >
-            az iot central app monitor-events --app-id {app_id} -d {device_id} --properties anno sys --timeout 0
-        - name: Receive all message attributes from all device messages
-          text: >
-            az iot central app monitor-events --app-id {app_id} --props all
-        - name: Receive all messages and parse message payload as JSON
-          text: >
-            az iot central app monitor-events --app-id {app_id} --output json
+        short-summary: Get the device twin from IoT Hub.
     """

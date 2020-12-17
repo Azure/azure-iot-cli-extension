@@ -40,14 +40,14 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
         # Verify incorrect app-id throws error
         self.cmd(
-            "iot central app device-twin show --app-id incorrect-app --device-id {}".format(
+            "iot central device twin show --app-id incorrect-app --device-id {}".format(
                 device_id
             ),
             expect_failure=True,
         )
         # Verify incorrect device-id throws error
         self.cmd(
-            "iot central app device-twin show --app-id {} --device-id incorrect-device".format(
+            "iot central device twin show --app-id {} --device-id incorrect-device".format(
                 APP_ID
             ),
             expect_failure=True,
@@ -79,7 +79,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         time.sleep(60)
 
         self.cmd(
-            "iot central app device-twin show --app-id {} --device-id {}".format(
+            "iot central device twin show --app-id {} --device-id {}".format(
                 APP_ID, device_id
             ),
             checks=[self.check("deviceId", device_id)],
@@ -94,38 +94,6 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
         self._delete_device(device_id)
         self._delete_device_template(template_id)
-
-    # TODO: Delete this by end of Dec 2020
-    def test_central_monitor_events_deprecated(self):
-        (template_id, _) = self._create_device_template()
-        (device_id, _) = self._create_device(instance_of=template_id)
-        credentials = self._get_credentials(device_id)
-
-        device_client = helpers.dps_connect_device(device_id, credentials)
-
-        enqueued_time = utility.calculate_millisec_since_unix_epoch_utc() - 10000
-
-        payload = {"Bool": True}
-        msg = Message(
-            data=json.dumps(payload),
-            content_encoding="utf-8",
-            content_type="application/json",
-        )
-        device_client.send_message(msg)
-
-        # Test with invalid app-id
-        self.cmd(
-            "iot central app monitor-events --app-id {} -y".format(APP_ID + "zzz"),
-            expect_failure=True,
-        )
-
-        # Ensure no failure
-        output = self._get_monitor_events_output_deprecated(device_id, enqueued_time)
-
-        self._delete_device(device_id)
-        self._delete_device_template(template_id)
-        assert '"Bool": true' in output
-        assert device_id in output
 
     def test_central_monitor_events(self):
         (template_id, _) = self._create_device_template()
@@ -670,25 +638,6 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
         output = self.command_execute_assert(
             "iot central diagnostics monitor-events -n {} -d {} --et {} --to 1 -y".format(
-                APP_ID, device_id, enqueued_time
-            ),
-            asserts,
-        )
-
-        if not output:
-            output = ""
-
-        return output
-
-    # TODO: Delete this by end of Dec 2020
-    def _get_monitor_events_output_deprecated(
-        self, device_id, enqueued_time, asserts=None
-    ):
-        if not asserts:
-            asserts = []
-
-        output = self.command_execute_assert(
-            "iot central app monitor-events -n {} -d {} --et {} --to 1 -y".format(
                 APP_ID, device_id, enqueued_time
             ),
             asserts,

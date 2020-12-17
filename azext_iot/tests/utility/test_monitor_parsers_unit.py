@@ -310,6 +310,7 @@ class TestCentralParser:
     encoding = "UTF-8"
     content_type = "application/json"
     app_properties = {"appPropsKey": "appPropsValue"}
+    component_name = "some-component-name"
 
     bad_encoding = "ascii"
     bad_payload = "bad-payload"
@@ -390,6 +391,145 @@ class TestCentralParser:
 
         expected_details = strings.invalid_field_name_mismatch_template(
             list(self.bad_dcm_payload.keys()), device_template.schema_names
+        )
+
+        _validate_issues(parser, Severity.warning, 1, 1, [expected_details])
+
+    def test_validate_against_no_component_template_should_fail(self):
+        # setup
+        device_template = self._get_template()
+
+        properties = MessageProperties(
+            content_encoding=self.encoding, content_type=self.content_type
+        )
+        message = Message(
+            body=json.dumps(self.bad_dcm_payload).encode(),
+            properties=properties,
+            annotations={
+                common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode(),
+                common_parser.COMPONENT_NAME_IDENTIFIER: self.component_name.encode(),
+            },
+            application_properties=_encode_app_props(self.app_properties),
+        )
+        args = CommonParserArguments(properties=["all"])
+        parser = self._create_parser(
+            device_template=device_template, message=message, args=args
+        )
+
+        # act
+        parsed_msg = parser.parse_message()
+
+        # verify
+        assert parsed_msg["event"]["payload"] == self.bad_dcm_payload
+        assert parsed_msg["event"]["origin"] == self.device_id
+        device_identifier = str(common_parser.DEVICE_ID_IDENTIFIER, "utf8")
+        assert parsed_msg["event"]["annotations"][device_identifier] == self.device_id
+        component_identifier = str(common_parser.COMPONENT_NAME_IDENTIFIER, "utf8")
+        assert (
+            parsed_msg["event"]["annotations"][component_identifier]
+            == self.component_name
+        )
+        properties = parsed_msg["event"]["properties"]
+        assert properties["system"]["content_encoding"] == self.encoding
+        assert properties["system"]["content_type"] == self.content_type
+        assert properties["application"] == self.app_properties
+
+        expected_details = strings.invalid_component_name(self.component_name, list())
+
+        _validate_issues(parser, Severity.warning, 1, 1, [expected_details])
+
+    def test_validate_against_invalid_component_template_should_fail(self):
+        # setup
+        device_template = Template(
+            load_json(FileNames.central_property_validation_template_file)
+        )
+
+        properties = MessageProperties(
+            content_encoding=self.encoding, content_type=self.content_type
+        )
+        message = Message(
+            body=json.dumps(self.bad_dcm_payload).encode(),
+            properties=properties,
+            annotations={
+                common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode(),
+                common_parser.COMPONENT_NAME_IDENTIFIER: self.component_name.encode(),
+            },
+            application_properties=_encode_app_props(self.app_properties),
+        )
+        args = CommonParserArguments(properties=["all"])
+        parser = self._create_parser(
+            device_template=device_template, message=message, args=args
+        )
+
+        # act
+        parsed_msg = parser.parse_message()
+
+        # verify
+        assert parsed_msg["event"]["payload"] == self.bad_dcm_payload
+        assert parsed_msg["event"]["origin"] == self.device_id
+        device_identifier = str(common_parser.DEVICE_ID_IDENTIFIER, "utf8")
+        assert parsed_msg["event"]["annotations"][device_identifier] == self.device_id
+        component_identifier = str(common_parser.COMPONENT_NAME_IDENTIFIER, "utf8")
+        assert (
+            parsed_msg["event"]["annotations"][component_identifier]
+            == self.component_name
+        )
+        properties = parsed_msg["event"]["properties"]
+        assert properties["system"]["content_encoding"] == self.encoding
+        assert properties["system"]["content_type"] == self.content_type
+        assert properties["application"] == self.app_properties
+
+        expected_details = strings.invalid_component_name(
+            self.component_name, list(device_template.components.keys())
+        )
+
+        _validate_issues(parser, Severity.warning, 1, 1, [expected_details])
+
+    def test_validate_invalid_telmetry_component_template_should_fail(self):
+        # setup
+        device_template = Template(
+            load_json(FileNames.central_property_validation_template_file)
+        )
+
+        properties = MessageProperties(
+            content_encoding=self.encoding, content_type=self.content_type
+        )
+        message = Message(
+            body=json.dumps(self.bad_dcm_payload).encode(),
+            properties=properties,
+            annotations={
+                common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode(),
+                common_parser.COMPONENT_NAME_IDENTIFIER: list(
+                    device_template.components.keys()
+                )[1].encode(),
+            },
+            application_properties=_encode_app_props(self.app_properties),
+        )
+        args = CommonParserArguments(properties=["all"])
+        parser = self._create_parser(
+            device_template=device_template, message=message, args=args
+        )
+
+        # act
+        parsed_msg = parser.parse_message()
+
+        # verify
+        assert parsed_msg["event"]["payload"] == self.bad_dcm_payload
+        assert parsed_msg["event"]["origin"] == self.device_id
+        device_identifier = str(common_parser.DEVICE_ID_IDENTIFIER, "utf8")
+        assert parsed_msg["event"]["annotations"][device_identifier] == self.device_id
+        component_identifier = str(common_parser.COMPONENT_NAME_IDENTIFIER, "utf8")
+        assert (
+            parsed_msg["event"]["annotations"][component_identifier]
+            == list(device_template.components.keys())[1]
+        )
+        properties = parsed_msg["event"]["properties"]
+        assert properties["system"]["content_encoding"] == self.encoding
+        assert properties["system"]["content_type"] == self.content_type
+        assert properties["application"] == self.app_properties
+
+        expected_details = strings.invalid_field_name_component_mismatch_template(
+            list(self.bad_dcm_payload.keys()), device_template.component_schema_names,
         )
 
         _validate_issues(parser, Severity.warning, 1, 1, [expected_details])

@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import pytest
+import collections
 
 from azext_iot.central.models.template import Template
 from azext_iot.monitor.central_validator import validate, extract_schema_type
@@ -13,7 +14,69 @@ from azext_iot.tests.helpers import load_json
 from azext_iot.tests.test_constants import FileNames
 
 
+class TestTemplateValidations:
+    def test_template_interface_list(self):
+        expected_interface_list = [
+            "urn:sampleApp:groupOne_bz:_rpgcmdpo:1",
+            "urn:sampleApp:groupTwo_bz:myxqftpsr:2",
+            "urn:sampleApp:groupThree_bz:myxqftpsr:2",
+            "urn:sampleApp:groupOne_bz:2",
+        ]
+        template = Template(
+            load_json(FileNames.central_property_validation_template_file)
+        )
+
+        assert collections.Counter(template.interfaces.keys()) == collections.Counter(
+            expected_interface_list
+        )
+
+    def test_template_component_list(self):
+        expected_component_list = [
+            "_rpgcmdpo",
+            "RS40OccupancySensorV36fy",
+        ]
+        template = Template(
+            load_json(FileNames.central_property_validation_template_file)
+        )
+
+        assert collections.Counter(template.components.keys()) == collections.Counter(
+            expected_component_list
+        )
+
+
 class TestExtractSchemaType:
+    def test_extract_schema_type_component(self):
+        expected_mapping = {
+            "component1Prop": "boolean",
+            "testComponent": "boolean",
+            "component1PropReadonly": "boolean",
+            "component1Prop2": "boolean",
+        }
+        template = Template(
+            load_json(FileNames.central_property_validation_template_file)
+        )
+        for key, val in expected_mapping.items():
+            schema = template.get_schema(key, is_component=True)
+            schema_type = extract_schema_type(schema)
+            assert schema_type == val
+
+    def test_extract_schema_type_component_identifier(self):
+        expected_mapping = {
+            "component2prop": "boolean",
+            "component2Prop2": "boolean",
+            "testComponent": "boolean",
+            "component2PropReadonly": "boolean",
+        }
+        template = Template(
+            load_json(FileNames.central_property_validation_template_file)
+        )
+        for key, val in expected_mapping.items():
+            schema = template.get_schema(
+                key, is_component=True, identifier="RS40OccupancySensorV36fy"
+            )
+            schema_type = extract_schema_type(schema)
+            assert schema_type == val
+
     def test_extract_schema_type(self):
         expected_mapping = {
             "Bool": "boolean",
