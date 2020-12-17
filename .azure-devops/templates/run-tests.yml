@@ -1,7 +1,7 @@
 parameters:
   pythonVersion: ''
   runUnitTestsOnly: 'true'
-  runWithAzureCliReleased: 'false'
+  runWithAzureCliReleased: 'true'
 
 steps:
   - task: UsePythonVersion@0
