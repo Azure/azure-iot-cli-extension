@@ -2,6 +2,10 @@ pr: none
 
 trigger: none
 
+variables:
+  pythonVersion: '3.6.x'
+  architecture: 'x64'
+
 stages:
   - stage: 'build'
     displayName: 'Build and Publish Artifacts'
@@ -14,8 +18,8 @@ stages:
       steps:
       - task: UsePythonVersion@0
         inputs:
-          versionSpec: '3.6.x'
-          architecture: 'x64'
+          versionSpec: $pythonVersion
+          architecture: $architecture
 
       - template: templates/setup-ci-machine.yml
 
@@ -28,8 +32,8 @@ stages:
       steps:
       - task: UsePythonVersion@0
         inputs:
-          versionSpec: '3.6.x'
-          architecture: 'x64'
+          versionSpec: $pythonVersion
+          architecture: $architecture
 
       - template: templates/setup-ci-machine.yml
 
@@ -46,45 +50,54 @@ stages:
       steps:
       - template: templates/run-tests.yml
         parameters:
-          pythonVersion: '3.6.x'
           path: 'azext_iot/tests/central'
           name: 'IoT-Central'
+    
     - job: 'testADT'
       displayName: 'Test Azure DigitalTwins'
       steps:
       - template: templates/run-tests.yml
         parameters:
-          pythonVersion: '3.6.x'
           path: 'azext_iot/tests/digitaltwins'
           name: 'Azure-DigitalTwins'
+    
     - job: 'testDPS'
       displayName: 'Test DPS'
       steps:
       - template: templates/run-tests.yml
         parameters:
-          pythonVersion: '3.6.x'
           path: 'azext_iot/tests/dps'
           name: 'Device-Provisioning-Service'
+    
     - job: 'testHub'
       displayName: 'Test IoT Hub'
       steps:
       - template: templates/run-tests.yml
         parameters:
-          pythonVersion: '3.6.x'
           path: 'azext_iot/tests/iothub'
           name: 'IoT-Hub'
+    
     - job: 'unitTests'
       displayName: 'Unit tests and code coverage'
       steps:
       - template: templates/run-tests.yml
         parameters:
-          pythonVersion: '3.6.x'
           runIntTests: 'false'
           runUnitTests: 'true'
 
+    - job: 'recordVersion'
+      displayName: 'Install and verify version'
+      steps:
+      - template: templates/setup-dev-test-env.yml
+        parameters:
+          pythonVersion: $pythonVersion
+          architecture: $architecture
+
+      - template: templates/install-and-record-version.yml
+
   - stage: 'release'
     displayName: 'Stage GitHub release'
-    dependsOn: 'test'
+    dependsOn: [build, test]
     jobs:
     - deployment: 'StageGitHub'
       displayName: 'Stage CLI extension on GitHub'
@@ -94,8 +107,8 @@ stages:
       pool:
         vmImage: 'vs2017-win2016'
       variables:
-        CLIVersion: $[dependencies.Run_Tests.outputs['setupVersion.CLIVersion']]
-        ReleaseTitle: $[dependencies.Run_Tests.outputs['setupVersion.ReleaseTitle']]
+        CLIVersion: $[ stageDependencies.test.recordVersion.outputs['setupVersion.CLIVersion'] ]
+        ReleaseTitle: $[ stageDependencies.test.recordVersion.outputs['setupVersion.ReleaseTitle'] ]
 
       steps:
       - task: DownloadBuildArtifacts@0

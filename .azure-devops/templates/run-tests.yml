@@ -1,5 +1,6 @@
 parameters:
-  pythonVersion: ''
+  pythonVersion: '3.6.x'
+  architecture: 'x64'
   runUnitTests: 'false'
   runIntTests: 'true'
   runWithAzureCliReleased: 'true'
@@ -7,24 +8,11 @@ parameters:
   name: 'All'
 
 steps:
-  - task: UsePythonVersion@0
-    inputs:
-      versionSpec: ${{ parameters.pythonVersion }}
-      architecture: 'x64'
-
-  - ${{ if eq(parameters.runWithAzureCliReleased, 'false') }}:
-    - template: install-azure-cli-edge.yml
-
-  - ${{ if eq(parameters.runWithAzureCliReleased, 'true') }}:
-    - template: install-azure-cli-released.yml
-
-  - template: download-install-local-azure-test-sdk.yml
-
-  - template: setup-ci-machine.yml
-
-  - template: download-install-local-azure-iot-cli-extension.yml
-
-  - template: set-pythonpath.yml
+  - template: setup-dev-test-env.yml
+    parameters:
+      architecture: ${{ parameters.architecture }}
+      pythonVersion: ${{ parameters.pythonVersion }}
+      runWithAzureCliReleased: ${{ parameters.runWithAzureCliReleased }}
 
   - template: set-testenv-sentinel.yml
 
@@ -56,18 +44,3 @@ steps:
       testResultsFiles: '**/test-*.xml'
       testRunTitle: 'Publish ${{ parameters.name }} test results for Python ${{ parameters.pythonVersion }} on OS $(Agent.OS)'
       searchFolder: '$(System.DefaultWorkingDirectory)'
-
-  - script: 'pip install .'
-    displayName: 'Install the whl locally'
-    workingDirectory: '.'
-
-  - task: PythonScript@0
-    displayName : 'setupVersion'
-    name: 'setupVersion'
-    inputs:
-      scriptSource: 'inline'
-      script: |
-        from azext_iot.constants import VERSION
-        print("Version is " + VERSION)
-        print("##vso[task.setvariable variable=CLIVersion;isOutput=true]"+VERSION)
-        print("##vso[task.setvariable variable=ReleaseTitle;isOutput=true]"+"azure-iot "+VERSION)
