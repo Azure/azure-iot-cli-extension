@@ -31,14 +31,14 @@ def show_twin(cmd, name_or_hostname, twin_id, resource_group_name=None):
     return twin_provider.get(twin_id)
 
 
-def update_twin(cmd, name_or_hostname, twin_id, json_patch, resource_group_name=None):
+def update_twin(cmd, name_or_hostname, twin_id, json_patch, resource_group_name=None, etag=None):
     twin_provider = TwinProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
-    return twin_provider.update(twin_id=twin_id, json_patch=json_patch)
+    return twin_provider.update(twin_id=twin_id, json_patch=json_patch, etag=None)
 
 
-def delete_twin(cmd, name_or_hostname, twin_id, resource_group_name=None):
+def delete_twin(cmd, name_or_hostname, twin_id, resource_group_name=None, etag=None):
     twin_provider = TwinProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
-    return twin_provider.delete(twin_id)
+    return twin_provider.delete(twin_id, etag=None)
 
 
 def create_relationship(
@@ -77,10 +77,11 @@ def update_relationship(
     relationship_id,
     json_patch,
     resource_group_name=None,
+    etag=None
 ):
     twin_provider = TwinProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
     return twin_provider.update_relationship(
-        twin_id=twin_id, relationship_id=relationship_id, json_patch=json_patch,
+        twin_id=twin_id, relationship_id=relationship_id, json_patch=json_patch, etag=None
     )
 
 
@@ -101,11 +102,11 @@ def list_relationships(
 
 
 def delete_relationship(
-    cmd, name_or_hostname, twin_id, relationship_id, resource_group_name=None,
+    cmd, name_or_hostname, twin_id, relationship_id, resource_group_name=None, etag=None
 ):
     twin_provider = TwinProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
     return twin_provider.delete_relationship(
-        twin_id=twin_id, relationship_id=relationship_id
+        twin_id=twin_id, relationship_id=relationship_id, etag=None
     )
 
 
@@ -132,10 +133,10 @@ def show_component(
 
 
 def update_component(
-    cmd, name_or_hostname, twin_id, component_path, json_patch, resource_group_name=None
+    cmd, name_or_hostname, twin_id, component_path, json_patch, resource_group_name=None, etag=None
 ):
     twin_provider = TwinProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
     twin_provider.update_component(
-        twin_id=twin_id, component_path=component_path, json_patch=json_patch
+        twin_id=twin_id, component_path=component_path, json_patch=json_patch, etag=None
     )
     return
