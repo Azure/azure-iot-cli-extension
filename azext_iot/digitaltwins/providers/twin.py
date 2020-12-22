@@ -70,7 +70,7 @@ class TwinProvider(DigitalTwinsProvider):
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
 
-    def update(self, twin_id, json_patch):
+    def update(self, twin_id, json_patch, etag=None):
         json_patch = process_json_arg(content=json_patch, argument_name="json-patch")
 
         json_patch_collection = []
@@ -83,16 +83,16 @@ class TwinProvider(DigitalTwinsProvider):
 
         try:
             self.twins_sdk.update(
-                id=twin_id, patch_document=json_patch_collection, if_match="*", raw=True
+                id=twin_id, patch_document=json_patch_collection, if_match=(etag if etag else "*"), raw=True
             )
             return self.get(twin_id=twin_id)
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
 
-    def delete(self, twin_id):
+    def delete(self, twin_id, etag=None):
         # Not a json response
         try:
-            self.twins_sdk.delete(id=twin_id, if_match="*", raw=True)
+            self.twins_sdk.delete(id=twin_id, if_match=(etag if etag else "*"), raw=True)
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
 
@@ -155,7 +155,7 @@ class TwinProvider(DigitalTwinsProvider):
 
         return incoming_result
 
-    def update_relationship(self, twin_id, relationship_id, json_patch):
+    def update_relationship(self, twin_id, relationship_id, json_patch, etag=None):
         json_patch = process_json_arg(content=json_patch, argument_name="json-patch")
 
         json_patch_collection = []
@@ -171,7 +171,7 @@ class TwinProvider(DigitalTwinsProvider):
                 id=twin_id,
                 relationship_id=relationship_id,
                 patch_document=json_patch_collection,
-                if_match="*",
+                if_match=(etag if etag else "*"),
             )
             return self.get_relationship(
                 twin_id=twin_id, relationship_id=relationship_id
@@ -179,10 +179,10 @@ class TwinProvider(DigitalTwinsProvider):
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
 
-    def delete_relationship(self, twin_id, relationship_id):
+    def delete_relationship(self, twin_id, relationship_id, etag=None):
         try:
             self.twins_sdk.delete_relationship(
-                id=twin_id, relationship_id=relationship_id, if_match="*"
+                id=twin_id, relationship_id=relationship_id, if_match=(etag if etag else "*")
             )
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
@@ -192,7 +192,7 @@ class TwinProvider(DigitalTwinsProvider):
             id=twin_id, component_path=component_path, raw=True
         ).response.json()
 
-    def update_component(self, twin_id, component_path, json_patch):
+    def update_component(self, twin_id, component_path, json_patch, etag=None):
         json_patch = process_json_arg(content=json_patch, argument_name="json-patch")
 
         json_patch_collection = []
@@ -209,7 +209,7 @@ class TwinProvider(DigitalTwinsProvider):
                 id=twin_id,
                 component_path=component_path,
                 patch_document=json_patch_collection,
-                if_match="*",
+                if_match=(etag if etag else "*"),
             )
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
