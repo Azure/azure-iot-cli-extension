@@ -90,8 +90,8 @@ stages:
       steps:
       - template: templates/setup-dev-test-env.yml
         parameters:
-          pythonVersion: $pythonVersion
-          architecture: $architecture
+          pythonVersion: $(pythonVersion)
+          architecture: $(architecture)
 
       - template: templates/install-and-record-version.yml
 
