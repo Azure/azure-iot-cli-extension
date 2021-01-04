@@ -18,8 +18,8 @@ stages:
       steps:
       - task: UsePythonVersion@0
         inputs:
-          versionSpec: $pythonVersion
-          architecture: $architecture
+          versionSpec: $(pythonVersion)
+          architecture: $(architecture)
 
       - template: templates/setup-ci-machine.yml
 
@@ -32,8 +32,8 @@ stages:
       steps:
       - task: UsePythonVersion@0
         inputs:
-          versionSpec: $pythonVersion
-          architecture: $architecture
+          versionSpec: $(pythonVersion)
+          architecture: $(architecture)
 
       - template: templates/setup-ci-machine.yml
 
