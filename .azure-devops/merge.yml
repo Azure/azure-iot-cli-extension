@@ -58,6 +58,8 @@ jobs:
   - template: templates/run-tests.yml
     parameters:
       pythonVersion: '$(python.version)'
+      runUnitTests: 'true'
+      runIntTests: 'false'
 
 - job: 'run_unit_tests_macOs'
   dependsOn: ['build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']
@@ -68,6 +70,8 @@ jobs:
   - template: templates/run-tests.yml
     parameters:
       pythonVersion: '3.8.x'
+      runUnitTests: 'true'
+      runIntTests: 'false'
 
 - job: 'run_unit_tests_windows'
   dependsOn : [ 'build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']
@@ -83,6 +87,8 @@ jobs:
   - template: templates/run-tests.yml
     parameters:
       pythonVersion: '3.8.x'
+      runUnitTests: 'true'
+      runIntTests: 'false'
 
 - job: 'run_style_check'
   dependsOn: ['build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']

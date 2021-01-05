@@ -9,8 +9,8 @@ import json
 
 from time import time
 from uuid import uuid4
-from . import IoTLiveScenarioTest, PREFIX_DEVICE
-from .settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC
+from azext_iot.tests import IoTLiveScenarioTest, PREFIX_DEVICE
+from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC
 from azext_iot.common.utility import (
     validate_min_python_version,
     execute_onthread,

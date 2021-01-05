@@ -7,9 +7,9 @@
 import random
 import json
 
-from ... import IoTLiveScenarioTest
-from ...conftest import get_context_path
-from ...settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC
+from azext_iot.tests import IoTLiveScenarioTest
+from azext_iot.tests.conftest import get_context_path
+from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC
 from azext_iot.common.utility import read_file_content
 
 settings = DynamoSettings(ENV_SET_TEST_IOTHUB_BASIC)

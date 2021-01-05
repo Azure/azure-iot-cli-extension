@@ -8,7 +8,7 @@ import pytest
 from time import sleep
 from knack.log import get_logger
 from azext_iot.digitaltwins.common import ADTEndpointType
-from ..settings import DynamoSettings
+from azext_iot.tests.settings import DynamoSettings
 from . import DTLiveScenarioTest
 from . import (
     MOCK_RESOURCE_TAGS,
@@ -246,7 +246,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             )
         )
 
-        sleep(20)  # Wait for service to catch-up
+        sleep(60)  # Wait for service to catch-up
 
         list_ep_output = self.cmd(
             "dt endpoint list -n {}".format(endpoints_instance_name)

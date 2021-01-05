@@ -9,7 +9,7 @@ import pytest
 import responses
 import json
 from azext_iot.digitaltwins.providers.base import DigitalTwinsProvider
-from ..generators import generate_generic_id
+from azext_iot.tests.generators import generate_generic_id
 
 
 resource_group = generate_generic_id()

@@ -19,8 +19,8 @@ from azext_iot.monitor.parsers import common_parser, central_parser
 from azext_iot.monitor.parsers import strings
 from azext_iot.monitor.models.arguments import CommonParserArguments
 from azext_iot.monitor.models.enum import Severity
-from .helpers import load_json
-from .test_constants import FileNames
+from azext_iot.tests.helpers import load_json
+from azext_iot.tests.test_constants import FileNames
 
 
 def _encode_app_props(app_props: dict):

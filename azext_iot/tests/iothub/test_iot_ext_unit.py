@@ -28,7 +28,7 @@ from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.constants import TRACING_PROPERTY, USER_AGENT, BASE_MQTT_API_VERSION
 from azext_iot.tests.generators import create_req_monitor_events, generate_generic_id
 from knack.util import CLIError
-from .conftest import (
+from azext_iot.tests.conftest import (
     fixture_cmd,
     build_mock_response,
     path_service_client,
@@ -1682,7 +1682,7 @@ class TestDeviceModuleMethodInvoke:
 class TestCloudToDeviceMessaging:
     @pytest.fixture(params=["full", "min"])
     def c2d_receive_scenario(self, fixture_ghcs, mocked_response, request):
-        from .generators import create_c2d_receive_response
+        from azext_iot.tests.generators import create_c2d_receive_response
 
         if request.param == "full":
             payload = create_c2d_receive_response()
@@ -1706,8 +1706,7 @@ class TestCloudToDeviceMessaging:
 
     @pytest.fixture()
     def c2d_receive_ack_scenario(self, fixture_ghcs, mocked_response):
-        from .generators import create_c2d_receive_response
-
+        from azext_iot.tests.generators import create_c2d_receive_response
         payload = create_c2d_receive_response()
         mocked_response.add(
             method=responses.GET,

@@ -9,7 +9,7 @@ from azext_iot.iothub.providers.discovery import (
     PRIVILEDGED_ACCESS_RIGHTS_SET,
 )
 from azext_iot.tests import IoTLiveScenarioTest
-from ..settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC, Setting
+from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC, Setting
 
 settings = DynamoSettings(ENV_SET_TEST_IOTHUB_BASIC)
 LIVE_HUB = settings.env.azext_iot_testhub

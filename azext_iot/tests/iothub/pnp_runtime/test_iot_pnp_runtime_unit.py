@@ -11,8 +11,8 @@ import json
 from random import randint
 from knack.cli import CLIError
 from azext_iot.iothub import commands_pnp_runtime as subject
-from ...conftest import mock_target
-from ...generators import generate_generic_id
+from azext_iot.tests.conftest import mock_target
+from azext_iot.tests.generators import generate_generic_id
 
 
 device_id = generate_generic_id()

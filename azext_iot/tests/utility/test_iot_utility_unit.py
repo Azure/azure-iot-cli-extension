@@ -242,7 +242,7 @@ class TestProcessJsonArg(object):
 
     @pytest.mark.parametrize(
         "content, argname",
-        [("iothub/configurations/test_adm_device_content.json", "myarg0")],
+        [("../iothub/configurations/test_adm_device_content.json", "myarg0")],
     )
     def test_file_json(self, content, argname, set_cwd):
         result = process_json_arg(content, argument_name=argname)
@@ -267,7 +267,7 @@ class TestProcessJsonArg(object):
         )
         assert mocked_util_logger.call_args[0][1] == argname
 
-    @pytest.mark.parametrize("content, argname", [("generators.py", "myarg0")])
+    @pytest.mark.parametrize("content, argname", [("../generators.py", "myarg0")])
     def test_file_json_fail_invalidcontent(self, content, argname, set_cwd, mocker):
         mocked_util_logger = mocker.patch.object(logger, "warning", autospec=True)
 
