@@ -5,7 +5,7 @@ parameters:
   runIntTests: 'true'
   runWithAzureCliReleased: 'true'
   path: 'azext_iot/tests'
-  name: 'All'
+  name: 'all'
 
 steps:
   - template: setup-dev-test-env.yml
@@ -23,18 +23,22 @@ steps:
         azureSubscription: AzIoTCLIService
         scriptType: bash
         scriptLocation: inlineScript
-        inlineScript: pytest -vv ${{ parameters.path }} -k "_int"  --junitxml=junit/test-iotext-int-${{ parameters.name }}.xml
+        inlineScript: |
+          export COVERAGE_FILE=.coverage.${{ parameters.name }}
+          pytest -vv ${{ parameters.path }} -k "_int" --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int-${{ parameters.name }}.xml
 
   - ${{ if eq(parameters.runUnitTests, 'true') }}:
-    - script: pytest -vv ${{ parameters.path }} -k "_unit" --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-unit-${{ parameters.name }}.xml --cov-report=xml
+    - script: |
+        pytest -vv ${{ parameters.path }} -k "_unit" --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-unit-${{ parameters.name }}.xml
       displayName: '${{ parameters.name }} unit tests'
-  
-    - task: PublishCodeCoverageResults@1
-      inputs:
-        codeCoverageTool: 'cobertura'
-        summaryFileLocation: '$(System.DefaultWorkingDirectory)/coverage.xml'
-        reportDirectory: '$(System.DefaultWorkingDirectory)/htmlcov'
-        additionalCodeCoverageFiles: '$(System.DefaultWorkingDirectory)/htmlcov/**/*.*'
+      env:
+        COVERAGE_FILE: .coverage.${{ parameters.name }}
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      pathToPublish: .coverage.${{ parameters.name }}
+      publishLocation: 'Container' 
+      artifactName: 'coverage'
 
   - task: PublishTestResults@2
     condition: succeededOrFailed()
