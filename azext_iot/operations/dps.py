@@ -111,6 +111,7 @@ def iot_dps_device_enrollment_create(
     edge_enabled=False,
     webhook_url=None,
     api_version=None,
+    etag=None
 ):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
@@ -163,7 +164,7 @@ def iot_dps_device_enrollment_create(
             iot_hubs=iot_hub_list,
             custom_allocation_definition=custom_allocation_definition,
         )
-        return sdk.create_or_update_individual_enrollment(enrollment_id, enrollment)
+        return sdk.create_or_update_individual_enrollment(enrollment_id, enrollment, if_match=(etag if etag else "*"))
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
@@ -197,17 +198,11 @@ def iot_dps_device_enrollment_update(
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
-
         enrollment_record = sdk.get_individual_enrollment(enrollment_id)
+
         # Verify etag
-        if (
-            etag
-            and hasattr(enrollment_record, "etag")
-            and etag != enrollment_record.etag.replace('"', "")
-        ):
-            raise LookupError("enrollment etag doesn't match.")
-        if not etag:
-            etag = enrollment_record.etag.replace('"', "")
+        etag = _validate_or_get_etag_from_enrollment_record(enrollment_record, etag)
+
         # Verify and update attestation information
         attestation_type = enrollment_record.attestation.type
         _validate_arguments_for_attestation_mechanism(
@@ -281,14 +276,17 @@ def iot_dps_device_enrollment_update(
 
 
 def iot_dps_device_enrollment_delete(
-    client, enrollment_id, dps_name, resource_group_name
+    client, enrollment_id, dps_name, resource_group_name, etag=None
 ):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
+        enrollment_record = sdk.get_individual_enrollment(enrollment_id)
 
-        return sdk.delete_individual_enrollment(enrollment_id)
+        etag = _validate_or_get_etag_from_enrollment_record(enrollment_record, etag)
+
+        return sdk.delete_individual_enrollment(enrollment_id, etag)
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
@@ -364,6 +362,7 @@ def iot_dps_device_enrollment_group_create(
     edge_enabled=False,
     webhook_url=None,
     api_version=None,
+    etag=None,
 ):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
@@ -422,7 +421,7 @@ def iot_dps_device_enrollment_group_create(
             iot_hubs=iot_hub_list,
             custom_allocation_definition=custom_allocation_definition,
         )
-        return sdk.create_or_update_enrollment_group(enrollment_id, group_enrollment)
+        return sdk.create_or_update_enrollment_group(enrollment_id, group_enrollment, if_match=(etag if etag else "*"))
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
@@ -456,17 +455,11 @@ def iot_dps_device_enrollment_group_update(
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
+        enrollment_record = sdk.get_individual_enrollment(enrollment_id)
+
+        etag = _validate_or_get_etag_from_enrollment_record(enrollment_record, etag)
 
         enrollment_record = sdk.get_enrollment_group(enrollment_id)
-        # Verify etag
-        if (
-            etag
-            and hasattr(enrollment_record, "etag")
-            and etag != enrollment_record.etag.replace('"', "")
-        ):
-            raise LookupError("enrollment etag doesn't match.")
-        if not etag:
-            etag = enrollment_record.etag.replace('"', "")
         # Update enrollment information
         if enrollment_record.attestation.type == AttestationType.symmetricKey.value:
             enrollment_record.attestation = sdk.get_enrollment_group_attestation_mechanism(
@@ -559,14 +552,17 @@ def iot_dps_device_enrollment_group_update(
 
 
 def iot_dps_device_enrollment_group_delete(
-    client, enrollment_id, dps_name, resource_group_name
+    client, enrollment_id, dps_name, resource_group_name, etag=None
 ):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
+        enrollment_record = sdk.get_individual_enrollment(enrollment_id)
 
-        return sdk.delete_enrollment_group(enrollment_id)
+        etag = _validate_or_get_etag_from_enrollment_record(enrollment_record, etag)
+
+        return sdk.delete_enrollment_group(enrollment_id, etag)
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
@@ -608,13 +604,13 @@ def iot_dps_registration_get(client, dps_name, resource_group_name, registration
         raise CLIError(e)
 
 
-def iot_dps_registration_delete(client, dps_name, resource_group_name, registration_id):
+def iot_dps_registration_delete(client, dps_name, resource_group_name, registration_id, etag=None):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
-        return sdk.delete_device_registration_state(registration_id)
+        return sdk.delete_device_registration_state(registration_id, if_match=(etag if etag else "*"))
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
@@ -915,3 +911,16 @@ def _validate_allocation_policy_for_enrollment(
     else:
         if iot_hub_list:
             raise CLIError("Please provide allocation policy.")
+
+
+def _validate_or_get_etag_from_enrollment_record(enrollment_record, etag):
+    # Verify etag
+    if (
+        etag
+        and hasattr(enrollment_record, "etag")
+        and etag != enrollment_record.etag.replace('"', "")
+    ):
+        raise LookupError("enrollment etag doesn't match.")
+    if not etag:
+        etag = enrollment_record.etag.replace('"', "")
+    return etag
