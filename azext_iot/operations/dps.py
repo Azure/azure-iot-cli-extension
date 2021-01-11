@@ -200,9 +200,6 @@ def iot_dps_device_enrollment_update(
         sdk = resolver.get_sdk(SdkType.dps_sdk)
         enrollment_record = sdk.get_individual_enrollment(enrollment_id)
 
-        # Verify etag
-        etag = _validate_or_get_etag_from_enrollment_record(enrollment_record, etag)
-
         # Verify and update attestation information
         attestation_type = enrollment_record.attestation.type
         _validate_arguments_for_attestation_mechanism(
@@ -269,7 +266,7 @@ def iot_dps_device_enrollment_update(
             enrollment_record.capabilities = DeviceCapabilities(iot_edge=edge_enabled)
 
         return sdk.create_or_update_individual_enrollment(
-            enrollment_id, enrollment_record, etag
+            enrollment_id, enrollment_record, if_match=(etag if etag else "*")
         )
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
@@ -282,11 +279,8 @@ def iot_dps_device_enrollment_delete(
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
-        enrollment_record = sdk.get_individual_enrollment(enrollment_id)
 
-        etag = _validate_or_get_etag_from_enrollment_record(enrollment_record, etag)
-
-        return sdk.delete_individual_enrollment(enrollment_id, etag)
+        return sdk.delete_individual_enrollment(enrollment_id, if_match=(etag if etag else "*"))
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
@@ -457,8 +451,6 @@ def iot_dps_device_enrollment_group_update(
         sdk = resolver.get_sdk(SdkType.dps_sdk)
         enrollment_record = sdk.get_individual_enrollment(enrollment_id)
 
-        etag = _validate_or_get_etag_from_enrollment_record(enrollment_record, etag)
-
         enrollment_record = sdk.get_enrollment_group(enrollment_id)
         # Update enrollment information
         if enrollment_record.attestation.type == AttestationType.symmetricKey.value:
@@ -545,7 +537,7 @@ def iot_dps_device_enrollment_group_update(
         if edge_enabled is not None:
             enrollment_record.capabilities = DeviceCapabilities(iot_edge=edge_enabled)
         return sdk.create_or_update_enrollment_group(
-            enrollment_id, enrollment_record, etag
+            enrollment_id, enrollment_record, if_match=(etag if etag else "*")
         )
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
@@ -558,11 +550,8 @@ def iot_dps_device_enrollment_group_delete(
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
-        enrollment_record = sdk.get_individual_enrollment(enrollment_id)
 
-        etag = _validate_or_get_etag_from_enrollment_record(enrollment_record, etag)
-
-        return sdk.delete_enrollment_group(enrollment_id, etag)
+        return sdk.delete_enrollment_group(enrollment_id, if_match=(etag if etag else "*"))
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
@@ -911,16 +900,3 @@ def _validate_allocation_policy_for_enrollment(
     else:
         if iot_hub_list:
             raise CLIError("Please provide allocation policy.")
-
-
-def _validate_or_get_etag_from_enrollment_record(enrollment_record, etag):
-    # Verify etag
-    if (
-        etag
-        and hasattr(enrollment_record, "etag")
-        and etag != enrollment_record.etag.replace('"', "")
-    ):
-        raise LookupError("enrollment etag doesn't match.")
-    if not etag:
-        etag = enrollment_record.etag.replace('"', "")
-    return etag
