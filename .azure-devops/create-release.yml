@@ -51,7 +51,7 @@ stages:
       - template: templates/run-tests.yml
         parameters:
           path: 'azext_iot/tests/central'
-          name: 'IoT-Central'
+          name: 'iot-central'
     
     - job: 'testADT'
       displayName: 'Test Azure DigitalTwins'
@@ -59,15 +59,15 @@ stages:
       - template: templates/run-tests.yml
         parameters:
           path: 'azext_iot/tests/digitaltwins'
-          name: 'Azure-DigitalTwins'
-    
+          name: 'azure-digitaltwins'
+
     - job: 'testDPS'
       displayName: 'Test DPS'
       steps:
       - template: templates/run-tests.yml
         parameters:
           path: 'azext_iot/tests/dps'
-          name: 'Device-Provisioning-Service'
+          name: 'device-provisioning-service'
     
     - job: 'testHub'
       displayName: 'Test IoT Hub'
@@ -75,8 +75,8 @@ stages:
       - template: templates/run-tests.yml
         parameters:
           path: 'azext_iot/tests/iothub'
-          name: 'IoT-Hub'
-    
+          name: 'iot-hub'
+
     - job: 'unitTests'
       displayName: 'Unit tests and code coverage'
       steps:
@@ -94,6 +94,18 @@ stages:
           architecture: $(architecture)
 
       - template: templates/install-and-record-version.yml
+
+  - stage: 'kpi'
+    displayName: 'Build KPIs'
+    dependsOn: [build, test]
+    jobs:
+    - job: 'calculateCodeCoverage'
+      displayName: 'Calculate distributed code coverage'
+      steps:
+      - template: templates/calculate-code-coverage.yml
+        parameters:
+          pythonVersion: $(pythonVersion)
+          architecture: $(architecture)
 
   - stage: 'release'
     displayName: 'Stage GitHub release'
