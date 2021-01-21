@@ -57,3 +57,14 @@ class RbacProvider(object):
         if not delete_op.success():
             raise CLIError("Unable to remove role assignment.")
         return
+
+    def assign_role_flex(self, principal_id, scope, principal_type="ServicePrincipal", role_type="Contributor"):
+        assign_op = self.cli.invoke(
+            "role assignment create --scope '{}' --role '{}' --assignee-object-id '{}' --assignee-principal-type '{}' ".format(
+                scope, role_type, principal_id, principal_type
+            )
+        )
+        if not assign_op.success():
+            raise CLIError("Unable to assign role.")
+
+        return assign_op.as_json()

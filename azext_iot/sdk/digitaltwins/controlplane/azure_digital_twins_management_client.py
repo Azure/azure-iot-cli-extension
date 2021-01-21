@@ -16,8 +16,9 @@ from .version import VERSION
 from .operations.digital_twins_operations import DigitalTwinsOperations
 from .operations.digital_twins_endpoint_operations import DigitalTwinsEndpointOperations
 from .operations.operations import Operations
+from .operations.private_link_resources_operations import PrivateLinkResourcesOperations
+from .operations.private_endpoint_connections_operations import PrivateEndpointConnectionsOperations
 from . import models
-from azext_iot.constants import USER_AGENT
 
 
 class AzureDigitalTwinsManagementClientConfiguration(AzureConfiguration):
@@ -46,7 +47,6 @@ class AzureDigitalTwinsManagementClientConfiguration(AzureConfiguration):
         super(AzureDigitalTwinsManagementClientConfiguration, self).__init__(base_url)
 
         self.add_user_agent('azure-mgmt-digitaltwins/{}'.format(VERSION))
-        self.add_user_agent(USER_AGENT)
 
         self.credentials = credentials
         self.subscription_id = subscription_id
@@ -59,11 +59,15 @@ class AzureDigitalTwinsManagementClient(SDKClient):
     :vartype config: AzureDigitalTwinsManagementClientConfiguration
 
     :ivar digital_twins: DigitalTwins operations
-    :vartype digital_twins: azure.mgmt.digitaltwins.operations.DigitalTwinsOperations
+    :vartype digital_twins: controlplane.operations.DigitalTwinsOperations
     :ivar digital_twins_endpoint: DigitalTwinsEndpoint operations
-    :vartype digital_twins_endpoint: azure.mgmt.digitaltwins.operations.DigitalTwinsEndpointOperations
+    :vartype digital_twins_endpoint: controlplane.operations.DigitalTwinsEndpointOperations
     :ivar operations: Operations operations
-    :vartype operations: azure.mgmt.digitaltwins.operations.Operations
+    :vartype operations: controlplane.operations.Operations
+    :ivar private_link_resources: PrivateLinkResources operations
+    :vartype private_link_resources: controlplane.operations.PrivateLinkResourcesOperations
+    :ivar private_endpoint_connections: PrivateEndpointConnections operations
+    :vartype private_endpoint_connections: controlplane.operations.PrivateEndpointConnectionsOperations
 
     :param credentials: Credentials needed for the client to connect to Azure.
     :type credentials: :mod:`A msrestazure Credentials
@@ -80,7 +84,7 @@ class AzureDigitalTwinsManagementClient(SDKClient):
         super(AzureDigitalTwinsManagementClient, self).__init__(self.config.credentials, self.config)
 
         client_models = {k: v for k, v in models.__dict__.items() if isinstance(v, type)}
-        self.api_version = '2020-10-31'
+        self.api_version = '2020-12-01'
         self._serialize = Serializer(client_models)
         self._deserialize = Deserializer(client_models)
 
@@ -89,4 +93,8 @@ class AzureDigitalTwinsManagementClient(SDKClient):
         self.digital_twins_endpoint = DigitalTwinsEndpointOperations(
             self._client, self.config, self._serialize, self._deserialize)
         self.operations = Operations(
+            self._client, self.config, self._serialize, self._deserialize)
+        self.private_link_resources = PrivateLinkResourcesOperations(
+            self._client, self.config, self._serialize, self._deserialize)
+        self.private_endpoint_connections = PrivateEndpointConnectionsOperations(
             self._client, self.config, self._serialize, self._deserialize)

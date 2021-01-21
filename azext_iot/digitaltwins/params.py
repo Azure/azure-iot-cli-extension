@@ -12,8 +12,10 @@ from knack.arguments import CLIArgumentType
 from azure.cli.core.commands.parameters import (
     resource_group_name_type,
     get_three_state_flag,
-    tags_type
+    get_enum_type,
+    tags_type,
 )
+from azext_iot.digitaltwins.common import ADTEndpointAuthType
 
 depfor_type = CLIArgumentType(
     options_list=["--dependencies-for"],
@@ -102,12 +104,45 @@ def load_digitaltwins_arguments(self, _):
             help="Maximum number of elements to return.",
         )
 
+    with self.argument_context("dt create") as context:
+        context.argument(
+            "assign_identity",
+            arg_group="Managed Service Identity",
+            help="Assign a system generated identity to the Digital Twins instance.",
+            arg_type=get_three_state_flag(),
+        )
+        context.argument(
+            "scopes",
+            arg_group="Managed Service Identity",
+            nargs="+",
+            options_list=["--scopes"],
+            help="Space-seperated scopes the system assigned identity can access.",
+        )
+        context.argument(
+            "role_type",
+            arg_group="Managed Service Identity",
+            options_list=["--role"],
+            help="Role name or Id the system assigned identity will have.",
+        )
+
     with self.argument_context("dt endpoint create") as context:
         context.argument(
-            "dead_letter_endpoint",
+            "dead_letter_secret",
             options_list=["--deadletter-sas-uri", "--dsu"],
-            help="Dead-letter storage container URL with SAS token",
+            help="Dead-letter storage container URL with SAS token for Key based authentication.",
             arg_group="Dead-letter Endpoint"
+        )
+        context.argument(
+            "dead_letter_uri",
+            options_list=["--deadletter-uri", "--du"],
+            help="Dead-letter storage container URL for Identity based authentication.",
+            arg_group="Dead-letter Endpoint"
+        )
+        context.argument(
+            "auth_type",
+            options_list=["--auth-type"],
+            help="Endpoint authentication type.",
+            arg_type=get_enum_type(ADTEndpointAuthType)
         )
 
     with self.argument_context("dt endpoint create eventgrid") as context:
@@ -141,7 +176,7 @@ def load_digitaltwins_arguments(self, _):
         context.argument(
             "eventhub_policy",
             options_list=["--eventhub-policy", "--ehp"],
-            help="EventHub policy to use for endpoint configuration.",
+            help="EventHub policy to use for endpoint configuration. Required when --auth-type is KeyBased.",
             arg_group="Event Hub",
         )
         context.argument(
@@ -174,7 +209,7 @@ def load_digitaltwins_arguments(self, _):
         context.argument(
             "servicebus_policy",
             options_list=["--servicebus-policy", "--sbp"],
-            help="ServiceBus Topic policy to use for endpoint configuration.",
+            help="ServiceBus Topic policy to use for endpoint configuration. Required when --auth-type is KeyBased.",
             arg_group="Service Bus Topic",
         )
         context.argument(

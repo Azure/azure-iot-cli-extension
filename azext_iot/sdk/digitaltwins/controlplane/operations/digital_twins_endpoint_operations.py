@@ -24,7 +24,7 @@ class DigitalTwinsEndpointOperations(object):
     :param config: Configuration of service client.
     :param serializer: An object model serializer.
     :param deserializer: An object model deserializer.
-    :ivar api_version: Version of the DigitalTwinsInstance Management API. Constant value: "2020-10-31".
+    :ivar api_version: Version of the DigitalTwinsInstance Management API. Constant value: "2020-12-01".
     """
 
     models = models
@@ -34,7 +34,7 @@ class DigitalTwinsEndpointOperations(object):
         self._client = client
         self._serialize = serializer
         self._deserialize = deserializer
-        self.api_version = "2020-10-31"
+        self.api_version = "2020-12-01"
 
         self.config = config
 
@@ -54,9 +54,9 @@ class DigitalTwinsEndpointOperations(object):
          overrides<msrest:optionsforoperations>`.
         :return: An iterator like instance of DigitalTwinsEndpointResource
         :rtype:
-         ~azure.mgmt.digitaltwins.models.DigitalTwinsEndpointResourcePaged[~azure.mgmt.digitaltwins.models.DigitalTwinsEndpointResource]
+         ~controlplane.models.DigitalTwinsEndpointResourcePaged[~controlplane.models.DigitalTwinsEndpointResource]
         :raises:
-         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
         """
         def internal_paging(next_link=None, raw=False):
 
@@ -65,7 +65,7 @@ class DigitalTwinsEndpointOperations(object):
                 url = self.list.metadata['url']
                 path_format_arguments = {
                     'subscriptionId': self._serialize.url("self.config.subscription_id", self.config.subscription_id, 'str'),
-                    'resourceGroupName': self._serialize.url("resource_group_name", resource_group_name, 'str', max_length=64, min_length=1),
+                    'resourceGroupName': self._serialize.url("resource_group_name", resource_group_name, 'str', max_length=90, min_length=1),
                     'resourceName': self._serialize.url("resource_name", resource_name, 'str', max_length=63, min_length=3, pattern=r'^(?!-)[A-Za-z0-9-]{3,63}(?<!-)$')
                 }
                 url = self._client.format_url(url, **path_format_arguments)
@@ -125,16 +125,16 @@ class DigitalTwinsEndpointOperations(object):
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
         :return: DigitalTwinsEndpointResource or ClientRawResponse if raw=true
-        :rtype: ~azure.mgmt.digitaltwins.models.DigitalTwinsEndpointResource
-         or ~msrest.pipeline.ClientRawResponse
+        :rtype: ~controlplane.models.DigitalTwinsEndpointResource or
+         ~msrest.pipeline.ClientRawResponse
         :raises:
-         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
         """
         # Construct URL
         url = self.get.metadata['url']
         path_format_arguments = {
             'subscriptionId': self._serialize.url("self.config.subscription_id", self.config.subscription_id, 'str'),
-            'resourceGroupName': self._serialize.url("resource_group_name", resource_group_name, 'str', max_length=64, min_length=1),
+            'resourceGroupName': self._serialize.url("resource_group_name", resource_group_name, 'str', max_length=90, min_length=1),
             'resourceName': self._serialize.url("resource_name", resource_name, 'str', max_length=63, min_length=3, pattern=r'^(?!-)[A-Za-z0-9-]{3,63}(?<!-)$'),
             'endpointName': self._serialize.url("endpoint_name", endpoint_name, 'str', max_length=49, min_length=2, pattern=r'^(?![0-9]+$)(?!-)[a-zA-Z0-9-]{2,49}[a-zA-Z0-9]$')
         }
@@ -182,7 +182,7 @@ class DigitalTwinsEndpointOperations(object):
         url = self.create_or_update.metadata['url']
         path_format_arguments = {
             'subscriptionId': self._serialize.url("self.config.subscription_id", self.config.subscription_id, 'str'),
-            'resourceGroupName': self._serialize.url("resource_group_name", resource_group_name, 'str', max_length=64, min_length=1),
+            'resourceGroupName': self._serialize.url("resource_group_name", resource_group_name, 'str', max_length=90, min_length=1),
             'resourceName': self._serialize.url("resource_name", resource_name, 'str', max_length=63, min_length=3, pattern=r'^(?!-)[A-Za-z0-9-]{3,63}(?<!-)$'),
             'endpointName': self._serialize.url("endpoint_name", endpoint_name, 'str', max_length=49, min_length=2, pattern=r'^(?![0-9]+$)(?!-)[a-zA-Z0-9-]{2,49}[a-zA-Z0-9]$')
         }
@@ -239,7 +239,7 @@ class DigitalTwinsEndpointOperations(object):
         :type endpoint_name: str
         :param properties: DigitalTwinsInstance endpoint resource properties.
         :type properties:
-         ~azure.mgmt.digitaltwins.models.DigitalTwinsEndpointResourceProperties
+         ~controlplane.models.DigitalTwinsEndpointResourceProperties
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: The poller return type is ClientRawResponse, the
          direct response alongside the deserialized response
@@ -249,11 +249,11 @@ class DigitalTwinsEndpointOperations(object):
          DigitalTwinsEndpointResource or
          ClientRawResponse<DigitalTwinsEndpointResource> if raw==True
         :rtype:
-         ~msrestazure.azure_operation.AzureOperationPoller[~azure.mgmt.digitaltwins.models.DigitalTwinsEndpointResource]
+         ~msrestazure.azure_operation.AzureOperationPoller[~controlplane.models.DigitalTwinsEndpointResource]
          or
-         ~msrestazure.azure_operation.AzureOperationPoller[~msrest.pipeline.ClientRawResponse[~azure.mgmt.digitaltwins.models.DigitalTwinsEndpointResource]]
+         ~msrestazure.azure_operation.AzureOperationPoller[~msrest.pipeline.ClientRawResponse[~controlplane.models.DigitalTwinsEndpointResource]]
         :raises:
-         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
         """
         raw_result = self._create_or_update_initial(
             resource_group_name=resource_group_name,
@@ -290,7 +290,7 @@ class DigitalTwinsEndpointOperations(object):
         url = self.delete.metadata['url']
         path_format_arguments = {
             'subscriptionId': self._serialize.url("self.config.subscription_id", self.config.subscription_id, 'str'),
-            'resourceGroupName': self._serialize.url("resource_group_name", resource_group_name, 'str', max_length=64, min_length=1),
+            'resourceGroupName': self._serialize.url("resource_group_name", resource_group_name, 'str', max_length=90, min_length=1),
             'resourceName': self._serialize.url("resource_name", resource_name, 'str', max_length=63, min_length=3, pattern=r'^(?!-)[A-Za-z0-9-]{3,63}(?<!-)$'),
             'endpointName': self._serialize.url("endpoint_name", endpoint_name, 'str', max_length=49, min_length=2, pattern=r'^(?![0-9]+$)(?!-)[a-zA-Z0-9-]{2,49}[a-zA-Z0-9]$')
         }
@@ -350,11 +350,11 @@ class DigitalTwinsEndpointOperations(object):
          DigitalTwinsEndpointResource or
          ClientRawResponse<DigitalTwinsEndpointResource> if raw==True
         :rtype:
-         ~msrestazure.azure_operation.AzureOperationPoller[~azure.mgmt.digitaltwins.models.DigitalTwinsEndpointResource]
+         ~msrestazure.azure_operation.AzureOperationPoller[~controlplane.models.DigitalTwinsEndpointResource]
          or
-         ~msrestazure.azure_operation.AzureOperationPoller[~msrest.pipeline.ClientRawResponse[~azure.mgmt.digitaltwins.models.DigitalTwinsEndpointResource]]
+         ~msrestazure.azure_operation.AzureOperationPoller[~msrest.pipeline.ClientRawResponse[~controlplane.models.DigitalTwinsEndpointResource]]
         :raises:
-         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
         """
         raw_result = self._delete_initial(
             resource_group_name=resource_group_name,
