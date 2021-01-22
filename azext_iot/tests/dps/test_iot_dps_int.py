@@ -105,11 +105,18 @@ class TestDPSEnrollments(LiveScenarioTest):
 
         output_dir = os.getcwd()
         create_self_signed_certificate(cert_name, 200, output_dir, True)
-        self.kwargs["generic_dict"] = {
+        base_enrollment_props = {
             "count": None,
-            "key": "value",
             "metadata": None,
             "version": None,
+        }
+        self.kwargs["generic_dict"] = {
+            **base_enrollment_props,
+            "key": "value",
+        }
+        self.kwargs["twin_array_dict"] = {
+            **base_enrollment_props,
+            "values": [{"key1": "value1"}, {"key2": "value2"}],
         }
 
         _cleanup_enrollments(self, dps, rg)
@@ -551,5 +558,93 @@ class TestDPSEnrollments(LiveScenarioTest):
         self.cmd(
             "iot dps certificate delete -g {} --dps-name {} --name {} --etag {}".format(
                 rg, dps, cert_name, cert_etag
+            )
+        )
+
+    def test_dps_enrollment_twin_array(self):
+        hub_host_name = "{}.azure-devices.net".format(hub)
+
+        # test twin array in enrollment
+        attestation_type = AttestationType.x509.value
+        device_id = self.create_random_name("device-id-for-test", length=48)
+        enrollment_id = self.create_random_name("enrollment-for-test", length=48)
+
+        self.cmd(
+            "iot dps enrollment create --enrollment-id {} --attestation-type {}"
+            " -g {} --dps-name {} --cp {} --scp {}"
+            " --provisioning-status {} --device-id {}"
+            " --initial-twin-tags {} --initial-twin-properties {}"
+            " --allocation-policy {} --iot-hubs {}".format(
+                enrollment_id,
+                attestation_type,
+                rg,
+                dps,
+                cert_path,
+                cert_path,
+                provisioning_status,
+                device_id,
+                '"{generic_dict}"',
+                '"{twin_array_dict}"',
+                AllocationType.hashed.value,
+                hub_host_name,
+            ),
+            checks=[
+                self.check("attestation.type", attestation_type),
+                self.check("registrationId", enrollment_id),
+                self.check("provisioningStatus", provisioning_status),
+                self.check("deviceId", device_id),
+                self.check("allocationPolicy", AllocationType.hashed.value),
+                self.check("iotHubs", hub_host_name.split()),
+                self.check("initialTwin.tags", self.kwargs["generic_dict"]),
+                self.check(
+                    "initialTwin.properties.desired", self.kwargs["twin_array_dict"]
+                ),
+                self.exists("reprovisionPolicy"),
+                self.check("reprovisionPolicy.migrateDeviceData", True),
+                self.check("reprovisionPolicy.updateHubAssignment", True),
+            ],
+        )
+
+        self.cmd(
+            "iot dps enrollment delete -g {} --dps-name {} --enrollment-id {}".format(
+                rg, dps, enrollment_id
+            )
+        )
+
+        # test twin array in enrollment group
+        enrollment_group_id = self.create_random_name("enrollment-for-test", length=48)
+
+        self.cmd(
+            "iot dps enrollment-group create --enrollment-id {} -g {} --dps-name {}"
+            " --cp {} --scp {} --provisioning-status {} --allocation-policy {}"
+            " --iot-hubs {} --edge-enabled --props {}".format(
+                enrollment_group_id,
+                rg,
+                dps,
+                cert_path,
+                cert_path,
+                provisioning_status,
+                "geoLatency",
+                hub_host_name,
+                '"{twin_array_dict}"',
+            ),
+            checks=[
+                self.check("enrollmentGroupId", enrollment_group_id),
+                self.check("provisioningStatus", provisioning_status),
+                self.exists("reprovisionPolicy"),
+                self.check("allocationPolicy", "geoLatency"),
+                self.check("iotHubs", hub_host_name.split()),
+                self.check(
+                    "initialTwin.properties.desired", self.kwargs["twin_array_dict"]
+                ),
+                self.check("reprovisionPolicy.migrateDeviceData", True),
+                self.check("reprovisionPolicy.updateHubAssignment", True),
+                self.check("capabilities.iotEdge", True),
+            ],
+        )
+
+        self.cmd(
+            "iot dps enrollment-group delete -g {} --dps-name {} --enrollment-id {}".format(
+                rg, dps, enrollment_group_id
             )
         )
