@@ -14,9 +14,18 @@ from enum import Enum
 
 class ADTEndpointType(Enum):
     """
-    ADT Location Type.
+    ADT Endpoint Type.
     """
 
     eventgridtopic = "eventgridtopic"
     servicebus = "servicebus"
     eventhub = "eventhub"
+
+
+class ADTEndpointAuthType(Enum):
+    """
+    ADT Endpoint Auth Type.
+    """
+
+    identitybased = "IdentityBased"
+    keybased = "KeyBased"

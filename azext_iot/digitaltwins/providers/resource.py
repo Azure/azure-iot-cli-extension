@@ -3,20 +3,19 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-
+from azext_iot.digitaltwins.common import ADTEndpointAuthType
 from azext_iot.digitaltwins.providers import (
     DigitalTwinsResourceManager,
     CloudError,
     ErrorResponseException,
 )
 from azext_iot.digitaltwins.providers.rbac import RbacProvider
-from azext_iot.sdk.digitaltwins.controlplane.models import (
-    EventGrid as EventGridEndpointProperties,
-    EventHub as EventHubEndpointProperties,
-    ServiceBus as ServiceBusEndpointProperties,
-)
+from azext_iot.sdk.digitaltwins.controlplane.models import DigitalTwinsDescription
 from azext_iot.common.utility import unpack_msrest_error
 from knack.util import CLIError
+from knack.log import get_logger
+
+logger = get_logger(__name__)
 
 
 class ResourceProvider(DigitalTwinsResourceManager):
@@ -25,8 +24,17 @@ class ResourceProvider(DigitalTwinsResourceManager):
         self.mgmt_sdk = self.get_mgmt_sdk()
         self.rbac = RbacProvider()
 
-    def create(self, name, resource_group_name, location=None, tags=None, timeout=60):
-
+    def create(
+        self,
+        name,
+        resource_group_name,
+        location=None,
+        tags=None,
+        timeout=60,
+        assign_identity=None,
+        scopes=None,
+        role_type="Contributor",
+    ):
         if not location:
             from azext_iot.common.embedded_cli import EmbeddedCLI
 
@@ -38,13 +46,51 @@ class ResourceProvider(DigitalTwinsResourceManager):
             location = resource_group_meta["location"]
 
         try:
-            return self.mgmt_sdk.digital_twins.create_or_update(
-                resource_name=name,
-                resource_group_name=resource_group_name,
+            if assign_identity:
+                if scopes and not role_type:
+                    raise CLIError(
+                        "Both --scopes and --role values are required when assigning the instance identity."
+                    )
+
+            digital_twins_create = DigitalTwinsDescription(
                 location=location,
                 tags=tags,
+                identity={"type": "SystemAssigned" if assign_identity else "None"},
+            )
+            create_or_update = self.mgmt_sdk.digital_twins.create_or_update(
+                resource_name=name,
+                resource_group_name=resource_group_name,
+                digital_twins_create=digital_twins_create,
                 long_running_operation_timeout=timeout,
             )
+
+            def rbac_handler(lro):
+                instance = lro.resource().as_dict()
+                identity = instance.get("identity")
+                if identity:
+                    identity_type = identity.get("type")
+                    principal_id = identity.get("principal_id")
+
+                    if (
+                        principal_id
+                        and scopes
+                        and identity_type
+                        and identity_type.lower() == "systemassigned"
+                    ):
+                        for scope in scopes:
+                            logger.info(
+                                "Applying rbac assignment: Principal Id: {}, Scope: {}, Role: {}".format(
+                                    principal_id, scope, role_type
+                                )
+                            )
+                            self.rbac.assign_role_flex(
+                                principal_id=principal_id,
+                                scope=scope,
+                                role_type=role_type,
+                            )
+
+            create_or_update.add_done_callback(rbac_handler)
+            return create_or_update
         except CloudError as e:
             raise e
         except ErrorResponseException as err:
@@ -216,7 +262,6 @@ class ResourceProvider(DigitalTwinsResourceManager):
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
 
-    # TODO: Breakout and refactor
     def add_endpoint(
         self,
         name,
@@ -227,29 +272,45 @@ class ResourceProvider(DigitalTwinsResourceManager):
         endpoint_resource_policy=None,
         endpoint_resource_namespace=None,
         endpoint_subscription=None,
-        dead_letter_endpoint=None,
-        tags=None,
+        dead_letter_uri=None,
+        dead_letter_secret=None,
         resource_group_name=None,
         timeout=20,
+        auth_type=None,
     ):
-        from azext_iot.common.embedded_cli import EmbeddedCLI
         from azext_iot.digitaltwins.common import ADTEndpointType
 
-        requires_policy = [ADTEndpointType.eventhub, ADTEndpointType.servicebus]
-        if endpoint_resource_type in requires_policy:
-            if not endpoint_resource_policy:
-                raise CLIError(
-                    "Endpoint resources of type {} require a policy name.".format(
-                        " or ".join(map(str, requires_policy))
-                    )
-                )
-
+        requires_namespace = [
+            ADTEndpointType.eventhub.value,
+            ADTEndpointType.servicebus.value,
+        ]
+        if endpoint_resource_type in requires_namespace:
             if not endpoint_resource_namespace:
                 raise CLIError(
                     "Endpoint resources of type {} require a namespace.".format(
-                        " or ".join(map(str, requires_policy))
+                        " or ".join(map(str, requires_namespace))
                     )
                 )
+
+            if (
+                auth_type == ADTEndpointAuthType.keybased.value
+                and not endpoint_resource_policy
+            ):
+                raise CLIError(
+                    "Endpoint resources of type {} require a policy name when using Key based integration.".format(
+                        " or ".join(map(str, requires_namespace))
+                    )
+                )
+
+        if dead_letter_uri and auth_type == ADTEndpointAuthType.keybased.value:
+            raise CLIError(
+                "Use --deadletter-sas-uri to support deadletter for a Key based endpoint."
+            )
+
+        if dead_letter_secret and auth_type == ADTEndpointAuthType.identitybased.value:
+            raise CLIError(
+                "Use --deadletter-uri to support deadletter for an Identity based endpoint."
+            )
 
         target_instance = self.find_instance(
             name=name, resource_group_name=resource_group_name
@@ -257,84 +318,19 @@ class ResourceProvider(DigitalTwinsResourceManager):
         if not resource_group_name:
             resource_group_name = self.get_rg(target_instance)
 
-        cli = EmbeddedCLI()
-        error_prefix = "Could not create ADT instance endpoint. Unable to retrieve"
+        from azext_iot.digitaltwins.providers.endpoint.builders import build_endpoint
 
-        properties = {}
-
-        if endpoint_resource_type == ADTEndpointType.eventgridtopic:
-            eg_topic_keys_op = cli.invoke(
-                "eventgrid topic key list -n {} -g {}".format(
-                    endpoint_resource_name, endpoint_resource_group
-                ),
-                subscription=endpoint_subscription,
-            )
-            if not eg_topic_keys_op.success():
-                raise CLIError("{} Event Grid topic keys.".format(error_prefix))
-            eg_topic_keys = eg_topic_keys_op.as_json()
-
-            eg_topic_endpoint_op = cli.invoke(
-                "eventgrid topic show -n {} -g {}".format(
-                    endpoint_resource_name, endpoint_resource_group
-                ),
-                subscription=endpoint_subscription,
-            )
-            if not eg_topic_endpoint_op.success():
-                raise CLIError("{} Event Grid topic endpoint.".format(error_prefix))
-            eg_topic_endpoint = eg_topic_endpoint_op.as_json()
-
-            properties = EventGridEndpointProperties(
-                access_key1=eg_topic_keys["key1"],
-                access_key2=eg_topic_keys["key2"],
-                dead_letter_secret=dead_letter_endpoint,
-                topic_endpoint=eg_topic_endpoint["endpoint"],
-            )
-
-        elif endpoint_resource_type == ADTEndpointType.servicebus:
-            sb_topic_keys_op = cli.invoke(
-                "servicebus topic authorization-rule keys list -n {} "
-                "--namespace-name {} -g {} --topic-name {}".format(
-                    endpoint_resource_policy,
-                    endpoint_resource_namespace,
-                    endpoint_resource_group,
-                    endpoint_resource_name,
-                ),
-                subscription=endpoint_subscription,
-            )
-            if not sb_topic_keys_op.success():
-                raise CLIError("{} Service Bus topic keys.".format(error_prefix))
-            sb_topic_keys = sb_topic_keys_op.as_json()
-
-            properties = ServiceBusEndpointProperties(
-                primary_connection_string=sb_topic_keys["primaryConnectionString"],
-                secondary_connection_string=sb_topic_keys["secondaryConnectionString"],
-                dead_letter_secret=dead_letter_endpoint,
-            )
-
-        elif endpoint_resource_type == ADTEndpointType.eventhub:
-            eventhub_topic_keys_op = cli.invoke(
-                "eventhubs eventhub authorization-rule keys list -n {} "
-                "--namespace-name {} -g {} --eventhub-name {}".format(
-                    endpoint_resource_policy,
-                    endpoint_resource_namespace,
-                    endpoint_resource_group,
-                    endpoint_resource_name,
-                ),
-                subscription=endpoint_subscription,
-            )
-            if not eventhub_topic_keys_op.success():
-                raise CLIError("{} Event Hub keys.".format(error_prefix))
-            eventhub_topic_keys = eventhub_topic_keys_op.as_json()
-
-            properties = EventHubEndpointProperties(
-                connection_string_primary_key=eventhub_topic_keys[
-                    "primaryConnectionString"
-                ],
-                connection_string_secondary_key=eventhub_topic_keys[
-                    "secondaryConnectionString"
-                ],
-                dead_letter_secret=dead_letter_endpoint,
-            )
+        properties = build_endpoint(
+            endpoint_resource_type=endpoint_resource_type,
+            endpoint_resource_name=endpoint_resource_name,
+            endpoint_resource_group=endpoint_resource_group,
+            endpoint_subscription=endpoint_subscription,
+            endpoint_resource_namespace=endpoint_resource_namespace,
+            endpoint_resource_policy=endpoint_resource_policy,
+            auth_type=auth_type,
+            dead_letter_secret=dead_letter_secret,
+            dead_letter_uri=dead_letter_uri,
+        )
 
         try:
             return self.mgmt_sdk.digital_twins_endpoint.create_or_update(

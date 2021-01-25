@@ -30,17 +30,25 @@ class DigitalTwinsDescription(DigitalTwinsResource):
     :type location: str
     :param tags: The resource tags.
     :type tags: dict[str, str]
+    :param identity: The managed identity for the DigitalTwinsInstance.
+    :type identity: ~controlplane.models.DigitalTwinsIdentity
     :ivar created_time: Time when DigitalTwinsInstance was created.
     :vartype created_time: datetime
     :ivar last_updated_time: Time when DigitalTwinsInstance was updated.
     :vartype last_updated_time: datetime
     :ivar provisioning_state: The provisioning state. Possible values include:
-     'Provisioning', 'Deleting', 'Succeeded', 'Failed', 'Canceled', 'Deleted',
-     'Warning', 'Suspending', 'Restoring', 'Moving'
-    :vartype provisioning_state: str or
-     ~azure.mgmt.digitaltwins.models.ProvisioningState
+     'Provisioning', 'Deleting', 'Updating', 'Succeeded', 'Failed', 'Canceled',
+     'Deleted', 'Warning', 'Suspending', 'Restoring', 'Moving'
+    :vartype provisioning_state: str or ~controlplane.models.ProvisioningState
     :ivar host_name: Api endpoint to work with DigitalTwinsInstance.
     :vartype host_name: str
+    :param private_endpoint_connections:
+    :type private_endpoint_connections:
+     list[~controlplane.models.PrivateEndpointConnection]
+    :param public_network_access: Public network access for the
+     DigitalTwinsInstance. Possible values include: 'Enabled', 'Disabled'
+    :type public_network_access: str or
+     ~controlplane.models.PublicNetworkAccess
     """
 
     _validation = {
@@ -60,10 +68,13 @@ class DigitalTwinsDescription(DigitalTwinsResource):
         'type': {'key': 'type', 'type': 'str'},
         'location': {'key': 'location', 'type': 'str'},
         'tags': {'key': 'tags', 'type': '{str}'},
+        'identity': {'key': 'identity', 'type': 'DigitalTwinsIdentity'},
         'created_time': {'key': 'properties.createdTime', 'type': 'iso-8601'},
         'last_updated_time': {'key': 'properties.lastUpdatedTime', 'type': 'iso-8601'},
         'provisioning_state': {'key': 'properties.provisioningState', 'type': 'str'},
         'host_name': {'key': 'properties.hostName', 'type': 'str'},
+        'private_endpoint_connections': {'key': 'properties.privateEndpointConnections', 'type': '[PrivateEndpointConnection]'},
+        'public_network_access': {'key': 'properties.publicNetworkAccess', 'type': 'str'},
     }
 
     def __init__(self, **kwargs):
@@ -72,3 +83,5 @@ class DigitalTwinsDescription(DigitalTwinsResource):
         self.last_updated_time = None
         self.provisioning_state = None
         self.host_name = None
+        self.private_endpoint_connections = kwargs.get('private_endpoint_connections', None)
+        self.public_network_access = kwargs.get('public_network_access', None)

@@ -30,6 +30,8 @@ class DigitalTwinsResource(Model):
     :type location: str
     :param tags: The resource tags.
     :type tags: dict[str, str]
+    :param identity: The managed identity for the DigitalTwinsInstance.
+    :type identity: ~controlplane.models.DigitalTwinsIdentity
     """
 
     _validation = {
@@ -45,6 +47,7 @@ class DigitalTwinsResource(Model):
         'type': {'key': 'type', 'type': 'str'},
         'location': {'key': 'location', 'type': 'str'},
         'tags': {'key': 'tags', 'type': '{str}'},
+        'identity': {'key': 'identity', 'type': 'DigitalTwinsIdentity'},
     }
 
     def __init__(self, **kwargs):
@@ -54,3 +57,4 @@ class DigitalTwinsResource(Model):
         self.type = None
         self.location = kwargs.get('location', None)
         self.tags = kwargs.get('tags', None)
+        self.identity = kwargs.get('identity', None)
