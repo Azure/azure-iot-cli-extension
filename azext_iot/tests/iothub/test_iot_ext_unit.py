@@ -520,6 +520,20 @@ class TestDeviceUpdate:
                 ),
             ),
             (generate_device_show(), device_update_con_arg(auth_method="x509_ca",)),
+            (generate_device_show(), device_update_con_arg(primary_key="secondary_key", secondary_key="primary_key")),
+            (
+                generate_device_show(
+                    authentication={
+                        "type": "selfSigned",
+                        "symmetricKey": {"primaryKey": None, "secondaryKey": None},
+                        "x509Thumbprint": {
+                            "primaryThumbprint": "123",
+                            "secondaryThumbprint": "321",
+                        },
+                    }
+                ),
+                device_update_con_arg(primary_thumbprint="321", secondary_thumbprint="123")
+            )
         ],
     )
     def test_iot_device_custom(self, fixture_cmd, serviceclient, req, arg):
@@ -583,6 +597,25 @@ class TestDeviceUpdate:
                 device_update_con_arg(auth_method="Unknown",),
                 ValueError,
             ),
+            (
+                generate_device_show(),
+                device_update_con_arg(primary_thumbprint="newThumbprint",),
+                ValueError,
+            ),
+            (
+                generate_device_show(
+                    authentication={
+                        "type": "selfSigned",
+                        "symmetricKey": {"primaryKey": None, "secondaryKey": None},
+                        "x509Thumbprint": {
+                            "primaryThumbprint": "123",
+                            "secondaryThumbprint": "321",
+                        },
+                    }
+                ),
+                device_update_con_arg(primary_key='updated_key'),
+                ValueError
+            )
         ],
     )
     def test_iot_device_custom_invalid_args(self, serviceclient, req, arg, exp):
