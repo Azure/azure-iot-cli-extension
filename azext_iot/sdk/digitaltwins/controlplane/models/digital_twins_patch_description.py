@@ -15,14 +15,22 @@ from msrest.serialization import Model
 class DigitalTwinsPatchDescription(Model):
     """The description of the DigitalTwins service.
 
-    :param tags: Instance tags
+    :param tags: Instance patch properties
     :type tags: dict[str, str]
+    :param identity: The managed identity for the DigitalTwinsInstance.
+    :type identity: ~controlplane.models.DigitalTwinsIdentity
+    :param properties: Properties for the DigitalTwinsInstance.
+    :type properties: ~controlplane.models.DigitalTwinsPatchProperties
     """
 
     _attribute_map = {
         'tags': {'key': 'tags', 'type': '{str}'},
+        'identity': {'key': 'identity', 'type': 'DigitalTwinsIdentity'},
+        'properties': {'key': 'properties', 'type': 'DigitalTwinsPatchProperties'},
     }
 
     def __init__(self, **kwargs):
         super(DigitalTwinsPatchDescription, self).__init__(**kwargs)
         self.tags = kwargs.get('tags', None)
+        self.identity = kwargs.get('identity', None)
+        self.properties = kwargs.get('properties', None)

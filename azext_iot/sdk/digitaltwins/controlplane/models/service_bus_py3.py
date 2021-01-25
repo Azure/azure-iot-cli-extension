@@ -24,41 +24,59 @@ class ServiceBus(DigitalTwinsEndpointResourceProperties):
      'Provisioning', 'Deleting', 'Succeeded', 'Failed', 'Canceled', 'Deleted',
      'Warning', 'Suspending', 'Restoring', 'Moving', 'Disabled'
     :vartype provisioning_state: str or
-     ~azure.mgmt.digitaltwins.models.EndpointProvisioningState
+     ~controlplane.models.EndpointProvisioningState
     :ivar created_time: Time when the Endpoint was added to
      DigitalTwinsInstance.
     :vartype created_time: datetime
-    :param dead_letter_secret: Dead letter storage secret. Will be obfuscated
-     during read.
+    :param authentication_type: Specifies the authentication type being used
+     for connecting to the endpoint. Possible values include: 'KeyBased',
+     'IdentityBased'
+    :type authentication_type: str or ~controlplane.models.AuthenticationType
+    :param dead_letter_secret: Dead letter storage secret for key-based
+     authentication. Will be obfuscated during read.
     :type dead_letter_secret: str
+    :param dead_letter_uri: Dead letter storage URL for identity-based
+     authentication.
+    :type dead_letter_uri: str
     :param endpoint_type: Required. Constant filled by server.
     :type endpoint_type: str
-    :param primary_connection_string: Required. PrimaryConnectionString of the
-     endpoint. Will be obfuscated during read.
+    :param primary_connection_string: PrimaryConnectionString of the endpoint
+     for key-based authentication. Will be obfuscated during read.
     :type primary_connection_string: str
     :param secondary_connection_string: SecondaryConnectionString of the
-     endpoint. Will be obfuscated during read.
+     endpoint for key-based authentication. Will be obfuscated during read.
     :type secondary_connection_string: str
+    :param endpoint_uri: The URL of the ServiceBus namespace for
+     identity-based authentication. It must include the protocol sb://
+    :type endpoint_uri: str
+    :param entity_path: The ServiceBus Topic name for identity-based
+     authentication
+    :type entity_path: str
     """
 
     _validation = {
         'provisioning_state': {'readonly': True},
         'created_time': {'readonly': True},
         'endpoint_type': {'required': True},
-        'primary_connection_string': {'required': True},
     }
 
     _attribute_map = {
         'provisioning_state': {'key': 'provisioningState', 'type': 'str'},
         'created_time': {'key': 'createdTime', 'type': 'iso-8601'},
+        'authentication_type': {'key': 'authenticationType', 'type': 'str'},
         'dead_letter_secret': {'key': 'deadLetterSecret', 'type': 'str'},
+        'dead_letter_uri': {'key': 'deadLetterUri', 'type': 'str'},
         'endpoint_type': {'key': 'endpointType', 'type': 'str'},
         'primary_connection_string': {'key': 'primaryConnectionString', 'type': 'str'},
         'secondary_connection_string': {'key': 'secondaryConnectionString', 'type': 'str'},
+        'endpoint_uri': {'key': 'endpointUri', 'type': 'str'},
+        'entity_path': {'key': 'entityPath', 'type': 'str'},
     }
 
-    def __init__(self, *, primary_connection_string: str, dead_letter_secret: str=None, secondary_connection_string: str=None, **kwargs) -> None:
-        super(ServiceBus, self).__init__(dead_letter_secret=dead_letter_secret, **kwargs)
+    def __init__(self, *, authentication_type=None, dead_letter_secret: str=None, dead_letter_uri: str=None, primary_connection_string: str=None, secondary_connection_string: str=None, endpoint_uri: str=None, entity_path: str=None, **kwargs) -> None:
+        super(ServiceBus, self).__init__(authentication_type=authentication_type, dead_letter_secret=dead_letter_secret, dead_letter_uri=dead_letter_uri, **kwargs)
         self.primary_connection_string = primary_connection_string
         self.secondary_connection_string = secondary_connection_string
+        self.endpoint_uri = endpoint_uri
+        self.entity_path = entity_path
         self.endpoint_type = 'ServiceBus'
