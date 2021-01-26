@@ -209,6 +209,95 @@ def load_digitaltwins_help():
             az dt endpoint delete -n {instance_name} --endpoint-name {endpoint_name} -y --no-wait
     """
 
+    helps["dt network"] = """
+        type: group
+        short-summary: Manage Digital Twins network configuration including private links and endpoint connections.
+    """
+
+    helps["dt network private-link"] = """
+        type: group
+        short-summary: Manage Digital Twins instance private-link operations.
+    """
+
+    helps["dt network private-link show"] = """
+        type: command
+        short-summary: Show a private-link associated with the instance.
+
+        examples:
+        - name: Show the private-link named "API" associated with the instance.
+          text: >
+            az dt network private-link show -n {instance_name} --link-name API
+    """
+
+    helps["dt network private-link list"] = """
+        type: command
+        short-summary: List private-links associated with the Digital Twins instance.
+
+        examples:
+        - name: List all private-links associated with the instance.
+          text: >
+            az dt network private-link list -n {instance_name}
+    """
+
+    helps["dt network private-endpoint"] = """
+        type: group
+        short-summary: Manage Digital Twins instance private-endpoints.
+        long-summary: Use 'az network private-endpoint create' to create a private-endpoint and link to a Digital Twins resource.
+    """
+
+    helps["dt network private-endpoint connection"] = """
+        type: group
+        short-summary: Manage Digital Twins instance private-endpoint connections.
+    """
+
+    helps["dt network private-endpoint connection list"] = """
+        type: command
+        short-summary: List private-endpoint connections associated with the Digital Twins instance.
+
+        examples:
+        - name: List all private-endpoint connections associated with the instance.
+          text: >
+            az dt network private-endpoint connection list -n {instance_name}
+    """
+
+    helps["dt network private-endpoint connection show"] = """
+        type: command
+        short-summary: Show a private-endpoint connection associated with the Digital Twins instance.
+
+        examples:
+        - name: Show details of the private-endpoint connection named ba8408b6-1372-41b2-aef8-af43afc4729f.
+          text: >
+            az dt network private-endpoint connection show -n {instance_name} --cn ba8408b6-1372-41b2-aef8-af43afc4729f
+    """
+
+    helps["dt network private-endpoint connection set"] = """
+        type: command
+        short-summary: Set the state of a private-endpoint connection associated with the Digital Twins instance.
+
+        examples:
+        - name: Approve a pending private-endpoint connection associated with the instance and add a description.
+          text: >
+            az dt network private-endpoint connection set -n {instance_name} --cn {connection_name} --status Approved --desc "A description."
+
+        - name: Reject a private-endpoint connection associated with the instance and add a description.
+          text: >
+            az dt network private-endpoint connection set -n {instance_name} --cn {connection_name} --status Rejected --desc "Does not comply."
+    """
+
+    helps["dt network private-endpoint connection delete"] = """
+        type: command
+        short-summary: Delete a private-endpoint connection associated with the Digital Twins instance.
+
+        examples:
+        - name: Delete the private-endpoint connection named ba8408b6-1372-41b2-aef8-af43afc4729f with confirmation. Block until finished.
+          text: >
+            az dt network private-endpoint connection delete -n {instance_name} --cn ba8408b6-1372-41b2-aef8-af43afc4729f
+
+        - name: Delete the private-endpoint connection named ba8408b6-1372-41b2-aef8-af43afc4729f no confirmation. Return immediately.
+          text: >
+            az dt network private-endpoint connection delete -n {instance_name} --cn ba8408b6-1372-41b2-aef8-af43afc4729f -y --no-wait
+    """
+
     helps["dt role-assignment"] = """
         type: group
         short-summary: Manage RBAC role assignments for a Digital Twins instance.
