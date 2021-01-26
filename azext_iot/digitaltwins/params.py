@@ -15,7 +15,11 @@ from azure.cli.core.commands.parameters import (
     get_enum_type,
     tags_type,
 )
-from azext_iot.digitaltwins.common import ADTEndpointAuthType
+from azext_iot.digitaltwins.common import (
+    ADTEndpointAuthType,
+    ADTPrivateConnectionStatusType,
+    ADTPublicNetworkAccessType,
+)
 
 depfor_type = CLIArgumentType(
     options_list=["--dependencies-for"],
@@ -72,10 +76,14 @@ def load_digitaltwins_arguments(self, _):
             help="Event route name.",
         )
         context.argument(
-            "filter", options_list=["--filter"], help="Event route filter.",
+            "filter",
+            options_list=["--filter"],
+            help="Event route filter.",
         )
         context.argument(
-            "role_type", options_list=["--role"], help="Role name or Id.",
+            "role_type",
+            options_list=["--role"],
+            help="Role name or Id.",
         )
         context.argument(
             "assignee",
@@ -89,7 +97,9 @@ def load_digitaltwins_arguments(self, _):
             help="Digital Twins model Id. Example: dtmi:com:example:Room;2",
         )
         context.argument(
-            "twin_id", options_list=["--twin-id", "-t"], help="The digital twin Id.",
+            "twin_id",
+            options_list=["--twin-id", "-t"],
+            help="The digital twin Id.",
         )
         context.argument(
             "include_inherited",
@@ -102,6 +112,13 @@ def load_digitaltwins_arguments(self, _):
             type=int,
             options_list=["--top"],
             help="Maximum number of elements to return.",
+        )
+        context.argument(
+            "public_network_access",
+            options_list=["--public-network-access", "--pna"],
+            help="Determines if the Digital Twins instance can be accessed from a public network.",
+            arg_group="Networking",
+            arg_type=get_enum_type(ADTPublicNetworkAccessType),
         )
 
     with self.argument_context("dt create") as context:
@@ -130,19 +147,19 @@ def load_digitaltwins_arguments(self, _):
             "dead_letter_secret",
             options_list=["--deadletter-sas-uri", "--dsu"],
             help="Dead-letter storage container URL with SAS token for Key based authentication.",
-            arg_group="Dead-letter Endpoint"
+            arg_group="Dead-letter Endpoint",
         )
         context.argument(
             "dead_letter_uri",
             options_list=["--deadletter-uri", "--du"],
             help="Dead-letter storage container URL for Identity based authentication.",
-            arg_group="Dead-letter Endpoint"
+            arg_group="Dead-letter Endpoint",
         )
         context.argument(
             "auth_type",
             options_list=["--auth-type"],
             help="Endpoint authentication type.",
-            arg_type=get_enum_type(ADTEndpointAuthType)
+            arg_type=get_enum_type(ADTEndpointAuthType),
         )
 
     with self.argument_context("dt endpoint create eventgrid") as context:
@@ -352,5 +369,48 @@ def load_digitaltwins_arguments(self, _):
             help="Indicates intent to decommission a target model.",
         )
         context.argument(
-            "dependencies_for", arg_type=depfor_type,
+            "dependencies_for",
+            arg_type=depfor_type,
+        )
+
+    with self.argument_context("dt network private-link") as context:
+        context.argument(
+            "link_name",
+            options_list=["--link-name", "--ln"],
+            help="Private link name.",
+            arg_group="Private Connection",
+        )
+
+    with self.argument_context("dt network private-endpoint") as context:
+        context.argument(
+            "conn_name",
+            options_list=["--conn-name", "--cn"],
+            help="Private endpoint connection name.",
+            arg_group="Private-Endpoint",
+        )
+        context.argument(
+            "group_ids",
+            options_list=["--group-ids"],
+            help="Space seperated list of group ids that the private endpoint should connect to.",
+            arg_group="Private-Endpoint",
+            nargs="+",
+        )
+        context.argument(
+            "status",
+            options_list=["--status"],
+            help="The status of a private endpoint connection.",
+            arg_type=get_enum_type(ADTPrivateConnectionStatusType),
+            arg_group="Private-Endpoint",
+        )
+        context.argument(
+            "description",
+            options_list=["--description", "--desc"],
+            help="Description for the private endpoint connection.",
+            arg_group="Private-Endpoint",
+        )
+        context.argument(
+            "actions_required",
+            options_list=["--actions-required", "--ar"],
+            help="A message indicating if changes on the service provider require any updates on the consumer.",
+            arg_group="Private-Endpoint",
         )
