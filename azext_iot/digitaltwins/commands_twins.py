@@ -21,11 +21,9 @@ def create_twin(
     cmd, name_or_hostname, twin_id, model_id, properties=None, resource_group_name=None
 ):
     twin_provider = TwinProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
-    x =  twin_provider.create(
+    return twin_provider.create(
         twin_id=twin_id, model_id=model_id, properties=properties
     )
-    print(x)
-    return (x)
 
 
 def show_twin(cmd, name_or_hostname, twin_id, resource_group_name=None):
