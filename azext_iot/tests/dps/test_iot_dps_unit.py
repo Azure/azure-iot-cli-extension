@@ -182,6 +182,15 @@ class TestEnrollmentCreate():
                                         primary_key='primarykey',
                                         secondary_key='secondarykey',
                                         edge_enabled=True)),
+        (generate_enrollment_create_req(attestation_type='symmetricKey',
+                                        primary_key='primarykey',
+                                        secondary_key='secondarykey',
+                                        edge_enabled=True,
+                                        initial_twin_properties={'key': ['value1', 'value2']})),
+        (generate_enrollment_create_req(attestation_type='tpm',
+                                        endorsement_key='mykey',
+                                        provisioning_status='enabled',
+                                        initial_twin_properties={'key': ['value1', 'value2']}))
     ])
     def test_enrollment_create(self, serviceclient, fixture_cmd, req):
         subject.iot_dps_device_enrollment_create(fixture_cmd,
@@ -705,6 +714,14 @@ class TestEnrollmentGroupCreate():
         (generate_enrollment_group_create_req(primary_key='primarykey',
                                               secondary_key='secondarykey',
                                               edge_enabled=True)),
+        (generate_enrollment_group_create_req(primary_key='primarykey',
+                                              secondary_key='secondarykey',
+                                              edge_enabled=True,
+                                              initial_twin_properties={'key': ['value1', 'value2']})),
+        (generate_enrollment_group_create_req(primary_key='primarykey',
+                                              secondary_key='secondarykey',
+                                              edge_enabled=True,
+                                              initial_twin_properties={'key': ['value1', 'value2']})),
     ])
     def test_enrollment_group_create(self, serviceclient, req):
         subject.iot_dps_device_enrollment_group_create(None,

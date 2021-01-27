@@ -295,6 +295,8 @@ def update_iot_device_custom(
         instance["status"] = status
     if status_reason is not None:
         instance["statusReason"] = status_reason
+
+    auth_type = instance['authentication']['type']
     if auth_method is not None:
         if auth_method == DeviceAuthType.shared_private_key.name:
             auth = "sas"
@@ -323,6 +325,35 @@ def update_iot_device_custom(
         else:
             raise ValueError("Authorization method {} invalid.".format(auth_method))
         instance["authentication"]["type"] = auth
+
+    # if no new auth_method is provided, validate secondary auth arguments and update accordingly
+    elif auth_type == "sas":
+        if any([primary_thumbprint, secondary_thumbprint]):
+            raise ValueError(
+                "Device authorization method {} does not support primary or secondary thumbprints.".format(
+                    DeviceAuthType.shared_private_key.name
+                )
+            )
+        if primary_key:
+            instance["authentication"]["symmetricKey"]["primaryKey"] = primary_key
+        if secondary_key:
+            instance["authentication"]["symmetricKey"]["secondaryKey"] = secondary_key
+
+    elif auth_type == "selfSigned":
+        if any([primary_key, secondary_key]):
+            raise ValueError(
+                "Device authorization method {} does not support primary or secondary keys.".format(
+                    DeviceAuthType.x509_thumbprint.name
+                )
+            )
+        if primary_thumbprint:
+            instance["authentication"]["x509Thumbprint"][
+                "primaryThumbprint"
+            ] = primary_thumbprint
+        if secondary_thumbprint:
+            instance["authentication"]["x509Thumbprint"][
+                "secondaryThumbprint"
+            ] = secondary_thumbprint
     return instance
 
 
