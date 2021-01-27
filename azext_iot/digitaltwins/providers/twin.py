@@ -17,6 +17,14 @@ from knack.util import CLIError
 logger = get_logger(__name__)
 
 
+class TwinOptions():
+    def __init__(self, if_match=None):
+        self.if_match=if_match
+        self.traceparent=None
+        self.tracestate=None
+
+
+
 class TwinProvider(DigitalTwinsProvider):
     def __init__(self, cmd, name, rg=None):
         super(TwinProvider, self).__init__(
@@ -29,13 +37,16 @@ class TwinProvider(DigitalTwinsProvider):
     def invoke_query(self, query, show_cost):
         from azext_iot.digitaltwins.providers.generic import accumulate_result
 
-        accumulated_result, cost = accumulate_result(
-            self.query_sdk.query_twins,
-            values_name="value",
-            token_name="continuationToken",
-            token_arg_name="continuation_token",
-            query=query,
-        )
+        try:
+            accumulated_result, cost = accumulate_result(
+                self.query_sdk.query_twins,
+                values_name="value",
+                token_name="continuationToken",
+                token_arg_name="continuation_token",
+                query=query,
+            )
+        except ErrorResponseException as e:
+            raise CLIError(unpack_msrest_error(e))
 
         query_result = {}
         query_result["result"] = accumulated_result
@@ -45,10 +56,9 @@ class TwinProvider(DigitalTwinsProvider):
         return query_result
 
     def create(self, twin_id, model_id, properties=None):
-        target_model = self.model_provider.get(id=model_id)
         twin_request = {
             "$dtId": twin_id,
-            "$metadata": {"$model": target_model["id"]},
+            "$metadata": {"$model": model_id},
         }
 
         if properties:
@@ -82,8 +92,9 @@ class TwinProvider(DigitalTwinsProvider):
         logger.info("Patch payload %s", json.dumps(json_patch_collection))
 
         try:
+            options = TwinOptions(if_match=(etag if etag else "*"))
             self.twins_sdk.update(
-                id=twin_id, patch_document=json_patch_collection, if_match=(etag if etag else "*"), raw=True
+                id=twin_id, patch_document=json_patch_collection, digital_twins_update_options=options, raw=True
             )
             return self.get(twin_id=twin_id)
         except ErrorResponseException as e:
@@ -92,7 +103,8 @@ class TwinProvider(DigitalTwinsProvider):
     def delete(self, twin_id, etag=None):
         # Not a json response
         try:
-            self.twins_sdk.delete(id=twin_id, if_match=(etag if etag else "*"), raw=True)
+            options = TwinOptions(if_match=(etag if etag else "*"))
+            self.twins_sdk.delete(id=twin_id, digital_twins_delete_options=options, raw=True)
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
 
@@ -116,18 +128,24 @@ class TwinProvider(DigitalTwinsProvider):
             relationship_request.update(properties)
 
         logger.info("Relationship payload %s", json.dumps(relationship_request))
-        return self.twins_sdk.add_relationship(
-            id=twin_id,
-            relationship_id=relationship_id,
-            relationship=relationship_request,
-            if_none_match="*",
-            raw=True,
-        ).response.json()
+        try:
+            return self.twins_sdk.add_relationship(
+                id=twin_id,
+                relationship_id=relationship_id,
+                relationship=relationship_request,
+                if_none_match="*",
+                raw=True,
+            ).response.json()
+        except ErrorResponseException as e:
+            raise CLIError(unpack_msrest_error(e))
 
     def get_relationship(self, twin_id, relationship_id):
-        return self.twins_sdk.get_relationship_by_id(
-            id=twin_id, relationship_id=relationship_id, raw=True
-        ).response.json()
+        try:
+            return self.twins_sdk.get_relationship_by_id(
+                id=twin_id, relationship_id=relationship_id, raw=True
+            ).response.json()
+        except ErrorResponseException as e:
+            raise CLIError(unpack_msrest_error(e))
 
     def list_relationships(
         self, twin_id, incoming_relationships=False, relationship=None
@@ -145,6 +163,8 @@ class TwinProvider(DigitalTwinsProvider):
                 incoming_result.extend(incoming_pager.advance_page())
         except StopIteration:
             pass
+        except ErrorResponseException as e:
+            raise CLIError(unpack_msrest_error(e))
 
         if relationship:
             incoming_result = [
@@ -167,11 +187,12 @@ class TwinProvider(DigitalTwinsProvider):
         logger.info("Patch payload %s", json.dumps(json_patch_collection))
 
         try:
+            options = TwinOptions(if_match=(etag if etag else "*"))
             self.twins_sdk.update_relationship(
                 id=twin_id,
                 relationship_id=relationship_id,
                 patch_document=json_patch_collection,
-                if_match=(etag if etag else "*"),
+                digital_twins_update_relationship_options=options,
             )
             return self.get_relationship(
                 twin_id=twin_id, relationship_id=relationship_id
@@ -181,16 +202,20 @@ class TwinProvider(DigitalTwinsProvider):
 
     def delete_relationship(self, twin_id, relationship_id, etag=None):
         try:
+            options = TwinOptions(if_match=(etag if etag else "*"))
             self.twins_sdk.delete_relationship(
-                id=twin_id, relationship_id=relationship_id, if_match=(etag if etag else "*")
+                id=twin_id, relationship_id=relationship_id, digital_twins_delete_relationship_options=options
             )
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
 
     def get_component(self, twin_id, component_path):
-        return self.twins_sdk.get_component(
-            id=twin_id, component_path=component_path, raw=True
-        ).response.json()
+        try:
+            return self.twins_sdk.get_component(
+                id=twin_id, component_path=component_path, raw=True
+            ).response.json()
+        except ErrorResponseException as e:
+            raise CLIError(unpack_msrest_error(e))
 
     def update_component(self, twin_id, component_path, json_patch, etag=None):
         json_patch = process_json_arg(content=json_patch, argument_name="json-patch")
@@ -204,13 +229,14 @@ class TwinProvider(DigitalTwinsProvider):
         logger.info("Patch payload %s", json.dumps(json_patch_collection))
 
         try:
-            # TODO: API does not return response
+            options = TwinOptions(if_match=(etag if etag else "*"))
             self.twins_sdk.update_component(
                 id=twin_id,
                 component_path=component_path,
                 patch_document=json_patch_collection,
-                if_match=(etag if etag else "*"),
+                digital_twins_update_component_options=options,
             )
+            return self.get_component(twin_id=twin_id, component_path=component_path)
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
 
@@ -234,18 +260,23 @@ class TwinProvider(DigitalTwinsProvider):
         if not dt_id:
             dt_id = str(uuid4())
 
-        if component_path:
-            self.twins_sdk.send_component_telemetry(
+        try:
+            if component_path:
+                self.twins_sdk.send_component_telemetry(
+                    id=twin_id,
+                    message_id=dt_id,
+                    dt_timestamp=dt_timestamp,
+                    component_path=component_path,
+                    telemetry=telemetry_request,
+                )
+
+            self.twins_sdk.send_telemetry(
                 id=twin_id,
                 message_id=dt_id,
                 dt_timestamp=dt_timestamp,
-                component_path=component_path,
                 telemetry=telemetry_request,
             )
+        except ErrorResponseException as e:
+            raise CLIError(unpack_msrest_error(e))
 
-        self.twins_sdk.send_telemetry(
-            id=twin_id,
-            message_id=dt_id,
-            dt_timestamp=dt_timestamp,
-            telemetry=telemetry_request,
-        )
+
