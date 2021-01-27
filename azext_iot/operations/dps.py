@@ -449,7 +449,6 @@ def iot_dps_device_enrollment_group_update(
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
-        enrollment_record = sdk.get_individual_enrollment(enrollment_id)
 
         enrollment_record = sdk.get_enrollment_group(enrollment_id)
         # Update enrollment information
