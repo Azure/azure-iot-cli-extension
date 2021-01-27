@@ -72,7 +72,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         self.track_instance(create_output)
 
         assert_common_resource_attributes(
-            create_output,
+            self.wait_for_hostname(create_output),
             instance_names[0],
             self.rg,
             self.region,
@@ -97,7 +97,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         self.track_instance(create_msi_output)
 
         assert_common_resource_attributes(
-            create_msi_output,
+            self.wait_for_hostname(create_msi_output),
             instance_names[1],
             self.rg,
             self.rg_region,
@@ -567,6 +567,7 @@ def assert_common_resource_attributes(
 ):
     assert instance_output["createdTime"]
     hostname = instance_output.get("hostName")
+
     assert hostname, "Provisioned instance is missing hostName."
     assert hostname.startswith(resource_id)
     assert instance_output["location"] == location
