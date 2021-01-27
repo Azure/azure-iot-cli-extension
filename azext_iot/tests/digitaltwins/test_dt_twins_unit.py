@@ -8,13 +8,9 @@ import re
 import pytest
 import responses
 import json
-from random import randint
 from knack.cli import CLIError
 from azext_iot.digitaltwins import commands_twins as subject
-from azext_iot.tests.conftest import mock_target
 from azext_iot.tests.generators import generate_generic_id
-from knack.util import CLIError
-from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from msrest.paging import Paged
 
 instance_name = generate_generic_id()
@@ -31,8 +27,9 @@ component_path = generate_generic_id()
 generic_result = json.dumps({"result": generate_generic_id()})
 generic_query = "select * from digitaltwins"
 models_result = json.dumps({"id": model_id})
-generic_patch_1 = json.dumps({"a":"b"})
-generic_patch_2 = json.dumps({"a":"b", "c":"d"})
+generic_patch_1 = json.dumps({"a" : "b"})
+generic_patch_2 = json.dumps({"a" : "b", "c" : "d"})
+
 
 def generate_twin_result(twin_id=twin_id, etag=etag, model_id=model_id):
     return json.dumps({
@@ -43,13 +40,14 @@ def generate_twin_result(twin_id=twin_id, etag=etag, model_id=model_id):
         }
     })
 
+
 def create_relationship(relationship_name=None):
     return {
         "$relationshipId": generate_generic_id(),
         "relationship_name": relationship_name
     }
 
-# should move this to a conftest to generalize
+
 @pytest.fixture
 def get_mgmt_client(mocker, fixture_cmd):
     from azext_iot.sdk.digitaltwins.controlplane import AzureDigitalTwinsManagementClient
@@ -95,6 +93,7 @@ def start_twin_response(mocked_response, get_mgmt_client):
 
     yield mocked_response
 
+
 def check_resource_group_name_call(service_client, resource_group_input):
     if ("management.azure.com/subscriptions" in service_client.calls[0].request.url):
         return 1
@@ -114,14 +113,14 @@ class TestTwinQueryTwins(object):
             (generic_query, True, [generate_twin_result()], 1),
             (generic_query, False, [generate_twin_result()], 1),
             (generic_query, True, [generate_twin_result(), generate_twin_result()], 2),
-            (generic_query, True, [generate_twin_result(), generate_twin_result(),  generate_twin_result()], 2)
+            (generic_query, True, [generate_twin_result(), generate_twin_result(), generate_twin_result()], 2)
         ]
     )
     def test_query_twins(
         self, fixture_cmd, service_client, query_command, show_cost, servresult, numresultsperpage
     ):
         # Set up number of pages, setting it to 1 if result is []
-        numpages = int(len(servresult)/numresultsperpage)
+        numpages = int(len(servresult) / numresultsperpage)
         if numpages == 0:
             numpages += 1
         cost = 0
@@ -135,18 +134,18 @@ class TestTwinQueryTwins(object):
 
             if numpages - i == 1:
                 contToken = None
-                value = servresult[i*numresultsperpage:]
+                value = servresult[i * numresultsperpage:]
             else:
-                contToken = "https://{}/query?{}".format(hostname, str(i+1))
-                value = servresult[i*numresultsperpage:(i+1)*numresultsperpage]
+                contToken = "https://{}/query?{}".format(hostname, str(i + 1))
+                value = servresult[i * numresultsperpage:(i + 1) * numresultsperpage]
 
             cost += 0.5 + i
             service_client.add(
                 method=responses.POST,
                 url=url,
                 body=json.dumps({
-                    "value":value,
-                    "continuationToken":contToken
+                    "value" : value,
+                    "continuationToken" : contToken
                 }),
                 status=200,
                 content_type="application/json",
@@ -211,12 +210,12 @@ class TestTwinQueryTwins(object):
     def test_list_relationship_error(self, fixture_cmd, service_client_error):
         with pytest.raises(CLIError):
             subject.query_twins(
-            cmd=fixture_cmd,
-            name_or_hostname=hostname,
-            query_command=generic_query,
-            show_cost=False,
-            resource_group_name=None
-        )
+                cmd=fixture_cmd,
+                name_or_hostname=hostname,
+                query_command=generic_query,
+                show_cost=False,
+                resource_group_name=None
+            )
 
 
 class TestTwinCreateTwin(object):
@@ -241,7 +240,7 @@ class TestTwinCreateTwin(object):
             (None, None), (None, resource_group),
             (generic_patch_1, None),
             (generic_patch_2, None)
-            ]
+        ]
     )
     def test_create_twin(self, fixture_cmd, service_client, properties, resource_group_name):
         result = subject.create_twin(
@@ -413,7 +412,7 @@ class TestTwinUpdateTwin(object):
         assert patch_request.headers["If-Match"] == etag if etag else "*"
 
         # check get request
-        get_request = service_client.calls[start+1].request
+        get_request = service_client.calls[start + 1].request
         assert get_request.method == "GET"
 
         assert result == json.loads(generate_twin_result())
@@ -547,7 +546,7 @@ class TestTwinCreateRelationship(object):
             ("contains", generic_patch_1, None),
             ("contains", generic_patch_2, None),
             ("contains", None, resource_group)
-            ]
+        ]
     )
     def test_create_relationship(self, fixture_cmd, service_client, relationship, properties, resource_group_name):
         result = subject.create_relationship(
@@ -718,7 +717,7 @@ class TestTwinUpdateRelationship(object):
         assert patch_request.headers["If-Match"] == etag if etag else "*"
 
         # check get request
-        get_request = service_client.calls[start+1].request
+        get_request = service_client.calls[start + 1].request
         assert get_request.method == "GET"
 
         assert result == json.loads(generic_result)
@@ -768,7 +767,7 @@ class TestTwinListRelationship(object):
         yield mocked_response
 
     @pytest.mark.parametrize(
-         "incoming_relationships, relationship, resource_group_name, servresult, numresultsperpage",
+        "incoming_relationships, relationship, resource_group_name, servresult, numresultsperpage",
         [
             (False, None, None, [], 1),
             (True, None, None, [], 1),
@@ -781,14 +780,29 @@ class TestTwinListRelationship(object):
             (True, "contains", None, [create_relationship("contains")], 1),
             (False, "contains", None, [create_relationship("other")], 1),
             (True, "contains", None, [create_relationship("other")], 2),
-            (False, "contains", None, [create_relationship("other"), create_relationship("contains"), create_relationship("contains"), create_relationship("other")], 2),
-            (True, "contains", None, [create_relationship("other"), create_relationship("contains"), create_relationship("contains"), create_relationship("other")], 1),
+            (False, "contains", None, [create_relationship("other"),
+                                       create_relationship("contains"),
+                                       create_relationship("contains"),
+                                       create_relationship("other")], 2),
+            (True, "contains", None, [create_relationship("other"),
+                                      create_relationship("contains"),
+                                      create_relationship("contains"),
+                                      create_relationship("other")], 1),
             (False, None, resource_group, [], 1)
         ]
     )
-    def test_list_relationship(self, fixture_cmd, service_client, incoming_relationships, relationship, resource_group_name, servresult, numresultsperpage):
+    def test_list_relationship(
+        self,
+        fixture_cmd,
+        service_client,
+        incoming_relationships,
+        relationship,
+        resource_group_name,
+        servresult,
+        numresultsperpage
+    ):
         # Set up number of pages, setting it to 1 if result is []
-        numpages = int(len(servresult)/numresultsperpage)
+        numpages = int(len(servresult) / numresultsperpage)
         if numpages == 0:
             numpages += 1
         relationship = "incomingrelationships" if incoming_relationships else "relationships"
@@ -802,17 +816,17 @@ class TestTwinListRelationship(object):
 
             if numpages - i == 1:
                 contToken = None
-                value = servresult[i*numresultsperpage:]
+                value = servresult[i * numresultsperpage:]
             else:
-                contToken = "https://{}/digitaltwins/{}/{}?{}".format(hostname, twin_id, relationship, str(i+1))
-                value = servresult[i*numresultsperpage:(i+1)*numresultsperpage]
+                contToken = "https://{}/digitaltwins/{}/{}?{}".format(hostname, twin_id, relationship, str(i + 1))
+                value = servresult[i * numresultsperpage:(i + 1) * numresultsperpage]
 
             service_client.add(
                 method=responses.GET,
                 url=url,
                 body=json.dumps({
-                    "value":value,
-                    "nextLink":contToken
+                    "value" : value,
+                    "nextLink" : contToken
                 }),
                 status=200,
                 content_type="application/json",
@@ -846,7 +860,6 @@ class TestTwinListRelationship(object):
                 pass
 
             assert unpacked_result == servresult
-
 
     @pytest.fixture(params=[(400, 200), (401, 200), (500, 200), (200, 400), (200, 401), (200, 500)])
     def service_client_error(self, mocked_response, start_twin_response, request):
@@ -1032,7 +1045,7 @@ class TestTwinSendTelemetry(object):
         if dt_id:
             twin_telemetry_request.headers["Message-Id"] == dt_id
 
-        assert result == None
+        assert result is None
 
     @pytest.fixture(params=[(400, 204), (401, 204), (500, 204), (204, 400), (204, 401), (204, 500)])
     def service_client_error(self, mocked_response, start_twin_response, request):
@@ -1186,7 +1199,7 @@ class TestTwinUpdateComponent(object):
         assert patch_request.headers["If-Match"] == etag if etag else "*"
 
         # check get request
-        get_request = service_client.calls[start+1].request
+        get_request = service_client.calls[start + 1].request
         assert get_request.method == "GET"
 
         assert result == json.loads(generic_result)
