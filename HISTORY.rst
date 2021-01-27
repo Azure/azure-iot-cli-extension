@@ -3,6 +3,13 @@
 Release History
 ===============
 
+0.10.9
++++++++++++++++
+
+**Azure IoT Product Certification service**
+
+* Fix bug for `az iot product test create` sending a byte string instead of "regular" base64 string.
+
 0.10.8
 +++++++++++++++
 
