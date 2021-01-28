@@ -19,10 +19,9 @@ logger = get_logger(__name__)
 
 class TwinOptions():
     def __init__(self, if_match=None):
-        self.if_match=if_match
-        self.traceparent=None
-        self.tracestate=None
-
+        self.if_match = if_match
+        self.traceparent = None
+        self.tracestate = None
 
 
 class TwinProvider(DigitalTwinsProvider):
@@ -278,5 +277,3 @@ class TwinProvider(DigitalTwinsProvider):
             )
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
-
-
