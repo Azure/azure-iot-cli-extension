@@ -19,7 +19,7 @@ def load_digitaltwins_help():
 
     helps["dt create"] = """
         type: command
-        short-summary: Create a new Digital Twins instance.
+        short-summary: Create or update a Digital Twins instance.
 
         examples:
         - name: Create instance in target resource group using the resource group location.
@@ -50,6 +50,18 @@ def load_digitaltwins_help():
             "/subscriptions/a12345ea-bb21-994d-2263-c716348e32a1/resourceGroups/ProResourceGroup/providers/Microsoft.EventHub/namespaces/myEventHubNamespace/eventhubs/myEventHub"
             "/subscriptions/a12345ea-bb21-994d-2263-c716348e32a1/resourceGroups/ProResourceGroup/providers/Microsoft.ServiceBus/namespaces/myServiceBusNamespace/topics/myTopic"
             --role MyCustomRole
+
+        - name: Update an instance in the target resource group to enable system managed identity.
+          text: >
+            az dt create -n {instance_name} -g {resouce_group} --assign-identity
+
+        - name: Update an instance in the target resource group to disable system managed identity.
+          text: >
+            az dt create -n {instance_name} -g {resouce_group} --assign-identity false
+
+        - name: Update an instance with new tag values and disable public network access.
+          text: >
+            az dt create -n {instance_name} --tags env=prod --public-network-access Disabled
     """
 
     helps["dt show"] = """

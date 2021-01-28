@@ -28,11 +28,22 @@ class TestDTPrivateLinksLifecycle(DTLiveScenarioTest):
             )
         ).get_output_in_json()
         self.track_instance(create_output)
+        create_output = self.wait_for_hostname(create_output)
 
         # Fail test if hostName missing
         assert create_output.get(
             "hostName"
         ), "Service failed to provision DT instance: {}.".format(instance_name)
+        assert create_output["publicNetworkAccess"] == "Enabled"
+
+        update_output = self.cmd(
+            "dt create -n {} -g {} -l {} --public-network-access Disabled".format(
+                instance_name,
+                self.rg,
+                self.region,
+            )
+        ).get_output_in_json()
+        assert update_output["publicNetworkAccess"] == "Disabled"
 
         list_priv_links = self.cmd(
             "dt network private-link list -n {} -g {}".format(
