@@ -19,7 +19,7 @@ MOCK_RESOURCE_TAGS_DICT = {"a": "b", "c": "d"}
 MOCK_DEAD_LETTER_ENDPOINT = "https://accountname.blob.core.windows.net/containerName"
 MOCK_DEAD_LETTER_SECRET = "{}?sasToken".format(MOCK_DEAD_LETTER_ENDPOINT)
 REGION_RESOURCE_LIMIT = 10
-REGION_LIST = ["westus2", "westus", "eastus", "eastus2euap"]
+REGION_LIST = ["westus2", "westcentralus", "eastus2", "eastus", "eastus2euap"]
 
 
 def generate_resource_id():
@@ -135,10 +135,13 @@ class DTLiveScenarioTest(LiveScenarioTest):
             skip_regions = []
 
         region_capacity = self.calculate_region_capacity
-        for region in region_capacity:
-            if region_capacity[region] + capacity <= REGION_RESOURCE_LIMIT:
-                if region not in skip_regions:
+
+        while region_capacity:
+            region = min(region_capacity, key=region_capacity.get)
+            if region not in skip_regions:
+                if region_capacity[region] + capacity <= REGION_RESOURCE_LIMIT:
                     return region
+            region_capacity.pop(region, None)
 
         raise RuntimeError(
             "There are no available regions with capacity: {} for provision DT instances in subscription: {}".format(
@@ -154,3 +157,26 @@ class DTLiveScenarioTest(LiveScenarioTest):
             self.embedded_cli.invoke(
                 "dt delete -n {} -g {} -y --no-wait".format(instance[0], instance[1])
             )
+
+    # Needed because the DT service will indicate provisioning is finished before it actually is.
+    def wait_for_hostname(
+        self, instance: dict, wait_in_sec: int = 5, interval: int = 3
+    ):
+        from time import sleep
+
+        while interval >= 1:
+            logger.info(
+                "Waiting :{} (sec) for provisioning to complete.".format(wait_in_sec)
+            )
+            sleep(wait_in_sec)
+            interval = interval - 1
+            refereshed_instance = self.embedded_cli.invoke(
+                "dt show -n {} -g {}".format(
+                    instance["name"], instance["resourceGroup"]
+                )
+            ).as_json()
+
+            if refereshed_instance.get("hostName"):
+                return refereshed_instance
+
+        return instance

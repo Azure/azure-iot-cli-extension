@@ -18,7 +18,6 @@ from .operations.query_operations import QueryOperations
 from .operations.digital_twins_operations import DigitalTwinsOperations
 from .operations.event_routes_operations import EventRoutesOperations
 from . import models
-from azext_iot.constants import USER_AGENT
 
 
 class AzureDigitalTwinsAPIConfiguration(AzureConfiguration):
@@ -43,8 +42,6 @@ class AzureDigitalTwinsAPIConfiguration(AzureConfiguration):
         super(AzureDigitalTwinsAPIConfiguration, self).__init__(base_url)
 
         self.add_user_agent('azuredigitaltwinsapi/{}'.format(VERSION))
-        self.add_user_agent(USER_AGENT)
-
         self.credentials = credentials
 
 

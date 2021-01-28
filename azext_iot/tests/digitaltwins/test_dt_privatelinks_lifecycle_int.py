@@ -4,27 +4,17 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import pytest
 from knack.log import get_logger
-from azext_iot.tests.settings import DynamoSettings
 from . import DTLiveScenarioTest
 from . import generate_resource_id, generate_generic_id
 
 logger = get_logger(__name__)
-
-resource_test_env_vars = ["azext_dt_vnet_subnet_id"]
-
-settings = DynamoSettings(opt_env_set=resource_test_env_vars)
 
 
 class TestDTPrivateLinksLifecycle(DTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestDTPrivateLinksLifecycle, self).__init__(test_case)
 
-    @pytest.mark.skipif(
-        not settings.env.azext_dt_vnet_subnet_id,
-        reason="Set azext_dt_vnet_subnet_id (fully qualified resource Id) for private-link/private-endpoint tests.",
-    )
     def test_dt_privatelinks(self):
         self.wait_for_capacity()
 
