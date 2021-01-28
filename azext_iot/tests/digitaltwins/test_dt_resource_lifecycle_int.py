@@ -130,6 +130,22 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             assign_identity=True,
         )
 
+        # Update tags and disable MSI
+        updated_tags = "env=test tier=premium"
+        updated_tags_dict = {"env": "test", "tier": "premium"}
+        remove_msi_output = self.cmd(
+            "dt create -n {} -g {} --assign-identity false --tags {}".format(instance_names[1], self.rg, updated_tags)
+        ).get_output_in_json()
+
+        assert_common_resource_attributes(
+            self.wait_for_hostname(remove_msi_output),
+            instance_names[1],
+            self.rg,
+            self.rg_region,
+            tags=updated_tags_dict,
+            assign_identity=False,
+        )
+
         list_output = self.cmd("dt list").get_output_in_json()
         filtered_list = filter_dt_list(list_output, instance_names)
         assert len(filtered_list) == len(instance_names)

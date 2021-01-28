@@ -160,7 +160,7 @@ class DTLiveScenarioTest(LiveScenarioTest):
 
     # Needed because the DT service will indicate provisioning is finished before it actually is.
     def wait_for_hostname(
-        self, instance: dict, wait_in_sec: int = 5, interval: int = 3
+        self, instance: dict, wait_in_sec: int = 5, interval: int = 4
     ):
         from time import sleep
 
@@ -176,7 +176,7 @@ class DTLiveScenarioTest(LiveScenarioTest):
                 )
             ).as_json()
 
-            if refereshed_instance.get("hostName"):
+            if refereshed_instance.get("hostName") and refereshed_instance["provisioningState"] == "Succeeded":
                 return refereshed_instance
 
         return instance
