@@ -20,7 +20,9 @@ logger = get_logger(__name__)
 class TwinProvider(DigitalTwinsProvider):
     def __init__(self, cmd, name, rg=None):
         super(TwinProvider, self).__init__(
-            cmd=cmd, name=name, rg=rg,
+            cmd=cmd,
+            name=name,
+            rg=rg,
         )
         self.model_provider = ModelProvider(cmd=cmd, name=name, rg=rg)
         self.query_sdk = self.get_sdk().query

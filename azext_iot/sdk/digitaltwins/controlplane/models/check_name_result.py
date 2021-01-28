@@ -23,7 +23,7 @@ class CheckNameResult(Model):
     :type message: str
     :param reason: Message providing the reason why the given name is invalid.
      Possible values include: 'Invalid', 'AlreadyExists'
-    :type reason: str or ~azure.mgmt.digitaltwins.models.Reason
+    :type reason: str or ~controlplane.models.Reason
     """
 
     _attribute_map = {

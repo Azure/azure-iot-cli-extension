@@ -24,13 +24,20 @@ class EventGrid(DigitalTwinsEndpointResourceProperties):
      'Provisioning', 'Deleting', 'Succeeded', 'Failed', 'Canceled', 'Deleted',
      'Warning', 'Suspending', 'Restoring', 'Moving', 'Disabled'
     :vartype provisioning_state: str or
-     ~azure.mgmt.digitaltwins.models.EndpointProvisioningState
+     ~controlplane.models.EndpointProvisioningState
     :ivar created_time: Time when the Endpoint was added to
      DigitalTwinsInstance.
     :vartype created_time: datetime
-    :param dead_letter_secret: Dead letter storage secret. Will be obfuscated
-     during read.
+    :param authentication_type: Specifies the authentication type being used
+     for connecting to the endpoint. Possible values include: 'KeyBased',
+     'IdentityBased'
+    :type authentication_type: str or ~controlplane.models.AuthenticationType
+    :param dead_letter_secret: Dead letter storage secret for key-based
+     authentication. Will be obfuscated during read.
     :type dead_letter_secret: str
+    :param dead_letter_uri: Dead letter storage URL for identity-based
+     authentication.
+    :type dead_letter_uri: str
     :param endpoint_type: Required. Constant filled by server.
     :type endpoint_type: str
     :param topic_endpoint: Required. EventGrid Topic Endpoint
@@ -54,15 +61,17 @@ class EventGrid(DigitalTwinsEndpointResourceProperties):
     _attribute_map = {
         'provisioning_state': {'key': 'provisioningState', 'type': 'str'},
         'created_time': {'key': 'createdTime', 'type': 'iso-8601'},
+        'authentication_type': {'key': 'authenticationType', 'type': 'str'},
         'dead_letter_secret': {'key': 'deadLetterSecret', 'type': 'str'},
+        'dead_letter_uri': {'key': 'deadLetterUri', 'type': 'str'},
         'endpoint_type': {'key': 'endpointType', 'type': 'str'},
         'topic_endpoint': {'key': 'TopicEndpoint', 'type': 'str'},
         'access_key1': {'key': 'accessKey1', 'type': 'str'},
         'access_key2': {'key': 'accessKey2', 'type': 'str'},
     }
 
-    def __init__(self, *, topic_endpoint: str, access_key1: str, dead_letter_secret: str=None, access_key2: str=None, **kwargs) -> None:
-        super(EventGrid, self).__init__(dead_letter_secret=dead_letter_secret, **kwargs)
+    def __init__(self, *, topic_endpoint: str, access_key1: str, authentication_type=None, dead_letter_secret: str=None, dead_letter_uri: str=None, access_key2: str=None, **kwargs) -> None:
+        super(EventGrid, self).__init__(authentication_type=authentication_type, dead_letter_secret=dead_letter_secret, dead_letter_uri=dead_letter_uri, **kwargs)
         self.topic_endpoint = topic_endpoint
         self.access_key1 = access_key1
         self.access_key2 = access_key2

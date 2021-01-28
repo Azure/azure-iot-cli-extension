@@ -7,6 +7,7 @@
 from azext_iot.sdk.digitaltwins.controlplane import AzureDigitalTwinsManagementClient
 from azext_iot.sdk.digitaltwins.controlplane.models import ErrorResponseException
 from msrestazure.azure_exceptions import CloudError
+from azext_iot.constants import USER_AGENT
 
 __all__ = [
     "digitaltwins_service_factory",
@@ -16,7 +17,7 @@ __all__ = [
 ]
 
 
-def digitaltwins_service_factory(cli_ctx, *_):
+def digitaltwins_service_factory(cli_ctx, *_) -> AzureDigitalTwinsManagementClient:
     """
     Factory for importing deps and getting service client resources.
 
@@ -25,8 +26,7 @@ def digitaltwins_service_factory(cli_ctx, *_):
         *_ : all other args ignored.
 
     Returns:
-        iot_hub_resource (IotHubClient.iot_hub_resource): operational resource for
-            working with IoT Hub.
+        AzureDigitalTwinsManagementClient: Top level client instance.
     """
     from azure.cli.core.commands.client_factory import get_mgmt_service_client
 
@@ -39,4 +39,6 @@ class DigitalTwinsResourceManager(object):
         self.cmd = cmd
 
     def get_mgmt_sdk(self):
-        return digitaltwins_service_factory(self.cmd.cli_ctx)
+        client = digitaltwins_service_factory(self.cmd.cli_ctx)
+        client.config.add_user_agent(USER_AGENT)
+        return client

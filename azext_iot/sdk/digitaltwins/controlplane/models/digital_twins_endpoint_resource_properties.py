@@ -27,13 +27,20 @@ class DigitalTwinsEndpointResourceProperties(Model):
      'Provisioning', 'Deleting', 'Succeeded', 'Failed', 'Canceled', 'Deleted',
      'Warning', 'Suspending', 'Restoring', 'Moving', 'Disabled'
     :vartype provisioning_state: str or
-     ~azure.mgmt.digitaltwins.models.EndpointProvisioningState
+     ~controlplane.models.EndpointProvisioningState
     :ivar created_time: Time when the Endpoint was added to
      DigitalTwinsInstance.
     :vartype created_time: datetime
-    :param dead_letter_secret: Dead letter storage secret. Will be obfuscated
-     during read.
+    :param authentication_type: Specifies the authentication type being used
+     for connecting to the endpoint. Possible values include: 'KeyBased',
+     'IdentityBased'
+    :type authentication_type: str or ~controlplane.models.AuthenticationType
+    :param dead_letter_secret: Dead letter storage secret for key-based
+     authentication. Will be obfuscated during read.
     :type dead_letter_secret: str
+    :param dead_letter_uri: Dead letter storage URL for identity-based
+     authentication.
+    :type dead_letter_uri: str
     :param endpoint_type: Required. Constant filled by server.
     :type endpoint_type: str
     """
@@ -47,7 +54,9 @@ class DigitalTwinsEndpointResourceProperties(Model):
     _attribute_map = {
         'provisioning_state': {'key': 'provisioningState', 'type': 'str'},
         'created_time': {'key': 'createdTime', 'type': 'iso-8601'},
+        'authentication_type': {'key': 'authenticationType', 'type': 'str'},
         'dead_letter_secret': {'key': 'deadLetterSecret', 'type': 'str'},
+        'dead_letter_uri': {'key': 'deadLetterUri', 'type': 'str'},
         'endpoint_type': {'key': 'endpointType', 'type': 'str'},
     }
 
@@ -59,5 +68,7 @@ class DigitalTwinsEndpointResourceProperties(Model):
         super(DigitalTwinsEndpointResourceProperties, self).__init__(**kwargs)
         self.provisioning_state = None
         self.created_time = None
+        self.authentication_type = kwargs.get('authentication_type', None)
         self.dead_letter_secret = kwargs.get('dead_letter_secret', None)
+        self.dead_letter_uri = kwargs.get('dead_letter_uri', None)
         self.endpoint_type = None

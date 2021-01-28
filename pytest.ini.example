@@ -19,6 +19,7 @@ env =
     azext_iot_teststorageuri=
     azext_iot_teststorageid=
     azext_iot_central_app_id=
+    azext_dt_region=
     azext_dt_ep_eventgrid_topic=
     azext_dt_ep_servicebus_namespace=
     azext_dt_ep_servicebus_policy=
