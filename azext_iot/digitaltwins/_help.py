@@ -59,9 +59,9 @@ def load_digitaltwins_help():
           text: >
             az dt create -n {instance_name} -g {resouce_group} --assign-identity false
 
-        - name: Update an instance with new tag values and disable public network access.
+        - name: Update an instance in the target resource group with new tag values and disable public network access.
           text: >
-            az dt create -n {instance_name} --tags env=prod --public-network-access Disabled
+            az dt create -n {instance_name} -g {resouce_group} --tags env=prod --public-network-access Disabled
     """
 
     helps["dt show"] = """
