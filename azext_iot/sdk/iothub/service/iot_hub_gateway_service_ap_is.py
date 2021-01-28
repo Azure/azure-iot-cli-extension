@@ -23,7 +23,6 @@ from .operations.cloud_to_device_messages_operations import CloudToDeviceMessage
 from .operations.modules_operations import ModulesOperations
 from .operations.digital_twin_operations import DigitalTwinOperations
 from . import models
-from azext_iot.constants import USER_AGENT
 
 
 class IotHubGatewayServiceAPIsConfiguration(AzureConfiguration):
@@ -48,7 +47,6 @@ class IotHubGatewayServiceAPIsConfiguration(AzureConfiguration):
         super(IotHubGatewayServiceAPIsConfiguration, self).__init__(base_url)
 
         self.add_user_agent('iothubgatewayserviceapis/{}'.format(VERSION))
-        self.add_user_agent(USER_AGENT)  # @digimaun
 
         self.credentials = credentials
 
