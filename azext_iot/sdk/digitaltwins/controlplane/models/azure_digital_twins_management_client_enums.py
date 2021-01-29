@@ -12,10 +12,17 @@
 from enum import Enum
 
 
+class PublicNetworkAccess(str, Enum):
+
+    enabled = "Enabled"
+    disabled = "Disabled"
+
+
 class ProvisioningState(str, Enum):
 
     provisioning = "Provisioning"
     deleting = "Deleting"
+    updating = "Updating"
     succeeded = "Succeeded"
     failed = "Failed"
     canceled = "Canceled"
@@ -24,6 +31,12 @@ class ProvisioningState(str, Enum):
     suspending = "Suspending"
     restoring = "Restoring"
     moving = "Moving"
+
+
+class DigitalTwinsIdentityType(str, Enum):
+
+    none = "None"
+    system_assigned = "SystemAssigned"
 
 
 class Reason(str, Enum):
@@ -45,3 +58,25 @@ class EndpointProvisioningState(str, Enum):
     restoring = "Restoring"
     moving = "Moving"
     disabled = "Disabled"
+
+
+class AuthenticationType(str, Enum):
+
+    key_based = "KeyBased"
+    identity_based = "IdentityBased"
+
+
+class PrivateLinkServiceConnectionStatus(str, Enum):
+
+    pending = "Pending"
+    approved = "Approved"
+    rejected = "Rejected"
+    disconnected = "Disconnected"
+
+
+class ConnectionPropertiesProvisioningState(str, Enum):
+
+    pending = "Pending"
+    approved = "Approved"
+    rejected = "Rejected"
+    disconnected = "Disconnected"

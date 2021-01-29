@@ -18,17 +18,19 @@ logger = get_logger(__name__)
 
 
 class TwinOptions():
-    def __init__(self, if_match=None):
-        self.if_match=if_match
-        self.traceparent=None
-        self.tracestate=None
-
+    def __init__(self, if_match=None, if_none_match=None):
+        self.if_match = if_match
+        self.if_none_match = if_none_match
+        self.traceparent = None
+        self.tracestate = None
 
 
 class TwinProvider(DigitalTwinsProvider):
     def __init__(self, cmd, name, rg=None):
         super(TwinProvider, self).__init__(
-            cmd=cmd, name=name, rg=rg,
+            cmd=cmd,
+            name=name,
+            rg=rg,
         )
         self.model_provider = ModelProvider(cmd=cmd, name=name, rg=rg)
         self.query_sdk = self.get_sdk().query
@@ -70,7 +72,8 @@ class TwinProvider(DigitalTwinsProvider):
         logger.info("Twin payload %s", json.dumps(twin_request))
 
         try:
-            return self.twins_sdk.add(id=twin_id, twin=twin_request, if_none_match="*")
+            options = TwinOptions(if_none_match="*")
+            return self.twins_sdk.add(id=twin_id, twin=twin_request, digital_twins_add_options=options)
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
 
@@ -129,11 +132,12 @@ class TwinProvider(DigitalTwinsProvider):
 
         logger.info("Relationship payload %s", json.dumps(relationship_request))
         try:
+            options = TwinOptions(if_none_match="*")
             return self.twins_sdk.add_relationship(
                 id=twin_id,
                 relationship_id=relationship_id,
                 relationship=relationship_request,
-                if_none_match="*",
+                digital_twins_add_relationship_options=options,
                 raw=True,
             ).response.json()
         except ErrorResponseException as e:
@@ -278,5 +282,3 @@ class TwinProvider(DigitalTwinsProvider):
             )
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
-
-

@@ -13,9 +13,7 @@ from azext_iot.common.utility import (
     process_json_arg,
 )
 from . import DTLiveScenarioTest
-from . import (
-    generate_resource_id
-)
+from . import generate_resource_id
 
 logger = get_logger(__name__)
 
@@ -26,26 +24,30 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
         super(TestDTModelLifecycle, self).__init__(test_case)
 
     def test_dt_models(self):
+        self.wait_for_capacity()
+
         instance_name = generate_resource_id()
         models_directory = "./models"
         inline_model = "./models/Floor.json"
         component_dtmi = "dtmi:com:example:Thermostat;1"
         room_dtmi = "dtmi:com:example:Room;1"
 
-        self.cmd(
-            "dt create -n {} -g {} -l {}".format(
-                instance_name, self.dt_resource_group, self.dt_location
-            )
+        self.track_instance(
+            self.cmd(
+                "dt create -n {} -g {} -l {}".format(
+                    instance_name, self.rg, self.region
+                )
+            ).get_output_in_json()
         )
 
         self.cmd(
             "dt role-assignment create -n {} -g {} --assignee {} --role '{}'".format(
-                instance_name, self.dt_resource_group, self.current_user, self.role_map["owner"]
+                instance_name, self.rg, self.current_user, self.role_map["owner"]
             )
         )
 
         # Wait for RBAC to catch-up
-        sleep(20)
+        sleep(60)
 
         create_models_output = self.cmd(
             "dt model create -n {} --from-directory '{}'".format(
@@ -65,9 +67,7 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
             assert model["id"]
 
         list_models_output = self.cmd(
-            "dt model list -n {} -g {} --definition".format(
-                instance_name, self.dt_resource_group
-            )
+            "dt model list -n {} -g {} --definition".format(instance_name, self.rg)
         ).get_output_in_json()
         assert len(list_models_output) == len(create_models_output)
         for model in list_models_output:
@@ -76,7 +76,9 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
 
         model_dependencies_output = self.cmd(
             "dt model list -n {} -g {} --dependencies-for '{}'".format(
-                instance_name, self.dt_resource_group, room_dtmi,
+                instance_name,
+                self.rg,
+                room_dtmi,
             )
         ).get_output_in_json()
         assert len(model_dependencies_output) == 2
@@ -89,7 +91,7 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
 
             model_show_def_output = self.cmd(
                 "dt model show -n {} -g {} --dtmi '{}' --definition".format(
-                    instance_name, self.dt_resource_group, model["id"]
+                    instance_name, self.rg, model["id"]
                 )
             ).get_output_in_json()
 
@@ -140,17 +142,12 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
             == 0
         )
 
-        self.cmd(
-            "dt delete -n {} -g {}".format(instance_name, self.dt_resource_group)
-        )
 
-
-def assert_create_models_attributes(
-    result, directory_path=None, models=None, return_metadata=True
-):
+def assert_create_models_attributes(result, directory_path=None, models=None):
     if not any([directory_path, models]):
         raise ValueError("Provide directory_path or models.")
 
+    local_test_models = []
     if directory_path:
         local_test_models = _get_models_from_directory(directory_path)
 

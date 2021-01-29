@@ -15,7 +15,6 @@ from msrestazure import AzureConfiguration
 from .version import VERSION
 from .operations.device_operations import DeviceOperations
 from . import models
-from azext_iot.constants import USER_AGENT
 
 
 class IotHubGatewayDeviceAPIsConfiguration(AzureConfiguration):
@@ -40,7 +39,6 @@ class IotHubGatewayDeviceAPIsConfiguration(AzureConfiguration):
         super(IotHubGatewayDeviceAPIsConfiguration, self).__init__(base_url)
 
         self.add_user_agent('iothubgatewaydeviceapis/{}'.format(VERSION))
-        self.add_user_agent(USER_AGENT)  # @digimaun
 
         self.credentials = credentials
 

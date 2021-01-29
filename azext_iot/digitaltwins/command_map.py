@@ -4,8 +4,6 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from azure.cli.core.profiles import ResourceType
-
 """
 Load CLI commands
 """
@@ -39,12 +37,11 @@ def load_digitaltwins_commands(self, _):
     with self.command_group(
         "dt",
         command_type=digitaltwins_resource_ops,
-        resource_type=ResourceType.MGMT_RESOURCE_RESOURCES,
     ) as cmd_group:
         cmd_group.command("create", "create_instance")
         cmd_group.show_command("show", "show_instance")
         cmd_group.command("list", "list_instances")
-        cmd_group.command("delete", "delete_instance")
+        cmd_group.command("delete", "delete_instance", confirmation=True, supports_no_wait=True)
 
     with self.command_group(
         "dt endpoint", command_type=digitaltwins_resource_ops
@@ -65,7 +62,7 @@ def load_digitaltwins_commands(self, _):
                 "ProvisioningState:properties.provisioningState,CreatedTime:properties.createdTime}"
             ),
         )
-        cmd_group.command("delete", "delete_endpoint")
+        cmd_group.command("delete", "delete_endpoint", confirmation=True, supports_no_wait=True)
 
     with self.command_group(
         "dt endpoint create", command_type=digitaltwins_resource_ops
@@ -140,3 +137,31 @@ def load_digitaltwins_commands(self, _):
         )
         cmd_group.command("update", "update_model")
         cmd_group.command("delete", "delete_model")
+
+    with self.command_group(
+        "dt network",
+        command_type=digitaltwins_resource_ops,
+    ) as cmd_group:
+        pass
+
+    with self.command_group(
+        "dt network private-link",
+        command_type=digitaltwins_resource_ops,
+    ) as cmd_group:
+        cmd_group.show_command("show", "show_private_link")
+        cmd_group.command("list", "list_private_links")
+
+    with self.command_group(
+        "dt network private-endpoint",
+        command_type=digitaltwins_resource_ops,
+    ) as cmd_group:
+        pass
+
+    with self.command_group(
+        "dt network private-endpoint connection",
+        command_type=digitaltwins_resource_ops,
+    ) as cmd_group:
+        cmd_group.command("set", "set_private_endpoint_conn")
+        cmd_group.show_command("show", "show_private_endpoint_conn")
+        cmd_group.command("list", "list_private_endpoint_conns")
+        cmd_group.command("delete", "delete_private_endpoint_conn", confirmation=True, supports_no_wait=True)
