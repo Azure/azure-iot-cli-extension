@@ -40,11 +40,13 @@ def generate_twin_result(twin_id=twin_id, etag=etag, model_id=model_id):
         }
     })
 
+
 def create_relationship(relationship_name=None):
     return {
         "$relationshipId": generate_generic_id(),
         "relationship_name": relationship_name
     }
+
 
 @pytest.fixture
 def get_mgmt_client(mocker, fixture_cmd):
@@ -90,6 +92,7 @@ def start_twin_response(mocked_response, get_mgmt_client):
     )
 
     yield mocked_response
+
 
 def check_resource_group_name_call(service_client, resource_group_input):
     if ("management.azure.com/subscriptions" in service_client.calls[0].request.url):
