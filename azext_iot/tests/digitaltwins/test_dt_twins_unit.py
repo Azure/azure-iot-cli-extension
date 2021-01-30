@@ -49,8 +49,9 @@ def create_relationship(relationship_name=None):
 
 
 @pytest.fixture
-def get_mgmt_client(mocker, fixture_cmd):
+def control_and_data_plane_client(mocker, fixture_cmd):
     from azext_iot.sdk.digitaltwins.controlplane import AzureDigitalTwinsManagementClient
+    from azext_iot.sdk.digitaltwins.dataplane import AzureDigitalTwinsAPI
     from azext_iot.digitaltwins.providers.auth import DigitalTwinAuthentication
 
     patched_get_raw_token = mocker.patch(
@@ -62,21 +63,32 @@ def get_mgmt_client(mocker, fixture_cmd):
         mocker.MagicMock(name="tenant"),
     )
 
-    patch = mocker.patch(
+    control_plane_patch = mocker.patch(
         "azext_iot.digitaltwins.providers.digitaltwins_service_factory"
     )
-    patch.return_value = AzureDigitalTwinsManagementClient(
+    control_plane_patch.return_value = AzureDigitalTwinsManagementClient(
         credentials=DigitalTwinAuthentication(
             fixture_cmd, "00000000-0000-0000-0000-000000000000"
         ),
         subscription_id="00000000-0000-0000-0000-000000000000",
     )
 
-    return patch
+    data_plane_patch = mocker.patch(
+        "azext_iot.digitaltwins.providers.base.DigitalTwinsProvider.get_sdk"
+    )
+
+    data_plane_patch.return_value = AzureDigitalTwinsAPI(
+        credentials=DigitalTwinAuthentication(
+            fixture_cmd, "00000000-0000-0000-0000-000000000000"
+        ),
+        base_url="https://{}/".format(hostname)
+    )
+
+    return control_plane_patch, data_plane_patch
 
 
 @pytest.fixture
-def start_twin_response(mocked_response, get_mgmt_client):
+def start_twin_response(mocked_response, control_and_data_plane_client):
     mocked_response.assert_all_requests_are_fired = False
 
     mocked_response.add(
