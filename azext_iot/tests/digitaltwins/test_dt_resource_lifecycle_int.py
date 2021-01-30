@@ -57,6 +57,17 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestDTResourceLifecycle, self).__init__(test_case)
 
+    @pytest.mark.skipif(
+        not all(
+            [
+                settings.env.azext_dt_ep_rg,
+                settings.env.azext_dt_ep_eventgrid_topic,
+                settings.env.azext_dt_ep_servicebus_topic,
+                settings.env.azext_dt_ep_servicebus_namespace,
+            ]
+        ),
+        reason="Required env vars missing.",
+    )
     def test_dt_resource(self):
         self.wait_for_capacity(capacity=3)
 
