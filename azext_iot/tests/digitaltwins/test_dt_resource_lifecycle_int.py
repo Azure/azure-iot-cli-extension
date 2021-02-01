@@ -57,8 +57,35 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestDTResourceLifecycle, self).__init__(test_case)
 
+    @pytest.mark.skipif(
+        not all(
+            [
+                settings.env.azext_dt_ep_rg,
+                settings.env.azext_dt_ep_eventgrid_topic,
+                settings.env.azext_dt_ep_servicebus_topic,
+                settings.env.azext_dt_ep_servicebus_namespace,
+            ]
+        ),
+        reason="Required env vars missing.",
+    )
     def test_dt_resource(self):
         self.wait_for_capacity(capacity=3)
+
+        eventgrid_topic_id = self.cmd(
+            "eventgrid topic show -g {} -n {}".format(
+                settings.env.azext_dt_ep_rg, settings.env.azext_dt_ep_eventgrid_topic
+            )
+        ).get_output_in_json()["id"]
+
+        servicebus_topic_id = self.cmd(
+            "servicebus topic show -g {} -n {} --namespace-name {}".format(
+                settings.env.azext_dt_ep_rg,
+                settings.env.azext_dt_ep_servicebus_topic,
+                settings.env.azext_dt_ep_servicebus_namespace,
+            )
+        ).get_output_in_json()["id"]
+
+        scope_ids = [eventgrid_topic_id, servicebus_topic_id]
 
         instance_names = [generate_resource_id(), generate_resource_id()]
         create_output = self.cmd(
@@ -79,6 +106,18 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             MOCK_RESOURCE_TAGS_DICT,
         )
 
+        show_output = self.cmd(
+            "dt show -n {}".format(instance_names[0])
+        ).get_output_in_json()
+
+        assert_common_resource_attributes(
+            show_output,
+            instance_names[0],
+            self.rg,
+            self.region,
+            MOCK_RESOURCE_TAGS_DICT,
+        )
+
         # Explictly assert create prevents provisioning on a name conflict (across regions)
         self.cmd(
             "dt create -n {} -g {} -l {} --tags {}".format(
@@ -92,7 +131,9 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
 
         # No location specified. Use the resource group location.
         create_msi_output = self.cmd(
-            "dt create -n {} -g {} --assign-identity".format(instance_names[1], self.rg)
+            "dt create -n {} -g {} --assign-identity --scopes {}".format(
+                instance_names[1], self.rg, " ".join(scope_ids)
+            )
         ).get_output_in_json()
         self.track_instance(create_msi_output)
 
@@ -103,18 +144,6 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             self.rg_region,
             tags=None,
             assign_identity=True,
-        )
-
-        show_output = self.cmd(
-            "dt show -n {}".format(instance_names[0])
-        ).get_output_in_json()
-
-        assert_common_resource_attributes(
-            show_output,
-            instance_names[0],
-            self.rg,
-            self.region,
-            MOCK_RESOURCE_TAGS_DICT,
         )
 
         show_msi_output = self.cmd(
@@ -130,11 +159,27 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             assign_identity=True,
         )
 
+        role_assignment_egt_list = self.cmd(
+            "role assignment list --scope {} --assignee {}".format(
+                eventgrid_topic_id, show_msi_output["identity"]["principalId"]
+            )
+        ).get_output_in_json()
+        assert len(role_assignment_egt_list) == 1
+
+        role_assignment_sbt_list = self.cmd(
+            "role assignment list --scope {} --assignee {}".format(
+                servicebus_topic_id, show_msi_output["identity"]["principalId"]
+            )
+        ).get_output_in_json()
+        assert len(role_assignment_sbt_list) == 1
+
         # Update tags and disable MSI
         updated_tags = "env=test tier=premium"
         updated_tags_dict = {"env": "test", "tier": "premium"}
         remove_msi_output = self.cmd(
-            "dt create -n {} -g {} --assign-identity false --tags {}".format(instance_names[1], self.rg, updated_tags)
+            "dt create -n {} -g {} --assign-identity false --tags {}".format(
+                instance_names[1], self.rg, updated_tags
+            )
         ).get_output_in_json()
 
         assert_common_resource_attributes(
@@ -633,10 +678,14 @@ def assert_common_endpoint_attributes(
     assert endpoint_output["properties"]["createdTime"]
 
     if dead_letter_secret:
-        assert endpoint_output["properties"]["deadLetterSecret"]
+        assert endpoint_output["properties"][
+            "deadLetterSecret"
+        ], "Expected deadletter secret."
 
     if dead_letter_endpoint:
-        assert endpoint_output["properties"]["deadLetterUri"]
+        assert endpoint_output["properties"][
+            "deadLetterUri"
+        ], "Expected deadletter Uri."
 
     # Currently DT -> EventGrid is only key based.
     if endpoint_type == ADTEndpointType.eventgridtopic:
