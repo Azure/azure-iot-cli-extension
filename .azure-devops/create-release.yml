@@ -41,6 +41,7 @@ stages:
 
     - job: 'recordVersion'
       displayName: 'Install and verify version'
+      dependsOn: [Build_Publish_Azure_IoT_CLI_Extension, Build_Publish_Azure_CLI_Test_SDK]
       steps:
       - template: templates/setup-dev-test-env.yml
         parameters:
