@@ -39,6 +39,17 @@ stages:
 
       - template: templates/build-publish-azure-cli-test-sdk.yml
 
+    - job: 'recordVersion'
+      displayName: 'Install and verify version'
+      dependsOn: [Build_Publish_Azure_IoT_CLI_Extension, Build_Publish_Azure_CLI_Test_SDK]
+      steps:
+      - template: templates/setup-dev-test-env.yml
+        parameters:
+          pythonVersion: $(pythonVersion)
+          architecture: $(architecture)
+
+      - template: templates/install-and-record-version.yml
+
   - stage: 'test'
     displayName: 'Run tests'
     pool:
@@ -85,16 +96,6 @@ stages:
           runIntTests: 'false'
           runUnitTests: 'true'
 
-    - job: 'recordVersion'
-      displayName: 'Install and verify version'
-      steps:
-      - template: templates/setup-dev-test-env.yml
-        parameters:
-          pythonVersion: $(pythonVersion)
-          architecture: $(architecture)
-
-      - template: templates/install-and-record-version.yml
-
   - stage: 'kpi'
     displayName: 'Build KPIs'
     dependsOn: [build, test]
@@ -119,8 +120,8 @@ stages:
       pool:
         vmImage: 'vs2017-win2016'
       variables:
-        CLIVersion: $[ stageDependencies.test.recordVersion.outputs['setupVersion.CLIVersion'] ]
-        ReleaseTitle: $[ stageDependencies.test.recordVersion.outputs['setupVersion.ReleaseTitle'] ]
+        CLIVersion: $[ stageDependencies.build.recordVersion.outputs['setupVersion.CLIVersion'] ]
+        ReleaseTitle: $[ stageDependencies.build.recordVersion.outputs['setupVersion.ReleaseTitle'] ]
 
       steps:
       - task: DownloadBuildArtifacts@0

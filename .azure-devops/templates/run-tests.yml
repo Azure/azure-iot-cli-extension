@@ -18,6 +18,7 @@ steps:
 
   - ${{ if eq(parameters.runIntTests, 'true') }}:
     - task: AzureCLI@2
+      continueOnError: true
       displayName: '${{ parameters.name }} integration tests'
       inputs:
         azureSubscription: AzIoTCLIService
