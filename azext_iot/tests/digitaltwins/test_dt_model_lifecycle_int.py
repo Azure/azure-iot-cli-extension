@@ -32,13 +32,11 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
         component_dtmi = "dtmi:com:example:Thermostat;1"
         room_dtmi = "dtmi:com:example:Room;1"
 
-        self.track_instance(
-            self.cmd(
-                "dt create -n {} -g {} -l {}".format(
-                    instance_name, self.rg, self.region
-                )
-            ).get_output_in_json()
-        )
+        create_output = self.cmd(
+            "dt create -n {} -g {} -l {}".format(instance_name, self.rg, self.region)
+        ).get_output_in_json()
+        self.track_instance(create_output)
+        self.wait_for_hostname(create_output)
 
         self.cmd(
             "dt role-assignment create -n {} -g {} --assignee {} --role '{}'".format(
