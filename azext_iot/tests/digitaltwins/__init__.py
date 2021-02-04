@@ -160,7 +160,7 @@ class DTLiveScenarioTest(LiveScenarioTest):
 
     # Needed because the DT service will indicate provisioning is finished before it actually is.
     def wait_for_hostname(
-        self, instance: dict, wait_in_sec: int = 5, interval: int = 4
+        self, instance: dict, wait_in_sec: int = 10, interval: int = 4
     ):
         from time import sleep
 

@@ -31,13 +31,11 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
         room_twin_id = "myroom"
         thermostat_component_id = "Thermostat"
 
-        self.track_instance(
-            self.cmd(
-                "dt create -n {} -g {} -l {}".format(
-                    instance_name, self.rg, self.region
-                )
-            ).get_output_in_json()
-        )
+        create_output = self.cmd(
+            "dt create -n {} -g {} -l {}".format(instance_name, self.rg, self.region)
+        ).get_output_in_json()
+        self.track_instance(create_output)
+        self.wait_for_hostname(create_output)
 
         self.cmd(
             "dt role-assignment create -n {} -g {} --assignee {} --role '{}'".format(
@@ -54,9 +52,7 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
         )
 
         twin_query_result = self.cmd(
-            "dt twin query -n {} -q 'select * from digitaltwins'".format(
-                instance_name
-            )
+            "dt twin query -n {} -q 'select * from digitaltwins'".format(instance_name)
         ).get_output_in_json()
         assert len(twin_query_result["result"]) == 0
 
@@ -71,11 +67,7 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
         )
 
         self.kwargs["emptyThermostatComponentJson"] = json.dumps(
-            {
-                "Thermostat": {
-                    "$metadata": {}
-                }
-            }
+            {"Thermostat": {"$metadata": {}}}
         )
 
         floor_twin = self.cmd(
@@ -95,12 +87,9 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
         # create twin will fail without --properties
         self.cmd(
             "dt twin create -n {} -g {} --dtmi {} --twin-id {}".format(
-                instance_name,
-                self.rg,
-                room_dtmi,
-                room_twin_id
+                instance_name, self.rg, room_dtmi, room_twin_id
             ),
-            expect_failure=True
+            expect_failure=True,
         )
 
         # minimum component object with empty $metadata object
@@ -228,9 +217,7 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
                 "dt twin show -n {} --twin-id {} {}".format(
                     instance_name,
                     twin_tuple[0],
-                    "-g {}".format(self.rg)
-                    if twins_id_list[-1] == twin_tuple
-                    else "",
+                    "-g {}".format(self.rg) if twins_id_list[-1] == twin_tuple else "",
                 )
             ).get_output_in_json()
             assert_twin_attributes(
@@ -243,7 +230,9 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
 
         update_twin_result = self.cmd(
             "dt twin update -n {} --twin-id {} --json-patch '{}'".format(
-                instance_name, room_twin_id, "{temperatureJsonPatch}",
+                instance_name,
+                room_twin_id,
+                "{temperatureJsonPatch}",
             )
         ).get_output_in_json()
 
@@ -326,7 +315,8 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
 
         twin_relationship_list_result = self.cmd(
             "dt twin relationship list -n {} --twin-id {}".format(
-                instance_name, floor_twin_id,
+                instance_name,
+                floor_twin_id,
             )
         ).get_output_in_json()
         assert len(twin_relationship_list_result) == 1
@@ -343,14 +333,16 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
 
         twin_relationship_list_result = self.cmd(
             "dt twin relationship list -n {} --twin-id {}".format(
-                instance_name, room_twin_id,
+                instance_name,
+                room_twin_id,
             )
         ).get_output_in_json()
         assert len(twin_relationship_list_result) == 0
 
         twin_relationship_list_result = self.cmd(
             "dt twin relationship list -n {} --twin-id {} --incoming".format(
-                instance_name, room_twin_id,
+                instance_name,
+                room_twin_id,
             )
         ).get_output_in_json()
         assert len(twin_relationship_list_result) == 1
@@ -365,7 +357,9 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
         # No output from API for delete edge
         self.cmd(
             "dt twin relationship delete -n {} --twin-id {} -r {}".format(
-                instance_name, floor_twin_id, relationship_id,
+                instance_name,
+                floor_twin_id,
+                relationship_id,
             )
         )
 
@@ -408,9 +402,7 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
                 "dt twin delete -n {} --twin-id {} {}".format(
                     instance_name,
                     twin_tuple[0],
-                    "-g {}".format(self.rg)
-                    if twins_id_list[-1] == twin_tuple
-                    else "",
+                    "-g {}".format(self.rg) if twins_id_list[-1] == twin_tuple else "",
                 )
             )
         sleep(10)  # Wait for API to catch up
