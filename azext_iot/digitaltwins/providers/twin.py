@@ -57,7 +57,7 @@ class TwinProvider(DigitalTwinsProvider):
 
         return query_result
 
-    def create(self, twin_id, model_id, properties=None):
+    def create(self, twin_id, model_id, replace=False, properties=None):
         twin_request = {
             "$dtId": twin_id,
             "$metadata": {"$model": model_id},
@@ -72,7 +72,7 @@ class TwinProvider(DigitalTwinsProvider):
         logger.info("Twin payload %s", json.dumps(twin_request))
 
         try:
-            options = TwinOptions(if_none_match="*")
+            options = TwinOptions(if_none_match=(None if replace else "*"))
             return self.twins_sdk.add(id=twin_id, twin=twin_request, digital_twins_add_options=options)
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
@@ -117,6 +117,7 @@ class TwinProvider(DigitalTwinsProvider):
         target_twin_id,
         relationship_id,
         relationship,
+        replace=False,
         properties=None,
     ):
         relationship_request = {
@@ -132,7 +133,7 @@ class TwinProvider(DigitalTwinsProvider):
 
         logger.info("Relationship payload %s", json.dumps(relationship_request))
         try:
-            options = TwinOptions(if_none_match="*")
+            options = TwinOptions(if_none_match=(None if replace else "*"))
             return self.twins_sdk.add_relationship(
                 id=twin_id,
                 relationship_id=relationship_id,

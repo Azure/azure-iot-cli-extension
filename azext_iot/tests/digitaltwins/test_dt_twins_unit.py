@@ -247,19 +247,22 @@ class TestTwinCreateTwin(object):
         yield mocked_response
 
     @pytest.mark.parametrize(
-        "properties, resource_group_name",
+        "replace, properties, resource_group_name",
         [
-            (None, None), (None, resource_group),
-            (generic_patch_1, None),
-            (generic_patch_2, None)
+            (False, None, None),
+            (True, None, None),
+            (False, None, resource_group),
+            (False, generic_patch_1, None),
+            (False, generic_patch_2, None)
         ]
     )
-    def test_create_twin(self, fixture_cmd, service_client, properties, resource_group_name):
+    def test_create_twin(self, fixture_cmd, service_client, replace, properties, resource_group_name):
         result = subject.create_twin(
             cmd=fixture_cmd,
             name_or_hostname=hostname,
             twin_id=twin_id,
             model_id=model_id,
+            replace=replace,
             properties=properties,
             resource_group_name=resource_group_name
         )
@@ -273,6 +276,9 @@ class TestTwinCreateTwin(object):
         twin_request_body = json.loads(twin_request.body)
         assert twin_request_body["$dtId"] == twin_id
         assert twin_request_body["$metadata"]["$model"] == model_id
+
+        if not replace:
+            assert twin_request.headers["If-None-Match"] == "*"
 
         if properties:
             for (key, value) in json.loads(properties).items():
@@ -551,16 +557,17 @@ class TestTwinCreateRelationship(object):
         yield mocked_response
 
     @pytest.mark.parametrize(
-        "relationship, properties, resource_group_name",
+        "relationship, replace, properties, resource_group_name",
         [
-            ("contains", None, None),
-            ("", None, None),
-            ("contains", generic_patch_1, None),
-            ("contains", generic_patch_2, None),
-            ("contains", None, resource_group)
+            ("contains", False, None, None),
+            ("", False, None, None),
+            ("contains", True, None, None),
+            ("contains", False, generic_patch_1, None),
+            ("contains", False, generic_patch_2, None),
+            ("contains", False, None, resource_group)
         ]
     )
-    def test_create_relationship(self, fixture_cmd, service_client, relationship, properties, resource_group_name):
+    def test_create_relationship(self, fixture_cmd, service_client, relationship, replace, properties, resource_group_name):
         result = subject.create_relationship(
             cmd=fixture_cmd,
             name_or_hostname=hostname,
@@ -568,6 +575,7 @@ class TestTwinCreateRelationship(object):
             target_twin_id=target_twin_id,
             relationship_id=relationship_id,
             relationship=relationship,
+            replace=replace,
             properties=properties,
             resource_group_name=resource_group_name
         )
@@ -582,6 +590,9 @@ class TestTwinCreateRelationship(object):
 
         assert result_request_body["$targetId"] == target_twin_id
         assert result_request_body["$relationshipName"] == relationship
+
+        if not replace:
+            assert put_request.headers["If-None-Match"] == "*"
 
         if properties:
             for (key, value) in json.loads(properties).items():

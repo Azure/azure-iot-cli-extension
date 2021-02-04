@@ -122,6 +122,44 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
             component_name=thermostat_component_id,
         )
 
+        replaced_room_twin = self.cmd(
+            "dt twin create -n {} -g {} --dtmi {} --twin-id {} --replace --properties '{}'".format(
+                instance_name,
+                self.rg,
+                room_dtmi,
+                room_twin_id,
+                "{tempAndThermostatComponentJson}",
+            )
+        ).get_output_in_json()
+
+        assert_twin_attributes(
+            twin=replaced_room_twin,
+            expected_twin_id=room_twin_id,
+            expected_dtmi=room_dtmi,
+            properties=self.kwargs["tempAndThermostatComponentJson"],
+            component_name=thermostat_component_id,
+        )
+
+        # new twin cannot be created with same twin_id if replace not provided
+        self.cmd(
+            "dt twin create -n {} -g {} --dtmi {} --twin-id {} --properties '{}'".format(
+                instance_name,
+                self.rg,
+                room_dtmi,
+                room_twin_id,
+                "{emptyThermostatComponentJson}",
+            ),
+            expect_failure=True
+        )
+
+        self.cmd(
+            "dt twin delete -n {} -g {} --twin-id {}".format(
+                instance_name,
+                self.rg,
+                room_twin_id,
+            )
+        )
+
         room_twin = self.cmd(
             "dt twin create -n {} -g {} --dtmi {} --twin-id {} --properties '{}'".format(
                 instance_name,
