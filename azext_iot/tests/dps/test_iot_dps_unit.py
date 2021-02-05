@@ -454,6 +454,8 @@ class TestEnrollmentUpdate():
         assert "{}/enrollments/{}?".format(mock_target['entity'], enrollment_id) in url
         assert update_request.method == 'PUT'
 
+        assert update_request.headers["If-Match"] == req['etag'] if req['etag'] else "*"
+
         body = json.loads(update_request.body)
         if not req['certificate_path']:
             if req['remove_certificate_path']:
@@ -614,14 +616,19 @@ class TestEnrollmentDelete():
         )
         yield mocked_response
 
-    def test_enrollment_delete(self, serviceclient):
-        subject.iot_dps_device_enrollment_delete(None, enrollment_id,
-                                                 mock_target['entity'], resource_group)
+    @pytest.mark.parametrize(
+        "etag",
+        [None, etag]
+    )
+    def test_enrollment_delete(self, serviceclient, etag):
+        subject.iot_dps_device_enrollment_delete(serviceclient, enrollment_id,
+                                                 mock_target['entity'], resource_group, etag=etag)
         request = serviceclient.calls[0].request
         url = request.url
         method = request.method
         assert "{}/enrollments/{}?".format(mock_target['entity'], enrollment_id) in url
         assert method == 'DELETE'
+        assert request.headers["If-Match"] == etag if etag else "*"
 
     def test_enrollment_delete_error(self, serviceclient_generic_error):
         with pytest.raises(CLIError):
@@ -1004,6 +1011,7 @@ class TestEnrollmentGroupUpdate():
 
         assert "{}/enrollmentGroups/{}?".format(mock_target['entity'], enrollment_id) in url
         assert request.method == 'PUT'
+        assert request.headers["If-Match"] == req['etag'] if req['etag'] else "*"
 
         body = json.loads(request.body)
         if not req['certificate_path']:
@@ -1211,14 +1219,19 @@ class TestEnrollmentGroupDelete():
         )
         yield mocked_response
 
-    def test_enrollment_group_delete(self, serviceclient):
+    @pytest.mark.parametrize(
+        "etag",
+        [None, etag]
+    )
+    def test_enrollment_group_delete(self, serviceclient, etag):
         subject.iot_dps_device_enrollment_group_delete(None, enrollment_id,
-                                                       mock_target['entity'], resource_group)
+                                                       mock_target['entity'], resource_group, etag=etag)
         request = serviceclient.calls[0].request
         url = request.url
         method = request.method
         assert "{}/enrollmentGroups/{}?".format(mock_target['entity'], enrollment_id) in url
         assert method == 'DELETE'
+        assert request.headers["If-Match"] == etag if etag else "*"
 
     def test_enrollment_group_delete_error(self):
         with pytest.raises(CLIError):
@@ -1302,14 +1315,19 @@ class TestRegistrationDelete():
         )
         yield mocked_response
 
-    def test_registration_delete(self, serviceclient):
+    @pytest.mark.parametrize(
+        "etag",
+        [None, etag]
+    )
+    def test_registration_delete(self, serviceclient, etag):
         subject.iot_dps_registration_delete(None, mock_target['entity'],
-                                            resource_group, registration_id)
+                                            resource_group, registration_id, etag=etag)
         request = serviceclient.calls[0].request
         url = request.url
         method = request.method
         assert "{}/registrations/{}?".format(mock_target['entity'], registration_id) in url
         assert method == 'DELETE'
+        assert request.headers["If-Match"] == etag if etag else "*"
 
     def test_registration_delete_error(self):
         with pytest.raises(CLIError):

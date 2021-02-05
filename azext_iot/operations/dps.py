@@ -110,8 +110,7 @@ def iot_dps_device_enrollment_create(
     iot_hubs=None,
     edge_enabled=False,
     webhook_url=None,
-    api_version=None,
-    etag=None
+    api_version=None
 ):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
@@ -164,7 +163,7 @@ def iot_dps_device_enrollment_create(
             iot_hubs=iot_hub_list,
             custom_allocation_definition=custom_allocation_definition,
         )
-        return sdk.create_or_update_individual_enrollment(enrollment_id, enrollment, if_match=(etag if etag else "*"))
+        return sdk.create_or_update_individual_enrollment(enrollment_id, enrollment)
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
@@ -356,7 +355,6 @@ def iot_dps_device_enrollment_group_create(
     edge_enabled=False,
     webhook_url=None,
     api_version=None,
-    etag=None,
 ):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
@@ -415,7 +413,7 @@ def iot_dps_device_enrollment_group_create(
             iot_hubs=iot_hub_list,
             custom_allocation_definition=custom_allocation_definition,
         )
-        return sdk.create_or_update_enrollment_group(enrollment_id, group_enrollment, if_match=(etag if etag else "*"))
+        return sdk.create_or_update_enrollment_group(enrollment_id, group_enrollment)
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
