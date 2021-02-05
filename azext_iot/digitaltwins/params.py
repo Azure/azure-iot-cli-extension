@@ -279,9 +279,17 @@ def load_digitaltwins_arguments(self, _):
             "Operations are limited to add, replace and remove. Provide file path or inline JSON.",
         )
         context.argument(
+            "etag", options_list=["--etag", "-e"], help="Entity tag value."
+        )
+        context.argument(
             "component_path",
             options_list=["--component"],
             help="The path to the DTDL component.",
+        )
+        context.argument(
+            "replace",
+            options_list=["--replace"],
+            help="Indicates the operation should replace an existing twin if it exists."
         )
 
     with self.argument_context("dt twin create") as context:
