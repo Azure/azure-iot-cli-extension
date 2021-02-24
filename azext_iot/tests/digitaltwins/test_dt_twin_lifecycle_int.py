@@ -112,7 +112,7 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
         )
 
         replaced_room_twin = self.cmd(
-            "dt twin create -n {} -g {} --dtmi {} --twin-id {} --replace --properties '{}'".format(
+            "dt twin create -n {} -g {} --dtmi {} --twin-id {} --properties '{}'".format(
                 instance_name,
                 self.rg,
                 room_dtmi,
@@ -129,9 +129,9 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
             component_name=thermostat_component_id,
         )
 
-        # new twin cannot be created with same twin_id if replace not provided
+        # new twin cannot be created with same twin_id if if-none-match provided
         self.cmd(
-            "dt twin create -n {} -g {} --dtmi {} --twin-id {} --properties '{}'".format(
+            "dt twin create -n {} -g {} --dtmi {} --twin-id {} --if-none-match --properties '{}'".format(
                 instance_name,
                 self.rg,
                 room_dtmi,
