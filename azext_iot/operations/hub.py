@@ -2223,7 +2223,7 @@ def iot_simulate_device(
                 max_runs=msg_count,
                 return_handle=True,
             )
-            while True and op.is_alive():
+            while op.is_alive():
                 _handle_c2d_msg(target, device_id, receive_settle)
                 sleep(SIM_RECEIVE_SLEEP_SEC)
 
