@@ -22,6 +22,10 @@ from azext_iot.tests import CaptureOutputLiveScenarioTest, helpers
 APP_ID = os.environ.get("azext_iot_central_app_id")
 APP_PRIMARY_KEY = os.environ.get("azext_iot_central_primarykey")
 APP_SCOPE_ID = os.environ.get("azext_iot_central_scope_id")
+DEVICE_ID = os.environ.get("azext_iot_central_device_id")
+TOKEN = os.environ.get("azext_iot_central_token")
+DNS_SUFFIX = os.environ.get("azext_iot_central_dns_suffix")
+
 device_template_path = get_context_path(
     __file__, "json/device_template_int_test.json"
 )
@@ -459,6 +463,9 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             == "Device does not have a valid template associated with it."
         )
 
+    @pytest.mark.skipif(
+        not DEVICE_ID, reason="empty azext_iot_central_primarykey env var"
+    )
     def test_central_device_registration_summary(self):
 
         result = self.cmd(
@@ -471,6 +478,74 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         assert json_result[DeviceStatus.unassociated.value] is not None
         assert json_result[DeviceStatus.blocked.value] is not None
         assert len(json_result) == 4
+
+    # Using existing device in provisioned state.  check configuration: DEVICE_ID = os.environ.get("azext_iot_central_device_id")
+    @pytest.mark.skipif(
+        not DEVICE_ID, reason="empty azext_iot_central_device_id env var"
+    )
+    @pytest.mark.skip(reason="skipping until applications are multi hub by default")
+    def test_central_device_should_start_failover_and_failback(self):
+        
+        # step 1: initiating failover 
+        result = self.cmd(
+            "iot central device manual-failover"
+            " --app-id {}"
+            " --device-id {}"
+            " --ttl {}"
+            " --token \"{}\""
+            " --central-dns-suffix \"{}\""
+            .format(APP_ID, DEVICE_ID, 5, TOKEN, DNS_SUFFIX)
+        )
+        json_result = result.get_output_in_json()
+        
+        
+        # check if failover started and getting original hub identifier
+        hubIdentifierOriginal = json_result["hubIdentifier"]
+        assert len(hubIdentifierOriginal)>0
+        time.sleep(60)
+
+        #Initiating failback   
+        result = self.cmd(
+            "iot central device manual-failback"
+            " --app-id {}"
+            " --device-id {}"
+            " --token \"{}\""
+            " --central-dns-suffix \"{}\""
+            .format(APP_ID, DEVICE_ID, TOKEN, DNS_SUFFIX)
+        )
+
+        # checking if failover has been done by comparing original hub identifier with hub identifier after failover is done
+        json_result = result.get_output_in_json()
+        hubIdentifierFailOver = json_result["hubIdentifier"]
+        assert len(hubIdentifierFailOver)>0
+        assert hubIdentifierOriginal!=hubIdentifierFailOver
+        time.sleep(60)
+
+        # initiating failover again to see if hub identifier after failbackreturned to original state 
+        result = self.cmd(
+            "iot central device manual-failover"
+            " --app-id {}"
+            " --device-id {}"
+            " --ttl {}"
+            " --token \"{}\""
+            " --central-dns-suffix \"{}\""
+            .format(APP_ID, DEVICE_ID, 5, TOKEN, DNS_SUFFIX)
+        )
+
+        json_result = result.get_output_in_json()
+        hubIdentifierFinal = json_result["hubIdentifier"]
+        assert len(hubIdentifierFinal)>0
+        assert hubIdentifierOriginal==hubIdentifierFinal
+
+        #Initiating failback   
+        result = self.cmd(
+            "iot central device manual-failback"
+            " --app-id {}"
+            " --device-id {}"
+            " --token \"{}\""
+            " --central-dns-suffix \"{}\""
+            .format(APP_ID, DEVICE_ID, TOKEN, DNS_SUFFIX)
+        )
 
     def _create_device(self, **kwargs) -> (str, str):
         """
