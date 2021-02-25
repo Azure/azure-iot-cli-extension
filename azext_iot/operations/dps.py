@@ -110,7 +110,7 @@ def iot_dps_device_enrollment_create(
     iot_hubs=None,
     edge_enabled=False,
     webhook_url=None,
-    api_version=None,
+    api_version=None
 ):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
@@ -197,17 +197,8 @@ def iot_dps_device_enrollment_update(
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
-
         enrollment_record = sdk.get_individual_enrollment(enrollment_id)
-        # Verify etag
-        if (
-            etag
-            and hasattr(enrollment_record, "etag")
-            and etag != enrollment_record.etag.replace('"', "")
-        ):
-            raise LookupError("enrollment etag doesn't match.")
-        if not etag:
-            etag = enrollment_record.etag.replace('"', "")
+
         # Verify and update attestation information
         attestation_type = enrollment_record.attestation.type
         _validate_arguments_for_attestation_mechanism(
@@ -274,21 +265,21 @@ def iot_dps_device_enrollment_update(
             enrollment_record.capabilities = DeviceCapabilities(iot_edge=edge_enabled)
 
         return sdk.create_or_update_individual_enrollment(
-            enrollment_id, enrollment_record, etag
+            enrollment_id, enrollment_record, if_match=(etag if etag else "*")
         )
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
 
 def iot_dps_device_enrollment_delete(
-    client, enrollment_id, dps_name, resource_group_name
+    client, enrollment_id, dps_name, resource_group_name, etag=None
 ):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
-        return sdk.delete_individual_enrollment(enrollment_id)
+        return sdk.delete_individual_enrollment(enrollment_id, if_match=(etag if etag else "*"))
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
@@ -458,15 +449,6 @@ def iot_dps_device_enrollment_group_update(
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
         enrollment_record = sdk.get_enrollment_group(enrollment_id)
-        # Verify etag
-        if (
-            etag
-            and hasattr(enrollment_record, "etag")
-            and etag != enrollment_record.etag.replace('"', "")
-        ):
-            raise LookupError("enrollment etag doesn't match.")
-        if not etag:
-            etag = enrollment_record.etag.replace('"', "")
         # Update enrollment information
         if enrollment_record.attestation.type == AttestationType.symmetricKey.value:
             enrollment_record.attestation = sdk.get_enrollment_group_attestation_mechanism(
@@ -552,21 +534,21 @@ def iot_dps_device_enrollment_group_update(
         if edge_enabled is not None:
             enrollment_record.capabilities = DeviceCapabilities(iot_edge=edge_enabled)
         return sdk.create_or_update_enrollment_group(
-            enrollment_id, enrollment_record, etag
+            enrollment_id, enrollment_record, if_match=(etag if etag else "*")
         )
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
 
 def iot_dps_device_enrollment_group_delete(
-    client, enrollment_id, dps_name, resource_group_name
+    client, enrollment_id, dps_name, resource_group_name, etag=None
 ):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
-        return sdk.delete_enrollment_group(enrollment_id)
+        return sdk.delete_enrollment_group(enrollment_id, if_match=(etag if etag else "*"))
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
@@ -608,13 +590,13 @@ def iot_dps_registration_get(client, dps_name, resource_group_name, registration
         raise CLIError(e)
 
 
-def iot_dps_registration_delete(client, dps_name, resource_group_name, registration_id):
+def iot_dps_registration_delete(client, dps_name, resource_group_name, registration_id, etag=None):
     target = get_iot_dps_connection_string(client, dps_name, resource_group_name)
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
-        return sdk.delete_device_registration_state(registration_id)
+        return sdk.delete_device_registration_state(registration_id, if_match=(etag if etag else "*"))
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 

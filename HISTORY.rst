@@ -3,6 +3,45 @@
 Release History
 ===============
 
+0.10.10
++++++++++++++++
+
+**Azure Digital Twins updates**
+
+* Addition of the optional '--etag' argument for the following commands:
+
+  * az dt twin [update | delete]
+  * az dt twin relationship [update | delete]
+
+* Addition of the optional '--if-not-match' switch for the following commands:
+
+  * az dt twin create
+  * az dt twin relationship create
+
+**IoT Central updates**
+
+Placeholder
+
+
+0.10.9
++++++++++++++++
+
+**Azure IoT Product Certification service updates**
+
+* Fix bug for `az iot product test create` sending a byte string instead of "regular" base64 string.
+
+**Azure Digital Twins updates**
+
+* Addition of Digital Twins Identity support focused around Managed Service Identity (MSI) and Identity based endpoint integration.
+* Addition of Digital Twins networking functionality around private-links and private-endpoint connections. See "az dt network".
+
+**IoT Hub updates**
+
+* Improve http debug logging.
+* Fix bug related to issue #296. Adds a clause to device-identity update that allows user to update primary-key / secondary-key 
+  and primary-thumbprint / secondary-thumbprint values (respectively, per auth method) without needing to specify the auth_method in the update command.
+
+
 0.10.8
 +++++++++++++++
 
