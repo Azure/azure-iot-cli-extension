@@ -289,7 +289,7 @@ def load_digitaltwins_arguments(self, _):
         context.argument(
             "if_none_match",
             options_list=["--if-none-match"],
-            help="Indicates the create operation should fail an existing twin if it exists."
+            help="Indicates the create operation should fail if an existing twin with the same id exists."
         )
 
     with self.argument_context("dt twin create") as context:
