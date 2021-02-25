@@ -20,7 +20,10 @@ Release History
 
 **IoT Central updates**
 
-Placeholder
+* Addition of following commands
+
+  * az iot central device manual-failover - Execute a manual failover of device across multiple IoT Hubs 
+  * az iot central device manual-failback - Reverts the previously executed failover command by moving the device back to it's original IoT Hub
 
 
 0.10.9
