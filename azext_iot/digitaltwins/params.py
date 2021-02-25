@@ -279,7 +279,8 @@ def load_digitaltwins_arguments(self, _):
             "Operations are limited to add, replace and remove. Provide file path or inline JSON.",
         )
         context.argument(
-            "etag", options_list=["--etag", "-e"], help="Entity tag value."
+            "etag", options_list=["--etag", "-e"], help="Entity tag value. The command will succeed if "
+            "the etag matches the current etag for the resource."
         )
         context.argument(
             "component_path",
