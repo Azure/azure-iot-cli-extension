@@ -1611,6 +1611,7 @@ def iot_get_sas_token(
     cmd,
     hub_name=None,
     device_id=None,
+    device_connection_string=None,
     policy_name="iothubowner",
     key_type="primary",
     duration=3600,
@@ -1639,6 +1640,7 @@ def iot_get_sas_token(
             cmd,
             hub_name,
             device_id,
+            device_connection_string,
             module_id,
             policy_name,
             key_type,
@@ -1653,6 +1655,7 @@ def _iot_build_sas_token(
     cmd,
     hub_name=None,
     device_id=None,
+    device_connection_string=None,
     module_id=None,
     policy_name="iothubowner",
     key_type="primary",
@@ -1665,6 +1668,22 @@ def _iot_build_sas_token(
         parse_iot_device_module_connection_string,
     )
 
+    uri = None
+    policy = None
+    key = None
+
+    if device_connection_string:
+        try:
+            parsed_device_cs = parse_iot_device_connection_string(device_connection_string)
+        except ValueError as e:
+            logger.debug(e)
+            raise CLIError("This device does not support SAS auth.")
+
+        uri = "{}/devices/{}".format(parsed_device_cs["HostName"], parsed_device_cs["DeviceId"])
+        key = parsed_device_cs["SharedAccessKey"]
+
+        return SasTokenAuthentication(uri, policy, key, duration)
+
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         hub_name=hub_name,
@@ -1672,9 +1691,7 @@ def _iot_build_sas_token(
         policy_name=policy_name,
         login=login,
     )
-    uri = None
-    policy = None
-    key = None
+
     if device_id:
         logger.info(
             'Obtaining device "%s" details from registry, using IoT Hub policy "%s"',

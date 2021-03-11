@@ -97,6 +97,12 @@ def load_arguments(self, _):
             "module_id", options_list=["--module-id", "-m"], help="Target Module."
         )
         context.argument(
+            "device_connection_string", 
+            options_list=["--device-connection-string", "--dcs"], 
+            help="Target device connection string."
+            "This bypasses the IoT Hub registry and generates the SAS token directly from the supplied symmetric key without further validation."
+        )
+        context.argument(
             "key_type",
             options_list=["--key-type", "--kt"],
             arg_type=get_enum_type(KeyType),
