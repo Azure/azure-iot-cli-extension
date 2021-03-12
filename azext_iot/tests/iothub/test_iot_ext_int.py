@@ -75,15 +75,31 @@ class TestIoTHub(IoTLiveScenarioTest):
         conn_str_pattern = r'^HostName={0}.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey='.format(
             LIVE_HUB)
         conn_str_eventhub_pattern = r'^Endpoint=sb://'
+        defaultpolicy = "iothubowner"
+        nonexistantpolicy = "badpolicy"
 
         # TODO: Temporarily disable to support warning on missing policy.
-        # hubs_in_sub = self.cmd('iot hub connection-string show').get_output_in_json()
-        # hubs_in_rg = self.cmd('iot hub connection-string show -g {}'.format(LIVE_RG)).get_output_in_json()
-        # assert len(hubs_in_sub) >= len(hubs_in_rg)
+        hubs_in_sub = self.cmd('iot hub connection-string show').get_output_in_json()
+        hubs_in_rg = self.cmd('iot hub connection-string show -g {}'.format(LIVE_RG)).get_output_in_json()
+        assert len(hubs_in_sub) >= len(hubs_in_rg)
 
         self.cmd('iot hub connection-string show -n {0}'.format(LIVE_HUB), checks=[
             self.check_pattern('connectionString', conn_str_pattern)
         ])
+
+        self.cmd('iot hub connection-string show -n {0} --pn {1}'.format(LIVE_HUB, defaultpolicy), checks=[
+            self.check_pattern('connectionString', conn_str_pattern)
+        ])
+
+        self.cmd(
+            'iot hub connection-string show -n {0} --pn {1}'.format(LIVE_HUB, nonexistantpolicy),
+            expect_failure=True,
+        )
+
+        self.cmd(
+            'iot hub connection-string show --pn {0}'.format(nonexistantpolicy),
+            checks=[self.check('length(@)', 0)]
+        )
 
         self.cmd('iot hub connection-string show -n {0} --eh'.format(LIVE_HUB), checks=[
             self.check_pattern('connectionString', conn_str_eventhub_pattern)
