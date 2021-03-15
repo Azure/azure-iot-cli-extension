@@ -42,7 +42,7 @@ def update_twin(cmd, name_or_hostname, twin_id, json_patch, resource_group_name=
     return twin_provider.update(twin_id=twin_id, json_patch=json_patch, etag=etag)
 
 
-def delete_twin(cmd, name_or_hostname, twin_id, resource_group_name=None, etag=None):
+def delete_twin(cmd, name_or_hostname, twin_id=None, all=False, resource_group_name=None, etag=None):
     twin_provider = TwinProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
     return twin_provider.delete(twin_id=twin_id, etag=etag)
 
