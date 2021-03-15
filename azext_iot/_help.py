@@ -107,7 +107,7 @@ helps[
     "iot hub connection-string show"
 ] = """
     type: command
-    short-summary: Show the connection strings for an IoT Hub using the given policy name and key.
+    short-summary: Show the connection strings for the specified IoT Hubs using the given policy name and key.
     examples:
     - name: Show the connection string for all active state IoT Hubs in a subscription using the default policy and primary key.
       text: >

@@ -100,12 +100,12 @@ def load_arguments(self, _):
             "key_type",
             options_list=["--key-type", "--kt"],
             arg_type=get_enum_type(KeyType),
-            help="Shared access policy key type for auth.",
+            help="Shared access policy key type for authentication.",
         )
         context.argument(
             "policy_name",
             options_list=["--policy-name", "--pn"],
-            help="Shared access policy to use for auth.",
+            help="Shared access policy to use for authentication.",
         )
         context.argument(
             "duration",
@@ -266,13 +266,14 @@ def load_arguments(self, _):
         context.argument(
             "show_all",
             options_list=["--show-all", "--all"],
-            help="Show all shared access policies for the respective iot hub.",
+            help="Show all shared access policies for the respective IoT Hub.",
         )
         context.argument(
             "default_eventhub",
             arg_type=get_three_state_flag(),
+            default="false",
             options_list=["--default-eventhub", "--eh"],
-            help="Flag indicating the connection string returned is for the default EventHub endpoint. Default: false",
+            help="Flag indicating the connection string returned is for the default EventHub endpoint.",
         )
 
     with self.argument_context("iot hub job") as context:
