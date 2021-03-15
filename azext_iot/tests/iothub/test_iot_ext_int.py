@@ -74,11 +74,10 @@ class TestIoTHub(IoTLiveScenarioTest):
         # Test 'az iot hub connection-string show'
         conn_str_pattern = r'^HostName={0}.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey='.format(
             LIVE_HUB)
-        conn_str_eventhub_pattern = r'^Endpoint=sb://'
+        conn_str_eventhub_pattern = r'^Endpoint=sb://(.+?)servicebus.windows.net/;SharedAccessKeyName=iothubowner;SharedAccessKey=(.+?);EntityPath='
         defaultpolicy = "iothubowner"
         nonexistantpolicy = "badpolicy"
 
-        # TODO: Temporarily disable to support warning on missing policy.
         hubs_in_sub = self.cmd('iot hub connection-string show').get_output_in_json()
         hubs_in_rg = self.cmd('iot hub connection-string show -g {}'.format(LIVE_RG)).get_output_in_json()
         assert len(hubs_in_sub) >= len(hubs_in_rg)

@@ -266,7 +266,7 @@ def load_arguments(self, _):
         context.argument(
             "show_all",
             options_list=["--show-all", "--all"],
-            help="Allow to show all shared access policies.",
+            help="Show all shared access policies for the respective iot hub.",
         )
         context.argument(
             "default_eventhub",
