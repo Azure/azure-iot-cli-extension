@@ -103,13 +103,35 @@ class TwinProvider(DigitalTwinsProvider):
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
 
-    def delete(self, twin_id, etag=None):
-        # Not a json response
-        try:
+    def delete(self, twin_id, all=False, etag=None):
+        if all:
+            # need to get all twins
+            query = "select * from digitaltwins"
+            twins = self.invoke_query(query=query, show_cost=False)["result"]
+
+            # confirmation
+            # logger.warn(f"This operation will delete all twins")
+            # i = input(f"Delete all twins? (y/n)")
+            # note that input will be really annoying to test
+
+            # go through and delete all
             options = TwinOptions(if_match=(etag if etag else "*"))
-            self.twins_sdk.delete(id=twin_id, digital_twins_delete_options=options, raw=True)
-        except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            for twin in twins:
+                i = input(f"Delete twin {twin['$dtId']}? (y/n)")
+                if i.lower() == "y":
+                    try:
+                        self.twins_sdk.delete(id=twin["$dtId"], digital_twins_delete_options=options, raw=True)
+                        print("Deleted.")
+                    except ErrorResponseException as e:
+                        logger.warn(f"Could not delete twin {twin['$dtId']}. The error is {unpack_msrest_error(e)}")
+        elif twin_id:
+            try:
+                options = TwinOptions(if_match=(etag if etag else "*"))
+                self.twins_sdk.delete(id=twin_id, digital_twins_delete_options=options, raw=True)
+            except ErrorResponseException as e:
+                raise CLIError(unpack_msrest_error(e))
+        else:
+            raise CLIError("Must provide twin id if not deleting all twins")
 
     def add_relationship(
         self,
