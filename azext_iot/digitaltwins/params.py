@@ -292,6 +292,11 @@ def load_digitaltwins_arguments(self, _):
             options_list=["--if-none-match"],
             help="Indicates the create operation should fail if an existing twin with the same id exists."
         )
+        context.argument(
+            "all",
+            options_list=["--all"],
+            help="Will delete all of the resource."
+        )
 
     with self.argument_context("dt twin create") as context:
         context.argument(
