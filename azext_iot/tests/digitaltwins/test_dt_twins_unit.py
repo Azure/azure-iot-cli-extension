@@ -510,8 +510,84 @@ class TestTwinDeleteTwin(object):
 
         assert result is None
 
+    @pytest.fixture
+    def service_client_all(self, mocked_response, start_twin_response):
+        mocked_response.add(
+            method=responses.POST,
+            url="https://{}/query".format(
+                hostname
+            ),
+            body=json.dumps({
+                "value": [generate_twin_result(), generate_twin_result()],
+                "continuationToken": None
+            }),
+            status=200,
+            content_type="application/json",
+            match_querystring=False,
+            headers={
+                "Query-Charge": "1.0"
+            }
+        )
+
+        mocked_response.add(
+            method=responses.DELETE,
+            url="https://{}/digitaltwins/{}".format(
+                hostname, twin_id
+            ),
+            body=generic_result,
+            status=204,
+            content_type="application/json",
+            match_querystring=False,
+        )
+
+        yield mocked_response
+
+    @pytest.mark.parametrize(
+        "userinput",
+        [['y', 'y'], ['n', 'y'], ['n', 'n']]
+    )
+    def test_delete_twin_all(self, mocker, fixture_cmd, service_client_all, userinput):
+        mocker.patch('builtins.input', lambda msg : next(iter(userinput)))
+
+        result = subject.delete_twin(
+            cmd=fixture_cmd,
+            name_or_hostname=hostname,
+            twin_id=twin_id,
+            all=True
+        )
+
+        start = check_resource_group_name_call(service_client_all, resource_group_input=None)
+
+        delete_request = service_client_all.calls[start].request
+        assert delete_request.method == "POST"
+
+        # check delete calls based on input
+        number_deletes = userinput.count('y')
+        for i in range(number_deletes):
+            delete_request = service_client_all.calls[start + i + 1].request
+            assert delete_request.method == "DELETE"
+
+        assert result is None
+
     @pytest.fixture(params=[400, 401, 500])
     def service_client_error(self, mocked_response, start_twin_response, request):
+        mocked_response.add(
+            method=responses.POST,
+            url="https://{}/query".format(
+                hostname
+            ),
+            body=json.dumps({
+                "value": [generate_twin_result()],
+                "continuationToken": None
+            }),
+            status=200,
+            content_type="application/json",
+            match_querystring=False,
+            headers={
+                "Query-Charge": "1.0"
+            }
+        )
+
         mocked_response.add(
             method=responses.DELETE,
             url="https://{}/digitaltwins/{}".format(
@@ -526,17 +602,28 @@ class TestTwinDeleteTwin(object):
         yield mocked_response
 
     @pytest.mark.parametrize(
-        "resource_group_name, etag",
-        [(None, None), (resource_group, None), (None, etag)]
+        "all, resource_group_name, etag",
+        [(False, None, None), (False, resource_group, None), (False, None, etag), (True, None, None)]
     )
-    def test_delete_twin_error(self, fixture_cmd, service_client_error, resource_group_name, etag):
+    def test_delete_twin_error(self, mocker, fixture_cmd, service_client_error, all, resource_group_name, etag):
+        mocker.patch('builtins.input', lambda msg : 'y')
+        # if all is selected -> should not throw errors
         with pytest.raises(CLIError):
             subject.delete_twin(
                 cmd=fixture_cmd,
                 name_or_hostname=hostname,
                 twin_id=twin_id,
+                all=all,
                 resource_group_name=resource_group_name,
                 etag=etag
+            )
+
+    def test_delete_twin_no_twin_id_error(self, fixture_cmd, service_client_error):
+        with pytest.raises(CLIError):
+            subject.delete_twin(
+                cmd=fixture_cmd,
+                name_or_hostname=hostname,
+                twin_id=None
             )
 
 
