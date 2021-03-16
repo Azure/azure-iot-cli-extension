@@ -44,12 +44,7 @@ def update_twin(cmd, name_or_hostname, twin_id, json_patch, resource_group_name=
 
 def delete_twin(cmd, name_or_hostname, twin_id=None, all=False, resource_group_name=None, etag=None):
     twin_provider = TwinProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
-    return twin_provider.delete(twin_id=twin_id, etag=etag)
-
-
-def delete_all_twin(cmd, name_or_hostname, resource_group_name=None, etag=None):
-    twin_provider = TwinProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
-    return twin_provider.delete_all(etag=etag)
+    return twin_provider.delete(twin_id=twin_id, all=all, etag=etag)
 
 
 def create_relationship(

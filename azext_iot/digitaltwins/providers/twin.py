@@ -103,7 +103,7 @@ class TwinProvider(DigitalTwinsProvider):
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
 
-    def delete(self, twin_id, all=False, etag=None):
+    def delete(self, twin_id=None, all=False, etag=None):
         if all:
             # need to get all twins
             query = "select * from digitaltwins"
@@ -116,7 +116,9 @@ class TwinProvider(DigitalTwinsProvider):
 
             # go through and delete all
             options = TwinOptions(if_match=(etag if etag else "*"))
+            print(twins)
             for twin in twins:
+                twin = json.loads(twin)
                 i = input(f"Delete twin {twin['$dtId']}? (y/n)")
                 if i.lower() == "y":
                     try:
