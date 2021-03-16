@@ -107,24 +107,24 @@ helps[
     "iot hub connection-string show"
 ] = """
     type: command
-    short-summary: Show the connection strings for an IoT Hub.
+    short-summary: Show the connection strings for the specified IoT Hubs using the given policy name and key.
     examples:
-    - name: Show the connection string for all IoT Hubs in a subscription using the default policy and primary key.
+    - name: Show the connection strings for all active state IoT Hubs in a subscription using the default policy and primary key.
       text: >
           az iot hub connection-string show
-    - name: Show the connection string for all IoT Hubs in a resource group using the default policy and primary key.
+    - name: Show the connection strings for all active state IoT Hubs in a resource group using the default policy and primary key.
       text: >
           az iot hub connection-string show --resource-group MyResourceGroup
-    - name: Show all the connection string of an IoT Hub using primary key.
+    - name: Show all connection strings of the given IoT Hub using primary key.
       text: >
           az iot hub connection-string show -n MyIotHub --all
-    - name: Show the connection string of an IoT Hub using default policy and primary key.
+    - name: Show the connection string of the given IoT Hub using the default policy and primary key.
       text: >
           az iot hub connection-string show -n MyIotHub
-    - name: Show the connection string of an IoT Hub using policy 'service' and secondary key.
+    - name: Show the connection string of the given IoT Hub using policy 'service' and secondary key.
       text: >
           az iot hub connection-string show -n MyIotHub --policy-name service --key-type secondary
-    - name: Show the eventhub compatible connection string of an IoT Hub\'s default eventhub.
+    - name: Show the eventhub compatible connection string of the given IoT Hub\'s default eventhub.
       text: >
           az iot hub connection-string show -n MyIotHub --default-eventhub
 """
