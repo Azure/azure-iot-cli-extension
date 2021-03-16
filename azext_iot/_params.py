@@ -271,9 +271,8 @@ def load_arguments(self, _):
         context.argument(
             "default_eventhub",
             arg_type=get_three_state_flag(),
-            default="false",
             options_list=["--default-eventhub", "--eh"],
-            help="Flag indicating the connection string returned is for the default EventHub endpoint.",
+            help="Flag indicating the connection string returned is for the default EventHub endpoint. Default: false.",
         )
 
     with self.argument_context("iot hub job") as context:

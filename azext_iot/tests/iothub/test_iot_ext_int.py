@@ -74,7 +74,8 @@ class TestIoTHub(IoTLiveScenarioTest):
         # Test 'az iot hub connection-string show'
         conn_str_pattern = r'^HostName={0}.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey='.format(
             LIVE_HUB)
-        conn_str_eventhub_pattern = r'^Endpoint=sb://(.+?)servicebus.windows.net/;SharedAccessKeyName=iothubowner;SharedAccessKey=(.+?);EntityPath='
+        conn_str_eventhub_pattern = (r'^Endpoint=sb://(.+?)servicebus.windows.net/;SharedAccessKeyName='
+                                     r'iothubowner;SharedAccessKey=(.+?);EntityPath=')
         defaultpolicy = "iothubowner"
         nonexistantpolicy = "badpolicy"
 
