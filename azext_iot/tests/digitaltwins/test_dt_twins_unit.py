@@ -31,20 +31,21 @@ generic_patch_1 = json.dumps({"a" : "b"})
 generic_patch_2 = json.dumps({"a" : "b", "c" : "d"})
 
 
-def generate_twin_result(twin_id=twin_id, etag=etag, model_id=model_id):
-    return json.dumps({
-        "$dtId": twin_id,
-        "$etag": etag,
+def generate_twin_result(randomized=False):
+    return {
+        "$dtId": generate_generic_id() if randomized else twin_id,
+        "$etag": generate_generic_id() if randomized else etag,
         "$metadata": {
-            "$model": model_id
+            "$model": generate_generic_id() if randomized else model_id
         }
-    })
+    }
 
 
 def create_relationship(relationship_name=None):
     return {
         "$relationshipId": generate_generic_id(),
-        "relationship_name": relationship_name
+        "$relationshipName": relationship_name,
+        "$sourceId": generate_generic_id()
     }
 
 
@@ -390,7 +391,7 @@ class TestTwinUpdateTwin(object):
             url="https://{}/digitaltwins/{}".format(
                 hostname, twin_id
             ),
-            body=generate_twin_result(),
+            body=json.dumps(generate_twin_result()),
             status=200,
             content_type="application/json",
             match_querystring=False,
@@ -433,7 +434,7 @@ class TestTwinUpdateTwin(object):
         get_request = service_client.calls[start + 1].request
         assert get_request.method == "GET"
 
-        assert result == json.loads(generate_twin_result())
+        assert result == generate_twin_result()
 
     @pytest.fixture(params=[(400, 200), (401, 200), (500, 200), (202, 400), (202, 401), (202, 500)])
     def service_client_error(self, mocked_response, start_twin_response, request):
@@ -512,13 +513,71 @@ class TestTwinDeleteTwin(object):
 
     @pytest.fixture
     def service_client_all(self, mocked_response, start_twin_response):
-        mocked_response.add(
+        yield mocked_response
+
+    @pytest.mark.parametrize(
+        "user_input, number_twins",
+        [
+            ('y', 0),
+            ('y', 1),
+            ('y', 3),
+            ('n', 3)
+        ]
+    )
+    def test_delete_twin_all(self, mocker, fixture_cmd, service_client_all, user_input, number_twins):
+        mocker.patch('builtins.input', side_effect=user_input)
+
+        # Create query call and delete calls
+        query_result = []
+        for i in range(number_twins):
+            twin = generate_twin_result(randomized=True)
+            query_result.append(twin)
+            # Query calls to check if there are any relationships
+            service_client_all.add(
+                method=responses.GET,
+                url="https://{}/digitaltwins/{}/incomingrelationships".format(
+                    hostname, twin["$dtId"]
+                ),
+                body=json.dumps({
+                    "value" : [],
+                    "nextLink" : None
+                }),
+                status=200,
+                content_type="application/json",
+                match_querystring=False
+            )
+            service_client_all.add(
+                method=responses.GET,
+                url="https://{}/digitaltwins/{}/relationships".format(
+                    hostname, twin["$dtId"]
+                ),
+                body=json.dumps({
+                    "value" : [],
+                    "nextLink" : None
+                }),
+                status=200,
+                content_type="application/json",
+                match_querystring=False
+            )
+            # Delete call
+            service_client_all.add(
+                method=responses.DELETE,
+                url="https://{}/digitaltwins/{}".format(
+                    hostname, twin["$dtId"]
+                ),
+                body=generic_result,
+                status=204 if i % 2 == 0 else 400,
+                content_type="application/json",
+                match_querystring=False,
+            )
+        # Query call for twins to delete
+        service_client_all.add(
             method=responses.POST,
             url="https://{}/query".format(
                 hostname
             ),
             body=json.dumps({
-                "value": [generate_twin_result(), generate_twin_result()],
+                "value": query_result,
                 "continuationToken": None
             }),
             status=200,
@@ -529,31 +588,12 @@ class TestTwinDeleteTwin(object):
             }
         )
 
-        mocked_response.add(
-            method=responses.DELETE,
-            url="https://{}/digitaltwins/{}".format(
-                hostname, twin_id
-            ),
-            body=generic_result,
-            status=204,
-            content_type="application/json",
-            match_querystring=False,
-        )
-
-        yield mocked_response
-
-    @pytest.mark.parametrize(
-        "userinput",
-        [['y', 'y'], ['n', 'y'], ['n', 'n']]
-    )
-    def test_delete_twin_all(self, mocker, fixture_cmd, service_client_all, userinput):
-        mocker.patch('builtins.input', lambda msg : next(iter(userinput)))
-
+        # Call the delete all command
         result = subject.delete_twin(
             cmd=fixture_cmd,
             name_or_hostname=hostname,
-            twin_id=twin_id,
-            all=True
+            twin_id=None,
+            delete_all=True
         )
 
         start = check_resource_group_name_call(service_client_all, resource_group_input=None)
@@ -561,33 +601,27 @@ class TestTwinDeleteTwin(object):
         delete_request = service_client_all.calls[start].request
         assert delete_request.method == "POST"
 
-        # check delete calls based on input
-        number_deletes = userinput.count('y')
-        for i in range(number_deletes):
-            delete_request = service_client_all.calls[start + i + 1].request
-            assert delete_request.method == "DELETE"
+        # Check delete calls based on input.
+        if user_input == "y":
+            for i in range(number_twins):
+                query1_request = service_client_all.calls[start + 1 + 3 * i].request
+                assert query1_request.method == "GET"
+                assert query_result[i]["$dtId"] in query1_request.url
+
+                query2_request = service_client_all.calls[start + 2 + 3 * i].request
+                assert query2_request.method == "GET"
+                assert query_result[i]["$dtId"] in query2_request.url
+
+                delete_request = service_client_all.calls[start + 3 + 3 * i].request
+                assert delete_request.method == "DELETE"
+                assert query_result[i]["$dtId"] in delete_request.url
+        else:
+            assert len(service_client_all.calls) - 1 == start
 
         assert result is None
 
     @pytest.fixture(params=[400, 401, 500])
     def service_client_error(self, mocked_response, start_twin_response, request):
-        mocked_response.add(
-            method=responses.POST,
-            url="https://{}/query".format(
-                hostname
-            ),
-            body=json.dumps({
-                "value": [generate_twin_result()],
-                "continuationToken": None
-            }),
-            status=200,
-            content_type="application/json",
-            match_querystring=False,
-            headers={
-                "Query-Charge": "1.0"
-            }
-        )
-
         mocked_response.add(
             method=responses.DELETE,
             url="https://{}/digitaltwins/{}".format(
@@ -602,23 +636,20 @@ class TestTwinDeleteTwin(object):
         yield mocked_response
 
     @pytest.mark.parametrize(
-        "all, resource_group_name, etag",
-        [(False, None, None), (False, resource_group, None), (False, None, etag), (True, None, None)]
+        "resource_group_name, etag",
+        [(None, None), (resource_group, None), (None, etag)]
     )
-    def test_delete_twin_error(self, mocker, fixture_cmd, service_client_error, all, resource_group_name, etag):
-        mocker.patch('builtins.input', lambda msg : 'y')
-        # if all is selected -> should not throw errors
+    def test_delete_twin_error(self, mocker, fixture_cmd, service_client_error, resource_group_name, etag):
         with pytest.raises(CLIError):
             subject.delete_twin(
                 cmd=fixture_cmd,
                 name_or_hostname=hostname,
                 twin_id=twin_id,
-                all=all,
                 resource_group_name=resource_group_name,
                 etag=etag
             )
 
-    def test_delete_twin_no_twin_id_error(self, fixture_cmd, service_client_error):
+    def test_delete_twin_no_twin_id_error(self, fixture_cmd):
         with pytest.raises(CLIError):
             subject.delete_twin(
                 cmd=fixture_cmd,
@@ -957,7 +988,7 @@ class TestTwinListRelationship(object):
             expected_result = [
                 x
                 for x in servresult
-                if x["relationship_name"] and x["relationship_name"] == relationship
+                if x["$relationshipName"] and x["$relationshipName"] == relationship
             ]
             assert result == expected_result
         else:
@@ -1050,6 +1081,118 @@ class TestTwinDeleteRelationship(object):
 
         assert result is None
 
+
+    @pytest.fixture
+    def service_client_all(self, mocked_response, start_twin_response):
+        yield mocked_response
+
+    @pytest.mark.parametrize(
+        "user_input, incoming, outcoming",
+        [
+            ("y", 0, 0),
+            ("y", 1, 0),
+            ("y", 0, 1),
+            ("y", 1, 1),
+            ("y", 3, 0),
+            ("y", 0, 3),
+            ("y", 3, 3),
+            ("n", 3, 3)
+        ]
+    )
+    def test_delete_relationship_all(self, mocker, fixture_cmd, service_client_all, user_input, incoming, outcoming):
+        mocker.patch('builtins.input', side_effect=user_input)
+
+        # Create query call with incoming_relationships=True
+        incoming_query = []
+        for i in range(incoming):
+            relationship = create_relationship("contains")
+            incoming_query.append(relationship)
+            service_client_all.add(
+                method=responses.DELETE,
+                url="https://{}/digitaltwins/{}/relationships/{}".format(
+                    hostname, relationship["$sourceId"], relationship["$relationshipId"]
+                ),
+                body=generic_result,
+                status=204 if i % 2 == 0 else 400,
+                content_type="application/json",
+                match_querystring=False,
+            )
+        service_client_all.add(
+            method=responses.GET,
+            url="https://{}/digitaltwins/{}/incomingrelationships".format(
+                hostname, twin_id
+            ),
+            body=json.dumps({
+                "value" : incoming_query,
+                "nextLink" : None
+            }),
+            status=200,
+            content_type="application/json",
+            match_querystring=False
+        )
+
+        # Create query call with incoming_relationships=False
+        outcoming_query = []
+        for i in range(incoming):
+            relationship = create_relationship("contains")
+            outcoming_query.append(relationship)
+            service_client_all.add(
+                method=responses.DELETE,
+                url="https://{}/digitaltwins/{}/relationships/{}".format(
+                    hostname, twin_id, relationship["$relationshipId"]
+                ),
+                body=generic_result,
+                status=204 if i % 2 == 0 else 400,
+                content_type="application/json",
+                match_querystring=False,
+            )
+        service_client_all.add(
+            method=responses.GET,
+            url="https://{}/digitaltwins/{}/relationships".format(
+                hostname, twin_id
+            ),
+            body=json.dumps({
+                "value" : outcoming_query,
+                "nextLink" : None
+            }),
+            status=200,
+            content_type="application/json",
+            match_querystring=False
+        )
+
+        # Run the delete all command
+        result = subject.delete_relationship(
+            cmd=fixture_cmd,
+            name_or_hostname=hostname,
+            twin_id=twin_id,
+            relationship_id=None,
+            delete_all=True
+        )
+
+        start = check_resource_group_name_call(service_client_all, resource_group_input=None)
+
+        # First two calls should be the query calls
+        assert service_client_all.calls[start].request.method == "GET"
+        assert service_client_all.calls[start + 1].request.method == "GET"
+
+        if user_input == "y":
+            call_num = start + 2
+            for i in range(len(incoming_query)):
+                delete_request = service_client_all.calls[call_num + i].request
+                assert delete_request.method == "DELETE"
+                assert incoming_query[i]["$relationshipId"] in delete_request.url
+
+            call_num += len(incoming_query)
+            for i in range(len(outcoming_query)):
+                delete_request = service_client_all.calls[call_num + i].request
+                assert delete_request.method == "DELETE"
+                assert outcoming_query[i]["$relationshipId"] in delete_request.url
+            assert len(service_client_all.calls) == call_num + len(outcoming_query)
+        else:
+            assert len(service_client_all.calls) - 2 == start
+
+        assert result is None
+
     @pytest.fixture(params=[400, 401, 500])
     def service_client_error(self, mocked_response, start_twin_response, request):
         mocked_response.add(
@@ -1074,6 +1217,16 @@ class TestTwinDeleteRelationship(object):
                 relationship_id=relationship_id,
                 resource_group_name=None,
                 etag=None
+            )
+
+    def test_delete_relationship_no_twin_id_error(self, fixture_cmd):
+        with pytest.raises(CLIError):
+            subject.delete_relationship(
+                cmd=fixture_cmd,
+                name_or_hostname=hostname,
+                twin_id=twin_id,
+                relationship_id=None,
+                delete_all=False
             )
 
 
