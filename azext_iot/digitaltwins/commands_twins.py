@@ -42,9 +42,9 @@ def update_twin(cmd, name_or_hostname, twin_id, json_patch, resource_group_name=
     return twin_provider.update(twin_id=twin_id, json_patch=json_patch, etag=etag)
 
 
-def delete_twin(cmd, name_or_hostname, twin_id=None, all=False, resource_group_name=None, etag=None):
+def delete_twin(cmd, name_or_hostname, twin_id=None, delete_all=False, resource_group_name=None, etag=None):
     twin_provider = TwinProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
-    return twin_provider.delete(twin_id=twin_id, all=all, etag=etag)
+    return twin_provider.delete(twin_id=twin_id, delete_all=delete_all, etag=etag)
 
 
 def create_relationship(
@@ -110,11 +110,11 @@ def list_relationships(
 
 
 def delete_relationship(
-    cmd, name_or_hostname, twin_id, relationship_id=None, resource_group_name=None, etag=None
+    cmd, name_or_hostname, twin_id, relationship_id=None, delete_all=False, resource_group_name=None, etag=None
 ):
     twin_provider = TwinProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
     return twin_provider.delete_relationship(
-        twin_id=twin_id, relationship_id=relationship_id, etag=etag
+        twin_id=twin_id, relationship_id=relationship_id, delete_all=delete_all, etag=etag
     )
 
 

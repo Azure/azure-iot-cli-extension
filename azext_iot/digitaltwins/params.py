@@ -292,11 +292,6 @@ def load_digitaltwins_arguments(self, _):
             options_list=["--if-none-match"],
             help="Indicates the create operation should fail if an existing twin with the same id exists."
         )
-        context.argument(
-            "all",
-            options_list=["--all"],
-            help="Will delete all of the resource."
-        )
 
     with self.argument_context("dt twin create") as context:
         context.argument(
@@ -355,6 +350,13 @@ def load_digitaltwins_arguments(self, _):
             "relationship",
             options_list=["--relationship", "--kind"],
             help="Filter result by the kind of relationship.",
+        )
+
+    with self.argument_context("dt twin relationship delete") as context:
+        context.argument(
+            "delete_all",
+            options_list=["--all"],
+            help="Will delete all relationships for the specified twin."
         )
 
     with self.argument_context("dt model") as context:
