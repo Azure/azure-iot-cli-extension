@@ -103,8 +103,8 @@ class TwinProvider(DigitalTwinsProvider):
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
 
-    def delete(self, twin_id=None, all=False, etag=None):
-        if all:
+    def delete(self, twin_id=None, delete_all=False, etag=None):
+        if delete_all:
             # need to get all twins
             query = "select * from digitaltwins"
             twins = self.invoke_query(query=query, show_cost=False)["result"]
@@ -113,19 +113,32 @@ class TwinProvider(DigitalTwinsProvider):
             # logger.warn(f"This operation will delete all twins")
             # i = input(f"Delete all twins? (y/n)")
             # note that input will be really annoying to test
+            if len(twins) == 0:
+                print(f"Found {len(twins)} twins.")
+                return
+
+            i = input(f"Found {len(twins)} twin(s). Delete all? (y/n) ")
+            if i.lower() != "y":
+                return
 
             # go through and delete all
             options = TwinOptions(if_match=(etag if etag else "*"))
             print(twins)
             for twin in twins:
-                twin = json.loads(twin)
-                i = input(f"Delete twin {twin['$dtId']}? (y/n)")
-                if i.lower() == "y":
-                    try:
-                        self.twins_sdk.delete(id=twin["$dtId"], digital_twins_delete_options=options, raw=True)
-                        print("Deleted.")
-                    except ErrorResponseException as e:
-                        logger.warn(f"Could not delete twin {twin['$dtId']}. The error is {unpack_msrest_error(e)}")
+                try:
+                    print("remove relationships")
+                    self.delete_relationship(
+                        twin_id=twin["$dtId"],
+                        relationship_id="REMOVETHIS",
+                        delete_all=True,
+                        etag=etag,
+                        skip=True
+                    )
+                    print("actual remove")
+                    self.twins_sdk.delete(id=twin["$dtId"], digital_twins_delete_options=options, raw=True)
+                    print("Deleted.")
+                except ErrorResponseException as e:
+                    logger.warn(f"Could not delete twin {twin['$dtId']}. The error is {unpack_msrest_error(e)}")
         elif twin_id:
             try:
                 options = TwinOptions(if_match=(etag if etag else "*"))
@@ -229,14 +242,55 @@ class TwinProvider(DigitalTwinsProvider):
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
 
-    def delete_relationship(self, twin_id, relationship_id, etag=None):
-        try:
+    def delete_relationship(self, twin_id, relationship_id=None, delete_all=False, etag=None, skip=False):
+        if delete_all:
+            relationships = self.list_relationships(twin_id, incoming_relationships=True)
+            incoming_pager = self.list_relationships(twin_id)
+
+            # relationships pager needs to be advanced to get relationships
+            try:
+                while True:
+                    relationships.extend(incoming_pager.advance_page())
+            except StopIteration:
+                pass
+
+            # confirmation for all. Skip for other functions that call this.
+            if relationships == []:
+                print(f"Found {len(relationships)} relationships associated with twin {twin_id}.")
+                return
+
+            if not skip:
+                i = input(f"Found {len(relationships)} relationship(s) associated with twin {twin_id}. Delete all? (y/n) ")
+                if i.lower() != 'y':
+                    return
+
             options = TwinOptions(if_match=(etag if etag else "*"))
-            self.twins_sdk.delete_relationship(
-                id=twin_id, relationship_id=relationship_id, digital_twins_delete_relationship_options=options
-            )
-        except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            for relationship in relationships:
+                try:
+                    if type(relationship) == dict:
+                        self.twins_sdk.delete_relationship(
+                            id=twin_id,
+                            relationship_id=relationship['$relationshipId'],
+                            digital_twins_delete_relationship_options=options
+                        )
+                    else:
+                        self.twins_sdk.delete_relationship(
+                            id=relationship.source_id,
+                            relationship_id=relationship.relationship_id,
+                            digital_twins_delete_relationship_options=options
+                        )
+                except ErrorResponseException as e:
+                    logger.warn(f"Could not delete relationship {relationship}. The error is {unpack_msrest_error(e)}.")
+        elif relationship_id:
+            try:
+                options = TwinOptions(if_match=(etag if etag else "*"))
+                self.twins_sdk.delete_relationship(
+                    id=twin_id, relationship_id=relationship_id, digital_twins_delete_relationship_options=options
+                )
+            except ErrorResponseException as e:
+                raise CLIError(unpack_msrest_error(e))
+        else:
+            raise CLIError("Must provide relationship id if not deleting all relationships")
 
     def get_component(self, twin_id, component_path):
         try:
