@@ -284,6 +284,7 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
         ).get_output_in_json()
         assert len(twin_query_result["result"]) == 2
 
+        # Relationship Tests
         relationship_id = "myedge"
         relationship = "contains"
         self.kwargs["relationshipJson"] = json.dumps(
@@ -499,6 +500,13 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
                 "{telemetryJson}",
             )
         )
+
+        # TODO: delete all
+        # self.cmd(
+        #         "dt twin delete -n {} --all".format(
+        #             instance_name,
+        #         )
+        # )
 
         for twin_tuple in twins_id_list:
             # No output from API for delete twin
