@@ -110,9 +110,6 @@ class TwinProvider(DigitalTwinsProvider):
             twins = self.invoke_query(query=query, show_cost=False)["result"]
 
             # confirmation
-            # logger.warn(f"This operation will delete all twins")
-            # i = input(f"Delete all twins? (y/n)")
-            # note that input will be really annoying to test
             if len(twins) == 0:
                 print(f"Found {len(twins)} twins.")
                 return
@@ -123,10 +120,8 @@ class TwinProvider(DigitalTwinsProvider):
 
             # go through and delete all
             options = TwinOptions(if_match=(etag if etag else "*"))
-            print(twins)
             for twin in twins:
                 try:
-                    print("remove relationships")
                     self.delete_relationship(
                         twin_id=twin["$dtId"],
                         relationship_id="REMOVETHIS",
@@ -134,9 +129,7 @@ class TwinProvider(DigitalTwinsProvider):
                         etag=etag,
                         skip=True
                     )
-                    print("actual remove")
                     self.twins_sdk.delete(id=twin["$dtId"], digital_twins_delete_options=options, raw=True)
-                    print("Deleted.")
                 except ErrorResponseException as e:
                     logger.warn(f"Could not delete twin {twin['$dtId']}. The error is {unpack_msrest_error(e)}")
         elif twin_id:
