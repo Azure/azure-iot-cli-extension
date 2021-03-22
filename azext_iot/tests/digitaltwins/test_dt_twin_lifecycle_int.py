@@ -501,11 +501,22 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
             )
         )
 
-        self.cmd(
-            "dt twin delete-all -n {} --yes".format(
-                instance_name,
+        # TODO: delete all
+        # self.cmd(
+        #         "dt twin delete -n {} --all".format(
+        #             instance_name,
+        #         )
+        # )
+
+        for twin_tuple in twins_id_list:
+            # No output from API for delete twin
+            self.cmd(
+                "dt twin delete -n {} --twin-id {} {}".format(
+                    instance_name,
+                    twin_tuple[0],
+                    "-g {}".format(self.rg) if twins_id_list[-1] == twin_tuple else "",
+                )
             )
-        )
         sleep(10)  # Wait for API to catch up
 
         twin_query_result = self.cmd(
