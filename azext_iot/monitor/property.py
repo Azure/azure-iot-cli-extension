@@ -17,9 +17,11 @@ from azext_iot.constants import (
 )
 
 from azext_iot.central.models.devicetwin import DeviceTwin, Property
+from azext_iot.central.providers.preview import (
+    CentralDeviceProviderPreview,
+    CentralDeviceTemplateProviderPreview,
+)
 from azext_iot.central.providers import (
-    CentralDeviceProvider,
-    CentralDeviceTemplateProvider,
     CentralDeviceTwinProvider,
 )
 from azext_iot.monitor.parsers.issue import IssueHandler
@@ -45,10 +47,10 @@ class PropertyMonitor:
             token=self._token,
             device_id=self._device_id,
         )
-        self._central_device_provider = CentralDeviceProvider(
+        self._central_device_provider = CentralDeviceProviderPreview(
             cmd=self._cmd, app_id=self._app_id, token=self._token
         )
-        self._central_template_provider = CentralDeviceTemplateProvider(
+        self._central_template_provider = CentralDeviceTemplateProviderPreview(
             cmd=self._cmd, app_id=self._app_id, token=self._token
         )
         self._template = self._get_device_template()

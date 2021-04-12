@@ -1,0 +1,29 @@
+{
+    "id": "dtmi:modelDefinition:u3ayxmc0gn:h8lfh3pg741",
+    "types": [
+        "DeviceModel"
+    ],
+    "displayName": "jacktest",
+    "capabilityModel": {
+        "@id": "dtmi:digitalDistributionCenter2oumz6ipo8a:jacktest25;1",
+        "@type": "Interface",
+        "contents": [
+            {
+                "@id": "dtmi:digitalDistributionCenter2oumz6ipo8a:jacktest25:testcmd;1",
+                "@type": "Command",
+                "commandType": "synchronous",
+                "displayName": "testcmd",
+                "name": "testcmd"
+            }
+        ],
+        "displayName": "jacktest",
+        "@context": [
+            "dtmi:iotcentral:context;2",
+            "dtmi:dtdl:context;2"
+        ]
+    },
+    "solutionModel": {
+        "@id": "dtmi:solutionModel:modelDefinition:u3ayxmc0gn:d70qjrdpm46",
+        "@type": "SolutionModel"
+    }
+}

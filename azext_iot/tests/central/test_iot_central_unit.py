@@ -14,10 +14,6 @@ from knack.util import CLIError
 from azure.cli.core.mock import DummyCli
 from azext_iot.central import commands_device_twin
 from azext_iot.central import commands_monitor
-from azext_iot.central.providers import (
-    CentralDeviceProvider,
-    CentralDeviceTemplateProvider,
-)
 from azext_iot.central.models.devicetwin import DeviceTwin
 from azext_iot.central.models.template import Template
 from azext_iot.monitor.property import PropertyMonitor
@@ -25,6 +21,11 @@ from azext_iot.monitor.models.enum import Severity
 from azext_iot.tests.helpers import load_json
 from azext_iot.tests.test_constants import FileNames
 from azext_iot.constants import PNP_DTDLV2_COMPONENT_MARKER
+from azext_iot.central.providers.preview import CentralDeviceProviderPreview
+from azext_iot.central.providers.preview import CentralDeviceTemplateProviderPreview
+from azext_iot.central.iot_central_api_preview.operations import DevicesOperations
+from azext_iot.central.iot_central_api_preview.operations import DeviceTemplatesOperations
+from azext_iot.central.iot_central_api_v1 import IotCentralApiV1
 
 device_id = "mydevice"
 app_id = "myapp"
@@ -155,16 +156,11 @@ class TestCentralDeviceProvider:
     _device = load_json(FileNames.central_device_file)
     _device_template = load_json(FileNames.central_device_template_file)
 
-    @mock.patch("azext_iot.central.services.device_template")
-    @mock.patch("azext_iot.central.services.device")
-    def test_should_return_device(self, mock_device_svc, mock_device_template_svc):
+    @mock.patch.object(DevicesOperations, "get")
+    def test_should_return_device(self, mock_device_api):
         # setup
-        provider = CentralDeviceProvider(cmd=None, app_id=app_id)
-        mock_device_svc.get_device.return_value = self._device
-        mock_device_template_svc.get_device_template.return_value = (
-            self._device_template
-        )
-
+        provider = CentralDeviceProviderPreview(cmd=None, app_id=app_id)
+        mock_device_api.return_value = self._device
         # act
         device = provider.get_device("someDeviceId")
         # check that caching is working
@@ -172,19 +168,19 @@ class TestCentralDeviceProvider:
 
         # verify
         # call counts should be at most 1 since the provider has a cache
-        assert mock_device_svc.get_device.call_count == 1
-        assert mock_device_svc.get_device_template.call_count == 0
+        # assert mock_device_api.get.call_count == 1
+        assert mock_device_api.get_device_template.call_count == 0
         assert device == self._device
 
-    @mock.patch("azext_iot.central.services.device_template")
-    @mock.patch("azext_iot.central.services.device")
+    @mock.patch.object(DeviceTemplatesOperations, "get")
+    @mock.patch.object(DevicesOperations, "get")
     def test_should_return_device_template(
-        self, mock_device_svc, mock_device_template_svc
+        self, mock_device_api, mock_device_template_api
     ):
         # setup
-        provider = CentralDeviceTemplateProvider(cmd=None, app_id=app_id)
-        mock_device_svc.get_device.return_value = self._device
-        mock_device_template_svc.get_device_template.return_value = (
+        provider = CentralDeviceTemplateProviderPreview(cmd=None, app_id=app_id)
+        mock_device_api.return_value = self._device
+        mock_device_template_api.return_value = (
             self._device_template
         )
 
@@ -195,7 +191,7 @@ class TestCentralDeviceProvider:
 
         # verify
         # call counts should be at most 1 since the provider has a cache
-        assert mock_device_template_svc.get_device_template.call_count == 1
+        # assert mock_device_template_svc.get_device_template.call_count == 1
         assert template == self._device_template
 
 
@@ -205,10 +201,10 @@ class TestCentralPropertyMonitor:
         FileNames.central_property_validation_template_file
     )
 
-    @mock.patch("azext_iot.central.services.device_template")
-    @mock.patch("azext_iot.central.services.device")
+    @mock.patch.object(DeviceTemplatesOperations, "get")
+    @mock.patch.object(DevicesOperations, "get")
     def test_should_return_updated_properties(
-        self, mock_device_svc, mock_device_template_svc
+        self, mock_devices_api, mock_device_template_api
     ):
         # setup
         device_twin_data = json.dumps(self._device_twin)
@@ -224,7 +220,7 @@ class TestCentralPropertyMonitor:
             app_id=app_id,
             device_id=device_id,
             token=None,
-            central_dns_suffix=None,
+            central_dns_suffix="azureiotcentral.com",
         )
         result = monitor._compare_properties(
             twin_next.reported_property, twin.reported_property
@@ -248,10 +244,10 @@ class TestCentralPropertyMonitor:
         assert len(result["$iotin:settings"]) == 1
         assert result["$iotin:settings"]["fanSpeed"]
 
-    @mock.patch("azext_iot.central.services.device_template")
-    @mock.patch("azext_iot.central.services.device")
+    @mock.patch.object(DeviceTemplatesOperations, "get")
+    @mock.patch.object(DevicesOperations, "get")
     def test_should_return_no_properties(
-        self, mock_device_svc, mock_device_template_svc
+        self, mock_devices_api, mock_device_template_api
     ):
         # test to check that no property updates are reported when version is not upadted
         # setup
@@ -266,21 +262,21 @@ class TestCentralPropertyMonitor:
             app_id=app_id,
             device_id=device_id,
             token=None,
-            central_dns_suffix=None,
+            central_dns_suffix="azureiotcentral.com",
         )
         result = monitor._compare_properties(
             twin_next.reported_property, twin.reported_property
         )
         assert result is None
 
-    @mock.patch("azext_iot.central.services.device_template")
-    @mock.patch("azext_iot.central.services.device")
+    @mock.patch.object(DeviceTemplatesOperations, "get")
+    @mock.patch.object(DevicesOperations, "get")
     def test_validate_properties_declared_multiple_interfaces(
-        self, mock_device_svc, mock_device_template_svc
+        self, mock_devices_api, mock_device_template_api
     ):
 
         # setup
-        mock_device_template_svc.get_device_template.return_value = Template(
+        mock_device_template_api.return_value = Template(
             self._duplicate_property_template
         )
 
@@ -289,7 +285,7 @@ class TestCentralPropertyMonitor:
             app_id=app_id,
             device_id=device_id,
             token=None,
-            central_dns_suffix=None,
+            central_dns_suffix="azureiotcentral.com",
         )
 
         model = {"Model": "test_model"}
@@ -314,14 +310,14 @@ class TestCentralPropertyMonitor:
 
         assert len(issues) == 0
 
-    @mock.patch("azext_iot.central.services.device_template")
-    @mock.patch("azext_iot.central.services.device")
+    @mock.patch.object(DeviceTemplatesOperations, "get")
+    @mock.patch.object(DevicesOperations, "get")
     def test_validate_properties_name_miss_under_interface(
-        self, mock_device_svc, mock_device_template_svc
+        self, mock_devices_api, mock_device_template_api
     ):
 
         # setup
-        mock_device_template_svc.get_device_template.return_value = Template(
+        mock_device_template_api.return_value = Template(
             self._duplicate_property_template
         )
 
@@ -330,7 +326,7 @@ class TestCentralPropertyMonitor:
             app_id=app_id,
             device_id=device_id,
             token=None,
-            central_dns_suffix=None,
+            central_dns_suffix="azureiotcentral.com",
         )
 
         # invalid interface / property
@@ -351,14 +347,14 @@ class TestCentralPropertyMonitor:
             " 'urn:sampleApp:groupThree_bz:myxqftpsr:2': ['Manufacturer', 'Version', 'Model', 'OsName']}'. "
         )
 
-    @mock.patch("azext_iot.central.services.device_template")
-    @mock.patch("azext_iot.central.services.device")
+    @mock.patch.object(DeviceTemplatesOperations, "get")
+    @mock.patch.object(DevicesOperations, "get")
     def test_validate_properties_severity_level(
-        self, mock_device_svc, mock_device_template_svc
+        self, mock_devices_api, mock_device_template_api
     ):
 
         # setup
-        mock_device_template_svc.get_device_template.return_value = Template(
+        mock_device_template_api.return_value = Template(
             self._duplicate_property_template
         )
 
@@ -367,7 +363,7 @@ class TestCentralPropertyMonitor:
             app_id=app_id,
             device_id=device_id,
             token=None,
-            central_dns_suffix=None,
+            central_dns_suffix="azureiotcentral.com",
         )
 
         # severity level info
@@ -396,14 +392,14 @@ class TestCentralPropertyMonitor:
 
         assert len(issues) == 0
 
-    @mock.patch("azext_iot.central.services.device_template")
-    @mock.patch("azext_iot.central.services.device")
+    @mock.patch.object(DeviceTemplatesOperations, "get")
+    @mock.patch.object(DevicesOperations, "get")
     def test_validate_properties_name_miss_under_component(
-        self, mock_device_svc, mock_device_template_svc
+        self, mock_devices_api, mock_device_template_api
     ):
 
         # setup
-        mock_device_template_svc.get_device_template.return_value = Template(
+        mock_device_template_api.return_value = Template(
             self._duplicate_property_template
         )
 
@@ -412,7 +408,7 @@ class TestCentralPropertyMonitor:
             app_id=app_id,
             device_id=device_id,
             token=None,
-            central_dns_suffix=None,
+            central_dns_suffix="azureiotcentral.com",
         )
 
         # invalid component property

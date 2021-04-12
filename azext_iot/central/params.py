@@ -65,6 +65,12 @@ def load_central_arguments(self, _):
             help="The ID of the target device, "
             "You can find the Device Id by clicking on the Connect button on the Device Details page.",
         )
+        context.argument(
+            "version",
+            options_list=["--version", "-v"],
+            help="The version of command to use, "
+            "currently preview and v1 are supported.",
+        )
 
     with self.argument_context("iot central device-template") as context:
         context.argument(

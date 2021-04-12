@@ -57,4 +57,4 @@ class CentralDeviceTwinProvider:
                 if exception is None:
                     exception = CLIError(unpack_msrest_error(e))
 
-        raise CLIError("Could not get device twin")
+        raise exception

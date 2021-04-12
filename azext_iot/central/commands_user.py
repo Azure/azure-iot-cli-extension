@@ -7,9 +7,13 @@
 
 
 from azext_iot.constants import CENTRAL_ENDPOINT
-from azext_iot.central.providers import CentralUserProvider
 from azext_iot.central.models.enum import Role
-
+from azext_iot.central.providers.preview import CentralUserProviderPreview
+from azext_iot.central.providers.v1 import CentralUserProviderV1
+from azext_iot.constants import PREVIEW
+from azext_iot.constants import V1
+from azext_iot.central.utils import process_version
+from azext_iot.central.utils import throw_unsupported_version
 
 def add_user(
     cmd,
@@ -21,8 +25,16 @@ def add_user(
     object_id=None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
+    version=None
 ):
-    provider = CentralUserProvider(cmd=cmd, app_id=app_id, token=token)
+    supported_versions = [PREVIEW, V1]
+    version = process_version(supported_versions, version)
+    if(version == PREVIEW):
+        provider = CentralUserProviderPreview(cmd=cmd, app_id=app_id, token=token)
+    elif(version == V1):
+        provider = CentralUserProviderV1(cmd=cmd, app_id=app_id, token=token)
+    else:
+        throw_unsupported_version(supported_versions)
 
     if email:
         return provider.add_email(
@@ -42,26 +54,47 @@ def add_user(
 
 
 def list_users(
-    cmd, app_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd, app_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT, version=None
 ):
-    provider = CentralUserProvider(cmd=cmd, app_id=app_id, token=token)
+    supported_versions = [PREVIEW, V1]
+    version = process_version(supported_versions, version)
+    if(version == PREVIEW):
+        provider = CentralUserProviderPreview(cmd=cmd, app_id=app_id, token=token)
+    elif(version == V1):
+        provider = CentralUserProviderV1(cmd=cmd, app_id=app_id, token=token)
+    else:
+        throw_unsupported_version(supported_versions)
 
     return provider.get_user_list(central_dns_suffix=central_dns_suffix,)
 
 
 def get_user(
-    cmd, app_id: str, assignee: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd, app_id: str, user_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT, version=None
 ):
-    provider = CentralUserProvider(cmd=cmd, app_id=app_id, token=token)
+    supported_versions = [PREVIEW, V1]
+    version = process_version(supported_versions, version)
+    if(version == PREVIEW):
+        provider = CentralUserProviderPreview(cmd=cmd, app_id=app_id, token=token)
+    elif(version == V1):
+        provider = CentralUserProviderV1(cmd=cmd, app_id=app_id, token=token)
+    else:
+        throw_unsupported_version(supported_versions)
 
-    return provider.get_user(assignee=assignee, central_dns_suffix=central_dns_suffix)
+    return provider.get_user(user_id=user_id, central_dns_suffix=central_dns_suffix)
 
 
 def delete_user(
-    cmd, app_id: str, assignee: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd, app_id: str, user_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT, version=None
 ):
-    provider = CentralUserProvider(cmd=cmd, app_id=app_id, token=token)
+    supported_versions = [PREVIEW, V1]
+    version = process_version(supported_versions, version)
+    if(version == PREVIEW):
+        provider = CentralUserProviderPreview(cmd=cmd, app_id=app_id, token=token)
+    elif(version == V1):
+        provider = CentralUserProviderV1(cmd=cmd, app_id=app_id, token=token)
+    else:
+        throw_unsupported_version(supported_versions)
 
     return provider.delete_user(
-        assignee=assignee, central_dns_suffix=central_dns_suffix
+        user_id=user_id, central_dns_suffix=central_dns_suffix
     )

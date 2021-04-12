@@ -8,10 +8,6 @@ import re
 
 from uamqp.message import Message
 
-from azext_iot.central.providers import (
-    CentralDeviceProvider,
-    CentralDeviceTemplateProvider,
-)
 from azext_iot.central.models.template import Template
 from azext_iot.monitor.parsers import strings
 from azext_iot.monitor.central_validator import validate, extract_schema_type
@@ -25,8 +21,8 @@ class CentralParser(CommonParser):
         self,
         message: Message,
         common_parser_args: CommonParserArguments,
-        central_device_provider: CentralDeviceProvider,
-        central_template_provider: CentralDeviceTemplateProvider,
+        central_device_provider,
+        central_template_provider,
     ):
         super(CentralParser, self).__init__(
             message=message, common_parser_args=common_parser_args
@@ -119,9 +115,14 @@ class CentralParser(CommonParser):
     def _get_template(self):
         try:
             device = self._central_device_provider.get_device(self.device_id)
-            template = self._central_template_provider.get_device_template(
-                device.instance_of
-            )
+            if hasattr(device, "instance_of"):
+                template = self._central_template_provider.get_device_template(
+                    device.instance_of
+                )
+            else:
+                template = self._central_template_provider.get_device_template(
+                    device.template
+                )
             self._template_id = template.id
             return template
         except Exception as e:

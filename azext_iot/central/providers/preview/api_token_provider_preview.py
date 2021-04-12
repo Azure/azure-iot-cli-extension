@@ -9,12 +9,14 @@ from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.enum import Role
-
+from azext_iot.central.iot_central_api_preview import IotCentralApiPreview
+from azext_iot.central.services import _utility
+from azext_iot.central.utils import parse_device_status
 
 logger = get_logger(__name__)
 
 
-class CentralApiTokenProvider:
+class CentralApiTokenProviderPreview:
     def __init__(self, cmd, app_id: str, token=None):
         """
         Provider for API token APIs
@@ -34,45 +36,30 @@ class CentralApiTokenProvider:
     def add_api_token(
         self, token_id: str, role: Role, central_dns_suffix=CENTRAL_ENDPOINT,
     ):
-
-        return central_services.api_token.add_api_token(
-            cmd=self._cmd,
-            app_id=self._app_id,
-            token_id=token_id,
-            role=role,
-            token=self._token,
-            central_dns_suffix=central_dns_suffix,
-        )
+        token = _utility.get_token_credential(self._cmd)
+        apiClient = IotCentralApiPreview(token, self._app_id, central_dns_suffix)
+        payload = {
+            "roles": [{"role": role.value}],
+        }
+        return apiClient.api_tokens.set(token_id, payload)
 
     def get_api_token_list(
         self, central_dns_suffix=CENTRAL_ENDPOINT,
     ):
-
-        return central_services.api_token.get_api_token_list(
-            cmd=self._cmd,
-            app_id=self._app_id,
-            token=self._token,
-            central_dns_suffix=central_dns_suffix,
-        )
+        token = _utility.get_token_credential(self._cmd)
+        apiClient = IotCentralApiPreview(token, self._app_id, central_dns_suffix)
+        return apiClient.api_tokens.list()
 
     def get_api_token(
         self, token_id, central_dns_suffix=CENTRAL_ENDPOINT,
     ):
-        return central_services.api_token.get_api_token(
-            cmd=self._cmd,
-            app_id=self._app_id,
-            token_id=token_id,
-            token=self._token,
-            central_dns_suffix=central_dns_suffix,
-        )
+        token = _utility.get_token_credential(self._cmd)
+        apiClient = IotCentralApiPreview(token, self._app_id, central_dns_suffix)
+        return apiClient.api_tokens.get(token_id)
 
     def delete_api_token(
         self, token_id, central_dns_suffix=CENTRAL_ENDPOINT,
     ):
-        return central_services.api_token.delete_api_token(
-            cmd=self._cmd,
-            app_id=self._app_id,
-            token_id=token_id,
-            token=self._token,
-            central_dns_suffix=central_dns_suffix,
-        )
+        token = _utility.get_token_credential(self._cmd)
+        apiClient = IotCentralApiPreview(token, self._app_id, central_dns_suffix)
+        return apiClient.api_tokens.remove(token_id)

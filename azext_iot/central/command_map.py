@@ -43,10 +43,10 @@ def load_central_commands(self, _):
     ) as cmd_group:
         cmd_group.command("monitor-events", "monitor_events")
         cmd_group.command(
-            "validate-messages", "validate_messages",
+            "validate-messages", "validate_messages", 
         )
         cmd_group.command(
-            "monitor-properties", "monitor_properties",
+            "monitor-properties", "monitor_properties", 
         )
         cmd_group.command(
             "validate-properties", "validate_properties",
@@ -78,7 +78,6 @@ def load_central_commands(self, _):
     with self.command_group(
         "iot central device", command_type=central_device_ops, is_preview=True,
     ) as cmd_group:
-        # cmd_group.command("list", "list_devices")
         cmd_group.show_command("show", "get_device")
         cmd_group.command("create", "create_device")
         cmd_group.command("delete", "delete_device")
@@ -97,8 +96,6 @@ def load_central_commands(self, _):
         command_type=central_device_templates_ops,
         is_preview=True,
     ) as cmd_group:
-        # cmd_group.command("list", "list_device_templates")
-        # cmd_group.command("map", "map_device_templates")
         cmd_group.show_command("show", "get_device_template")
         cmd_group.command("create", "create_device_template")
         cmd_group.command("delete", "delete_device_template")

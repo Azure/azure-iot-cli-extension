@@ -10,7 +10,10 @@ from requests import Response
 
 from azext_iot import constants
 from azext_iot.common import auth
+from azure.identity import AzureCliCredential
 
+def get_token_credential(cmd):
+    return AzureCliCredential()
 
 def get_headers(token, cmd, has_json_payload=False):
     if not token:
