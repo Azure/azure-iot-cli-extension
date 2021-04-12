@@ -43,10 +43,10 @@ def load_central_commands(self, _):
     ) as cmd_group:
         cmd_group.command("monitor-events", "monitor_events")
         cmd_group.command(
-            "validate-messages", "validate_messages", 
+            "validate-messages", "validate_messages",
         )
         cmd_group.command(
-            "monitor-properties", "monitor_properties", 
+            "monitor-properties", "monitor_properties",
         )
         cmd_group.command(
             "validate-properties", "validate_properties",

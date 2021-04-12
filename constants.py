@@ -34,6 +34,8 @@ MIN_SIM_MSG_INTERVAL = 1
 MIN_SIM_MSG_COUNT = 1
 SIM_RECEIVE_SLEEP_SEC = 3
 CENTRAL_ENDPOINT = "azureiotcentral.com"
+PREVIEW = "preview"
+V1 = "v1"
 DEVICE_DEVICESCOPE_PREFIX = "ms-azure-iot-edge://"
 TRACING_PROPERTY = "azureiot*com^dtracing^1"
 TRACING_ALLOWED_FOR_LOCATION = ("northeurope", "westus2", "west us 2", "southeastasia")
@@ -48,7 +50,3 @@ PNP_DTDLV2_COMPONENT_MARKER = "__t"
 
 # Config Key's
 CONFIG_KEY_UAMQP_EXT_VERSION = "uamqp_ext_version"
-
-#IoTC Versions
-PREVIEW = "preview"
-V1 = "v1"
