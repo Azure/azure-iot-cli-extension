@@ -7,7 +7,7 @@
 from knack.util import CLIError
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
-from azext_iot.central.iot_central_api_v1 import IotCentralApiV1
+from azext_iot.sdk.central.iot_central_api_v1 import IotCentralApiIOTC_VERSION_V1
 from azext_iot.central.services import _utility
 
 class CentralDeviceTemplateProviderV1:
@@ -35,7 +35,7 @@ class CentralDeviceTemplateProviderV1:
         if central_dns_suffix == None: 
             central_dns_suffix = self.central_dns_suffix
         token = _utility.get_token_credential(self._cmd)
-        apiClient = IotCentralApiV1(token, self._app_id, central_dns_suffix)
+        apiClient = IotCentralApiIOTC_VERSION_V1(token, self._app_id, central_dns_suffix)
 
         device_template = apiClient.device_templates.get(device_template_id)
 
@@ -57,7 +57,7 @@ class CentralDeviceTemplateProviderV1:
         if central_dns_suffix == None: 
             central_dns_suffix = self.central_dns_suffix
         token = _utility.get_token_credential(self._cmd)
-        apiClient = IotCentralApiV1(token, self._app_id, central_dns_suffix)
+        apiClient = IotCentralApiIOTC_VERSION_V1(token, self._app_id, central_dns_suffix)
 
         return apiClient.device_templates.set(device_template_id, payload)
 
@@ -71,6 +71,6 @@ class CentralDeviceTemplateProviderV1:
             raise CLIError("Device template id must be specified.")
 
         token = _utility.get_token_credential(self._cmd)
-        apiClient = IotCentralApiV1(token, self._app_id, central_dns_suffix)
+        apiClient = IotCentralApiIOTC_VERSION_V1(token, self._app_id, central_dns_suffix)
 
         return apiClient.device_templates.remove(device_template_id)

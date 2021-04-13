@@ -18,7 +18,7 @@ from azext_iot.monitor.parsers.issue import IssueHandler
 
 DEVICE_ID_IDENTIFIER = b"iothub-connection-device-id"
 MODULE_ID_IDENTIFIER = b"iothub-connection-module-id"
-INTERFACE_NAME_IDENTIFIER_V1 = b"iothub-interface-name"
+INTERFACE_NAME_IDENTIFIER_IOTC_VERSION_V1 = b"iothub-interface-name"
 INTERFACE_NAME_IDENTIFIER_V2 = b"dt-dataschema"
 COMPONENT_NAME_IDENTIFIER = b"dt-subject"
 
@@ -111,7 +111,7 @@ class CommonParser(AbstractBaseParser):
             # It's highly unlikely both will be present at the same time
             # as they reflect different versions of a Plug & Play device.
             target_interface = message.annotations.get(
-                INTERFACE_NAME_IDENTIFIER_V1
+                INTERFACE_NAME_IDENTIFIER_IOTC_VERSION_V1
             ) or message.annotations.get(INTERFACE_NAME_IDENTIFIER_V2)
             return str(target_interface, "utf8")
         except Exception:

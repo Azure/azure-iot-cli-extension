@@ -19,8 +19,8 @@ from azext_iot.monitor.models.arguments import (
 from azext_iot.monitor.property import PropertyMonitor
 from azext_iot.central.utils import process_version
 from azext_iot.central.utils import throw_unsupported_version
-from azext_iot.constants import PREVIEW
-from azext_iot.constants import V1
+from azext_iot.constants import IOTC_VERSION_PREVIEW
+from azext_iot.constants import IOTC_VERSION_V1
 
 def validate_messages(
     cmd: AzCliCommand,
@@ -66,9 +66,9 @@ def validate_messages(
         common_handler_args=common_handler_args,
     )
 
-    supported_versions = [PREVIEW, V1]
+    supported_versions = [IOTC_VERSION_PREVIEW, IOTC_VERSION_V1]
     version = process_version(supported_versions, version)
-    if(version == PREVIEW):
+    if(version == IOTC_VERSION_PREVIEW):
         provider = MonitorProviderPreview(
             cmd=cmd,
             app_id=app_id,
@@ -77,7 +77,7 @@ def validate_messages(
             central_dns_suffix=central_dns_suffix,
             central_handler_args=central_handler_args,
         )
-    elif(version == V1):
+    elif(version == IOTC_VERSION_V1):
         provider = MonitorProviderV1(
             cmd=cmd,
             app_id=app_id,
@@ -133,9 +133,9 @@ def monitor_events(
         common_handler_args=common_handler_args,
     )
 
-    supported_versions = [PREVIEW, V1]
+    supported_versions = [IOTC_VERSION_PREVIEW, IOTC_VERSION_V1]
     version = process_version(supported_versions, version)
-    if(version == PREVIEW):
+    if(version == IOTC_VERSION_PREVIEW):
         provider = MonitorProviderPreview(
             cmd=cmd,
             app_id=app_id,
@@ -144,7 +144,7 @@ def monitor_events(
             central_dns_suffix=central_dns_suffix,
             central_handler_args=central_handler_args,
         )
-    elif(version == V1):
+    elif(version == IOTC_VERSION_V1):
         provider = MonitorProviderV1(
             cmd=cmd,
             app_id=app_id,
@@ -162,7 +162,7 @@ def monitor_events(
 def monitor_properties(
     cmd, device_id: str, app_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT, version=None
 ):
-    supported_versions = [PREVIEW, V1]
+    supported_versions = [IOTC_VERSION_PREVIEW, IOTC_VERSION_V1]
     version = process_version(supported_versions, version)
 
     if(version not in supported_versions):

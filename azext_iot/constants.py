@@ -50,5 +50,5 @@ PNP_DTDLV2_COMPONENT_MARKER = "__t"
 CONFIG_KEY_UAMQP_EXT_VERSION = "uamqp_ext_version"
 
 #IoTC Versions
-PREVIEW = "preview"
-V1 = "v1"
+IOTC_VERSION_PREVIEW = "preview"
+IOTC_VERSION_V1 = "v1"

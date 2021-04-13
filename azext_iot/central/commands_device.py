@@ -9,8 +9,8 @@ from knack.util import CLIError
 
 from azext_iot.common import utility
 from azext_iot.constants import CENTRAL_ENDPOINT
-from azext_iot.constants import PREVIEW
-from azext_iot.constants import V1
+from azext_iot.constants import IOTC_VERSION_PREVIEW
+from azext_iot.constants import IOTC_VERSION_V1
 from azext_iot.central.providers.preview import CentralDeviceProviderPreview
 from azext_iot.central.providers.v1 import CentralDeviceProviderV1
 from azext_iot.central.utils import process_version
@@ -20,11 +20,11 @@ from azure.core.exceptions import ResourceNotFoundError
 def get_device(
     cmd, app_id: str, device_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT, version=None
 ):
-    supported_versions = [PREVIEW, V1]
+    supported_versions = [IOTC_VERSION_PREVIEW, IOTC_VERSION_V1]
     version = process_version(supported_versions, version)
-    if(version == PREVIEW):
+    if(version == IOTC_VERSION_PREVIEW):
         provider = CentralDeviceProviderPreview(cmd=cmd, app_id=app_id, token=token)
-    elif(version == V1):
+    elif(version == IOTC_VERSION_V1):
         provider = CentralDeviceProviderV1(cmd=cmd, app_id=app_id, token=token)
     else:
         throw_unsupported_version(supported_versions)
@@ -47,11 +47,11 @@ def create_device(
             "Error: if you supply --simulated you must also specify --instance-of"
         )
 
-    supported_versions = [PREVIEW, V1]
+    supported_versions = [IOTC_VERSION_PREVIEW, IOTC_VERSION_V1]
     version = process_version(supported_versions, version)
-    if(version == PREVIEW):
+    if(version == IOTC_VERSION_PREVIEW):
         provider = CentralDeviceProviderPreview(cmd=cmd, app_id=app_id, token=token)
-    elif(version == V1):
+    elif(version == IOTC_VERSION_V1):
         provider = CentralDeviceProviderV1(cmd=cmd, app_id=app_id, token=token)
     else:
         throw_unsupported_version(supported_versions)
@@ -73,11 +73,11 @@ def create_device(
 def delete_device(
     cmd, app_id: str, device_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT, version=None
 ):
-    supported_versions = [PREVIEW, V1]
+    supported_versions = [IOTC_VERSION_PREVIEW, IOTC_VERSION_V1]
     version = process_version(supported_versions, version)
-    if(version == PREVIEW):
+    if(version == IOTC_VERSION_PREVIEW):
         provider = CentralDeviceProviderPreview(cmd=cmd, app_id=app_id, token=token)
-    elif(version == V1):
+    elif(version == IOTC_VERSION_V1):
         provider = CentralDeviceProviderV1(cmd=cmd, app_id=app_id, token=token)
     else:
         throw_unsupported_version(supported_versions)
@@ -93,11 +93,11 @@ def delete_device(
 def registration_info(
     cmd, app_id: str, device_id, token=None, central_dns_suffix=CENTRAL_ENDPOINT, version=None
 ):
-    supported_versions = [PREVIEW, V1]
+    supported_versions = [IOTC_VERSION_PREVIEW, IOTC_VERSION_V1]
     version = process_version(supported_versions, version)
-    if(version == PREVIEW):
+    if(version == IOTC_VERSION_PREVIEW):
         provider = CentralDeviceProviderPreview(cmd=cmd, app_id=app_id, token=token)
-    elif(version == V1):
+    elif(version == IOTC_VERSION_V1):
         provider = CentralDeviceProviderV1(cmd=cmd, app_id=app_id, token=token)
     else:
         throw_unsupported_version(supported_versions)
@@ -123,11 +123,11 @@ def run_command(
 
     payload = utility.process_json_arg(content, argument_name="content")
 
-    supported_versions = [PREVIEW, V1]
+    supported_versions = [IOTC_VERSION_PREVIEW, IOTC_VERSION_V1]
     version = process_version(supported_versions, version)
-    if(version == PREVIEW):
+    if(version == IOTC_VERSION_PREVIEW):
         provider = CentralDeviceProviderPreview(cmd=cmd, app_id=app_id, token=token)
-    elif(version == V1):
+    elif(version == IOTC_VERSION_V1):
         provider = CentralDeviceProviderV1(cmd=cmd, app_id=app_id, token=token)
     else:
         throw_unsupported_version(supported_versions)
@@ -151,11 +151,11 @@ def get_command_history(
     central_dns_suffix=CENTRAL_ENDPOINT,
     version=None
 ):
-    supported_versions = [PREVIEW, V1]
+    supported_versions = [IOTC_VERSION_PREVIEW, IOTC_VERSION_V1]
     version = process_version(supported_versions, version)
-    if(version == PREVIEW):
+    if(version == IOTC_VERSION_PREVIEW):
         provider = CentralDeviceProviderPreview(cmd=cmd, app_id=app_id, token=token)
-    elif(version == V1):
+    elif(version == IOTC_VERSION_V1):
         provider = CentralDeviceProviderV1(cmd=cmd, app_id=app_id, token=token)
     else:
         throw_unsupported_version(supported_versions)
@@ -167,11 +167,11 @@ def get_command_history(
 def registration_summary(
     cmd, app_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT, version=None
 ):
-    supported_versions = [PREVIEW, V1]
+    supported_versions = [IOTC_VERSION_PREVIEW, IOTC_VERSION_V1]
     version = process_version(supported_versions, version)
-    if(version == PREVIEW):
+    if(version == IOTC_VERSION_PREVIEW):
         provider = CentralDeviceProviderPreview(cmd=cmd, app_id=app_id, token=token)
-    elif(version == V1):
+    elif(version == IOTC_VERSION_V1):
         provider = CentralDeviceProviderV1(cmd=cmd, app_id=app_id, token=token)
     else:
         throw_unsupported_version(supported_versions)
@@ -183,11 +183,11 @@ def registration_summary(
 def get_credentials(
     cmd, app_id: str, device_id, token=None, central_dns_suffix=CENTRAL_ENDPOINT,version=None
 ):
-    supported_versions = [PREVIEW, V1]
+    supported_versions = [IOTC_VERSION_PREVIEW, IOTC_VERSION_V1]
     version = process_version(supported_versions, version)
-    if(version == PREVIEW):
+    if(version == IOTC_VERSION_PREVIEW):
         provider = CentralDeviceProviderPreview(cmd=cmd, app_id=app_id, token=token)
-    elif(version == V1):
+    elif(version == IOTC_VERSION_V1):
         provider = CentralDeviceProviderV1(cmd=cmd, app_id=app_id, token=token)
     else:
         throw_unsupported_version(supported_versions)

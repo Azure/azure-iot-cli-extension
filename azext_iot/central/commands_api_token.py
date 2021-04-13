@@ -10,8 +10,8 @@ from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.models.enum import Role
 from azext_iot.central.providers.preview import CentralApiTokenProviderPreview
 from azext_iot.central.providers.v1 import CentralApiTokenProviderV1
-from azext_iot.constants import PREVIEW
-from azext_iot.constants import V1
+from azext_iot.constants import IOTC_VERSION_PREVIEW
+from azext_iot.constants import IOTC_VERSION_V1
 from azext_iot.central.utils import process_version
 from azext_iot.central.utils import throw_unsupported_version
 
@@ -24,11 +24,11 @@ def add_api_token(
     central_dns_suffix=CENTRAL_ENDPOINT,
     version=None
 ):
-    supported_versions = [PREVIEW, V1]
+    supported_versions = [IOTC_VERSION_PREVIEW, IOTC_VERSION_V1]
     version = process_version(supported_versions, version)
-    if(version == PREVIEW):
+    if(version == IOTC_VERSION_PREVIEW):
         provider = CentralApiTokenProviderPreview(cmd=cmd, app_id=app_id, token=token)
-    elif(version == V1):
+    elif(version == IOTC_VERSION_V1):
         provider = CentralApiTokenProviderV1(cmd=cmd, app_id=app_id, token=token)
     else:
         throw_unsupported_version(supported_versions)
@@ -41,11 +41,11 @@ def add_api_token(
 def list_api_tokens(
     cmd, app_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT, version=None
 ):
-    supported_versions = [PREVIEW, V1]
+    supported_versions = [IOTC_VERSION_PREVIEW, IOTC_VERSION_V1]
     version = process_version(supported_versions, version)
-    if(version == PREVIEW):
+    if(version == IOTC_VERSION_PREVIEW):
         provider = CentralApiTokenProviderPreview(cmd=cmd, app_id=app_id, token=token)
-    elif(version == V1):
+    elif(version == IOTC_VERSION_V1):
         provider = CentralApiTokenProviderV1(cmd=cmd, app_id=app_id, token=token)
     else:
         throw_unsupported_version(supported_versions)
@@ -56,11 +56,11 @@ def list_api_tokens(
 def get_api_token(
     cmd, app_id: str, token_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT, version=None
 ):
-    supported_versions = [PREVIEW, V1]
+    supported_versions = [IOTC_VERSION_PREVIEW, IOTC_VERSION_V1]
     version = process_version(supported_versions, version)
-    if(version == PREVIEW):
+    if(version == IOTC_VERSION_PREVIEW):
         provider = CentralApiTokenProviderPreview(cmd=cmd, app_id=app_id, token=token)
-    elif(version == V1):
+    elif(version == IOTC_VERSION_V1):
         provider = CentralApiTokenProviderV1(cmd=cmd, app_id=app_id, token=token)
     else:
         throw_unsupported_version(supported_versions)
@@ -73,11 +73,11 @@ def get_api_token(
 def delete_api_token(
     cmd, app_id: str, token_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT, version=None
 ):
-    supported_versions = [PREVIEW, V1]
+    supported_versions = [IOTC_VERSION_PREVIEW, IOTC_VERSION_V1]
     version = process_version(supported_versions, version)
-    if(version == PREVIEW):
+    if(version == IOTC_VERSION_PREVIEW):
         provider = CentralApiTokenProviderPreview(cmd=cmd, app_id=app_id, token=token)
-    elif(version == V1):
+    elif(version == IOTC_VERSION_V1):
         provider = CentralApiTokenProviderV1(cmd=cmd, app_id=app_id, token=token)
     else:
         throw_unsupported_version(supported_versions)

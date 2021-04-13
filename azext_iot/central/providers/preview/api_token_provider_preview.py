@@ -9,7 +9,7 @@ from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.enum import Role
-from azext_iot.central.iot_central_api_preview import IotCentralApiPreview
+from azext_iot.sdk.central.iot_central_api_preview import IotCentralApiPreview
 from azext_iot.central.services import _utility
 from azext_iot.central.utils import parse_device_status
 

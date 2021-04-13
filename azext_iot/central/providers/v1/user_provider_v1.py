@@ -10,7 +10,7 @@ from knack.util import CLIError
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.enum import Role
-from azext_iot.central.iot_central_api_v1 import IotCentralApiV1
+from azext_iot.sdk.central.iot_central_api_v1 import IotCentralApiIOTC_VERSION_V1
 from azext_iot.central.services import _utility
 from azext_iot.central.models.enum import Role, UserType
 
@@ -42,7 +42,7 @@ class CentralUserProviderV1:
         if central_dns_suffix == None: 
             central_dns_suffix = self.central_dns_suffix
         token = _utility.get_token_credential(self._cmd)
-        apiClient = IotCentralApiV1(token, self._app_id, central_dns_suffix)
+        apiClient = IotCentralApiIOTC_VERSION_V1(token, self._app_id, central_dns_suffix)
         
         return apiClient.users.list()
 
@@ -53,7 +53,7 @@ class CentralUserProviderV1:
         if central_dns_suffix == None: 
             central_dns_suffix = self.central_dns_suffix
         token = _utility.get_token_credential(self._cmd)
-        apiClient = IotCentralApiV1(token, self._app_id, central_dns_suffix)
+        apiClient = IotCentralApiIOTC_VERSION_V1(token, self._app_id, central_dns_suffix)
         
         return apiClient.users.get(user_id)
 
@@ -63,7 +63,7 @@ class CentralUserProviderV1:
         if central_dns_suffix == None: 
             central_dns_suffix = self.central_dns_suffix
         token = _utility.get_token_credential(self._cmd)
-        apiClient = IotCentralApiV1(token, self._app_id, central_dns_suffix)
+        apiClient = IotCentralApiIOTC_VERSION_V1(token, self._app_id, central_dns_suffix)
         
         return apiClient.users.remove(user_id)
 
@@ -80,7 +80,7 @@ class CentralUserProviderV1:
             raise CLIError("Must specify --email when adding a user by email")
 
         token = _utility.get_token_credential(self._cmd)
-        apiClient = IotCentralApiV1(token, self._app_id, central_dns_suffix)
+        apiClient = IotCentralApiIOTC_VERSION_V1(token, self._app_id, central_dns_suffix)
         payload = {
             "email": email,
             "type": "email",
@@ -104,7 +104,7 @@ class CentralUserProviderV1:
         if not object_id:
             raise CLIError("Must specify --object-id when adding a service principal")
         token = _utility.get_token_credential(self._cmd)
-        apiClient = IotCentralApiV1(token, self._app_id, central_dns_suffix)
+        apiClient = IotCentralApiIOTC_VERSION_V1(token, self._app_id, central_dns_suffix)
 
         payload = {
             "tenantId": tenant_id,

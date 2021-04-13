@@ -13,8 +13,8 @@ from azext_iot.central.providers.preview import CentralDeviceTemplateProviderPre
 from azext_iot.central.providers.v1 import CentralDeviceTemplateProviderV1
 from azext_iot.central.utils import process_version
 from azext_iot.central.utils import throw_unsupported_version
-from azext_iot.constants import PREVIEW
-from azext_iot.constants import V1
+from azext_iot.constants import IOTC_VERSION_PREVIEW
+from azext_iot.constants import IOTC_VERSION_V1
 
 def get_device_template(
     cmd,
@@ -24,11 +24,11 @@ def get_device_template(
     central_dns_suffix=CENTRAL_ENDPOINT,
     version=None
 ):
-    supported_versions = [PREVIEW, V1]  
+    supported_versions = [IOTC_VERSION_PREVIEW, IOTC_VERSION_V1]  
     version = process_version(supported_versions, version)
-    if(version == PREVIEW):
+    if(version == IOTC_VERSION_PREVIEW):
         provider = CentralDeviceTemplateProviderPreview(cmd=cmd, app_id=app_id, token=token)
-    elif(version == V1):
+    elif(version == IOTC_VERSION_V1):
         provider = CentralDeviceTemplateProviderV1(cmd=cmd, app_id=app_id, token=token)
     else:
         throw_unsupported_version(supported_versions)
@@ -51,11 +51,11 @@ def create_device_template(
 
     payload = utility.process_json_arg(content, argument_name="content")
 
-    supported_versions = [PREVIEW, V1]  
+    supported_versions = [IOTC_VERSION_PREVIEW, IOTC_VERSION_V1]  
     version = process_version(supported_versions, version)
-    if(version == PREVIEW):
+    if(version == IOTC_VERSION_PREVIEW):
         provider = CentralDeviceTemplateProviderPreview(cmd=cmd, app_id=app_id, token=token)
-    elif(version == V1):
+    elif(version == IOTC_VERSION_V1):
         provider = CentralDeviceTemplateProviderV1(cmd=cmd, app_id=app_id, token=token)
     else:
         throw_unsupported_version(supported_versions)
@@ -75,11 +75,11 @@ def delete_device_template(
     central_dns_suffix=CENTRAL_ENDPOINT,
     version=None
 ):
-    supported_versions = [PREVIEW, V1]  
+    supported_versions = [IOTC_VERSION_PREVIEW, IOTC_VERSION_V1]  
     version = process_version(supported_versions, version)
-    if(version == PREVIEW):
+    if(version == IOTC_VERSION_PREVIEW):
         provider = CentralDeviceTemplateProviderPreview(cmd=cmd, app_id=app_id, token=token)
-    elif(version == V1):
+    elif(version == IOTC_VERSION_V1):
         provider = CentralDeviceTemplateProviderV1(cmd=cmd, app_id=app_id, token=token)
     else:
         throw_unsupported_version(supported_versions)

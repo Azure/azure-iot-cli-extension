@@ -14,7 +14,7 @@ from azext_iot.constants import (
     DEVICETWIN_POLLING_INTERVAL_SEC,
     DEVICETWIN_MONITOR_TIME_SEC,
     PNP_DTDLV2_COMPONENT_MARKER,
-    PREVIEW
+    IOTC_VERSION_PREVIEW
 )
 
 from azext_iot.central.models.devicetwin import DeviceTwin, Property
@@ -53,7 +53,7 @@ class PropertyMonitor:
             token=self._token,
             device_id=self._device_id,
         )
-        if(version == PREVIEW):
+        if(version == IOTC_VERSION_PREVIEW):
             self._central_device_provider = CentralDeviceProviderPreview(
                 cmd=self._cmd, app_id=self._app_id, token=self._token
             )

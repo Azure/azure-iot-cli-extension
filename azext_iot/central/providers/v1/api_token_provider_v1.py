@@ -9,7 +9,7 @@ from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.enum import Role
-from azext_iot.central.iot_central_api_v1 import IotCentralApiV1
+from azext_iot.sdk.central.iot_central_api_v1 import IotCentralApiIOTC_VERSION_V1
 from azext_iot.central.services import _utility
 from azext_iot.central.utils import parse_device_status
 
@@ -40,7 +40,7 @@ class CentralApiTokenProviderV1:
         if central_dns_suffix == None: 
             central_dns_suffix = self.central_dns_suffix
         token = _utility.get_token_credential(self._cmd)
-        apiClient = IotCentralApiV1(token, self._app_id, central_dns_suffix)
+        apiClient = IotCentralApiIOTC_VERSION_V1(token, self._app_id, central_dns_suffix)
         payload = {
             "roles": [{"role": role.value}],
         }
@@ -52,7 +52,7 @@ class CentralApiTokenProviderV1:
         if central_dns_suffix == None: 
             central_dns_suffix = self.central_dns_suffix
         token = _utility.get_token_credential(self._cmd)
-        apiClient = IotCentralApiV1(token, self._app_id, central_dns_suffix)
+        apiClient = IotCentralApiIOTC_VERSION_V1(token, self._app_id, central_dns_suffix)
         return apiClient.api_tokens.list()
 
     def get_api_token(
@@ -61,7 +61,7 @@ class CentralApiTokenProviderV1:
         if central_dns_suffix == None: 
             central_dns_suffix = self.central_dns_suffix
         token = _utility.get_token_credential(self._cmd)
-        apiClient = IotCentralApiV1(token, self._app_id, central_dns_suffix)
+        apiClient = IotCentralApiIOTC_VERSION_V1(token, self._app_id, central_dns_suffix)
         return apiClient.api_tokens.get(token_id)
 
     def delete_api_token(
@@ -70,5 +70,5 @@ class CentralApiTokenProviderV1:
         if central_dns_suffix == None: 
             central_dns_suffix = self.central_dns_suffix
         token = _utility.get_token_credential(self._cmd)
-        apiClient = IotCentralApiV1(token, self._app_id, central_dns_suffix)
+        apiClient = IotCentralApiIOTC_VERSION_V1(token, self._app_id, central_dns_suffix)
         return apiClient.api_tokens.remove(token_id)

@@ -20,13 +20,13 @@ from azext_iot.monitor.property import PropertyMonitor
 from azext_iot.monitor.models.enum import Severity
 from azext_iot.tests.helpers import load_json
 from azext_iot.tests.test_constants import FileNames
-from azext_iot.constants import PREVIEW
+from azext_iot.constants import IOTC_VERSION_PREVIEW
 from azext_iot.constants import PNP_DTDLV2_COMPONENT_MARKER
 from azext_iot.central.providers.preview import CentralDeviceProviderPreview
 from azext_iot.central.providers.preview import CentralDeviceTemplateProviderPreview
-from azext_iot.central.iot_central_api_preview.operations import DevicesOperations
-from azext_iot.central.iot_central_api_preview.operations import DeviceTemplatesOperations
-from azext_iot.central.iot_central_api_v1 import IotCentralApiV1
+from azext_iot.sdk.central.iot_central_api_preview.operations import DevicesOperations
+from azext_iot.sdk.central.iot_central_api_preview.operations import DeviceTemplatesOperations
+from azext_iot.sdk.central.iot_central_api_v1 import IotCentralApiIOTC_VERSION_V1
 
 device_id = "mydevice"
 app_id = "myapp"
@@ -222,7 +222,7 @@ class TestCentralPropertyMonitor:
             device_id=device_id,
             token=None,
             central_dns_suffix="azureiotcentral.com",
-            version=PREVIEW
+            version=IOTC_VERSION_PREVIEW
         )
         result = monitor._compare_properties(
             twin_next.reported_property, twin.reported_property
@@ -265,7 +265,7 @@ class TestCentralPropertyMonitor:
             device_id=device_id,
             token=None,
             central_dns_suffix="azureiotcentral.com",
-            version=PREVIEW
+            version=IOTC_VERSION_PREVIEW
         )
         result = monitor._compare_properties(
             twin_next.reported_property, twin.reported_property
@@ -289,7 +289,7 @@ class TestCentralPropertyMonitor:
             device_id=device_id,
             token=None,
             central_dns_suffix="azureiotcentral.com",
-            version=PREVIEW
+            version=IOTC_VERSION_PREVIEW
         )
 
         model = {"Model": "test_model"}
@@ -331,7 +331,7 @@ class TestCentralPropertyMonitor:
             device_id=device_id,
             token=None,
             central_dns_suffix="azureiotcentral.com",
-            version=PREVIEW
+            version=IOTC_VERSION_PREVIEW
         )
 
         # invalid interface / property
@@ -369,7 +369,7 @@ class TestCentralPropertyMonitor:
             device_id=device_id,
             token=None,
             central_dns_suffix="azureiotcentral.com",
-            version=PREVIEW
+            version=IOTC_VERSION_PREVIEW
         )
 
         # severity level info
@@ -415,7 +415,7 @@ class TestCentralPropertyMonitor:
             device_id=device_id,
             token=None,
             central_dns_suffix="azureiotcentral.com",
-            version=PREVIEW
+            version=IOTC_VERSION_PREVIEW
         )
 
         # invalid component property

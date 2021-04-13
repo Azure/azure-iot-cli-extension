@@ -21,8 +21,8 @@ if TYPE_CHECKING:
     from azure.core.credentials import TokenCredential
 
 
-class IotCentralApiV1Configuration(Configuration):
-    """Configuration for IotCentralApiV1.
+class IotCentralApiIOTC_VERSION_V1Configuration(Configuration):
+    """Configuration for IotCentralApiIOTC_VERSION_V1.
 
     Note that all parameters used to create this instance are saved as instance
     attributes.
@@ -49,7 +49,7 @@ class IotCentralApiV1Configuration(Configuration):
             raise ValueError("Parameter 'subdomain' must not be None.")
         if central_dns_suffix_in_path is None:
             raise ValueError("Parameter 'central_dns_suffix_in_path' must not be None.")
-        super(IotCentralApiV1Configuration, self).__init__(**kwargs)
+        super(IotCentralApiIOTC_VERSION_V1Configuration, self).__init__(**kwargs)
 
         self.credential = credential
         self.subdomain = subdomain

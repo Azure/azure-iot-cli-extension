@@ -14,7 +14,7 @@ from azext_iot.central.providers.v1 import (
     CentralDeviceTemplateProviderV1,
 )
 from azext_iot.central.models.template import Template
-from azext_iot.central.iot_central_api_v1.models import Device
+from azext_iot.sdk.central.iot_central_api_v1.models import Device
 from azext_iot.monitor.parsers import common_parser, central_parser
 from azext_iot.monitor.parsers import strings
 from azext_iot.monitor.models.arguments import CommonParserArguments
@@ -46,7 +46,7 @@ def _validate_issues(
 
 @pytest.fixture(
     params=[
-        common_parser.INTERFACE_NAME_IDENTIFIER_V1,
+        common_parser.INTERFACE_NAME_IDENTIFIER_IOTC_VERSION_V1,
         common_parser.INTERFACE_NAME_IDENTIFIER_V2,
     ]
 )

@@ -6,14 +6,5 @@
 # Changes may cause incorrect behavior and will be lost if the code is regenerated.
 # --------------------------------------------------------------------------
 
-from ._iot_central_api_v1 import IotCentralApiV1
-from ._version import VERSION
-
-__version__ = VERSION
-__all__ = ['IotCentralApiV1']
-
-try:
-    from ._patch import patch_sdk  # type: ignore
-    patch_sdk()
-except ImportError:
-    pass
+from ._iot_central_api_v1 import IotCentralApiIOTC_VERSION_V1
+__all__ = ['IotCentralApiIOTC_VERSION_V1']

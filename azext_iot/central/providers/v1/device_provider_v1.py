@@ -11,8 +11,8 @@ from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.enum import DeviceStatus
 from azext_iot.dps.services import global_service as dps_global_service
-from azext_iot.central.iot_central_api_v1 import IotCentralApiV1
-from azext_iot.central.iot_central_api_v1.models import Device
+from azext_iot.sdk.central.iot_central_api_v1 import IotCentralApiIOTC_VERSION_V1
+from azext_iot.sdk.central.iot_central_api_v1.models import Device
 from azext_iot.central.services import _utility
 from azext_iot.central.utils import parse_device_status
 from azext_iot.central.utils import dps_populate_essential_info
@@ -48,7 +48,7 @@ class CentralDeviceProviderV1:
         if not device_id:
             raise CLIError("Device id must be specified.")
         token = _utility.get_token_credential(self._cmd)
-        apiClient = IotCentralApiV1(token, self._app_id, central_dns_suffix)
+        apiClient = IotCentralApiIOTC_VERSION_V1(token, self._app_id, central_dns_suffix)
         return apiClient.devices.get(device_id)
 
     def delete_device(self, device_id, central_dns_suffix=None) -> Device:
@@ -57,7 +57,7 @@ class CentralDeviceProviderV1:
         if not device_id:
             raise CLIError("Device id must be specified.")
         token = _utility.get_token_credential(self._cmd)
-        apiClient = IotCentralApiV1(token, self._app_id, central_dns_suffix)
+        apiClient = IotCentralApiIOTC_VERSION_V1(token, self._app_id, central_dns_suffix)
         return apiClient.devices.remove(device_id)
 
     def create_device(
@@ -77,7 +77,7 @@ class CentralDeviceProviderV1:
             raise CLIError("Device already exists.")
 
         token = _utility.get_token_credential(self._cmd)
-        apiClient = IotCentralApiV1(token, self._app_id, central_dns_suffix)
+        apiClient = IotCentralApiIOTC_VERSION_V1(token, self._app_id, central_dns_suffix)
 
         device = Device()
         device.display_name = device_name
@@ -95,7 +95,7 @@ class CentralDeviceProviderV1:
         if central_dns_suffix == None: 
             central_dns_suffix = self.central_dns_suffix
         token = _utility.get_token_credential(self._cmd)
-        apiClient = IotCentralApiV1(token, self._app_id, central_dns_suffix)
+        apiClient = IotCentralApiIOTC_VERSION_V1(token, self._app_id, central_dns_suffix)
 
         credentials = apiClient.devices.get_credentials(device_id)
 
@@ -157,7 +157,7 @@ class CentralDeviceProviderV1:
         if central_dns_suffix == None: 
             central_dns_suffix = self.central_dns_suffix
         token = _utility.get_token_credential(self._cmd)
-        apiClient = IotCentralApiV1(token, self._app_id, central_dns_suffix)
+        apiClient = IotCentralApiIOTC_VERSION_V1(token, self._app_id, central_dns_suffix)
         return apiClient.devices.execute_command(device_id, command_name, payload)
 
     def get_component_command_history(
@@ -170,14 +170,14 @@ class CentralDeviceProviderV1:
         if central_dns_suffix == None: 
             central_dns_suffix = self.central_dns_suffix
         token = _utility.get_token_credential(self._cmd)
-        apiClient = IotCentralApiV1(token, self._app_id, central_dns_suffix)
+        apiClient = IotCentralApiIOTC_VERSION_V1(token, self._app_id, central_dns_suffix)
         return apiClient.devices.get_command_history(device_id, command_name)
 
     def get_device_registration_summary(self, central_dns_suffix=None):
         if central_dns_suffix == None: 
             central_dns_suffix = self.central_dns_suffix
         token = _utility.get_token_credential(self._cmd)
-        apiClient = IotCentralApiV1(token, self._app_id, central_dns_suffix)
+        apiClient = IotCentralApiIOTC_VERSION_V1(token, self._app_id, central_dns_suffix)
         
         logger.warning(
         "This command may take a long time to complete if your app contains a lot of devices"
