@@ -20,6 +20,7 @@ from azext_iot.monitor.property import PropertyMonitor
 from azext_iot.monitor.models.enum import Severity
 from azext_iot.tests.helpers import load_json
 from azext_iot.tests.test_constants import FileNames
+from azext_iot.constants import PREVIEW
 from azext_iot.constants import PNP_DTDLV2_COMPONENT_MARKER
 from azext_iot.central.providers.preview import CentralDeviceProviderPreview
 from azext_iot.central.providers.preview import CentralDeviceTemplateProviderPreview
@@ -221,6 +222,7 @@ class TestCentralPropertyMonitor:
             device_id=device_id,
             token=None,
             central_dns_suffix="azureiotcentral.com",
+            version=PREVIEW
         )
         result = monitor._compare_properties(
             twin_next.reported_property, twin.reported_property
@@ -263,6 +265,7 @@ class TestCentralPropertyMonitor:
             device_id=device_id,
             token=None,
             central_dns_suffix="azureiotcentral.com",
+            version=PREVIEW
         )
         result = monitor._compare_properties(
             twin_next.reported_property, twin.reported_property
@@ -286,6 +289,7 @@ class TestCentralPropertyMonitor:
             device_id=device_id,
             token=None,
             central_dns_suffix="azureiotcentral.com",
+            version=PREVIEW
         )
 
         model = {"Model": "test_model"}
@@ -327,6 +331,7 @@ class TestCentralPropertyMonitor:
             device_id=device_id,
             token=None,
             central_dns_suffix="azureiotcentral.com",
+            version=PREVIEW
         )
 
         # invalid interface / property
@@ -364,6 +369,7 @@ class TestCentralPropertyMonitor:
             device_id=device_id,
             token=None,
             central_dns_suffix="azureiotcentral.com",
+            version=PREVIEW
         )
 
         # severity level info
@@ -409,6 +415,7 @@ class TestCentralPropertyMonitor:
             device_id=device_id,
             token=None,
             central_dns_suffix="azureiotcentral.com",
+            version=PREVIEW
         )
 
         # invalid component property
