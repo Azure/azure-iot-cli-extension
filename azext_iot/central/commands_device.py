@@ -17,10 +17,6 @@ from azext_iot.central.utils import process_version
 from azext_iot.central.utils import throw_unsupported_version
 from azure.core.exceptions import ResourceNotFoundError
 
-def list_devices(cmd, app_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT):
-    provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token)
-    return provider.list_devices()
-
 def get_device(
     cmd, app_id: str, device_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT, version=None
 ):

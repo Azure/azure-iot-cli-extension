@@ -186,6 +186,6 @@ class CentralDeviceProviderV1:
         devices = apiClient.devices.list()
         registration_summary = {status.value: 0 for status in DeviceStatus}
         for device in devices:
-            status = parse_device_status(device);
+            status = parse_device_status(device)
             registration_summary[status.value] += 1
         return registration_summary

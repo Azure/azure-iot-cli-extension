@@ -11,9 +11,9 @@ from azext_iot.central.providers.preview.api_token_provider_preview import Centr
 from azext_iot.central.providers.preview.monitor_provider_preview import MonitorProviderPreview
 
 __all__ = [
-    "CentralDeviceProviderPreview"
-    "CentralDeviceTemplateProviderPreview"
-    "CentralUserProviderPreview"
-    "CentralApiTokenProviderPreview"
+    "CentralDeviceProviderPreview",
+    "CentralDeviceTemplateProviderPreview",
+    "CentralUserProviderPreview",
+    "CentralApiTokenProviderPreview",
     "MonitorProviderPreview"
 ]

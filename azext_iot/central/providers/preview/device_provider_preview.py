@@ -106,7 +106,7 @@ class CentralDeviceProviderPreview:
         dps_state = {}
 
         device = self.get_device(device_id, central_dns_suffix)
-        status = parse_device_status(device);
+        status = parse_device_status(device)
         if status == DeviceStatus.provisioned:
             credentials = self.get_device_credentials(
                 device_id=device_id, central_dns_suffix=central_dns_suffix
@@ -169,6 +169,6 @@ class CentralDeviceProviderPreview:
         devices = apiClient.devices.list()
         registration_summary = {status.value: 0 for status in DeviceStatus}
         for device in devices:
-            status = parse_device_status(device);
+            status = parse_device_status(device)
             registration_summary[status.value] += 1
         return registration_summary

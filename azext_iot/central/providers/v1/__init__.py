@@ -12,8 +12,8 @@ from azext_iot.central.providers.v1.monitor_provider_v1 import MonitorProviderV1
 
 __all__ = [
     "CentralDeviceProviderV1",
-    "CentralDeviceTemplateProviderV1"
-    "CentralUserProviderV1"
-    "CentralApiTokenProviderV1"
+    "CentralDeviceTemplateProviderV1",
+    "CentralUserProviderV1",
+    "CentralApiTokenProviderV1",
     "MonitorProviderV1"
 ]

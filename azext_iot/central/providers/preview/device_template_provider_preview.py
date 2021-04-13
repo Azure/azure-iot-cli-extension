@@ -54,7 +54,7 @@ class CentralDeviceTemplateProviderPreview:
         token = _utility.get_token_credential(self._cmd)
         apiClient = IotCentralApiPreview(token, self._app_id, central_dns_suffix)
 
-        return apiClient.device_templates.set(device_template_id, payload);
+        return apiClient.device_templates.set(device_template_id, payload)
 
 
     def delete_device_template(

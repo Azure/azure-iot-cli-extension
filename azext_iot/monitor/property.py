@@ -14,12 +14,17 @@ from azext_iot.constants import (
     DEVICETWIN_POLLING_INTERVAL_SEC,
     DEVICETWIN_MONITOR_TIME_SEC,
     PNP_DTDLV2_COMPONENT_MARKER,
+    PREVIEW
 )
 
 from azext_iot.central.models.devicetwin import DeviceTwin, Property
 from azext_iot.central.providers.preview import (
     CentralDeviceProviderPreview,
     CentralDeviceTemplateProviderPreview,
+)
+from azext_iot.central.providers.v1 import (
+    CentralDeviceProviderV1,
+    CentralDeviceTemplateProviderV1,
 )
 from azext_iot.central.providers import (
     CentralDeviceTwinProvider,
@@ -35,6 +40,7 @@ class PropertyMonitor:
         device_id: str,
         token: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
+        version=None
     ):
         self._cmd = cmd
         self._app_id = app_id
@@ -47,13 +53,22 @@ class PropertyMonitor:
             token=self._token,
             device_id=self._device_id,
         )
-        self._central_device_provider = CentralDeviceProviderPreview(
-            cmd=self._cmd, app_id=self._app_id, token=self._token
-        )
-        self._central_template_provider = CentralDeviceTemplateProviderPreview(
-            cmd=self._cmd, app_id=self._app_id, token=self._token
-        )
-        self._template = self._get_device_template()
+        if(version == PREVIEW):
+            self._central_device_provider = CentralDeviceProviderPreview(
+                cmd=self._cmd, app_id=self._app_id, token=self._token
+            )
+            self._central_template_provider = CentralDeviceTemplateProviderPreview(
+                cmd=self._cmd, app_id=self._app_id, token=self._token
+            )
+            self._template = self._get_device_template()
+        else:
+            self._central_device_provider = CentralDeviceProviderV1(
+                cmd=self._cmd, app_id=self._app_id, token=self._token
+            )
+            self._central_template_provider = CentralDeviceTemplateProviderV1(
+                cmd=self._cmd, app_id=self._app_id, token=self._token
+            )
+            self._template = self._get_device_template()
 
     def _compare_properties(self, prev_prop: Property, prop: Property):
         if prev_prop.version == prop.version:
