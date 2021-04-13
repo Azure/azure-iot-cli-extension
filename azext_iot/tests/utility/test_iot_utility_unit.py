@@ -294,8 +294,13 @@ class TestVersionComparison(object):
             ("2.0.1.9", "2.0.6", False),
         ],
     )
-    def test_ensure_min_version(self, current, minimum, expected):
-        assert ensure_min_version(current, minimum) == expected
+    def test_ensure_min_version(self, mocker, current, minimum, expected):
+        try:
+            mocker.patch("azure.mgmt.iothub.__version__", current)
+        except:
+            mocker.patch("azure.mgmt.iothub._configuration.VERSION", current)
+
+        assert ensure_min_version(minimum) == expected
 
 
 class TestEmbeddedCli(object):
