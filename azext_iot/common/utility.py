@@ -412,19 +412,6 @@ def looks_like_file(element):
     )
 
 
-def ensure_pkg_resources_entries():
-    import pkg_resources
-
-    from azure.cli.core.extension import get_extension_path
-    from azext_iot.constants import EXTENSION_NAME
-
-    extension_path = get_extension_path(EXTENSION_NAME)
-    if extension_path not in pkg_resources.working_set.entries:
-        pkg_resources.working_set.add_entry(extension_path)
-
-    return
-
-
 class ISO8601Validator:
     def is_iso8601_date(self, to_validate) -> bool:
         try:
