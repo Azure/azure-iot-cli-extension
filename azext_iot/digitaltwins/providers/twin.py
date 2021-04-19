@@ -127,23 +127,6 @@ class TwinProvider(DigitalTwinsProvider):
             except CLIError as e:
                 logger.warn(f"Could not delete twin {twin['$dtId']}. The error is {e}")
 
-    def delete_all(self, etag=None):
-        # need to get all twins
-        query = "select * from digitaltwins"
-        twins = self.invoke_query(query=query, show_cost=False)["result"]
-        print(f"Found {len(twins)} twin(s).")
-
-        # go through and delete all
-        for twin in twins:
-            try:
-                self.delete_all_relationship(
-                    twin_id=twin["$dtId"],
-                    etag=etag,
-                )
-                self.delete(twin_id=twin["$dtId"], etag=etag)
-            except CLIError as e:
-                logger.warn(f"Could not delete twin {twin['$dtId']}. The error is {e}")
-
     def add_relationship(
         self,
         twin_id,
@@ -246,36 +229,6 @@ class TwinProvider(DigitalTwinsProvider):
             )
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
-
-    def delete_all_relationship(self, twin_id, etag=None):
-        relationships = self.list_relationships(twin_id, incoming_relationships=True)
-        incoming_pager = self.list_relationships(twin_id)
-
-        # relationships pager needs to be advanced to get relationships
-        try:
-            while True:
-                relationships.extend(incoming_pager.advance_page())
-        except StopIteration:
-            pass
-
-        print(f"Found {len(relationships)} relationship(s) associated with twin {twin_id}.")
-
-        for relationship in relationships:
-            try:
-                if type(relationship) == dict:
-                    self.delete_relationship(
-                        twin_id=twin_id,
-                        relationship_id=relationship['$relationshipId'],
-                        etag=etag
-                    )
-                else:
-                    self.delete_relationship(
-                        twin_id=relationship.source_id,
-                        relationship_id=relationship.relationship_id,
-                        etag=etag
-                    )
-            except CLIError as e:
-                logger.warn(f"Could not delete relationship {relationship}. The error is {e}.")
 
     def delete_all_relationship(self, twin_id, etag=None):
         relationships = self.list_relationships(twin_id, incoming_relationships=True)
