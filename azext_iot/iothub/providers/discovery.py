@@ -33,9 +33,9 @@ class IotHubDiscovery(object):
         if not self.client:
             if getattr(self.cmd, "cli_ctx", None):
                 self.client = iot_hub_service_factory(self.cmd.cli_ctx)
+                self.sub_id = get_subscription_id(self.cmd.cli_ctx)
             else:
                 self.client = self.cmd
-            self.sub_id = get_subscription_id(self.cmd.cli_ctx)
 
     def get_iothubs(self, rg: str = None) -> List:
         self._initialize_client()
