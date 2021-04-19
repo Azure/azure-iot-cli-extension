@@ -2651,15 +2651,26 @@ def iot_hub_connection_string_show(
                 discovery, hub, policy_name, key_type, show_all, default_eventhub
             )
 
-        return [
-            {
-                "name": hub.name,
-                "connectionString": conn_str_getter(hub)
-                if show_all
-                else conn_str_getter(hub)[0],
-            }
-            for hub in hubs if hub.properties.state == IoTHubStateType.Active.value
-        ]
+        connection_strings = []
+        for hub in hubs:
+            if hub.properties.state == IoTHubStateType.Active.value:
+                try:
+                    connection_strings.append({
+                        "name": hub.name,
+                        "connectionString": conn_str_getter(hub)
+                        if show_all
+                        else conn_str_getter(hub)[0],
+                    })
+                except:
+                    logger.warning(f"Warning: The IoT Hub {hub.name} in resource group " +
+                                   f"{hub.additional_properties['resourcegroup']} does " +
+                                   f"not have the target policy {policy_name}.")
+            else:
+                logger.warning(f"Warning: The IoT Hub {hub.name} in resource group " +
+                               f"{hub.additional_properties['resourcegroup']} is skipped " +
+                               "because the hub is not active.")
+        return connection_strings
+
     hub = discovery.find_iothub(hub_name, resource_group_name)
     if hub:
         conn_str = _get_hub_connection_string(
