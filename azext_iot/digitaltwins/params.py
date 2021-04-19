@@ -302,13 +302,6 @@ def load_digitaltwins_arguments(self, _):
             "at the minimum you must provide an empty $metadata object for each component.",
         )
 
-    with self.argument_context("dt twin delete") as context:
-        context.argument(
-            "delete_all",
-            options_list=["--all"],
-            help="Will delete all digital twins within the specified resource, including all relationships",
-        )
-
     with self.argument_context("dt twin telemetry") as context:
         context.argument(
             "telemetry",
@@ -357,13 +350,6 @@ def load_digitaltwins_arguments(self, _):
             "relationship",
             options_list=["--relationship", "--kind"],
             help="Filter result by the kind of relationship.",
-        )
-
-    with self.argument_context("dt twin relationship delete") as context:
-        context.argument(
-            "delete_all",
-            options_list=["--all"],
-            help="Will delete all relationships for the specified twin."
         )
 
     with self.argument_context("dt model") as context:
