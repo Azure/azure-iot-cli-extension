@@ -103,7 +103,7 @@ class TwinProvider(DigitalTwinsProvider):
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
 
-    def delete(self, twin_id=None, etag=None):
+    def delete(self, twin_id, etag=None):
         try:
             options = TwinOptions(if_match=(etag if etag else "*"))
             self.twins_sdk.delete(id=twin_id, digital_twins_delete_options=options, raw=True)
@@ -221,7 +221,7 @@ class TwinProvider(DigitalTwinsProvider):
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
 
-    def delete_relationship(self, twin_id, relationship_id=None, etag=None):
+    def delete_relationship(self, twin_id, relationship_id, etag=None):
         try:
             options = TwinOptions(if_match=(etag if etag else "*"))
             self.twins_sdk.delete_relationship(

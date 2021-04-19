@@ -115,7 +115,7 @@ def list_relationships(
 
 
 def delete_relationship(
-    cmd, name_or_hostname, twin_id, relationship_id=None, resource_group_name=None, etag=None
+    cmd, name_or_hostname, twin_id, relationship_id, resource_group_name=None, etag=None
 ):
     twin_provider = TwinProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
     return twin_provider.delete_relationship(

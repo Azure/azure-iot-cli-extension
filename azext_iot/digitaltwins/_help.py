@@ -653,10 +653,6 @@ def load_digitaltwins_help():
         - name: Delete a digital twin relationship using the etag.
           text: >
             az dt twin relationship delete -n {instance_or_hostname} --twin-id {twin_id} --relationship-id {relationship_id} --etag {etag}
-
-        - name: Delete all digital twin relationships associated with the twin.
-          text: >
-            az dt twin relationship delete -n {instance_or_hostname} --twin-id {twin_id} --all
     """
 
     helps["dt twin relationship delete-all"] = """

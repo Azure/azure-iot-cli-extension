@@ -530,7 +530,7 @@ class TestTwinDeleteTwin(object):
         "resource_group_name, etag",
         [(None, None), (resource_group, None), (None, etag)]
     )
-    def test_delete_twin_error(self, mocker, fixture_cmd, service_client_error, resource_group_name, etag):
+    def test_delete_twin_error(self, fixture_cmd, service_client_error, resource_group_name, etag):
         with pytest.raises(CLIError):
             subject.delete_twin(
                 cmd=fixture_cmd,
