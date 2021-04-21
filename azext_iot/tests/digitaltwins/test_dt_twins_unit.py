@@ -1194,6 +1194,88 @@ class TestTwinDeleteAllRelationship(object):
 
         assert result is None
 
+    @pytest.fixture
+    def service_client(self, mocked_response, start_twin_response):
+        yield mocked_response
+
+    @pytest.mark.parametrize(
+        "number_twins", [0, 1, 3]
+    )
+    def test_delete_relationships_all_twins(self, mocker, fixture_cmd, service_client, number_twins):
+        # Create query call and delete calls
+        query_result = []
+        for i in range(number_twins):
+            twin = generate_twin_result(randomized=True)
+            query_result.append(twin)
+            # Query calls to check if there are any relationships
+            service_client.add(
+                method=responses.GET,
+                url="https://{}/digitaltwins/{}/incomingrelationships".format(
+                    hostname, twin["$dtId"]
+                ),
+                body=json.dumps({
+                    "value" : [],
+                    "nextLink" : None
+                }),
+                status=200,
+                content_type="application/json",
+                match_querystring=False
+            )
+            service_client.add(
+                method=responses.GET,
+                url="https://{}/digitaltwins/{}/relationships".format(
+                    hostname, twin["$dtId"]
+                ),
+                body=json.dumps({
+                    "value" : [],
+                    "nextLink" : None
+                }),
+                status=200,
+                content_type="application/json",
+                match_querystring=False
+            )
+            # the only difference between this and delete_all_twins is no twin delete call
+        # Query call for twins to delete
+        service_client.add(
+            method=responses.POST,
+            url="https://{}/query".format(
+                hostname
+            ),
+            body=json.dumps({
+                "value": query_result,
+                "continuationToken": None
+            }),
+            status=200,
+            content_type="application/json",
+            match_querystring=False,
+            headers={
+                "Query-Charge": "1.0"
+            }
+        )
+
+        # Call the delete all command
+        result = subject.delete_all_relationship(
+            cmd=fixture_cmd,
+            name_or_hostname=hostname,
+        )
+
+        start = check_resource_group_name_call(service_client, resource_group_input=None)
+
+        delete_request = service_client.calls[start].request
+        assert delete_request.method == "POST"
+
+        # Check delete calls
+        for i in range(number_twins):
+            query1_request = service_client.calls[start + 1 + 2 * i].request
+            assert query1_request.method == "GET"
+            assert query_result[i]["$dtId"] in query1_request.url
+
+            query2_request = service_client.calls[start + 2 + 2 * i].request
+            assert query2_request.method == "GET"
+            assert query_result[i]["$dtId"] in query2_request.url
+
+        assert result is None
+
 
 class TestTwinSendTelemetry(object):
     @pytest.fixture

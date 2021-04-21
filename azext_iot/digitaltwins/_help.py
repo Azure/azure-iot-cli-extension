@@ -542,7 +542,7 @@ def load_digitaltwins_help():
 
     helps["dt twin delete-all"] = """
         type: command
-        short-summary: Deletes all digital twins within the specified resource, including all relationships for those twins.
+        short-summary: Deletes all digital twins within a Digital Twins instance, including all relationships for those twins.
 
         examples:
         - name: Delete all digital twins. Any relationships referencing the twins will also be deleted.
@@ -657,12 +657,16 @@ def load_digitaltwins_help():
 
     helps["dt twin relationship delete-all"] = """
         type: command
-        short-summary: Deletes all digital twin relationships on a Digital Twins instance, including incomming relationships.
+        short-summary: Deletes all digital twin relationships within a Digital Twins instance, including incoming relationships.
 
         examples:
         - name: Delete all digital twin relationships associated with the twin.
           text: >
             az dt twin relationship delete-all -n {instance_or_hostname} --twin-id {twin_id}
+
+        - name: Delete all digital twin relationships within the Digital Twins instace.
+          text: >
+            az dt twin relationship delete-all -n {instance_or_hostname}
     """
 
     helps["dt twin telemetry"] = """
