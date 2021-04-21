@@ -442,6 +442,11 @@ def load_digitaltwins_help():
             az dt twin create -n {instance_or_hostname} --dtmi "dtmi:com:example:Room;1"
             --twin-id {twin_id}
 
+        - name: Create a digital twin from an existing (prior-created) model with if-none-match tag.
+          text: >
+            az dt twin create -n {instance_or_hostname} --dtmi "dtmi:com:example:Room;1"
+            --twin-id {twin_id} --if-none-match
+
         - name: Create a digital twin from an existing (prior-created) model. Instantiate with property values.
           text: >
             az dt twin create -n {instance_or_hostname} --dtmi "dtmi:com:example:DeviceInformation;1"
@@ -476,6 +481,11 @@ def load_digitaltwins_help():
         - name: Update a digital twin via JSON patch specification.
           text: >
             az dt twin update -n {instance_or_hostname} --twin-id {twin_id}
+            --json-patch '{"op":"replace", "path":"/Temperature", "value": 20.5}'
+
+        - name: Update a digital twin via JSON patch specification and using etag.
+          text: >
+            az dt twin update -n {instance_or_hostname} --twin-id {twin_id} --etag {etag}
             --json-patch '{"op":"replace", "path":"/Temperature", "value": 20.5}'
 
         - name: Update a digital twin via JSON patch specification.
@@ -524,6 +534,10 @@ def load_digitaltwins_help():
         - name: Remove a digital twin by Id.
           text: >
             az dt twin delete -n {instance_or_hostname} --twin-id {twin_id}
+
+        - name: Remove a digital twin by Id using the etag.
+          text: >
+            az dt twin delete -n {instance_or_hostname} --twin-id {twin_id} --etag {etag}
     """
 
     helps["dt twin relationship"] = """
@@ -541,6 +555,11 @@ def load_digitaltwins_help():
           text: >
             az dt twin relationship create -n {instance_or_hostname} --relationship-id {relationship_id} --relationship contains
             --twin-id {source_twin_id} --target {target_twin_id}
+
+        - name: Create a relationship between two digital twins with if-none-match tag
+          text: >
+            az dt twin relationship create -n {instance_or_hostname} --relationship-id {relationship_id} --relationship contains
+            --twin-id {source_twin_id} --target {target_twin_id} --if-none-match
 
         - name: Create a relationship with initialized properties between two digital twins.
           text: >
@@ -593,6 +612,11 @@ def load_digitaltwins_help():
             az dt twin relationship update -n {instance_or_hostname} --twin-id {twin_id} --relationship-id {relationship_id}
             --relationship contains --json-patch '{"op":"replace", "path":"/Temperature", "value": 20.5}'
 
+        - name: Update a digital twin relationship via JSON patch specification and using etag.
+          text: >
+            az dt twin relationship update -n {instance_or_hostname} --twin-id {twin_id} --relationship-id {relationship_id}
+            --relationship contains --json-patch '{"op":"replace", "path":"/Temperature", "value": 20.5}' --etag {etag}
+
         - name: Update a digital twin relationship via JSON patch specification.
           text: >
             az dt twin relationship update -n {instance_or_hostname} --twin-id {twin_id} --relationship-id {relationship_id}
@@ -615,6 +639,10 @@ def load_digitaltwins_help():
         - name: Delete a digital twin relationship.
           text: >
             az dt twin relationship delete -n {instance_or_hostname} --twin-id {twin_id} --relationship-id {relationship_id}
+
+        - name: Delete a digital twin relationship using the etag.
+          text: >
+            az dt twin relationship delete -n {instance_or_hostname} --twin-id {twin_id} --relationship-id {relationship_id} --etag {etag}
     """
 
     helps["dt twin telemetry"] = """

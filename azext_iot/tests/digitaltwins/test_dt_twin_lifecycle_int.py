@@ -30,6 +30,7 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
         room_dtmi = "dtmi:com:example:Room;1"
         room_twin_id = "myroom"
         thermostat_component_id = "Thermostat"
+        etag = 'AAAA=='
 
         create_output = self.cmd(
             "dt create -n {} -g {} -l {}".format(instance_name, self.rg, self.region)
@@ -112,7 +113,7 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
         )
 
         replaced_room_twin = self.cmd(
-            "dt twin create -n {} -g {} --dtmi {} --twin-id {} --replace --properties '{}'".format(
+            "dt twin create -n {} -g {} --dtmi {} --twin-id {} --properties '{}'".format(
                 instance_name,
                 self.rg,
                 room_dtmi,
@@ -129,14 +130,25 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
             component_name=thermostat_component_id,
         )
 
-        # new twin cannot be created with same twin_id if replace not provided
+        # new twin cannot be created with same twin_id if if-none-match provided
         self.cmd(
-            "dt twin create -n {} -g {} --dtmi {} --twin-id {} --properties '{}'".format(
+            "dt twin create -n {} -g {} --dtmi {} --twin-id {} --if-none-match --properties '{}'".format(
                 instance_name,
                 self.rg,
                 room_dtmi,
                 room_twin_id,
                 "{emptyThermostatComponentJson}",
+            ),
+            expect_failure=True
+        )
+
+        # delete command should fail if etag is different
+        self.cmd(
+            "dt twin delete -n {} -g {} --twin-id {} --etag '{}'".format(
+                instance_name,
+                self.rg,
+                room_twin_id,
+                etag
             ),
             expect_failure=True
         )
@@ -241,6 +253,30 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
             == json.loads(self.kwargs["temperatureJsonPatch"])["value"]
         )
 
+        self.cmd(
+            "dt twin update -n {} --twin-id {} --json-patch '{}' --etag '{}'".format(
+                instance_name,
+                room_twin_id,
+                "{temperatureJsonPatch}",
+                etag
+            ),
+            expect_failure=True
+        )
+
+        update_twin_result = self.cmd(
+            "dt twin update -n {} --twin-id {} --json-patch '{}' --etag '{}'".format(
+                instance_name,
+                room_twin_id,
+                "{temperatureJsonPatch}",
+                update_twin_result["$etag"]
+            )
+        ).get_output_in_json()
+
+        assert (
+            update_twin_result["Temperature"]
+            == json.loads(self.kwargs["temperatureJsonPatch"])["value"]
+        )
+
         twin_query_result = self.cmd(
             "dt twin query -n {} -g {} -q 'select * from digitaltwins'".format(
                 instance_name, self.rg
@@ -256,6 +292,18 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
         self.kwargs["relationshipJsonPatch"] = json.dumps(
             {"op": "replace", "path": "/ownershipUser", "value": "meme"}
         )
+
+        twin_relationship_create_result = self.cmd(
+            "dt twin relationship create -n {} -g {} --relationship-id {} --relationship {} --twin-id {} "
+            "--target-twin-id {}".format(
+                instance_name,
+                self.rg,
+                relationship_id,
+                relationship,
+                floor_twin_id,
+                room_twin_id,
+            )
+        ).get_output_in_json()
 
         twin_relationship_create_result = self.cmd(
             "dt twin relationship create -n {} -g {} --relationship-id {} --relationship {} --twin-id {} "
@@ -277,6 +325,21 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
             source_id=floor_twin_id,
             target_id=room_twin_id,
             properties=self.kwargs["relationshipJson"],
+        )
+
+        # new twin cannot be created with same twin_id if if-none-match provided
+        twin_relationship_create_result = self.cmd(
+            "dt twin relationship create -n {} -g {} --relationship-id {} --relationship {} --twin-id {} "
+            "--target-twin-id {} --if-none-match --properties '{}'".format(
+                instance_name,
+                self.rg,
+                relationship_id,
+                relationship,
+                floor_twin_id,
+                room_twin_id,
+                "{relationshipJson}",
+            ),
+            expect_failure=True
         )
 
         twin_relationship_show_result = self.cmd(
@@ -305,6 +368,37 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
                 relationship_id,
                 floor_twin_id,
                 "{relationshipJsonPatch}",
+            )
+        ).get_output_in_json()
+
+        assert (
+            twin_edge_update_result["ownershipUser"]
+            == json.loads(self.kwargs["relationshipJsonPatch"])["value"]
+        )
+
+        # Fail to update if the etag if different
+        self.cmd(
+            "dt twin relationship update -n {} -g {} --relationship-id {} --twin-id {} "
+            "--json-patch '{}' --etag '{}'".format(
+                instance_name,
+                self.rg,
+                relationship_id,
+                floor_twin_id,
+                "{relationshipJsonPatch}",
+                etag
+            ),
+            expect_failure=True
+        )
+
+        twin_edge_update_result = self.cmd(
+            "dt twin relationship update -n {} -g {} --relationship-id {} --twin-id {} "
+            "--json-patch '{}' --etag '{}'".format(
+                instance_name,
+                self.rg,
+                relationship_id,
+                floor_twin_id,
+                "{relationshipJsonPatch}",
+                twin_edge_update_result["$etag"]
             )
         ).get_output_in_json()
 
@@ -353,6 +447,16 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
             )
         ).get_output_in_json()
         assert len(twin_relationship_list_result) == 1
+
+        self.cmd(
+            "dt twin relationship delete -n {} --twin-id {} -r {} --etag '{}'".format(
+                instance_name,
+                floor_twin_id,
+                relationship_id,
+                etag
+            ),
+            expect_failure=True
+        )
 
         # No output from API for delete edge
         self.cmd(

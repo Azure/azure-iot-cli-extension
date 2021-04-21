@@ -247,7 +247,7 @@ class TestTwinCreateTwin(object):
         yield mocked_response
 
     @pytest.mark.parametrize(
-        "replace, properties, resource_group_name",
+        "if_none_match, properties, resource_group_name",
         [
             (False, None, None),
             (True, None, None),
@@ -256,13 +256,13 @@ class TestTwinCreateTwin(object):
             (False, generic_patch_2, None)
         ]
     )
-    def test_create_twin(self, fixture_cmd, service_client, replace, properties, resource_group_name):
+    def test_create_twin(self, fixture_cmd, service_client, if_none_match, properties, resource_group_name):
         result = subject.create_twin(
             cmd=fixture_cmd,
             name_or_hostname=hostname,
             twin_id=twin_id,
             model_id=model_id,
-            replace=replace,
+            if_none_match=if_none_match,
             properties=properties,
             resource_group_name=resource_group_name
         )
@@ -277,7 +277,7 @@ class TestTwinCreateTwin(object):
         assert twin_request_body["$dtId"] == twin_id
         assert twin_request_body["$metadata"]["$model"] == model_id
 
-        if not replace:
+        if if_none_match:
             assert twin_request.headers["If-None-Match"] == "*"
 
         if properties:
@@ -557,7 +557,7 @@ class TestTwinCreateRelationship(object):
         yield mocked_response
 
     @pytest.mark.parametrize(
-        "relationship, replace, properties, resource_group_name",
+        "relationship, if_none_match, properties, resource_group_name",
         [
             ("contains", False, None, None),
             ("", False, None, None),
@@ -567,7 +567,7 @@ class TestTwinCreateRelationship(object):
             ("contains", False, None, resource_group)
         ]
     )
-    def test_create_relationship(self, fixture_cmd, service_client, relationship, replace, properties, resource_group_name):
+    def test_create_relationship(self, fixture_cmd, service_client, relationship, if_none_match, properties, resource_group_name):
         result = subject.create_relationship(
             cmd=fixture_cmd,
             name_or_hostname=hostname,
@@ -575,7 +575,7 @@ class TestTwinCreateRelationship(object):
             target_twin_id=target_twin_id,
             relationship_id=relationship_id,
             relationship=relationship,
-            replace=replace,
+            if_none_match=if_none_match,
             properties=properties,
             resource_group_name=resource_group_name
         )
@@ -591,7 +591,7 @@ class TestTwinCreateRelationship(object):
         assert result_request_body["$targetId"] == target_twin_id
         assert result_request_body["$relationshipName"] == relationship
 
-        if not replace:
+        if if_none_match:
             assert put_request.headers["If-None-Match"] == "*"
 
         if properties:

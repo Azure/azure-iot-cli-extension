@@ -22,13 +22,13 @@ def create_twin(
     name_or_hostname,
     twin_id,
     model_id,
-    replace=False,
+    if_none_match=False,
     properties=None,
     resource_group_name=None
 ):
     twin_provider = TwinProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
     return twin_provider.create(
-        twin_id=twin_id, model_id=model_id, replace=replace, properties=properties
+        twin_id=twin_id, model_id=model_id, if_none_match=if_none_match, properties=properties
     )
 
 
@@ -54,7 +54,7 @@ def create_relationship(
     target_twin_id,
     relationship_id,
     relationship,
-    replace=False,
+    if_none_match=False,
     properties=None,
     resource_group_name=None,
 ):
@@ -64,7 +64,7 @@ def create_relationship(
         target_twin_id=target_twin_id,
         relationship_id=relationship_id,
         relationship=relationship,
-        replace=replace,
+        if_none_match=if_none_match,
         properties=properties,
     )
 
