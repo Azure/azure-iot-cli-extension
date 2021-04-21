@@ -108,3 +108,44 @@ class ModelProvider(DigitalTwinsProvider):
             return self.model_sdk.delete(id=id)
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
+
+    def delete_all(self):
+        # Get all models and definitions
+        incoming_pager = self.model_sdk.list(include_model_definition=True)
+
+        incoming_result = []
+        try:
+            while True:
+                incoming_result.extend(incoming_pager.advance_page())
+        except StopIteration:
+            pass
+        except ErrorResponseException as e:
+            raise CLIError(unpack_msrest_error(e))
+
+        # dict to store model_id, set of parent_id
+        parsed_models = {model.id: set() for model in incoming_result}
+        print(incoming_result)
+        print(parsed_models)
+        print("(~~~~~~~~~~~~~~~~~~~~~)")
+        for model in incoming_result:
+            print(model.id)
+            print(model.model)
+            if "extends" in model:
+                parsed_models[model]
+            if "contents" in model.model:
+                for content in model.model["contents"]:
+                    if ("schema" in content) and content["schema"].startswith("dtmi:"):
+                        parsed_models[content["schema"]].add(model.id) # add current as the child's parent
+            print()
+
+        def delete_parents(model_id, model_dict):
+            if model_id not in model_dict:
+                return
+            for parent_id in model_dict[model_id]:
+                delete_parents(parent_id, model_dict)
+            self.delete(model_id)
+            del model_dict
+
+        while len(parsed_models) > 0:
+            model_id = parsed_models.keys()[0]
+            delete_parents(model_id, parsed_models)

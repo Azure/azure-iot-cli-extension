@@ -42,3 +42,8 @@ def update_model(cmd, name_or_hostname, model_id, decommission=None, resource_gr
 def delete_model(cmd, name_or_hostname, model_id, resource_group_name=None):
     model_provider = ModelProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
     return model_provider.delete(id=model_id)
+
+
+def delete_all_models(cmd, name_or_hostname, resource_group_name=None):
+    model_provider = ModelProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
+    return model_provider.delete_all()
