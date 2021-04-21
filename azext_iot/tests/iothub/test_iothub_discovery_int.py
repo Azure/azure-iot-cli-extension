@@ -74,7 +74,7 @@ class TestIoTHubDiscovery(IoTLiveScenarioTest):
         auto_target = discovery.get_target(hub_name=LIVE_HUB)
         assert_target(auto_target, rg=LIVE_RG)
 
-        auto_target = discovery.get_target(hub_name=LIVE_HUB, rg=LIVE_RG)
+        auto_target = discovery.get_target(hub_name=LIVE_HUB, resource_group_name=LIVE_RG)
         assert_target(auto_target, rg=LIVE_RG)
 
         desired_target = discovery.get_target(
@@ -85,7 +85,7 @@ class TestIoTHubDiscovery(IoTLiveScenarioTest):
         sub_targets = discovery.get_targets()
         [assert_target(tar) for tar in sub_targets]
 
-        rg_targets = discovery.get_targets(rg=LIVE_RG, include_events=True)
+        rg_targets = discovery.get_targets(resource_group_name=LIVE_RG, include_events=True)
         [assert_target(tar, rg=LIVE_RG, include_events=True) for tar in rg_targets]
 
         assert len(rg_targets) <= len(sub_targets)
@@ -99,7 +99,7 @@ def assert_target(target: dict, by_cstring=False, include_events=False, **kwargs
 
     if not by_cstring:
         assert target["secondarykey"]
-        assert target["subscription"]
+        assert target["subscription"] and target["subscription"] != "unknown"
 
         if "rg" in kwargs:
             assert target["resourcegroup"] == kwargs["rg"]

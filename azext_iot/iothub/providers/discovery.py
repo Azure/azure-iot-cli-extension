@@ -7,10 +7,10 @@
 from knack.util import CLIError
 from knack.log import get_logger
 from azure.cli.core.commands.client_factory import get_subscription_id
-from azext_iot.common.utility import trim_from_start, ensure_min_version
+from azext_iot.common.utility import trim_from_start, ensure_iothub_sdk_min_version
 from azext_iot.iothub.models.iothub_target import IotHubTarget
 from azext_iot._factory import iot_hub_service_factory
-from azext_iot.constants import TRACK_2_SDK_MIN_VERSION
+from azext_iot.constants import IOTHUB_TRACK_2_SDK_MIN_VERSION
 from typing import Dict, List
 from enum import Enum, EnumMeta
 
@@ -47,7 +47,7 @@ class IotHubDiscovery(object):
         else:
             hubs_pager = self.client.list_by_resource_group(resource_group_name=rg)
 
-        if ensure_min_version(TRACK_2_SDK_MIN_VERSION):
+        if ensure_iothub_sdk_min_version(IOTHUB_TRACK_2_SDK_MIN_VERSION):
             for hubs in hubs_pager.by_page():
                 hubs_list.extend(hubs)
         else:
@@ -67,7 +67,7 @@ class IotHubDiscovery(object):
         )
         policy_list = []
 
-        if ensure_min_version(TRACK_2_SDK_MIN_VERSION):
+        if ensure_iothub_sdk_min_version(IOTHUB_TRACK_2_SDK_MIN_VERSION):
             for policy in policy_pager.by_page():
                 policy_list.extend(policy)
         else:
@@ -139,18 +139,18 @@ class IotHubDiscovery(object):
     def get_target_by_cstring(cls, connection_string: str) -> IotHubTarget:
         return IotHubTarget.from_connection_string(cstring=connection_string).as_dict()
 
-    def get_target(self, hub_name: str, rg: str = None, **kwargs) -> Dict[str, str]:
+    def get_target(self, hub_name: str, resource_group_name: str = None, **kwargs) -> Dict[str, str]:
         cstring = kwargs.get("login")
         if cstring:
             return self.get_target_by_cstring(connection_string=cstring)
 
-        target_iothub = self.find_iothub(hub_name=hub_name, rg=rg)
+        target_iothub = self.find_iothub(hub_name=hub_name, rg=resource_group_name)
 
         policy_name = kwargs.get("policy_name", "auto")
         rg = target_iothub.additional_properties.get("resourcegroup")
 
         target_policy = self.find_policy(
-            hub_name=target_iothub.name, rg=rg, policy_name=policy_name,
+            hub_name=target_iothub.name, rg=resource_group_name, policy_name=policy_name,
         )
 
         key_type = kwargs.get("key_type", "primary")
@@ -162,13 +162,13 @@ class IotHubDiscovery(object):
             include_events=include_events,
         )
 
-    def get_targets(self, rg: str = None, **kwargs) -> List[Dict[str, str]]:
+    def get_targets(self, resource_group_name: str = None, **kwargs) -> List[Dict[str, str]]:
         targets = []
         hubs = self.get_iothubs(rg=rg)
         if hubs:
             for hub in hubs:
                 targets.append(
-                    self.get_target(hub_name=hub.name, rg=self._get_rg(hub), **kwargs)
+                    self.get_target(hub_name=hub.name, resource_group_name=self._get_rg(hub), **kwargs)
                 )
 
         return targets
