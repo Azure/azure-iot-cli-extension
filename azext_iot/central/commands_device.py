@@ -21,7 +21,7 @@ def get_device(
     cmd, app_id: str, device_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token)
-    return provider.get_device(device_id)
+    return provider.get_device(device_id,central_dns_suffix=central_dns_suffix)
 
 
 def create_device(
@@ -52,7 +52,9 @@ def delete_device(
     cmd, app_id: str, device_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token)
-    return provider.delete_device(device_id)
+    return provider.delete_device(
+        device_id=device_id,
+        central_dns_suffix=central_dns_suffix)
 
 
 def registration_info(
