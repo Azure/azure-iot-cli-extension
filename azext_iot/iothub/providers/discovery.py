@@ -150,7 +150,7 @@ class IotHubDiscovery(object):
         rg = target_iothub.additional_properties.get("resourcegroup")
 
         target_policy = self.find_policy(
-            hub_name=target_iothub.name, rg=resource_group_name, policy_name=policy_name,
+            hub_name=target_iothub.name, rg=rg, policy_name=policy_name,
         )
 
         key_type = kwargs.get("key_type", "primary")
@@ -164,7 +164,7 @@ class IotHubDiscovery(object):
 
     def get_targets(self, resource_group_name: str = None, **kwargs) -> List[Dict[str, str]]:
         targets = []
-        hubs = self.get_iothubs(rg=rg)
+        hubs = self.get_iothubs(rg=resource_group_name)
         if hubs:
             for hub in hubs:
                 targets.append(
