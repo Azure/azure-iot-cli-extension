@@ -137,6 +137,7 @@ def load_digitaltwins_commands(self, _):
         )
         cmd_group.command("update", "update_model")
         cmd_group.command("delete", "delete_model")
+        cmd_group.command("delete-all", "delete_all_models")
 
     with self.command_group(
         "dt network",
