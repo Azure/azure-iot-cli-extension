@@ -44,7 +44,12 @@ def update_twin(cmd, name_or_hostname, twin_id, json_patch, resource_group_name=
 
 def delete_twin(cmd, name_or_hostname, twin_id, resource_group_name=None, etag=None):
     twin_provider = TwinProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
-    return twin_provider.delete(twin_id, etag=etag)
+    return twin_provider.delete(twin_id=twin_id, etag=etag)
+
+
+def delete_all_twin(cmd, name_or_hostname, resource_group_name=None):
+    twin_provider = TwinProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
+    return twin_provider.delete_all()
 
 
 def create_relationship(
@@ -116,6 +121,16 @@ def delete_relationship(
     return twin_provider.delete_relationship(
         twin_id=twin_id, relationship_id=relationship_id, etag=etag
     )
+
+
+def delete_all_relationship(
+    cmd, name_or_hostname, twin_id=None, resource_group_name=None
+):
+    twin_provider = TwinProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
+    if twin_id:
+        return twin_provider.delete_all_relationship(twin_id=twin_id)
+    else:
+        return twin_provider.delete_all(only_relationships=True)
 
 
 def send_telemetry(
