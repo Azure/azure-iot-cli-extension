@@ -85,7 +85,7 @@ class IotHubDiscovery(object):
         if rg:
             try:
                 return self.client.get(resource_group_name=rg, resource_name=hub_name)
-            except: # pylint: disable=broad-except
+            except:  # pylint: disable=broad-except
                 raise CLIError(
                     "Unable to find IoT Hub: {} in resource group: {}".format(
                         hub_name, rg
