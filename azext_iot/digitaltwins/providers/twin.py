@@ -104,12 +104,28 @@ class TwinProvider(DigitalTwinsProvider):
             raise CLIError(unpack_msrest_error(e))
 
     def delete(self, twin_id, etag=None):
-        # Not a json response
         try:
             options = TwinOptions(if_match=(etag if etag else "*"))
             self.twins_sdk.delete(id=twin_id, digital_twins_delete_options=options, raw=True)
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
+
+    def delete_all(self, only_relationships=False):
+        # need to get all twins
+        query = "select * from digitaltwins"
+        twins = self.invoke_query(query=query, show_cost=False)["result"]
+        print(f"Found {len(twins)} twin(s).")
+
+        # go through and delete all
+        for twin in twins:
+            try:
+                self.delete_all_relationship(
+                    twin_id=twin["$dtId"]
+                )
+                if not only_relationships:
+                    self.delete(twin_id=twin["$dtId"])
+            except CLIError as e:
+                logger.warn(f"Could not delete twin {twin['$dtId']}. The error is {e}")
 
     def add_relationship(
         self,
@@ -213,6 +229,34 @@ class TwinProvider(DigitalTwinsProvider):
             )
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
+
+    def delete_all_relationship(self, twin_id):
+        relationships = self.list_relationships(twin_id, incoming_relationships=True)
+        incoming_pager = self.list_relationships(twin_id)
+
+        # relationships pager needs to be advanced to get relationships
+        try:
+            while True:
+                relationships.extend(incoming_pager.advance_page())
+        except StopIteration:
+            pass
+
+        print(f"Found {len(relationships)} relationship(s) associated with twin {twin_id}.")
+
+        for relationship in relationships:
+            try:
+                if isinstance(relationship, dict):
+                    self.delete_relationship(
+                        twin_id=twin_id,
+                        relationship_id=relationship['$relationshipId']
+                    )
+                else:
+                    self.delete_relationship(
+                        twin_id=relationship.source_id,
+                        relationship_id=relationship.relationship_id
+                    )
+            except CLIError as e:
+                logger.warn(f"Could not delete relationship {relationship}. The error is {e}.")
 
     def get_component(self, twin_id, component_path):
         try:
