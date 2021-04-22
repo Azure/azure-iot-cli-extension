@@ -168,6 +168,42 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         cli_ctx = DummyCli()
         client = iot_hub_service_factory(cli_ctx)
+        
+        token, thread = execute_onthread(
+            method=iot_simulate_device,
+            args=[
+                client,
+                device_ids[0],
+                LIVE_HUB,
+                "complete",
+                "Testing mqtt c2d and direct method invocations",
+                2,
+                5,
+                "mqtt",
+            ],
+            max_runs=4,
+            return_handle=True,
+        )
+
+        self.cmd(
+            "iot device c2d-message send -d {} --ack {} --login {} --wait -y".format(
+                device_ids[0], "full", self.connection_string
+            )
+        )
+        token.set()
+        thread.join()
+
+        result = self.cmd(
+            "iot hub invoke-device-method -d {} --method-name Reboot --login {}".format(
+                device_ids[0], self.connection_string
+            )
+        ).get_output_in_json()
+
+        assert result != None
+        assert result["status"] == 200
+
+        token.set()
+        thread.join()
 
         token, thread = execute_onthread(
             method=iot_simulate_device,
@@ -220,7 +256,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
     def test_device_messaging(self):
         device_count = 1
         device_ids = self.generate_device_names(device_count)
-
+        
         self.cmd(
             "iot hub device-identity create -d {} -n {} -g {}".format(
                 device_ids[0], LIVE_HUB, LIVE_RG

@@ -5,93 +5,74 @@
 # --------------------------------------------------------------------------------------------
 
 
-import ssl
-import os
 import six
 
 from time import sleep
-from paho.mqtt import client as mqtt
+from azext_iot.constants import USER_AGENT, BASE_MQTT_API_VERSION
+from azext_iot.common.utility import url_encode_str
+from azure.iot.device import IoTHubDeviceClient as mqtt_device_client, Message, MethodResponse
+from azure.iot.hub import IoTHubRegistryManager, DigitalTwinClient
 
-from azext_iot.constants import EXTENSION_ROOT, USER_AGENT, BASE_MQTT_API_VERSION
-from azext_iot.common.sas_token_auth import SasTokenAuthentication
-from azext_iot.common.utility import url_encode_dict, url_encode_str
-
-connection_result = {
-    0: "success",
-    1: "refused - incorrect protocol version",
-    2: "refused - invalid client id",
-    3: "refused - server unavailable",
-    4: "refused - bad username or password",
-    5: "refused - not authorized",
-}
-
-
-class mqtt_client_wrap(object):
-    def __init__(self, target, device_id, properties=None, sas_duration=3600):
-        self.target = target
+class mqtt_client(object):
+    def __init__(self, target, device_connection_string, device_id):
         self.device_id = device_id
+        self.registry_manager = IoTHubRegistryManager(target["cs"]) 
+        self.device_client = mqtt_device_client.create_from_connection_string(device_connection_string)
+        self.digital_twin_client =  DigitalTwinClient(target["cs"])
+        self.device_client.connect()
+        self.device_client.on_message_received = self.message_handler
+        self.device_client.on_method_request_received = self.method_request_handler
 
-        sas = SasTokenAuthentication(
-            target["entity"],
-            target["policy"],
-            target["primarykey"],
-            sas_duration,
-        ).generate_sas_token()
-        cwd = EXTENSION_ROOT
-        cert_path = os.path.join(cwd, "digicert.pem")
-        tls = {"ca_certs": cert_path, "tls_version": ssl.PROTOCOL_SSLv23}
-        self.topic_publish = "devices/{}/messages/events/{}".format(
-            device_id, url_encode_dict(properties) if properties else ""
-        )
-        self.topic_receive = "devices/{}/messages/devicebound/#".format(device_id)
-        self.connected = False
+    def send_c2d_message(self, message_text="", properties={}):
+        result = {
+            "status": None,
+            "error": None
+        }
+        try:
+            self.registry_manager.send_c2d_message(self.device_id, message_text, properties)
+            result.status = "C2D Message sent succesfully"
+        except Exception as ex:
+            result.status = "Failed to send C2D Message"
+            result.error = "Unexpected error {0}".format(ex)
+        return result
+    
+    def send_d2c_message(self, message_text="", properties={}):
+        message = Message(message_text)
+        message.custom_properties = properties
+        self.device_client.send_message(message)
+    
+    def invoke_direct_method(self, command_name, payload="", connect_timeout_in_seconds=100, response_timeout_in_seconds=100):
+        self.digital_twin_client.invoke_command(self.device_id, command_name, payload, connect_timeout_in_seconds, response_timeout_in_seconds)
 
-        self.client = mqtt.Client(protocol=mqtt.MQTTv311, client_id=device_id)
-        self.client.on_connect = self.on_connect
-        self.client.on_message = self.on_message
-        self.client.on_publish = self.on_publish
-        self.client.tls_set(ca_certs=tls["ca_certs"], tls_version=tls["tls_version"])
-        self.client.username_pw_set(username=build_mqtt_device_username(target["entity"], device_id), password=sas)
-        self.client.connect(host=self.target["entity"], port=8883)
-
-    def on_connect(self, client, userdata, flags, rc):
-        six.print_(
-            "Connected to target IoT Hub MQTT broker with result: {}".format(
-                connection_result[rc]
-            )
-        )
-        self.client.subscribe(self.topic_receive)
-        six.print_("Subscribed to device bound message queue")
-        self.connected = True
-
-    def on_message(self, client, userdata, msg):
+    def message_handler(self, message):
         six.print_()
-        six.print_("_Received C2D message with topic_: {}".format(msg.topic))
-        six.print_("_Payload_: {}".format(msg.payload))
-
-    def on_publish(self, client, userdata, mid):
-        six.print_(".", end="", flush=True)
-
-    def is_connected(self):
-        return self.connected
-
-    def execute(self, data, publish_delay=2, msg_count=100):
+        six.print_("_Received C2D message with topic_: /devices/{}/messages/devicebound".format(self.device_id))
+        six.print_("_Payload_: {}".format(message.data))
+        if message.custom_properties:
+            six.print_("_Custom Properties_: {}".format(message.custom_properties))
+    
+    def method_request_handler(self, method_request):
+        six.print_()
+        six.print_("Received method request with id: '{}' and method name: '{}' for device with id: '{}'".format(method_request.request_id, method_request.name, self.device_id))
+        six.print_("_Payload_: {}".format(method_request.payload))
+        payload = {"result": True, "data": "Method succeeded"}  # set response payload
+        status = 200  # set return status code
+        method_response = MethodResponse.create_from_method_request(method_request, status, payload)
+        self.device_client.send_method_response(method_response)
+    
+    def execute(self, data, properties={}, publish_delay=2, msg_count=100):
         try:
             msgs = 0
-            self.client.loop_start()
             while True:
-                if self.is_connected():
-                    if msgs < msg_count:
-                        msgs += 1
-                        self.client.publish(self.topic_publish, data.generate(True))
-                    else:
-                        break
+                if msgs < msg_count:
+                    msgs += 1
+                    self.send_d2c_message(message_text=data.generate(True), properties=properties)
+                    six.print_(".", end="", flush=True)
+                else:
+                    break
                 sleep(publish_delay)
         except Exception as x:
             raise x
-        finally:
-            self.client.loop_stop()
-
 
 def build_mqtt_device_username(entity, device_id):
     return "{}/{}/?api-version={}&DeviceClientType={}".format(
