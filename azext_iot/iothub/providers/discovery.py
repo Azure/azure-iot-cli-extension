@@ -82,12 +82,10 @@ class IotHubDiscovery(object):
     def find_iothub(self, hub_name: str, rg: str = None):
         self._initialize_client()
 
-        from azure.core.exceptions import HttpResponseError
-
         if rg:
             try:
                 return self.client.get(resource_group_name=rg, resource_name=hub_name)
-            except HttpResponseError:
+            except: # pylint: disable=broad-except
                 raise CLIError(
                     "Unable to find IoT Hub: {} in resource group: {}".format(
                         hub_name, rg
