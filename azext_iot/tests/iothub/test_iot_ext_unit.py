@@ -2167,7 +2167,7 @@ class TestSasTokenAuth:
 
 class TestDeviceSimulate:
     @pytest.fixture(params=[204])
-    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
+    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request, fixture_device_connection):
         service_client = mocker.patch(path_service_client)
         service_client.return_value = build_mock_response(mocker, request.param, {})
         return service_client
@@ -2227,28 +2227,19 @@ class TestDeviceSimulate:
             assert json.dumps(result[0][2])
 
         if protocol == "mqtt":
-            assert mc == mqttclient().publish.call_count
+            assert mc == mqttclient().send_message.call_count
 
-            assert mqttclient().publish.call_args[0][
-                0
-            ] == "devices/{}/messages/events/{}".format(
-                device_id, url_encode_dict(properties_to_send)
-            )
+            if properties == None or properties == "invalid":
+                assert mqttclient().send_message.call_args[0][0].custom_properties == {'$.ce': 'utf-8', '$.ct': 'application/json'}
 
-            assert mqttclient().username_pw_set.call_args[1][
-                "username"
-            ] == "{}/{}/?api-version={}&DeviceClientType={}".format(
-                mock_target["entity"],
-                device_id,
-                BASE_MQTT_API_VERSION,
-                url_encode_str(USER_AGENT),
-            )
+            elif properties == "myprop=myvalue;$.ce=utf-16":
+                assert mqttclient().send_message.call_args[0][0].custom_properties == {'$.ce': 'utf-16', '$.ct': 'application/json', 'myprop': 'myvalue'}
 
+            elif properties == "myinvalidprop;myvalidprop=myvalidpropvalue":
+                assert mqttclient().send_message.call_args[0][0].custom_properties == {'$.ce': 'utf-8', '$.ct': 'application/json', 'myvalidprop': 'myvalidpropvalue'}
+            
             # mqtt msg body - which is a json string
-            assert json.loads(mqttclient().publish.call_args[0][1])
-
-            assert mqttclient().tls_set.call_count == 1
-            assert mqttclient().username_pw_set.call_count == 1
+            assert json.loads(mqttclient().send_message.call_args[0][0].data)
             assert serviceclient.call_count == 0
 
     @pytest.mark.parametrize(

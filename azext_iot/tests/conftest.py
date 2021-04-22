@@ -14,6 +14,7 @@ from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azure.cli.core.commands import AzCliCommand
 from azure.cli.core.mock import DummyCli
 
+path_get_device_connection = "azext_iot.operations.hub.iot_get_device_connection_string"
 path_iot_hub_service_factory = "azext_iot._factory.iot_hub_service_factory"
 path_service_client = "msrest.service_client.ServiceClient.send"
 path_ghcs = "azext_iot.iothub.providers.discovery.IotHubDiscovery.get_target"
@@ -21,7 +22,8 @@ path_discovery_init = (
     "azext_iot.iothub.providers.discovery.IotHubDiscovery._initialize_client"
 )
 path_sas = "azext_iot._factory.SasTokenAuthentication"
-path_mqtt_client = "azext_iot.operations._mqtt.mqtt.Client"
+#path_mqtt_device_client = "azext_iot.operations._mqtt.mqtt_client.device_client"
+path_mqtt_device_client = "azext_iot.operations._mqtt.mqtt_device_client.create_from_connection_string"
 path_iot_hub_monitor_events_entrypoint = (
     "azext_iot.operations.hub._iot_hub_monitor_events"
 )
@@ -68,12 +70,16 @@ def fixture_cmd(mocker):
 
     return AzCliCommand(cli.loader, "iot-extension command", test_handler1)
 
+@pytest.fixture()
+def fixture_device_connection(mocker):
+    get_connection_string = mocker.patch(path_get_device_connection)
+    get_connection_string.return_value = {"connectionString": "test_device_conn_string"}
+    return get_connection_string
 
 @pytest.fixture()
 def fixture_service_client_generic(mocker, fixture_ghcs, fixture_sas):
     service_client = mocker.patch(path_service_client)
     return service_client
-
 
 @pytest.fixture(params=[400, 401, 500])
 def serviceclient_generic_error(mocker, fixture_ghcs, fixture_sas, request):
@@ -115,15 +121,13 @@ def serviceclient_generic_invalid_or_missing_etag(
 
 @pytest.fixture()
 def mqttclient(mocker, fixture_ghcs, fixture_sas):
-    client = mocker.patch(path_mqtt_client)
-    mock_conn = mocker.patch("azext_iot.operations._mqtt.mqtt_client_wrap.is_connected")
-    mock_conn.return_value = True
+    client = mocker.patch(path_mqtt_device_client)
     return client
 
 
 @pytest.fixture()
 def mqttclient_generic_error(mocker, fixture_ghcs, fixture_sas):
-    mqtt_client = mocker.patch(path_mqtt_client)
+    mqtt_client = mocker.patch(path_mqtt_device_client)
     mqtt_client().connect.side_effect = Exception("something happened")
     return mqtt_client
 

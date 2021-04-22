@@ -2157,7 +2157,7 @@ def iot_simulate_device(
     import uuid
     import datetime
     import json
-    from azext_iot.operations._mqtt import mqtt_client_wrap
+    from azext_iot.operations._mqtt import mqtt_client
     from azext_iot.common.utility import execute_onthread
     from azext_iot.constants import (
         MIN_SIM_MSG_INTERVAL,
@@ -2206,14 +2206,13 @@ def iot_simulate_device(
 
     try:
         if protocol_type == ProtocolType.mqtt.name:
-            wrap = mqtt_client_wrap(
-                target=target,
-                device_id=device_id,
-                properties=properties_to_send,
-                sas_duration=(msg_count * msg_interval)
-                + 60,  # int type is enforced for msg_count and msg_interval
-            )
-            wrap.execute(generator(), publish_delay=msg_interval, msg_count=msg_count)
+            device_connection = iot_get_device_connection_string(cmd=cmd, device_id=device_id, hub_name=hub_name, login=login)
+            client_mqtt = mqtt_client(
+                            target=target,
+                            device_connection_string=device_connection["connectionString"],
+                            device_id=device_id
+                        )
+            client_mqtt.execute(data=generator(), properties=properties_to_send, publish_delay=msg_interval, msg_count=msg_count)
         else:
             six.print_("Sending and receiving events via https")
             token, op = execute_onthread(
