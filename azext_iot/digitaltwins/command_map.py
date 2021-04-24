@@ -100,6 +100,7 @@ def load_digitaltwins_commands(self, _):
         cmd_group.show_command("show", "show_twin")
         cmd_group.command("update", "update_twin")
         cmd_group.command("delete", "delete_twin")
+        cmd_group.command("delete-all", "delete_all_twin", confirmation=True)
 
     with self.command_group(
         "dt twin component", command_type=digitaltwins_twin_ops
@@ -115,6 +116,7 @@ def load_digitaltwins_commands(self, _):
         cmd_group.command("list", "list_relationships")
         cmd_group.command("update", "update_relationship")
         cmd_group.command("delete", "delete_relationship")
+        cmd_group.command("delete-all", "delete_all_relationship", confirmation=True)
 
     with self.command_group(
         "dt twin telemetry", command_type=digitaltwins_twin_ops

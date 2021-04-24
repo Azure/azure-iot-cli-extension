@@ -412,19 +412,6 @@ def looks_like_file(element):
     )
 
 
-def ensure_pkg_resources_entries():
-    import pkg_resources
-
-    from azure.cli.core.extension import get_extension_path
-    from azext_iot.constants import EXTENSION_NAME
-
-    extension_path = get_extension_path(EXTENSION_NAME)
-    if extension_path not in pkg_resources.working_set.entries:
-        pkg_resources.working_set.add_entry(extension_path)
-
-    return
-
-
 class ISO8601Validator:
     def is_iso8601_date(self, to_validate) -> bool:
         try:
@@ -451,10 +438,14 @@ class ISO8601Validator:
             return False
 
 
-def ensure_min_version(cur_ver, min_ver):
-    from pkg_resources._vendor.packaging import version
+def ensure_iothub_sdk_min_version(min_ver):
+    from packaging import version
+    try:
+        from azure.mgmt.iothub import __version__ as iot_sdk_version
+    except ImportError:
+        from azure.mgmt.iothub._configuration import VERSION as iot_sdk_version
 
-    return version.parse(cur_ver) >= version.parse(min_ver)
+    return version.parse(iot_sdk_version) >= version.parse(min_ver)
 
 
 def scantree(path):

@@ -41,7 +41,7 @@ if not PACKAGE_NAME:
 # 'jmespath==0.9.3',
 # 'pyyaml==3.13'
 # 'knack>=0.3.1'
-# 'jsonschema==3.0.2'
+# 'jsonschema==3.2.0'
 # 'enum34' (when python_version < 3.4)
 
 # There is also a dependency for uamqp for amqp based commands
@@ -49,7 +49,6 @@ if not PACKAGE_NAME:
 # for compatibility reasons.
 
 DEPENDENCIES = ["paho-mqtt>=1.5.0", "jsonschema==3.0.2", "setuptools"]
-
 
 CLASSIFIERS = [
     "Development Status :: 4 - Beta",

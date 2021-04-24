@@ -540,6 +540,16 @@ def load_digitaltwins_help():
             az dt twin delete -n {instance_or_hostname} --twin-id {twin_id} --etag {etag}
     """
 
+    helps["dt twin delete-all"] = """
+        type: command
+        short-summary: Deletes all digital twins within a Digital Twins instance, including all relationships for those twins.
+
+        examples:
+        - name: Delete all digital twins. Any relationships referencing the twins will also be deleted.
+          text: >
+            az dt twin delete-all -n {instance_or_hostname}
+    """
+
     helps["dt twin relationship"] = """
         type: group
         short-summary: Manage and configure the digital twin relationships of a Digital Twins instance.
@@ -643,6 +653,20 @@ def load_digitaltwins_help():
         - name: Delete a digital twin relationship using the etag.
           text: >
             az dt twin relationship delete -n {instance_or_hostname} --twin-id {twin_id} --relationship-id {relationship_id} --etag {etag}
+    """
+
+    helps["dt twin relationship delete-all"] = """
+        type: command
+        short-summary: Deletes all digital twin relationships within a Digital Twins instance, including incoming relationships.
+
+        examples:
+        - name: Delete all digital twin relationships associated with the twin.
+          text: >
+            az dt twin relationship delete-all -n {instance_or_hostname} --twin-id {twin_id}
+
+        - name: Delete all digital twin relationships within the Digital Twins instace.
+          text: >
+            az dt twin relationship delete-all -n {instance_or_hostname}
     """
 
     helps["dt twin telemetry"] = """
