@@ -436,7 +436,7 @@ class TestTwinUpdateTwin(object):
 
         assert result == generate_twin_result()
 
-    def test_update_twin_invalid_patch(self, fixture_cmd):
+    def test_update_twin_invalid_patch(self, fixture_cmd, service_client):
         # CLIError is raised when --json-patch is not dict or list
         with pytest.raises(CLIError) as e:
             subject.update_twin(
@@ -858,7 +858,7 @@ class TestTwinUpdateRelationship(object):
 
         assert result == json.loads(generic_result)
 
-    def test_update_relationship_invalid_patch(self, fixture_cmd):
+    def test_update_relationship_invalid_patch(self, fixture_cmd, service_client):
         # CLIError is raised when --json-patch is not dict or list
         with pytest.raises(CLIError) as e:
             subject.update_relationship(
@@ -1541,7 +1541,7 @@ class TestTwinUpdateComponent(object):
 
         assert result == json.loads(generic_result)
 
-    def test_update_component_invalid_patch(self, fixture_cmd):
+    def test_update_component_invalid_patch(self, fixture_cmd, service_client):
         # CLIError is raised when --json-patch is not dict or list
         with pytest.raises(CLIError) as e:
             subject.update_component(
