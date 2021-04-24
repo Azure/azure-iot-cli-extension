@@ -182,6 +182,21 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             checks=[self.check("jobId", self.job_ids[2])],
         )
 
+        # Allow time for job to transfer to scheduled state (cannot cancel job in running state)
+        from time import sleep
+        sleep(5)
+
+        self.cmd(
+            "iot hub job show --job-id {} -n {} -g {}".format(
+                self.job_ids[2], LIVE_HUB, LIVE_RG
+            ),
+            checks=[
+                self.check("jobId", self.job_ids[2]),
+                self.check("status", "scheduled"),
+            ],
+        )
+
+        # Cancel job
         self.cmd(
             "iot hub job cancel --job-id {} -n {} -g {}".format(
                 self.job_ids[2], LIVE_HUB, LIVE_RG

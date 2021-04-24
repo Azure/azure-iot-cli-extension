@@ -9,6 +9,7 @@ from time import time, sleep
 import six
 from knack.log import get_logger
 from knack.util import CLIError
+from enum import Enum, EnumMeta
 from azext_iot.constants import (
     EXTENSION_ROOT,
     DEVICE_DEVICESCOPE_PREFIX,
@@ -36,7 +37,7 @@ from azext_iot.common.utility import (
     unpack_msrest_error,
     init_monitoring,
     process_json_arg,
-    ensure_min_version,
+    ensure_iothub_sdk_min_version,
     generate_key
 )
 from azext_iot._factory import SdkResolver, CloudError
@@ -55,7 +56,7 @@ def iot_query(
     top = _process_top(top)
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, rg=resource_group_name, login=login
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -2295,7 +2296,6 @@ def iot_device_export(
     resource_group_name=None,
 ):
     from azext_iot._factory import iot_hub_service_factory
-    from azure.mgmt.iothub import __version__ as iot_sdk_version
 
     client = iot_hub_service_factory(cmd.cli_ctx)
     discovery = IotHubDiscovery(cmd)
@@ -2306,7 +2306,7 @@ def iot_device_export(
     if exists(blob_container_uri):
         blob_container_uri = read_file_content(blob_container_uri)
 
-    if ensure_min_version(iot_sdk_version, "0.12.0"):
+    if ensure_iothub_sdk_min_version("0.12.0"):
         from azure.mgmt.iothub.models import ExportDevicesRequest
         from azext_iot.common.shared import AuthenticationType
 
@@ -2344,7 +2344,6 @@ def iot_device_import(
     resource_group_name=None,
 ):
     from azext_iot._factory import iot_hub_service_factory
-    from azure.mgmt.iothub import __version__ as iot_sdk_version
 
     client = iot_hub_service_factory(cmd.cli_ctx)
     discovery = IotHubDiscovery(cmd)
@@ -2358,7 +2357,7 @@ def iot_device_import(
     if exists(output_blob_container_uri):
         output_blob_container_uri = read_file_content(output_blob_container_uri)
 
-    if ensure_min_version(iot_sdk_version, "0.12.0"):
+    if ensure_iothub_sdk_min_version("0.12.0"):
         from azure.mgmt.iothub.models import ImportDevicesRequest
         from azext_iot.common.shared import AuthenticationType
 
@@ -2719,7 +2718,7 @@ def _get_hub_connection_string(
                 entityPath,
             )
             for p in policies
-            if "serviceconnect" in p.rights.value.lower()
+            if "serviceconnect" in (p.rights.value.lower() if isinstance(p.rights, (Enum, EnumMeta)) else p.rights.lower())
         ]
 
     hostname = hub.properties.host_name
