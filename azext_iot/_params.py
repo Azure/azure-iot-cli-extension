@@ -608,6 +608,17 @@ def load_arguments(self, _):
             options_list=["--properties", "--props", "-p"],
             help=info_param_properties_device(include_http=True),
         )
+        context.argument(
+            "method_response_status_code",
+            options_list=["--method-response-status-code", "--mrsc"],
+            help="Status code to be returned when a direct method is executed on the device. Optional argument, defaults to 200",
+        )
+        context.argument(
+            "method_response_payload",
+            options_list=["--method-response-payload", "--mrp"],
+            help="Payload to be returned when a direct method is executed on the device. Optional argument.",
+        )
+
 
     with self.argument_context("iot device c2d-message") as context:
         context.argument(
