@@ -506,7 +506,7 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
                 instance_name,
             )
         )
-        sleep(10)  # Wait for API to catch up
+        sleep(5)  # Wait for API to catch up
 
         twin_query_result = self.cmd(
             "dt twin query -n {} -g {} -q 'select * from digitaltwins' --cost".format(
@@ -586,6 +586,7 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
             component_name=thermostat_component_id,
         )
 
+        sleep(5)  # Wait for API to catch up
         twin_query_result = self.cmd(
             "dt twin query -n {} -g {} -q 'select * from digitaltwins'".format(
                 instance_name, self.rg
@@ -674,7 +675,7 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
                 instance_name,
             )
         )
-        sleep(10)  # Wait for API to catch up
+        sleep(5)  # Wait for API to catch up
 
         twin_query_result = self.cmd(
             "dt twin query -n {} -g {} -q 'select * from digitaltwins' --cost".format(
