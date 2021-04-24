@@ -2282,11 +2282,6 @@ class TestDeviceSimulate:
                 fixture_cmd, device_id, hub_name=mock_target["entity"]
             )
 
-
-@pytest.mark.skipif(
-    not validate_min_python_version(3, 5, exit_on_fail=False),
-    reason="minimum python version not satisfied",
-)
 class TestMonitorEvents:
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):

@@ -31,10 +31,6 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             test_case, LIVE_HUB, LIVE_RG
         )
 
-    @pytest.mark.skipif(
-        not validate_min_python_version(3, 4, exit_on_fail=False),
-        reason="minimum python version not satisfied",
-    )
     def test_uamqp_device_messaging(self):
         device_count = 1
         device_ids = self.generate_device_names(device_count)
@@ -159,7 +155,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             ),
             checks=self.is_empty(),
         )
-        
+
         # Test waiting for ack from c2d send
         from azext_iot.operations.hub import iot_simulate_device
         from azext_iot._factory import iot_hub_service_factory
@@ -259,10 +255,6 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             expect_failure=True,
         )
 
-    @pytest.mark.skipif(
-        not validate_min_python_version(3, 4, exit_on_fail=False),
-        reason="minimum python version not satisfied",
-    )
     def test_uamqp_device_direct_method_with_custom_response_status_payload(self):
         device_count = 1
         device_ids = self.generate_device_names(device_count)
@@ -476,10 +468,6 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             checks=self.is_empty(),
         )
 
-    @pytest.mark.skipif(
-        not validate_min_python_version(3, 5, exit_on_fail=False),
-        reason="minimum python version not satisfied",
-    )
     def test_hub_monitor_events(self):
         for cg in LIVE_CONSUMER_GROUPS:
             self.cmd(
@@ -707,10 +695,6 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 expect_failure=False,
             )
 
-    @pytest.mark.skipif(
-        not validate_min_python_version(3, 4, exit_on_fail=False),
-        reason="minimum python version not satisfied",
-    )
     def test_hub_monitor_feedback(self):
         device_count = 1
         device_ids = self.generate_device_names(device_count)
