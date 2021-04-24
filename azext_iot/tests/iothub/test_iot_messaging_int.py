@@ -43,7 +43,6 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             "iot hub device-identity create -d {} -n {} -g {}".format(
                 device_ids[0], LIVE_HUB, LIVE_RG
             ),
-            checks=[self.check("deviceId", device_ids[0])],
         )
 
         test_body = str(uuid4())
@@ -160,7 +159,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             ),
             checks=self.is_empty(),
         )
-
+        
         # Test waiting for ack from c2d send
         from azext_iot.operations.hub import iot_simulate_device
         from azext_iot._factory import iot_hub_service_factory
@@ -193,14 +192,21 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         token.set()
         thread.join()
 
-        result = self.cmd(
-            "iot hub invoke-device-method -d {} --method-name Reboot --login {}".format(
+        #invoke device method without response status and payload
+        res = self.cmd(
+            "iot hub invoke-device-method -d {} --method-name Test_Method_1 --login {}".format(
                 device_ids[0], self.connection_string
             )
         ).get_output_in_json()
 
-        assert result != None
-        assert result["status"] == 200
+        assert res != None
+        assert res["status"] == 200
+        assert res["payload"] == {
+            "data": "Method executed successfully",
+            "device_id": device_ids[0],
+            "method_name": "Test_Method_1",
+            "method_request_id": "1"
+        }
 
         token.set()
         thread.join()
@@ -252,6 +258,65 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             ),
             expect_failure=True,
         )
+
+    @pytest.mark.skipif(
+        not validate_min_python_version(3, 4, exit_on_fail=False),
+        reason="minimum python version not satisfied",
+    )
+    def test_uamqp_device_direct_method_with_custom_response_status_payload(self):
+        device_count = 1
+        device_ids = self.generate_device_names(device_count)
+
+        self.cmd(
+            "iot hub device-identity create -d {} -n {} -g {}".format(
+                device_ids[0], LIVE_HUB, LIVE_RG
+            ),
+            checks=[self.check("deviceId", device_ids[0])],
+        )
+
+        from azext_iot.operations.hub import iot_simulate_device
+        from azext_iot._factory import iot_hub_service_factory
+        from azure.cli.core.mock import DummyCli
+
+        cli_ctx = DummyCli()
+        client = iot_hub_service_factory(cli_ctx)
+
+        token, thread = execute_onthread(
+            method=iot_simulate_device,
+            args=[
+                client,
+                device_ids[0],
+                LIVE_HUB,
+                "complete",
+                "Testing direct method invocations when simulator is run with custom method response status and payload",
+                2,
+                5,
+                "mqtt",
+                None,
+                None,
+                None,
+                204,
+                "{'result': 'Direct method executed successfully'}"
+            ],
+            max_runs=4,
+            return_handle=True,
+        )
+
+        #invoke device method with response status and payload
+        result = self.cmd(
+            "iot hub invoke-device-method -d {} --method-name Test_Method_2 --login {}".format(
+                device_ids[0], self.connection_string
+            )
+        ).get_output_in_json()
+
+        assert result != None
+        assert result["status"] == 204
+        assert result["payload"] == {
+            "result": "Direct method executed successfully"
+        }
+
+        token.set()
+        thread.join()
 
     def test_device_messaging(self):
         device_count = 1

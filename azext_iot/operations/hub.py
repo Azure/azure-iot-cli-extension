@@ -2152,6 +2152,8 @@ def iot_simulate_device(
     properties=None,
     resource_group_name=None,
     login=None,
+    method_response_status_code=200,
+    method_response_payload=None
 ):
     import sys
     import uuid
@@ -2186,6 +2188,11 @@ def iot_simulate_device(
     )
     token = None
 
+    if method_response_payload:
+        method_response_payload = process_json_arg(
+                method_response_payload, argument_name="method-response-payload"
+            )
+
     class generator(object):
         def __init__(self):
             self.calls = 0
@@ -2210,7 +2217,9 @@ def iot_simulate_device(
             client_mqtt = mqtt_client(
                             target=target,
                             device_connection_string=device_connection["connectionString"],
-                            device_id=device_id
+                            device_id=device_id,
+                            method_response_status_code=method_response_status_code,
+                            method_response_payload=method_response_payload
                         )
             client_mqtt.execute(data=generator(), properties=properties_to_send, publish_delay=msg_interval, msg_count=msg_count)
         else:

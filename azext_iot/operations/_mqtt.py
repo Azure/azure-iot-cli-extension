@@ -11,38 +11,21 @@ from time import sleep
 from azext_iot.constants import USER_AGENT, BASE_MQTT_API_VERSION
 from azext_iot.common.utility import url_encode_str
 from azure.iot.device import IoTHubDeviceClient as mqtt_device_client, Message, MethodResponse
-from azure.iot.hub import IoTHubRegistryManager, DigitalTwinClient
 
 class mqtt_client(object):
-    def __init__(self, target, device_connection_string, device_id):
+    def __init__(self, target, device_connection_string, device_id, method_response_status_code=200, method_response_payload=None):
         self.device_id = device_id
-        self.registry_manager = IoTHubRegistryManager(target["cs"]) 
         self.device_client = mqtt_device_client.create_from_connection_string(device_connection_string)
-        self.digital_twin_client =  DigitalTwinClient(target["cs"])
         self.device_client.connect()
         self.device_client.on_message_received = self.message_handler
         self.device_client.on_method_request_received = self.method_request_handler
-
-    def send_c2d_message(self, message_text="", properties={}):
-        result = {
-            "status": None,
-            "error": None
-        }
-        try:
-            self.registry_manager.send_c2d_message(self.device_id, message_text, properties)
-            result.status = "C2D Message sent succesfully"
-        except Exception as ex:
-            result.status = "Failed to send C2D Message"
-            result.error = "Unexpected error {0}".format(ex)
-        return result
+        self.method_response_status_code = method_response_status_code
+        self.method_response_payload = method_response_payload
     
     def send_d2c_message(self, message_text="", properties={}):
         message = Message(message_text)
         message.custom_properties = properties
         self.device_client.send_message(message)
-    
-    def invoke_direct_method(self, command_name, payload="", connect_timeout_in_seconds=100, response_timeout_in_seconds=100):
-        self.digital_twin_client.invoke_command(self.device_id, command_name, payload, connect_timeout_in_seconds, response_timeout_in_seconds)
 
     def message_handler(self, message):
         six.print_()
@@ -55,8 +38,14 @@ class mqtt_client(object):
         six.print_()
         six.print_("Received method request with id: '{}' and method name: '{}' for device with id: '{}'".format(method_request.request_id, method_request.name, self.device_id))
         six.print_("_Payload_: {}".format(method_request.payload))
-        payload = {"result": True, "data": "Method succeeded"}  # set response payload
-        status = 200  # set return status code
+
+        # set response payload
+        if self.method_response_payload:
+            payload = self.method_response_payload
+        else:
+            payload = {"device_id": self.device_id, "method_name": method_request.name, "method_request_id": method_request.request_id, "data": "Method executed successfully"}
+        
+        status = self.method_response_status_code  # set return status code
         method_response = MethodResponse.create_from_method_request(method_request, status, payload)
         self.device_client.send_method_response(method_response)
     
