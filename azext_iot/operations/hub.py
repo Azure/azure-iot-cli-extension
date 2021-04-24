@@ -1502,7 +1502,6 @@ def iot_device_method(
     resource_group_name=None,
     login=None,
 ):
-    from azext_iot.sdk.iothub.service.models import CloudToDeviceMethod
     from azext_iot.constants import (
         METHOD_INVOKE_MAX_TIMEOUT_SEC,
         METHOD_INVOKE_MIN_TIMEOUT_SEC,
@@ -1532,14 +1531,15 @@ def iot_device_method(
                 method_payload, argument_name="method-payload"
             )
 
-        method = CloudToDeviceMethod(
-            method_name=method_name,
-            response_timeout_in_seconds=timeout,
-            connect_timeout_in_seconds=timeout,
-            payload=method_payload,
-        )
+        request_body = {
+            "methodName": method_name,
+            "payload": method_payload,
+            "responseTimeoutInSeconds": timeout,
+            "connectTimeoutInSeconds": timeout,
+        }
+
         return service_sdk.devices.invoke_method(
-            device_id=device_id, direct_method_request=method, timeout=timeout
+            device_id=device_id, direct_method_request=request_body, timeout=timeout,
         )
     except CloudError as e:
         raise CLIError(unpack_msrest_error(e))
@@ -1559,7 +1559,6 @@ def iot_device_module_method(
     resource_group_name=None,
     login=None,
 ):
-    from azext_iot.sdk.iothub.service.models import CloudToDeviceMethod
     from azext_iot.constants import (
         METHOD_INVOKE_MAX_TIMEOUT_SEC,
         METHOD_INVOKE_MIN_TIMEOUT_SEC,
@@ -1589,16 +1588,17 @@ def iot_device_module_method(
                 method_payload, argument_name="method-payload"
             )
 
-        method = CloudToDeviceMethod(
-            method_name=method_name,
-            response_timeout_in_seconds=timeout,
-            connect_timeout_in_seconds=timeout,
-            payload=method_payload,
-        )
+        request_body = {
+            "methodName": method_name,
+            "payload": method_payload,
+            "responseTimeoutInSeconds": timeout,
+            "connectTimeoutInSeconds": timeout,
+        }
+
         return service_sdk.modules.invoke_method(
             device_id=device_id,
             module_id=module_id,
-            direct_method_request=method,
+            direct_method_request=request_body,
             timeout=timeout,
         )
     except CloudError as e:

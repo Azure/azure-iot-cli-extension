@@ -89,8 +89,10 @@ class TwinProvider(DigitalTwinsProvider):
         json_patch_collection = []
         if isinstance(json_patch, dict):
             json_patch_collection.append(json_patch)
-        if isinstance(json_patch, list):
+        elif isinstance(json_patch, list):
             json_patch_collection.extend(json_patch)
+        else:
+            raise CLIError(f"--json-patch content must be an object or array. Actual type was: {type(json_patch).__name__}")
 
         logger.info("Patch payload %s", json.dumps(json_patch_collection))
 
@@ -202,8 +204,10 @@ class TwinProvider(DigitalTwinsProvider):
         json_patch_collection = []
         if isinstance(json_patch, dict):
             json_patch_collection.append(json_patch)
-        if isinstance(json_patch, list):
+        elif isinstance(json_patch, list):
             json_patch_collection.extend(json_patch)
+        else:
+            raise CLIError(f"--json-patch content must be an object or array. Actual type was: {type(json_patch).__name__}")
 
         logger.info("Patch payload %s", json.dumps(json_patch_collection))
 
@@ -272,8 +276,10 @@ class TwinProvider(DigitalTwinsProvider):
         json_patch_collection = []
         if isinstance(json_patch, dict):
             json_patch_collection.append(json_patch)
-        if isinstance(json_patch, list):
+        elif isinstance(json_patch, list):
             json_patch_collection.extend(json_patch)
+        else:
+            raise CLIError(f"--json-patch content must be an object or array. Actual type was: {type(json_patch).__name__}")
 
         logger.info("Patch payload %s", json.dumps(json_patch_collection))
 

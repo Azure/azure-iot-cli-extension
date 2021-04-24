@@ -436,6 +436,19 @@ class TestTwinUpdateTwin(object):
 
         assert result == generate_twin_result()
 
+    def test_update_twin_invalid_patch(self, fixture_cmd):
+        # CLIError is raised when --json-patch is not dict or list
+        with pytest.raises(CLIError) as e:
+            subject.update_twin(
+                cmd=fixture_cmd,
+                name_or_hostname=hostname,
+                twin_id=twin_id,
+                json_patch="'{op:add,path:/setPointTemp,value:50.2}'",
+                resource_group_name=None,
+                etag=None
+            )
+        assert str(e.value) == "--json-patch content must be an object or array. Actual type was: str"
+
     @pytest.fixture(params=[(400, 200), (401, 200), (500, 200), (202, 400), (202, 401), (202, 500)])
     def service_client_error(self, mocked_response, start_twin_response, request):
         mocked_response.add(
@@ -844,6 +857,20 @@ class TestTwinUpdateRelationship(object):
         assert get_request.method == "GET"
 
         assert result == json.loads(generic_result)
+
+    def test_update_relationship_invalid_patch(self, fixture_cmd):
+        # CLIError is raised when --json-patch is not dict or list
+        with pytest.raises(CLIError) as e:
+            subject.update_relationship(
+                cmd=fixture_cmd,
+                name_or_hostname=hostname,
+                twin_id=twin_id,
+                relationship_id=relationship_id,
+                json_patch="'{op:add,path:/setPointTemp,value:50.2}'",
+                resource_group_name=None,
+                etag=None
+            )
+        assert str(e.value) == "--json-patch content must be an object or array. Actual type was: str"
 
     @pytest.fixture(params=[(400, 200), (401, 200), (500, 200), (204, 400), (204, 401), (204, 500)])
     def service_client_error(self, mocked_response, start_twin_response, request):
@@ -1513,6 +1540,20 @@ class TestTwinUpdateComponent(object):
         assert get_request.method == "GET"
 
         assert result == json.loads(generic_result)
+
+    def test_update_component_invalid_patch(self, fixture_cmd):
+        # CLIError is raised when --json-patch is not dict or list
+        with pytest.raises(CLIError) as e:
+            subject.update_component(
+                cmd=fixture_cmd,
+                name_or_hostname=hostname,
+                twin_id=twin_id,
+                component_path=component_path,
+                json_patch="'{op:add,path:/setPointTemp,value:50.2}'",
+                resource_group_name=None,
+                etag=None
+            )
+        assert str(e.value) == "--json-patch content must be an object or array. Actual type was: str"
 
     @pytest.fixture(params=[400, 401, 500])
     def service_client_error(self, mocked_response, start_twin_response, request):

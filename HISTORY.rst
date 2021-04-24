@@ -3,6 +3,30 @@
 Release History
 ===============
 
+0.10.11
++++++++++++++++
+
+**IoT Hub updates**
+
+* Fixed an issue where an explicit json null could not be sent for the following commands:
+
+  * az iot hub invoke-device-method
+  * az iot hub invoke-module-method
+
+**Azure Digital Twins updates**
+
+* Fixed an issue in the following update commands where malformed json patch content would not raise an error
+  causing the process to call the respective service endpoint with a request payload containing an empty array.
+
+  * az dt twin update
+  * az dt twin relationship update
+  * az dt twin component update
+
+**IoT Central updates**
+
+Placeholder
+
+
 0.10.10
 +++++++++++++++
 
@@ -17,10 +41,6 @@ Release History
 
   * az dt twin create
   * az dt twin relationship create
-
-**IoT Central updates**
-
-Placeholder
 
 
 0.10.9
