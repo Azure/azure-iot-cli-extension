@@ -7,14 +7,13 @@
 
 import os
 
-VERSION = "0.9.2"
+VERSION = "0.10.11"
 EXTENSION_NAME = "azure-iot"
 EXTENSION_ROOT = os.path.dirname(os.path.abspath(__file__))
 EXTENSION_CONFIG_ROOT_KEY = "iotext"
 EDGE_DEPLOYMENT_SCHEMA_2_PATH = os.path.join(
     EXTENSION_ROOT, "assets", "edge-deploy-2.0.schema.json"
 )
-BASE_API_VERSION = "2018-08-30-preview"
 BASE_MQTT_API_VERSION = "2018-06-30"
 MESSAGING_HTTP_C2D_SYSTEM_PROPERTIES = [
     "iothub-messageid",
@@ -34,17 +33,21 @@ METHOD_INVOKE_MIN_TIMEOUT_SEC = 10
 MIN_SIM_MSG_INTERVAL = 1
 MIN_SIM_MSG_COUNT = 1
 SIM_RECEIVE_SLEEP_SEC = 3
-PNP_API_VERSION = "2019-07-01-preview"
-PNP_ENDPOINT = "https://provider.azureiotrepository.com"
-PNP_REPO_ENDPOINT = "https://repo.azureiotrepository.com"
+CENTRAL_ENDPOINT = "azureiotcentral.com"
 DEVICE_DEVICESCOPE_PREFIX = "ms-azure-iot-edge://"
 TRACING_PROPERTY = "azureiot*com^dtracing^1"
 TRACING_ALLOWED_FOR_LOCATION = ("northeurope", "westus2", "west us 2", "southeastasia")
 TRACING_ALLOWED_FOR_SKU = "standard"
 USER_AGENT = "IoTPlatformCliExtension/{}".format(VERSION)
-
+DIGITALTWINS_RESOURCE_ID = "https://digitaltwins.azure.net"
+DEVICETWIN_POLLING_INTERVAL_SEC = 10
+DEVICETWIN_MONITOR_TIME_SEC = 15
 # (Lib name, minimum version (including), maximum version (excluding))
 EVENT_LIB = ("uamqp", "1.2", "1.3")
+PNP_DTDLV2_COMPONENT_MARKER = "__t"
 
 # Config Key's
 CONFIG_KEY_UAMQP_EXT_VERSION = "uamqp_ext_version"
+
+# Initial Track 2 SDK version
+IOTHUB_TRACK_2_SDK_MIN_VERSION = '1.0.0'

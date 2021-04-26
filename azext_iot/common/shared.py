@@ -25,7 +25,6 @@ class SdkType(Enum):
     dps_sdk = 5
     device_sdk = 6
     service_sdk = 7
-    pnp_sdk = 8
 
 
 class EntityStatusType(Enum):
@@ -131,6 +130,7 @@ class AllocationType(Enum):
     hashed = "hashed"
     geolatency = "geolatency"
     static = "static"
+    custom = "custom"
 
 
 class DistributedTracingSamplingModeType(Enum):
@@ -150,16 +150,6 @@ class PnPModelType(Enum):
     any = "any"
     interface = "Interface"
     capabilityModel = "capabilityModel"
-
-
-class ModelSourceType(Enum):
-    """
-    Type of source to get model definition.
-    """
-
-    public = "public"
-    private = "private"
-    device = "device"
 
 
 class ConfigType(Enum):
@@ -214,3 +204,47 @@ class JobStatusType(Enum):
     cancelled = "cancelled"
     scheduled = "scheduled"
     queued = "queued"
+
+
+class AuthenticationType(Enum):
+    """
+    Route or endpoint authentication mechanism.
+    """
+
+    keyBased = "key"
+    identityBased = "identity"
+
+
+class RenewKeyType(Enum):
+    """
+    Target key type for regeneration.
+    """
+
+    primary = KeyType.primary.value
+    secondary = KeyType.secondary.value
+    swap = "swap"
+
+
+class IoTHubStateType(Enum):
+    """
+    IoT Hub State Property
+    """
+
+    Activating = "Activating"
+    Active = "Active"
+    Deleting = "Deleting"
+    Deleted = "Deleted"
+    ActivationFailed = "ActivationFailed"
+    DeletionFailed = "DeletionFailed"
+    Transitioning = "Transitioning"
+    Suspending = "Suspending"
+    Suspended = "Suspended"
+    Resuming = "Resuming"
+    FailingOver = "FailingOver"
+    FailoverFailed = "FailoverFailed"
+    TenantCommitted = "TenantCommitted"
+    Restoring = "Restoring"
+    IdentityCreated = "IdentityCreated"
+    KeyEncryptionKeyRevoking = "KeyEncryptionKeyRevoking"
+    KeyEncryptionKeyRevoked = "KeyEncryptionKeyRevoked"
+    ReActivating = "ReActivating"

@@ -1,0 +1,15 @@
+steps:
+- script: 'pip install .'
+  displayName: 'Install the whl locally'
+  workingDirectory: '.'
+
+- task: PythonScript@0
+  displayName : 'setupVersion'
+  name: 'setupVersion'
+  inputs:
+    scriptSource: 'inline'
+    script: |
+      from azext_iot.constants import VERSION
+      print("Version is " + VERSION)
+      print("##vso[task.setvariable variable=CLIVersion;isOutput=true]"+VERSION)
+      print("##vso[task.setvariable variable=ReleaseTitle;isOutput=true]"+"azure-iot "+VERSION)

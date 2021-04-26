@@ -8,37 +8,75 @@ pr:
 
 variables:
   iot_ext_package: azure-iot
+  iot_ext_venv: venv
 
 jobs:
 
-- job: 'Build_Publish_Azure_IoT_CLI_Extension'
+- job: 'build_and_publish_azure_iot_cli_ext'
   pool:
     vmImage: 'Ubuntu-16.04'
 
   steps:
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.7.x'
+      versionSpec: '3.6.x'
       architecture: 'x64'
 
   - template: templates/setup-ci-machine.yml
   - template: templates/build-publish-azure-iot-cli-extension.yml
 
-- job: 'Build_Publish_Azure_CLI_Test_SDK'
+- job: 'build_and_publish_azure_cli_test_sdk'
   pool:
     vmImage: 'Ubuntu-16.04'
 
   steps:
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.7.x'
+      versionSpec: '3.6.x'
       architecture: 'x64'
 
   - template: templates/setup-ci-machine.yml
   - template: templates/build-publish-azure-cli-test-sdk.yml
 
-- job: 'Run_Tests_Windows'
-  dependsOn : [ 'Build_Publish_Azure_CLI_Test_SDK', 'Build_Publish_Azure_IoT_CLI_Extension']
+- job: 'run_unit_tests_ubuntu'
+  dependsOn: [ 'build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']
+  pool:
+    vmImage: 'Ubuntu-16.04'
+  strategy:
+    matrix:
+      Python36:
+        python.version: '3.6.x'
+      Python37:
+        python.version: '3.7.x'
+      Python38:
+        python.version: '3.8.x'
+    maxParallel: 3
+
+  steps:
+  - bash: sudo rm -R -f /usr/local/lib/azureExtensionDir
+
+  - template: templates/run-tests.yml
+    parameters:
+      pythonVersion: '$(python.version)'
+      runUnitTests: 'true'
+      runIntTests: 'false'
+
+- job: 'run_unit_tests_macOs'
+  dependsOn: ['build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']
+  pool:
+    vmImage: 'macOS-10.14'
+
+  steps:
+  - template: templates/run-tests.yml
+    parameters:
+      pythonVersion: '3.8.x'
+      runUnitTests: 'true'
+      runIntTests: 'false'
+
+  - template: templates/calculate-code-coverage.yml
+
+- job: 'run_unit_tests_windows'
+  dependsOn : [ 'build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']
   pool:
     vmImage: 'vs2017-win2016'
 
@@ -47,64 +85,22 @@ jobs:
     inputs:
       targetType: 'inline'
       script : 'ren "C:\Program Files\Common Files\AzureCliExtensionDirectory" "C:\Program Files\Common Files\AzureCliExtensionDirectory1"'
-  
-  - template: templates/run-tests.yml
-    parameters:
-      pythonVersion: '3.x'
-
-- job: 'Run_Tests_Windows_Azure_CLI_Released_Version'
-  dependsOn : [Build_Publish_Azure_CLI_Test_SDK, 'Build_Publish_Azure_IoT_CLI_Extension']
-  pool:
-    vmImage: 'vs2017-win2016'
-
-  steps:
-  - template: templates/run-tests.yml
-    parameters:
-      pythonVersion: '3.x'
-      runWithAzureCliReleased: 'false'
-
-- job: 'Run_Tests_Ubuntu'
-  dependsOn: ['Build_Publish_Azure_CLI_Test_SDK','Build_Publish_Azure_IoT_CLI_Extension']
-  pool:
-    vmImage: 'Ubuntu-16.04'
-  strategy:
-    matrix:
-      Python27:
-        python.version: '2.x'
-      Python36:
-        python.version: '3.6.x'
-      Python37:
-        python.version: '3.7.x'
-      Python38:
-        python.version: '3.8.x'
-    maxParallel: 4
-
-  steps:
-  - bash: sudo rm -R -f /usr/local/lib/azureExtensionDir
 
   - template: templates/run-tests.yml
     parameters:
-      pythonVersion: '$(python.version)'
+      pythonVersion: '3.8.x'
+      runUnitTests: 'true'
+      runIntTests: 'false'
 
-- job: 'Run_Tests_Mac'
-  dependsOn: ['Build_Publish_Azure_CLI_Test_SDK','Build_Publish_Azure_IoT_CLI_Extension']
-  pool:
-    vmImage: 'macOS-10.14'
-
-  steps:
-  - template: templates/run-tests.yml
-    parameters:
-      pythonVersion: '3.x'
-
-- job: 'Run_Style_Check'
-  dependsOn: ['Build_Publish_Azure_CLI_Test_SDK','Build_Publish_Azure_IoT_CLI_Extension']
+- job: 'run_style_check'
+  dependsOn: ['build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']
   pool:
     vmImage: 'Ubuntu-16.04'
 
   steps:
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.x'
+      versionSpec: '3.8.x'
       architecture: 'x64'
 
   - template: templates/install-azure-cli-released.yml
@@ -119,21 +115,46 @@ jobs:
     displayName: 'Evaluate with flake8'
     workingDirectory: '.'
 
-- job: 'Run_Core_Linter_and_HelpText_Check'
-  dependsOn: ['Build_Publish_Azure_CLI_Test_SDK','Build_Publish_Azure_IoT_CLI_Extension']
+# TODO: Evaluate this style or similar alternative for setting up CLI env
+- job: 'run_azdev_linter_on_command_table'
+  dependsOn: ['build_and_publish_azure_iot_cli_ext']
+  displayName: 'Evaluate IoT extension command table'
   pool:
     vmImage: 'Ubuntu-16.04'
 
   steps:
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.x'
+      versionSpec: '3.6.x'
       architecture: 'x64'
 
-  - template: templates/install-azure-cli-released.yml
-  - template: templates/install-azdev.yml
-  - template: templates/setup-ci-machine.yml # Likely temporary fix due to pkg_resources.ContextualVersionConflict from six ver 1.13.0 vs pinned 1.12.0
-  - template: templates/download-install-local-azure-iot-cli-extension.yml
+  - template: templates/install-configure-azure-cli.yml
 
-  - script: 'azdev cli-lint --ci --extensions $(iot_ext_package)'
-    displayName: 'Evaluate with CLI core linter'
+- job: CredScan
+  displayName: 'Credential Scan'
+  pool:
+    vmImage: 'vs2017-win2016'
+
+  steps:
+  - task: CredScan@3
+    inputs:
+      outputFormat: 'pre'
+      scanFolder: '$(Build.SourcesDirectory)'
+      suppressionsFile: '$(Build.SourcesDirectory)/CredScanSuppressions.json'
+
+  - task: PostAnalysis@1
+    inputs:
+      AllTools: false
+      APIScan: false
+      BinSkim: false
+      CodesignValidation: false
+      CredScan: true
+      FortifySCA: false
+      FxCop: false
+      ModernCop: false
+      PoliCheck: false
+      RoslynAnalyzers: false
+      SDLNativeRules: false
+      Semmle: false
+      TSLint: false
+      ToolLogsNotFoundAction: 'Standard'

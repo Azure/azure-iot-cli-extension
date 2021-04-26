@@ -3,6 +3,396 @@
 Release History
 ===============
 
+0.10.11
++++++++++++++++
+
+**IoT Hub updates**
+
+* Fixed an issue where an explicit json null could not be sent for the following commands:
+
+  * az iot hub invoke-device-method
+  * az iot hub invoke-module-method
+
+**Azure Digital Twins updates**
+
+* Fixed an issue in the following update commands where malformed json patch content would not raise an error
+  causing the process to call the respective service endpoint with a request payload containing an empty array.
+
+  * az dt twin update
+  * az dt twin relationship update
+  * az dt twin component update
+
+**IoT Central updates**
+
+Placeholder
+
+
+0.10.10
++++++++++++++++
+
+**Azure Digital Twins updates**
+
+* Addition of the optional '--etag' argument for the following commands:
+
+  * az dt twin [update | delete]
+  * az dt twin relationship [update | delete]
+
+* Addition of the optional '--if-not-match' switch for the following commands:
+
+  * az dt twin create
+  * az dt twin relationship create
+
+
+0.10.9
++++++++++++++++
+
+**Azure IoT Product Certification service updates**
+
+* Fix bug for `az iot product test create` sending a byte string instead of "regular" base64 string.
+
+**Azure Digital Twins updates**
+
+* Addition of Digital Twins Identity support focused around Managed Service Identity (MSI) and Identity based endpoint integration.
+* Addition of Digital Twins networking functionality around private-links and private-endpoint connections. See "az dt network".
+
+**IoT Hub updates**
+
+* Improve http debug logging.
+* Fix bug related to issue #296. Adds a clause to device-identity update that allows user to update primary-key / secondary-key 
+  and primary-thumbprint / secondary-thumbprint values (respectively, per auth method) without needing to specify the auth_method in the update command.
+
+
+0.10.8
++++++++++++++++
+
+**IoT Central updates**
+
+* az iot central device|device-template|api-token|diagnostic help strings updated with improved language.
+* update parsing template logic to support  DTDLV2 models.
+* remove deprecated commands  1) iot central app device-twin 2) iot central app monitor-events
+
+
+**IoT Hub updates**
+
+The following commands support an explicit etag parameter. If no etag arg is passed the value "*" is used.
+
+* az iot hub device-identity update
+* az iot hub device-identity delete
+* az iot hub device-identity renew-key
+* az iot hub device-twin update
+* az iot hub device-twin delete
+* az iot hub module-identity update
+* az iot hub module-identity delete
+* az iot hub module-twin update
+* az iot hub module-twin delete
+* az iot hub configuration update
+* az iot hub configuration delete
+* az iot edge deployment update
+* az iot edge deployment update
+
+Re-introduce prior in-preview IoT Hub device digital twin/pnp runtime commands under the "az iot hub digital-twin" root command group.
+
+* az iot hub digital-twin show
+* az iot hub digital-twin update
+* az iot hub digital-twin invoke-command
+
+
+0.10.7
++++++++++++++++
+
+**IoT Hub updates**
+
+* Change command name from az iot hub device-identity `regenerate-key` to `renew-key` to better align with az cli core verbs.
+
+
+0.10.6
++++++++++++++++
+
+**Azure IoT Product Certification service**
+
+* Fix bug for `az iot product test create` not specifying query parameter "GenerateProvisioningConfiguration" appropriately.
+
+
+**IoT Hub updates**
+
+* SDK refresh. IoT Hub service calls point to api-version 2020-09-30.
+
+* Updated nested edge (edge offline) commands to support parentScopes.
+
+  Set of changes
+
+  * 'az iot hub device-identity get-parent' is deprecated use 'az iot hub device-identity parent show' instead. Deprecated command group is planned to be removed by December 2021
+  * 'az iot hub device-identity set-parent' is deprecated use 'az iot hub device-identity parent set' instead. Deprecated command is planned to be removed by December 2021
+  * 'az iot hub device-identity add-children' is deprecated use 'az iot hub device-identity children add' instead. Deprecated command group is planned to be removed by December 2021
+  * 'az iot hub device-identity remove-children' is deprecated use 'az iot hub device-identity children remove' instead. Deprecated command is planned to be removed by December 2021
+  * 'az iot hub device-identity list-children' is deprecated use 'az iot hub device-identity children list' instead. Deprecated command group is planned to be removed by December 2021
+
+
+0.10.5
++++++++++++++++
+
+**Azure Digital Twins updates**
+
+* Breaking change on the `--tags` parameter for `az dt create`. The prior input format of --tags "a=b;c=d" has been
+  changed to  --tags a=b c=d to be more consistent with other Az CLI tag formats.
+
+
+0.10.4
++++++++++++++++
+
+**General updates**
+
+* IoT extension installation constrained to Python 3.6 or greater.
+
+**Azure Digital Twins updates**
+
+* ADT GA updates and release.
+
+**IoT Edge**
+
+* Validation schema updated with $edgeHub 1.1 route option.
+* Introduces `--no-validation` to skip client side schema based validation for edge deployment creation.
+
+
+0.10.3
++++++++++++++++
+
+**General updates**
+
+* Python 3.5 support will soon be dropped corresponding with the official end of life date.
+* Formal python requires constraint added to constrain installs to Py 3.5+.
+
+**IoT Plug-and-Play updates**
+
+* The in preview `az iot pnp` command group has been removed. PnP CLI functionality will be re-imagined at a future point in time.
+
+
+0.10.2
++++++++++++++++
+
+**IoT Hub updates**
+
+* Adds `az iot hub device-identity regenerate-key`.
+
+
+0.10.1
++++++++++++++++
+
+**IoT Plug-and-Play updates**
+
+* Regenerated PnP runtime SDK to API version 2020-09-30
+* All `az iot pnp` commands still remain under preview and are subject to change or deletion.
+
+**IoT Hub updates**
+
+* All configuration/edge deployment list operations no longer have a default top. By default all configuration entities will be returned.
+  Existing --top input should not be affected.
+
+
+0.10.0
++++++++++++++++
+
+**IoT Hub updates**
+
+* Add convenience arguments for device update.
+
+**IoT DPS updates**
+
+* Added --show-keys argument to `dps enrollment show` and `dps enrollment-group show` to include full attestation information for symmetric key enrollments and enrollment groups
+* Regenerated 2019-03-31 DPS Service SDK
+
+**Breaking Changes**
+
+* `az iot dps enrollment show` and `az iot dps enrollment-group show` now return raw service results instead of deserialized models.
+  This means that some properties that were previously returned as `null` for these commands will no longer be returned, possibly causing a breaking change.
+
+
+0.9.9
++++++++++++++++
+
+**IoT DPS updates**
+
+* Introduces 'az iot dps compute-device-key' preview command to generate derived device SAS key
+
+**IoT Central updates**
+
+* Introduces 'az iot central diagnostics' preview command group to perform application and device level diagnostics
+* Introduces 'az iot central device compute-device-key' preview command to generate derived device SAS key
+
+* This release involves a re-grouping of IoT Central commands.
+
+  Set of changes for GA commands
+
+  * 'az iot central app device-twin' is deprecated use 'az iot central device twin' instead. Deprecated command group is planned to be removed by December 2020
+  * 'az iot central app monitor-events' is deprecated use 'az iot central diagnostics monitor-events' instead. Deprecated command is planned to be removed by December 2020
+
+  Set of changes for preview commands
+
+  * 'az iot central app device registration-summary' moved to 'az iot central diagnostics registration-summary'
+  * 'az iot central app monitor-properties' moved to 'az iot central diagnostics monitor-properties'
+  * 'az iot central app validate-messages' moved to 'az iot central diagnostics validate-messages'
+  * 'az iot central app validate-properties' moved to 'az iot central diagnostics validate-properties'
+  * 'az iot central diagnostics monitor-events' added to support deprecation of 'az iot central app monitor-events'
+  * 'az iot central app device run-command' moved to 'az iot central device command run'
+  * 'az iot central app device show-command-history' moved to 'az iot central device command history'
+  * 'az iot central device twin' added to support deprecation of 'az iot central app device-twin' command group
+
+**IoT Hub updates**
+
+Cloud-to-Device message enhancements
+
+* Introduced new `az iot device c2d-message purge` command to purge the message queue for a device.
+* Added message ack arguments to `az iot c2d-message receive` to ack the message after it is received:
+
+  * Options are `--complete`, `--abandon`, and `--reject`, and only one can be used per command.
+  * `az iot device c2d-message receive` with no ack arguments remains unchanged and will not ack the message.
+
+Edge device creation enhancements
+
+* Enabled x509 certificate authentication types (`x509_thumbprint` and `x509_ca`) for edge device creation with `az iot hub device-identity create --ee`
+
+Bug fixes
+
+* Fixes issue #243 where providing a connection string via --login still required "az login".
+
+**Digital Twins updates**
+
+The following command groups support passing in a DT instance hostname directly.
+
+  * az dt route
+  * az dt model
+  * az dt twin
+
+* Like before, if an instance name is provided, the user subscription is first queried for the target instance to retrieve the hostname.
+* If a hostname is provided, the subscription query is skipped and the provided value is used for subsequent interaction.
+
+
+0.9.8
++++++++++++++++
+General changes
+
+* Starting with v0.9.8 of the IoT extension, the minCliCoreVersion has been bumped to 2.3.1. This sets a comfortable minimum desired experience we want for our users.
+
+Introducing preview commands for the Azure IoT Product Certification service
+
+* A new IoT root command group 'az iot product' has been added
+
+  * Use 'az iot product requirement' to manage product certification requirements
+  * Use 'az iot product test' to manage device tests for certification
+
+    * The product test command group encompasses test cases, runs and tasks
+
+IoT Central updates
+
+* Introduces the 'az iot central app user' preview command group for managing application users and service principals
+* Introduces the 'az iot central app api-token' preview command group for managing application api tokens
+* Removal of deprecated command groups and commands
+
+IoT Hub updates
+
+* All "... show-connection-string" based commands are deprecated in favor of "... connection-string show" canonical Az CLI style.
+
+  * The show connection string command for a target IoT Hub has moved to the IoT extension.
+  * 'az iot hub connection-string show' supports a --default-eventhub flag which indicates the operation will construct a connection string for the default eventhub endpoint of the target IoT Hub.
+* Export/Import device identity commands support reading blob container SAS URI's via file
+
+Azure Digital Twins updates
+
+* The 'location' argument for 'az dt create' is now optional. If no location is provided, the location of the target resource group is used.
+
+
+0.9.7
++++++++++++++++
+Refreshes commands for the Azure IoT Plug & Play summer refresh
+
+* The existing Plug & Play preview commands across Azure CLI and the IoT extension have been removed and replaced with a completely new commands. If you still need the legacy preview experience, then you can leverage older versions of the CLI and extension.
+* The new commands exist entirely in the extension with the following command groups:
+
+  * az iot pnp repo ## For tenant repository configuration
+  * az iot pnp model ## For managing repository models and related content
+  * az iot pnp role-assignment ## For managing role assignments for model repo assets
+  * az iot pnp twin ## For interacting with the digital twin of a Plug & Play device
+
+Introduces new preview Azure IoT Central commands
+
+* az iot central app monitor-properties
+* az iot central app validate-properties
+* az iot central app device run-command
+* az iot central app device show-command-history
+* az iot central app device show-credentials
+
+Device Provisioning Service update
+
+* DPS enrollments now support the custom allocation policy resolving issue #200
+
+0.9.6
++++++++++++++++
+* Fixes event monitor initialization issue.
+
+0.9.5
++++++++++++++++
+* IoT Hub commands now support dynamic privileged policy discovery. `iothubhowner` is no longer relied on. Instead any policy that has `RegistryWrite`, `ServiceConnect` and `DeviceConnect` permissions will be used.
+* Monitoring commands (such as for `central` or `hub`) support module Id filter. Also it is more clear that an event comes from a module.
+* Improved validation of central telemetry.
+* Digital Twin endpoint create commands now support custom subscription options.
+
+0.9.4
++++++++++++++++
+Azure Digital Twins Public Preview - CLI release
+
+Introducing 35 new commands in the following command groups:
+
+* az dt
+* az dt endpoint
+* az dt model
+* az dt role-assignment
+* az dt route
+* az dt twin
+* az dt twin relationship
+* az dt twin telemety
+
+0.9.3
++++++++++++++++
+* IoT Hub device identity import/export commands support usage via managed service identity using the --auth-type argument.
+
+* Adds preview command group "az iot central app device"
+
+  * Adds preview command "az iot central app device create"
+  * Adds preview command "az iot central app device show"
+  * Adds preview command "az iot central app device list"
+  * Adds preview command "az iot central app device delete"
+  * Adds preview command "az iot central app device registration-info"
+  * Adds preview command "az iot central app device registration-summary"
+
+* Adds preview command group "az iot central app device-template"
+
+  * Adds preview command "az iot central app device-template create"
+  * Adds preview command "az iot central app device-template show"
+  * Adds preview command "az iot central app device-template list"
+  * Adds preview command "az iot central app device-template delete"
+  * Adds preview command "az iot central app device-template map"
+
+* Changed how results are displayed in "az iot central app validate-messages"
+
+Known issues
+
+* The following preview commands will retrieve at most 25 results
+
+  * az iot central app device list
+  * az iot central app device-template list
+  * az iot central app device-template map
+
+0.9.2
++++++++++++++++
+* Device and module twin update operations provide explicit patch arguments (--desired, --tags).
+* Adds command "az iot central app validate-messages"
+* Remove Py 2.7 support and remnants from setup manifest.
+* Remove Py 3.4 support and remnants from setup manifest.
+
+0.9.1
++++++++++++++++
+* Adds edge configuration argument for creating or updating enrollment[groups]
+
 0.9.0
 +++++++++++++++
 * Breaking change: Evaluating an edge deployment/hub configuration SYSTEM metric (via show-metric) will return non-manipulated query output.
@@ -13,7 +403,6 @@ Release History
 * SDK refresh. IoT Hub service calls (except for 'az iot dt' commands) point to api-version 2019-10-01.
 * Extension package name has been changed to 'azure-iot'.
 * Help text for ADM module configurations has been updated with proper target condition syntax for module criteria.
-
 
 0.8.9
 +++++++++++++++
@@ -200,27 +589,27 @@ Release History
 * Significant restructing of CLI, prioritizes pure Python solutions where possible
 * Provides IoT Edge capabilities
 * Adds following new commands:
-* iot query 
-* iot device show 
-* iot device list 
-* iot device create 
-* iot device update 
-* iot device delete 
-* iot device twin show 
-* iot device twin update 
-* iot device module show 
-* iot device module list 
-* iot device module create 
-* iot device module update 
-* iot device module delete 
-* iot device module twin show 
-* iot device module twin update 
-* iot device module twin replace 
-* iot configuration apply 
-* iot configuration create 
-* iot configuration update 
-* iot configuration delete 
-* iot configuration show 
+* iot query
+* iot device show
+* iot device list
+* iot device create
+* iot device update
+* iot device delete
+* iot device twin show
+* iot device twin update
+* iot device module show
+* iot device module list
+* iot device module create
+* iot device module update
+* iot device module delete
+* iot device module twin show
+* iot device module twin update
+* iot device module twin replace
+* iot configuration apply
+* iot configuration create
+* iot configuration update
+* iot configuration delete
+* iot configuration show
 * iot configuration list
 * Bug fixes
 
@@ -235,6 +624,6 @@ Release History
 * Show and update device twin
 * Invoke device method
 * Device simulation
-* Hub message send (Cloud-to-device) 
+* Hub message send (Cloud-to-device)
 * New device message send (Device-to-cloud) supports http, amqp, mqtt
 * Get SAS token

@@ -1,49 +1,45 @@
 parameters:
-  pythonVersion: ''
-  runUnitTestsOnly: 'true'
-  runWithAzureCliReleased: 'false'
+  pythonVersion: '3.6.x'
+  architecture: 'x64'
+  runUnitTests: 'false'
+  runIntTests: 'true'
+  runWithAzureCliReleased: 'true'
+  path: 'azext_iot/tests'
+  name: 'all'
 
 steps:
-  - task: UsePythonVersion@0
+  - template: setup-dev-test-env.yml
+    parameters:
+      architecture: ${{ parameters.architecture }}
+      pythonVersion: ${{ parameters.pythonVersion }}
+      runWithAzureCliReleased: ${{ parameters.runWithAzureCliReleased }}
+
+  - template: set-testenv-sentinel.yml
+
+  - ${{ if eq(parameters.runIntTests, 'true') }}:
+    - task: AzureCLI@2
+      continueOnError: true
+      displayName: '${{ parameters.name }} integration tests'
+      inputs:
+        azureSubscription: AzIoTCLIService
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          export COVERAGE_FILE=.coverage.${{ parameters.name }}
+          pytest -vv ${{ parameters.path }} -k "_int" --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int-${{ parameters.name }}.xml
+
+  - ${{ if eq(parameters.runUnitTests, 'true') }}:
+    - script: |
+        pytest -vv ${{ parameters.path }} -k "_unit" --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-unit-${{ parameters.name }}.xml
+      displayName: '${{ parameters.name }} unit tests'
+      env:
+        COVERAGE_FILE: .coverage.${{ parameters.name }}
+
+  - task: PublishBuildArtifacts@1
     inputs:
-      versionSpec: ${{ parameters.pythonVersion }}
-      architecture: 'x64'
-
-  - ${{ if eq(parameters.runWithAzureCliReleased, 'false') }}:
-    - template: install-azure-cli-edge.yml
-
-  - ${{ if eq(parameters.runWithAzureCliReleased, 'true') }}:
-    - template: install-azure-cli-released.yml
-
-  - template: download-install-local-azure-test-sdk.yml
-
-  - template: setup-ci-machine.yml
-
-  - template: download-install-local-azure-iot-cli-extension.yml
-
-  - template: set-pythonpath.yml
-
-  - ${{ if eq(parameters.runUnitTestsOnly, 'false') }}:
-    - script: pytest --junitxml "TEST-results.xml"
-      displayName: 'Execute all Tests'
-
-  - ${{ if eq(parameters.runUnitTestsOnly, 'true') }}:
-    - script: pytest -v azext_iot/tests/test_iot_ext_unit.py --junitxml=junit/test-iothub-unit-results.xml
-      displayName: 'Execute IoT Hub unit tests'
-    - script: pytest -v azext_iot/tests/test_iot_dps_unit.py --junitxml=junit/test-dps-unit-results.xml
-      displayName: 'Execute DPS unit tests'
-    - script: pytest -v azext_iot/tests/test_iot_utility_unit.py --junitxml=junit/test-utility-unit-results.xml
-      displayName: 'Execute Utility unit tests'
-    - script: pytest -v azext_iot/tests/test_iot_central_unit.py --junitxml=junit/test-central-unit-results.xml
-      displayName: 'Execute IoT Central unit tests'
-    - script: pytest -v azext_iot/tests/test_iot_pnp_unit.py --junitxml=junit/test-pnp-unit-results.xml
-      displayName: 'Execute IoT PnP unit tests'
-    - script: pytest -v azext_iot/tests/test_iot_digitaltwin_unit.py --junitxml=junit/test-dt-unit-results.xml
-      displayName: 'Execute IoT DigitalTwin unit tests'
-    - script: pytest -v azext_iot/tests/iothub/configurations/test_iot_config_unit.py --junitxml=junit/test-config-unit-results.xml
-      displayName: 'Execute IoT Configuration unit tests'
-    - script: pytest -v azext_iot/tests/iothub/jobs/test_iothub_jobs_unit.py --junitxml=junit/test-jobs-unit-results.xml
-      displayName: 'Execute IoT Hub job unit tests'
+      pathToPublish: .coverage.${{ parameters.name }}
+      publishLocation: 'Container' 
+      artifactName: 'coverage'
 
   - task: PublishTestResults@2
     condition: succeededOrFailed()
@@ -51,5 +47,5 @@ steps:
     inputs:
       testResultsFormat: 'JUnit'
       testResultsFiles: '**/test-*.xml'
-      testRunTitle: 'Publish test results for Python ${{ parameters.pythonVersion }} on OS $(Agent.OS)'
+      testRunTitle: 'Publish ${{ parameters.name }} test results for Python ${{ parameters.pythonVersion }} on OS $(Agent.OS)'
       searchFolder: '$(System.DefaultWorkingDirectory)'

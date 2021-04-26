@@ -50,22 +50,40 @@ def capture_output():
         buffer_tee.close()
 
 
-class IoTLiveScenarioTest(LiveScenarioTest):
-    def __init__(self, test_scenario, entity_name, entity_rg, entity_cs):
+class CaptureOutputLiveScenarioTest(LiveScenarioTest):
+    def __init__(self, test_scenario):
+        super(CaptureOutputLiveScenarioTest, self).__init__(test_scenario)
+
+    # TODO: @digimaun - Maybe put a helper like this in the shared lib, when you create it?
+    def command_execute_assert(self, command, asserts):
+        from . import capture_output
+
+        with capture_output() as buffer:
+            self.cmd(command, checks=None)
+            output = buffer.get_output()
+
+        for a in asserts:
+            assert a in output
+
+        return output
+
+
+class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
+    def __init__(self, test_scenario, entity_name, entity_rg):
         assert test_scenario
         assert entity_name
         assert entity_rg
-        assert entity_cs
 
         self.entity_name = entity_name
         self.entity_rg = entity_rg
-        self.entity_cs = entity_cs
         self.device_ids = []
         self.config_ids = []
 
         os.environ["AZURE_CORE_COLLECT_TELEMETRY"] = "no"
+
         super(IoTLiveScenarioTest, self).__init__(test_scenario)
         self.region = self.get_region()
+        self.connection_string = self.get_hub_cstring()
 
     def generate_device_names(self, count=1, edge=False):
         names = [
@@ -95,27 +113,15 @@ class IoTLiveScenarioTest(LiveScenarioTest):
 
     def generate_job_names(self, count=1):
         return [
-            self.create_random_name(prefix=PREFIX_JOB, length=32)
-            for i in range(count)
+            self.create_random_name(prefix=PREFIX_JOB, length=32) for i in range(count)
         ]
-
-    # TODO: @digimaun - Maybe put a helper like this in the shared lib, when you create it?
-    def command_execute_assert(self, command, asserts):
-        from . import capture_output
-
-        with capture_output() as buffer:
-            self.cmd(command, checks=None)
-            output = buffer.get_output()
-
-        for a in asserts:
-            assert a in output
 
     def tearDown(self):
         if self.device_ids:
             device = self.device_ids.pop()
             self.cmd(
                 "iot hub device-identity delete -d {} --login {}".format(
-                    device, self.entity_cs
+                    device, self.connection_string
                 ),
                 checks=self.is_empty(),
             )
@@ -132,7 +138,7 @@ class IoTLiveScenarioTest(LiveScenarioTest):
             config = self.config_ids.pop()
             self.cmd(
                 "iot hub configuration delete -c {} --login {}".format(
-                    config, self.entity_cs
+                    config, self.connection_string
                 ),
                 checks=self.is_empty(),
             )
@@ -153,6 +159,13 @@ class IoTLiveScenarioTest(LiveScenarioTest):
         for loc in locations_set:
             if loc["role"] == "primary":
                 return loc["location"]
+
+    def get_hub_cstring(self, policy="iothubowner"):
+        return self.cmd(
+            "iot hub show-connection-string -n {} -g {} --policy-name {}".format(
+                self.entity_name, self.entity_rg, policy
+            )
+        ).get_output_in_json()["connectionString"]
 
 
 def disable_telemetry(test_function):

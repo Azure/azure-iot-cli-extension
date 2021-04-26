@@ -1,0 +1,282 @@
+{
+  "id": "urn:d9cltbeus:tvj4oal1a0",
+  "etag": "\"~WgqHZmg+d95gTA53P8AnqBsDLGgj2wa0msOL7xozC9Y=\"",
+  "types": [
+    "DeviceModel"
+  ],
+  "displayName": "property-validation",
+  "capabilityModel": {
+    "@id": "urn:sampleApp:groupOne_bz:2",
+    "@type": "CapabilityModel",
+    "contents": [
+      {
+        "@id": "urn:sampleApp:root_bz:_rpgcmdpo:1",
+        "@type": "Property",
+        "displayName": "addRootProperty",
+        "name": "addRootProperty",
+        "schema": "boolean",
+        "writable": true
+      },
+      {
+        "@id": "urn:sampleApp:componentOne_bz:_rpgcmdpo:1",
+        "@type": "Component",
+        "displayName": "Component",
+        "name": "_rpgcmdpo",
+        "schema": {
+          "@id": "dtmi:sampleApp:_rpgcmdpo;4",
+          "@type": "Interface",
+          "contents": [
+            {
+              "@id": "dtmi:sampleApp:_rpgcmdpo:component1Prop;1",
+              "@type": "Property",
+              "displayName": "component1Prop",
+              "name": "component1Prop",
+              "schema": "boolean",
+              "writable": true
+            },
+            {
+              "@id": "dtmi:sampleApp:_rpgcmdpo:testComponent;1",
+              "@type": "Property",
+              "displayName": "testComponent",
+              "name": "testComponent",
+              "schema": "boolean",
+              "writable": true
+            },
+            {
+              "@id": "dtmi:sampleApp:_rpgcmdpo:component1PropReadonly;1",
+              "@type": "Property",
+              "displayName": "component1PropReadonly",
+              "name": "component1PropReadonly",
+              "schema": "boolean",
+              "writable": false
+            },
+            {
+              "@id": "dtmi:sampleApp:_rpgcmdpo:component1Prop2;1",
+              "@type": "Property",
+              "displayName": "component1Prop2",
+              "name": "component1Prop2",
+              "schema": "boolean",
+              "writable": true
+            }
+          ],
+          "displayName": "Component"
+        }
+      },
+      {
+        "@id": "urn:rigado:RS40_Occupancy_Sensor:RS40OccupancySensorV36fy:3",
+        "@type": "Component",
+        "displayName": "Component",
+        "name": "RS40OccupancySensorV36fy",
+        "schema": {
+          "@id": "dtmi:cliIntegrationtestApp:RS40OccupancySensorV36fy;4",
+          "@type": "Interface",
+          "contents": [
+            {
+              "@id": "dtmi:cliIntegrationtestApp:RS40OccupancySensorV36fy:component2prop;1",
+              "@type": "Property",
+              "displayName": "component2prop",
+              "name": "component2prop",
+              "schema": "boolean",
+              "writable": true
+            },
+            {
+              "@id": "dtmi:cliIntegrationtestApp:RS40OccupancySensorV36fy:testComponent;2",
+              "@type": "Property",
+              "displayName": "testComponent",
+              "name": "testComponent",
+              "schema": "boolean",
+              "writable": true
+            },
+            {
+              "@id": "dtmi:cliIntegrationtestApp:RS40OccupancySensorV36fy:component2PropReadonly;3",
+              "@type": "Property",
+              "displayName": "component2PropReadonly",
+              "name": "component2PropReadonly",
+              "schema": "boolean",
+              "writable": false
+            },
+            {
+              "@id": "dtmi:cliIntegrationtestApp:RS40OccupancySensorV36fy:component2Prop2;4",
+              "@type": "Property",
+              "displayName": "component2Prop2",
+              "name": "component2Prop2",
+              "schema": "boolean",
+              "writable": true
+            },
+            {
+              "@id": "dtmi:cliIntegrationtestApp:RS40OccupancySensorV36fy:component1Telemetry;5",
+              "@type": "Telemetry",
+              "displayName": "component1Telemetry",
+              "name": "component1Telemetry",
+              "schema": "double"
+            }
+          ],
+          "displayName": "Component"
+        }
+      },
+      {
+        "@id": "urn:rigado:RS40_Occupancy_Sensor:addRootPropertyReadOnly:5",
+        "@type": "Property",
+        "displayName": "addRootPropertyReadOnly",
+        "name": "addRootPropertyReadOnly",
+        "schema": "boolean",
+        "writable": false
+      },
+      {
+        "@id": "urn:rigado:RS40_Occupancy_Sensor:addRootProperty2:7",
+        "@type": "Property",
+        "displayName": "addRootProperty2",
+        "name": "addRootProperty2",
+        "schema": "boolean",
+        "writable": true
+      }
+    ],
+    "implements": [
+      {
+        "@id": "urn:sampleApp:groupOne_bz:_rpgcmdpo:1",
+        "@type": [
+          "InterfaceInstance"
+        ],
+        "displayName": "Interface",
+        "name": "groupOne_g4",
+        "schema": {
+          "@id": "urn:sampleApp:groupOne_g4:1",
+          "@type": [
+            "Interface"
+          ],
+          "displayName": "Interface",
+          "contents": [
+            {
+              "@id": "urn:sampleApp:groupOne_g4:Model:1",
+              "@type": [
+                "Property"
+              ],
+              "displayName": "Model",
+              "name": "Model",
+              "schema": "string"
+            },
+            {
+              "@id": "urn:sampleApp:groupOne_g4:Version:1",
+              "@type": [
+                "Property"
+              ],
+              "displayName": "Version",
+              "name": "Version",
+              "schema": "string"
+            },
+            {
+              "@id": "urn:sampleApp:groupOne_g4:TotalStorage:1",
+              "@type": [
+                "Property"
+              ],
+              "displayName": "TotalStorage",
+              "name": "TotalStorage",
+              "schema": "string"
+            }
+          ]
+        }
+      },
+      {
+        "@id": "urn:sampleApp:groupTwo_bz:myxqftpsr:2",
+        "@type": [
+          "InterfaceInstance"
+        ],
+        "displayName": "Interface",
+        "name": "groupTwo_ed",
+        "schema": {
+          "@id": "urn:sampleApp:groupTwo_ed:1",
+          "@type": [
+            "Interface"
+          ],
+          "displayName": "Interface",
+          "contents": [
+            {
+              "@id": "urn:sampleApp:groupTwo_ed:Model:1",
+              "@type": [
+                "Property"
+              ],
+              "displayName": "Model",
+              "name": "Model",
+              "schema": "string"
+            },
+            {
+              "@id": "urn:sampleApp:groupThree_ed:Manufacturer:1",
+              "@type": [
+                "Property"
+              ],
+              "displayName": "Manufacturer",
+              "name": "Manufacturer",
+              "schema": "string"
+            }
+          ]
+        }
+      },
+      {
+        "@id": "urn:sampleApp:groupThree_bz:myxqftpsr:2",
+        "@type": [
+          "InterfaceInstance"
+        ],
+        "displayName": "Interface",
+        "name": "groupThree_ed",
+        "schema": {
+          "@id": "urn:sampleApp:groupThree_ed:1",
+          "@type": [
+            "Interface"
+          ],
+          "displayName": "Interface",
+          "contents": [
+            {
+              "@id": "urn:sampleApp:groupThree_ed:Manufacturer:1",
+              "@type": [
+                "Property"
+              ],
+              "displayName": "Manufacturer",
+              "name": "Manufacturer",
+              "schema": "string"
+            },
+            {
+              "@id": "urn:sampleApp:groupThree_g4:Version:1",
+              "@type": [
+                "Property"
+              ],
+              "displayName": "Version",
+              "name": "Version",
+              "schema": "string"
+            },
+            {
+              "@id": "urn:sampleApp:groupThree_ed:Model:1",
+              "@type": [
+                "Property"
+              ],
+              "displayName": "Model",
+              "name": "Model",
+              "schema": "string"
+            },
+            {
+              "@id": "urn:sampleApp:groupThree_ed:OsName:1",
+              "@type": [
+                "Property"
+              ],
+              "displayName": "OsName",
+              "name": "OsName",
+              "schema": "string"
+            }
+          ]
+        }
+      }
+    ],
+    "displayName": "property_validation",
+    "@context": [
+      "http://azureiot.com/v1/contexts/IoTModel.json"
+    ]
+  },
+  "solutionModel": {
+    "@id": "urn:d9cltbeus:lz1tl4a_jz",
+    "@type": [
+      "SolutionModel"
+    ],
+    "cloudProperties": [],
+    "initialValues": [],
+    "overrides": []
+  }
+}

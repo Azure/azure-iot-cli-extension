@@ -11,7 +11,7 @@ ignore=CVS
 
 # Add files or directories matching the regex patterns to the blacklist. The
 # regex matches against base names, not paths.
-ignore-patterns=
+ignore-patterns=sdk
 
 # Python code to execute, usually for sys.path manipulation such as
 # pygtk.require().
@@ -278,7 +278,10 @@ disable=import-outside-toplevel,
         xreadlines-attribute,
         deprecated-sys-function,
         exception-escape,
-        comprehension-escape
+        comprehension-escape,
+        not-callable,
+        raise-missing-from,
+        super-with-arguments
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option
@@ -337,7 +340,6 @@ enable=syntax-error,
        bad-super-call,
        missing-super-argument,
        no-member,
-       not-callable,
        assignment-from-no-return,
        no-value-for-parameter,
        too-many-function-args,

@@ -14,9 +14,12 @@ from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azure.cli.core.commands import AzCliCommand
 from azure.cli.core.mock import DummyCli
 
-path_iot_hub_service_factory = "azext_iot.common._azure.iot_hub_service_factory"
+path_iot_hub_service_factory = "azext_iot._factory.iot_hub_service_factory"
 path_service_client = "msrest.service_client.ServiceClient.send"
-path_ghcs = "azext_iot.operations.hub.get_iot_hub_connection_string"
+path_ghcs = "azext_iot.iothub.providers.discovery.IotHubDiscovery.get_target"
+path_discovery_init = (
+    "azext_iot.iothub.providers.discovery.IotHubDiscovery._initialize_client"
+)
 path_sas = "azext_iot._factory.SasTokenAuthentication"
 path_mqtt_client = "azext_iot.operations._mqtt.mqtt.Client"
 path_iot_hub_monitor_events_entrypoint = (
@@ -48,18 +51,6 @@ def generate_cs(
     return result.lower() if lower_case else result
 
 
-@pytest.fixture()
-def fixture_cmd2(mocker):
-    cli = DummyCli()
-    cli.loader = mocker.MagicMock()
-    cli.loader.cli_ctx = cli
-
-    def test_handler1():
-        pass
-
-    return AzCliCommand(cli.loader, 'iot-extension command', test_handler1)
-
-
 # Sets current working directory to the directory of the executing file
 @pytest.fixture()
 def set_cwd(request):
@@ -68,16 +59,14 @@ def set_cwd(request):
 
 @pytest.fixture()
 def fixture_cmd(mocker):
-    # Placeholder for later use
-    mocker.patch(path_iot_hub_service_factory)
-    cmd = mocker.MagicMock(name="cli cmd context")
-    return cmd
+    cli = DummyCli()
+    cli.loader = mocker.MagicMock()
+    cli.loader.cli_ctx = cli
 
+    def test_handler1():
+        pass
 
-@pytest.fixture()
-def fixture_events_uamqp_sendclient(mocker):
-    from azext_iot.operations.events3._events import uamqp
-    return mocker.patch.object(uamqp, "SendClient", autospec=True)
+    return AzCliCommand(cli.loader, "iot-extension command", test_handler1)
 
 
 @pytest.fixture()
@@ -99,6 +88,9 @@ def serviceclient_generic_error(mocker, fixture_ghcs, fixture_sas, request):
 def fixture_ghcs(mocker):
     ghcs = mocker.patch(path_ghcs)
     ghcs.return_value = mock_target
+    mocker.patch(path_iot_hub_service_factory)
+    mocker.patch(path_discovery_init)
+
     return ghcs
 
 
@@ -142,13 +134,17 @@ def fixture_monitor_events_entrypoint(mocker):
 
 
 # TODO: To be deprecated asap. Leverage mocked_response fixture for this functionality.
-def build_mock_response(mocker=None, status_code=200, payload=None, headers=None, **kwargs):
+def build_mock_response(
+    mocker=None, status_code=200, payload=None, headers=None, **kwargs
+):
     try:
         from unittest.mock import MagicMock
     except:
         from mock import MagicMock
 
-    response = mocker.MagicMock(name="response") if mocker else MagicMock(name="response")
+    response = (
+        mocker.MagicMock(name="response") if mocker else MagicMock(name="response")
+    )
     response.status_code = status_code
     del response.context
     del response._attribute_map
@@ -161,8 +157,8 @@ def build_mock_response(mocker=None, status_code=200, payload=None, headers=None
         response.text = _payload_str
         response.internal_response.json.return_value = json.loads(_payload_str)
     else:
-        response.text.return_value = ''
-        response.text = ''
+        response.text.return_value = ""
+        response.text = ""
 
     headers_get_side_effect = kwargs.get("headers_get_side_effect")
     if headers_get_side_effect:
@@ -183,6 +179,28 @@ def get_context_path(base_path, *paths):
     return base_path
 
 
+''' TODO: Possibly expand for future use
+fake_oauth_response = responses.Response(
+    method=responses.POST,
+    url=re.compile("https://login.microsoftonline.com/(.+)/oauth2/token"),
+    body=json.dumps({
+        "token_type": "Bearer",
+        "scope": "user_impersonation",
+        "expires_in": "90000",
+        "ext_expires_in": "90000",
+        "expires_on": "979778250",
+        "not_before": "979739250",
+        "resource": "localhost",
+        "access_token": "totally_fake_access_token",
+        "refresh_token": "totally_fake_refresh_token",
+        "foci": "1"
+    }),
+    status=200,
+    content_type="application/json",
+)
+'''
+
+
 @pytest.fixture
 def mocked_response():
     with responses.RequestsMock() as rsps:
@@ -192,13 +210,40 @@ def mocked_response():
 @pytest.fixture(params=[400, 401, 500])
 def service_client_generic_errors(mocked_response, fixture_ghcs, request):
     def error_callback(_):
-        return (request.param, {'Content-Type': "application/json; charset=utf-8"}, json.dumps({"error": "something failed"}))
+        return (
+            request.param,
+            {"Content-Type": "application/json; charset=utf-8"},
+            json.dumps({"error": "something failed"}),
+        )
 
     any_endpoint = r"^https:\/\/.+"
     with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
-        rsps.add_callback(callback=error_callback, method=responses.GET, url=re.compile(any_endpoint))
-        rsps.add_callback(callback=error_callback, method=responses.PUT, url=re.compile(any_endpoint))
-        rsps.add_callback(callback=error_callback, method=responses.POST, url=re.compile(any_endpoint))
-        rsps.add_callback(callback=error_callback, method=responses.DELETE, url=re.compile(any_endpoint))
-        rsps.add_callback(callback=error_callback, method=responses.PATCH, url=re.compile(any_endpoint))
+        rsps.add_callback(
+            callback=error_callback, method=responses.GET, url=re.compile(any_endpoint)
+        )
+        rsps.add_callback(
+            callback=error_callback, method=responses.PUT, url=re.compile(any_endpoint)
+        )
+        rsps.add_callback(
+            callback=error_callback, method=responses.POST, url=re.compile(any_endpoint)
+        )
+        rsps.add_callback(
+            callback=error_callback,
+            method=responses.DELETE,
+            url=re.compile(any_endpoint),
+        )
+        rsps.add_callback(
+            callback=error_callback,
+            method=responses.PATCH,
+            url=re.compile(any_endpoint),
+        )
         yield rsps
+
+
+@pytest.fixture()
+def fixture_mock_aics_token(mocker):
+    patch = mocker.patch(
+        "azext_iot.product.providers.auth.AICSAuthentication.generate_token"
+    )
+    patch.return_value = "Bearer token"
+    return patch

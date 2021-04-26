@@ -1,0 +1,50 @@
+steps:
+  - task: PythonScript@0
+    displayName : 'Set test envs with sentinel values'
+    name: 'setTestEnvSentinel'
+    inputs:
+      scriptSource: 'inline'
+      script: |
+        # This task is in place to get around DevOps pipelines env var naming rules which would require
+        # application code changes.
+        import os
+        sentinel_value = "sentinel"
+        envvars = {
+            "AZURE_TEST_RUN_LIVE":True,
+            "azext_iot_testrg": os.environ.get("AZEXT_IOT_TESTRG", sentinel_value),
+            "azext_iot_testhub": os.environ.get("AZEXT_IOT_TESTHUB", sentinel_value),
+            "azext_iot_testdps": os.environ.get("AZEXT_IOT_TESTDPS", sentinel_value),
+            "azext_iot_teststorageuri": os.environ.get("AZEXT_IOT_TESTSTORAGEURI", sentinel_value),
+            "azext_iot_central_app_id": os.environ.get("AZEXT_IOT_CENTRAL_APP_ID", sentinel_value),
+            "azext_dt_ep_eventgrid_topic": os.environ.get("AZEXT_DT_EP_EVENTGRID_TOPIC", sentinel_value),
+            "azext_dt_ep_servicebus_namespace": os.environ.get("AZEXT_DT_EP_SERVICEBUS_NAMESPACE", sentinel_value),
+            "azext_dt_ep_servicebus_policy": os.environ.get("AZEXT_DT_EP_SERVICEBUS_POLICY", sentinel_value),
+            "azext_dt_ep_servicebus_topic": os.environ.get("AZEXT_DT_EP_SERVICEBUS_TOPIC", sentinel_value),
+            "azext_dt_ep_eventhub_namespace": os.environ.get("AZEXT_DT_EP_EVENTHUB_NAMESPACE", sentinel_value),
+            "azext_dt_ep_eventhub_policy": os.environ.get("AZEXT_DT_EP_EVENTHUB_POLICY", sentinel_value),
+            "azext_dt_ep_eventhub_topic": os.environ.get("AZEXT_DT_EP_EVENTHUB_TOPIC", sentinel_value),
+            "azext_dt_ep_rg": os.environ.get("AZEXT_DT_EP_RG", sentinel_value),
+        }
+        f = open("./pytest.ini", "w+")
+        f.write("[pytest]\n")
+        f.write("junit_family = xunit1\n")
+        f.write("env = \n")
+        envvars_sentinel = ["  {}={}\n".format(key, val) for key, val in envvars.items()]
+        f.writelines(envvars_sentinel)
+        print(envvars_sentinel)
+        f.close()
+
+    env:
+      AZEXT_IOT_TESTRG: $(azext_iot_testrg)
+      AZEXT_IOT_TESTHUB: $(azext_iot_testhub)
+      AZEXT_IOT_TESTDPS: $(azext_iot_testdps)
+      AZEXT_IOT_TESTSTORAGEURI: $(azext_iot_teststorageuri)
+      AZEXT_IOT_CENTRAL_APP_ID: $(azext_iot_central_app_id)
+      AZEXT_DT_EP_EVENTGRID_TOPIC: $(azext_dt_ep_eventgrid_topic)
+      AZEXT_DT_EP_SERVICEBUS_NAMESPACE: $(azext_dt_ep_servicebus_namespace)
+      AZEXT_DT_EP_SERVICEBUS_POLICY: $(azext_dt_ep_servicebus_policy)
+      AZEXT_DT_EP_SERVICEBUS_TOPIC: $(azext_dt_ep_servicebus_topic)
+      AZEXT_DT_EP_EVENTHUB_NAMESPACE: $(azext_dt_ep_eventhub_namespace)
+      AZEXT_DT_EP_EVENTHUB_POLICY: $(azext_dt_ep_eventhub_policy)
+      AZEXT_DT_EP_EVENTHUB_TOPIC: $(azext_dt_ep_eventhub_topic)
+      AZEXT_DT_EP_RG: $(azext_dt_ep_rg)

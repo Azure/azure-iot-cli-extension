@@ -23,7 +23,7 @@ class ConfigurationOperations(object):
     :param config: Configuration of service client.
     :param serializer: An object model serializer.
     :param deserializer: An object model deserializer.
-    :ivar api_version: Version of the Api. Constant value: "2019-10-01".
+    :ivar api_version: Version of the Api. Constant value: "2020-09-30".
     """
 
     models = models
@@ -33,16 +33,16 @@ class ConfigurationOperations(object):
         self._client = client
         self._serialize = serializer
         self._deserialize = deserializer
-        self.api_version = "2019-10-01"
+        self.api_version = "2020-09-30"
 
         self.config = config
 
     def get(
             self, id, custom_headers=None, raw=False, **operation_config):
-        """Retrieve a configuration for Iot Hub devices and modules by it
-        identifier.
+        """Gets a configuration on the IoT Hub for automatic device/module
+        management.
 
-        :param id:
+        :param id: The unique identifier of the configuration.
         :type id: str
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
@@ -98,16 +98,17 @@ class ConfigurationOperations(object):
 
     def create_or_update(
             self, id, configuration, if_match=None, custom_headers=None, raw=False, **operation_config):
-        """Create or update the configuration for devices or modules of an IoT
-        hub. An ETag must not be specified for the create operation. An ETag
-        must be specified for the update operation. Note that configuration Id
-        and Content cannot be updated by the user.
+        """Creates or updates a configuration on the IoT Hub for automatic
+        device/module management. Configuration identifier and Content cannot
+        be updated.
 
-        :param id:
+        :param id: The unique identifier of the configuration.
         :type id: str
-        :param configuration:
+        :param configuration: The configuration to be created or updated.
         :type configuration: ~service.models.Configuration
-        :param if_match:
+        :param if_match: The string representing a weak ETag for the
+         configuration, as per RFC7232. This should not be set when creating a
+         configuration, but may be set when updating a configuration.
         :type if_match: str
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
@@ -171,19 +172,17 @@ class ConfigurationOperations(object):
 
     def delete(
             self, id, if_match=None, custom_headers=None, raw=False, **operation_config):
-        """Delete the configuration for devices or modules of an IoT hub. This
-        request requires the If-Match header. The client may specify the ETag
-        for the device identity on the request in order to compare to the ETag
-        maintained by the service for the purpose of optimistic concurrency.
-        The delete operation is performed only if the ETag sent by the client
-        matches the value maintained by the server, indicating that the device
-        identity has not been modified since it was retrieved by the client. To
-        force an unconditional delete, set If-Match to the wildcard character
-        (*).
+        """Deletes a configuration on the IoT Hub for automatic device/module
+        management.
 
-        :param id:
+        :param id: The unique identifier of the configuration.
         :type id: str
-        :param if_match:
+        :param if_match: The string representing a weak ETag for the
+         configuration, as per RFC7232. The delete operation is performed only
+         if this ETag matches the value maintained by the server, indicating
+         that the configuration has not been modified since it was last
+         retrieved. To force an unconditional delete, set If-Match to the
+         wildcard character (*).
         :type if_match: str
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
@@ -232,11 +231,12 @@ class ConfigurationOperations(object):
 
     def get_configurations(
             self, top=None, custom_headers=None, raw=False, **operation_config):
-        """Get multiple configurations for devices or modules of an IoT Hub.
-        Returns the specified number of configurations for Iot Hub. Pagination
-        is not supported.
+        """Gets configurations on the IoT Hub for automatic device/module
+        management. Pagination is not supported.
 
-        :param top:
+        :param top: The number of configurations to retrieve. Value will be
+         overridden if greater than the maximum deployment count for the IoT
+         Hub.
         :type top: int
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
@@ -290,15 +290,14 @@ class ConfigurationOperations(object):
 
     def test_queries(
             self, target_condition=None, custom_metric_queries=None, custom_headers=None, raw=False, **operation_config):
-        """Validates the target condition query and custom metric queries for a
-        configuration.
+        """Validates target condition and custom metric queries for a
+        configuration on the IoT Hub.
 
-        Validates the target condition query and custom metric queries for a
-        configuration.
-
-        :param target_condition:
+        :param target_condition: The query used to define targeted devices or
+         modules. The query is based on twin tags and/or reported properties.
         :type target_condition: str
-        :param custom_metric_queries:
+        :param custom_metric_queries: The key-value pairs with queries and
+         their identifier.
         :type custom_metric_queries: dict[str, str]
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
@@ -357,23 +356,19 @@ class ConfigurationOperations(object):
 
     def apply_on_edge_device(
             self, id, content, custom_headers=None, raw=False, **operation_config):
-        """Applies the provided configuration content to the specified edge
-        device.
+        """Applies the configuration content to an edge device.
 
-        Applies the provided configuration content to the specified edge
-        device. Configuration content must have modules content.
-
-        :param id: Device ID.
+        :param id: The unique identifier of the edge device.
         :type id: str
-        :param content: Configuration Content.
+        :param content: The configuration content.
         :type content: ~service.models.ConfigurationContent
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
          deserialized response
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
-        :return: object or ClientRawResponse if raw=true
-        :rtype: object or ~msrest.pipeline.ClientRawResponse
+        :return: None or ClientRawResponse if raw=true
+        :rtype: None or ~msrest.pipeline.ClientRawResponse
         :raises: :class:`CloudError<msrestazure.azure_exceptions.CloudError>`
         """
         # Construct URL
@@ -389,7 +384,6 @@ class ConfigurationOperations(object):
 
         # Construct headers
         header_parameters = {}
-        header_parameters['Accept'] = 'application/json'
         header_parameters['Content-Type'] = 'application/json; charset=utf-8'
         if self.config.generate_client_request_id:
             header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())

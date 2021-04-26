@@ -2,11 +2,14 @@ pytest
 pytest-mock
 pytest-cov
 pytest-env
-pylint
+uamqp~=1.2
 mock;python_version<'3.3'
 responses
-flake8
+urllib3[secure]>=1.21.1,<=1.25
 black;python_version>='3.6'
 wheel==0.30.0
 pre-commit
-six==1.12
+six>=1.12
+pylint
+flake8
+azure-iot-device

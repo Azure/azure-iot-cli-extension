@@ -7,20 +7,20 @@
 import random
 import json
 
-from ... import IoTLiveScenarioTest
-from ...conftest import get_context_path
-from ...settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC
+from azext_iot.tests import IoTLiveScenarioTest
+from azext_iot.tests.conftest import get_context_path
+from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC
 from azext_iot.common.utility import read_file_content
 
 settings = DynamoSettings(ENV_SET_TEST_IOTHUB_BASIC)
 LIVE_HUB = settings.env.azext_iot_testhub
 LIVE_RG = settings.env.azext_iot_testrg
-LIVE_HUB_CS = settings.env.azext_iot_testhub_cs
 
 edge_content_path = get_context_path(__file__, "test_edge_deployment.json")
 edge_content_layered_path = get_context_path(
     __file__, "test_edge_deployment_layered.json"
 )
+edge_content_v11_path = get_context_path(__file__, "test_edge_deployment_v11.json")
 edge_content_v1_path = get_context_path(__file__, "test_edge_deployment_v1.json")
 edge_content_malformed_path = get_context_path(
     __file__, "test_edge_deployment_malformed.json"
@@ -33,7 +33,7 @@ adm_content_device_path = get_context_path(__file__, "test_adm_device_content.js
 class TestIoTEdgeSetModules(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTEdgeSetModules, self).__init__(
-            test_case, LIVE_HUB, LIVE_RG, LIVE_HUB_CS
+            test_case, LIVE_HUB, LIVE_RG
         )
 
     def test_edge_set_modules(self):
@@ -67,7 +67,7 @@ class TestIoTEdgeSetModules(IoTLiveScenarioTest):
         # Using connection string - content from file
         self.cmd(
             "iot edge set-modules -d {} --login {} -k '{}'".format(
-                edge_device_ids[0], LIVE_HUB_CS, edge_content_v1_path
+                edge_device_ids[0], self.connection_string, edge_content_v1_path
             ),
             checks=[self.check("length([*])", 4)],
         )
@@ -84,11 +84,11 @@ class TestIoTEdgeSetModules(IoTLiveScenarioTest):
 class TestIoTEdgeDeployments(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTEdgeDeployments, self).__init__(
-            test_case, LIVE_HUB, LIVE_RG, LIVE_HUB_CS
+            test_case, LIVE_HUB, LIVE_RG
         )
 
     def test_edge_deployments(self):
-        config_count = 4
+        config_count = 5
         config_ids = self.generate_config_names(config_count)
 
         self.kwargs["generic_metrics"] = read_file_content(generic_metrics_path)
@@ -138,7 +138,7 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
         self.cmd(
             "iot edge deployment create -d {} --login {} --pri {} --tc \"{}\" --lab '{}' -k '{}' --metrics '{}'".format(
                 config_ids[1].upper(),
-                LIVE_HUB_CS,
+                self.connection_string,
                 priority,
                 condition,
                 "{labels}",
@@ -168,7 +168,7 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
         self.cmd(
             "iot edge deployment create -d {} --login {} -k '{}' --metrics '{}' --layered".format(
                 config_ids[2].upper(),
-                LIVE_HUB_CS,
+                self.connection_string,
                 edge_content_layered_path,
                 generic_metrics_path,
             ),
@@ -251,6 +251,31 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
             expect_failure=True,
         )
 
+        # Uses IoT Edge hub schema version 1.1
+        self.cmd(
+            """iot edge deployment create --deployment-id {} --hub-name {} --resource-group {} --priority {}
+            --target-condition \"{}\" --labels '{}' --content '{}'""".format(
+                config_ids[4],
+                LIVE_HUB,
+                LIVE_RG,
+                priority,
+                condition,
+                "{labels}",
+                edge_content_v11_path,
+            ),
+            checks=[
+                self.check("id", config_ids[4]),
+                self.check("priority", priority),
+                self.check("targetCondition", condition),
+                self.check("labels", json.loads(self.kwargs["labels"])),
+                self.check(
+                    "content.modulesContent",
+                    json.loads(read_file_content(edge_content_v11_path))["modulesContent"],
+                ),
+                self.check("metrics.queries", {}),
+            ],
+        )
+
         # Show deployment
         self.cmd(
             "iot edge deployment show --deployment-id {} --hub-name {} --resource-group {}".format(
@@ -267,7 +292,7 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
         # Show deployment - using connection string
         self.cmd(
             "iot edge deployment show -d {} --login {}".format(
-                config_ids[1], LIVE_HUB_CS
+                config_ids[1], self.connection_string
             ),
             checks=[
                 self.check("id", config_ids[1]),
@@ -324,7 +349,7 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
         system_metric_name = "appliedCount"
         config_output = self.cmd(
             "iot edge deployment show --login {} --deployment-id {}".format(
-                LIVE_HUB_CS, config_ids[1]
+                self.connection_string, config_ids[1]
             )
         ).get_output_in_json()
 
@@ -344,7 +369,7 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
         # System metric - using connection string
         self.cmd(
             "iot edge deployment show-metric --metric-id {} --login '{}' --deployment-id {} --metric-type {}".format(
-                system_metric_name, LIVE_HUB_CS, config_ids[1], "system"
+                system_metric_name, self.connection_string, config_ids[1], "system"
             ),
             checks=[
                 self.check("metric", system_metric_name),
@@ -358,13 +383,13 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
         # Error - metric does not exist, using connection string
         self.cmd(
             "iot edge deployment show-metric -m {} --login {} -d {}".format(
-                "doesnotexist", LIVE_HUB_CS, config_ids[0]
+                "doesnotexist", self.connection_string, config_ids[0]
             ),
             expect_failure=True,
         )
 
         config_list_check = [
-            self.check("length([*])", 4),
+            self.check("length([*])", config_count),
             self.exists("[?id=='{}']".format(config_ids[0])),
             self.exists("[?id=='{}']".format(config_ids[1])),
             self.exists("[?id=='{}']".format(config_ids[2])),
@@ -379,20 +404,8 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
 
         # List all edge deployments - using connection string
         self.cmd(
-            "iot edge deployment list --login {}".format(LIVE_HUB_CS),
+            "iot edge deployment list --login {}".format(self.connection_string),
             checks=config_list_check,
-        )
-
-        # Error top of -1 does not work with configurations
-        self.cmd(
-            "iot edge deployment list -n {} -g {} --top -1".format(LIVE_HUB, LIVE_RG),
-            expect_failure=True,
-        )
-
-        # Error max top of 100 with configurations
-        self.cmd(
-            "iot edge deployment list -n {} -g {} --top 101".format(LIVE_HUB, LIVE_RG),
-            expect_failure=True,
         )
 
         # Explicitly delete an edge deployment
@@ -406,7 +419,7 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
         # Explicitly delete an edge deployment - using connection string
         self.cmd(
             "iot edge deployment delete -d {} --login {}".format(
-                config_ids[1], LIVE_HUB_CS
+                config_ids[1], self.connection_string
             )
         )
         del self.config_ids[0]
@@ -415,7 +428,7 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
 class TestIoTHubConfigurations(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTHubConfigurations, self).__init__(
-            test_case, LIVE_HUB, LIVE_RG, LIVE_HUB_CS
+            test_case, LIVE_HUB, LIVE_RG
         )
 
     def test_device_configurations(self):
@@ -466,7 +479,7 @@ class TestIoTHubConfigurations(IoTLiveScenarioTest):
         self.cmd(
             "iot hub configuration create -c {} --login {} --pri {} --tc \"{}\" --lab '{}' -k '{}' --metrics '{}'".format(
                 config_ids[1].upper(),
-                LIVE_HUB_CS,
+                self.connection_string,
                 priority,
                 module_condition,
                 "{labels}",
@@ -496,7 +509,7 @@ class TestIoTHubConfigurations(IoTLiveScenarioTest):
         self.cmd(
             "iot hub configuration create -c {} --login {} -k '{}' --metrics '{}'".format(
                 config_ids[2].upper(),
-                LIVE_HUB_CS,
+                self.connection_string,
                 adm_content_device_path,
                 generic_metrics_path,
             ),
@@ -539,7 +552,7 @@ class TestIoTHubConfigurations(IoTLiveScenarioTest):
         self.cmd(
             "iot hub configuration create -c {} --login {} -k '{}'".format(
                 config_ids[1].upper(),
-                LIVE_HUB_CS,
+                self.connection_string,
                 adm_content_module_path,
             ),
             expect_failure=True,
@@ -561,7 +574,7 @@ class TestIoTHubConfigurations(IoTLiveScenarioTest):
         # Show ADM configuration - using connection string
         self.cmd(
             "iot hub configuration show -c {} --login {}".format(
-                config_ids[1], LIVE_HUB_CS
+                config_ids[1], self.connection_string
             ),
             checks=[
                 self.check("id", config_ids[1]),
@@ -618,7 +631,7 @@ class TestIoTHubConfigurations(IoTLiveScenarioTest):
         system_metric_name = "appliedCount"
         config_output = self.cmd(
             "iot hub configuration show --login {} --config-id {}".format(
-                LIVE_HUB_CS, config_ids[1]
+                self.connection_string, config_ids[1]
             )
         ).get_output_in_json()
 
@@ -638,7 +651,7 @@ class TestIoTHubConfigurations(IoTLiveScenarioTest):
         # System metric - using connection string
         self.cmd(
             "iot hub configuration show-metric --metric-id {} --login '{}' --config-id {} --metric-type {}".format(
-                system_metric_name, LIVE_HUB_CS, config_ids[1], "system"
+                system_metric_name, self.connection_string, config_ids[1], "system"
             ),
             checks=[
                 self.check("metric", system_metric_name),
@@ -652,7 +665,7 @@ class TestIoTHubConfigurations(IoTLiveScenarioTest):
         # Error - metric does not exist, using connection string
         self.cmd(
             "iot hub configuration show-metric -m {} --login {} -c {}".format(
-                "doesnotexist", LIVE_HUB_CS, config_ids[0]
+                "doesnotexist", self.connection_string, config_ids[0]
             ),
             expect_failure=True,
         )
@@ -668,7 +681,7 @@ class TestIoTHubConfigurations(IoTLiveScenarioTest):
         )
 
         config_list_check = [
-            self.check("length([*])", 3),
+            self.check("length([*])", config_count),
             self.exists("[?id=='{}']".format(config_ids[0])),
             self.exists("[?id=='{}']".format(config_ids[1])),
             self.exists("[?id=='{}']".format(config_ids[2]))
@@ -682,20 +695,8 @@ class TestIoTHubConfigurations(IoTLiveScenarioTest):
 
         # List all ADM configurations - using connection string
         self.cmd(
-            "iot hub configuration list --login {}".format(LIVE_HUB_CS),
+            "iot hub configuration list --login {}".format(self.connection_string),
             checks=config_list_check,
-        )
-
-        # Error top of -1 does not work with configurations
-        self.cmd(
-            "iot hub configuration list -n {} -g {} --top -1".format(LIVE_HUB, LIVE_RG),
-            expect_failure=True,
-        )
-
-        # Error max top of 100 with configurations
-        self.cmd(
-            "iot hub configuration list -n {} -g {} --top 101".format(LIVE_HUB, LIVE_RG),
-            expect_failure=True,
         )
 
         # Explicitly delete an ADM configuration
@@ -709,7 +710,7 @@ class TestIoTHubConfigurations(IoTLiveScenarioTest):
         # Explicitly delete an ADM configuration - using connection string
         self.cmd(
             "iot hub configuration delete -c {} --login {}".format(
-                config_ids[1], LIVE_HUB_CS
+                config_ids[1], self.connection_string
             )
         )
         del self.config_ids[0]

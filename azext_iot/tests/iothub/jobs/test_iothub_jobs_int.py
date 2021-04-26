@@ -6,19 +6,18 @@
 
 import json
 from datetime import datetime, timedelta
-from ... import IoTLiveScenarioTest
-from ...settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC
+from azext_iot.tests import IoTLiveScenarioTest
+from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC
 
 
 settings = DynamoSettings(ENV_SET_TEST_IOTHUB_BASIC)
 LIVE_HUB = settings.env.azext_iot_testhub
 LIVE_RG = settings.env.azext_iot_testrg
-LIVE_HUB_CS = settings.env.azext_iot_testhub_cs
 
 
 class TestIoTHubJobs(IoTLiveScenarioTest):
     def __init__(self, test_case):
-        super(TestIoTHubJobs, self).__init__(test_case, LIVE_HUB, LIVE_RG, LIVE_HUB_CS)
+        super(TestIoTHubJobs, self).__init__(test_case, LIVE_HUB, LIVE_RG)
 
         job_count = 3
         self.job_ids = self.generate_job_names(job_count)
@@ -89,7 +88,7 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
                 "scheduleUpdateTwin",
                 query_condition,
                 "{twin_patch_props}",
-                LIVE_HUB_CS,
+                self.connection_string,
             ),
             checks=[
                 self.check("jobId", self.job_ids[1]),
@@ -150,7 +149,7 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
         # With connection string
         self.cmd(
             "iot hub job show --job-id {} --login {}".format(
-                self.job_ids[1], LIVE_HUB_CS
+                self.job_ids[1], self.connection_string
             ),
             checks=[
                 self.check("jobId", self.job_ids[1]),
@@ -168,7 +167,7 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
 
         # Cancel Job test
         # Create job to be cancelled - scheduled +7 days from now.
-        scheduled_time_iso = (datetime.utcnow() + timedelta(days=7)).isoformat()
+        scheduled_time_iso = (datetime.utcnow() + timedelta(days=6)).isoformat()
 
         self.cmd(
             "iot hub job create --job-id {} --job-type {} -q \"{}\" --twin-patch '{}' --start '{}' -n {} -g {}".format(
@@ -183,6 +182,21 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             checks=[self.check("jobId", self.job_ids[2])],
         )
 
+        # Allow time for job to transfer to scheduled state (cannot cancel job in running state)
+        from time import sleep
+        sleep(5)
+
+        self.cmd(
+            "iot hub job show --job-id {} -n {} -g {}".format(
+                self.job_ids[2], LIVE_HUB, LIVE_RG
+            ),
+            checks=[
+                self.check("jobId", self.job_ids[2]),
+                self.check("status", "scheduled"),
+            ],
+        )
+
+        # Cancel job
         self.cmd(
             "iot hub job cancel --job-id {} -n {} -g {}".format(
                 self.job_ids[2], LIVE_HUB, LIVE_RG
@@ -211,7 +225,7 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
 
         # List Jobs - with connection string
         job_result_set_cs = self.cmd(
-            "iot hub job list --login {}".format(LIVE_HUB_CS)
+            "iot hub job list --login {}".format(self.connection_string)
         ).get_output_in_json()
 
         self.validate_job_list(jobs_set=job_result_set_cs)
