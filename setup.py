@@ -48,7 +48,7 @@ if not PACKAGE_NAME:
 # though that is installed out of band (managed by the extension)
 # for compatibility reasons.
 
-DEPENDENCIES = ["paho-mqtt>=1.5.0", "jsonschema==3.0.2", "packaging"]
+DEPENDENCIES = ["paho-mqtt>=1.5.0", "jsonschema==3.0.2", "packaging", "azure-iot-device>=2.5.1"]
 
 CLASSIFIERS = [
     "Development Status :: 4 - Beta",

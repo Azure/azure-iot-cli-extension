@@ -619,7 +619,6 @@ def load_arguments(self, _):
             help="Payload to be returned when a direct method is executed on the device. Optional argument.",
         )
 
-
     with self.argument_context("iot device c2d-message") as context:
         context.argument(
             "correlation_id",
