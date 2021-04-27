@@ -23,7 +23,6 @@ path_discovery_init = (
     "azext_iot.iothub.providers.discovery.IotHubDiscovery._initialize_client"
 )
 path_sas = "azext_iot._factory.SasTokenAuthentication"
-#path_mqtt_device_client = "azext_iot.operations._mqtt.mqtt_client.device_client"
 path_mqtt_device_client = "azext_iot.operations._mqtt.mqtt_device_client.create_from_connection_string"
 path_iot_hub_monitor_events_entrypoint = (
     "azext_iot.operations.hub._iot_hub_monitor_events"
@@ -74,16 +73,19 @@ def fixture_cmd(mocker):
 
     return AzCliCommand(cli.loader, "iot-extension command", test_handler1)
 
+
 @pytest.fixture()
 def fixture_device_connection(mocker):
     get_connection_string = mocker.patch(path_get_device_connection)
     get_connection_string.return_value = {"connectionString": "test_device_conn_string"}
     return get_connection_string
 
+
 @pytest.fixture()
 def fixture_service_client_generic(mocker, fixture_ghcs, fixture_sas):
     service_client = mocker.patch(path_service_client)
     return service_client
+
 
 @pytest.fixture(params=[400, 401, 500])
 def serviceclient_generic_error(mocker, fixture_ghcs, fixture_sas, request):

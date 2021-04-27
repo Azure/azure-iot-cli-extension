@@ -12,7 +12,6 @@ from uuid import uuid4
 from azext_iot.tests import IoTLiveScenarioTest, PREFIX_DEVICE
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC
 from azext_iot.common.utility import (
-    validate_min_python_version,
     execute_onthread,
     calculate_millisec_since_unix_epoch_utc,
     validate_key_value_pairs
@@ -163,7 +162,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         cli_ctx = DummyCli()
         client = iot_hub_service_factory(cli_ctx)
-        
+
         token, thread = execute_onthread(
             method=iot_simulate_device,
             args=[
@@ -188,14 +187,14 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         token.set()
         thread.join()
 
-        #invoke device method without response status and payload
+        # invoke device method without response status and payload
         res = self.cmd(
             "iot hub invoke-device-method -d {} --method-name Test_Method_1 --login {}".format(
                 device_ids[0], self.connection_string
             )
         ).get_output_in_json()
 
-        assert res != None
+        assert res is not None
         assert res["status"] == 200
         assert res["payload"] == {
             "data": "Method executed successfully",
@@ -294,14 +293,14 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             return_handle=True,
         )
 
-        #invoke device method with response status and payload
+        # invoke device method with response status and payload
         result = self.cmd(
             "iot hub invoke-device-method -d {} --method-name Test_Method_2 --login {}".format(
                 device_ids[0], self.connection_string
             )
         ).get_output_in_json()
 
-        assert result != None
+        assert result is not None
         assert result["status"] == 204
         assert result["payload"] == {
             "result": "Direct method executed successfully"
@@ -313,7 +312,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
     def test_device_messaging(self):
         device_count = 1
         device_ids = self.generate_device_names(device_count)
-        
+
         self.cmd(
             "iot hub device-identity create -d {} -n {} -g {}".format(
                 device_ids[0], LIVE_HUB, LIVE_RG

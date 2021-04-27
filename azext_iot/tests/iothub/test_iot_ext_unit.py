@@ -18,14 +18,11 @@ import responses
 import re
 from azext_iot.operations import hub as subject
 from azext_iot.common.utility import (
-    validate_min_python_version,
-    url_encode_dict,
-    url_encode_str,
     validate_key_value_pairs,
     read_file_content,
 )
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
-from azext_iot.constants import TRACING_PROPERTY, USER_AGENT, BASE_MQTT_API_VERSION
+from azext_iot.constants import TRACING_PROPERTY
 from azext_iot.tests.generators import create_req_monitor_events, generate_generic_id
 from knack.util import CLIError
 from azext_iot.tests.conftest import (
@@ -2231,15 +2228,18 @@ class TestDeviceSimulate:
         if protocol == "mqtt":
             assert mc == mqttclient().send_message.call_count
 
-            if properties == None or properties == "invalid":
-                assert mqttclient().send_message.call_args[0][0].custom_properties == {'$.ce': 'utf-8', '$.ct': 'application/json'}
+            if properties is None or properties == "invalid":
+                assert mqttclient().send_message.call_args[0][0].custom_properties == {
+                    '$.ce': 'utf-8', '$.ct': 'application/json'}
 
             elif properties == "myprop=myvalue;$.ce=utf-16":
-                assert mqttclient().send_message.call_args[0][0].custom_properties == {'$.ce': 'utf-16', '$.ct': 'application/json', 'myprop': 'myvalue'}
+                assert mqttclient().send_message.call_args[0][0].custom_properties == {
+                    '$.ce': 'utf-16', '$.ct': 'application/json', 'myprop': 'myvalue'}
 
             elif properties == "myinvalidprop;myvalidprop=myvalidpropvalue":
-                assert mqttclient().send_message.call_args[0][0].custom_properties == {'$.ce': 'utf-8', '$.ct': 'application/json', 'myvalidprop': 'myvalidpropvalue'}
-            
+                assert mqttclient().send_message.call_args[0][0].custom_properties == {
+                    '$.ce': 'utf-8', '$.ct': 'application/json', 'myvalidprop': 'myvalidpropvalue'}
+
             # mqtt msg body - which is a json string
             assert json.loads(mqttclient().send_message.call_args[0][0].data)
             assert serviceclient.call_count == 0
@@ -2281,6 +2281,7 @@ class TestDeviceSimulate:
             subject.iot_simulate_device(
                 fixture_cmd, device_id, hub_name=mock_target["entity"]
             )
+
 
 class TestMonitorEvents:
     @pytest.fixture(params=[200])

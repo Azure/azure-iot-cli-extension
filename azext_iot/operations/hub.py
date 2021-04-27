@@ -2191,8 +2191,8 @@ def iot_simulate_device(
 
     if method_response_payload:
         method_response_payload = process_json_arg(
-                method_response_payload, argument_name="method-response-payload"
-            )
+            method_response_payload, argument_name="method-response-payload"
+        )
 
     class generator(object):
         def __init__(self):
@@ -2216,12 +2216,12 @@ def iot_simulate_device(
         if protocol_type == ProtocolType.mqtt.name:
             device_connection = iot_get_device_connection_string(cmd=cmd, device_id=device_id, hub_name=hub_name, login=login)
             client_mqtt = mqtt_client(
-                            target=target,
-                            device_connection_string=device_connection["connectionString"],
-                            device_id=device_id,
-                            method_response_status_code=method_response_status_code,
-                            method_response_payload=method_response_payload
-                        )
+                target=target,
+                device_connection_string=device_connection["connectionString"],
+                device_id=device_id,
+                method_response_status_code=method_response_status_code,
+                method_response_payload=method_response_payload
+            )
             client_mqtt.execute(data=generator(), properties=properties_to_send, publish_delay=msg_interval, msg_count=msg_count)
         else:
             six.print_("Sending and receiving events via https")
