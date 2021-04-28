@@ -90,6 +90,7 @@ def _load_central_devices_help():
     ] = """
         type: command
         short-summary: Execute a manual failover of device across multiple IoT Hubs to validate device firmware's ability to reconnect using DPS to a different IoT Hub.
+        long-summary: For more information about high availability visit https://github.com/iot-for-all/iot-central-high-availability-clients#readme
 
         examples:
         - name: Execute a manual failover of device across multiple IoT Hubs to validate device firmware's ability to reconnect using DPS to a different IoT Hub.
@@ -105,7 +106,8 @@ def _load_central_devices_help():
     ] = """
         type: command
         short-summary: Reverts the previously executed failover command by moving the device back to it's original IoT Hub
-
+        long-summary: For more information about high availability visit https://github.com/iot-for-all/iot-central-high-availability-clients#readme
+        
         examples:
         - name: Reverts the previously executed failover command by moving the device back to it's original IoT Hub
           text: >
