@@ -284,6 +284,7 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
         ).get_output_in_json()
         assert len(twin_query_result["result"]) == 2
 
+        # Relationship Tests
         relationship_id = "myedge"
         relationship = "contains"
         self.kwargs["relationshipJson"] = json.dumps(
@@ -500,16 +501,182 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
             )
         )
 
-        for twin_tuple in twins_id_list:
-            # No output from API for delete twin
-            self.cmd(
-                "dt twin delete -n {} --twin-id {} {}".format(
-                    instance_name,
-                    twin_tuple[0],
-                    "-g {}".format(self.rg) if twins_id_list[-1] == twin_tuple else "",
-                )
+        self.cmd(
+            "dt twin delete-all -n {} --yes".format(
+                instance_name,
             )
-        sleep(10)  # Wait for API to catch up
+        )
+        sleep(5)  # Wait for API to catch up
+
+        twin_query_result = self.cmd(
+            "dt twin query -n {} -g {} -q 'select * from digitaltwins' --cost".format(
+                instance_name, self.rg
+            )
+        ).get_output_in_json()
+        assert len(twin_query_result["result"]) == 0
+        assert twin_query_result["cost"]
+
+    def test_dt_twin_delete(self):
+        self.wait_for_capacity()
+        instance_name = generate_resource_id()
+        models_directory = "./models"
+        floor_dtmi = "dtmi:com:example:Floor;1"
+        floor_twin_id = "myfloor"
+        room_dtmi = "dtmi:com:example:Room;1"
+        room_twin_id = "myroom"
+        thermostat_component_id = "Thermostat"
+
+        create_output = self.cmd(
+            "dt create -n {} -g {} -l {}".format(instance_name, self.rg, self.region)
+        ).get_output_in_json()
+        self.track_instance(create_output)
+        self.wait_for_hostname(create_output)
+
+        self.cmd(
+            "dt role-assignment create -n {} -g {} --assignee {} --role '{}'".format(
+                instance_name, self.rg, self.current_user, self.role_map["owner"]
+            )
+        )
+        # Wait for RBAC to catch-up
+        sleep(60)
+
+        self.cmd(
+            "dt model create -n {} --from-directory '{}'".format(
+                instance_name, models_directory
+            )
+        )
+
+        self.kwargs["tempAndThermostatComponentJson"] = json.dumps(
+            {
+                "Temperature": 10.2,
+                "Thermostat": {
+                    "$metadata": {},
+                    "setPointTemp": 23.12,
+                },
+            }
+        )
+
+        floor_twin = self.cmd(
+            "dt twin create -n {} --dtmi {} --twin-id {}".format(
+                instance_name, floor_dtmi, floor_twin_id
+            )
+        ).get_output_in_json()
+
+        assert_twin_attributes(
+            twin=floor_twin,
+            expected_twin_id=floor_twin_id,
+            expected_dtmi=floor_dtmi,
+        )
+
+        room_twin = self.cmd(
+            "dt twin create -n {} -g {} --dtmi {} --twin-id {} --properties '{}'".format(
+                instance_name,
+                self.rg,
+                room_dtmi,
+                room_twin_id,
+                "{tempAndThermostatComponentJson}",
+            )
+        ).get_output_in_json()
+
+        assert_twin_attributes(
+            twin=room_twin,
+            expected_twin_id=room_twin_id,
+            expected_dtmi=room_dtmi,
+            properties=self.kwargs["tempAndThermostatComponentJson"],
+            component_name=thermostat_component_id,
+        )
+
+        sleep(5)  # Wait for API to catch up
+        twin_query_result = self.cmd(
+            "dt twin query -n {} -g {} -q 'select * from digitaltwins'".format(
+                instance_name, self.rg
+            )
+        ).get_output_in_json()
+        assert len(twin_query_result["result"]) == 2
+
+        # Relationship Tests
+        relationship_id = "myedge"
+        relationship = "contains"
+        self.kwargs["relationshipJson"] = json.dumps(
+            {"ownershipUser": "me", "ownershipDepartment": "mydepartment"}
+        )
+
+        twin_relationship_create_result = self.cmd(
+            "dt twin relationship create -n {} -g {} --relationship-id {} --relationship {} --twin-id {} "
+            "--target-twin-id {} --properties '{}'".format(
+                instance_name,
+                self.rg,
+                relationship_id,
+                relationship,
+                floor_twin_id,
+                room_twin_id,
+                "{relationshipJson}",
+            )
+        ).get_output_in_json()
+
+        assert_twin_relationship_attributes(
+            twin_relationship_obj=twin_relationship_create_result,
+            expected_relationship=relationship,
+            relationship_id=relationship_id,
+            source_id=floor_twin_id,
+            target_id=room_twin_id,
+            properties=self.kwargs["relationshipJson"],
+        )
+
+        twin_relationship_list_result = self.cmd(
+            "dt twin relationship list -n {} --twin-id {}".format(
+                instance_name,
+                floor_twin_id,
+            )
+        ).get_output_in_json()
+        assert len(twin_relationship_list_result) == 1
+
+        # Delete all relationships
+        self.cmd(
+            "dt twin relationship delete-all -n {} --twin-id {} --yes".format(
+                instance_name,
+                floor_twin_id,
+            )
+        )
+
+        twin_relationship_list_result = self.cmd(
+            "dt twin relationship list -n {} --twin-id {}".format(
+                instance_name,
+                floor_twin_id,
+            )
+        ).get_output_in_json()
+        assert len(twin_relationship_list_result) == 0
+
+        # Recreate relationship for delete all twins
+        twin_relationship_create_result = self.cmd(
+            "dt twin relationship create -n {} -g {} --relationship-id {} --relationship {} --twin-id {} "
+            "--target-twin-id {} --properties '{}'".format(
+                instance_name,
+                self.rg,
+                relationship_id,
+                relationship,
+                floor_twin_id,
+                room_twin_id,
+                "{relationshipJson}",
+            )
+        ).get_output_in_json()
+
+        assert_twin_relationship_attributes(
+            twin_relationship_obj=twin_relationship_create_result,
+            expected_relationship=relationship,
+            relationship_id=relationship_id,
+            source_id=floor_twin_id,
+            target_id=room_twin_id,
+            properties=self.kwargs["relationshipJson"],
+        )
+
+        self.cmd(
+            "dt twin delete-all -n {} --yes".format(
+                instance_name,
+            )
+        )
+        sleep(5)  # Wait for API to catch up
+
         twin_query_result = self.cmd(
             "dt twin query -n {} -g {} -q 'select * from digitaltwins' --cost".format(
                 instance_name, self.rg

@@ -534,7 +534,9 @@ class DevicesOperations(object):
             header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
 
         # Construct body
-        body_content = self._serialize.body(direct_method_request, 'CloudToDeviceMethod')
+        # @digimaun - Originally 'CloudToDeviceMethod'. Model serialization forces a null payload property to be removed.
+        # TODO: Test model behavior in latest autorest generator.
+        body_content = self._serialize.body(direct_method_request, 'object')
 
         # Construct and send request
         request = self._client.post(url, query_parameters, header_parameters, body_content)

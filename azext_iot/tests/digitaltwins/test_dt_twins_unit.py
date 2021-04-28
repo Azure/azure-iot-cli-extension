@@ -31,20 +31,21 @@ generic_patch_1 = json.dumps({"a" : "b"})
 generic_patch_2 = json.dumps({"a" : "b", "c" : "d"})
 
 
-def generate_twin_result(twin_id=twin_id, etag=etag, model_id=model_id):
-    return json.dumps({
-        "$dtId": twin_id,
-        "$etag": etag,
+def generate_twin_result(randomized=False):
+    return {
+        "$dtId": generate_generic_id() if randomized else twin_id,
+        "$etag": generate_generic_id() if randomized else etag,
         "$metadata": {
-            "$model": model_id
+            "$model": generate_generic_id() if randomized else model_id
         }
-    })
+    }
 
 
 def create_relationship(relationship_name=None):
     return {
         "$relationshipId": generate_generic_id(),
-        "relationship_name": relationship_name
+        "$relationshipName": relationship_name,
+        "$sourceId": generate_generic_id()
     }
 
 
@@ -390,7 +391,7 @@ class TestTwinUpdateTwin(object):
             url="https://{}/digitaltwins/{}".format(
                 hostname, twin_id
             ),
-            body=generate_twin_result(),
+            body=json.dumps(generate_twin_result()),
             status=200,
             content_type="application/json",
             match_querystring=False,
@@ -433,7 +434,20 @@ class TestTwinUpdateTwin(object):
         get_request = service_client.calls[start + 1].request
         assert get_request.method == "GET"
 
-        assert result == json.loads(generate_twin_result())
+        assert result == generate_twin_result()
+
+    def test_update_twin_invalid_patch(self, fixture_cmd, service_client):
+        # CLIError is raised when --json-patch is not dict or list
+        with pytest.raises(CLIError) as e:
+            subject.update_twin(
+                cmd=fixture_cmd,
+                name_or_hostname=hostname,
+                twin_id=twin_id,
+                json_patch="'{op:add,path:/setPointTemp,value:50.2}'",
+                resource_group_name=None,
+                etag=None
+            )
+        assert str(e.value) == "--json-patch content must be an object or array. Actual type was: str"
 
     @pytest.fixture(params=[(400, 200), (401, 200), (500, 200), (202, 400), (202, 401), (202, 500)])
     def service_client_error(self, mocked_response, start_twin_response, request):
@@ -538,6 +552,105 @@ class TestTwinDeleteTwin(object):
                 resource_group_name=resource_group_name,
                 etag=etag
             )
+
+
+class TestTwinDeleteAllTwin(object):
+    @pytest.fixture
+    def service_client_all(self, mocked_response, start_twin_response):
+        yield mocked_response
+
+    @pytest.mark.parametrize(
+        "number_twins", [0, 1, 3]
+    )
+    def test_delete_twin_all(self, mocker, fixture_cmd, service_client_all, number_twins):
+
+        # Create query call and delete calls
+        query_result = []
+        for i in range(number_twins):
+            twin = generate_twin_result(randomized=True)
+            query_result.append(twin)
+            # Query calls to check if there are any relationships
+            service_client_all.add(
+                method=responses.GET,
+                url="https://{}/digitaltwins/{}/incomingrelationships".format(
+                    hostname, twin["$dtId"]
+                ),
+                body=json.dumps({
+                    "value" : [],
+                    "nextLink" : None
+                }),
+                status=200,
+                content_type="application/json",
+                match_querystring=False
+            )
+            service_client_all.add(
+                method=responses.GET,
+                url="https://{}/digitaltwins/{}/relationships".format(
+                    hostname, twin["$dtId"]
+                ),
+                body=json.dumps({
+                    "value" : [],
+                    "nextLink" : None
+                }),
+                status=200,
+                content_type="application/json",
+                match_querystring=False
+            )
+            # Delete call
+            service_client_all.add(
+                method=responses.DELETE,
+                url="https://{}/digitaltwins/{}".format(
+                    hostname, twin["$dtId"]
+                ),
+                body=generic_result,
+                status=204 if i % 2 == 0 else 400,
+                content_type="application/json",
+                match_querystring=False,
+            )
+        # Query call for twins to delete
+        service_client_all.add(
+            method=responses.POST,
+            url="https://{}/query".format(
+                hostname
+            ),
+            body=json.dumps({
+                "value": query_result,
+                "continuationToken": None
+            }),
+            status=200,
+            content_type="application/json",
+            match_querystring=False,
+            headers={
+                "Query-Charge": "1.0"
+            }
+        )
+
+        # Call the delete all command
+        result = subject.delete_all_twin(
+            cmd=fixture_cmd,
+            name_or_hostname=hostname,
+        )
+
+        start = check_resource_group_name_call(service_client_all, resource_group_input=None)
+
+        delete_request = service_client_all.calls[start].request
+        assert delete_request.method == "POST"
+
+        # Check delete calls
+        for i in range(number_twins):
+            query1_request = service_client_all.calls[start + 1 + 3 * i].request
+            assert query1_request.method == "GET"
+            assert query_result[i]["$dtId"] in query1_request.url
+
+            query2_request = service_client_all.calls[start + 2 + 3 * i].request
+            assert query2_request.method == "GET"
+            assert query_result[i]["$dtId"] in query2_request.url
+
+            delete_request = service_client_all.calls[start + 3 + 3 * i].request
+            assert delete_request.method == "DELETE"
+            assert query_result[i]["$dtId"] in delete_request.url
+
+        assert result is None
 
 
 class TestTwinCreateRelationship(object):
@@ -745,6 +858,20 @@ class TestTwinUpdateRelationship(object):
 
         assert result == json.loads(generic_result)
 
+    def test_update_relationship_invalid_patch(self, fixture_cmd, service_client):
+        # CLIError is raised when --json-patch is not dict or list
+        with pytest.raises(CLIError) as e:
+            subject.update_relationship(
+                cmd=fixture_cmd,
+                name_or_hostname=hostname,
+                twin_id=twin_id,
+                relationship_id=relationship_id,
+                json_patch="'{op:add,path:/setPointTemp,value:50.2}'",
+                resource_group_name=None,
+                etag=None
+            )
+        assert str(e.value) == "--json-patch content must be an object or array. Actual type was: str"
+
     @pytest.fixture(params=[(400, 200), (401, 200), (500, 200), (204, 400), (204, 401), (204, 500)])
     def service_client_error(self, mocked_response, start_twin_response, request):
         mocked_response.add(
@@ -870,7 +997,7 @@ class TestTwinListRelationship(object):
             expected_result = [
                 x
                 for x in servresult
-                if x["relationship_name"] and x["relationship_name"] == relationship
+                if x["$relationshipName"] and x["$relationshipName"] == relationship
             ]
             assert result == expected_result
         else:
@@ -988,6 +1115,193 @@ class TestTwinDeleteRelationship(object):
                 resource_group_name=None,
                 etag=None
             )
+
+
+class TestTwinDeleteAllRelationship(object):
+    @pytest.fixture
+    def service_client_all(self, mocked_response, start_twin_response):
+        yield mocked_response
+
+    @pytest.mark.parametrize(
+        "incoming, outcoming",
+        [
+            (0, 0),
+            (1, 0),
+            (0, 1),
+            (1, 1),
+            (3, 0),
+            (0, 3),
+            (3, 3),
+        ]
+    )
+    def test_delete_relationship_all(self, mocker, fixture_cmd, service_client_all, incoming, outcoming):
+        # Create query call with incoming_relationships=True
+        incoming_query = []
+        for i in range(incoming):
+            relationship = create_relationship("contains")
+            incoming_query.append(relationship)
+            service_client_all.add(
+                method=responses.DELETE,
+                url="https://{}/digitaltwins/{}/relationships/{}".format(
+                    hostname, relationship["$sourceId"], relationship["$relationshipId"]
+                ),
+                body=generic_result,
+                status=204 if i % 2 == 0 else 400,
+                content_type="application/json",
+                match_querystring=False,
+            )
+        service_client_all.add(
+            method=responses.GET,
+            url="https://{}/digitaltwins/{}/incomingrelationships".format(
+                hostname, twin_id
+            ),
+            body=json.dumps({
+                "value" : incoming_query,
+                "nextLink" : None
+            }),
+            status=200,
+            content_type="application/json",
+            match_querystring=False
+        )
+
+        # Create query call with incoming_relationships=False
+        outcoming_query = []
+        for i in range(incoming):
+            relationship = create_relationship("contains")
+            outcoming_query.append(relationship)
+            service_client_all.add(
+                method=responses.DELETE,
+                url="https://{}/digitaltwins/{}/relationships/{}".format(
+                    hostname, twin_id, relationship["$relationshipId"]
+                ),
+                body=generic_result,
+                status=204 if i % 2 == 0 else 400,
+                content_type="application/json",
+                match_querystring=False,
+            )
+        service_client_all.add(
+            method=responses.GET,
+            url="https://{}/digitaltwins/{}/relationships".format(
+                hostname, twin_id
+            ),
+            body=json.dumps({
+                "value" : outcoming_query,
+                "nextLink" : None
+            }),
+            status=200,
+            content_type="application/json",
+            match_querystring=False
+        )
+
+        # Run the delete all command
+        result = subject.delete_all_relationship(
+            cmd=fixture_cmd,
+            name_or_hostname=hostname,
+            twin_id=twin_id,
+        )
+
+        start = check_resource_group_name_call(service_client_all, resource_group_input=None)
+
+        # First two calls should be the query calls
+        assert service_client_all.calls[start].request.method == "GET"
+        assert service_client_all.calls[start + 1].request.method == "GET"
+
+        call_num = start + 2
+        for i in range(len(incoming_query)):
+            delete_request = service_client_all.calls[call_num + i].request
+            assert delete_request.method == "DELETE"
+            assert incoming_query[i]["$relationshipId"] in delete_request.url
+
+        call_num += len(incoming_query)
+        for i in range(len(outcoming_query)):
+            delete_request = service_client_all.calls[call_num + i].request
+            assert delete_request.method == "DELETE"
+            assert outcoming_query[i]["$relationshipId"] in delete_request.url
+        assert len(service_client_all.calls) == call_num + len(outcoming_query)
+
+        assert result is None
+
+    @pytest.fixture
+    def service_client(self, mocked_response, start_twin_response):
+        yield mocked_response
+
+    @pytest.mark.parametrize(
+        "number_twins", [0, 1, 3]
+    )
+    def test_delete_relationships_all_twins(self, mocker, fixture_cmd, service_client, number_twins):
+        # Create query call and delete calls
+        query_result = []
+        for i in range(number_twins):
+            twin = generate_twin_result(randomized=True)
+            query_result.append(twin)
+            # Query calls to check if there are any relationships
+            service_client.add(
+                method=responses.GET,
+                url="https://{}/digitaltwins/{}/incomingrelationships".format(
+                    hostname, twin["$dtId"]
+                ),
+                body=json.dumps({
+                    "value" : [],
+                    "nextLink" : None
+                }),
+                status=200,
+                content_type="application/json",
+                match_querystring=False
+            )
+            service_client.add(
+                method=responses.GET,
+                url="https://{}/digitaltwins/{}/relationships".format(
+                    hostname, twin["$dtId"]
+                ),
+                body=json.dumps({
+                    "value" : [],
+                    "nextLink" : None
+                }),
+                status=200,
+                content_type="application/json",
+                match_querystring=False
+            )
+            # the only difference between this and delete_all_twins is no twin delete call
+        # Query call for twins to delete
+        service_client.add(
+            method=responses.POST,
+            url="https://{}/query".format(
+                hostname
+            ),
+            body=json.dumps({
+                "value": query_result,
+                "continuationToken": None
+            }),
+            status=200,
+            content_type="application/json",
+            match_querystring=False,
+            headers={
+                "Query-Charge": "1.0"
+            }
+        )
+
+        # Call the delete all command
+        result = subject.delete_all_relationship(
+            cmd=fixture_cmd,
+            name_or_hostname=hostname,
+        )
+
+        start = check_resource_group_name_call(service_client, resource_group_input=None)
+
+        delete_request = service_client.calls[start].request
+        assert delete_request.method == "POST"
+
+        # Check delete calls
+        for i in range(number_twins):
+            query1_request = service_client.calls[start + 1 + 2 * i].request
+            assert query1_request.method == "GET"
+            assert query_result[i]["$dtId"] in query1_request.url
+
+            query2_request = service_client.calls[start + 2 + 2 * i].request
+            assert query2_request.method == "GET"
+            assert query_result[i]["$dtId"] in query2_request.url
+
+        assert result is None
 
 
 class TestTwinSendTelemetry(object):
@@ -1226,6 +1540,20 @@ class TestTwinUpdateComponent(object):
         assert get_request.method == "GET"
 
         assert result == json.loads(generic_result)
+
+    def test_update_component_invalid_patch(self, fixture_cmd, service_client):
+        # CLIError is raised when --json-patch is not dict or list
+        with pytest.raises(CLIError) as e:
+            subject.update_component(
+                cmd=fixture_cmd,
+                name_or_hostname=hostname,
+                twin_id=twin_id,
+                component_path=component_path,
+                json_patch="'{op:add,path:/setPointTemp,value:50.2}'",
+                resource_group_name=None,
+                etag=None
+            )
+        assert str(e.value) == "--json-patch content must be an object or array. Actual type was: str"
 
     @pytest.fixture(params=[400, 401, 500])
     def service_client_error(self, mocked_response, start_twin_response, request):

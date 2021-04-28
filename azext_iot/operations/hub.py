@@ -9,6 +9,7 @@ from time import time, sleep
 import six
 from knack.log import get_logger
 from knack.util import CLIError
+from enum import Enum, EnumMeta
 from azext_iot.constants import (
     EXTENSION_ROOT,
     DEVICE_DEVICESCOPE_PREFIX,
@@ -36,7 +37,7 @@ from azext_iot.common.utility import (
     unpack_msrest_error,
     init_monitoring,
     process_json_arg,
-    ensure_min_version,
+    ensure_iothub_sdk_min_version,
     generate_key
 )
 from azext_iot._factory import SdkResolver, CloudError
@@ -55,7 +56,7 @@ def iot_query(
     top = _process_top(top)
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, rg=resource_group_name, login=login
+        hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -1501,7 +1502,6 @@ def iot_device_method(
     resource_group_name=None,
     login=None,
 ):
-    from azext_iot.sdk.iothub.service.models import CloudToDeviceMethod
     from azext_iot.constants import (
         METHOD_INVOKE_MAX_TIMEOUT_SEC,
         METHOD_INVOKE_MIN_TIMEOUT_SEC,
@@ -1531,14 +1531,15 @@ def iot_device_method(
                 method_payload, argument_name="method-payload"
             )
 
-        method = CloudToDeviceMethod(
-            method_name=method_name,
-            response_timeout_in_seconds=timeout,
-            connect_timeout_in_seconds=timeout,
-            payload=method_payload,
-        )
+        request_body = {
+            "methodName": method_name,
+            "payload": method_payload,
+            "responseTimeoutInSeconds": timeout,
+            "connectTimeoutInSeconds": timeout,
+        }
+
         return service_sdk.devices.invoke_method(
-            device_id=device_id, direct_method_request=method, timeout=timeout
+            device_id=device_id, direct_method_request=request_body, timeout=timeout,
         )
     except CloudError as e:
         raise CLIError(unpack_msrest_error(e))
@@ -1558,7 +1559,6 @@ def iot_device_module_method(
     resource_group_name=None,
     login=None,
 ):
-    from azext_iot.sdk.iothub.service.models import CloudToDeviceMethod
     from azext_iot.constants import (
         METHOD_INVOKE_MAX_TIMEOUT_SEC,
         METHOD_INVOKE_MIN_TIMEOUT_SEC,
@@ -1588,16 +1588,17 @@ def iot_device_module_method(
                 method_payload, argument_name="method-payload"
             )
 
-        method = CloudToDeviceMethod(
-            method_name=method_name,
-            response_timeout_in_seconds=timeout,
-            connect_timeout_in_seconds=timeout,
-            payload=method_payload,
-        )
+        request_body = {
+            "methodName": method_name,
+            "payload": method_payload,
+            "responseTimeoutInSeconds": timeout,
+            "connectTimeoutInSeconds": timeout,
+        }
+
         return service_sdk.modules.invoke_method(
             device_id=device_id,
             module_id=module_id,
-            direct_method_request=method,
+            direct_method_request=request_body,
             timeout=timeout,
         )
     except CloudError as e:
@@ -2287,7 +2288,6 @@ def iot_device_export(
     resource_group_name=None,
 ):
     from azext_iot._factory import iot_hub_service_factory
-    from azure.mgmt.iothub import __version__ as iot_sdk_version
 
     client = iot_hub_service_factory(cmd.cli_ctx)
     discovery = IotHubDiscovery(cmd)
@@ -2298,7 +2298,7 @@ def iot_device_export(
     if exists(blob_container_uri):
         blob_container_uri = read_file_content(blob_container_uri)
 
-    if ensure_min_version(iot_sdk_version, "0.12.0"):
+    if ensure_iothub_sdk_min_version("0.12.0"):
         from azure.mgmt.iothub.models import ExportDevicesRequest
         from azext_iot.common.shared import AuthenticationType
 
@@ -2336,7 +2336,6 @@ def iot_device_import(
     resource_group_name=None,
 ):
     from azext_iot._factory import iot_hub_service_factory
-    from azure.mgmt.iothub import __version__ as iot_sdk_version
 
     client = iot_hub_service_factory(cmd.cli_ctx)
     discovery = IotHubDiscovery(cmd)
@@ -2350,7 +2349,7 @@ def iot_device_import(
     if exists(output_blob_container_uri):
         output_blob_container_uri = read_file_content(output_blob_container_uri)
 
-    if ensure_min_version(iot_sdk_version, "0.12.0"):
+    if ensure_iothub_sdk_min_version("0.12.0"):
         from azure.mgmt.iothub.models import ImportDevicesRequest
         from azext_iot.common.shared import AuthenticationType
 
@@ -2711,7 +2710,7 @@ def _get_hub_connection_string(
                 entityPath,
             )
             for p in policies
-            if "serviceconnect" in p.rights.value.lower()
+            if "serviceconnect" in (p.rights.value.lower() if isinstance(p.rights, (Enum, EnumMeta)) else p.rights.lower())
         ]
 
     hostname = hub.properties.host_name

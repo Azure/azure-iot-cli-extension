@@ -16,7 +16,7 @@ from azext_iot.common.utility import (
     process_json_arg,
     read_file_content,
     logger,
-    ensure_min_version,
+    ensure_iothub_sdk_min_version,
 )
 from azext_iot.common.deps import ensure_uamqp
 from azext_iot.constants import EVENT_LIB, EXTENSION_NAME
@@ -294,8 +294,13 @@ class TestVersionComparison(object):
             ("2.0.1.9", "2.0.6", False),
         ],
     )
-    def test_ensure_min_version(self, current, minimum, expected):
-        assert ensure_min_version(current, minimum) == expected
+    def test_ensure_iothub_sdk_min_version(self, mocker, current, minimum, expected):
+        try:
+            mocker.patch("azure.mgmt.iothub.__version__", current)
+        except:
+            mocker.patch("azure.mgmt.iothub._configuration.VERSION", current)
+
+        assert ensure_iothub_sdk_min_version(minimum) == expected
 
 
 class TestEmbeddedCli(object):
