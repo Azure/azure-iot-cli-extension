@@ -1575,7 +1575,8 @@ class TestDeviceMethodInvoke:
         if methodbody:
             assert body["payload"] == json.loads(payload)
         else:
-            assert body.get("payload") is None
+            # We must ensure null is passed for payload.
+            assert body["payload"] is None
 
         assert body["responseTimeoutInSeconds"] == timeout
         assert body["connectTimeoutInSeconds"] == timeout
@@ -1655,7 +1656,8 @@ class TestDeviceModuleMethodInvoke:
         if methodbody:
             assert body["payload"] == json.loads(payload)
         else:
-            assert body.get("payload") is None
+            # We must ensure null is passed for payload.
+            assert body["payload"] is None
 
         assert body["responseTimeoutInSeconds"] == timeout
         assert body["connectTimeoutInSeconds"] == timeout
