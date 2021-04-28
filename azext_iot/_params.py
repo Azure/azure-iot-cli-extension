@@ -609,8 +609,8 @@ def load_arguments(self, _):
             help=info_param_properties_device(include_http=True),
         )
         context.argument(
-            "method_response_status_code",
-            options_list=["--method-response-status-code", "--mrsc"],
+            "method_response_code",
+            options_list=["--method-response-code", "--mrc"],
             help="Status code to be returned when a direct method is executed on the device. Optional argument, defaults to 200",
         )
         context.argument(
