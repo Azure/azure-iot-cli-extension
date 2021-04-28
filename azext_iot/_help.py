@@ -933,7 +933,7 @@ helps[
     - name: Basic usage (mqtt) with sending mixed properties
       text: az iot device simulate -n {iothub_name} -d {device_id} --properties "myprop=myvalue;$.ct=application/json"
     - name: Basic usage (mqtt) with sending direct method response status code and direct method response payload
-      text: az iot device simulate -n {iothub_name} -d {device_id} --method-response-status-code 201 --method-response-payload "{'result'= 'Direct method successful'}"
+      text: az iot device simulate -n {iothub_name} -d {device_id} --method-response-code 201 --method-response-payload "{'result'= 'Direct method successful'}"
     - name: Basic usage (http)
       text: az iot device simulate -n {iothub_name} -d {device_id} --protocol http
     - name: Basic usage (http) with sending mixed properties

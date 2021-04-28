@@ -14,13 +14,13 @@ from azure.iot.device import IoTHubDeviceClient as mqtt_device_client, Message, 
 
 
 class mqtt_client(object):
-    def __init__(self, target, device_conn_string, device_id, method_response_status_code=200, method_response_payload=None):
+    def __init__(self, target, device_conn_string, device_id, method_response_code=200, method_response_payload=None):
         self.device_id = device_id
         self.device_client = mqtt_device_client.create_from_connection_string(device_conn_string)
         self.device_client.connect()
         self.device_client.on_message_received = self.message_handler
         self.device_client.on_method_request_received = self.method_request_handler
-        self.method_response_status_code = method_response_status_code
+        self.method_response_code = method_response_code
         self.method_response_payload = method_response_payload
 
     def send_d2c_message(self, message_text="", properties={}):
@@ -52,7 +52,7 @@ class mqtt_client(object):
                 "data": "Method executed successfully"
             }
 
-        status = self.method_response_status_code  # set return status code
+        status = self.method_response_code  # set return status code
         method_response = MethodResponse.create_from_method_request(method_request, status, payload)
         self.device_client.send_method_response(method_response)
 

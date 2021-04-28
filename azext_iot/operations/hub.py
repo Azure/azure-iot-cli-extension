@@ -2153,7 +2153,7 @@ def iot_simulate_device(
     properties=None,
     resource_group_name=None,
     login=None,
-    method_response_status_code=200,
+    method_response_code=200,
     method_response_payload=None
 ):
     import sys
@@ -2219,7 +2219,7 @@ def iot_simulate_device(
                 target=target,
                 device_conn_string=device_connection["connectionString"],
                 device_id=device_id,
-                method_response_status_code=method_response_status_code,
+                method_response_code=method_response_code,
                 method_response_payload=method_response_payload
             )
             client_mqtt.execute(data=generator(), properties=properties_to_send, publish_delay=msg_interval, msg_count=msg_count)
