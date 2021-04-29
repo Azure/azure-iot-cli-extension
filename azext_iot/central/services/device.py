@@ -334,7 +334,7 @@ def run_manual_failover(
     if ttl_minutes :
         json = {"ttl": ttl_minutes}
     else:
-        print("""Using default time to live - 
+        print("""Using default time to live -
         see https://github.com/iot-for-all/iot-central-high-availability-clients#readme for more information""")
 
     response = requests.post(url, headers=headers, verify=not should_disable_connection_verify(), json=json)
