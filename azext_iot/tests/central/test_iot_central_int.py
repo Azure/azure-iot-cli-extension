@@ -525,8 +525,6 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         # checking if failover has been done by comparing original hub identifier with hub identifier after failover is done
         fb_json_result = fb_result.get_output_in_json()
         hubIdentifierFailOver = fb_json_result["hubIdentifier"]
-      
-
         # connect & disconnect device & wait to be provisioned
         self._connect_gettwin_disconnect_wait_tobeprovisioned(device_id, credentials)
 
@@ -547,12 +545,10 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         # Cleanup
         self._delete_device(device_id)
         self._delete_device_template(template_id)
-        
-        
+
         assert len(hubIdentifierOriginal) > 0
         assert len(hubIdentifierFailOver) > 0
         assert hubIdentifierOriginal != hubIdentifierFailOver
-            
         assert len(hubIdentifierFinal) > 0
         assert hubIdentifierOriginal == hubIdentifierFinal
 

@@ -155,8 +155,7 @@ def load_central_arguments(self, _):
             "ttl_minutes",
             type=int,
             options_list=["--ttl-minutes", "--ttl"],
-            help="A positive integer. TTL in minutes to move device back to the original hub."
-            "Defaults to 30 minutes if not specified.",
+            help="A positive integer. TTL in minutes to move device back to the original hub.",
         )
 
     with self.argument_context("iot central user") as context:
