@@ -319,3 +319,6 @@ src/build
 
 # Code coverage
 .coverage
+
+# Shell scripts
+*.sh
