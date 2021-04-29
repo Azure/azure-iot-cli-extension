@@ -508,7 +508,6 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
         # check if failover started and getting original hub identifier
         hubIdentifierOriginal = json_result["hubIdentifier"]
-        assert len(hubIdentifierOriginal) > 0
 
         # connect & disconnect device & wait to be provisioned
         self._connect_gettwin_disconnect_wait_tobeprovisioned(device_id, credentials)
@@ -526,9 +525,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         # checking if failover has been done by comparing original hub identifier with hub identifier after failover is done
         fb_json_result = fb_result.get_output_in_json()
         hubIdentifierFailOver = fb_json_result["hubIdentifier"]
-        assert len(hubIdentifierFailOver) > 0
-        assert hubIdentifierOriginal != hubIdentifierFailOver, "Original {}, Failover {}.".format(
-            hubIdentifierOriginal, hubIdentifierFailOver)
+      
 
         # connect & disconnect device & wait to be provisioned
         self._connect_gettwin_disconnect_wait_tobeprovisioned(device_id, credentials)
@@ -546,12 +543,18 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
         json_result = result.get_output_in_json()
         hubIdentifierFinal = json_result["hubIdentifier"]
-        assert len(hubIdentifierFinal) > 0
-        assert hubIdentifierOriginal == hubIdentifierFinal
 
         # Cleanup
         self._delete_device(device_id)
         self._delete_device_template(template_id)
+        
+        
+        assert len(hubIdentifierOriginal) > 0
+        assert len(hubIdentifierFailOver) > 0
+        assert hubIdentifierOriginal != hubIdentifierFailOver
+            
+        assert len(hubIdentifierFinal) > 0
+        assert hubIdentifierOriginal == hubIdentifierFinal
 
     def _create_device(self, **kwargs) -> (str, str):
         """
@@ -754,7 +757,6 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
     def _connect_gettwin_disconnect_wait_tobeprovisioned(self, device_id, credentials):
         device_client = helpers.dps_connect_device(device_id, credentials)
-        assert device_client.connected
         device_client.get_twin()
         device_client.disconnect()
         device_client.shutdown()
