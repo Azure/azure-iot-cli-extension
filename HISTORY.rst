@@ -13,6 +13,9 @@ Release History
   * az iot hub invoke-device-method
   * az iot hub invoke-module-method
 
+* When using "az iot hub connection-string show" against a group or subscription, the command will now
+  show a warning instead of raising an error if a problem occurs obtaining a connection-string from a particular hub.
+
 **Azure Digital Twins updates**
 
 * Fixed an issue in the following update commands where malformed json patch content would not raise an error
