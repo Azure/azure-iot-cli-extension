@@ -308,14 +308,16 @@ def run_manual_failover(
     central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     """
-    Execute a manual failover of device across multiple IoT Hubs to validate device firmware's ability to reconnect using DPS to a different IoT Hub.
+    Execute a manual failover of device across multiple IoT Hubs to validate device firmware's
+         ability to reconnect using DPS to a different IoT Hub.
 
     Args:
         cmd: command passed into az
         app_id: id of an app (used for forming request URL)
         device_id: unique case-sensitive device id
-        ttl_minutes: (OPTIONAL) An optional value to specify the expiration time of this manual failover test before the device moves back to it's original IoT Hub. 
-            This has a default value of 30 minutes, but can optionally be any positive integer between 1 and 30. 
+        ttl_minutes: (OPTIONAL) An optional value to specify the expiration time of this manual failover
+            test before the device moves back to it's original IoT Hub.
+            This has a default value of 30 minutes, but can optionally be any positive integer between 1 and 30.
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
         central_dns_suffix:(OPTIONAL) {centralDnsSuffixInPath} as found in docs
@@ -345,7 +347,8 @@ def run_manual_failback(
     central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     """
-    Execute a manual failback for device. Reverts the previously executed failover command by moving the device back to it's original IoT Hub.
+    Execute a manual failback for device. Reverts the previously executed failover
+         command by moving the device back to it's original IoT Hub.
 
     Args:
         cmd: command passed into az

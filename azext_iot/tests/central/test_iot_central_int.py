@@ -513,7 +513,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         # connect & disconnect device & wait to be provisioned
         self._connect_gettwin_disconnect_wait_tobeprovisioned(device_id, credentials)
 
-        #Initiating failback
+        # Initiating failback
         fb_result = self.cmd(
             "iot central device manual-failback"
             " --app-id {}"
@@ -562,9 +562,13 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         device_id = self.create_random_name(prefix="aztest", length=24)
         device_name = self.create_random_name(prefix="aztest", length=24)
 
-        command = "iot central device create --app-id {} -d {} --device-name {}   --token \"{}\" --central-dns-suffix \"{}\"".format(
-            APP_ID, device_id, device_name, TOKEN, DNS_SUFFIX
-        )
+        command = """iot central device create
+         --app-id {}
+         -d {}
+         --device-name {}
+         --token \"{}\"
+         --central-dns-suffix \"{}\" """.format(APP_ID, device_id, device_name, TOKEN, DNS_SUFFIX)
+
         checks = [
             self.check("approved", True),
             self.check("displayName", device_name),
@@ -652,7 +656,12 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
     def _delete_device(self, device_id) -> None:
         self.cmd(
-            "iot central device delete --app-id {} -d {} --token \"{}\" --central-dns-suffix \"{}\" ".format(
+            "iot central device delete "
+            "--app-id {} "
+            "-d {} "
+            "--token \"{}\" "
+            "--central-dns-suffix \"{}\" "
+            .format(
                 APP_ID, device_id, TOKEN, DNS_SUFFIX),
             checks=[self.check("result", "success")],
         )
@@ -665,7 +674,13 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         template_id = template_name + "id"
 
         self.cmd(
-            "iot central device-template create --app-id {} --device-template-id {} -k '{}' --token \"{}\"  --central-dns-suffix \"{}\" ".format(
+            """iot central device-template create
+              --app-id {}
+              --device-template-id {}
+               -k '{}'
+               --token \"{}\"
+                --central-dns-suffix \"{}\" """
+            .format(
                 APP_ID, template_id, device_template_path, TOKEN, DNS_SUFFIX
             ),
             checks=[
@@ -678,7 +693,8 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
     def _delete_device_template(self, template_id):
         attempts = range(0, 10)
-        command = "iot central device-template delete --app-id {} --device-template-id {}  --token \"{}\" --central-dns-suffix \"{}\"".format(
+        command = "iot central device-template delete "
+        "--app-id {} --device-template-id {}  --token \"{}\" --central-dns-suffix \"{}\" ".format(
             APP_ID, template_id, TOKEN, DNS_SUFFIX
         )
 
@@ -704,7 +720,12 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             asserts = []
 
         output = self.command_execute_assert(
-            "iot central diagnostics validate-messages --app-id {} -d {} --et {} --duration {} --mm {} -y --style json".format(
+            "iot central diagnostics validate-messages"
+            "--app-id {} "
+            "-d {} "
+            "--et {} "
+            "--duration {} "
+            "--mm {} -y --style json".format(
                 APP_ID, device_id, enqueued_time, duration, max_messages
             ),
             asserts,

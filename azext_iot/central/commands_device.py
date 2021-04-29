@@ -14,14 +14,14 @@ from azext_iot.central.providers import CentralDeviceProvider
 
 def list_devices(cmd, app_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT):
     provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token)
-    return provider.list_devices()
+    return provider.list_devices(central_dns_suffix=central_dns_suffix)
 
 
 def get_device(
     cmd, app_id: str, device_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token)
-    return provider.get_device(device_id,central_dns_suffix=central_dns_suffix)
+    return provider.get_device(device_id, central_dns_suffix=central_dns_suffix)
 
 
 def create_device(
@@ -90,6 +90,7 @@ def run_command(
         payload=payload,
     )
 
+
 def run_manual_failover(
     cmd,
     app_id: str,
@@ -99,7 +100,7 @@ def run_manual_failover(
     central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     if ttl_minutes and ttl_minutes < 1:
-            raise CLIError("TTL value should be a positive integer: {}".format(ttl_minutes))
+        raise CLIError("TTL value should be a positive integer: {}".format(ttl_minutes))
 
     provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token)
     return provider.run_manual_failover(
@@ -107,6 +108,7 @@ def run_manual_failover(
         ttl_minutes=ttl_minutes,
         central_dns_suffix=central_dns_suffix
     )
+
 
 def run_manual_failback(
     cmd,
@@ -120,6 +122,7 @@ def run_manual_failback(
         device_id=device_id,
         central_dns_suffix=central_dns_suffix
     )
+
 
 def get_command_history(
     cmd,

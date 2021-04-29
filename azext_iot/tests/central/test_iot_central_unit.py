@@ -467,7 +467,7 @@ class TestFailover:
     def test_should_fail_negative_ttl(self):
         with pytest.raises(CLIError):
             # act
-            result = commands_device.run_manual_failover(fixture_cmd, app_id, device_id, ttl_minutes=-10, token="Shared sig")
+            commands_device.run_manual_failover(fixture_cmd, app_id, device_id, ttl_minutes=-10, token="Shared sig")
 
 
 class TestFailback:

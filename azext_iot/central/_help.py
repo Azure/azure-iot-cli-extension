@@ -107,7 +107,7 @@ def _load_central_devices_help():
         type: command
         short-summary: Reverts the previously executed failover command by moving the device back to it's original IoT Hub
         long-summary: For more information about high availability visit https://github.com/iot-for-all/iot-central-high-availability-clients#readme
-        
+
         examples:
         - name: Reverts the previously executed failover command by moving the device back to it's original IoT Hub
           text: >
@@ -115,7 +115,7 @@ def _load_central_devices_help():
             --app-id {appid}
             --device-id {deviceid}
     """
-    
+
     helps[
         "iot central device delete"
     ] = """

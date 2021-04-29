@@ -44,8 +44,8 @@ def try_extract_result(response: Response):
 
     return body
 
+
 def log_response_debug(response: Response, logger: logging.Logger):
     logger.debug("Response status code: {}".format(response.status_code))
     logger.debug("Response url: {}".format(response.url))
     logger.debug("Response headers: {}".format(response.headers))
-
