@@ -1,0 +1,168 @@
+trigger:
+  branches:
+    include:
+      - device_client_integration
+    exclude:
+      - dev
+      - master
+
+pr:
+  branches:
+    include:
+      - device_client_integration
+    exclude:
+      - dev
+      - master
+
+variables:
+  iot_ext_package: azure-iot
+  iot_ext_venv: venv
+
+jobs:
+
+- job: 'build_and_publish_azure_iot_cli_ext'
+  pool:
+    vmImage: 'Ubuntu-16.04'
+
+  steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.6.x'
+      architecture: 'x64'
+
+  - template: templates/setup-ci-machine.yml
+  - template: templates/build-publish-azure-iot-cli-extension.yml
+
+- job: 'build_and_publish_azure_cli_test_sdk'
+  pool:
+    vmImage: 'Ubuntu-16.04'
+
+  steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.6.x'
+      architecture: 'x64'
+
+  - template: templates/setup-ci-machine.yml
+  - template: templates/build-publish-azure-cli-test-sdk.yml
+
+- job: 'run_unit_tests_ubuntu'
+  dependsOn: [ 'build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']
+  pool:
+    vmImage: 'Ubuntu-16.04'
+  strategy:
+    matrix:
+      Python36:
+        python.version: '3.6.x'
+      Python37:
+        python.version: '3.7.x'
+      Python38:
+        python.version: '3.8.x'
+    maxParallel: 3
+
+  steps:
+  - bash: sudo rm -R -f /usr/local/lib/azureExtensionDir
+
+  - template: templates/run-tests.yml
+    parameters:
+      pythonVersion: '$(python.version)'
+      runUnitTests: 'true'
+      runIntTests: 'false'
+
+- job: 'run_unit_tests_macOs'
+  dependsOn: ['build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']
+  pool:
+    vmImage: 'macOS-10.14'
+
+  steps:
+  - template: templates/run-tests.yml
+    parameters:
+      pythonVersion: '3.8.x'
+      runUnitTests: 'true'
+      runIntTests: 'false'
+
+  - template: templates/calculate-code-coverage.yml
+
+- job: 'run_unit_tests_windows'
+  dependsOn : [ 'build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']
+  pool:
+    vmImage: 'vs2017-win2016'
+
+  steps:
+  - task: PowerShell@2
+    inputs:
+      targetType: 'inline'
+      script : 'ren "C:\Program Files\Common Files\AzureCliExtensionDirectory" "C:\Program Files\Common Files\AzureCliExtensionDirectory1"'
+
+  - template: templates/run-tests.yml
+    parameters:
+      pythonVersion: '3.8.x'
+      runUnitTests: 'true'
+      runIntTests: 'false'
+
+- job: 'run_style_check'
+  dependsOn: ['build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']
+  pool:
+    vmImage: 'Ubuntu-16.04'
+
+  steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.8.x'
+      architecture: 'x64'
+
+  - template: templates/install-azure-cli-released.yml
+  - template: templates/setup-ci-machine.yml
+  - template: templates/download-install-local-azure-iot-cli-extension-with-pip.yml
+
+  - script: 'pylint azext_iot/ --rcfile=.pylintrc'
+    displayName: 'Evaluate with pylint'
+    workingDirectory: '.'
+
+  - script: 'flake8 azext_iot/ --statistics --config=setup.cfg'
+    displayName: 'Evaluate with flake8'
+    workingDirectory: '.'
+
+# TODO: Evaluate this style or similar alternative for setting up CLI env
+- job: 'run_azdev_linter_on_command_table'
+  dependsOn: ['build_and_publish_azure_iot_cli_ext']
+  displayName: 'Evaluate IoT extension command table'
+  pool:
+    vmImage: 'Ubuntu-16.04'
+
+  steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.6.x'
+      architecture: 'x64'
+
+  - template: templates/install-configure-azure-cli.yml
+
+- job: CredScan
+  displayName: 'Credential Scan'
+  pool:
+    vmImage: 'vs2017-win2016'
+
+  steps:
+  - task: CredScan@3
+    inputs:
+      outputFormat: 'pre'
+      scanFolder: '$(Build.SourcesDirectory)'
+      suppressionsFile: '$(Build.SourcesDirectory)/CredScanSuppressions.json'
+
+  - task: PostAnalysis@1
+    inputs:
+      AllTools: false
+      APIScan: false
+      BinSkim: false
+      CodesignValidation: false
+      CredScan: true
+      FortifySCA: false
+      FxCop: false
+      ModernCop: false
+      PoliCheck: false
+      RoslynAnalyzers: false
+      SDLNativeRules: false
+      Semmle: false
+      TSLint: false
+      ToolLogsNotFoundAction: 'Standard'
