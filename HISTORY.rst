@@ -18,6 +18,11 @@ Release History
 
 **Azure Digital Twins updates**
 
+* Addition of the following commands
+
+  * az dt twin delete-all - Deletes all digital twins within a Digital Twins instance.
+  * az dt twin relationship delete-all - Deletes all digital twin relationships within a Digital Twins instance
+
 * Fixed an issue in the following update commands where malformed json patch content would not raise an error
   causing the process to call the respective service endpoint with a request payload containing an empty array.
 
@@ -27,7 +32,7 @@ Release History
 
 **IoT Central updates**
 
-* Addition of following commands
+* Addition of the following commands
 
   * az iot central device manual-failover - Execute a manual failover of device across multiple IoT Hubs 
   * az iot central device manual-failback - Reverts the previously executed failover command by moving the device back to it's original IoT Hub
