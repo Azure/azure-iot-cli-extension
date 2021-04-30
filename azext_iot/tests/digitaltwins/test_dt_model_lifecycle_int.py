@@ -29,7 +29,7 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
         instance_name = generate_resource_id()
         models_directory = "./models"
         inline_model = "./models/Floor.json"
-        component_dtmi = "dtmi:com:example:Thermostat;1"
+        # component_dtmi = "dtmi:com:example:Thermostat;1"
         room_dtmi = "dtmi:com:example:Room;1"
 
         create_output = self.cmd(
@@ -119,16 +119,9 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
             "dt model list -n {}".format(instance_name)
         ).get_output_in_json()
 
-        # Delete non-referenced models first
-        for model in list_models_output:
-            if model["id"] != component_dtmi:
-                self.cmd(
-                    "dt model delete -n {} --dtmi {}".format(instance_name, model["id"])
-                )
-
-        # Now referenced component
+        # Delete all
         self.cmd(
-            "dt model delete -n {} --dtmi {}".format(instance_name, component_dtmi)
+            "dt model delete-all -n {} --yes".format(instance_name)
         )
 
         assert (
