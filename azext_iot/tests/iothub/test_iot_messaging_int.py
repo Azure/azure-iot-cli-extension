@@ -254,7 +254,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             expect_failure=True,
         )
 
-    def test_uamqp_device_direct_method_with_custom_response_status_payload(self):
+    def test_mqtt_device_direct_method_with_custom_response_status_payload(self):
         device_count = 1
         device_ids = self.generate_device_names(device_count)
 
