@@ -805,5 +805,5 @@ def load_digitaltwins_help():
         examples:
         - name: Delete all models.
           text: >
-            az dt model delete -n {instance_or_hostname}"
+            az dt model delete-all -n {instance_or_hostname}
     """

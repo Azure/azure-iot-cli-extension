@@ -4,7 +4,6 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import re
 import pytest
 import responses
 import json
@@ -13,7 +12,6 @@ from knack.cli import CLIError
 from azext_iot.digitaltwins import commands_models as subject
 from azext_iot.tests.generators import generate_generic_id
 from msrest.paging import Paged
-from os import DirEntry
 
 instance_name = generate_generic_id()
 hostname = "{}.subdomain.domain".format(instance_name)
