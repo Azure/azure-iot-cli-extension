@@ -14,7 +14,7 @@ from azure.iot.device import IoTHubDeviceClient as mqtt_device_client, Message, 
 
 
 class mqtt_client(object):
-    def __init__(self, target, device_conn_string, device_id, method_response_code=200, method_response_payload=None):
+    def __init__(self, target, device_conn_string, device_id, method_response_code=None, method_response_payload=None):
         self.device_id = device_id
         self.device_client = mqtt_device_client.create_from_connection_string(device_conn_string)
         self.device_client.connect()
@@ -32,8 +32,20 @@ class mqtt_client(object):
         six.print_()
         six.print_("_Received C2D message with topic_: /devices/{}/messages/devicebound".format(self.device_id))
         six.print_("_Payload_: {}".format(message.data))
-        if message.custom_properties:
-            six.print_("_Custom Properties_: {}".format(message.custom_properties))
+
+        property_names = [
+            "message_id", "expiry_time_utc", "correlation_id", "user_id",
+            "content_encoding", "content_type", "_iothub_interface_id"]
+
+        message_properties = {}
+        message_attributes = vars(message)
+
+        for item in message_attributes:
+            if item in property_names and message_attributes[item] is not None:
+                message_properties[item] = message_attributes[item]
+
+        message_properties.update(message.custom_properties)
+        six.print_("_Message Properties_: {}".format(message_properties))
 
     def method_request_handler(self, method_request):
         six.print_()
@@ -46,13 +58,18 @@ class mqtt_client(object):
             payload = self.method_response_payload
         else:
             payload = {
-                "device_id": self.device_id,
-                "method_name": method_request.name,
-                "method_request_id": method_request.request_id,
-                "data": "Method executed successfully"
+                "methodName": method_request.name,
+                "methodRequestId": method_request.request_id,
+                "methodRequestPayload": method_request.payload,
+                "result": "Method executed successfully"
             }
 
-        status = self.method_response_code  # set return status code
+        # set response status code
+        if self.method_response_code:
+            status = self.method_response_code
+        else:
+            status = 200
+
         method_response = MethodResponse.create_from_method_request(method_request, status, payload)
         self.device_client.send_method_response(method_response)
 

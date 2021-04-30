@@ -2153,7 +2153,7 @@ def iot_simulate_device(
     properties=None,
     resource_group_name=None,
     login=None,
-    method_response_code=200,
+    method_response_code=None,
     method_response_payload=None
 ):
     import sys
@@ -2178,6 +2178,12 @@ def iot_simulate_device(
 
     if msg_count < MIN_SIM_MSG_COUNT:
         raise CLIError("msg count must be at least {}".format(MIN_SIM_MSG_COUNT))
+
+    if protocol_type != ProtocolType.mqtt.name:
+        if method_response_code:
+            raise CLIError("'method-response-code' not supported, {} doesn't allow direct methods.".format(protocol_type))
+        if method_response_payload:
+            raise CLIError("'method-response-payload' not supported, {} doesn't allow direct methods.".format(protocol_type))
 
     properties_to_send = _iot_simulate_get_default_properties(protocol_type)
     user_properties = validate_key_value_pairs(properties) or {}
