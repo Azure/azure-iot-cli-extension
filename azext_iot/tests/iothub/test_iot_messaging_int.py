@@ -191,16 +191,15 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         res = self.cmd(
             "iot hub invoke-device-method -d {} --method-name Test_Method_1 --login {}".format(
                 device_ids[0], self.connection_string
-            )
+            ) + "--method-payload {'payload_data1':'payload_value1'}"
         ).get_output_in_json()
 
         assert res is not None
         assert res["status"] == 200
         assert res["payload"] == {
-            "data": "Method executed successfully",
-            "device_id": device_ids[0],
-            "method_name": "Test_Method_1",
-            "method_request_id": "1"
+            "methodName": "Test_Method_1",
+            "methodRequestId": "1",
+            "methodRequestPayload": "{'payload_data1':'payload_value1'}"
         }
 
         token.set()

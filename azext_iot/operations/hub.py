@@ -11,7 +11,6 @@ from knack.log import get_logger
 from knack.util import CLIError
 from enum import Enum, EnumMeta
 from azext_iot.constants import (
-    EXTENSION_ROOT,
     DEVICE_DEVICESCOPE_PREFIX,
     TRACING_PROPERTY,
     TRACING_ALLOWED_FOR_LOCATION,
@@ -33,7 +32,6 @@ from azext_iot.common.utility import (
     shell_safe_json_parse,
     read_file_content,
     validate_key_value_pairs,
-    url_encode_dict,
     unpack_msrest_error,
     init_monitoring,
     process_json_arg,
@@ -1806,62 +1804,25 @@ def iot_device_send_message(
     login=None,
     qos=1,
 ):
+    from azext_iot.operations._mqtt import mqtt_client
+
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
-    return _iot_device_send_message(
-        target=target,
-        device_id=device_id,
-        data=data,
-        properties=properties,
-        msg_count=msg_count,
-        qos=qos,
-    )
 
-
-def _iot_device_send_message(
-    target, device_id, data, properties=None, msg_count=1, qos=1
-):
-    from azext_iot.operations._mqtt import build_mqtt_device_username
-    import paho.mqtt.publish as publish
-    from paho.mqtt import client as mqtt
-    import ssl
-    import os
-
-    msgs = []
     if properties:
         properties = validate_key_value_pairs(properties)
 
-    sas = SasTokenAuthentication(
-        target["entity"], target["policy"], target["primarykey"], 360
-    ).generate_sas_token()
-    cwd = EXTENSION_ROOT
-    cert_path = os.path.join(cwd, "digicert.pem")
-    auth = {
-        "username": build_mqtt_device_username(target["entity"], device_id),
-        "password": sas,
-    }
-
-    tls = {"ca_certs": cert_path, "tls_version": ssl.PROTOCOL_SSLv23}
-    topic = "devices/{}/messages/events/{}".format(
-        device_id, url_encode_dict(properties) if properties else ""
+    device_connection = iot_get_device_connection_string(cmd=cmd, device_id=device_id, hub_name=hub_name, login=login)
+    client_mqtt = mqtt_client(
+        target=target,
+        device_conn_string=device_connection["connectionString"],
+        device_id=device_id
     )
+
     for _ in range(msg_count):
-        msgs.append({"topic": topic, "payload": data, "qos": int(qos)})
-    try:
-        publish.multiple(
-            msgs,
-            client_id=device_id,
-            hostname=target["entity"],
-            auth=auth,
-            port=8883,
-            protocol=mqtt.MQTTv311,
-            tls=tls,
-        )
-        return
-    except Exception as x:
-        raise CLIError(x)
+        client_mqtt.send_d2c_message(message_text=data, properties=properties)
 
 
 def iot_device_send_message_http(

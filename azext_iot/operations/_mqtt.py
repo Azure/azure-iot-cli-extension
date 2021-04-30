@@ -23,7 +23,7 @@ class mqtt_client(object):
         self.method_response_code = method_response_code
         self.method_response_payload = method_response_payload
 
-    def send_d2c_message(self, message_text="", properties={}):
+    def send_d2c_message(self, message_text, properties=None):
         message = Message(message_text)
         message.custom_properties = properties
         self.device_client.send_message(message)
@@ -35,7 +35,8 @@ class mqtt_client(object):
 
         property_names = [
             "message_id", "expiry_time_utc", "correlation_id", "user_id",
-            "content_encoding", "content_type", "_iothub_interface_id"]
+            "content_encoding", "content_type", "_iothub_interface_id"
+        ]
 
         message_properties = {}
         message_attributes = vars(message)
@@ -60,8 +61,7 @@ class mqtt_client(object):
             payload = {
                 "methodName": method_request.name,
                 "methodRequestId": method_request.request_id,
-                "methodRequestPayload": method_request.payload,
-                "result": "Method executed successfully"
+                "methodRequestPayload": method_request.payload
             }
 
         # set response status code
