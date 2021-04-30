@@ -220,7 +220,7 @@ class TestTwinQueryTwins(object):
 
         yield mocked_response
 
-    def test_list_relationship_error(self, fixture_cmd, service_client_error):
+    def test_query_twins_error(self, fixture_cmd, service_client_error):
         with pytest.raises(CLIError):
             subject.query_twins(
                 cmd=fixture_cmd,
