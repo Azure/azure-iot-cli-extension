@@ -10,18 +10,34 @@ from knack.util import CLIError
 from azext_iot.common import utility
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.providers import CentralDeviceProvider
+from azext_iot.central.models.enum import ApiVersion
 
 
-def list_devices(cmd, app_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT):
+def list_devices(
+    cmd,
+    app_id: str,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
+):
     provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token)
-    return provider.list_devices()
+    return provider.list_devices(
+        api_version=api_version, central_dns_suffix=central_dns_suffix
+    )
 
 
 def get_device(
-    cmd, app_id: str, device_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd,
+    app_id: str,
+    device_id: str,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
 ):
     provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token)
-    return provider.get_device(device_id)
+    return provider.get_device(
+        device_id, api_version=api_version, central_dns_suffix=central_dns_suffix
+    )
 
 
 def create_device(
@@ -33,6 +49,7 @@ def create_device(
     simulated=False,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
 ):
     if simulated and not instance_of:
         raise CLIError(
@@ -45,23 +62,39 @@ def create_device(
         instance_of=instance_of,
         simulated=simulated,
         central_dns_suffix=central_dns_suffix,
+        api_version=api_version,
     )
 
 
 def delete_device(
-    cmd, app_id: str, device_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd,
+    app_id: str,
+    device_id: str,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
 ):
     provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token)
-    return provider.delete_device(device_id)
+    return provider.delete_device(
+        device_id, api_version=api_version, central_dns_suffix=central_dns_suffix
+    )
 
 
 def registration_info(
-    cmd, app_id: str, device_id, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd,
+    app_id: str,
+    device_id,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
 ):
     provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token,)
 
     return provider.get_device_registration_info(
-        device_id=device_id, central_dns_suffix=central_dns_suffix, device_status=None,
+        device_id=device_id,
+        central_dns_suffix=central_dns_suffix,
+        device_status=None,
+        api_version=api_version,
     )
 
 
@@ -74,6 +107,7 @@ def run_command(
     content: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
 ):
     if not isinstance(content, str):
         raise CLIError("content must be a string: {}".format(content))
@@ -86,6 +120,8 @@ def run_command(
         interface_id=interface_id,
         command_name=command_name,
         payload=payload,
+        api_version=api_version,
+        central_dns_suffix=central_dns_suffix,
     )
 
 
@@ -97,10 +133,15 @@ def get_command_history(
     command_name: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
 ):
     provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token)
     return provider.get_component_command_history(
-        device_id=device_id, interface_id=interface_id, command_name=command_name,
+        device_id=device_id,
+        interface_id=interface_id,
+        command_name=command_name,
+        api_version=api_version,
+        central_dns_suffix=central_dns_suffix,
     )
 
 
@@ -114,11 +155,18 @@ def registration_summary(
 
 
 def get_credentials(
-    cmd, app_id: str, device_id, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd,
+    app_id: str,
+    device_id,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
 ):
     provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token,)
     return provider.get_device_credentials(
-        device_id=device_id, central_dns_suffix=central_dns_suffix,
+        device_id=device_id,
+        central_dns_suffix=central_dns_suffix,
+        api_version=api_version,
     )
 
 

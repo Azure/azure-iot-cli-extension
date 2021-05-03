@@ -22,9 +22,7 @@ from azext_iot.tests import CaptureOutputLiveScenarioTest, helpers
 APP_ID = os.environ.get("azext_iot_central_app_id")
 APP_PRIMARY_KEY = os.environ.get("azext_iot_central_primarykey")
 APP_SCOPE_ID = os.environ.get("azext_iot_central_scope_id")
-device_template_path = get_context_path(
-    __file__, "json/device_template_int_test.json"
-)
+device_template_path = get_context_path(__file__, "json/device_template_int_test.json")
 sync_command_params = get_context_path(__file__, "json/sync_command_args.json")
 
 if not all([APP_ID]):
@@ -263,6 +261,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             assert issue in output
 
     def test_central_device_methods_CRD(self):
+
         (device_id, device_name) = self._create_device()
 
         self.cmd(

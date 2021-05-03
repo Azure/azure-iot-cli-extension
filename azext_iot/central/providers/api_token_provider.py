@@ -8,7 +8,7 @@ from knack.log import get_logger
 
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
-from azext_iot.central.models.enum import Role
+from azext_iot.central.models.enum import Role, ApiVersion
 
 
 logger = get_logger(__name__)
@@ -32,7 +32,11 @@ class CentralApiTokenProvider:
         self._token = token
 
     def add_api_token(
-        self, token_id: str, role: Role, central_dns_suffix=CENTRAL_ENDPOINT,
+        self,
+        token_id: str,
+        role: Role,
+        api_version=ApiVersion.v1.value,
+        central_dns_suffix=CENTRAL_ENDPOINT,
     ):
 
         return central_services.api_token.add_api_token(
@@ -41,38 +45,48 @@ class CentralApiTokenProvider:
             token_id=token_id,
             role=role,
             token=self._token,
+            api_version=api_version,
             central_dns_suffix=central_dns_suffix,
         )
 
     def get_api_token_list(
-        self, central_dns_suffix=CENTRAL_ENDPOINT,
+        self, api_version=ApiVersion.v1.value, central_dns_suffix=CENTRAL_ENDPOINT
     ):
 
         return central_services.api_token.get_api_token_list(
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
+            api_version=api_version,
             central_dns_suffix=central_dns_suffix,
         )
 
     def get_api_token(
-        self, token_id, central_dns_suffix=CENTRAL_ENDPOINT,
+        self,
+        token_id,
+        api_version=ApiVersion.v1.value,
+        central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         return central_services.api_token.get_api_token(
             cmd=self._cmd,
             app_id=self._app_id,
             token_id=token_id,
             token=self._token,
+            api_version=api_version,
             central_dns_suffix=central_dns_suffix,
         )
 
     def delete_api_token(
-        self, token_id, central_dns_suffix=CENTRAL_ENDPOINT,
+        self,
+        token_id,
+        api_version=ApiVersion.v1.value,
+        central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         return central_services.api_token.delete_api_token(
             cmd=self._cmd,
             app_id=self._app_id,
             token_id=token_id,
             token=self._token,
+            api_version=api_version,
             central_dns_suffix=central_dns_suffix,
         )

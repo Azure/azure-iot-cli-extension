@@ -14,15 +14,20 @@ from typing import List
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
 from azext_iot.central.models.device import Device
-from azext_iot.central.models.enum import DeviceStatus
+from azext_iot.central.models.enum import DeviceStatus, ApiVersion
 
 logger = get_logger(__name__)
 
-BASE_PATH = "api/preview/devices"
+BASE_PATH = "api/devices"
 
 
 def get_device(
-    cmd, app_id: str, device_id: str, token: str, central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd,
+    app_id: str,
+    device_id: str,
+    token: str,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
 ) -> Device:
     """
     Get device info given a device id
@@ -42,13 +47,22 @@ def get_device(
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, device_id)
     headers = _utility.get_headers(token, cmd)
 
-    response = requests.get(url, headers=headers)
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
+    response = requests.get(url, headers=headers, params=query_parameters)
     result = _utility.try_extract_result(response)
     return Device(result)
 
 
 def list_devices(
-    cmd, app_id: str, token: str, max_pages=1, central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd,
+    app_id: str,
+    token: str,
+    max_pages=1,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
 ) -> List[Device]:
     """
     Get a list of all devices in IoTC app
@@ -69,9 +83,13 @@ def list_devices(
     url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
     headers = _utility.get_headers(token, cmd)
 
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
     pages_processed = 0
     while (pages_processed <= max_pages) and url:
-        response = requests.get(url, headers=headers)
+        response = requests.get(url, headers=headers, params=query_parameters)
         result = _utility.try_extract_result(response)
 
         if "value" not in result:
@@ -79,14 +97,18 @@ def list_devices(
 
         devices = devices + [Device(device) for device in result["value"]]
 
-        url = result.get("nextLink")
+        url = result.get("nextLink", params=query_parameters)
         pages_processed = pages_processed + 1
 
     return devices
 
 
 def get_device_registration_summary(
-    cmd, app_id: str, token: str, central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd,
+    app_id: str,
+    token: str,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
 ):
     """
     Get device registration summary for a given app
@@ -106,11 +128,16 @@ def get_device_registration_summary(
 
     url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
     headers = _utility.get_headers(token, cmd)
+
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
     logger.warning(
         "This command may take a long time to complete if your app contains a lot of devices"
     )
     while url:
-        response = requests.get(url, headers=headers)
+        response = requests.get(url, headers=headers, params=query_parameters)
         result = _utility.try_extract_result(response)
 
         if "value" not in result:
@@ -120,7 +147,7 @@ def get_device_registration_summary(
             registration_summary[Device(device).device_status.value] += 1
 
         print("Processed {} devices...".format(sum(registration_summary.values())))
-        url = result.get("nextLink")
+        url = result.get("nextLink", params=query_parameters)
     return registration_summary
 
 
@@ -133,6 +160,7 @@ def create_device(
     simulated: bool,
     token: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
 ) -> Device:
     """
     Create a device in IoTC
@@ -158,6 +186,11 @@ def create_device(
 
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, device_id)
     headers = _utility.get_headers(token, cmd, has_json_payload=True)
+
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
     payload = {
         "displayName": device_name,
         "simulated": simulated,
@@ -166,13 +199,18 @@ def create_device(
     if instance_of:
         payload["instanceOf"] = instance_of
 
-    response = requests.put(url, headers=headers, json=payload)
+    response = requests.put(url, headers=headers, json=payload, params=query_parameters)
     result = _utility.try_extract_result(response)
     return Device(result)
 
 
 def delete_device(
-    cmd, app_id: str, device_id: str, token: str, central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd,
+    app_id: str,
+    device_id: str,
+    token: str,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
 ) -> dict:
     """
     Delete a device from IoTC
@@ -192,12 +230,21 @@ def delete_device(
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, device_id)
     headers = _utility.get_headers(token, cmd)
 
-    response = requests.delete(url, headers=headers)
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
+    response = requests.delete(url, headers=headers, params=query_parameters)
     return _utility.try_extract_result(response)
 
 
 def get_device_credentials(
-    cmd, app_id: str, device_id: str, token: str, central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd,
+    app_id: str,
+    device_id: str,
+    token: str,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
 ):
     """
     Get device credentials from IoTC
@@ -218,7 +265,11 @@ def get_device_credentials(
     )
     headers = _utility.get_headers(token, cmd)
 
-    response = requests.get(url, headers=headers)
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
+    response = requests.get(url, headers=headers, params=query_parameters)
     return _utility.try_extract_result(response)
 
 
@@ -231,6 +282,7 @@ def run_component_command(
     command_name: str,
     payload: dict,
     central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
 ):
     """
     Execute a direct method on a device
@@ -254,7 +306,13 @@ def run_component_command(
     )
     headers = _utility.get_headers(token, cmd)
 
-    response = requests.post(url, headers=headers, json=payload)
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
+    response = requests.post(
+        url, headers=headers, json=payload, params=query_parameters
+    )
 
     # execute command response has caveats in it due to Async/Sync device methods
     # return the response if we get 201, otherwise try to apply generic logic
@@ -272,6 +330,7 @@ def get_component_command_history(
     interface_id: str,
     command_name: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
 ):
     """
     Get component command history
@@ -294,5 +353,9 @@ def get_component_command_history(
     )
     headers = _utility.get_headers(token, cmd)
 
-    response = requests.get(url, headers=headers)
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
+    response = requests.get(url, headers=headers, params=query_parameters)
     return _utility.try_extract_result(response)

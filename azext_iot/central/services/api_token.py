@@ -9,11 +9,11 @@ import requests
 from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
-from azext_iot.central.models.enum import Role
+from azext_iot.central.models.enum import Role, ApiVersion
 
 logger = get_logger(__name__)
 
-BASE_PATH = "api/preview/apiTokens"
+BASE_PATH = "api/apiTokens"
 
 
 def add_api_token(
@@ -22,6 +22,7 @@ def add_api_token(
     token_id: str,
     role: Role,
     token: str,
+    api_version=ApiVersion.v1.value,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     """
@@ -45,14 +46,22 @@ def add_api_token(
         "roles": [{"role": role.value}],
     }
 
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
     headers = _utility.get_headers(token, cmd, has_json_payload=True)
 
-    response = requests.put(url, headers=headers, json=payload)
+    response = requests.put(url, headers=headers, json=payload, params=query_parameters)
     return _utility.try_extract_result(response)
 
 
 def get_api_token_list(
-    cmd, app_id: str, token: str, central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd,
+    app_id: str,
+    token: str,
+    api_version: ApiVersion.v1.value,
+    central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     """
     Get the list of API tokens for a central app.
@@ -69,14 +78,23 @@ def get_api_token_list(
     """
     url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
 
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
     headers = _utility.get_headers(token, cmd)
 
-    response = requests.get(url, headers=headers)
+    response = requests.get(url, params=query_parameters, headers=headers)
     return _utility.try_extract_result(response)
 
 
 def get_api_token(
-    cmd, app_id: str, token: str, token_id: str, central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd,
+    app_id: str,
+    token: str,
+    token_id: str,
+    api_version=ApiVersion.v1.value,
+    central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     """
     Get information about a specified API token.
@@ -96,12 +114,21 @@ def get_api_token(
 
     headers = _utility.get_headers(token, cmd)
 
-    response = requests.get(url, headers=headers)
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
+    response = requests.get(url, headers=headers, params=query_parameters)
     return _utility.try_extract_result(response)
 
 
 def delete_api_token(
-    cmd, app_id: str, token: str, token_id: str, central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd,
+    app_id: str,
+    token: str,
+    token_id: str,
+    api_version=ApiVersion.v1.value,
+    central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     """
     delete API token from the app.
@@ -121,5 +148,9 @@ def delete_api_token(
 
     headers = _utility.get_headers(token, cmd)
 
-    response = requests.delete(url, headers=headers)
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
+    response = requests.delete(url, headers=headers, params=query_parameters)
     return _utility.try_extract_result(response)

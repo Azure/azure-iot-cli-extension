@@ -41,3 +41,12 @@ class UserType(Enum):
 
     service_principal = "ServicePrincipalUser"
     email = "EmailUser"
+
+
+class ApiVersion(Enum):
+    """
+    API version's supported
+    """
+
+    preview = "preview"
+    v1 = "1.0"

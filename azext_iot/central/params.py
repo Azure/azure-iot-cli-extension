@@ -11,7 +11,7 @@ CLI parameter definitions.
 from knack.arguments import CLIArgumentType, CaseInsensitiveList
 from azure.cli.core.commands.parameters import get_three_state_flag
 from azext_iot.monitor.models.enum import Severity
-from azext_iot.central.models.enum import Role
+from azext_iot.central.models.enum import Role, ApiVersion
 from azext_iot._params import event_msg_prop_type, event_timeout_type
 
 severity_type = CLIArgumentType(
@@ -35,6 +35,13 @@ style_type = CLIArgumentType(
     "scroll = deliver errors as they arrive, json = summarize results as json, csv = summarize results as csv",
 )
 
+api_version = CLIArgumentType(
+    options_list=["--api-version", "--av"],
+    choices=CaseInsensitiveList([version.value for version in ApiVersion]),
+    default="1.0",
+    help="The API version for the requested operation.",
+)
+
 
 def load_central_arguments(self, _):
     """
@@ -45,8 +52,9 @@ def load_central_arguments(self, _):
             "app_id",
             options_list=["--app-id", "-n"],
             help="The App ID of the IoT Central app you want to manage."
-            " You can find the App ID in the \"About\" page for your application under the help menu."
+            ' You can find the App ID in the "About" page for your application under the help menu.',
         )
+        context.argument("api_version", arg_type=api_version)
         context.argument(
             "token",
             options_list=["--token"],
@@ -194,5 +202,8 @@ def load_central_arguments(self, _):
             "Use 0 for infinity.",
         )
         context.argument(
-            "module_id", options_list=["--module-id", "-m"], help="Provide IoT Edge Module ID if the device type is IoT Edge.",
+            "module_id",
+            options_list=["--module-id", "-m"],
+            help="Provide IoT Edge Module ID if the device type is IoT Edge.",
         )
+
