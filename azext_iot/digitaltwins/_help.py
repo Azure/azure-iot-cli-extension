@@ -800,7 +800,7 @@ def load_digitaltwins_help():
 
     helps["dt model delete-all"] = """
         type: command
-        short-summary: Delete all model within a Digital Twins instance. Twins configurations are not affected but may be broken without model definitions.
+        short-summary: Delete all models within a Digital Twins instance. Twins configurations are not affected but may be broken without model definitions.
 
         examples:
         - name: Delete all models.

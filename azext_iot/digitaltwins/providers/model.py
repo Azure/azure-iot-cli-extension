@@ -7,8 +7,7 @@
 import json
 from azext_iot.common.utility import process_json_arg, scantree, unpack_msrest_error
 from azext_iot.digitaltwins.providers.base import DigitalTwinsProvider
-# from azext_iot.digitaltwins.providers import ErrorResponseException
-from azext_iot.sdk.digitaltwins.dataplane.models.error_response_py3 import ErrorResponseException
+from azext_iot.sdk.digitaltwins.dataplane.models import ErrorResponseException
 from knack.log import get_logger
 from knack.util import CLIError
 
