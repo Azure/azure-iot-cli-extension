@@ -29,7 +29,6 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
         instance_name = generate_resource_id()
         models_directory = "./models"
         inline_model = "./models/Floor.json"
-        # component_dtmi = "dtmi:com:example:Thermostat;1"
         room_dtmi = "dtmi:com:example:Room;1"
 
         create_output = self.cmd(
@@ -106,6 +105,13 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
             "dt model create -n {} --models '{}'".format(instance_name, "{modelJson}")
         ).get_output_in_json()
         assert create_models_inline_output[0]["id"] == inc_model_id
+
+        self.cmd(
+            "dt model delete -n {} --dtmi '{}'".format(instance_name, inc_model_id)
+        )
+        self.cmd(
+            "dt model create -n {} --models '{}'".format(instance_name, "{modelJson}")
+        )
 
         update_model_output = self.cmd(
             "dt model update -n {} --dtmi '{}' --decommission".format(
