@@ -7,102 +7,22 @@
 import pytest
 import responses
 import json
-import urllib
 from knack.cli import CLIError
 from azext_iot.digitaltwins import commands_models as subject
-from azext_iot.tests.generators import generate_generic_id
 from msrest.paging import Paged
+from azext_iot.tests.digitaltwins.dt_helpers import (
+    control_and_data_plane_client,
+    generate_model_id,
+    generate_model_result,
+    generate_generic_id,
+    generic_result,
+    hostname,
+    model_id,
+    resource_group,
+    url_model_id
+)
 
-instance_name = generate_generic_id()
-hostname = "{}.subdomain.domain".format(instance_name)
-resource_group = 'myrg'
 api_version = "2020-10-31"
-
-
-def generate_model_id():
-    normal_id = "dtmi:com:{}:{};1".format(generate_generic_id(), generate_generic_id())
-    url_id = urllib.parse.quote_plus(normal_id)
-    return normal_id, url_id
-
-
-model_id, url_model_id = generate_model_id()
-generic_result = json.dumps({"result": generate_generic_id()})
-
-
-def generate_model_result(model_id=None):
-    model_id = model_id if model_id else generate_model_id()[0]
-    return {
-        "model": {
-            "@context" : ["dtmi:com:context;2"],
-            "@id" : model_id,
-            "@type" : "Interface"
-        },
-        "id": model_id
-    }
-
-
-@pytest.fixture
-def control_and_data_plane_client(mocker, fixture_cmd):
-    from azext_iot.sdk.digitaltwins.controlplane import AzureDigitalTwinsManagementClient
-    from azext_iot.sdk.digitaltwins.dataplane import AzureDigitalTwinsAPI
-    from azext_iot.digitaltwins.providers.auth import DigitalTwinAuthentication
-
-    patched_get_raw_token = mocker.patch(
-        "azure.cli.core._profile.Profile.get_raw_token"
-    )
-    patched_get_raw_token.return_value = (
-        mocker.MagicMock(name="creds"),
-        mocker.MagicMock(name="subscription"),
-        mocker.MagicMock(name="tenant"),
-    )
-
-    control_plane_patch = mocker.patch(
-        "azext_iot.digitaltwins.providers.digitaltwins_service_factory"
-    )
-    control_plane_patch.return_value = AzureDigitalTwinsManagementClient(
-        credentials=DigitalTwinAuthentication(
-            fixture_cmd, "00000000-0000-0000-0000-000000000000"
-        ),
-        subscription_id="00000000-0000-0000-0000-000000000000",
-    )
-
-    data_plane_patch = mocker.patch(
-        "azext_iot.digitaltwins.providers.base.DigitalTwinsProvider.get_sdk"
-    )
-
-    data_plane_patch.return_value = AzureDigitalTwinsAPI(
-        credentials=DigitalTwinAuthentication(
-            fixture_cmd, "00000000-0000-0000-0000-000000000000"
-        ),
-        base_url="https://{}/".format(hostname)
-    )
-
-    return control_plane_patch, data_plane_patch
-
-
-# @pytest.fixture
-# def start_model_response(mocked_response, control_and_data_plane_client):
-#     mocked_response.assert_all_requests_are_fired = False
-
-#     mocked_response.add(
-#         method=responses.GET,
-#         content_type="application/json",
-#         url=re.compile(
-#             "https://management.azure.com/subscriptions/(.*)/"
-#             "providers/Microsoft.DigitalTwins/digitalTwinsInstances"
-#         ),
-#         status=200,
-#         match_querystring=False,
-#         body=json.dumps({"hostName": hostname}),
-#     )
-
-#     yield mocked_response
-
-
-def check_resource_group_name_call(service_client, resource_group_input):
-    if ("management.azure.com/subscriptions" in service_client.calls[0].request.url):
-        return 1
-    return 0
 
 
 class TestAddModels(object):
