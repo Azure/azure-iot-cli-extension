@@ -12,17 +12,16 @@ from knack.cli import CLIError
 from azext_iot.digitaltwins import commands_twins as subject
 from msrest.paging import Paged
 from azext_iot.tests.digitaltwins.dt_helpers import (
-    control_and_data_plane_client,
     etag,
     generate_generic_id,
     generate_relationship,
     generate_twin_result,
     generic_result,
-    hostname,
     model_id,
     resource_group,
     twin_id
 )
+from azext_iot.tests.conftest import hostname
 
 target_twin_id = generate_generic_id()
 relationship_id = generate_generic_id()
@@ -35,7 +34,7 @@ generic_patch_2 = json.dumps({"a" : "b", "c" : "d"})
 
 
 @pytest.fixture
-def start_twin_response(mocked_response, control_and_data_plane_client):
+def start_twin_response(mocked_response, fixture_dt_client):
     mocked_response.assert_all_requests_are_fired = False
 
     mocked_response.add(

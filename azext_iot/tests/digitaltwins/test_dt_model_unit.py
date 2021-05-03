@@ -11,23 +11,22 @@ from knack.cli import CLIError
 from azext_iot.digitaltwins import commands_models as subject
 from msrest.paging import Paged
 from azext_iot.tests.digitaltwins.dt_helpers import (
-    control_and_data_plane_client,
     generate_model_id,
     generate_model_result,
     generate_generic_id,
     generic_result,
-    hostname,
     model_id,
     resource_group,
     url_model_id
 )
+from azext_iot.tests.conftest import hostname
 
 api_version = "2020-10-31"
 
 
 class TestAddModels(object):
     @pytest.fixture(params=[200, 201])
-    def service_client(self, mocked_response, control_and_data_plane_client, request):
+    def service_client(self, mocked_response, fixture_dt_client, request):
         mocked_response.add(
             method=responses.POST,
             url="https://{}/models".format(
@@ -139,7 +138,7 @@ class TestAddModels(object):
             )
 
     @pytest.fixture(params=[400, 401, 403, 500])
-    def service_client_error(self, mocked_response, control_and_data_plane_client, request):
+    def service_client_error(self, mocked_response, fixture_dt_client, request):
         mocked_response.assert_all_requests_are_fired = False
         mocked_response.add(
             method=responses.POST,
@@ -167,7 +166,7 @@ class TestAddModels(object):
 
 class TestShowModel(object):
     @pytest.fixture
-    def service_client(self, mocked_response, control_and_data_plane_client):
+    def service_client(self, mocked_response, fixture_dt_client):
         mocked_response.add(
             method=responses.GET,
             url="https://{}/models/{}".format(
@@ -205,7 +204,7 @@ class TestShowModel(object):
         assert result == json.loads(generic_result)
 
     @pytest.fixture(params=[400, 401, 500])
-    def service_client_error(self, mocked_response, control_and_data_plane_client, request):
+    def service_client_error(self, mocked_response, fixture_dt_client, request):
         mocked_response.assert_all_requests_are_fired = False
         mocked_response.add(
             method=responses.GET,
@@ -233,7 +232,7 @@ class TestShowModel(object):
 
 class TestListModels(object):
     @pytest.fixture
-    def service_client(self, mocked_response, control_and_data_plane_client):
+    def service_client(self, mocked_response, fixture_dt_client):
         yield mocked_response
 
     @pytest.mark.parametrize(
@@ -324,7 +323,7 @@ class TestListModels(object):
 
 class TestUpdateModel(object):
     @pytest.fixture
-    def service_client(self, mocked_response, control_and_data_plane_client):
+    def service_client(self, mocked_response, fixture_dt_client):
         mocked_response.assert_all_requests_are_fired = False
 
         mocked_response.add(
@@ -388,7 +387,7 @@ class TestUpdateModel(object):
         assert result == json.loads(generic_result)
 
     @pytest.fixture(params=[(200, 400), (200, 401), (200, 500), (400, 204), (401, 204), (500, 204)])
-    def service_client_error(self, mocked_response, control_and_data_plane_client, request):
+    def service_client_error(self, mocked_response, fixture_dt_client, request):
         mocked_response.assert_all_requests_are_fired = False
 
         mocked_response.add(
@@ -428,7 +427,7 @@ class TestUpdateModel(object):
 
 class TestDeleteModel(object):
     @pytest.fixture
-    def service_client(self, mocked_response, control_and_data_plane_client):
+    def service_client(self, mocked_response, fixture_dt_client):
         mocked_response.add(
             method=responses.DELETE,
             url="https://{}/models/{}".format(
@@ -457,7 +456,7 @@ class TestDeleteModel(object):
         assert result is None
 
     @pytest.fixture(params=[400, 401, 500])
-    def service_client_error(self, mocked_response, control_and_data_plane_client, request):
+    def service_client_error(self, mocked_response, fixture_dt_client, request):
         mocked_response.assert_all_requests_are_fired = False
         mocked_response.add(
             method=responses.DELETE,
@@ -530,7 +529,7 @@ class TestDeleteAllModels(object):
         return value
 
     @pytest.fixture
-    def service_client(self, mocked_response, control_and_data_plane_client):
+    def service_client(self, mocked_response, fixture_dt_client):
         yield mocked_response
 
     @pytest.mark.parametrize(
@@ -587,7 +586,7 @@ class TestDeleteAllModels(object):
         assert result is None
 
     @pytest.fixture(params=[(200, 400), (200, 401), (200, 500), (400, 204), (401, 204), (500, 204)])
-    def service_client_error(self, mocked_response, control_and_data_plane_client, request):
+    def service_client_error(self, mocked_response, fixture_dt_client, request):
         mocked_response.assert_all_requests_are_fired = False
         # only failures unaccounted for are those from unpacking the list pager
         model_id, url_model_id = generate_model_id()
