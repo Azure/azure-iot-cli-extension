@@ -113,16 +113,16 @@ def load_central_arguments(self, _):
 
     with self.argument_context("iot central device") as context:
         context.argument(
-            "instance_of",
-            options_list=["--instance-of"],
-            help="Central template id. Example: urn:ojpkindbz:modelDefinition:iild3tm_uo",
+            "template",
+            options_list=["--template"],
+            help="Central template id. Example: dtmi:ojpkindbz:modelDefinition:iild3tm_uo.",
         )
         context.argument(
             "simulated",
             options_list=["--simulated"],
             arg_type=get_three_state_flag(),
             help="Add this flag if you would like IoT Central to set this up as a simulated device. "
-            "--instance-of is required if this is true",
+            "--template is required if this is true",
         )
         context.argument(
             "device_name",

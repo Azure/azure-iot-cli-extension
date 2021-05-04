@@ -120,7 +120,7 @@ class CentralParser(CommonParser):
         try:
             device = self._central_device_provider.get_device(self.device_id)
             template = self._central_template_provider.get_device_template(
-                device.instance_of
+                device.template
             )
             self._template_id = template.id
             return template

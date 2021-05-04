@@ -45,21 +45,21 @@ def create_device(
     app_id: str,
     device_id: str,
     device_name=None,
-    instance_of=None,
+    template=None,
     simulated=False,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
 ):
-    if simulated and not instance_of:
+    if simulated and not template:
         raise CLIError(
-            "Error: if you supply --simulated you must also specify --instance-of"
+            "Error: if you supply --simulated you must also specify --template"
         )
     provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token)
     return provider.create_device(
         device_id=device_id,
         device_name=device_name,
-        instance_of=instance_of,
+        template=template,
         simulated=simulated,
         central_dns_suffix=central_dns_suffix,
         api_version=api_version,
@@ -81,20 +81,12 @@ def delete_device(
 
 
 def registration_info(
-    cmd,
-    app_id: str,
-    device_id,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
+    cmd, app_id: str, device_id, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token,)
 
     return provider.get_device_registration_info(
-        device_id=device_id,
-        central_dns_suffix=central_dns_suffix,
-        device_status=None,
-        api_version=api_version,
+        device_id=device_id, central_dns_suffix=central_dns_suffix, device_status=None,
     )
 
 

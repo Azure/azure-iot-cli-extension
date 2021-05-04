@@ -6,11 +6,9 @@
 
 from knack.util import CLIError
 from knack.log import get_logger
-from typing import List
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.enum import DeviceStatus, ApiVersion
-from azext_iot.central.models.device import Device
 from azext_iot.dps.services import global_service as dps_global_service
 
 
@@ -43,7 +41,7 @@ class CentralDeviceProvider:
         device_id,
         central_dns_suffix=CENTRAL_ENDPOINT,
         api_version=ApiVersion.v1.value,
-    ) -> Device:
+    ):
         if not device_id:
             raise CLIError("Device id must be specified.")
         # get or add to cache
@@ -66,7 +64,7 @@ class CentralDeviceProvider:
 
     def list_devices(
         self, central_dns_suffix=CENTRAL_ENDPOINT, api_version=ApiVersion.v1.value,
-    ) -> List[Device]:
+    ):
         devices = central_services.device.list_devices(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -84,11 +82,11 @@ class CentralDeviceProvider:
         self,
         device_id,
         device_name=None,
-        instance_of=None,
+        template=None,
         simulated=False,
         central_dns_suffix=CENTRAL_ENDPOINT,
         api_version=ApiVersion.v1.value,
-    ) -> Device:
+    ):
         if not device_id:
             raise CLIError("Device id must be specified.")
 
@@ -100,7 +98,7 @@ class CentralDeviceProvider:
             app_id=self._app_id,
             device_id=device_id,
             device_name=device_name,
-            instance_of=instance_of,
+            template=template,
             simulated=simulated,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
@@ -174,7 +172,6 @@ class CentralDeviceProvider:
         device_id,
         device_status: DeviceStatus,
         central_dns_suffix=CENTRAL_ENDPOINT,
-        api_version=ApiVersion.v1.value,
     ) -> dict:
         dps_state = {}
         info = self._device_registration_info.get(device_id)
@@ -185,9 +182,7 @@ class CentralDeviceProvider:
         device = self.get_device(device_id, central_dns_suffix)
         if device.device_status == DeviceStatus.provisioned:
             credentials = self.get_device_credentials(
-                device_id=device_id,
-                central_dns_suffix=central_dns_suffix,
-                api_version=api_version,
+                device_id=device_id, central_dns_suffix=central_dns_suffix,
             )
             id_scope = credentials["idScope"]
             key = credentials["symmetricKey"]["primaryKey"]
@@ -206,15 +201,12 @@ class CentralDeviceProvider:
 
         return info
 
-    def get_device_registration_summary(
-        self, central_dns_suffix=CENTRAL_ENDPOINT, api_version=ApiVersion.v1.value,
-    ):
+    def get_device_registration_summary(self, central_dns_suffix=CENTRAL_ENDPOINT):
         return central_services.device.get_device_registration_summary(
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
-            api_version=api_version,
         )
 
     def run_component_command(

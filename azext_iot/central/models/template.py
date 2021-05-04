@@ -82,9 +82,11 @@ class Template:
                 interfaces.append(self._extract_root_interface_contents(dcm))
 
             if dcm.get("@type") == "CapabilityModel":
-                interfaces.extend(dcm.get("implements"))
+                if dcm.get("implements"):
+                    interfaces.extend(dcm.get("implements"))
             else:
-                interfaces.extend(dcm.get("extends"))
+                if dcm.get("extends"):
+                    interfaces.extend(dcm.get("extends"))
 
             return {
                 interface["@id"]: self._extract_schemas(interface)
@@ -97,7 +99,10 @@ class Template:
             raise CLIError(details)
 
     def _extract_schemas(self, entity: dict) -> dict:
-        return {schema["name"]: schema for schema in entity["schema"]["contents"]}
+        if entity.get("schema"):
+            return {schema["name"]: schema for schema in entity["schema"]["contents"]}
+        else:
+            return {schema["name"]: schema for schema in entity["contents"]}
 
     def _extract_schema_names(self, entity: dict) -> dict:
         return {

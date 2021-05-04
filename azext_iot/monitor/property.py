@@ -162,7 +162,7 @@ class PropertyMonitor:
     def _get_device_template(self):
         device = self._central_device_provider.get_device(self._device_id)
         template = self._central_template_provider.get_device_template(
-            device_template_id=device.instance_of,
+            device_template_id=device.template,
             central_dns_suffix=self._central_dns_suffix,
         )
         return template

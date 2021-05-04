@@ -491,7 +491,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
         instance_of = kwargs.get("instance_of")
         if instance_of:
-            command = command + " --instance-of {}".format(instance_of)
+            command = command + " --template {}".format(instance_of)
             checks.append(self.check("instanceOf", instance_of))
 
         simulated = bool(kwargs.get("simulated"))

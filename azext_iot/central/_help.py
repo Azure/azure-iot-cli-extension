@@ -67,7 +67,7 @@ def _load_central_devices_help():
             az iot central device create
             --app-id {appid}
             --device-id {deviceid}
-            --instance-of {devicetemplateid}
+            --template {devicetemplateid}
             --simulated
     """
 

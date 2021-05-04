@@ -9,11 +9,10 @@ import requests
 
 from knack.util import CLIError
 from knack.log import get_logger
-from typing import List
 
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
-from azext_iot.central.models.device import Device
+from azext_iot.central.models.device import DevicePreview, DeviceV1
 from azext_iot.central.models.enum import DeviceStatus, ApiVersion
 
 logger = get_logger(__name__)
@@ -28,7 +27,7 @@ def get_device(
     token: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
-) -> Device:
+):
     """
     Get device info given a device id
 
@@ -53,7 +52,11 @@ def get_device(
 
     response = requests.get(url, headers=headers, params=query_parameters)
     result = _utility.try_extract_result(response)
-    return Device(result)
+
+    if api_version == ApiVersion.preview.value:
+        return DevicePreview(result)
+    else:
+        return DeviceV1(result)
 
 
 def list_devices(
@@ -63,7 +66,7 @@ def list_devices(
     max_pages=1,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
-) -> List[Device]:
+):
     """
     Get a list of all devices in IoTC app
 
@@ -95,7 +98,10 @@ def list_devices(
         if "value" not in result:
             raise CLIError("Value is not present in body: {}".format(result))
 
-        devices = devices + [Device(device) for device in result["value"]]
+        if api_version == ApiVersion.preview.value:
+            devices = devices + [DevicePreview(device) for device in result["value"]]
+        else:
+            devices = devices + [DeviceV1(device) for device in result["value"]]
 
         url = result.get("nextLink", params=query_parameters)
         pages_processed = pages_processed + 1
@@ -104,11 +110,7 @@ def list_devices(
 
 
 def get_device_registration_summary(
-    cmd,
-    app_id: str,
-    token: str,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
+    cmd, app_id: str, token: str, central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     """
     Get device registration summary for a given app
@@ -126,28 +128,32 @@ def get_device_registration_summary(
 
     registration_summary = {status.value: 0 for status in DeviceStatus}
 
-    url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
+    url = "https://{}.{}/{}?api-version={}".format(
+        app_id, central_dns_suffix, BASE_PATH, ApiVersion.v1.value
+    )
     headers = _utility.get_headers(token, cmd)
 
     # Construct parameters
     query_parameters = {}
-    query_parameters["api-version"] = api_version
+    query_parameters["api-version"] = ApiVersion.v1.value
 
     logger.warning(
         "This command may take a long time to complete if your app contains a lot of devices"
     )
+
     while url:
-        response = requests.get(url, headers=headers, params=query_parameters)
+        response = requests.get(url, headers=headers)
         result = _utility.try_extract_result(response)
 
         if "value" not in result:
             raise CLIError("Value is not present in body: {}".format(result))
 
         for device in result["value"]:
-            registration_summary[Device(device).device_status.value] += 1
+            registration_summary[DeviceV1(device).device_status.value] += 1
 
         print("Processed {} devices...".format(sum(registration_summary.values())))
-        url = result.get("nextLink", params=query_parameters)
+        url = result.get("nextLink")
+
     return registration_summary
 
 
@@ -156,12 +162,12 @@ def create_device(
     app_id: str,
     device_id: str,
     device_name: str,
-    instance_of: str,
+    template: str,
     simulated: bool,
     token: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
-) -> Device:
+):
     """
     Create a device in IoTC
 
@@ -170,7 +176,7 @@ def create_device(
         app_id: name of app (used for forming request URL)
         device_id: unique case-sensitive device id
         device_name: (non-unique) human readable name for the device
-        instance_of: (optional) string that maps to the device_template_id
+        template: (optional) string that maps to the device_template_id
             of the device template that this device is to be an instance of
         simulated: if IoTC is to simulate data for this device
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
@@ -191,17 +197,30 @@ def create_device(
     query_parameters = {}
     query_parameters["api-version"] = api_version
 
-    payload = {
-        "displayName": device_name,
-        "simulated": simulated,
-        "approved": True,
-    }
-    if instance_of:
-        payload["instanceOf"] = instance_of
+    if api_version == ApiVersion.preview.value:
+        payload = {
+            "displayName": device_name,
+            "simulated": simulated,
+            "approved": True,
+        }
+        if template:
+            payload["instanceOf"] = template
+    else:
+        payload = {
+            "displayName": device_name,
+            "simulated": simulated,
+            "enabled": True,
+        }
+        if template:
+            payload["template"] = template
 
     response = requests.put(url, headers=headers, json=payload, params=query_parameters)
     result = _utility.try_extract_result(response)
-    return Device(result)
+
+    if api_version == ApiVersion.preview.value:
+        return DevicePreview(result)
+    else:
+        return DeviceV1(result)
 
 
 def delete_device(
