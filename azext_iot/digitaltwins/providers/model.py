@@ -5,7 +5,6 @@
 # --------------------------------------------------------------------------------------------
 
 import json
-import six
 from azext_iot.common.utility import process_json_arg, scantree, unpack_msrest_error
 from azext_iot.digitaltwins.providers.base import DigitalTwinsProvider
 from azext_iot.sdk.digitaltwins.dataplane.models import ErrorResponseException
@@ -15,8 +14,6 @@ from knack.util import CLIError
 logger = get_logger(__name__)
 
 
-# Example implementation in Python. There are still gaps with this. The C# implementation
-# covers more variations - this should be refactored to support those additional variations.
 def get_model_dependencies(model):
     """Return a list of dependency DTMIs for a given model"""
     dependencies = []
@@ -28,18 +25,21 @@ def get_model_dependencies(model):
     if "extends" in model:
         # Models defined in a DTDL can implement extensions of up to two interfaces.
         # These interfaces can be in the form of a DTMI reference, or a nested model.
-        if isinstance(model["extends"], six.text_type):
+        if isinstance(model["extends"], str):
             # If its just a string, thats a single DTMI reference, so just add that to our list
             dependencies.append(model["extends"])
+        elif isinstance(model["extends"], dict):
+            # If its a single nested model. Get its dependencies and add them
+            dependencies.extend(model["extends"])
         elif isinstance(model["extends"], list):
             # If its a list, could have DTMIs or nested models
             for item in model["extends"]:
-                if isinstance(item, six.text_type):
+                if isinstance(item, str):
                     # If there are strings in the list, that's a DTMI reference, so add it
                     dependencies.append(item)
                 elif isinstance(item, dict):
                     # This is a nested model. Now go get its dependencies and add them
-                    dependencies += get_model_dependencies(item)
+                    dependencies.extend(item)
 
     # Remove duplicate dependencies
     dependencies = list(set(dependencies))
