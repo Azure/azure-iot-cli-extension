@@ -21,8 +21,6 @@ from azext_iot.tests.digitaltwins.dt_helpers import (
 )
 from azext_iot.tests.conftest import hostname
 
-api_version = "2020-10-31"
-
 
 class TestAddModels(object):
     @pytest.fixture(params=[200, 201])
@@ -307,8 +305,6 @@ class TestListModels(object):
             resource_group_name=resource_group_name
         )
 
-        print(serv_result)
-
         assert isinstance(result, Paged)
         unpacked_result = []
         try:
@@ -486,7 +482,6 @@ class TestDeleteAllModels(object):
         model_id, url_model_id = model_ids if model_ids else generate_model_id()
 
         # Start making list call with dependencies, result should include self
-        url = "https://{}/models?dependenciesFor={}&".format(hostname, url_model_id)
         value = [generate_model_result(model_id=model_id)]
 
         # Add depedencies to value and create those model calls
@@ -500,20 +495,6 @@ class TestDeleteAllModels(object):
                     num_dependencies=i
                 )
             )
-
-        # List call for current model with dependencies
-        url += "includeModelDefinition=false&api-version={}".format(api_version)
-        service_client.add(
-            method=responses.GET,
-            url=url,
-            body=json.dumps({
-                "value" : value,
-                "nextLink" : None
-            }),
-            status=200,
-            content_type="application/json",
-            match_querystring=True
-        )
 
         # Delete call for current model, have some failures
         service_client.add(
@@ -554,11 +535,11 @@ class TestDeleteAllModels(object):
         # First List call
         service_client.add(
             method=responses.GET,
-            url="https://{}/models?includeModelDefinition=false&api-version={}".format(hostname, api_version),
+            url="https://{}/models?includeModelDefinition=true".format(hostname),
             body=json.dumps({"value" : all_models, "nextLink": None}),
             status=200,
             content_type="application/json",
-            match_querystring=True,
+            match_querystring=False,
         )
 
         result = subject.delete_all_models(
@@ -569,53 +550,28 @@ class TestDeleteAllModels(object):
 
         all_request = service_client.calls[0].request
         assert all_request.method == "GET"
-        assert "/models?includeModelDefinition=false" in all_request.url
-
-        # Check that each model had depedencies listed
-        for i in range(len(all_models)):
-            list_request = service_client.calls[1 + i].request
-            assert list_request.method == "GET"
-            assert "/models?dependenciesFor=" in list_request.url
+        assert "/models?includeModelDefinition=true" in all_request.url
 
         # Check that models were deleted
-        start = 1 + len(all_models)
         for i in range(len(all_models)):
-            delete_request = service_client.calls[start + i].request
+            delete_request = service_client.calls[1 + i].request
             assert delete_request.method == "DELETE"
 
         assert result is None
 
-    @pytest.fixture(params=[(200, 400), (200, 401), (200, 500), (400, 204), (401, 204), (500, 204)])
+    @pytest.fixture(params=[400, 401, 500])
     def service_client_error(self, mocked_response, fixture_dt_client, request):
         mocked_response.assert_all_requests_are_fired = False
         # only failures unaccounted for are those from unpacking the list pager
-        model_id, url_model_id = generate_model_id()
-
         mocked_response.add(
             method=responses.GET,
             url=(
-                "https://{}/models?dependenciesFor={}&"
-                "includeModelDefinition=false&api-version={}"
-            ).format(url_model_id, hostname, api_version),
+                "https://{}/models?includeModelDefinition=true"
+            ).format(hostname),
             body=json.dumps({"value" : generic_result, "nextLink": None}),
-            status=request.param[0],
+            status=request.param,
             content_type="application/json",
-            match_querystring=True,
-        )
-
-        mocked_response.add(
-            method=responses.GET,
-            url="https://{}/models?includeModelDefinition=false&api-version={}".format(
-                hostname,
-                api_version
-            ),
-            body=json.dumps({
-                "value" : generate_model_result(model_id=model_id),
-                "nextLink": None
-            }),
-            status=request.param[1],
-            content_type="application/json",
-            match_querystring=True,
+            match_querystring=False,
         )
 
         yield mocked_response

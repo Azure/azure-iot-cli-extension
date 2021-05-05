@@ -121,8 +121,7 @@ class ModelProvider(DigitalTwinsProvider):
 
     def delete_all(self):
         # Get all models
-        incoming_pager = self.list()
-
+        incoming_pager = self.list(get_definition=True)
         incoming_result = []
         try:
             while True:
@@ -132,24 +131,21 @@ class ModelProvider(DigitalTwinsProvider):
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
 
-        # Build dict to store model_id : set of parent_id
+        # Build dict of model_id : set of parent_ids
         parsed_models = {model.id: set() for model in incoming_result}
         for model in incoming_result:
-            # Call to get model dependencies (children)
-            model_dependencies = []
-            model_pager = self.list(dependencies_for=[model.id])
-            try:
-                while True:
-                    model_dependencies.extend(model_pager.advance_page())
-            except StopIteration:
-                pass
-            except ErrorResponseException as e:
-                raise CLIError(unpack_msrest_error(e))
-
-            # Add as dependent's parent but ignore self
-            for dependent in model_dependencies:
-                if dependent.id != model.id:
-                    parsed_models[dependent.id].add(model.id)
+            # Parse dependents
+            data = model.model
+            if 'extends' in data:
+                extend = data['extends']
+                if isinstance(extend, str):
+                    parsed_models[extend].add(model.id)
+                elif isinstance(extend, list):
+                    for e_id in extend:
+                        parsed_models[e_id].add(model.id)
+            if "contents" in data:
+                for c in filter(lambda x: x["@type"] == "Component", data["contents"]):
+                    parsed_models[c['schema']].add(model.id)
 
         def delete_parents(model_id, model_dict):
             # Check if current model has been deleted already
@@ -158,7 +154,8 @@ class ModelProvider(DigitalTwinsProvider):
 
             # Delete parents first
             for parent_id in model_dict[model_id]:
-                delete_parents(parent_id, model_dict)
+                if parent_id in model_dict:
+                    delete_parents(parent_id, model_dict)
 
             # Delete current model and remove references
             del model_dict[model_id]
@@ -168,5 +165,5 @@ class ModelProvider(DigitalTwinsProvider):
                 logger.warn(f"Could not delete model {model_id}; error is {e}")
 
         while len(parsed_models) > 0:
-            model_id = list(parsed_models.keys())[0]
+            model_id = next(iter(parsed_models))
             delete_parents(model_id, parsed_models)
