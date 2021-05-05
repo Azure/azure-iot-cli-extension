@@ -30,7 +30,7 @@ def get_model_dependencies(model):
             dependencies.append(model["extends"])
         elif isinstance(model["extends"], dict):
             # If its a single nested model. Get its dependencies and add them
-            dependencies.extend(model["extends"])
+            dependencies.extend(get_model_dependencies(model["extends"]))
         elif isinstance(model["extends"], list):
             # If its a list, could have DTMIs or nested models
             for item in model["extends"]:
@@ -39,7 +39,7 @@ def get_model_dependencies(model):
                     dependencies.append(item)
                 elif isinstance(item, dict):
                     # This is a nested model. Now go get its dependencies and add them
-                    dependencies.extend(item)
+                    dependencies.extend(get_model_dependencies(item))
 
     # Remove duplicate dependencies
     dependencies = list(set(dependencies))
