@@ -9,7 +9,7 @@ import requests
 from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
-from azext_iot.central.models.enum import Role, UserType, ApiVersion
+from azext_iot.central.models.enum import Role, ApiVersion, UserTypePreview, UserTypeV1
 
 logger = get_logger(__name__)
 
@@ -44,10 +44,15 @@ def add_service_principal(
     """
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, assignee)
 
+    if api_version == ApiVersion.v1.value:
+        user_type = (UserTypeV1.service_principal.value,)
+    else:
+        user_type = (UserTypePreview.service_principal.value,)
+
     payload = {
         "tenantId": tenant_id,
         "objectId": object_id,
-        "type": UserType.service_principal.value,
+        "type": user_type,
         "roles": [{"role": role.value}],
     }
 
@@ -87,9 +92,14 @@ def add_email(
     """
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, assignee)
 
+    if api_version == ApiVersion.v1.value:
+        user_type = UserTypeV1.email.value
+    else:
+        user_type = UserTypePreview.email.value
+
     payload = {
         "email": email,
-        "type": UserType.email.value,
+        "type": user_type,
         "roles": [{"role": role.value}],
     }
 

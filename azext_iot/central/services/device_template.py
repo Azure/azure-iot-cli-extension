@@ -7,13 +7,11 @@
 
 import requests
 
-from typing import List
-
 from knack.util import CLIError
 from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
-from azext_iot.central.models.template import Template
+from azext_iot.central import models as central_models
 from azext_iot.central.models.enum import ApiVersion
 
 logger = get_logger(__name__)
@@ -28,7 +26,7 @@ def get_device_template(
     token: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
-) -> Template:
+):
     """
     Get a specific device template from IoTC
 
@@ -53,7 +51,11 @@ def get_device_template(
     query_parameters["api-version"] = api_version
 
     response = requests.get(url, headers=headers, params=query_parameters)
-    return Template(_utility.try_extract_result(response))
+
+    if api_version == ApiVersion.preview.value:
+        return central_models.TemplatePreview(_utility.try_extract_result(response))
+    else:
+        return central_models.TemplateV1(_utility.try_extract_result(response))
 
 
 def list_device_templates(
@@ -62,7 +64,7 @@ def list_device_templates(
     token: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
-) -> List[Template]:
+):
     """
     Get a list of all device templates in IoTC
 
@@ -91,7 +93,10 @@ def list_device_templates(
     if "value" not in result:
         raise CLIError("Value is not present in body: {}".format(result))
 
-    return [Template(item) for item in result["value"]]
+    if api_version == ApiVersion.preview.value:
+        return [central_models.TemplatePreview(item) for item in result["value"]]
+    else:
+        return [central_models.TemplateV1(item) for item in result["value"]]
 
 
 def create_device_template(
@@ -102,7 +107,7 @@ def create_device_template(
     token: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
-) -> Template:
+):
     """
     Create a device template in IoTC
 
@@ -132,7 +137,10 @@ def create_device_template(
     query_parameters["api-version"] = api_version
 
     response = requests.put(url, headers=headers, json=payload, params=query_parameters)
-    return Template(_utility.try_extract_result(response))
+    if api_version == ApiVersion.preview.value:
+        return central_models.TemplatePreview(_utility.try_extract_result(response))
+    else:
+        return central_models.TemplateV1(_utility.try_extract_result(response))
 
 
 def delete_device_template(

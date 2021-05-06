@@ -71,7 +71,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
     def test_central_device_twin_show_success(self):
         (template_id, _) = self._create_device_template()
-        (device_id, _) = self._create_device(instance_of=template_id, simulated=True)
+        (device_id, _) = self._create_device(template=template_id, simulated=True)
 
         # wait about a few seconds for simulator to kick in so that provisioning completes
         time.sleep(60)
@@ -95,7 +95,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
     def test_central_monitor_events(self):
         (template_id, _) = self._create_device_template()
-        (device_id, _) = self._create_device(instance_of=template_id)
+        (device_id, _) = self._create_device(template=template_id)
         credentials = self._get_credentials(device_id)
 
         device_client = helpers.dps_connect_device(device_id, credentials)
@@ -128,7 +128,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
     def test_central_validate_messages_success(self):
         (template_id, _) = self._create_device_template()
-        (device_id, _) = self._create_device(instance_of=template_id)
+        (device_id, _) = self._create_device(template=template_id)
         credentials = self._get_credentials(device_id)
 
         device_client = helpers.dps_connect_device(device_id, credentials)
@@ -186,7 +186,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
     def test_central_validate_messages_issues_detected(self):
         expected_messages = []
         (template_id, _) = self._create_device_template()
-        (device_id, _) = self._create_device(instance_of=template_id)
+        (device_id, _) = self._create_device(template=template_id)
         credentials = self._get_credentials(device_id)
 
         device_client = helpers.dps_connect_device(device_id, credentials)
@@ -267,7 +267,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         self.cmd(
             "iot central device show --app-id {} -d {}".format(APP_ID, device_id),
             checks=[
-                self.check("approved", True),
+                self.check("enabled", True),
                 self.check("displayName", device_name),
                 self.check("id", device_id),
                 self.check("simulated", False),
@@ -327,22 +327,23 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         # currently: create, show, list, delete
         (template_id, template_name) = self._create_device_template()
 
-        self.cmd(
+        result = self.cmd(
             "iot central device-template show --app-id {} --device-template-id {}".format(
                 APP_ID, template_id
             ),
-            checks=[
-                self.check("displayName", template_name),
-                self.check("id", template_id),
-            ],
+            checks=[self.check("displayName", template_name)],
         )
+
+        json_result = result.get_output_in_json()
+
+        assert json_result["@id"] == template_id
 
         self._delete_device_template(template_id)
 
     def test_central_device_registration_info_registered(self):
         (template_id, _) = self._create_device_template()
         (device_id, device_name) = self._create_device(
-            instance_of=template_id, simulated=False
+            template=template_id, simulated=False
         )
 
         result = self.cmd(
@@ -369,7 +370,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         assert device_registration_info.get("device_status") == "registered"
         assert device_registration_info.get("id") == device_id
         assert device_registration_info.get("display_name") == device_name
-        assert device_registration_info.get("instance_of") == template_id
+        assert device_registration_info.get("template") == template_id
         assert not device_registration_info.get("simulated")
 
         # Validation - dps state
@@ -379,10 +380,10 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         assert dps_state.get("error") == "Device is not yet provisioned."
 
     def test_central_run_command(self):
-        interface_id = "modelOne_g4"
-        command_name = "sync_cmd"
+        interface_id = "dtmiIntTestDeviceTemplateV33jl"
+        command_name = "testCommand"
         (template_id, _) = self._create_device_template()
-        (device_id, _) = self._create_device(instance_of=template_id, simulated=True)
+        (device_id, _) = self._create_device(template=template_id, simulated=True)
 
         self._wait_for_provisioned(device_id)
 
@@ -446,7 +447,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         assert device_registration_info.get("device_status") == "unassociated"
         assert device_registration_info.get("id") == device_id
         assert device_registration_info.get("display_name") == device_name
-        assert device_registration_info.get("instance_of") is None
+        assert device_registration_info.get("template") is None
         assert not device_registration_info.get("simulated")
 
         # Validation - dps state
@@ -484,15 +485,15 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             APP_ID, device_id, device_name
         )
         checks = [
-            self.check("approved", True),
+            self.check("enabled", True),
             self.check("displayName", device_name),
             self.check("id", device_id),
         ]
 
-        instance_of = kwargs.get("instance_of")
-        if instance_of:
-            command = command + " --template {}".format(instance_of)
-            checks.append(self.check("instanceOf", instance_of))
+        template = kwargs.get("template")
+        if template:
+            command = command + " --template {}".format(template)
+            checks.append(self.check("template", template))
 
         simulated = bool(kwargs.get("simulated"))
         if simulated:
@@ -516,7 +517,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             checks = [
                 self.check("id", user_id),
                 self.check("email", email),
-                self.check("type", "EmailUser"),
+                self.check("type", "email"),
                 self.check("roles[0].role", role.value),
             ]
             users.append(self.cmd(command, checks=checks).get_output_in_json())
@@ -580,16 +581,15 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         template_name = template["displayName"]
         template_id = template_name + "id"
 
-        self.cmd(
+        result = self.cmd(
             "iot central device-template create --app-id {} --device-template-id {} -k '{}'".format(
                 APP_ID, template_id, device_template_path
             ),
-            checks=[
-                self.check("displayName", template_name),
-                self.check("id", template_id),
-            ],
+            checks=[self.check("displayName", template_name)],
         )
+        json_result = result.get_output_in_json()
 
+        assert json_result["@id"] == template_id
         return (template_id, template_name)
 
     def _delete_device_template(self, template_id):

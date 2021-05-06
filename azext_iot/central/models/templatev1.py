@@ -7,7 +7,7 @@
 from knack.util import CLIError
 
 
-class Template:
+class TemplateV1:
     def __init__(self, template: dict):
         self.raw_template = template
         try:
@@ -74,19 +74,14 @@ class Template:
 
     def _extract_interfaces(self, template: dict) -> dict:
         try:
-
             interfaces = []
             dcm = template.get("capabilityModel", {})
 
             if dcm.get("contents"):
                 interfaces.append(self._extract_root_interface_contents(dcm))
 
-            if dcm.get("@type") == "CapabilityModel":
-                if dcm.get("implements"):
-                    interfaces.extend(dcm.get("implements"))
-            else:
-                if dcm.get("extends"):
-                    interfaces.extend(dcm.get("extends"))
+            if dcm.get("extends"):
+                interfaces.extend(dcm.get("extends"))
 
             return {
                 interface["@id"]: self._extract_schemas(interface)

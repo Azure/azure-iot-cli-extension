@@ -14,12 +14,12 @@ from knack.util import CLIError
 from azure.cli.core.mock import DummyCli
 from azext_iot.central import commands_device_twin
 from azext_iot.central import commands_monitor
-from azext_iot.central.providers import (
-    CentralDeviceProvider,
-    CentralDeviceTemplateProvider,
+from azext_iot.central.providers.v1 import (
+    CentralDeviceProviderV1,
+    CentralDeviceTemplateProviderV1,
 )
 from azext_iot.central.models.devicetwin import DeviceTwin
-from azext_iot.central.models.template import Template
+from azext_iot.central import models as central_models
 from azext_iot.monitor.property import PropertyMonitor
 from azext_iot.monitor.models.enum import Severity
 from azext_iot.tests.helpers import load_json
@@ -159,7 +159,7 @@ class TestCentralDeviceProvider:
     @mock.patch("azext_iot.central.services.device")
     def test_should_return_device(self, mock_device_svc, mock_device_template_svc):
         # setup
-        provider = CentralDeviceProvider(cmd=None, app_id=app_id)
+        provider = CentralDeviceProviderV1(cmd=None, app_id=app_id)
         mock_device_svc.get_device.return_value = self._device
         mock_device_template_svc.get_device_template.return_value = (
             self._device_template
@@ -182,7 +182,7 @@ class TestCentralDeviceProvider:
         self, mock_device_svc, mock_device_template_svc
     ):
         # setup
-        provider = CentralDeviceTemplateProvider(cmd=None, app_id=app_id)
+        provider = CentralDeviceTemplateProviderV1(cmd=None, app_id=app_id)
         mock_device_svc.get_device.return_value = self._device
         mock_device_template_svc.get_device_template.return_value = (
             self._device_template
@@ -280,7 +280,7 @@ class TestCentralPropertyMonitor:
     ):
 
         # setup
-        mock_device_template_svc.get_device_template.return_value = Template(
+        mock_device_template_svc.get_device_template.return_value = central_models.TemplateV1(
             self._duplicate_property_template
         )
 
@@ -321,7 +321,7 @@ class TestCentralPropertyMonitor:
     ):
 
         # setup
-        mock_device_template_svc.get_device_template.return_value = Template(
+        mock_device_template_svc.get_device_template.return_value = central_models.TemplateV1(
             self._duplicate_property_template
         )
 
@@ -358,7 +358,7 @@ class TestCentralPropertyMonitor:
     ):
 
         # setup
-        mock_device_template_svc.get_device_template.return_value = Template(
+        mock_device_template_svc.get_device_template.return_value = central_models.TemplateV1(
             self._duplicate_property_template
         )
 
@@ -403,7 +403,7 @@ class TestCentralPropertyMonitor:
     ):
 
         # setup
-        mock_device_template_svc.get_device_template.return_value = Template(
+        mock_device_template_svc.get_device_template.return_value = central_models.TemplateV1(
             self._duplicate_property_template
         )
 

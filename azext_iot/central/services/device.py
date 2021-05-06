@@ -12,7 +12,7 @@ from knack.log import get_logger
 
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
-from azext_iot.central.models.device import DevicePreview, DeviceV1
+from azext_iot.central import models as central_models
 from azext_iot.central.models.enum import DeviceStatus, ApiVersion
 
 logger = get_logger(__name__)
@@ -54,9 +54,9 @@ def get_device(
     result = _utility.try_extract_result(response)
 
     if api_version == ApiVersion.preview.value:
-        return DevicePreview(result)
+        return central_models.DevicePreview(result)
     else:
-        return DeviceV1(result)
+        return central_models.DeviceV1(result)
 
 
 def list_devices(
@@ -99,9 +99,13 @@ def list_devices(
             raise CLIError("Value is not present in body: {}".format(result))
 
         if api_version == ApiVersion.preview.value:
-            devices = devices + [DevicePreview(device) for device in result["value"]]
+            devices = devices + [
+                central_models.DevicePreview(device) for device in result["value"]
+            ]
         else:
-            devices = devices + [DeviceV1(device) for device in result["value"]]
+            devices = devices + [
+                central_models.DeviceV1(device) for device in result["value"]
+            ]
 
         url = result.get("nextLink", params=query_parameters)
         pages_processed = pages_processed + 1
@@ -133,10 +137,6 @@ def get_device_registration_summary(
     )
     headers = _utility.get_headers(token, cmd)
 
-    # Construct parameters
-    query_parameters = {}
-    query_parameters["api-version"] = ApiVersion.v1.value
-
     logger.warning(
         "This command may take a long time to complete if your app contains a lot of devices"
     )
@@ -149,7 +149,9 @@ def get_device_registration_summary(
             raise CLIError("Value is not present in body: {}".format(result))
 
         for device in result["value"]:
-            registration_summary[DeviceV1(device).device_status.value] += 1
+            registration_summary[
+                central_models.DeviceV1(device).device_status.value
+            ] += 1
 
         print("Processed {} devices...".format(sum(registration_summary.values())))
         url = result.get("nextLink")
@@ -218,9 +220,9 @@ def create_device(
     result = _utility.try_extract_result(response)
 
     if api_version == ApiVersion.preview.value:
-        return DevicePreview(result)
+        return central_models.DevicePreview(result)
     else:
-        return DeviceV1(result)
+        return central_models.DeviceV1(result)
 
 
 def delete_device(

@@ -10,7 +10,7 @@ from azext_iot.central import services as central_services
 from azext_iot.central.models.enum import ApiVersion
 
 
-class CentralDeviceTemplateProvider:
+class CentralDeviceTemplateProviderV1:
     def __init__(self, cmd, app_id, token=None):
         """
         Provider for device_template APIs
@@ -29,10 +29,7 @@ class CentralDeviceTemplateProvider:
         self._device_templates = {}
 
     def get_device_template(
-        self,
-        device_template_id,
-        central_dns_suffix=CENTRAL_ENDPOINT,
-        api_version=ApiVersion.v1.value,
+        self, device_template_id, central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         # get or add to cache
         device_template = self._device_templates.get(device_template_id)
@@ -43,7 +40,7 @@ class CentralDeviceTemplateProvider:
                 device_template_id=device_template_id,
                 token=self._token,
                 central_dns_suffix=central_dns_suffix,
-                api_version=api_version,
+                api_version=ApiVersion.v1.value,
             )
             self._device_templates[device_template_id] = device_template
 
@@ -57,14 +54,14 @@ class CentralDeviceTemplateProvider:
         return device_template
 
     def list_device_templates(
-        self, central_dns_suffix=CENTRAL_ENDPOINT, api_version=ApiVersion.v1.value,
+        self, central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         templates = central_services.device_template.list_device_templates(
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
-            api_version=api_version,
+            api_version=ApiVersion.v1.value,
         )
 
         self._device_templates.update({template.id: template for template in templates})
@@ -72,7 +69,7 @@ class CentralDeviceTemplateProvider:
         return self._device_templates
 
     def map_device_templates(
-        self, central_dns_suffix=CENTRAL_ENDPOINT, api_version=ApiVersion.v1.value,
+        self, central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         """
         Maps each template name to the corresponding template id
@@ -81,7 +78,7 @@ class CentralDeviceTemplateProvider:
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
-            api_version=api_version,
+            api_version=ApiVersion.v1.value,
         )
         return {template.name: template.id for template in templates}
 
@@ -90,7 +87,6 @@ class CentralDeviceTemplateProvider:
         device_template_id: str,
         payload: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
-        api_version=ApiVersion.v1.value,
     ):
         template = central_services.device_template.create_device_template(
             cmd=self._cmd,
@@ -99,7 +95,7 @@ class CentralDeviceTemplateProvider:
             payload=payload,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
-            api_version=api_version,
+            api_version=ApiVersion.v1.value,
         )
 
         self._device_templates[template.id] = template
@@ -107,10 +103,7 @@ class CentralDeviceTemplateProvider:
         return template
 
     def delete_device_template(
-        self,
-        device_template_id,
-        central_dns_suffix=CENTRAL_ENDPOINT,
-        api_version=ApiVersion.v1.value,
+        self, device_template_id, central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         if not device_template_id:
             raise CLIError("Device template id must be specified.")
@@ -121,7 +114,7 @@ class CentralDeviceTemplateProvider:
             app_id=self._app_id,
             device_template_id=device_template_id,
             central_dns_suffix=central_dns_suffix,
-            api_version=api_version,
+            api_version=ApiVersion.v1.value,
         )
 
         # remove from cache
