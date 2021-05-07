@@ -158,6 +158,15 @@ def load_central_arguments(self, _):
             " A case-sensitive string (up to 128 characters long) of ASCII 7-bit alphanumeric characters plus"
             " certain special characters: - . + % _ # * ? ! ( ) , : = @ $ '",
         )
+    with self.argument_context("iot central device manual-failover") as context:
+        context.argument(
+            "ttl_minutes",
+            type=int,
+            options_list=["--ttl-minutes", "--ttl"],
+            help="A positive integer. TTL in minutes to move device back to the original hub."
+            "Has default value in backend. See documentation on what the latest backend default time to live value"
+            "by visiting https://github.com/iot-for-all/iot-central-high-availability-clients#readme",
+        )
 
     with self.argument_context("iot central user") as context:
         context.argument(

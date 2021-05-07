@@ -13,6 +13,7 @@ from datetime import datetime
 from knack.util import CLIError
 from azure.cli.core.mock import DummyCli
 from azext_iot.central import commands_device_twin
+from azext_iot.central import commands_device
 from azext_iot.central import commands_monitor
 from azext_iot.central.providers.v1 import (
     CentralDeviceProviderV1,
@@ -30,6 +31,7 @@ device_id = "mydevice"
 app_id = "myapp"
 device_twin_result = {"deviceId": "{}".format(device_id)}
 resource = "shared_resource"
+success_resp = {"result": "success"}
 
 
 @pytest.fixture()
@@ -434,3 +436,62 @@ class TestCentralPropertyMonitor:
             "'RS40OccupancySensorV36fy': ['component2prop', 'testComponent', 'component2PropReadonly', "
             "'component2Prop2', 'component1Telemetry']}'. "
         )
+
+
+class TestFailover:
+
+    @pytest.fixture
+    def service_client(
+        self, mocked_response, fixture_cmd, fixture_get_iot_central_tokens
+    ):
+
+        mocked_response.add(
+            method=responses.POST,
+            url="https://myapp.azureiotcentral.com/system/iothub/devices/{}/manual-failover".format(device_id),
+            body=json.dumps(success_resp),
+            status=200,
+            content_type="application/json",
+            match_querystring=False,
+        )
+
+        yield mocked_response
+
+    def test_should_run_manual_failover(
+        self, service_client
+    ):
+        # act
+        result = commands_device.run_manual_failover(fixture_cmd, app_id, device_id, ttl_minutes=10, token="Shared sig")
+        # assert
+        assert result == success_resp
+
+    def test_should_fail_negative_ttl(self):
+        with pytest.raises(CLIError):
+            # act
+            commands_device.run_manual_failover(fixture_cmd, app_id, device_id, ttl_minutes=-10, token="Shared sig")
+
+
+class TestFailback:
+
+    @pytest.fixture
+    def service_client(
+        self, mocked_response, fixture_cmd, fixture_get_iot_central_tokens
+    ):
+
+        mocked_response.add(
+            method=responses.POST,
+            url="https://myapp.azureiotcentral.com/system/iothub/devices/{}/manual-failback".format(device_id),
+            body=json.dumps(success_resp),
+            status=200,
+            content_type="application/json",
+            match_querystring=False,
+        )
+
+        yield mocked_response
+
+    def test_should_run_manual_failover(
+        self, service_client
+    ):
+        # act
+        result = commands_device.run_manual_failback(fixture_cmd, app_id, device_id, token="Shared sig")
+        # assert
+        assert result == success_resp

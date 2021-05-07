@@ -142,7 +142,9 @@ def get_device_registration_summary(
     )
 
     while url:
-        response = requests.get(url, headers=headers)
+        response = requests.get(
+            url, headers=headers, verify=not should_disable_connection_verify()
+        )
         result = _utility.try_extract_result(response)
 
         if "value" not in result:
