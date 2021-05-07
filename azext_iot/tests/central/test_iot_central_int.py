@@ -22,6 +22,9 @@ from azext_iot.tests import CaptureOutputLiveScenarioTest, helpers
 APP_ID = os.environ.get("azext_iot_central_app_id")
 APP_PRIMARY_KEY = os.environ.get("azext_iot_central_primarykey")
 APP_SCOPE_ID = os.environ.get("azext_iot_central_scope_id")
+DEVICE_ID = os.environ.get("azext_iot_central_device_id")
+TOKEN = os.environ.get("azext_iot_central_token")
+DNS_SUFFIX = os.environ.get("azext_iot_central_dns_suffix")
 device_template_path = get_context_path(__file__, "json/device_template_int_test.json")
 sync_command_params = get_context_path(__file__, "json/sync_command_args.json")
 

@@ -142,25 +142,20 @@ def run_manual_failover(
     if ttl_minutes and ttl_minutes < 1:
         raise CLIError("TTL value should be a positive integer: {}".format(ttl_minutes))
 
-    provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token)
+    provider = CentralDeviceProviderV1(cmd=cmd, app_id=app_id, token=token)
     return provider.run_manual_failover(
         device_id=device_id,
         ttl_minutes=ttl_minutes,
-        central_dns_suffix=central_dns_suffix
+        central_dns_suffix=central_dns_suffix,
     )
 
 
 def run_manual_failback(
-    cmd,
-    app_id: str,
-    device_id: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd, app_id: str, device_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
 ):
-    provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token)
+    provider = CentralDeviceProviderV1(cmd=cmd, app_id=app_id, token=token)
     return provider.run_manual_failback(
-        device_id=device_id,
-        central_dns_suffix=central_dns_suffix
+        device_id=device_id, central_dns_suffix=central_dns_suffix
     )
 
 
