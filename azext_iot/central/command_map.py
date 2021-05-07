@@ -85,6 +85,8 @@ def load_central_commands(self, _):
         cmd_group.command("registration-info", "registration_info")
         cmd_group.command("show-credentials", "get_credentials")
         cmd_group.command("compute-device-key", "compute_device_key")
+        cmd_group.command("manual-failover", "run_manual_failover")
+        cmd_group.command("manual-failback", "run_manual_failback")
 
     with self.command_group(
         "iot central device command", command_type=central_device_ops, is_preview=True,

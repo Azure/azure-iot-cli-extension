@@ -226,6 +226,34 @@ class CentralDeviceProvider:
             central_dns_suffix=central_dns_suffix,
         )
 
+    def run_manual_failover(
+        self,
+        device_id: str,
+        ttl_minutes: int = None,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.run_manual_failover(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            ttl_minutes=ttl_minutes,
+            token=self._token,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def run_manual_failback(
+        self,
+        device_id: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.run_manual_failback(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            token=self._token,
+            central_dns_suffix=central_dns_suffix,
+        )
+
     def _dps_populate_essential_info(self, dps_info, device_status: DeviceStatus):
         error = {
             DeviceStatus.provisioned: "None.",

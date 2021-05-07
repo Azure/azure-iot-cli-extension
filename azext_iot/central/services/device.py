@@ -15,6 +15,7 @@ from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
 from azext_iot.central.models.device import Device
 from azext_iot.central.models.enum import DeviceStatus
+from azure.cli.core.util import should_disable_connection_verify
 
 logger = get_logger(__name__)
 
@@ -42,7 +43,7 @@ def get_device(
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, device_id)
     headers = _utility.get_headers(token, cmd)
 
-    response = requests.get(url, headers=headers)
+    response = requests.get(url, headers=headers, verify=not should_disable_connection_verify())
     result = _utility.try_extract_result(response)
     return Device(result)
 
@@ -110,7 +111,7 @@ def get_device_registration_summary(
         "This command may take a long time to complete if your app contains a lot of devices"
     )
     while url:
-        response = requests.get(url, headers=headers)
+        response = requests.get(url, headers=headers, verify=not should_disable_connection_verify())
         result = _utility.try_extract_result(response)
 
         if "value" not in result:
@@ -218,7 +219,7 @@ def get_device_credentials(
     )
     headers = _utility.get_headers(token, cmd)
 
-    response = requests.get(url, headers=headers)
+    response = requests.get(url, headers=headers, verify=not should_disable_connection_verify())
     return _utility.try_extract_result(response)
 
 
@@ -254,7 +255,7 @@ def run_component_command(
     )
     headers = _utility.get_headers(token, cmd)
 
-    response = requests.post(url, headers=headers, json=payload)
+    response = requests.post(url, headers=headers, json=payload, verify=not should_disable_connection_verify())
 
     # execute command response has caveats in it due to Async/Sync device methods
     # return the response if we get 201, otherwise try to apply generic logic
@@ -294,5 +295,81 @@ def get_component_command_history(
     )
     headers = _utility.get_headers(token, cmd)
 
-    response = requests.get(url, headers=headers)
+    response = requests.get(url, headers=headers, verify=not should_disable_connection_verify())
+    return _utility.try_extract_result(response)
+
+
+def run_manual_failover(
+    cmd,
+    app_id: str,
+    device_id: str,
+    ttl_minutes: int = None,
+    token: str = None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+):
+    """
+    Execute a manual failover of device across multiple IoT Hubs to validate device firmware's
+         ability to reconnect using DPS to a different IoT Hub.
+
+    Args:
+        cmd: command passed into az
+        app_id: id of an app (used for forming request URL)
+        device_id: unique case-sensitive device id
+        ttl_minutes: (OPTIONAL) An optional value to specify the expiration time of this manual failover
+            test before the device moves back to it's original IoT Hub.
+            This has a default value of 30 minutes, but can optionally be any positive integer between 1 and 30.
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix:(OPTIONAL) {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        result (currently a 200)
+    """
+
+    url = "https://{}.{}/{}/{}/manual-failover".format(
+        app_id, central_dns_suffix, "system/iothub/devices", device_id
+    )
+    headers = _utility.get_headers(token, cmd)
+    json = {}
+    if ttl_minutes :
+        json = {"ttl": ttl_minutes}
+    else:
+        print("""Using default time to live -
+        see https://github.com/iot-for-all/iot-central-high-availability-clients#readme for more information""")
+
+    response = requests.post(url, headers=headers, verify=not should_disable_connection_verify(), json=json)
+    _utility.log_response_debug(response=response, logger=logger)
+    return _utility.try_extract_result(response)
+
+
+def run_manual_failback(
+    cmd,
+    app_id: str,
+    device_id: str,
+    token: str,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+):
+    """
+    Execute a manual failback for device. Reverts the previously executed failover
+         command by moving the device back to it's original IoT Hub.
+
+    Args:
+        cmd: command passed into az
+        app_id: id of an app (used for forming request URL)
+        device_id: unique case-sensitive device id
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        result (currently a 200)
+    """
+
+    url = "https://{}.{}/{}/{}/manual-failback".format(
+        app_id, central_dns_suffix, "system/iothub/devices", device_id
+    )
+    headers = _utility.get_headers(token, cmd)
+    response = requests.post(url, headers=headers, verify=not should_disable_connection_verify())
+    _utility.log_response_debug(response=response, logger=logger)
+
     return _utility.try_extract_result(response)

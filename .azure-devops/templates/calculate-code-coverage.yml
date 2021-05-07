@@ -24,7 +24,7 @@ steps:
       for i in ./coverage/.coverage.*; do
         coverage combine -a $i
       done
-      coverage xml --rcfile="$(System.DefaultWorkingDirectory)/.coveragerc"
+      coverage xml -i --rcfile="$(System.DefaultWorkingDirectory)/.coveragerc"
     workingDirectory: '$(System.ArtifactsDirectory)/aziotext_kpi/'
     displayName: 'Merging code coverage data'
 
