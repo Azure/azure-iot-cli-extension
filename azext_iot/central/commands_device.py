@@ -192,12 +192,7 @@ def registration_summary(
 
 
 def get_credentials(
-    cmd,
-    app_id: str,
-    device_id,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
+    cmd, app_id: str, device_id, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     provider = CentralDeviceProviderV1(cmd=cmd, app_id=app_id, token=token,)
     return provider.get_device_credentials(
