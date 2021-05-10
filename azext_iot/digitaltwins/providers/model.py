@@ -36,7 +36,6 @@ def get_model_dependencies(model):
             no_dup.add(item)
         elif isinstance(item, dict):
             # If its a single nested model, get its dtmi reference, dependencies and add them
-            no_dup.add(item['@id'])
             no_dup.update(set(get_model_dependencies(item)))
         elif isinstance(item, list):
             # If its a list, could have DTMIs or nested models
@@ -46,7 +45,6 @@ def get_model_dependencies(model):
                     no_dup.add(sub_item)
                 elif isinstance(sub_item, dict):
                     # This is a nested model. Now go get its dependencies and add them
-                    no_dup.add(sub_item['@id'])
                     no_dup.update(set(get_model_dependencies(sub_item)))
 
     return list(no_dup)

@@ -60,7 +60,6 @@ def parse_extends(schema_input):
 
     if isinstance(schema_input, dict):
         model, dependencies = parse_model(schema_input)
-        dependencies.add(schema_input['id'])
         return model, dependencies
 
     schema = []
@@ -71,7 +70,6 @@ def parse_extends(schema_input):
         if isinstance(schema_item, dict):
             schema_model, schema_dependencies = parse_model(schema_item)
             schema.append(schema_model)
-            dependencies.add(schema_item['id'])
             dependencies.update(schema_dependencies)
     return schema, dependencies
 
