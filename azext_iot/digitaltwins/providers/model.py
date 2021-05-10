@@ -18,32 +18,38 @@ def get_model_dependencies(model):
     """Return a list of dependency DTMIs for a given model"""
     dependencies = []
 
+    # Add everything that would have dependency DTMIs, worry about flattening later
     if "contents" in model:
         components = [item["schema"] for item in model["contents"] if item["@type"] == "Component"]
-        dependencies += components
+        dependencies.extend(components)
 
     if "extends" in model:
+        dependencies.append(model['extends'])
+
+    # Go through gathered items, get the DTMI references, and flatten if needed
+    no_dup = set()
+    for item in dependencies:
         # Models defined in a DTDL can implement extensions of up to two interfaces.
         # These interfaces can be in the form of a DTMI reference, or a nested model.
-        if isinstance(model["extends"], str):
-            # If its just a string, thats a single DTMI reference, so just add that to our list
-            dependencies.append(model["extends"])
-        elif isinstance(model["extends"], dict):
-            # If its a single nested model. Get its dependencies and add them
-            dependencies.extend(get_model_dependencies(model["extends"]))
-        elif isinstance(model["extends"], list):
+        if isinstance(item, str):
+            # If its just a string, thats a single DTMI reference, so just add that to our set
+            no_dup.add(item)
+        elif isinstance(item, dict):
+            # If its a single nested model, get its dtmi reference, dependencies and add them
+            no_dup.add(item['@id'])
+            no_dup.update(set(get_model_dependencies(item)))
+        elif isinstance(item, list):
             # If its a list, could have DTMIs or nested models
-            for item in model["extends"]:
-                if isinstance(item, str):
+            for sub_item in item:
+                if isinstance(sub_item, str):
                     # If there are strings in the list, that's a DTMI reference, so add it
-                    dependencies.append(item)
-                elif isinstance(item, dict):
+                    no_dup.add(sub_item)
+                elif isinstance(sub_item, dict):
                     # This is a nested model. Now go get its dependencies and add them
-                    dependencies.extend(get_model_dependencies(item))
+                    no_dup.add(sub_item['@id'])
+                    no_dup.update(set(get_model_dependencies(sub_item)))
 
-    # Remove duplicate dependencies
-    dependencies = list(set(dependencies))
-    return dependencies
+    return list(no_dup)
 
 
 class ModelProvider(DigitalTwinsProvider):
