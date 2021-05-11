@@ -47,8 +47,11 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         test_ct = "text/plain"
         test_et = int((time() + 3600) * 1000)  # milliseconds since epoch
         test_ce = "utf8"
+        test_mn = "Test_Method_1"
+        test_mp = {'payload_data1': 'payload_value1'}
 
         self.kwargs["c2d_json_send_data"] = json.dumps({"data": str(uuid4())})
+        self.kwargs["method_payload_test_data"] = json.dumps(test_mp)
 
         # Send C2D message
         self.cmd(
@@ -189,17 +192,15 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # invoke device method without response status and payload
         res = self.cmd(
-            "iot hub invoke-device-method -d {} --method-name Test_Method_1 --login {}".format(
-                device_ids[0], self.connection_string
-            ) + "--method-payload {'payload_data1':'payload_value1'}"
-        ).get_output_in_json()
+            """iot hub invoke-device-method -d {} --method-name {} --login {} --method-payload '{}'""".format(
+                device_ids[0], test_mn, self.connection_string, "{method_payload_test_data}")).get_output_in_json()
 
         assert res is not None
         assert res["status"] == 200
         assert res["payload"] == {
-            "methodName": "Test_Method_1",
+            "methodName": test_mn,
             "methodRequestId": "1",
-            "methodRequestPayload": "{'payload_data1':'payload_value1'}"
+            "methodRequestPayload": test_mp
         }
 
         token.set()
@@ -503,21 +504,32 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         enqueued_time = calculate_millisec_since_unix_epoch_utc()
 
         for i in range(device_count):
-            execute_onthread(
-                method=iot_device_send_message,
-                args=[
-                    client,
-                    device_ids[i],
-                    LIVE_HUB,
-                    '{\r\n"payload_data1":"payload_value1"\r\n}',
-                    "$.mid=12345;key0=value0;key1=1",
-                    1,
-                    LIVE_RG,
-                    None,
-                    0,
-                ],
-                max_runs=1,
+            # execute_onthread(
+            #     method=iot_device_send_message,
+            #     args=[
+            #         client,
+            #         device_ids[i],
+            #         LIVE_HUB,
+            #         '{\r\n"payload_data1":"payload_value1"\r\n}',
+            #         "$.mid=12345;key0=value0;key1=1",
+            #         1,
+            #         LIVE_RG,
+            #         None
+            #     ],
+            #     max_runs=1,
+            # )
+            iot_device_send_message(
+                client,
+                device_ids[i],
+                LIVE_HUB,
+                '{\r\n"payload_data1":"payload_value1"\r\n}',
+                "$.mid=12345;key0=value0;key1=1",
+                1,
+                LIVE_RG,
+                None
             )
+
+
         # Monitor events for all devices and include sys, anno, app
         self.command_execute_assert(
             "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 5 -y -p sys anno app".format(
@@ -595,20 +607,30 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         enqueued_time = calculate_millisec_since_unix_epoch_utc()
 
         # Send messages that have JSON payload, but do not pass $.ct property
-        execute_onthread(
-            method=iot_device_send_message,
-            args=[
-                client,
-                device_ids[i],
-                LIVE_HUB,
-                '{\r\n"payload_data1":"payload_value1"\r\n}',
-                "",
-                1,
-                LIVE_RG,
-                None,
-                1,
-            ],
-            max_runs=1,
+        # execute_onthread(
+        #     method=iot_device_send_message,
+        #     args=[
+        #         client,
+        #         device_ids[i],
+        #         LIVE_HUB,
+        #         '{\r\n"payload_data1":"payload_value1"\r\n}',
+        #         "",
+        #         1,
+        #         LIVE_RG,
+        #         None
+        #     ],
+        #     max_runs=1,
+        # )
+
+        iot_device_send_message(
+            client,
+            device_ids[i],
+            LIVE_HUB,
+            '{\r\n"payload_data1":"payload_value1"\r\n}',
+            "",
+            1,
+            LIVE_RG,
+            None
         )
 
         # Monitor messages for ugly JSON output
@@ -630,19 +652,30 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         enqueued_time = calculate_millisec_since_unix_epoch_utc()
 
         # Send messages that have JSON payload and have $.ct property
-        execute_onthread(
-            method=iot_device_send_message,
-            args=[
-                client,
-                device_ids[i],
-                LIVE_HUB,
-                '{\r\n"payload_data1":"payload_value1"\r\n}',
-                "$.ct=application/json",
-                1,
-                LIVE_RG,
-            ],
-            max_runs=1,
+        # execute_onthread(
+        #     method=iot_device_send_message,
+        #     args=[
+        #         client,
+        #         device_ids[i],
+        #         LIVE_HUB,
+        #         '{\r\n"payload_data1":"payload_value1"\r\n}',
+        #         "$.ct=application/json",
+        #         1,
+        #         LIVE_RG,
+        #     ],
+        #     max_runs=1,
+        # )
+
+        iot_device_send_message(
+            client,
+            device_ids[i],
+            LIVE_HUB,
+            '{\r\n"payload_data1":"payload_value1"\r\n}',
+            "$.ct=application/json",
+            1,
+            LIVE_RG,
         )
+
 
         # Monitor messages for pretty JSON output
         self.command_execute_assert(
@@ -663,18 +696,28 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         enqueued_time = calculate_millisec_since_unix_epoch_utc()
 
         # Send messages that have improperly formatted JSON payload and a $.ct property
-        execute_onthread(
-            method=iot_device_send_message,
-            args=[
-                client,
-                device_ids[i],
-                LIVE_HUB,
-                '{\r\n"payload_data1""payload_value1"\r\n}',
-                "$.ct=application/json",
-                1,
-                LIVE_RG,
-            ],
-            max_runs=1,
+        # execute_onthread(
+        #     method=iot_device_send_message,
+        #     args=[
+        #         client,
+        #         device_ids[i],
+        #         LIVE_HUB,
+        #         '{\r\n"payload_data1""payload_value1"\r\n}',
+        #         "$.ct=application/json",
+        #         1,
+        #         LIVE_RG,
+        #     ],
+        #     max_runs=1,
+        # )
+
+        iot_device_send_message(
+            client,
+            device_ids[i],
+            LIVE_HUB,
+            '{\r\n"payload_data1""payload_value1"\r\n}',
+            "$.ct=application/json",
+            1,
+            LIVE_RG,
         )
 
         # Monitor messages to ensure it returns improperly formatted JSON

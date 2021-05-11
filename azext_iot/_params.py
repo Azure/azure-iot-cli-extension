@@ -63,7 +63,8 @@ qos_type = CLIArgumentType(
     type=str,
     nargs="?",
     choices=["0", "1"],
-    help="Quality of Service. 0 = At most once, 1 = At least once. 2 (Exactly once) is not supported.",
+    help="Quality of Service. 0 = At most once, 1 = At least once. 2 (Exactly once) is not supported."
+        "This command parameter has been deprecated and will be removed in a future release.",
 )
 
 event_timeout_type = CLIArgumentType(

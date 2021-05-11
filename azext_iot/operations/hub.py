@@ -1805,24 +1805,28 @@ def iot_device_send_message(
     qos=1,
 ):
     from azext_iot.operations._mqtt import mqtt_client
-
+    from datetime import datetime
+    #import pdb; pdb.set_trace()
+    six.print_('Method enter: ' + str(datetime.now().time()))
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
-
+    six.print_('Hub discovery completed: ' + str(datetime.now().time()))
     if properties:
         properties = validate_key_value_pairs(properties)
 
     device_connection = iot_get_device_connection_string(cmd=cmd, device_id=device_id, hub_name=hub_name, login=login)
+    six.print_('Got device connection: ' + str(datetime.now().time()))
     client_mqtt = mqtt_client(
         target=target,
         device_conn_string=device_connection["connectionString"],
         device_id=device_id
     )
-
+    six.print_('Got MQTT Client: ' + str(datetime.now().time()))
     for _ in range(msg_count):
         client_mqtt.send_d2c_message(message_text=data, properties=properties)
+    six.print_('Method exit: ' + str(datetime.now().time()))
 
 
 def iot_device_send_message_http(
