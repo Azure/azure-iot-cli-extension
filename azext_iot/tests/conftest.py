@@ -15,7 +15,7 @@ from azure.cli.core.commands import AzCliCommand
 from azure.cli.core.mock import DummyCli
 from azext_iot.tests.generators import generate_generic_id
 
-path_get_device_connection = "azext_iot.operations.hub.iot_get_device_connection_string"
+path_get_device = "azext_iot.operations.hub._iot_device_show"
 path_iot_hub_service_factory = "azext_iot._factory.iot_hub_service_factory"
 path_service_client = "msrest.service_client.ServiceClient.send"
 path_ghcs = "azext_iot.iothub.providers.discovery.IotHubDiscovery.get_target"
@@ -75,10 +75,36 @@ def fixture_cmd(mocker):
 
 
 @pytest.fixture()
-def fixture_device_connection(mocker):
-    get_connection_string = mocker.patch(path_get_device_connection)
-    get_connection_string.return_value = {"connectionString": "test_device_conn_string"}
-    return get_connection_string
+def fixture_device(mocker):
+    get_device = mocker.patch(path_get_device)
+    get_device.return_value = {
+        'deviceId': 'Test_Device_1',
+        'generationId': '637534345627501371',
+        'etag': 'ODgxNTgwOA==',
+        'connectionState': 'Connected',
+        'status': 'enabled',
+        'statusReason': None,
+        'connectionStateUpdatedTime': '2021-05-12T08:48:08.7205939Z',
+        'statusUpdatedTime': '0001-01-01T00:00:00Z',
+        'lastActivityTime': '2021-05-12T08:48:07.6903807Z',
+        'cloudToDeviceMessageCount': 0,
+        'authentication': {
+            'symmetricKey': {
+                'primaryKey': 'TestKey1',
+                'secondaryKey': 'TestKey2'
+            },
+            'x509Thumbprint': {
+                'primaryThumbprint': None,
+                'secondaryThumbprint': None
+            },
+            'type': 'sas'
+        },
+        'capabilities': {
+            'iotEdge': False
+        },
+        'hub': 'test-iot-hub.azure-devices.net'
+    }
+    return get_device
 
 
 @pytest.fixture()

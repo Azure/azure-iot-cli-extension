@@ -504,35 +504,25 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         enqueued_time = calculate_millisec_since_unix_epoch_utc()
 
         for i in range(device_count):
-            # execute_onthread(
-            #     method=iot_device_send_message,
-            #     args=[
-            #         client,
-            #         device_ids[i],
-            #         LIVE_HUB,
-            #         '{\r\n"payload_data1":"payload_value1"\r\n}',
-            #         "$.mid=12345;key0=value0;key1=1",
-            #         1,
-            #         LIVE_RG,
-            #         None
-            #     ],
-            #     max_runs=1,
-            # )
-            iot_device_send_message(
-                client,
-                device_ids[i],
-                LIVE_HUB,
-                '{\r\n"payload_data1":"payload_value1"\r\n}',
-                "$.mid=12345;key0=value0;key1=1",
-                1,
-                LIVE_RG,
-                None
+            token, thread = execute_onthread(
+                method=iot_device_send_message,
+                args=[
+                    client,
+                    device_ids[i],
+                    LIVE_HUB,
+                    '{\r\n"payload_data1":"payload_value1"\r\n}',
+                    "$.mid=12345;key0=value0;key1=1",
+                    1,
+                    LIVE_RG,
+                    None
+                ],
+                max_runs=1,
+                return_handle=True,
             )
-
 
         # Monitor events for all devices and include sys, anno, app
         self.command_execute_assert(
-            "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 5 -y -p sys anno app".format(
+            "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 7 -y -p sys anno app".format(
                 LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUPS[0], enqueued_time
             ),
             device_ids
@@ -548,7 +538,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # Monitor events for a single device
         self.command_execute_assert(
-            "iot hub monitor-events -n {} -g {} -d {} --cg {} --et {} -t 5 -y -p all".format(
+            "iot hub monitor-events -n {} -g {} -d {} --cg {} --et {} -t 7 -y -p all".format(
                 LIVE_HUB, LIVE_RG, device_ids[0], LIVE_CONSUMER_GROUPS[1], enqueued_time
             ),
             [
@@ -564,7 +554,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # Monitor events with device-id wildcards
         self.command_execute_assert(
-            "iot hub monitor-events -n {} -g {} -d {} --et {} -t 5 -y -p sys anno app".format(
+            "iot hub monitor-events -n {} -g {} -d {} --et {} -t 7 -y -p sys anno app".format(
                 LIVE_HUB, LIVE_RG, PREFIX_DEVICE + "*", enqueued_time
             ),
             device_ids,
@@ -580,7 +570,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         )
 
         self.command_execute_assert(
-            'iot hub monitor-events -n {} -g {} --device-query "{}" --et {} -t 5 -y -p sys anno app'.format(
+            'iot hub monitor-events -n {} -g {} --device-query "{}" --et {} -t 7 -y -p sys anno app'.format(
                 LIVE_HUB, LIVE_RG, query_string, enqueued_time
             ),
             device_subset_include,
@@ -590,7 +580,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         device_subset_exclude = device_ids[device_count // 2 :]
         with pytest.raises(Exception):
             self.command_execute_assert(
-                'iot hub monitor-events -n {} -g {} --device-query "{}" --et {} -t 5 -y -p sys anno app'.format(
+                'iot hub monitor-events -n {} -g {} --device-query "{}" --et {} -t 7 -y -p sys anno app'.format(
                     LIVE_HUB, LIVE_RG, query_string, enqueued_time
                 ),
                 device_subset_exclude,
@@ -598,7 +588,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # Monitor events with --login parameter
         self.command_execute_assert(
-            "iot hub monitor-events -t 5 -y -p all --cg {} --et {} --login {}".format(
+            "iot hub monitor-events -t 7 -y -p all --cg {} --et {} --login {}".format(
                 LIVE_CONSUMER_GROUPS[2], enqueued_time, self.connection_string
             ),
             device_ids,
@@ -607,21 +597,6 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         enqueued_time = calculate_millisec_since_unix_epoch_utc()
 
         # Send messages that have JSON payload, but do not pass $.ct property
-        # execute_onthread(
-        #     method=iot_device_send_message,
-        #     args=[
-        #         client,
-        #         device_ids[i],
-        #         LIVE_HUB,
-        #         '{\r\n"payload_data1":"payload_value1"\r\n}',
-        #         "",
-        #         1,
-        #         LIVE_RG,
-        #         None
-        #     ],
-        #     max_runs=1,
-        # )
-
         iot_device_send_message(
             client,
             device_ids[i],
@@ -635,7 +610,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # Monitor messages for ugly JSON output
         self.command_execute_assert(
-            "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 5 -y".format(
+            "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 7 -y".format(
                 LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUPS[0], enqueued_time
             ),
             ["\\r\\n"],
@@ -643,7 +618,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # Monitor messages and parse payload as JSON with the --ct parameter
         self.command_execute_assert(
-            "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 5 --ct application/json -y".format(
+            "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 7 --ct application/json -y".format(
                 LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUPS[1], enqueued_time
             ),
             ['"payload_data1": "payload_value1"'],
@@ -652,20 +627,6 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         enqueued_time = calculate_millisec_since_unix_epoch_utc()
 
         # Send messages that have JSON payload and have $.ct property
-        # execute_onthread(
-        #     method=iot_device_send_message,
-        #     args=[
-        #         client,
-        #         device_ids[i],
-        #         LIVE_HUB,
-        #         '{\r\n"payload_data1":"payload_value1"\r\n}',
-        #         "$.ct=application/json",
-        #         1,
-        #         LIVE_RG,
-        #     ],
-        #     max_runs=1,
-        # )
-
         iot_device_send_message(
             client,
             device_ids[i],
@@ -676,10 +637,9 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             LIVE_RG,
         )
 
-
         # Monitor messages for pretty JSON output
         self.command_execute_assert(
-            "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 5 -y".format(
+            "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 7 -y".format(
                 LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUPS[0], enqueued_time
             ),
             ['"payload_data1": "payload_value1"'],
@@ -687,7 +647,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # Monitor messages with yaml output
         self.command_execute_assert(
-            "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 5 -y -o yaml".format(
+            "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 7 -y -o yaml".format(
                 LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUPS[1], enqueued_time
             ),
             ["payload_data1: payload_value1"],
@@ -696,20 +656,6 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         enqueued_time = calculate_millisec_since_unix_epoch_utc()
 
         # Send messages that have improperly formatted JSON payload and a $.ct property
-        # execute_onthread(
-        #     method=iot_device_send_message,
-        #     args=[
-        #         client,
-        #         device_ids[i],
-        #         LIVE_HUB,
-        #         '{\r\n"payload_data1""payload_value1"\r\n}',
-        #         "$.ct=application/json",
-        #         1,
-        #         LIVE_RG,
-        #     ],
-        #     max_runs=1,
-        # )
-
         iot_device_send_message(
             client,
             device_ids[i],
@@ -722,7 +668,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # Monitor messages to ensure it returns improperly formatted JSON
         self.command_execute_assert(
-            "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 5 -y".format(
+            "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 7 -y".format(
                 LIVE_HUB, LIVE_RG, LIVE_CONSUMER_GROUPS[0], enqueued_time
             ),
             ['{\\r\\n\\"payload_data1\\"\\"payload_value1\\"\\r\\n}'],
