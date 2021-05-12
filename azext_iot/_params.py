@@ -611,13 +611,15 @@ def load_arguments(self, _):
         )
         context.argument(
             "method_response_code",
+            type=int,
             options_list=["--method-response-code", "--mrc"],
             help="Status code to be returned when direct method is executed on device. Optional param, only supported for mqtt.",
         )
         context.argument(
             "method_response_payload",
             options_list=["--method-response-payload", "--mrp"],
-            help="Payload to be returned when direct method is executed on device. Optional param, only supported for mqtt.",
+            help="Payload to be returned when direct method is executed on device. Provide file path or raw json. "
+            "Optional param, only supported for mqtt.",
         )
 
     with self.argument_context("iot device c2d-message") as context:

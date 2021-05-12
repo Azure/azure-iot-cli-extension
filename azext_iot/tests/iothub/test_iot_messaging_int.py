@@ -485,6 +485,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         device_count = 10
         device_ids = self.generate_device_names(device_count)
+        send_message_data = '{\r\n"payload_data1":"payload_value1"\r\n}'
 
         # Test with invalid connection string
         self.cmd(
@@ -504,13 +505,13 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         enqueued_time = calculate_millisec_since_unix_epoch_utc()
 
         for i in range(device_count):
-            token, thread = execute_onthread(
+            execute_onthread(
                 method=iot_device_send_message,
                 args=[
                     client,
                     device_ids[i],
                     LIVE_HUB,
-                    '{\r\n"payload_data1":"payload_value1"\r\n}',
+                    send_message_data,
                     "$.mid=12345;key0=value0;key1=1",
                     1,
                     LIVE_RG,
@@ -601,7 +602,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             client,
             device_ids[i],
             LIVE_HUB,
-            '{\r\n"payload_data1":"payload_value1"\r\n}',
+            send_message_data,
             "",
             1,
             LIVE_RG,
@@ -631,7 +632,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             client,
             device_ids[i],
             LIVE_HUB,
-            '{\r\n"payload_data1":"payload_value1"\r\n}',
+            send_message_data,
             "$.ct=application/json",
             1,
             LIVE_RG,
