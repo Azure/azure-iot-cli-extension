@@ -3,6 +3,32 @@
 Release History
 ===============
 
+0.10.12
++++++++++++++++
+
+**IoT Hub updates**
+
+* Removed deprecated edge offline commands and artifacts.
+* Removed deprecated device-identity | module-identity show-connection-string commands.
+
+* Most commands against IoT Hub support Azure AD based access. The type of auth
+  used to execute commands can be controlled with the "--auth-type" parameter
+  which accepts the values "key" or "login". The value of "key" is set by default.
+
+  * When "--auth-type" has the value of "key", like before the CLI will auto-discover
+    a suitable policy when interacting with iothub.
+  * When "--auth-type" has the value "login", an access token from the Azure CLI logged in principal
+    will be used for the operation.
+
+  * The following commands or command groups currently remain with key based access only.
+
+    * az iot hub monitor-events
+    * az iot hub monitor-feedback
+    * az iot device *
+
+For more information about IoT Hub support for AAD visit: https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-dev-guide-azure-ad-rbac
+
+
 0.10.11
 +++++++++++++++
 

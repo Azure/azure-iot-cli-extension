@@ -7,9 +7,9 @@
 from msrest.authentication import Authentication
 
 
-class DigitalTwinAuthentication(Authentication):
+class IoTHubOAuth(Authentication):
     """
-    Azure AD OAuth for Azure Digital Twins.
+    Azure AD OAuth for Azure IoT Hub.
 
     """
 
@@ -43,7 +43,7 @@ class DigitalTwinAuthentication(Authentication):
             session (): requests.Session.
         """
 
-        session = session or super(DigitalTwinAuthentication, self).signed_session()
+        session = session or super(IoTHubOAuth, self).signed_session()
         session.headers["Authorization"] = self.generate_token()
         return session
 
