@@ -98,10 +98,10 @@ pip install -r path/to/source/dev_requirements
 ```
 
 _Hub:_  
-`pytest azext_iot/tests/test_iot_ext_unit.py`
+`pytest azext_iot/tests/iothub/test_iot_ext_unit.py`
 
 _DPS:_  
-`pytest azext_iot/tests/test_iot_dps_unit.py`
+`pytest azext_iot/tests/dps/test_iot_dps_unit.py`
 
 ### Integration Tests
 
@@ -127,7 +127,6 @@ You can either manually set the environment variables or use the `pytest.ini.exa
     AZURE_TEST_RUN_LIVE=True
     azext_iot_testrg="Resource Group that contains your IoT Hub"
     azext_iot_testhub="IoT Hub Name"
-    azext_iot_testhub_cs="IoT Hub Connection String"
     azext_iot_testdps="IoT Hub DPS Name"
     azext_iot_teststorageuri="Blob Container SAS Uri"
     azext_iot_identity_teststorageid="Storage Account ID"
@@ -141,13 +140,13 @@ You can either manually set the environment variables or use the `pytest.ini.exa
 
 Execute the following command to run the IoT Hub integration tests:
 
-`pytest azext_iot/tests/test_iot_ext_int.py`
+`pytest azext_iot/tests/iothub/test_iot_ext_int.py`
 
 ##### Device Provisioning Service
 
 Execute the following command to run the IoT Hub DPS integration tests:
 
-`pytest azext_iot/tests/test_iot_dps_int.py`
+`pytest azext_iot/tests/dps/test_iot_dps_int.py`
 
 #### Unit and Integration Tests Single Command
 
@@ -264,7 +263,7 @@ https://medium.com/@marcobelo/setting-up-python-black-on-visual-studio-code-5318
 
 https://docs.python.org/3/library/pdb.html
 
-1. `pip install pdb`
+1. `pip install pdbpp`
 2. If you need a breakpoint, put `import pdb; pdb.set_trace()` in your code
 3. Run your command, it should break execution wherever you put the breakpoint.
 

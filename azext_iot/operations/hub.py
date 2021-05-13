@@ -11,7 +11,6 @@ from knack.log import get_logger
 from knack.util import CLIError
 from enum import Enum, EnumMeta
 from azext_iot.constants import (
-    EXTENSION_ROOT,
     DEVICE_DEVICESCOPE_PREFIX,
     TRACING_PROPERTY,
     TRACING_ALLOWED_FOR_LOCATION,
@@ -33,7 +32,6 @@ from azext_iot.common.utility import (
     shell_safe_json_parse,
     read_file_content,
     validate_key_value_pairs,
-    url_encode_dict,
     unpack_msrest_error,
     init_monitoring,
     process_json_arg,
@@ -1803,65 +1801,24 @@ def iot_device_send_message(
     properties=None,
     msg_count=1,
     resource_group_name=None,
-    login=None,
-    qos=1,
+    login=None
 ):
+    from azext_iot.operations._mqtt import mqtt_client
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
-    return _iot_device_send_message(
-        target=target,
-        device_id=device_id,
-        data=data,
-        properties=properties,
-        msg_count=msg_count,
-        qos=qos,
-    )
-
-
-def _iot_device_send_message(
-    target, device_id, data, properties=None, msg_count=1, qos=1
-):
-    from azext_iot.operations._mqtt import build_mqtt_device_username
-    import paho.mqtt.publish as publish
-    from paho.mqtt import client as mqtt
-    import ssl
-    import os
-
-    msgs = []
     if properties:
         properties = validate_key_value_pairs(properties)
-
-    sas = SasTokenAuthentication(
-        target["entity"], target["policy"], target["primarykey"], 360
-    ).generate_sas_token()
-    cwd = EXTENSION_ROOT
-    cert_path = os.path.join(cwd, "digicert.pem")
-    auth = {
-        "username": build_mqtt_device_username(target["entity"], device_id),
-        "password": sas,
-    }
-
-    tls = {"ca_certs": cert_path, "tls_version": ssl.PROTOCOL_SSLv23}
-    topic = "devices/{}/messages/events/{}".format(
-        device_id, url_encode_dict(properties) if properties else ""
+    device = _iot_device_show(target, device_id)
+    device_connection_string = _build_device_or_module_connection_string(device, KeyType.primary.value)
+    client_mqtt = mqtt_client(
+        target=target,
+        device_conn_string=device_connection_string,
+        device_id=device_id
     )
     for _ in range(msg_count):
-        msgs.append({"topic": topic, "payload": data, "qos": int(qos)})
-    try:
-        publish.multiple(
-            msgs,
-            client_id=device_id,
-            hostname=target["entity"],
-            auth=auth,
-            port=8883,
-            protocol=mqtt.MQTTv311,
-            tls=tls,
-        )
-        return
-    except Exception as x:
-        raise CLIError(x)
+        client_mqtt.send_d2c_message(message_text=data, properties=properties)
 
 
 def iot_device_send_message_http(
@@ -2153,12 +2110,14 @@ def iot_simulate_device(
     properties=None,
     resource_group_name=None,
     login=None,
+    method_response_code=None,
+    method_response_payload=None
 ):
     import sys
     import uuid
     import datetime
     import json
-    from azext_iot.operations._mqtt import mqtt_client_wrap
+    from azext_iot.operations._mqtt import mqtt_client
     from azext_iot.common.utility import execute_onthread
     from azext_iot.constants import (
         MIN_SIM_MSG_INTERVAL,
@@ -2177,6 +2136,12 @@ def iot_simulate_device(
     if msg_count < MIN_SIM_MSG_COUNT:
         raise CLIError("msg count must be at least {}".format(MIN_SIM_MSG_COUNT))
 
+    if protocol_type != ProtocolType.mqtt.name:
+        if method_response_code:
+            raise CLIError("'method-response-code' not supported, {} doesn't allow direct methods.".format(protocol_type))
+        if method_response_payload:
+            raise CLIError("'method-response-payload' not supported, {} doesn't allow direct methods.".format(protocol_type))
+
     properties_to_send = _iot_simulate_get_default_properties(protocol_type)
     user_properties = validate_key_value_pairs(properties) or {}
     properties_to_send.update(user_properties)
@@ -2186,6 +2151,11 @@ def iot_simulate_device(
         hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
     token = None
+
+    if method_response_payload:
+        method_response_payload = process_json_arg(
+            method_response_payload, argument_name="method-response-payload"
+        )
 
     class generator(object):
         def __init__(self):
@@ -2207,14 +2177,16 @@ def iot_simulate_device(
 
     try:
         if protocol_type == ProtocolType.mqtt.name:
-            wrap = mqtt_client_wrap(
+            device = _iot_device_show(target, device_id)
+            device_connection_string = _build_device_or_module_connection_string(device, KeyType.primary.value)
+            client_mqtt = mqtt_client(
                 target=target,
+                device_conn_string=device_connection_string,
                 device_id=device_id,
-                properties=properties_to_send,
-                sas_duration=(msg_count * msg_interval)
-                + 60,  # int type is enforced for msg_count and msg_interval
+                method_response_code=method_response_code,
+                method_response_payload=method_response_payload
             )
-            wrap.execute(generator(), publish_delay=msg_interval, msg_count=msg_count)
+            client_mqtt.execute(data=generator(), properties=properties_to_send, publish_delay=msg_interval, msg_count=msg_count)
         else:
             six.print_("Sending and receiving events via https")
             token, op = execute_onthread(
