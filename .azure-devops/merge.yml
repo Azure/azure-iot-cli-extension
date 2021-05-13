@@ -1,16 +1,12 @@
 trigger:
   branches:
     include:
-      - device_client_integration
-    exclude:
       - dev
       - master
 
 pr:
   branches:
     include:
-      - device_client_integration
-    exclude:
       - dev
       - master
 

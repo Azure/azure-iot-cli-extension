@@ -14,14 +14,14 @@ from azext_iot.central.providers import CentralDeviceProvider
 
 def list_devices(cmd, app_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT):
     provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token)
-    return provider.list_devices()
+    return provider.list_devices(central_dns_suffix=central_dns_suffix)
 
 
 def get_device(
     cmd, app_id: str, device_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token)
-    return provider.get_device(device_id)
+    return provider.get_device(device_id, central_dns_suffix=central_dns_suffix)
 
 
 def create_device(
@@ -52,7 +52,9 @@ def delete_device(
     cmd, app_id: str, device_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token)
-    return provider.delete_device(device_id)
+    return provider.delete_device(
+        device_id=device_id,
+        central_dns_suffix=central_dns_suffix)
 
 
 def registration_info(
@@ -86,6 +88,39 @@ def run_command(
         interface_id=interface_id,
         command_name=command_name,
         payload=payload,
+    )
+
+
+def run_manual_failover(
+    cmd,
+    app_id: str,
+    device_id: str,
+    ttl_minutes=None,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+):
+    if ttl_minutes and ttl_minutes < 1:
+        raise CLIError("TTL value should be a positive integer: {}".format(ttl_minutes))
+
+    provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token)
+    return provider.run_manual_failover(
+        device_id=device_id,
+        ttl_minutes=ttl_minutes,
+        central_dns_suffix=central_dns_suffix
+    )
+
+
+def run_manual_failback(
+    cmd,
+    app_id: str,
+    device_id: str,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+):
+    provider = CentralDeviceProvider(cmd=cmd, app_id=app_id, token=token)
+    return provider.run_manual_failback(
+        device_id=device_id,
+        central_dns_suffix=central_dns_suffix
     )
 
 
