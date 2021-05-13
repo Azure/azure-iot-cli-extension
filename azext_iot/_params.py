@@ -55,18 +55,6 @@ children_list_prop_type = CLIArgumentType(
     help="Child device list (space separated).",
 )
 
-# There is a bug in CLI core preventing treating --qos as an integer.
-# Until its resolved, ensure casting of value to integer
-# TODO: azure.cli.core.parser line 180 difflib.get_close_matches
-qos_type = CLIArgumentType(
-    options_list=["--qos"],
-    type=str,
-    nargs="?",
-    choices=["0", "1"],
-    help="Quality of Service. 0 = At most once, 1 = At least once. 2 (Exactly once) is not supported."
-    "This command parameter has been deprecated and will be removed in a future release.",
-)
-
 event_timeout_type = CLIArgumentType(
     options_list=["--timeout", "--to", "-t"],
     type=int,
@@ -601,7 +589,6 @@ def load_arguments(self, _):
             arg_type=get_enum_type(ProtocolType),
             help="Indicates device-to-cloud message protocol",
         )
-        context.argument("qos", arg_type=qos_type)
 
     with self.argument_context("iot device simulate") as context:
         context.argument(

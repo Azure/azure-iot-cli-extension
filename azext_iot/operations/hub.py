@@ -1801,8 +1801,7 @@ def iot_device_send_message(
     properties=None,
     msg_count=1,
     resource_group_name=None,
-    login=None,
-    qos=1,
+    login=None
 ):
     from azext_iot.operations._mqtt import mqtt_client
     discovery = IotHubDiscovery(cmd)
