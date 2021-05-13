@@ -117,20 +117,19 @@ class ResourceProvider(DigitalTwinsResourceManager):
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
 
-    def get(self, name, resource_group_name):
+    def get(self, name, resource_group_name, wait=False):
         try:
             return self.mgmt_sdk.digital_twins.get(
                 resource_name=name, resource_group_name=resource_group_name
             )
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            raise e if wait else CLIError(unpack_msrest_error(e))
 
-    def find_instance(self, name, resource_group_name=None):
+    def find_instance(self, name, resource_group_name=None, wait=False):
         if resource_group_name:
-            try:
-                return self.get(name=name, resource_group_name=resource_group_name)
-            except ErrorResponseException as e:
-                raise CLIError(unpack_msrest_error(e))
+            return self.get(
+                name=name, resource_group_name=resource_group_name, wait=wait
+            )
 
         dt_collection_pager = self.list()
         dt_collection = []
@@ -221,7 +220,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
 
     # Endpoints
 
-    def get_endpoint(self, name, endpoint_name, resource_group_name=None):
+    def get_endpoint(self, name, endpoint_name, resource_group_name=None, wait=False):
         target_instance = self.find_instance(
             name=name, resource_group_name=resource_group_name
         )
@@ -235,7 +234,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
                 resource_group_name=resource_group_name,
             )
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            raise e if wait else CLIError(unpack_msrest_error(e))
 
     def list_endpoints(self, name, resource_group_name=None):
         target_instance = self.find_instance(
@@ -417,7 +416,13 @@ class ResourceProvider(DigitalTwinsResourceManager):
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
 
-    def get_private_endpoint_conn(self, name, conn_name, resource_group_name=None):
+    def get_private_endpoint_conn(
+        self,
+        name,
+        conn_name,
+        resource_group_name=None,
+        wait=False
+    ):
         target_instance = self.find_instance(
             name=name, resource_group_name=resource_group_name
         )
@@ -432,7 +437,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
                 raw=True,
             ).response.json()
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            raise e if wait else CLIError(unpack_msrest_error(e))
 
     def list_private_endpoint_conns(self, name, resource_group_name=None):
         target_instance = self.find_instance(
