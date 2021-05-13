@@ -113,6 +113,19 @@ def load_digitaltwins_help():
             az dt delete -n {instance_name} -y --no-wait
     """
 
+    helps["dt wait"] = """
+        type: command
+        short-summary: Wait until an operation on an Digital Twins instance is complete.
+
+        examples:
+        - name: Wait until an arbitrary instance is created.
+          text: >
+            az dt wait -n {instance_name} --created
+        - name: Wait until an existing instance is deleted.
+          text: >
+            az dt wait -n {instance_name} --deleted
+    """
+
     helps["dt endpoint"] = """
         type: group
         short-summary: Manage and configure Digital Twins instance endpoints.
@@ -221,6 +234,19 @@ def load_digitaltwins_help():
             az dt endpoint delete -n {instance_name} --endpoint-name {endpoint_name} -y --no-wait
     """
 
+    helps["dt endpoint wait"] = """
+        type: command
+        short-summary: Wait until an endpoint operation is done.
+
+        examples:
+        - name: Wait until an endpoint for an instance is created.
+          text: >
+            az dt endpoint wait -n {instance_name} --endpoint-name {endpoint_name} --created
+        - name: Wait until an existing endpoint is deleted from an instance.
+          text: >
+            az dt endpoint wait -n {instance_name} --endpoint-name {endpoint_name} --deleted
+    """
+
     helps["dt network"] = """
         type: group
         short-summary: Manage Digital Twins network configuration including private links and endpoint connections.
@@ -290,7 +316,6 @@ def load_digitaltwins_help():
         - name: Approve a pending private-endpoint connection associated with the instance and add a description.
           text: >
             az dt network private-endpoint connection set -n {instance_name} --cn {connection_name} --status Approved --desc "A description."
-
         - name: Reject a private-endpoint connection associated with the instance and add a description.
           text: >
             az dt network private-endpoint connection set -n {instance_name} --cn {connection_name} --status Rejected --desc "Does not comply."
@@ -308,6 +333,20 @@ def load_digitaltwins_help():
         - name: Delete the private-endpoint connection named ba8408b6-1372-41b2-aef8-af43afc4729f no confirmation. Return immediately.
           text: >
             az dt network private-endpoint connection delete -n {instance_name} --cn ba8408b6-1372-41b2-aef8-af43afc4729f -y --no-wait
+    """
+
+    helps["dt network private-endpoint connection wait"] = """
+        type: command
+        short-summary: Wait until an operation on a private-endpoint connection is complete.
+
+        examples:
+        - name: Wait until the existing private-endpoint connection named ba8408b6-1372-41b2-aef8-af43afc4729f state is updated.
+          text: >
+            az dt network private-endpoint connection wait -n {instance_name} --cn ba8408b6-1372-41b2-aef8-af43afc4729f --updated
+
+        - name: Wait until the existing private-endpoint connection named ba8408b6-1372-41b2-aef8-af43afc4729f is deleted.
+          text: >
+            az dt network private-endpoint connection wait -n {instance_name} --cn ba8408b6-1372-41b2-aef8-af43afc4729f --deleted
     """
 
     helps["dt role-assignment"] = """
