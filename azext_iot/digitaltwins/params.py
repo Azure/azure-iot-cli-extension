@@ -142,6 +142,9 @@ def load_digitaltwins_arguments(self, _):
             help="Role name or Id the system assigned identity will have.",
         )
 
+    with self.argument_context("dt wait") as context:
+        context.ignore("updated")
+
     with self.argument_context("dt endpoint create") as context:
         context.argument(
             "dead_letter_secret",
@@ -248,6 +251,9 @@ def load_digitaltwins_arguments(self, _):
             "If no subscription is provided the default subscription is used.",
             arg_group="Service Bus Topic",
         )
+
+    with self.argument_context("dt endpoint wait") as context:
+        context.ignore("updated")
 
     with self.argument_context("dt twin") as context:
         context.argument(
@@ -423,3 +429,7 @@ def load_digitaltwins_arguments(self, _):
             help="A message indicating if changes on the service provider require any updates on the consumer.",
             arg_group="Private-Endpoint",
         )
+
+    with self.argument_context("dt network private-endpoint connection wait") as context:
+        context.ignore("created")
+        context.ignore("exists")
