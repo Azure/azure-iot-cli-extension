@@ -28,6 +28,8 @@ Release History
     * az iot device c2d-message abandon
     * az iot device c2d-message reject
     * az iot device c2d-message purge
+    * az iot device send-d2c-message
+    * az iot device simulate
 
 For more information about IoT Hub support for AAD visit: https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-dev-guide-azure-ad-rbac
 
