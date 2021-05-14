@@ -2335,6 +2335,7 @@ def iot_c2d_message_send(
     repair=False,
     resource_group_name=None,
     login=None,
+    auth_type_dataplane=None,
 ):
     from azext_iot.common.deps import ensure_uamqp
     from azext_iot.common.utility import validate_min_python_version
@@ -2351,7 +2352,10 @@ def iot_c2d_message_send(
 
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
 
     if properties:
@@ -2492,7 +2496,9 @@ def iot_c2d_message_purge(
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -2737,6 +2743,7 @@ def iot_hub_monitor_feedback(
     repair=False,
     resource_group_name=None,
     login=None,
+    auth_type_dataplane=None,
 ):
     from azext_iot.common.deps import ensure_uamqp
     from azext_iot.common.utility import validate_min_python_version
@@ -2748,7 +2755,10 @@ def iot_hub_monitor_feedback(
 
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
 
     return _iot_hub_monitor_feedback(

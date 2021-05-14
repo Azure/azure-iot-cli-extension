@@ -521,6 +521,11 @@ def load_arguments(self, _):
         )
 
     with self.argument_context("iot device") as context:
+        context.argument(
+            "auth_type_dataplane",
+            options_list=["--auth-type"],
+            arg_type=auth_type_dataplane_param_type,
+        )
         context.argument("data", options_list=["--data", "--da"], help="Message body.")
         context.argument(
             "properties",

@@ -20,13 +20,22 @@ Release History
   * When "--auth-type" has the value "login", an access token from the Azure CLI logged in principal
     will be used for the operation.
 
-  * The following commands or command groups currently remain with key based access only.
+  * The following commands currently remain with key based access only.
 
     * az iot hub monitor-events
-    * az iot hub monitor-feedback
-    * az iot device *
+    * az iot device c2d-message receive
+    * az iot device c2d-message complete
+    * az iot device c2d-message abandon
+    * az iot device c2d-message reject
+    * az iot device c2d-message purge
 
 For more information about IoT Hub support for AAD visit: https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-dev-guide-azure-ad-rbac
+
+**Azure Digital Twins updates**
+
+* Addition of the following commands
+
+  * az dt model delete-all - Deletes all models associated with the Digital Twins instance.
 
 
 0.10.11
