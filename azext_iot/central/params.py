@@ -38,7 +38,7 @@ style_type = CLIArgumentType(
 api_version = CLIArgumentType(
     options_list=["--api-version", "--av"],
     choices=CaseInsensitiveList([version.value for version in ApiVersion]),
-    default="1.0",
+    default=ApiVersion.v1.value,
     help="The API version for the requested operation.",
 )
 
