@@ -123,7 +123,10 @@ class ResourceProvider(DigitalTwinsResourceManager):
                 resource_name=name, resource_group_name=resource_group_name
             )
         except ErrorResponseException as e:
-            raise e if wait else CLIError(unpack_msrest_error(e))
+            if wait:
+                e.status_code = e.response.status_code
+                raise e
+            raise CLIError(unpack_msrest_error(e))
 
     def find_instance(self, name, resource_group_name=None, wait=False):
         if resource_group_name:
@@ -234,7 +237,10 @@ class ResourceProvider(DigitalTwinsResourceManager):
                 resource_group_name=resource_group_name,
             )
         except ErrorResponseException as e:
-            raise e if wait else CLIError(unpack_msrest_error(e))
+            if wait:
+                e.status_code = e.response.status_code
+                raise e
+            raise CLIError(unpack_msrest_error(e))
 
     def list_endpoints(self, name, resource_group_name=None):
         target_instance = self.find_instance(
@@ -437,7 +443,10 @@ class ResourceProvider(DigitalTwinsResourceManager):
                 raw=True,
             ).response.json()
         except ErrorResponseException as e:
-            raise e if wait else CLIError(unpack_msrest_error(e))
+            if wait:
+                e.status_code = e.response.status_code
+                raise e
+            raise CLIError(unpack_msrest_error(e))
 
     def list_private_endpoint_conns(self, name, resource_group_name=None):
         target_instance = self.find_instance(
