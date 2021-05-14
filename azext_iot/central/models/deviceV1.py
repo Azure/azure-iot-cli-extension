@@ -17,7 +17,6 @@ class DeviceV1:
         self.provisioned = device.get("provisioned")
         self.simulated = device.get("simulated")
         self.device_status = self._parse_device_status()
-        pass
 
     def _parse_device_status(self) -> DeviceStatus:
         if not self.enabled:

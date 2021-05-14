@@ -45,9 +45,9 @@ def add_service_principal(
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, assignee)
 
     if api_version == ApiVersion.v1.value:
-        user_type = (UserTypeV1.service_principal.value,)
+        user_type = UserTypeV1.service_principal.value
     else:
-        user_type = (UserTypePreview.service_principal.value,)
+        user_type = UserTypePreview.service_principal.value
 
     payload = {
         "tenantId": tenant_id,

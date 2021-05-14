@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 # This is largely derived from https://docs.microsoft.com/en-us/rest/api/iotcentral/devices
 
+from typing import Union
 import requests
 
 from knack.util import CLIError
@@ -28,7 +29,7 @@ def get_device(
     token: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
-):
+) -> Union[central_models.DevicePreview, central_models.DeviceV1]:
     """
     Get device info given a device id
 
@@ -51,7 +52,12 @@ def get_device(
     query_parameters = {}
     query_parameters["api-version"] = api_version
 
-    response = requests.get(url, headers=headers, params=query_parameters)
+    response = requests.get(
+        url,
+        headers=headers,
+        params=query_parameters,
+        verify=not should_disable_connection_verify(),
+    )
     result = _utility.try_extract_result(response)
 
     if api_version == ApiVersion.preview.value:

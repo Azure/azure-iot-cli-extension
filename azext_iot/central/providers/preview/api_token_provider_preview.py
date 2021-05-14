@@ -33,7 +33,7 @@ class CentralApiTokenProviderPreview:
 
     def add_api_token(
         self, token_id: str, role: Role, central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
+    ) -> dict:
 
         return central_services.api_token.add_api_token(
             cmd=self._cmd,

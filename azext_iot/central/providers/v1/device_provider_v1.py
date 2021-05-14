@@ -4,6 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from typing import List
+from azext_iot.central.models.deviceV1 import DeviceV1
 from knack.util import CLIError
 from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
@@ -36,11 +38,8 @@ class CentralDeviceProviderV1:
         self._device_credentials = {}
         self._device_registration_info = {}
 
-    def get_device(
-        self, device_id, central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
-        if not device_id:
-            raise CLIError("Device id must be specified.")
+    def get_device(self, device_id, central_dns_suffix=CENTRAL_ENDPOINT,) -> DeviceV1:
+
         # get or add to cache
         device = self._devices.get(device_id)
         if not device:
@@ -59,9 +58,7 @@ class CentralDeviceProviderV1:
 
         return device
 
-    def list_devices(
-        self, central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
+    def list_devices(self, central_dns_suffix=CENTRAL_ENDPOINT,) -> List[DeviceV1]:
         devices = central_services.device.list_devices(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -251,9 +248,7 @@ class CentralDeviceProviderV1:
         )
 
     def run_manual_failback(
-        self,
-        device_id: str,
-        central_dns_suffix=CENTRAL_ENDPOINT,
+        self, device_id: str, central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         return central_services.device.run_manual_failback(
             cmd=self._cmd,

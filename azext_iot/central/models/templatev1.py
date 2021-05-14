@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from typing import List
 from knack.util import CLIError
 
 
@@ -64,7 +65,7 @@ class TemplateV1:
             )
             raise CLIError(details)
 
-    def _extract_root_interface_contents(self, dcm: dict):
+    def _extract_root_interface_contents(self, dcm: dict) -> dict:
         rootContents = dcm.get("contents", {})
         contents = [
             entity for entity in rootContents if entity.get("@type") != "Component"
@@ -105,7 +106,7 @@ class TemplateV1:
             for entity_name, entity_schemas in entity.items()
         }
 
-    def _get_interface_list_property(self, property_name):
+    def _get_interface_list_property(self, property_name) -> List:
         # returns the list of interfaces where property with property_name is defined
         return [
             interface
