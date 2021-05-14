@@ -1,12 +1,14 @@
 trigger:
-- dev
-- master
-- device_client_integration
+  branches:
+    include:
+      - dev
+      - master
 
 pr:
-- dev
-- master
-- device_client_integration
+  branches:
+    include:
+      - dev
+      - master
 
 variables:
   iot_ext_package: azure-iot

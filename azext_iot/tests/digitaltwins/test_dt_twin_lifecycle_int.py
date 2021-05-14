@@ -516,7 +516,7 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
         assert len(twin_query_result["result"]) == 0
         assert twin_query_result["cost"]
 
-    def test_dt_twin_delete(self):
+    def test_dt_twin_bulk_delete(self):
         self.wait_for_capacity()
         instance_name = generate_resource_id()
         models_directory = "./models"
