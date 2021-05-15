@@ -4,12 +4,15 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+
+from typing import List
+from azext_iot.central.models.devicePreview import DevicePreview
 from knack.util import CLIError
 from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.enum import DeviceStatus, ApiVersion
-
+from azext_iot.central import models as central_models
 
 logger = get_logger(__name__)
 
@@ -37,7 +40,7 @@ class CentralDeviceProviderPreview:
 
     def get_device(
         self, device_id, central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
+    ) -> central_models.DevicePreview:
         # get or add to cache
         device = self._devices.get(device_id)
         if not device:
@@ -56,7 +59,7 @@ class CentralDeviceProviderPreview:
 
         return device
 
-    def list_devices(self, central_dns_suffix=CENTRAL_ENDPOINT):
+    def list_devices(self, central_dns_suffix=CENTRAL_ENDPOINT) -> List[DevicePreview]:
         devices = central_services.device.list_devices(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -77,9 +80,7 @@ class CentralDeviceProviderPreview:
         template=None,
         simulated=False,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
-        if not device_id:
-            raise CLIError("Device id must be specified.")
+    ) -> central_models.DevicePreview:
 
         if device_id in self._devices:
             raise CLIError("Device already exists.")
@@ -132,7 +133,7 @@ class CentralDeviceProviderPreview:
         command_name: str,
         payload: dict,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
+    ) -> dict:
         return central_services.device.run_component_command(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -151,7 +152,7 @@ class CentralDeviceProviderPreview:
         interface_id: str,
         command_name: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
+    ) -> dict:
         return central_services.device.get_component_command_history(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -163,7 +164,9 @@ class CentralDeviceProviderPreview:
             api_version=ApiVersion.preview.value,
         )
 
-    def _dps_populate_essential_info(self, dps_info, device_status: DeviceStatus):
+    def _dps_populate_essential_info(
+        self, dps_info, device_status: DeviceStatus
+    ) -> dict:
         error = {
             DeviceStatus.provisioned: "None.",
             DeviceStatus.registered: "Device is not yet provisioned.",

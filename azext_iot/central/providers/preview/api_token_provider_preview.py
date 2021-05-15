@@ -45,7 +45,7 @@ class CentralApiTokenProviderPreview:
             central_dns_suffix=central_dns_suffix,
         )
 
-    def get_api_token_list(self, central_dns_suffix=CENTRAL_ENDPOINT):
+    def get_api_token_list(self, central_dns_suffix=CENTRAL_ENDPOINT) -> dict:
 
         return central_services.api_token.get_api_token_list(
             cmd=self._cmd,
@@ -55,9 +55,7 @@ class CentralApiTokenProviderPreview:
             central_dns_suffix=central_dns_suffix,
         )
 
-    def get_api_token(
-        self, token_id, central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
+    def get_api_token(self, token_id, central_dns_suffix=CENTRAL_ENDPOINT,) -> dict:
         return central_services.api_token.get_api_token(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -72,7 +70,7 @@ class CentralApiTokenProviderPreview:
         token_id,
         api_version=ApiVersion.v1.value,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
+    ) -> dict:
         return central_services.api_token.delete_api_token(
             cmd=self._cmd,
             app_id=self._app_id,

@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from typing import List
+
 from knack.util import CLIError
 
 
@@ -106,7 +106,7 @@ class TemplateV1:
             for entity_name, entity_schemas in entity.items()
         }
 
-    def _get_interface_list_property(self, property_name) -> List:
+    def _get_interface_list_property(self, property_name) -> list:
         # returns the list of interfaces where property with property_name is defined
         return [
             interface

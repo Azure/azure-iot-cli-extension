@@ -24,7 +24,7 @@ def add_api_token(
     token: str,
     api_version=ApiVersion.v1.value,
     central_dns_suffix=CENTRAL_ENDPOINT,
-):
+) -> dict:
     """
     Add an API token to a Central app
 
@@ -62,7 +62,7 @@ def get_api_token_list(
     token: str,
     api_version: ApiVersion.v1.value,
     central_dns_suffix=CENTRAL_ENDPOINT,
-):
+) -> dict:
     """
     Get the list of API tokens for a central app.
 
@@ -95,7 +95,7 @@ def get_api_token(
     token_id: str,
     api_version=ApiVersion.v1.value,
     central_dns_suffix=CENTRAL_ENDPOINT,
-):
+) -> dict:
     """
     Get information about a specified API token.
 
@@ -129,7 +129,7 @@ def delete_api_token(
     token_id: str,
     api_version=ApiVersion.v1.value,
     central_dns_suffix=CENTRAL_ENDPOINT,
-):
+) -> dict:
     """
     delete API token from the app.
 

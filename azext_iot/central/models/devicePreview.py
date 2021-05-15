@@ -31,7 +31,7 @@ class DevicePreview:
 
         return DeviceStatus.provisioned
 
-    def get_registration_info(self):
+    def get_registration_info(self) -> dict:
         registration_info = {
             "device_status": self.device_status.value,
             "display_name": self.display_name,

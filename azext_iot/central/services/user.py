@@ -26,7 +26,7 @@ def add_service_principal(
     token: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
-):
+) -> dict:
     """
     Add a user to a Central app
 
@@ -75,7 +75,7 @@ def add_email(
     token: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
-):
+) -> dict:
     """
     Add a user to a Central app
 
@@ -119,7 +119,7 @@ def get_user_list(
     token: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
-):
+) -> dict:
     """
     Get the list of users for central app.
 
@@ -152,7 +152,7 @@ def get_user(
     assignee: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
-):
+) -> dict:
     """
     Get information for the specified user.
 
@@ -186,7 +186,7 @@ def delete_user(
     assignee: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
-):
+) -> dict:
     """
     delete user from theapp.
 

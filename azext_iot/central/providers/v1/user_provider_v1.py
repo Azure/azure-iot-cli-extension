@@ -39,7 +39,7 @@ class CentralUserProviderV1:
         object_id: str,
         role: Role,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
+    ) -> dict:
         if not tenant_id:
             raise CLIError("Must specify --tenant-id when adding a service principal")
 
@@ -58,9 +58,7 @@ class CentralUserProviderV1:
             api_version=ApiVersion.v1.value,
         )
 
-    def get_user_list(
-        self, central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
+    def get_user_list(self, central_dns_suffix=CENTRAL_ENDPOINT,) -> dict:
         return central_services.user.get_user_list(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -69,9 +67,7 @@ class CentralUserProviderV1:
             api_version=ApiVersion.v1.value,
         )
 
-    def get_user(
-        self, assignee, central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
+    def get_user(self, assignee, central_dns_suffix=CENTRAL_ENDPOINT,) -> dict:
         return central_services.user.get_user(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -81,9 +77,7 @@ class CentralUserProviderV1:
             api_version=ApiVersion.v1.value,
         )
 
-    def delete_user(
-        self, assignee, central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
+    def delete_user(self, assignee, central_dns_suffix=CENTRAL_ENDPOINT,) -> dict:
         return central_services.user.delete_user(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -99,7 +93,7 @@ class CentralUserProviderV1:
         email: str,
         role: Role,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
+    ) -> dict:
         if not email:
             raise CLIError("Must specify --email when adding a user by email")
 

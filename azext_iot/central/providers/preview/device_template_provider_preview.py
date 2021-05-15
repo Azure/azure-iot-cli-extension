@@ -4,10 +4,12 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from typing import List
 from knack.util import CLIError
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.enum import ApiVersion
+from azext_iot.central import models as central_models
 
 
 class CentralDeviceTemplateProviderPreview:
@@ -30,7 +32,7 @@ class CentralDeviceTemplateProviderPreview:
 
     def get_device_template(
         self, device_template_id, central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
+    ) -> central_models.TemplatePreview:
         # get or add to cache
         device_template = self._device_templates.get(device_template_id)
         if not device_template:
@@ -55,7 +57,7 @@ class CentralDeviceTemplateProviderPreview:
 
     def list_device_templates(
         self, central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
+    ) -> List[central_models.TemplatePreview]:
         templates = central_services.device_template.list_device_templates(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -68,9 +70,7 @@ class CentralDeviceTemplateProviderPreview:
 
         return self._device_templates
 
-    def map_device_templates(
-        self, central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
+    def map_device_templates(self, central_dns_suffix=CENTRAL_ENDPOINT,) -> dict:
         """
         Maps each template name to the corresponding template id
         """
@@ -87,7 +87,7 @@ class CentralDeviceTemplateProviderPreview:
         device_template_id: str,
         payload: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
+    ) -> central_models.TemplatePreview:
         template = central_services.device_template.create_device_template(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -104,7 +104,7 @@ class CentralDeviceTemplateProviderPreview:
 
     def delete_device_template(
         self, device_template_id, central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
+    ) -> dict:
         if not device_template_id:
             raise CLIError("Device template id must be specified.")
 

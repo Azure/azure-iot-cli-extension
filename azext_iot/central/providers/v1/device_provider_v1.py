@@ -79,7 +79,7 @@ class CentralDeviceProviderV1:
         template=None,
         simulated=False,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
+    ) -> DeviceV1:
         if not device_id:
             raise CLIError("Device id must be specified.")
 

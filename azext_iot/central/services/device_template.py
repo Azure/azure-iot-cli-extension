@@ -5,7 +5,9 @@
 # --------------------------------------------------------------------------------------------
 # This is largely derived from https://docs.microsoft.com/en-us/rest/api/iotcentral/devicetemplates
 
+from typing import Union
 import requests
+from typing import List
 
 from knack.util import CLIError
 from knack.log import get_logger
@@ -26,7 +28,7 @@ def get_device_template(
     token: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
-):
+) -> Union[central_models.TemplatePreview, central_models.TemplateV1]:
     """
     Get a specific device template from IoTC
 
@@ -64,7 +66,7 @@ def list_device_templates(
     token: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
-):
+) -> List[Union[central_models.TemplatePreview, central_models.TemplateV1]]:
     """
     Get a list of all device templates in IoTC
 
@@ -107,7 +109,7 @@ def create_device_template(
     token: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
-):
+) -> Union[central_models.TemplatePreview, central_models.TemplateV1]:
     """
     Create a device template in IoTC
 

@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 # This is largely derived from https://docs.microsoft.com/en-us/rest/api/iotcentral/devices
 
-from typing import Union
+from typing import List, Union
 import requests
 
 from knack.util import CLIError
@@ -73,7 +73,7 @@ def list_devices(
     max_pages=1,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
-):
+) -> List[Union[central_models.DevicePreview, central_models.DeviceV1]]:
     """
     Get a list of all devices in IoTC app
 
@@ -122,7 +122,7 @@ def list_devices(
 
 def get_device_registration_summary(
     cmd, app_id: str, token: str, central_dns_suffix=CENTRAL_ENDPOINT,
-):
+) -> dict:
     """
     Get device registration summary for a given app
 
@@ -178,7 +178,7 @@ def create_device(
     token: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
-):
+) -> Union[central_models.DevicePreview, central_models.DeviceV1]:
     """
     Create a device in IoTC
 

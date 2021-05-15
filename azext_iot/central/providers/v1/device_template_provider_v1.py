@@ -4,10 +4,12 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from typing import List
 from knack.util import CLIError
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.enum import ApiVersion
+from azext_iot.central import models as central_models
 
 
 class CentralDeviceTemplateProviderV1:
@@ -30,7 +32,7 @@ class CentralDeviceTemplateProviderV1:
 
     def get_device_template(
         self, device_template_id, central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
+    ) -> central_models.TemplateV1:
         # get or add to cache
         device_template = self._device_templates.get(device_template_id)
         if not device_template:
@@ -53,9 +55,7 @@ class CentralDeviceTemplateProviderV1:
 
         return device_template
 
-    def list_device_templates(
-        self, central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
+    def list_device_templates(self, central_dns_suffix=CENTRAL_ENDPOINT,) -> List[central_models.TemplateV1]       :
         templates = central_services.device_template.list_device_templates(
             cmd=self._cmd,
             app_id=self._app_id,
