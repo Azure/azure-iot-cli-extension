@@ -10,86 +10,31 @@ import responses
 import json
 from knack.cli import CLIError
 from azext_iot.digitaltwins import commands_twins as subject
-from azext_iot.tests.generators import generate_generic_id
 from msrest.paging import Paged
+from azext_iot.tests.digitaltwins.dt_helpers import (
+    etag,
+    generate_generic_id,
+    generate_relationship,
+    generate_twin_result,
+    generic_result,
+    model_id,
+    resource_group,
+    twin_id
+)
+from azext_iot.tests.conftest import hostname
 
-instance_name = generate_generic_id()
-hostname = "{}.subdomain.domain".format(instance_name)
-etag = 'AAAA=='
-resource_group = 'myrg'
-
-model_id = generate_generic_id()
-twin_id = generate_generic_id()
 target_twin_id = generate_generic_id()
 relationship_id = generate_generic_id()
 component_path = generate_generic_id()
 
-generic_result = json.dumps({"result": generate_generic_id()})
 generic_query = "select * from digitaltwins"
 models_result = json.dumps({"id": model_id})
 generic_patch_1 = json.dumps({"a" : "b"})
 generic_patch_2 = json.dumps({"a" : "b", "c" : "d"})
 
 
-def generate_twin_result(randomized=False):
-    return {
-        "$dtId": generate_generic_id() if randomized else twin_id,
-        "$etag": generate_generic_id() if randomized else etag,
-        "$metadata": {
-            "$model": generate_generic_id() if randomized else model_id
-        }
-    }
-
-
-def create_relationship(relationship_name=None):
-    return {
-        "$relationshipId": generate_generic_id(),
-        "$relationshipName": relationship_name,
-        "$sourceId": generate_generic_id()
-    }
-
-
 @pytest.fixture
-def control_and_data_plane_client(mocker, fixture_cmd):
-    from azext_iot.sdk.digitaltwins.controlplane import AzureDigitalTwinsManagementClient
-    from azext_iot.sdk.digitaltwins.dataplane import AzureDigitalTwinsAPI
-    from azext_iot.digitaltwins.providers.auth import DigitalTwinAuthentication
-
-    patched_get_raw_token = mocker.patch(
-        "azure.cli.core._profile.Profile.get_raw_token"
-    )
-    patched_get_raw_token.return_value = (
-        mocker.MagicMock(name="creds"),
-        mocker.MagicMock(name="subscription"),
-        mocker.MagicMock(name="tenant"),
-    )
-
-    control_plane_patch = mocker.patch(
-        "azext_iot.digitaltwins.providers.digitaltwins_service_factory"
-    )
-    control_plane_patch.return_value = AzureDigitalTwinsManagementClient(
-        credentials=DigitalTwinAuthentication(
-            fixture_cmd, "00000000-0000-0000-0000-000000000000"
-        ),
-        subscription_id="00000000-0000-0000-0000-000000000000",
-    )
-
-    data_plane_patch = mocker.patch(
-        "azext_iot.digitaltwins.providers.base.DigitalTwinsProvider.get_sdk"
-    )
-
-    data_plane_patch.return_value = AzureDigitalTwinsAPI(
-        credentials=DigitalTwinAuthentication(
-            fixture_cmd, "00000000-0000-0000-0000-000000000000"
-        ),
-        base_url="https://{}/".format(hostname)
-    )
-
-    return control_plane_patch, data_plane_patch
-
-
-@pytest.fixture
-def start_twin_response(mocked_response, control_and_data_plane_client):
+def start_twin_response(mocked_response, fixture_dt_client):
     mocked_response.assert_all_requests_are_fired = False
 
     mocked_response.add(
@@ -105,12 +50,6 @@ def start_twin_response(mocked_response, control_and_data_plane_client):
     )
 
     yield mocked_response
-
-
-def check_resource_group_name_call(service_client, resource_group_input):
-    if ("management.azure.com/subscriptions" in service_client.calls[0].request.url):
-        return 1
-    return 0
 
 
 class TestTwinQueryTwins(object):
@@ -220,7 +159,7 @@ class TestTwinQueryTwins(object):
 
         yield mocked_response
 
-    def test_list_relationship_error(self, fixture_cmd, service_client_error):
+    def test_query_twins_error(self, fixture_cmd, service_client_error):
         with pytest.raises(CLIError):
             subject.query_twins(
                 cmd=fixture_cmd,
@@ -268,9 +207,7 @@ class TestTwinCreateTwin(object):
             resource_group_name=resource_group_name
         )
 
-        start = check_resource_group_name_call(service_client, resource_group_name)
-
-        twin_request = service_client.calls[start].request
+        twin_request = service_client.calls[0].request
         assert twin_request.method == "PUT"
         assert "{}/digitaltwins/{}".format(hostname, twin_id) in twin_request.url
 
@@ -419,10 +356,8 @@ class TestTwinUpdateTwin(object):
             etag=etag
         )
 
-        start = check_resource_group_name_call(service_client, resource_group_name)
-
         # check patch request
-        patch_request = service_client.calls[start].request
+        patch_request = service_client.calls[0].request
         assert patch_request.method == "PATCH"
 
         expected_request_body = [json.loads(json_patch)]
@@ -431,7 +366,7 @@ class TestTwinUpdateTwin(object):
         assert patch_request.headers["If-Match"] == etag if etag else "*"
 
         # check get request
-        get_request = service_client.calls[start + 1].request
+        get_request = service_client.calls[1].request
         assert get_request.method == "GET"
 
         assert result == generate_twin_result()
@@ -516,9 +451,7 @@ class TestTwinDeleteTwin(object):
             etag=etag
         )
 
-        start = check_resource_group_name_call(service_client, resource_group_name)
-
-        delete_request = service_client.calls[start].request
+        delete_request = service_client.calls[0].request
         assert delete_request.method == "DELETE"
         assert delete_request.headers["If-Match"] == etag if etag else "*"
 
@@ -631,22 +564,20 @@ class TestTwinDeleteAllTwin(object):
             name_or_hostname=hostname,
         )
 
-        start = check_resource_group_name_call(service_client_all, resource_group_input=None)
-
-        delete_request = service_client_all.calls[start].request
+        delete_request = service_client_all.calls[0].request
         assert delete_request.method == "POST"
 
         # Check delete calls
         for i in range(number_twins):
-            query1_request = service_client_all.calls[start + 1 + 3 * i].request
+            query1_request = service_client_all.calls[1 + 3 * i].request
             assert query1_request.method == "GET"
             assert query_result[i]["$dtId"] in query1_request.url
 
-            query2_request = service_client_all.calls[start + 2 + 3 * i].request
+            query2_request = service_client_all.calls[2 + 3 * i].request
             assert query2_request.method == "GET"
             assert query_result[i]["$dtId"] in query2_request.url
 
-            delete_request = service_client_all.calls[start + 3 + 3 * i].request
+            delete_request = service_client_all.calls[3 + 3 * i].request
             assert delete_request.method == "DELETE"
             assert query_result[i]["$dtId"] in delete_request.url
 
@@ -693,10 +624,8 @@ class TestTwinCreateRelationship(object):
             resource_group_name=resource_group_name
         )
 
-        start = check_resource_group_name_call(service_client, resource_group_name)
-
         # check body
-        put_request = service_client.calls[start].request
+        put_request = service_client.calls[0].request
         assert put_request.method == "PUT"
         assert "{}/digitaltwins/{}/relationships/{}".format(hostname, twin_id, relationship_id) in put_request.url
         result_request_body = json.loads(put_request.body)
@@ -841,10 +770,8 @@ class TestTwinUpdateRelationship(object):
             resource_group_name=resource_group_name,
             etag=etag
         )
-
-        start = check_resource_group_name_call(service_client, resource_group_name)
         # check patch request
-        patch_request = service_client.calls[start].request
+        patch_request = service_client.calls[0].request
         assert patch_request.method == "PATCH"
 
         expected_request_body = [json.loads(json_patch)]
@@ -853,7 +780,7 @@ class TestTwinUpdateRelationship(object):
         assert patch_request.headers["If-Match"] == etag if etag else "*"
 
         # check get request
-        get_request = service_client.calls[start + 1].request
+        get_request = service_client.calls[1].request
         assert get_request.method == "GET"
 
         assert result == json.loads(generic_result)
@@ -923,21 +850,21 @@ class TestTwinListRelationship(object):
             (True, None, None, [], 1),
             (False, "", None, [], 1),
             (True, "", None, [], 1),
-            (False, "", None, [create_relationship("")], 1),
+            (False, "", None, [generate_relationship("")], 1),
             (False, "contains", None, [], 1),
             (True, "contains", None, [], 1),
-            (False, "contains", None, [create_relationship("contains")], 1),
-            (True, "contains", None, [create_relationship("contains")], 1),
-            (False, "contains", None, [create_relationship("other")], 1),
-            (True, "contains", None, [create_relationship("other")], 2),
-            (False, "contains", None, [create_relationship("other"),
-                                       create_relationship("contains"),
-                                       create_relationship("contains"),
-                                       create_relationship("other")], 2),
-            (True, "contains", None, [create_relationship("other"),
-                                      create_relationship("contains"),
-                                      create_relationship("contains"),
-                                      create_relationship("other")], 1),
+            (False, "contains", None, [generate_relationship("contains")], 1),
+            (True, "contains", None, [generate_relationship("contains")], 1),
+            (False, "contains", None, [generate_relationship("other")], 1),
+            (True, "contains", None, [generate_relationship("other")], 2),
+            (False, "contains", None, [generate_relationship("other"),
+                                       generate_relationship("contains"),
+                                       generate_relationship("contains"),
+                                       generate_relationship("other")], 2),
+            (True, "contains", None, [generate_relationship("other"),
+                                      generate_relationship("contains"),
+                                      generate_relationship("contains"),
+                                      generate_relationship("other")], 1),
             (False, None, resource_group, [], 1)
         ]
     )
@@ -1019,7 +946,7 @@ class TestTwinListRelationship(object):
                 hostname, twin_id
             ),
             body=json.dumps({
-                "value": [create_relationship("contains")],
+                "value": [generate_relationship("contains")],
                 "nextLink": "https://{}/digitaltwins/{}/incomingrelationships?2".format(hostname, twin_id)
             }),
             status=request.param[0],
@@ -1032,7 +959,7 @@ class TestTwinListRelationship(object):
             url="https://{}/digitaltwins/{}/incomingrelationships?2".format(
                 hostname, twin_id
             ),
-            body=json.dumps({"value": [create_relationship("contains")]}),
+            body=json.dumps({"value": [generate_relationship("contains")]}),
             status=request.param[1],
             content_type="application/json",
             match_querystring=False,
@@ -1082,9 +1009,7 @@ class TestTwinDeleteRelationship(object):
             etag=etag
         )
 
-        start = check_resource_group_name_call(service_client, resource_group_name)
-
-        delete_request = service_client.calls[start].request
+        delete_request = service_client.calls[0].request
         assert delete_request.method == "DELETE"
         assert delete_request.headers["If-Match"] == etag if etag else "*"
 
@@ -1138,7 +1063,7 @@ class TestTwinDeleteAllRelationship(object):
         # Create query call with incoming_relationships=True
         incoming_query = []
         for i in range(incoming):
-            relationship = create_relationship("contains")
+            relationship = generate_relationship("contains")
             incoming_query.append(relationship)
             service_client_all.add(
                 method=responses.DELETE,
@@ -1167,7 +1092,7 @@ class TestTwinDeleteAllRelationship(object):
         # Create query call with incoming_relationships=False
         outcoming_query = []
         for i in range(incoming):
-            relationship = create_relationship("contains")
+            relationship = generate_relationship("contains")
             outcoming_query.append(relationship)
             service_client_all.add(
                 method=responses.DELETE,
@@ -1200,13 +1125,11 @@ class TestTwinDeleteAllRelationship(object):
             twin_id=twin_id,
         )
 
-        start = check_resource_group_name_call(service_client_all, resource_group_input=None)
-
         # First two calls should be the query calls
-        assert service_client_all.calls[start].request.method == "GET"
-        assert service_client_all.calls[start + 1].request.method == "GET"
+        assert service_client_all.calls[0].request.method == "GET"
+        assert service_client_all.calls[1].request.method == "GET"
 
-        call_num = start + 2
+        call_num = 2
         for i in range(len(incoming_query)):
             delete_request = service_client_all.calls[call_num + i].request
             assert delete_request.method == "DELETE"
@@ -1286,18 +1209,16 @@ class TestTwinDeleteAllRelationship(object):
             name_or_hostname=hostname,
         )
 
-        start = check_resource_group_name_call(service_client, resource_group_input=None)
-
-        delete_request = service_client.calls[start].request
+        delete_request = service_client.calls[0].request
         assert delete_request.method == "POST"
 
         # Check delete calls
         for i in range(number_twins):
-            query1_request = service_client.calls[start + 1 + 2 * i].request
+            query1_request = service_client.calls[1 + 2 * i].request
             assert query1_request.method == "GET"
             assert query_result[i]["$dtId"] in query1_request.url
 
-            query2_request = service_client.calls[start + 2 + 2 * i].request
+            query2_request = service_client.calls[2 + 2 * i].request
             assert query2_request.method == "GET"
             assert query_result[i]["$dtId"] in query2_request.url
 
@@ -1353,8 +1274,7 @@ class TestTwinSendTelemetry(object):
             resource_group_name=resource_group_name,
         )
 
-        start = check_resource_group_name_call(service_client, resource_group_name)
-
+        start = 0
         if component_path:
             component_telemetry_request = service_client.calls[start].request
             assert component_telemetry_request.method == "POST"
@@ -1524,10 +1444,8 @@ class TestTwinUpdateComponent(object):
             resource_group_name=resource_group_name,
             etag=etag
         )
-
-        start = check_resource_group_name_call(service_client, resource_group_name)
         # check patch request
-        patch_request = service_client.calls[start].request
+        patch_request = service_client.calls[0].request
         assert patch_request.method == "PATCH"
 
         expected_request_body = [json.loads(json_patch)]
@@ -1536,7 +1454,7 @@ class TestTwinUpdateComponent(object):
         assert patch_request.headers["If-Match"] == etag if etag else "*"
 
         # check get request
-        get_request = service_client.calls[start + 1].request
+        get_request = service_client.calls[1].request
         assert get_request.method == "GET"
 
         assert result == json.loads(generic_result)
