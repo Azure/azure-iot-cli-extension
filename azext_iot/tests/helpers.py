@@ -10,7 +10,7 @@ import os
 from inspect import getsourcefile
 from azure.iot.device import ProvisioningDeviceClient, IoTHubDeviceClient
 
-from azext_iot.common.utility import read_file_content
+afrom azext_iot.common.utility import read_file_content
 
 GLOBAL_PROVISIONING_HOST = "global.azure-devices-provisioning.net"
 
