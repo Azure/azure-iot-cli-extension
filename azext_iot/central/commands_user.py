@@ -7,8 +7,9 @@
 
 
 from azext_iot.constants import CENTRAL_ENDPOINT
-from azext_iot.central.providers import CentralUserProvider
-from azext_iot.central.models.enum import Role
+from azext_iot.central.providers.preview import CentralUserProviderPreview
+from azext_iot.central.providers.v1 import CentralUserProviderV1
+from azext_iot.central.models.enum import Role, ApiVersion
 
 
 def add_user(
@@ -21,8 +22,12 @@ def add_user(
     object_id=None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
 ):
-    provider = CentralUserProvider(cmd=cmd, app_id=app_id, token=token)
+    if api_version == ApiVersion.preview.value:
+        provider = CentralUserProviderPreview(cmd=cmd, app_id=app_id, token=token)
+    else:
+        provider = CentralUserProviderV1(cmd=cmd, app_id=app_id, token=token)
 
     if email:
         return provider.add_email(
@@ -42,26 +47,49 @@ def add_user(
 
 
 def list_users(
-    cmd, app_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd,
+    app_id: str,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
 ):
-    provider = CentralUserProvider(cmd=cmd, app_id=app_id, token=token)
+    if api_version == ApiVersion.preview.value:
+        provider = CentralUserProviderPreview(cmd=cmd, app_id=app_id, token=token)
+    else:
+        provider = CentralUserProviderV1(cmd=cmd, app_id=app_id, token=token)
 
     return provider.get_user_list(central_dns_suffix=central_dns_suffix,)
 
 
 def get_user(
-    cmd, app_id: str, assignee: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd,
+    app_id: str,
+    assignee: str,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
 ):
-    provider = CentralUserProvider(cmd=cmd, app_id=app_id, token=token)
+    if api_version == ApiVersion.preview.value:
+        provider = CentralUserProviderPreview(cmd=cmd, app_id=app_id, token=token)
+    else:
+        provider = CentralUserProviderV1(cmd=cmd, app_id=app_id, token=token)
 
-    return provider.get_user(assignee=assignee, central_dns_suffix=central_dns_suffix)
+    return provider.get_user(assignee=assignee, central_dns_suffix=central_dns_suffix,)
 
 
 def delete_user(
-    cmd, app_id: str, assignee: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd,
+    app_id: str,
+    assignee: str,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
 ):
-    provider = CentralUserProvider(cmd=cmd, app_id=app_id, token=token)
+    if api_version == ApiVersion.preview.value:
+        provider = CentralUserProviderPreview(cmd=cmd, app_id=app_id, token=token)
+    else:
+        provider = CentralUserProviderV1(cmd=cmd, app_id=app_id, token=token)
 
     return provider.delete_user(
-        assignee=assignee, central_dns_suffix=central_dns_suffix
+        assignee=assignee, central_dns_suffix=central_dns_suffix,
     )

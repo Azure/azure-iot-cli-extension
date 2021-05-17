@@ -5,26 +5,31 @@
 # --------------------------------------------------------------------------------------------
 # This is largely derived from https://docs.microsoft.com/en-us/rest/api/iotcentral/devices
 
+from typing import List, Union
 import requests
 
 from knack.util import CLIError
 from knack.log import get_logger
-from typing import List
 
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
-from azext_iot.central.models.device import Device
-from azext_iot.central.models.enum import DeviceStatus
+from azext_iot.central import models as central_models
+from azext_iot.central.models.enum import DeviceStatus, ApiVersion
 from azure.cli.core.util import should_disable_connection_verify
 
 logger = get_logger(__name__)
 
-BASE_PATH = "api/preview/devices"
+BASE_PATH = "api/devices"
 
 
 def get_device(
-    cmd, app_id: str, device_id: str, token: str, central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Device:
+    cmd,
+    app_id: str,
+    device_id: str,
+    token: str,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
+) -> Union[central_models.DevicePreview, central_models.DeviceV1]:
     """
     Get device info given a device id
 
@@ -43,14 +48,32 @@ def get_device(
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, device_id)
     headers = _utility.get_headers(token, cmd)
 
-    response = requests.get(url, headers=headers, verify=not should_disable_connection_verify())
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
+    response = requests.get(
+        url,
+        headers=headers,
+        params=query_parameters,
+        verify=not should_disable_connection_verify(),
+    )
     result = _utility.try_extract_result(response)
-    return Device(result)
+
+    if api_version == ApiVersion.preview.value:
+        return central_models.DevicePreview(result)
+    else:
+        return central_models.DeviceV1(result)
 
 
 def list_devices(
-    cmd, app_id: str, token: str, max_pages=1, central_dns_suffix=CENTRAL_ENDPOINT,
-) -> List[Device]:
+    cmd,
+    app_id: str,
+    token: str,
+    max_pages=1,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
+) -> List[Union[central_models.DevicePreview, central_models.DeviceV1]]:
     """
     Get a list of all devices in IoTC app
 
@@ -70,17 +93,28 @@ def list_devices(
     url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
     headers = _utility.get_headers(token, cmd)
 
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
     pages_processed = 0
     while (pages_processed <= max_pages) and url:
-        response = requests.get(url, headers=headers)
+        response = requests.get(url, headers=headers, params=query_parameters)
         result = _utility.try_extract_result(response)
 
         if "value" not in result:
             raise CLIError("Value is not present in body: {}".format(result))
 
-        devices = devices + [Device(device) for device in result["value"]]
+        if api_version == ApiVersion.preview.value:
+            devices = devices + [
+                central_models.DevicePreview(device) for device in result["value"]
+            ]
+        else:
+            devices = devices + [
+                central_models.DeviceV1(device) for device in result["value"]
+            ]
 
-        url = result.get("nextLink")
+        url = result.get("nextLink", params=query_parameters)
         pages_processed = pages_processed + 1
 
     return devices
@@ -88,7 +122,7 @@ def list_devices(
 
 def get_device_registration_summary(
     cmd, app_id: str, token: str, central_dns_suffix=CENTRAL_ENDPOINT,
-):
+) -> dict:
     """
     Get device registration summary for a given app
 
@@ -105,23 +139,32 @@ def get_device_registration_summary(
 
     registration_summary = {status.value: 0 for status in DeviceStatus}
 
-    url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
+    url = "https://{}.{}/{}?api-version={}".format(
+        app_id, central_dns_suffix, BASE_PATH, ApiVersion.v1.value
+    )
     headers = _utility.get_headers(token, cmd)
+
     logger.warning(
         "This command may take a long time to complete if your app contains a lot of devices"
     )
+
     while url:
-        response = requests.get(url, headers=headers, verify=not should_disable_connection_verify())
+        response = requests.get(
+            url, headers=headers, verify=not should_disable_connection_verify()
+        )
         result = _utility.try_extract_result(response)
 
         if "value" not in result:
             raise CLIError("Value is not present in body: {}".format(result))
 
         for device in result["value"]:
-            registration_summary[Device(device).device_status.value] += 1
+            registration_summary[
+                central_models.DeviceV1(device).device_status.value
+            ] += 1
 
         print("Processed {} devices...".format(sum(registration_summary.values())))
         url = result.get("nextLink")
+
     return registration_summary
 
 
@@ -130,11 +173,12 @@ def create_device(
     app_id: str,
     device_id: str,
     device_name: str,
-    instance_of: str,
+    template: str,
     simulated: bool,
     token: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Device:
+    api_version=ApiVersion.v1.value,
+) -> Union[central_models.DevicePreview, central_models.DeviceV1]:
     """
     Create a device in IoTC
 
@@ -143,7 +187,7 @@ def create_device(
         app_id: name of app (used for forming request URL)
         device_id: unique case-sensitive device id
         device_name: (non-unique) human readable name for the device
-        instance_of: (optional) string that maps to the device_template_id
+        template: (optional) string that maps to the device_template_id
             of the device template that this device is to be an instance of
         simulated: if IoTC is to simulate data for this device
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
@@ -159,21 +203,44 @@ def create_device(
 
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, device_id)
     headers = _utility.get_headers(token, cmd, has_json_payload=True)
-    payload = {
-        "displayName": device_name,
-        "simulated": simulated,
-        "approved": True,
-    }
-    if instance_of:
-        payload["instanceOf"] = instance_of
 
-    response = requests.put(url, headers=headers, json=payload)
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
+    if api_version == ApiVersion.preview.value:
+        payload = {
+            "displayName": device_name,
+            "simulated": simulated,
+            "approved": True,
+        }
+        if template:
+            payload["instanceOf"] = template
+    else:
+        payload = {
+            "displayName": device_name,
+            "simulated": simulated,
+            "enabled": True,
+        }
+        if template:
+            payload["template"] = template
+
+    response = requests.put(url, headers=headers, json=payload, params=query_parameters)
     result = _utility.try_extract_result(response)
-    return Device(result)
+
+    if api_version == ApiVersion.preview.value:
+        return central_models.DevicePreview(result)
+    else:
+        return central_models.DeviceV1(result)
 
 
 def delete_device(
-    cmd, app_id: str, device_id: str, token: str, central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd,
+    app_id: str,
+    device_id: str,
+    token: str,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
 ) -> dict:
     """
     Delete a device from IoTC
@@ -193,12 +260,21 @@ def delete_device(
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, device_id)
     headers = _utility.get_headers(token, cmd)
 
-    response = requests.delete(url, headers=headers)
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
+    response = requests.delete(url, headers=headers, params=query_parameters)
     return _utility.try_extract_result(response)
 
 
 def get_device_credentials(
-    cmd, app_id: str, device_id: str, token: str, central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd,
+    app_id: str,
+    device_id: str,
+    token: str,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
 ):
     """
     Get device credentials from IoTC
@@ -219,7 +295,11 @@ def get_device_credentials(
     )
     headers = _utility.get_headers(token, cmd)
 
-    response = requests.get(url, headers=headers, verify=not should_disable_connection_verify())
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
+    response = requests.get(url, headers=headers, params=query_parameters)
     return _utility.try_extract_result(response)
 
 
@@ -232,6 +312,7 @@ def run_component_command(
     command_name: str,
     payload: dict,
     central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
 ):
     """
     Execute a direct method on a device
@@ -255,7 +336,13 @@ def run_component_command(
     )
     headers = _utility.get_headers(token, cmd)
 
-    response = requests.post(url, headers=headers, json=payload, verify=not should_disable_connection_verify())
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
+    response = requests.post(
+        url, headers=headers, json=payload, params=query_parameters
+    )
 
     # execute command response has caveats in it due to Async/Sync device methods
     # return the response if we get 201, otherwise try to apply generic logic
@@ -273,6 +360,7 @@ def get_component_command_history(
     interface_id: str,
     command_name: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
 ):
     """
     Get component command history
@@ -295,7 +383,11 @@ def get_component_command_history(
     )
     headers = _utility.get_headers(token, cmd)
 
-    response = requests.get(url, headers=headers, verify=not should_disable_connection_verify())
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
+    response = requests.get(url, headers=headers, params=query_parameters)
     return _utility.try_extract_result(response)
 
 
@@ -310,7 +402,6 @@ def run_manual_failover(
     """
     Execute a manual failover of device across multiple IoT Hubs to validate device firmware's
          ability to reconnect using DPS to a different IoT Hub.
-
     Args:
         cmd: command passed into az
         app_id: id of an app (used for forming request URL)
@@ -321,7 +412,6 @@ def run_manual_failover(
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
         central_dns_suffix:(OPTIONAL) {centralDnsSuffixInPath} as found in docs
-
     Returns:
         result (currently a 200)
     """
@@ -331,28 +421,27 @@ def run_manual_failover(
     )
     headers = _utility.get_headers(token, cmd)
     json = {}
-    if ttl_minutes :
+    if ttl_minutes:
         json = {"ttl": ttl_minutes}
     else:
-        print("""Using default time to live -
-        see https://github.com/iot-for-all/iot-central-high-availability-clients#readme for more information""")
+        print(
+            """Using default time to live -
+        see https://github.com/iot-for-all/iot-central-high-availability-clients#readme for more information"""
+        )
 
-    response = requests.post(url, headers=headers, verify=not should_disable_connection_verify(), json=json)
+    response = requests.post(
+        url, headers=headers, verify=not should_disable_connection_verify(), json=json
+    )
     _utility.log_response_debug(response=response, logger=logger)
     return _utility.try_extract_result(response)
 
 
 def run_manual_failback(
-    cmd,
-    app_id: str,
-    device_id: str,
-    token: str,
-    central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd, app_id: str, device_id: str, token: str, central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     """
     Execute a manual failback for device. Reverts the previously executed failover
          command by moving the device back to it's original IoT Hub.
-
     Args:
         cmd: command passed into az
         app_id: id of an app (used for forming request URL)
@@ -360,7 +449,6 @@ def run_manual_failback(
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
         central_dns_suffix: {centralDnsSuffixInPath} as found in docs
-
     Returns:
         result (currently a 200)
     """
@@ -369,7 +457,9 @@ def run_manual_failback(
         app_id, central_dns_suffix, "system/iothub/devices", device_id
     )
     headers = _utility.get_headers(token, cmd)
-    response = requests.post(url, headers=headers, verify=not should_disable_connection_verify())
+    response = requests.post(
+        url, headers=headers, verify=not should_disable_connection_verify()
+    )
     _utility.log_response_debug(response=response, logger=logger)
 
     return _utility.try_extract_result(response)
