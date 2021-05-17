@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from typing import List
-from azext_iot.central.models.deviceV1 import DeviceV1
+from azext_iot.central.models.devicev1 import DeviceV1
 from knack.util import CLIError
 from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
