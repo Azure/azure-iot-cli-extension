@@ -129,8 +129,7 @@ def delete_all_relationship(
     twin_provider = TwinProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
     if twin_id:
         return twin_provider.delete_all_relationship(twin_id=twin_id)
-    else:
-        return twin_provider.delete_all(only_relationships=True)
+    return twin_provider.delete_all(only_relationships=True)
 
 
 def send_telemetry(

@@ -31,10 +31,6 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             test_case, LIVE_HUB, LIVE_RG
         )
 
-    @pytest.mark.skipif(
-        not validate_min_python_version(3, 4, exit_on_fail=False),
-        reason="minimum python version not satisfied",
-    )
     def test_uamqp_device_messaging(self):
         device_count = 1
         device_ids = self.generate_device_names(device_count)

@@ -797,3 +797,13 @@ def load_digitaltwins_help():
           text: >
             az dt model delete -n {instance_or_hostname} --dtmi "dtmi:com:example:Floor;1"
     """
+
+    helps["dt model delete-all"] = """
+        type: command
+        short-summary: Delete all models within a Digital Twins instance. Twins configurations are not affected but may be broken without model definitions.
+
+        examples:
+        - name: Delete all models.
+          text: >
+            az dt model delete-all -n {instance_or_hostname}
+    """

@@ -14,7 +14,7 @@ __all__ = ["IoTHubProvider", "CloudError", "SerializationError"]
 
 
 class IoTHubProvider(object):
-    def __init__(self, cmd, hub_name, rg, login=None):
+    def __init__(self, cmd, hub_name, rg, login=None, auth_type_dataplane=None):
         self.cmd = cmd
         self.hub_name = hub_name
         self.rg = rg
@@ -23,6 +23,7 @@ class IoTHubProvider(object):
             hub_name=self.hub_name,
             resource_group_name=self.rg,
             login=login,
+            auth_type=auth_type_dataplane,
         )
         self.resolver = SdkResolver(self.target)
 

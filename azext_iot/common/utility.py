@@ -349,10 +349,10 @@ def dict_transform_lower_case_key(d):
     return {k.lower(): v for k, v in d.items()}
 
 
-def calculate_millisec_since_unix_epoch_utc():
+def calculate_millisec_since_unix_epoch_utc(offset_seconds: int = 0):
     now = datetime.utcnow()
     epoch = datetime.utcfromtimestamp(0)
-    return int(1000 * (now - epoch).total_seconds())
+    return int(1000 * ((now - epoch).total_seconds() + offset_seconds))
 
 
 def init_monitoring(cmd, timeout, properties, enqueued_time, repair, yes):

@@ -13,6 +13,7 @@ import os
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azure.cli.core.commands import AzCliCommand
 from azure.cli.core.mock import DummyCli
+from azext_iot.tests.generators import generate_generic_id
 
 path_iot_hub_service_factory = "azext_iot._factory.iot_hub_service_factory"
 path_service_client = "msrest.service_client.ServiceClient.send"
@@ -26,6 +27,9 @@ path_iot_hub_monitor_events_entrypoint = (
     "azext_iot.operations.hub._iot_hub_monitor_events"
 )
 hub_entity = "myhub.azure-devices.net"
+
+instance_name = generate_generic_id()
+hostname = "{}.subdomain.domain".format(instance_name)
 
 mock_target = {}
 mock_target["entity"] = hub_entity
@@ -247,3 +251,42 @@ def fixture_mock_aics_token(mocker):
     )
     patch.return_value = "Bearer token"
     return patch
+
+
+@pytest.fixture
+def fixture_dt_client(mocker, fixture_cmd):
+    from azext_iot.sdk.digitaltwins.controlplane import AzureDigitalTwinsManagementClient
+    from azext_iot.sdk.digitaltwins.dataplane import AzureDigitalTwinsAPI
+    from azext_iot.digitaltwins.providers.auth import DigitalTwinAuthentication
+
+    patched_get_raw_token = mocker.patch(
+        "azure.cli.core._profile.Profile.get_raw_token"
+    )
+    patched_get_raw_token.return_value = (
+        mocker.MagicMock(name="creds"),
+        mocker.MagicMock(name="subscription"),
+        mocker.MagicMock(name="tenant"),
+    )
+
+    control_plane_patch = mocker.patch(
+        "azext_iot.digitaltwins.providers.digitaltwins_service_factory"
+    )
+    control_plane_patch.return_value = AzureDigitalTwinsManagementClient(
+        credentials=DigitalTwinAuthentication(
+            fixture_cmd, "00000000-0000-0000-0000-000000000000"
+        ),
+        subscription_id="00000000-0000-0000-0000-000000000000",
+    )
+
+    data_plane_patch = mocker.patch(
+        "azext_iot.digitaltwins.providers.base.DigitalTwinsProvider.get_sdk"
+    )
+
+    data_plane_patch.return_value = AzureDigitalTwinsAPI(
+        credentials=DigitalTwinAuthentication(
+            fixture_cmd, "00000000-0000-0000-0000-000000000000"
+        ),
+        base_url="https://{}/".format(hostname)
+    )
+
+    return control_plane_patch, data_plane_patch
