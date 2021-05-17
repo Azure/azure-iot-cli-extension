@@ -8,11 +8,14 @@ import json
 import uamqp
 import yaml
 
+from typing import Tuple, Union
 from uuid import uuid4
 from knack.log import get_logger
 from azext_iot.constants import USER_AGENT
+from azext_iot.common.shared import AuthenticationTypeDataplane
 from azext_iot.common.utility import process_json_arg
 from azext_iot.monitor.builders.hub_target_builder import AmqpBuilder
+from uamqp.authentication import JWTTokenAuth
 
 # To provide amqp frame trace
 DEBUG = False
@@ -72,10 +75,13 @@ def send_c2d_message(
     )
 
     operation = "/messages/devicebound"
-    endpoint = AmqpBuilder.build_iothub_amqp_endpoint_from_target(target)
-    endpoint_with_op = endpoint + operation
+    endpoint_target, token_auth = _get_endpoint_and_token_auth(
+        target=target, operation=operation
+    )
+
     client = uamqp.SendClient(
-        target="amqps://" + endpoint_with_op,
+        target=endpoint_target,
+        auth=token_auth,
         client_name=_get_container_id(),
         debug=DEBUG,
     )
@@ -107,24 +113,23 @@ def monitor_feedback(target, device_id, wait_on_id=None, token_duration=3600):
         return None
 
     operation = "/messages/servicebound/feedback"
-    endpoint = AmqpBuilder.build_iothub_amqp_endpoint_from_target(
-        target, duration=token_duration
+    endpoint_target, token_auth = _get_endpoint_and_token_auth(
+        target=target, operation=operation
     )
-    endpoint = endpoint + operation
-
     device_filter_txt = None
     if device_id:
         device_filter_txt = " filtering on device: {},".format(device_id)
 
     print(
-        "Starting C2D feedback monitor,{} use ctrl-c to stop...".format(
-            device_filter_txt if device_filter_txt else ""
-        )
+        f"Starting C2D feedback monitor,{device_filter_txt if device_filter_txt else ''} use ctrl-c to stop..."
     )
 
     try:
         client = uamqp.ReceiveClient(
-            "amqps://" + endpoint, client_name=_get_container_id(), debug=DEBUG
+            source=endpoint_target,
+            auth=token_auth,
+            client_name=_get_container_id(),
+            debug=DEBUG,
         )
         message_generator = client.receive_messages_iter()
         for msg in message_generator:
@@ -141,3 +146,36 @@ def monitor_feedback(target, device_id, wait_on_id=None, token_duration=3600):
 
 def _get_container_id():
     return "{}/{}".format(USER_AGENT, str(uuid4()))
+
+
+def _get_endpoint_and_token_auth(
+    target: dict, operation: str
+) -> Tuple[str, Union[JWTTokenAuth, None]]:
+    from azext_iot.constants import IOTHUB_RESOURCE_ID
+    from time import time
+    from collections import namedtuple
+
+    AccessToken = namedtuple("AccessToken", ["token", "expires_on"])
+
+    def token_provider():
+        from azure.cli.core._profile import Profile
+        profile = Profile(cli_ctx=target["cmd"].cli_ctx)
+        creds, _, _ = profile.get_raw_token(resource=IOTHUB_RESOURCE_ID)
+        access_token = AccessToken(f"{creds[0]} {creds[1]}", time() + 3599)
+        return access_token
+
+    endpoint_with_op = None
+    jwt_token_auth = None
+    if target["policy"] == AuthenticationTypeDataplane.login.value:
+        endpoint_with_op = f"amqps://{target['entity']}{operation}"
+        jwt_token_auth = JWTTokenAuth(
+            audience=IOTHUB_RESOURCE_ID,
+            uri=endpoint_with_op,
+            get_token=token_provider,
+            token_type=b"Bearer",
+        )
+        jwt_token_auth.update_token()  # Work-around for uamqp error.
+    else:
+        endpoint_with_op = f"amqps://{AmqpBuilder.build_iothub_amqp_endpoint_from_target(target)}{operation}"
+
+    return endpoint_with_op, jwt_token_auth

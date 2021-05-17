@@ -215,6 +215,15 @@ class AuthenticationType(Enum):
     identityBased = "identity"
 
 
+class AuthenticationTypeDataplane(Enum):
+    """
+    Use a policy key or Oauth token from Azure AD.
+    """
+
+    key = "key"
+    login = "login"
+
+
 class RenewKeyType(Enum):
     """
     Target key type for regeneration.
