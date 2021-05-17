@@ -8,11 +8,11 @@ import re
 
 from uamqp.message import Message
 
-from azext_iot.central.providers import (
-    CentralDeviceProvider,
-    CentralDeviceTemplateProvider,
+from azext_iot.central.providers.v1 import (
+    CentralDeviceProviderV1,
+    CentralDeviceTemplateProviderV1,
 )
-from azext_iot.central.models.template import Template
+from azext_iot.central import models as central_models
 from azext_iot.monitor.parsers import strings
 from azext_iot.monitor.central_validator import validate, extract_schema_type
 from azext_iot.monitor.models.arguments import CommonParserArguments
@@ -25,8 +25,8 @@ class CentralParser(CommonParser):
         self,
         message: Message,
         common_parser_args: CommonParserArguments,
-        central_device_provider: CentralDeviceProvider,
-        central_template_provider: CentralDeviceTemplateProvider,
+        central_device_provider: CentralDeviceProviderV1,
+        central_template_provider: CentralDeviceTemplateProviderV1,
     ):
         super(CentralParser, self).__init__(
             message=message, common_parser_args=common_parser_args
@@ -89,7 +89,7 @@ class CentralParser(CommonParser):
 
         template = self._get_template()
 
-        if not isinstance(template, Template):
+        if not isinstance(template, central_models.TemplateV1):
             return
 
         # if component name is not defined then data should be mapped to root/inherited interfaces
@@ -120,7 +120,7 @@ class CentralParser(CommonParser):
         try:
             device = self._central_device_provider.get_device(self.device_id)
             template = self._central_template_provider.get_device_template(
-                device.instance_of
+                device.template
             )
             self._template_id = template.id
             return template
@@ -131,7 +131,9 @@ class CentralParser(CommonParser):
     # currently validates:
     # 1) primitive types match (e.g. boolean is indeed bool etc)
     # 2) names match (i.e. Humidity vs humidity etc)
-    def _validate_payload(self, payload: dict, template: Template, is_component: bool):
+    def _validate_payload(
+        self, payload: dict, template: central_models.TemplateV1, is_component: bool
+    ):
         name_miss = []
         for telemetry_name, telemetry in payload.items():
             schema = template.get_schema(

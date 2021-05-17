@@ -11,9 +11,9 @@ from typing import List
 from knack.log import get_logger
 
 from azext_iot.monitor.utility import stop_monitor, get_loop
-from azext_iot.central.providers import (
-    CentralDeviceProvider,
-    CentralDeviceTemplateProvider,
+from azext_iot.central.providers.v1 import (
+    CentralDeviceProviderV1,
+    CentralDeviceTemplateProviderV1,
 )
 from azext_iot.monitor.handlers import CommonHandler
 from azext_iot.monitor.models.arguments import CentralHandlerArguments
@@ -26,8 +26,8 @@ logger = get_logger(__name__)
 class CentralHandler(CommonHandler):
     def __init__(
         self,
-        central_device_provider: CentralDeviceProvider,
-        central_template_provider: CentralDeviceTemplateProvider,
+        central_device_provider: CentralDeviceProviderV1,
+        central_template_provider: CentralDeviceTemplateProviderV1,
         central_handler_args: CentralHandlerArguments,
     ):
         super(CentralHandler, self).__init__(
