@@ -558,7 +558,7 @@ def load_arguments(self, _):
             arg_type=get_enum_type(ProtocolType),
             help="Indicates device-to-cloud message protocol",
         )
-        context.argument("qos", arg_type=qos_type, deprecate_info=context.deprecate(expiration='0.10.12'))
+        context.argument("qos", arg_type=qos_type, deprecate_info=context.deprecate())
 
     with self.argument_context("iot device simulate") as context:
         context.argument(
