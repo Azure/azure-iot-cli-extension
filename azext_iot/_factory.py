@@ -9,8 +9,9 @@ Factory functions for IoT Hub and Device Provisioning Service.
 """
 
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
+from azext_iot.iothub.providers.aad_oauth import IoTHubOAuth
 from azext_iot.common.shared import SdkType
-from azext_iot.constants import USER_AGENT
+from azext_iot.constants import USER_AGENT, IOTHUB_RESOURCE_ID
 from msrestazure.azure_exceptions import CloudError
 
 __all__ = [
@@ -97,15 +98,21 @@ class SdkResolver(object):
     def _get_iothub_service_sdk(self):
         from azext_iot.sdk.iothub.service import IotHubGatewayServiceAPIs
 
-        credentials = (
-            self.auth_override
-            if self.auth_override
-            else SasTokenAuthentication(
+        credentials = None
+
+        if self.auth_override:
+            credentials = self.auth_override
+        elif self.target["policy"] == "login":
+            credentials = IoTHubOAuth(
+                cmd=self.target["cmd"],
+                resource_id=IOTHUB_RESOURCE_ID
+            )
+        else:
+            credentials = SasTokenAuthentication(
                 uri=self.sas_uri,
                 shared_access_policy_name=self.target["policy"],
                 shared_access_key=self.target["primarykey"],
             )
-        )
 
         return IotHubGatewayServiceAPIs(credentials=credentials, base_url=self.endpoint)
 

@@ -10,6 +10,39 @@ Release History
 
 * Public API GA update - add support for preview and 1.0 routes 
 * Addition of the optional '--av' argument to specify the version of API for the requested operation.
+**IoT Hub updates**
+
+* Removed deprecated edge offline commands and artifacts.
+* Removed deprecated device-identity | module-identity show-connection-string commands.
+
+* Most commands against IoT Hub support Azure AD based access. The type of auth
+  used to execute commands can be controlled with the "--auth-type" parameter
+  which accepts the values "key" or "login". The value of "key" is set by default.
+
+  * When "--auth-type" has the value of "key", like before the CLI will auto-discover
+    a suitable policy when interacting with iothub.
+  * When "--auth-type" has the value "login", an access token from the Azure CLI logged in principal
+    will be used for the operation.
+
+  * The following commands currently remain with key based access only.
+
+    * az iot hub monitor-events
+    * az iot device c2d-message receive
+    * az iot device c2d-message complete
+    * az iot device c2d-message abandon
+    * az iot device c2d-message reject
+    * az iot device c2d-message purge
+    * az iot device send-d2c-message
+    * az iot device simulate
+
+For more information about IoT Hub support for AAD visit: https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-dev-guide-azure-ad-rbac
+
+**Azure Digital Twins updates**
+
+* Addition of the following commands
+
+  * az dt model delete-all - Deletes all models associated with the Digital Twins instance.
+
 
 0.10.11
 +++++++++++++++
