@@ -6,6 +6,10 @@ Release History
 0.10.12
 +++++++++++++++
 
+**IoT Central updates**
+
+* Public API GA update - add support for preview and 1.0 routes 
+* Addition of the optional '--av' argument to specify the version of API for the requested operation.
 **IoT Hub updates**
 
 * Removed deprecated edge offline commands and artifacts.
