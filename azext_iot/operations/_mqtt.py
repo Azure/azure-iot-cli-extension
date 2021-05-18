@@ -76,7 +76,7 @@ class mqtt_client(object):
     def execute(self, data, properties={}, publish_delay=2, msg_count=100):
         from tqdm import tqdm
         try:
-            for _ in tqdm(range(msg_count), desc='Simulation in progress'):
+            for _ in tqdm(range(msg_count), desc='Device simulation in progress'):
                 self.send_d2c_message(message_text=data.generate(True), properties=properties)
                 sleep(publish_delay)
 
