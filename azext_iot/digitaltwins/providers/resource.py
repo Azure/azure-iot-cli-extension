@@ -439,9 +439,8 @@ class ResourceProvider(DigitalTwinsResourceManager):
             return self.mgmt_sdk.private_endpoint_connections.get(
                 resource_group_name=resource_group_name,
                 resource_name=name,
-                private_endpoint_connection_name=conn_name,
-                raw=True,
-            ).response.json()
+                private_endpoint_connection_name=conn_name
+            )
         except ErrorResponseException as e:
             if wait:
                 e.status_code = e.response.status_code

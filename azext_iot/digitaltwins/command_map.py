@@ -42,7 +42,7 @@ def load_digitaltwins_commands(self, _):
         cmd_group.show_command("show", "show_instance")
         cmd_group.command("list", "list_instances")
         cmd_group.command("delete", "delete_instance", confirmation=True, supports_no_wait=True)
-        cmd_group.wait_command("wait", "wait_instance", table_transformer="{provisioning_state:provisioningState}")
+        cmd_group.wait_command("wait", "wait_instance")
 
     with self.command_group(
         "dt endpoint", command_type=digitaltwins_resource_ops
@@ -65,7 +65,7 @@ def load_digitaltwins_commands(self, _):
         )
         cmd_group.command("delete", "delete_endpoint", confirmation=True, supports_no_wait=True)
         cmd_group.wait_command(
-            "wait", "wait_endpoint", table_transformer="{properties.provisioning_state:provisioningState}"
+            "wait", "wait_endpoint"
         )
 
     with self.command_group(
@@ -173,5 +173,5 @@ def load_digitaltwins_commands(self, _):
         cmd_group.command("list", "list_private_endpoint_conns")
         cmd_group.command("delete", "delete_private_endpoint_conn", confirmation=True, supports_no_wait=True)
         cmd_group.wait_command(
-            "wait", "show_private_endpoint_conn", table_transformer="{properties.provisioning_state:provisioningState}"
+            "wait", "wait_private_endpoint_conn"
         )
