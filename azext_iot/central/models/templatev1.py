@@ -4,10 +4,11 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+
 from knack.util import CLIError
 
 
-class Template:
+class TemplateV1:
     def __init__(self, template: dict):
         self.raw_template = template
         try:
@@ -64,7 +65,7 @@ class Template:
             )
             raise CLIError(details)
 
-    def _extract_root_interface_contents(self, dcm: dict):
+    def _extract_root_interface_contents(self, dcm: dict) -> dict:
         rootContents = dcm.get("contents", {})
         contents = [
             entity for entity in rootContents if entity.get("@type") != "Component"
@@ -74,16 +75,13 @@ class Template:
 
     def _extract_interfaces(self, template: dict) -> dict:
         try:
-
             interfaces = []
             dcm = template.get("capabilityModel", {})
 
             if dcm.get("contents"):
                 interfaces.append(self._extract_root_interface_contents(dcm))
 
-            if dcm.get("@type") == "CapabilityModel":
-                interfaces.extend(dcm.get("implements"))
-            else:
+            if dcm.get("extends"):
                 interfaces.extend(dcm.get("extends"))
 
             return {
@@ -97,7 +95,10 @@ class Template:
             raise CLIError(details)
 
     def _extract_schemas(self, entity: dict) -> dict:
-        return {schema["name"]: schema for schema in entity["schema"]["contents"]}
+        if entity.get("schema"):
+            return {schema["name"]: schema for schema in entity["schema"]["contents"]}
+        else:
+            return {schema["name"]: schema for schema in entity["contents"]}
 
     def _extract_schema_names(self, entity: dict) -> dict:
         return {
@@ -105,7 +106,7 @@ class Template:
             for entity_name, entity_schemas in entity.items()
         }
 
-    def _get_interface_list_property(self, property_name):
+    def _get_interface_list_property(self, property_name) -> list:
         # returns the list of interfaces where property with property_name is defined
         return [
             interface

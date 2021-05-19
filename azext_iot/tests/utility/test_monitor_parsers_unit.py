@@ -9,12 +9,11 @@ import mock
 import pytest
 
 from uamqp.message import Message, MessageProperties
-from azext_iot.central.providers import (
-    CentralDeviceProvider,
-    CentralDeviceTemplateProvider,
+from azext_iot.central.providers.v1 import (
+    CentralDeviceProviderV1,
+    CentralDeviceTemplateProviderV1,
 )
-from azext_iot.central.models.template import Template
-from azext_iot.central.models.device import Device
+from azext_iot.central import models as central_models
 from azext_iot.monitor.parsers import common_parser, central_parser
 from azext_iot.monitor.parsers import strings
 from azext_iot.monitor.models.arguments import CommonParserArguments
@@ -440,7 +439,7 @@ class TestCentralParser:
 
     def test_validate_against_invalid_component_template_should_fail(self):
         # setup
-        device_template = Template(
+        device_template = central_models.TemplateV1(
             load_json(FileNames.central_property_validation_template_file)
         )
 
@@ -487,7 +486,7 @@ class TestCentralParser:
 
     def test_validate_invalid_telmetry_component_template_should_fail(self):
         # setup
-        device_template = Template(
+        device_template = central_models.TemplateV1(
             load_json(FileNames.central_property_validation_template_file)
         )
 
@@ -553,7 +552,7 @@ class TestCentralParser:
         )
 
         # haven't found a better way to force the error to occur within parser
-        parser._central_template_provider.get_device_template = lambda x: Template(
+        parser._central_template_provider.get_device_template = lambda x: central_models.TemplateV1(
             device_template
         )
 
@@ -605,14 +604,21 @@ class TestCentralParser:
         _validate_issues(parser, Severity.error, 1, 1, [expected_details])
 
     def _get_template(self):
-        return Template(load_json(FileNames.central_device_template_file))
+        return central_models.TemplateV1(
+            load_json(FileNames.central_device_template_file)
+        )
 
     def _create_parser(
-        self, device_template: Template, message: Message, args: CommonParserArguments
+        self,
+        device_template: central_models.TemplateV1,
+        message: Message,
+        args: CommonParserArguments,
     ):
-        device_provider = CentralDeviceProvider(cmd=None, app_id=None)
-        template_provider = CentralDeviceTemplateProvider(cmd=None, app_id=None)
-        device_provider.get_device = mock.MagicMock(return_value=Device({}))
+        device_provider = CentralDeviceProviderV1(cmd=None, app_id=None)
+        template_provider = CentralDeviceTemplateProviderV1(cmd=None, app_id=None)
+        device_provider.get_device = mock.MagicMock(
+            return_value=central_models.DeviceV1({})
+        )
         template_provider.get_device_template = mock.MagicMock(
             return_value=device_template
         )

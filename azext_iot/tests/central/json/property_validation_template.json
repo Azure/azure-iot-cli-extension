@@ -131,138 +131,106 @@
         "writable": true
       }
     ],
-    "implements": [
+    "extends": [
       {
         "@id": "urn:sampleApp:groupOne_bz:_rpgcmdpo:1",
-        "@type": [
-          "InterfaceInstance"
-        ],
-        "displayName": "Interface",
-        "name": "groupOne_g4",
-        "schema": {
-          "@id": "urn:sampleApp:groupOne_g4:1",
-          "@type": [
-            "Interface"
-          ],
-          "displayName": "Interface",
-          "contents": [
-            {
-              "@id": "urn:sampleApp:groupOne_g4:Model:1",
-              "@type": [
-                "Property"
-              ],
-              "displayName": "Model",
-              "name": "Model",
-              "schema": "string"
-            },
-            {
-              "@id": "urn:sampleApp:groupOne_g4:Version:1",
-              "@type": [
-                "Property"
-              ],
-              "displayName": "Version",
-              "name": "Version",
-              "schema": "string"
-            },
-            {
-              "@id": "urn:sampleApp:groupOne_g4:TotalStorage:1",
-              "@type": [
-                "Property"
-              ],
-              "displayName": "TotalStorage",
-              "name": "TotalStorage",
-              "schema": "string"
-            }
-          ]
-        }
+        "@type": "InterfaceInstance",
+        "contents": [
+          {
+            "@id": "urn:sampleApp:groupOne_g4:Model:1",
+            "@type": [
+              "Property"
+            ],
+            "displayName": "Model",
+            "name": "Model",
+            "schema": "string"
+          },
+          {
+            "@id": "urn:sampleApp:groupOne_g4:Version:1",
+            "@type": [
+              "Property"
+            ],
+            "displayName": "Version",
+            "name": "Version",
+            "schema": "string"
+          },
+          {
+            "@id": "urn:sampleApp:groupOne_g4:TotalStorage:1",
+            "@type": [
+              "Property"
+            ],
+            "displayName": "TotalStorage",
+            "name": "TotalStorage",
+            "schema": "string"
+          }
+        ]
       },
       {
         "@id": "urn:sampleApp:groupTwo_bz:myxqftpsr:2",
-        "@type": [
-          "InterfaceInstance"
-        ],
+        "@type": "InterfaceInstance",
         "displayName": "Interface",
-        "name": "groupTwo_ed",
-        "schema": {
-          "@id": "urn:sampleApp:groupTwo_ed:1",
-          "@type": [
-            "Interface"
-          ],
-          "displayName": "Interface",
-          "contents": [
-            {
-              "@id": "urn:sampleApp:groupTwo_ed:Model:1",
-              "@type": [
-                "Property"
-              ],
-              "displayName": "Model",
-              "name": "Model",
-              "schema": "string"
-            },
-            {
-              "@id": "urn:sampleApp:groupThree_ed:Manufacturer:1",
-              "@type": [
-                "Property"
-              ],
-              "displayName": "Manufacturer",
-              "name": "Manufacturer",
-              "schema": "string"
-            }
-          ]
-        }
+        "contents": [
+          {
+            "@id": "urn:sampleApp:groupTwo_ed:Model:1",
+            "@type": [
+              "Property"
+            ],
+            "displayName": "Model",
+            "name": "Model",
+            "schema": "string"
+          },
+          {
+            "@id": "urn:sampleApp:groupThree_ed:Manufacturer:1",
+            "@type": [
+              "Property"
+            ],
+            "displayName": "Manufacturer",
+            "name": "Manufacturer",
+            "schema": "string"
+          }
+        ]
       },
       {
         "@id": "urn:sampleApp:groupThree_bz:myxqftpsr:2",
-        "@type": [
-          "InterfaceInstance"
-        ],
-        "displayName": "Interface",
-        "name": "groupThree_ed",
-        "schema": {
-          "@id": "urn:sampleApp:groupThree_ed:1",
-          "@type": [
-            "Interface"
-          ],
-          "displayName": "Interface",
-          "contents": [
-            {
-              "@id": "urn:sampleApp:groupThree_ed:Manufacturer:1",
-              "@type": [
-                "Property"
-              ],
-              "displayName": "Manufacturer",
-              "name": "Manufacturer",
-              "schema": "string"
-            },
-            {
-              "@id": "urn:sampleApp:groupThree_g4:Version:1",
-              "@type": [
-                "Property"
-              ],
-              "displayName": "Version",
-              "name": "Version",
-              "schema": "string"
-            },
-            {
-              "@id": "urn:sampleApp:groupThree_ed:Model:1",
-              "@type": [
-                "Property"
-              ],
-              "displayName": "Model",
-              "name": "Model",
-              "schema": "string"
-            },
-            {
-              "@id": "urn:sampleApp:groupThree_ed:OsName:1",
-              "@type": [
-                "Property"
-              ],
-              "displayName": "OsName",
-              "name": "OsName",
-              "schema": "string"
-            }
-          ]
-        }
+        "@type": "Interface",
+        "contents": [
+          {
+            "@id": "urn:sampleApp:groupThree_ed:Manufacturer:1",
+            "@type": [
+              "Property"
+            ],
+            "displayName": "Manufacturer",
+            "name": "Manufacturer",
+            "schema": "string"
+          },
+          {
+            "@id": "urn:sampleApp:groupThree_g4:Version:1",
+            "@type": [
+              "Property"
+            ],
+            "displayName": "Version",
+            "name": "Version",
+            "schema": "string"
+          },
+          {
+            "@id": "urn:sampleApp:groupThree_ed:Model:1",
+            "@type": [
+              "Property"
+            ],
+            "displayName": "Model",
+            "name": "Model",
+            "schema": "string"
+          },
+          {
+            "@id": "urn:sampleApp:groupThree_ed:OsName:1",
+            "@type": [
+              "Property"
+            ],
+            "displayName": "OsName",
+            "name": "OsName",
+            "schema": "string"
+          }
+        ]
       }
     ],
     "displayName": "property_validation",

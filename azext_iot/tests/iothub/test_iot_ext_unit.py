@@ -61,9 +61,6 @@ def generate_device_create_req(
     status_reason=None,
     valid_days=None,
     output_dir=None,
-    set_parent_id=None,
-    add_children=None,
-    force=False,
 ):
     return {
         "client": None,
@@ -76,10 +73,7 @@ def generate_device_create_req(
         "status": status,
         "status_reason": status_reason,
         "valid_days": valid_days,
-        "output_dir": output_dir,
-        "set_parent_id": set_parent_id,
-        "add_children": add_children,
-        "force": force,
+        "output_dir": output_dir
     }
 
 
@@ -150,168 +144,6 @@ class TestDeviceCreate:
                 assert x509tp.get("secondaryThumbprint") is None
             else:
                 assert x509tp["secondaryThumbprint"] == req["stp"]
-
-    @pytest.fixture
-    def sc_device_create_setparent(self, mocker, fixture_ghcs, fixture_sas, request):
-        service_client = mocker.patch(path_service_client)
-        test_side_effect = [
-            build_mock_response(mocker, 200, generate_parent_device()),
-            build_mock_response(mocker, 200, {}),
-        ]
-        service_client.side_effect = test_side_effect
-        return service_client
-
-    @pytest.mark.parametrize(
-        "req", [(generate_device_create_req(set_parent_id=device_id))]
-    )
-    def test_device_create_setparent(self, sc_device_create_setparent, req):
-        subject.iot_device_create(
-            fixture_cmd,
-            child_device_id,
-            req["hub_name"],
-            req["ee"],
-            req["auth"],
-            req["ptp"],
-            req["stp"],
-            req["status"],
-            req["status_reason"],
-            req["valid_days"],
-            req["output_dir"],
-            req["set_parent_id"],
-        )
-
-        args = sc_device_create_setparent.call_args
-        url = args[0][0].url
-        body = json.loads(args[0][0].body)
-
-        assert "{}/devices/{}?".format(mock_target["entity"], child_device_id) in url
-        assert args[0][0].method == "PUT"
-
-        assert body["deviceId"] == child_device_id
-        assert body["deviceScope"] == generate_parent_device().get("deviceScope")
-
-    @pytest.fixture(params=[(200, 0)])
-    def sc_invalid_args_device_create_setparent(
-        self, mocker, fixture_ghcs, fixture_sas, request
-    ):
-        service_client = mocker.patch(path_service_client)
-        parent_kvp = {}
-        if request.param[1] == 0:
-            parent_kvp.setdefault("capabilities", {"iotEdge": False})
-        test_side_effect = [
-            build_mock_response(
-                mocker, request.param[0], generate_parent_device(**parent_kvp)
-            )
-        ]
-        service_client.side_effect = test_side_effect
-        return service_client
-
-    @pytest.mark.parametrize("req, exp", [(generate_device_create_req(), CLIError)])
-    def test_device_create_setparent_invalid_args(
-        self, sc_invalid_args_device_create_setparent, req, exp
-    ):
-        with pytest.raises(exp):
-            subject.iot_device_create(
-                fixture_cmd,
-                child_device_id,
-                req["hub_name"],
-                req["ee"],
-                req["auth"],
-                req["ptp"],
-                req["stp"],
-                req["status"],
-                req["status_reason"],
-                req["valid_days"],
-                req["output_dir"],
-                device_id,
-            )
-
-    @pytest.fixture(params=[(200, 0), (200, 1), (200, 1)])
-    def sc_device_create_addchildren(self, mocker, fixture_ghcs, fixture_sas, request):
-        service_client = mocker.patch(path_service_client)
-        child_kvp = {}
-        if request.param[1] == 1:
-            child_kvp.setdefault("parentScopes", ["abcd"])
-        if request.param[1] == 1:
-            child_kvp.setdefault("capabilities", {"iotEdge": True})
-        test_side_effect = [
-            build_mock_response(
-                mocker, request.param[0], generate_child_device(**child_kvp)
-            ),
-            build_mock_response(mocker, request.param[0], generate_parent_device()),
-            build_mock_response(
-                mocker, request.param[0], generate_child_device(**child_kvp)
-            ),
-            build_mock_response(mocker, request.param[0], {}),
-        ]
-        service_client.side_effect = test_side_effect
-        return service_client
-
-    @pytest.mark.parametrize("req", [(generate_device_create_req())])
-    def test_device_create_addchildren(self, sc_device_create_addchildren, req):
-        subject.iot_device_create(
-            fixture_cmd,
-            req["device_id"],
-            req["hub_name"],
-            True,
-            req["auth"],
-            req["ptp"],
-            req["stp"],
-            req["status"],
-            req["status_reason"],
-            req["valid_days"],
-            req["output_dir"],
-            None,
-            child_device_id,
-            True,
-        )
-
-        args = sc_device_create_addchildren.call_args
-        url = args[0][0].url
-        body = json.loads(args[0][0].body)
-        assert "{}/devices/{}?".format(mock_target["entity"], child_device_id) in url
-        assert args[0][0].method == "PUT"
-        assert body["deviceId"] == child_device_id
-        assert body["deviceScope"] == generate_parent_device().get(
-            "deviceScope"
-        ) or body["parentScopes"] == [generate_parent_device().get("deviceScope")]
-
-    @pytest.fixture(params=[(200, 0)])
-    def sc_invalid_args_device_create_addchildren(
-        self, mocker, fixture_ghcs, fixture_sas, request
-    ):
-        service_client = mocker.patch(path_service_client)
-        child_kvp = {}
-        child_kvp.setdefault("parentScopes", ["abcd"])
-        test_side_effect = [
-            build_mock_response(
-                mocker, request.param[0], generate_child_device(**child_kvp)
-            )
-        ]
-        service_client.side_effect = test_side_effect
-        return service_client
-
-    @pytest.mark.parametrize("req, exp", [(generate_device_create_req(), CLIError)])
-    def test_device_create_addchildren_invalid_args(
-        self, sc_invalid_args_device_create_addchildren, req, exp
-    ):
-        with pytest.raises(exp):
-            subject.iot_device_create(
-                fixture_cmd,
-                req["device_id"],
-                req["hub_name"],
-                True,
-                req["auth"],
-                req["ptp"],
-                req["stp"],
-                req["status"],
-                req["status_reason"],
-                req["valid_days"],
-                req["output_dir"],
-                None,
-                child_device_id,
-                False,
-            )
 
     @pytest.mark.parametrize(
         "req, exp",
@@ -2578,7 +2410,7 @@ class TestEdgeOffline:
 
     def test_device_children_add(self, sc_addchildren):
         subject.iot_device_children_add(
-            None, device_id, child_device_id, True, mock_target["entity"]
+            None, device_id, [child_device_id], True, mock_target["entity"]
         )
         args = sc_addchildren.call_args
         url = args[0][0].url
@@ -2614,7 +2446,7 @@ class TestEdgeOffline:
     def test_device_addchildren_invalid_args(self, sc_invalid_args_addchildren, exp):
         with pytest.raises(exp):
             subject.iot_device_children_add(
-                fixture_cmd, device_id, child_device_id, False, mock_target["entity"]
+                fixture_cmd, device_id, [child_device_id], False, mock_target["entity"]
             )
 
     @pytest.fixture(params=[(200, 400), (200, 401), (200, 500)])
@@ -2631,7 +2463,7 @@ class TestEdgeOffline:
     def test_device_addchildren_error(self, sc_addchildren_error):
         with pytest.raises(CLIError):
             subject.iot_device_children_add(
-                fixture_cmd, device_id, child_device_id, True, mock_target["entity"]
+                fixture_cmd, device_id, [child_device_id], True, mock_target["entity"]
             )
 
     @pytest.fixture(params=[(200, 200)])
@@ -2652,7 +2484,7 @@ class TestEdgeOffline:
     def test_device_addchildren_invalid_etag(self, sc_invalid_etag_setparent, exp):
         with pytest.raises(exp):
             subject.iot_device_children_add(
-                fixture_cmd, device_id, child_device_id, True, mock_target["entity"]
+                fixture_cmd, device_id, [child_device_id], True, mock_target["entity"]
             )
 
     # list-children
@@ -2725,7 +2557,7 @@ class TestEdgeOffline:
 
     def test_device_children_remove_list(self, sc_removechildrenlist):
         subject.iot_device_children_remove(
-            fixture_cmd, device_id, child_device_id, False, mock_target["entity"]
+            fixture_cmd, device_id, [child_device_id], False, mock_target["entity"]
         )
         args = sc_removechildrenlist.call_args
         url = args[0][0].url
@@ -2764,7 +2596,7 @@ class TestEdgeOffline:
     ):
         with pytest.raises(exp):
             subject.iot_device_children_remove(
-                fixture_cmd, device_id, child_device_id, False, mock_target["entity"]
+                fixture_cmd, device_id, [child_device_id], False, mock_target["entity"]
             )
 
     @pytest.fixture(params=[(200, 200)])
@@ -2793,7 +2625,7 @@ class TestEdgeOffline:
     ):
         with pytest.raises(exp):
             subject.iot_device_children_remove(
-                fixture_cmd, device_id, child_device_id, False, mock_target["entity"]
+                fixture_cmd, device_id, [child_device_id], False, mock_target["entity"]
             )
 
     @pytest.fixture(params=[(200, 400), (200, 401), (200, 500)])

@@ -145,14 +145,6 @@ helps[
     - name: Create an edge enabled IoT device with default authorization (shared private key).
       text: >
         az iot hub device-identity create -n {iothub_name} -d {device_id} --ee
-    - name: Create an edge enabled IoT device with default authorization (shared private key) and
-            add child devices as well.
-      text: >
-        az iot hub device-identity create -n {iothub_name} -d {device_id} --ee --cl {child_device_id}
-    - name: Create an IoT device with default authorization (shared private key) and
-            set parent device as well.
-      text: >
-        az iot hub device-identity create -n {iothub_name} -d {device_id} --pd {edge_device_id}
     - name: Create an IoT device with self-signed certificate authorization,
             generate a cert valid for 10 days then use its thumbprint.
       text: >
@@ -235,13 +227,6 @@ helps[
 """
 
 helps[
-    "iot hub device-identity show-connection-string"
-] = """
-    type: command
-    short-summary: Show a given IoT Hub device connection string.
-"""
-
-helps[
     "iot hub device-identity connection-string"
 ] = """
     type: group
@@ -291,32 +276,6 @@ helps[
 """
 
 helps[
-    "iot hub device-identity get-parent"
-] = """
-    type: command
-    short-summary: Get the parent device of the specified device.
-    examples:
-    - name: Get the parent device of the specified device.
-      text: >
-        az iot hub device-identity get-parent -d {device_id} -n {iothub_name}
-"""
-
-helps[
-    "iot hub device-identity set-parent"
-] = """
-    type: command
-    short-summary: Set the parent device of the specified device.
-    examples:
-    - name: Set the parent device of the specified device.
-      text: >
-        az iot hub device-identity set-parent -d {device_id} --pd {edge_device_id} -n {iothub_name}
-    - name: Set the parent device of the specified device irrespectively the device is
-            already a child of other edge device.
-      text: >
-        az iot hub device-identity set-parent -d {device_id} --pd {edge_device_id} --force -n {iothub_name}
-"""
-
-helps[
     "iot hub device-identity parent"
 ] = """
     type: group
@@ -346,49 +305,6 @@ helps[
     - name: Set the parent device of the specified device and overwrites its original parent.
       text: >
         az iot hub device-identity parent set -d {device_id} --pd {edge_device_id} --force -n {iothub_name}
-"""
-
-helps[
-    "iot hub device-identity add-children"
-] = """
-    type: command
-    short-summary: Add specified comma-separated list of device ids as children of specified edge device.
-    examples:
-    - name: Add devices as a children to the edge device.
-      text: >
-        az iot hub device-identity add-children -d {edge_device_id} --child-list {comma_separated_device_id}
-        -n {iothub_name}
-    - name: Add devices as a children to the edge device irrespectively the device is
-            already a child of other edge device.
-      text: >
-        az iot hub device-identity add-children -d {edge_device_id} --child-list {comma_separated_device_id}
-        -n {iothub_name} -f
-"""
-
-helps[
-    "iot hub device-identity list-children"
-] = """
-    type: command
-    short-summary: Outputs comma-separated list of assigned child devices.
-    examples:
-    - name: Show all assigned devices as comma-separated list.
-      text: >
-        az iot hub device-identity list-children -d {edge_device_id} -n {iothub_name}
-"""
-
-helps[
-    "iot hub device-identity remove-children"
-] = """
-    type: command
-    short-summary: Remove devices as children from specified edge device.
-    examples:
-    - name: Remove all mentioned devices as children of specified device.
-      text: >
-        az iot hub device-identity remove-children -d {edge_device_id} --child-list {comma_separated_device_id}
-        -n {iothub_name}
-    - name: Remove all devices as children specified edge device.
-      text: >
-        az iot hub device-identity remove-children -d {edge_device_id} --remove-all
 """
 
 helps[
@@ -498,13 +414,6 @@ helps[
 ] = """
     type: group
     short-summary: Manage IoT device modules.
-"""
-
-helps[
-    "iot hub module-identity show-connection-string"
-] = """
-    type: command
-    short-summary: Show a target IoT device module connection string.
 """
 
 helps[
