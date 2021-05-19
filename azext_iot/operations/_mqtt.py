@@ -74,16 +74,12 @@ class mqtt_client(object):
         self.device_client.send_method_response(method_response)
 
     def execute(self, data, properties={}, publish_delay=2, msg_count=100):
+        from tqdm import tqdm
         try:
-            msgs = 0
-            while True:
-                if msgs < msg_count:
-                    msgs += 1
-                    self.send_d2c_message(message_text=data.generate(True), properties=properties)
-                    six.print_(".", end="", flush=True)
-                else:
-                    break
+            for _ in tqdm(range(msg_count), desc='Device simulation in progress'):
+                self.send_d2c_message(message_text=data.generate(True), properties=properties)
                 sleep(publish_delay)
+
         except Exception as x:
             raise x
 
