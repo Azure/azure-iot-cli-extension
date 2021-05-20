@@ -82,7 +82,8 @@ qos_type = CLIArgumentType(
     type=str,
     nargs="?",
     choices=["0", "1"],
-    help="Quality of Service. 0 = At most once, 1 = At least once. 2 (Exactly once) is not supported.",
+    help="Quality of Service. 0 = At most once, 1 = At least once. 2 (Exactly once) is not supported."
+    "This command parameter has been deprecated and will be removed in the next release."
 )
 
 event_timeout_type = CLIArgumentType(
@@ -557,7 +558,7 @@ def load_arguments(self, _):
             arg_type=get_enum_type(ProtocolType),
             help="Indicates device-to-cloud message protocol",
         )
-        context.argument("qos", arg_type=qos_type)
+        context.argument("qos", arg_type=qos_type, deprecate_info=context.deprecate())
 
     with self.argument_context("iot device simulate") as context:
         context.argument(
