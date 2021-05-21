@@ -124,6 +124,9 @@ def load_digitaltwins_help():
         - name: Wait until an existing instance is deleted.
           text: >
             az dt wait -n {instance_name} --deleted
+        - name: Wait until an existing instance's publicNetworkAccess property is set to Enabled
+          text: >
+            az dt wait -n {instance_name} --custom "publicNetworkAccess=='Enabled'"
     """
 
     helps["dt endpoint"] = """
@@ -245,6 +248,9 @@ def load_digitaltwins_help():
         - name: Wait until an existing endpoint is deleted from an instance.
           text: >
             az dt endpoint wait -n {instance_name} --endpoint-name {endpoint_name} --deleted
+        - name: Wait until an existing endpoint's primaryConnectionString is null.
+          text: >
+            az dt endpoint wait -n {instance_name} --endpoint-name {endpoint_name} --custom "properties.primaryConnectionString==null"
     """
 
     helps["dt network"] = """
@@ -347,6 +353,9 @@ def load_digitaltwins_help():
         - name: Wait until the existing private-endpoint connection named ba8408b6-1372-41b2-aef8-af43afc4729f is deleted.
           text: >
             az dt network private-endpoint connection wait -n {instance_name} --cn ba8408b6-1372-41b2-aef8-af43afc4729f --deleted
+        - name: Wait until the existing private-endpoint connection named ba8408b6-1372-41b2-aef8-af43afc4729f has no actions required in the privateLinkServiceConnectionState property.
+          text: >
+            az dt network private-endpoint connection wait -n {instance_name} --cn ba8408b6-1372-41b2-aef8-af43afc4729f --custom "properties.privateLinkServiceConnectionState.actionsRequired=='None'"
     """
 
     helps["dt role-assignment"] = """
