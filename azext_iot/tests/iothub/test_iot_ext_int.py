@@ -155,14 +155,10 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
         if identity_type_enable not in hub_identity.get("type", None):
             # enable hub identity and get ID
-            self.cmd(
-                "iot hub identity assign -n {} --identities {}".format(
-                    LIVE_HUB, '[system]'
-                )
-            ).get_output_in_json()
-
             hub_identity = self.cmd(
-                "iot hub identity show -n {}".format(LIVE_HUB)
+                "iot hub identity assign -n {} --system".format(
+                    LIVE_HUB,
+                )
             ).get_output_in_json()
 
             identity_enabled = True
@@ -258,15 +254,11 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
         if hub_identity.get("userAssignedIdentities", None) != user_identity.get_output_in_json()["principalId"]:
             # enable hub identity and get ID
-            self.cmd(
-                "iot hub identity assign -n {} --identities {}".format(
+            hub_identity = self.cmd(
+                "iot hub identity assign -n {} --user {}".format(
                     LIVE_HUB, identity_id
                 )
             )
-
-            hub_identity = self.cmd(
-                "iot hub identity show -n {}".format(LIVE_HUB)
-            ).get_output_in_json()
 
             identity_enabled = True
 
