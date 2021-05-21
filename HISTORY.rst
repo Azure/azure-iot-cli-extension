@@ -10,7 +10,7 @@ Release History
 
 * Public API GA update 
   * Remove preview tag for  api-token, device, device-template, user routes. Default routes use central GA API's.
-  * add support for preview and 1.0 routes 
+  * Add support for preview and 1.0 routes. 
   * Addition of the optional '--av' argument to specify the version of API for the requested operation.
 
 **IoT Hub updates**
