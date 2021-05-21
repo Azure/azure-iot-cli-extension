@@ -60,7 +60,7 @@ def load_central_commands(self, _):
         )
 
     with self.command_group(
-        "iot central user", command_type=central_user_ops, is_preview=True,
+        "iot central user", command_type=central_user_ops,
     ) as cmd_group:
         cmd_group.command("create", "add_user")
         cmd_group.command("list", "list_users")
@@ -68,7 +68,7 @@ def load_central_commands(self, _):
         cmd_group.command("delete", "delete_user")
 
     with self.command_group(
-        "iot central api-token", command_type=central_api_token_ops, is_preview=True,
+        "iot central api-token", command_type=central_api_token_ops,
     ) as cmd_group:
         cmd_group.command("create", "add_api_token")
         cmd_group.command("list", "list_api_tokens")
@@ -76,7 +76,7 @@ def load_central_commands(self, _):
         cmd_group.command("delete", "delete_api_token")
 
     with self.command_group(
-        "iot central device", command_type=central_device_ops, is_preview=True,
+        "iot central device", command_type=central_device_ops,
     ) as cmd_group:
         # cmd_group.command("list", "list_devices")
         cmd_group.show_command("show", "get_device")
@@ -89,15 +89,13 @@ def load_central_commands(self, _):
         cmd_group.command("manual-failback", "run_manual_failback")
 
     with self.command_group(
-        "iot central device command", command_type=central_device_ops, is_preview=True,
+        "iot central device command", command_type=central_device_ops,
     ) as cmd_group:
         cmd_group.command("run", "run_command")
         cmd_group.command("history", "get_command_history")
 
     with self.command_group(
-        "iot central device-template",
-        command_type=central_device_templates_ops,
-        is_preview=True,
+        "iot central device-template", command_type=central_device_templates_ops,
     ) as cmd_group:
         # cmd_group.command("list", "list_device_templates")
         # cmd_group.command("map", "map_device_templates")
