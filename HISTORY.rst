@@ -8,8 +8,11 @@ Release History
 
 **IoT Central updates**
 
-* Public API GA update - add support for preview and 1.0 routes 
-* Addition of the optional '--av' argument to specify the version of API for the requested operation.
+* Public API GA update 
+  * Remove preview tag for  api-token, device, device-template, user routes. Default routes use central GA API's.
+  * Add support for preview and 1.0 routes. 
+  * Addition of the optional '--av' argument to specify the version of API for the requested operation.
+
 **IoT Hub updates**
 
 * Removed deprecated edge offline commands and artifacts.
