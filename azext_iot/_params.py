@@ -422,7 +422,8 @@ def load_arguments(self, _):
             help="Blob Shared Access Signature URI with write, read, and delete access to "
             "a blob container. This is used to output the status of the "
             "job and the results. Note: when using Identity-based authentication an "
-            "https:// URI is still required. Input for this argument can be inline or from a file path.",
+            "https:// URI is still required - but no SAS token is necessary. Input for this argument "
+            "can be inline or from a file path.",
         )
         context.argument(
             "include_keys",
@@ -437,6 +438,15 @@ def load_arguments(self, _):
             arg_type=get_enum_type(AuthenticationType),
             help="Authentication type for communicating with the storage container.",
         )
+        context.argument(
+            "identity",
+            options_list=["--identity"],
+            help="Managed identity type to determine if system assigned managed identity or "
+            "user assigned managed identity is used. For system assigned managed identity, use "
+            "[system]. For user assigned managed identity, provide the user assigned managed "
+            "identity resource id. This identity requires a Storage Blob Data Contributor roles for the Storage "
+            "Account.",
+        )
 
     with self.argument_context("iot hub device-identity import") as context:
         context.argument(
@@ -445,8 +455,8 @@ def load_arguments(self, _):
             help="Blob Shared Access Signature URI with read access to a blob "
             "container. This blob contains the operations to be performed on "
             "the identity registry. Note: when using Identity-based authentication "
-            "an https:// URI is still required. Input for this argument can be inline "
-            "or from a file path.",
+            "an https:// URI is still required - but no SAS token is necessary. Input for this "
+            "argument can be inline or from a file path.",
         )
         context.argument(
             "output_blob_container_uri",
@@ -454,14 +464,23 @@ def load_arguments(self, _):
             help="Blob Shared Access Signature URI with write access "
             "to a blob container. This is used to output the status of "
             "the job and the results. Note: when using Identity-based "
-            "authentication an https:// URI is still required. Input for "
-            "this argument can be inline or from a file path.",
+            "authentication an https:// URI without the SAS token is still required. "
+            "Input for this argument can be inline or from a file path.",
         )
         context.argument(
             "storage_authentication_type",
             options_list=["--auth-type", "--storage-authentication-type"],
             arg_type=get_enum_type(AuthenticationType),
             help="Authentication type for communicating with the storage container.",
+        )
+        context.argument(
+            "identity",
+            options_list=["--identity"],
+            help="Managed identity type to determine if system assigned managed identity or "
+            "user assigned managed identity is used. For system assigned managed identity, use "
+            "[system]. For user assigned managed identity, provide the user assigned managed "
+            "identity resource id. This identity requires a Storage Blob Data Contributor role for the target Storage "
+            "Account and Contributor role for the IoT Hub.",
         )
 
     with self.argument_context("iot hub device-identity parent set") as context:
