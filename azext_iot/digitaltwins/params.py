@@ -142,6 +142,23 @@ def load_digitaltwins_arguments(self, _):
             help="Role name or Id the system assigned identity will have.",
         )
 
+    with self.argument_context("dt reset") as context:
+        context.argument(
+            "reset_all",
+            options_list=["--all"],
+            help="Resets all dataplane assets of the Digital Twin instance. This deletes all models and twins.",
+        )
+        context.argument(
+            "reset_model",
+            options_list=["--models"],
+            help="Deletes all models associated with the Digital Twin instance.",
+        )
+        context.argument(
+            "reset_twin",
+            options_list=["--twins"],
+            help="Deletes all twins associated with the Digital Twin instance.",
+        )
+
     with self.argument_context("dt endpoint create") as context:
         context.argument(
             "dead_letter_secret",

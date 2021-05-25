@@ -4,6 +4,9 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from knack.util import CLIError
+from azext_iot.digitaltwins.commands_twins import delete_all_twin
+from azext_iot.digitaltwins.commands_models import delete_all_models
 from azext_iot.digitaltwins.providers.resource import ResourceProvider
 from azext_iot.digitaltwins.common import (
     ADTEndpointType,
@@ -55,6 +58,15 @@ def show_instance(cmd, name, resource_group_name=None):
 def delete_instance(cmd, name, resource_group_name=None):
     rp = ResourceProvider(cmd)
     return rp.delete(name=name, resource_group_name=resource_group_name)
+
+
+def reset_instance(cmd, name, reset_all=False, reset_model=False, reset_twin=False, resource_group_name=None):
+    if not (reset_all or reset_model or reset_twin):
+        raise CLIError("Must provide a reset argument.")
+    if reset_all or reset_model:
+        delete_all_models(cmd, name, resource_group_name)
+    if reset_all or reset_twin:
+        delete_all_twin(cmd, name, resource_group_name)
 
 
 def list_endpoints(cmd, name, resource_group_name=None):

@@ -113,6 +113,20 @@ def load_digitaltwins_help():
             az dt delete -n {instance_name} -y --no-wait
     """
 
+    helps["dt reset"] = """
+        type: command
+        short-summary: Reset an existing Digital Twins instance by deleting associated
+            dataplane assets. Currently only supports deleting models and twins.
+
+        examples:
+        - name: Reset all dataplane assets for a Digital Twins instance.
+          text: >
+            az dt reset -n {instance_name} --all
+        - name: Delete only the twins associated with the Digital Twins instance.
+          text: >
+            az dt delete -n {instance_name} --twins
+    """
+
     helps["dt endpoint"] = """
         type: group
         short-summary: Manage and configure Digital Twins instance endpoints.
