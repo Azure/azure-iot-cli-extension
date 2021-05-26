@@ -516,6 +516,17 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
         assert len(twin_query_result["result"]) == 0
         assert twin_query_result["cost"]
 
+        self.cmd(
+            "dt reset -n {} --yes".format(
+                instance_name,
+            )
+        )
+
+        model_query_result = self.cmd(
+            "dt model list -n {} -g {}".format(instance_name, self.rg)
+        ).get_output_in_json()
+        assert len(model_query_result) == 0
+
     def test_dt_twin_bulk_delete(self):
         self.wait_for_capacity()
         instance_name = generate_resource_id()
@@ -685,12 +696,6 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
         assert len(twin_query_result["result"]) == 0
         assert twin_query_result["cost"]
 
-        self.cmd(
-            "dt reset -n {} --twin --yes".format(
-                instance_name,
-            )
-        )
-
         model_query_result = self.cmd(
             "dt model list -n {} -g {}".format(instance_name, self.rg)
         ).get_output_in_json()
@@ -703,7 +708,7 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
         )
 
         self.cmd(
-            "dt reset -n {} --all --yes".format(
+            "dt reset -n {} --yes".format(
                 instance_name,
             )
         )

@@ -121,10 +121,7 @@ def load_digitaltwins_help():
         examples:
         - name: Reset all assets for a Digital Twins instance.
           text: >
-            az dt reset -n {instance_name} --all
-        - name: Delete only the twins associated with the Digital Twins instance.
-          text: >
-            az dt reset -n {instance_name} --twins
+            az dt reset -n {instance_name}
     """
 
     helps["dt endpoint"] = """

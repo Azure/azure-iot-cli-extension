@@ -60,13 +60,9 @@ def delete_instance(cmd, name, resource_group_name=None):
     return rp.delete(name=name, resource_group_name=resource_group_name)
 
 
-def reset_instance(cmd, name, reset_all=False, reset_model=False, reset_twin=False, resource_group_name=None):
-    if not (reset_all or reset_model or reset_twin):
-        raise CLIError("Must provide a reset argument.")
-    if reset_all or reset_model:
-        delete_all_models(cmd, name, resource_group_name)
-    if reset_all or reset_twin:
-        delete_all_twin(cmd, name, resource_group_name)
+def reset_instance(cmd, name, resource_group_name=None):
+    delete_all_models(cmd, name, resource_group_name)
+    delete_all_twin(cmd, name, resource_group_name)
 
 
 def list_endpoints(cmd, name, resource_group_name=None):
