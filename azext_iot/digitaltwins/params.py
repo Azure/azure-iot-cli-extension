@@ -146,7 +146,7 @@ def load_digitaltwins_arguments(self, _):
         context.argument(
             "reset_all",
             options_list=["--all"],
-            help="Resets all dataplane assets of the Digital Twin instance. This deletes all models and twins.",
+            help="Resets all assets of the Digital Twin instance. This deletes all models and twins.",
         )
         context.argument(
             "reset_model",
