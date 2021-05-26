@@ -4,7 +4,6 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from knack.util import CLIError
 from azext_iot.digitaltwins.commands_twins import delete_all_twin
 from azext_iot.digitaltwins.commands_models import delete_all_models
 from azext_iot.digitaltwins.providers.resource import ResourceProvider
