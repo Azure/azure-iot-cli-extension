@@ -6,22 +6,23 @@
 The **Azure IoT extension for Azure CLI** aims to accelerate the development, management and automation of Azure IoT solutions. It does this via addition of rich features and functionality to the official [Azure CLI](https://docs.microsoft.com/en-us/cli/azure).
 
 ## News
+- Starting with version `0.10.13` of the IoT extension, you will need an Azure CLI core version of `2.17.1` or higher. IoT extension version `0.10.11` remains on the extension index to support environments that cannot upgrade core CLI versions. 
 
-The legacy IoT extension Id `azure-cli-iot-ext` is deprecated in favor of the new modern Id `azure-iot`. `azure-iot` is a superset of `azure-cli-iot-ext` and any new features or fixes will apply to `azure-iot` only. Also the legacy and modern IoT extension should **never** co-exist in the same CLI environment.
+- The legacy IoT extension Id `azure-cli-iot-ext` is deprecated in favor of the new modern Id `azure-iot`. `azure-iot` is a superset of `azure-cli-iot-ext` and any new features or fixes will apply to `azure-iot` only. Also the legacy and modern IoT extension should **never** co-exist in the same CLI environment.
 
-Uninstall the legacy extension with the following command: `az extension remove --name azure-cli-iot-ext`.
+    Uninstall the legacy extension with the following command: `az extension remove --name azure-cli-iot-ext`.
 
-Related - if you see an error with a stacktrace similar to:
-```
-...
-azure-cli-iot-ext/azext_iot/common/_azure.py, ln 90, in get_iot_hub_connection_string
-    client = iot_hub_service_factory(cmd.cli_ctx)
-cliextensions/azure-cli-iot-ext/azext_iot/_factory.py, ln 29, in iot_hub_service_factory
-    from azure.mgmt.iothub.iot_hub_client import IotHubClient
-ModuleNotFoundError: No module named 'azure.mgmt.iothub.iot_hub_client'
-```
+    Related - if you see an error with a stacktrace similar to:
+    ```
+    ...
+    azure-cli-iot-ext/azext_iot/common/_azure.py, ln 90, in get_iot_hub_connection_string
+        client = iot_hub_service_factory(cmd.cli_ctx)
+    cliextensions/azure-cli-iot-ext/azext_iot/_factory.py, ln 29, in iot_hub_service_factory
+        from azure.mgmt.iothub.iot_hub_client import IotHubClient
+    ModuleNotFoundError: No module named 'azure.mgmt.iothub.iot_hub_client'
+    ```
 
-The resolution is to remove the deprecated `azure-cli-iot-ext` and install any version of the `azure-iot` extension.
+    The resolution is to remove the deprecated `azure-cli-iot-ext` and install any version of the `azure-iot` extension.
 
 ## Commands
 
