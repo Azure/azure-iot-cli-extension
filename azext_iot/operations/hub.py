@@ -2305,12 +2305,10 @@ def _iot_c2d_message_receive(target, device_id, lock_timeout=60, ack=None):
             if sys_props:
                 payload["properties"]["system"] = sys_props
 
-            if result.text:
-                payload["data"] = (
-                    result.text
-                    if not isinstance(result.text, six.binary_type)
-                    else result.text.decode("utf-8")
-                )
+            if result.content:
+                target_encoding = result.headers.get("ContentEncoding", "utf-8")
+                logger.info(f"Decoding message data encoded with: {target_encoding}")
+                payload["data"] = result.content.decode(target_encoding)
 
             return payload
         return
