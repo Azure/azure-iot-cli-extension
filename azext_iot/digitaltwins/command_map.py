@@ -43,6 +43,7 @@ def load_digitaltwins_commands(self, _):
         cmd_group.command("list", "list_instances")
         cmd_group.command("delete", "delete_instance", confirmation=True, supports_no_wait=True)
         cmd_group.wait_command("wait", "wait_instance")
+        cmd_group.command("reset", "reset_instance", confirmation=True, is_preview=True)
 
     with self.command_group(
         "dt endpoint", command_type=digitaltwins_resource_ops
