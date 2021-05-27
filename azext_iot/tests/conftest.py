@@ -31,6 +31,7 @@ path_iot_hub_monitor_events_entrypoint = (
 path_iot_device_show = "azext_iot.operations.hub._iot_device_show"
 path_update_device_twin = "azext_iot.operations.hub._iot_device_twin_update"
 hub_entity = "myhub.azure-devices.net"
+path_device_twin_show_entrypoint = "azext_iot.operations.hub._iot_device_twin_show"
 
 instance_name = generate_generic_id()
 hostname = "{}.subdomain.domain".format(instance_name)
@@ -171,6 +172,65 @@ def mqttclient_generic_error(mocker, fixture_ghcs, fixture_sas):
 def fixture_monitor_events_entrypoint(mocker):
     return mocker.patch(path_iot_hub_monitor_events_entrypoint)
 
+@pytest.fixture()
+def fixture_device_twin_show_entrypoint(mocker):
+    device_twin_client = mocker.patch(path_device_twin_show_entrypoint)
+    device_twin_client.return_value = {
+        "authenticationType": "sas",
+        "capabilities": {
+            "iotEdge": True
+        },
+        "cloudToDeviceMessageCount": 0,
+        "connectionState": "Disconnected",
+        "deviceEtag": "NTQ4ODMwNjY0",
+        "deviceId": "_Test_Device",
+        "deviceScope": "ms-azure-iot-edge://Test_Device-637535090608626001",
+        "etag": "AAAAAAAAAAU=",
+        "lastActivityTime": "2021-05-27T04:48:03.681238Z",
+        "modelId": "",
+        "properties": {
+            "desired": {
+            "$metadata": {
+                "$lastUpdated": "2021-05-27T04:45:38.5203899Z",
+                "$lastUpdatedVersion": 5,
+                "test_prop_1": {
+                "$lastUpdated": "2021-05-27T04:44:45.9299421Z",
+                "$lastUpdatedVersion": 4
+                },
+                "test_prop_2": {
+                "$lastUpdated": "2021-05-27T04:45:38.5203899Z",
+                "$lastUpdatedVersion": 5
+                }
+            },
+            "$version": 5,
+            "test_prop_1": "test_val_2",
+            "test_prop_2": "test_val_4"
+            },
+            "reported": {
+            "$metadata": {
+                "$lastUpdated": "2021-05-27T04:45:39.5521362Z",
+                "test_prop_1": {
+                "$lastUpdated": "2021-05-27T04:43:33.3650357Z"
+                },
+                "test_prop_2": {
+                "$lastUpdated": "2021-05-27T04:45:39.5521362Z"
+                }
+            },
+            "$version": 5,
+            "test_prop_1": "test_val_2",
+            "test_prop_2": "test_val_4"
+            }
+        },
+        "status": "enabled",
+        "statusUpdateTime": "0001-01-01T00:00:00Z",
+        "version": 10,
+        "x509Thumbprint": {
+            "primaryThumbprint": None,
+            "secondaryThumbprint": None
+        }
+    }
+    return device_twin_client
+    
 
 @pytest.fixture()
 def fixture_update_device_twin(mocker):
