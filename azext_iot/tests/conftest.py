@@ -172,6 +172,7 @@ def mqttclient_generic_error(mocker, fixture_ghcs, fixture_sas):
 def fixture_monitor_events_entrypoint(mocker):
     return mocker.patch(path_iot_hub_monitor_events_entrypoint)
 
+
 @pytest.fixture()
 def fixture_device_twin_show_entrypoint(mocker):
     device_twin_client = mocker.patch(path_device_twin_show_entrypoint)
@@ -190,35 +191,35 @@ def fixture_device_twin_show_entrypoint(mocker):
         "modelId": "",
         "properties": {
             "desired": {
-            "$metadata": {
-                "$lastUpdated": "2021-05-27T04:45:38.5203899Z",
-                "$lastUpdatedVersion": 5,
-                "test_prop_1": {
-                "$lastUpdated": "2021-05-27T04:44:45.9299421Z",
-                "$lastUpdatedVersion": 4
+                "$metadata": {
+                    "$lastUpdated": "2021-05-27T04:45:38.5203899Z",
+                    "$lastUpdatedVersion": 5,
+                    "test_prop_1": {
+                        "$lastUpdated": "2021-05-27T04:44:45.9299421Z",
+                        "$lastUpdatedVersion": 4
+                    },
+                    "test_prop_2": {
+                        "$lastUpdated": "2021-05-27T04:45:38.5203899Z",
+                        "$lastUpdatedVersion": 5
+                    }
                 },
-                "test_prop_2": {
-                "$lastUpdated": "2021-05-27T04:45:38.5203899Z",
-                "$lastUpdatedVersion": 5
-                }
-            },
-            "$version": 5,
-            "test_prop_1": "test_val_2",
-            "test_prop_2": "test_val_4"
+                "$version": 5,
+                "test_prop_1": "test_val_2",
+                "test_prop_2": "test_val_4"
             },
             "reported": {
-            "$metadata": {
-                "$lastUpdated": "2021-05-27T04:45:39.5521362Z",
-                "test_prop_1": {
-                "$lastUpdated": "2021-05-27T04:43:33.3650357Z"
+                "$metadata": {
+                    "$lastUpdated": "2021-05-27T04:45:39.5521362Z",
+                    "test_prop_1": {
+                        "$lastUpdated": "2021-05-27T04:43:33.3650357Z"
+                    },
+                    "test_prop_2": {
+                        "$lastUpdated": "2021-05-27T04:45:39.5521362Z"
+                    }
                 },
-                "test_prop_2": {
-                "$lastUpdated": "2021-05-27T04:45:39.5521362Z"
-                }
-            },
-            "$version": 5,
-            "test_prop_1": "test_val_2",
-            "test_prop_2": "test_val_4"
+                "$version": 5,
+                "test_prop_1": "test_val_2",
+                "test_prop_2": "test_val_4"
             }
         },
         "status": "enabled",
@@ -230,7 +231,7 @@ def fixture_device_twin_show_entrypoint(mocker):
         }
     }
     return device_twin_client
-    
+
 
 @pytest.fixture()
 def fixture_update_device_twin(mocker):
