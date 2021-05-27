@@ -623,12 +623,12 @@ def load_arguments(self, _):
         context.argument(
             "content_type",
             options_list=["--content-type", "--ct"],
-            help="The content type associated with the C2D message.",
+            help="The content type for the C2D message body.",
         )
         context.argument(
             "content_encoding",
             options_list=["--content-encoding", "--ce"],
-            help="The content encoding associated with the C2D message.",
+            help="The encoding for the C2D message body.",
         )
 
     with self.argument_context("iot device c2d-message send") as context:
