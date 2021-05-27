@@ -84,7 +84,7 @@ class mqtt_client(object):
                     desired_properties = device_twin.get("properties").get("desired")
                     reported_properties = device_twin.get("properties").get("reported")
                     twin_properties_to_update = {}
-                    
+
                     for prop in desired_properties:
                         if not prop.startswith("$"):
                             if prop not in reported_properties or desired_properties[prop] != reported_properties[prop]:
@@ -92,7 +92,7 @@ class mqtt_client(object):
 
                     if twin_properties_to_update:
                         self.device_client.patch_twin_reported_properties(twin_properties_to_update)
-                
+
                 self.send_d2c_message(message_text=data.generate(True), properties=properties)
                 sleep(publish_delay)
 

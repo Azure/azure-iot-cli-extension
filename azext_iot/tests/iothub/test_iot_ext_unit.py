@@ -2166,7 +2166,7 @@ class TestSasTokenAuth:
 
 class TestDeviceSimulate:
     @pytest.fixture(params=[204])
-    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request, fixture_device):
+    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request, fixture_device, fixture_device_twin_show_entrypoint):
         service_client = mocker.patch(path_service_client)
         service_client.return_value = build_mock_response(mocker, request.param, {})
         return service_client
