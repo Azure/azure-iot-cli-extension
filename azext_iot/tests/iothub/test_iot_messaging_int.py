@@ -309,6 +309,45 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         token.set()
         thread.join()
 
+    def test_twin_properties_update(self):
+        device_count = 1
+        device_ids = self.generate_device_names(device_count)
+
+        self.cmd(
+            "iot hub device-identity create -d {} -n {} -g {}".format(
+                device_ids[0], LIVE_HUB, LIVE_RG
+            ),
+            checks=[self.check("deviceId", device_ids[0])],
+        )
+
+        test_twin_props = {'twin_test_prop_1': 'twin_test_value_1'}
+        self.kwargs["twin_desired_properties"] = json.dumps(test_twin_props)
+
+        # invoke device twin property update
+        self.cmd(
+            """iot hub device-twin update -d {} --login {} --desired '{}'""".format(
+                device_ids[0], self.connection_string, "{twin_desired_properties}"
+            )
+        )
+
+        self.cmd(
+            "iot device simulate -d {} -n {} -g {} --mc {} --mi {} --rs 'complete'".format(
+                device_ids[0], LIVE_HUB, LIVE_RG, 2, 1
+            )
+        )
+
+        # get device twin
+        result = self.cmd(
+            "iot hub device-twin show -d {} --login {}".format(
+                device_ids[0], self.connection_string
+            )
+        ).get_output_in_json()
+
+        assert result is not None
+
+        for key in test_twin_props:
+            assert result["properties"]["reported"][key] == result["properties"]["desired"][key]
+
     def test_device_messaging(self):
         device_count = 1
         device_ids = self.generate_device_names(device_count)
