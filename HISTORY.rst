@@ -3,6 +3,29 @@
 Release History
 ===============
 
+0.10.14
++++++++++++++++
+
+**IoT Hub updates**
+
+* Fix for "az iot hub c2d-message receive" - the command will use the "ContentEncoding" header value (which indicates the message body encoding)
+  or fallback to utf-8 to decode the received message body.
+
+**Azure Digital Twins updates**
+
+* Addition of the following commands
+
+  * az dt reset - Preview command which deletes all data entities from the target instance (models, twins, twin relationships).
+  
+
+0.10.13
++++++++++++++++
+
+**General updates**
+
+* Min CLI core version raised to 2.17.1
+
+
 0.10.12
 +++++++++++++++
 

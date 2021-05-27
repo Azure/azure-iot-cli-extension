@@ -59,7 +59,7 @@ def send_c2d_message(
 
         # Ensures valid json when content_type is application/json
         content_type = content_type.lower()
-        if content_type == "application/json":
+        if "application/json" in content_type:
             data = json.dumps(process_json_arg(data, "data"))
 
     if content_encoding:
@@ -68,7 +68,7 @@ def send_c2d_message(
     if expiry_time_utc:
         msg_props.absolute_expiry_time = int(expiry_time_utc)
 
-    msg_body = str.encode(data)
+    msg_body = data.encode(encoding=content_encoding)
 
     message = uamqp.Message(
         body=msg_body, properties=msg_props, application_properties=app_props
