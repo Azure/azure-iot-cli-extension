@@ -201,6 +201,66 @@ class TestIoTHubModules(IoTLiveScenarioTest):
                     expect_failure=True,
                 )
 
+    def test_iothub_module_renew_key(self):
+        device_count = 1
+        device_ids = self.generate_device_names(device_count)
+        module_count = 2
+        module_ids = self.generate_device_names(module_count)
+
+        self.cmd(
+            f"iot hub device-identity create -d {device_ids[0]} -n {LIVE_HUB} -g {LIVE_RG}"
+        ).get_output_in_json()
+
+        symmetric_key_module = self.cmd(
+            f"iot hub module-identity create -m {module_ids[0]} -d {device_ids[0]} -n {LIVE_HUB} -g {LIVE_RG}"
+        ).get_output_in_json()
+
+        self.cmd(
+            f"iot hub module-identity create -m {module_ids[1]} -d {device_ids[0]} -n {LIVE_HUB} -g {LIVE_RG} --am x509_ca"
+        )
+
+        for auth_phase in DATAPLANE_AUTH_TYPES:
+            renew_primary_key_module = self.cmd(
+                self.set_cmd_auth_type(
+                    f"iot hub module-identity renew-key -m {module_ids[0]} "
+                    f"-d {device_ids[0]} -n {LIVE_HUB} -g {LIVE_RG} --kt primary",
+                    auth_type=auth_phase,
+                )
+            ).get_output_in_json()
+            assert (
+                renew_primary_key_module["authentication"]["symmetricKey"]["primaryKey"]
+                != symmetric_key_module["authentication"]["symmetricKey"]["primaryKey"]
+            )
+            assert (
+                renew_primary_key_module["authentication"]["symmetricKey"][
+                    "secondaryKey"
+                ]
+                == symmetric_key_module["authentication"]["symmetricKey"]["secondaryKey"]
+            )
+
+        swap_keys_module = self.cmd(
+            self.set_cmd_auth_type(
+                f"iot hub module-identity renew-key -d {device_ids[0]} -n {LIVE_HUB} -g {LIVE_RG} --kt swap",
+                auth_type=auth_phase,
+            )
+        ).get_output_in_json()
+        assert (
+            renew_primary_key_module["authentication"]["symmetricKey"]["primaryKey"]
+            == swap_keys_module["authentication"]["symmetricKey"]["secondaryKey"]
+        )
+        assert (
+            renew_primary_key_module["authentication"]["symmetricKey"]["secondaryKey"]
+            == swap_keys_module["authentication"]["symmetricKey"]["primaryKey"]
+        )
+
+        self.cmd(
+            self.set_cmd_auth_type(
+                f"iot hub module-identity renew-key -d {device_ids[1]} -n {LIVE_HUB} -g {LIVE_RG} --kt secondary",
+                auth_type=auth_phase,
+            ),
+            expect_failure=True,
+        )
+
     def test_iothub_module_connection_string_show(self):
         device_count = 1
         device_ids = self.generate_device_names(device_count)
