@@ -828,9 +828,11 @@ helps[
     "iot device send-d2c-message"
 ] = """
     type: command
-    short-summary: Send an mqtt device-to-cloud message.
-                   The command supports sending messages with application and system properties.
-                   Note: The command only works for symmetric key auth (SAS) based devices
+    short-summary: |
+                    Send an mqtt device-to-cloud message.                    
+                    The command supports sending messages with application and system properties.
+                    
+                    Note: The command only works for symmetric key auth (SAS) based devices
     examples:
     - name: Basic usage
       text: az iot device send-d2c-message -n {iothub_name} -d {device_id}
