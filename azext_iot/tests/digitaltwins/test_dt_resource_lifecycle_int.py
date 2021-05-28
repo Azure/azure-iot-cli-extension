@@ -372,6 +372,15 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
                 MOCK_DEAD_LETTER_SECRET,
             )
         ).get_output_in_json()
+
+        self.cmd(
+            "dt endpoint wait --created -n {} -g {} --en {} --interval 1".format(
+                endpoints_instance_name,
+                self.rg,
+                eventgrid_endpoint
+            )
+        )
+
         assert_common_endpoint_attributes(
             add_ep_output,
             eventgrid_endpoint,
@@ -407,6 +416,14 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             )
         ).get_output_in_json()
 
+        self.cmd(
+            "dt endpoint wait --created -n {} -g {} --en {} --interval 1".format(
+                endpoints_instance_name,
+                self.rg,
+                servicebus_endpoint
+            )
+        )
+
         assert_common_endpoint_attributes(
             add_ep_sb_key_output,
             servicebus_endpoint,
@@ -433,6 +450,14 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
                 MOCK_DEAD_LETTER_ENDPOINT,
             )
         ).get_output_in_json()
+
+        self.cmd(
+            "dt endpoint wait --created -n {} -g {} --en {} --interval 1".format(
+                endpoints_instance_name,
+                self.rg,
+                servicebus_endpoint_msi,
+            )
+        )
 
         assert_common_endpoint_attributes(
             add_ep_sb_identity_output,
@@ -470,6 +495,14 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             )
         ).get_output_in_json()
 
+        self.cmd(
+            "dt endpoint wait --created -n {} -g {} --en {} --interval 1".format(
+                endpoints_instance_name,
+                self.rg,
+                eventhub_endpoint,
+            )
+        )
+
         assert_common_endpoint_attributes(
             add_ep_output,
             eventhub_endpoint,
@@ -498,6 +531,14 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
                 MOCK_DEAD_LETTER_ENDPOINT,
             )
         ).get_output_in_json()
+
+        self.cmd(
+            "dt endpoint wait -n {} -g {} --en {} --created --interval 1".format(
+                endpoints_instance_name,
+                self.rg,
+                eventhub_endpoint_msi,
+            )
+        )
 
         assert_common_endpoint_attributes(
             add_ep_output,
@@ -600,10 +641,17 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             logger.debug("Deleting endpoint {}...".format(ep.endpoint_name))
             is_last = ep.endpoint_name == endpoint_tuple_collection[-1].endpoint_name
             self.cmd(
-                "dt endpoint delete -y -n {} --en {} {}".format(
+                "dt endpoint delete -y -n {} --en {} --no-wait {}".format(
                     endpoints_instance_name,
                     ep.endpoint_name,
-                    "-g {} --no-wait".format(self.rg) if is_last else "",
+                    "-g {}".format(self.rg) if is_last else "",
+                )
+            )
+            self.cmd(
+                "dt endpoint wait -n {} --en {} --deleted --interval 1 {}".format(
+                    endpoints_instance_name,
+                    ep.endpoint_name,
+                    "-g {}".format(self.rg) if is_last else "",
                 )
             )
 
