@@ -26,6 +26,7 @@ path_mqtt_client = "azext_iot.operations._mqtt.mqtt.Client"
 path_iot_hub_monitor_events_entrypoint = (
     "azext_iot.operations.hub._iot_hub_monitor_events"
 )
+path_iot_device_show = "azext_iot.operations.hub._iot_device_show"
 hub_entity = "myhub.azure-devices.net"
 
 instance_name = generate_generic_id()
@@ -135,6 +136,39 @@ def mqttclient_generic_error(mocker, fixture_ghcs, fixture_sas):
 @pytest.fixture()
 def fixture_monitor_events_entrypoint(mocker):
     return mocker.patch(path_iot_hub_monitor_events_entrypoint)
+
+
+@pytest.fixture()
+def fixture_iot_device_show(mocker):
+    device = mocker.patch(path_iot_device_show)
+    device.return_value = {
+        "authentication": {
+            "symmetricKey": {
+                "primaryKey": "test_pk",
+                "secondaryKey": "test_sk"
+            },
+            "type": "sas",
+            "x509Thumbprint": {
+                "primaryThumbprint": None,
+                "secondaryThumbprint": None
+            }
+        },
+        "capabilities": {
+            "iotEdge": False
+        },
+        "cloudToDeviceMessageCount": 0,
+        "connectionState": "Disconnected",
+        "connectionStateUpdatedTime": "2021-05-27T00:36:11.2861732Z",
+        "deviceId": "Test_Device_1",
+        "etag": "ODgxNTgwOA==",
+        "generationId": "637534345627501371",
+        "hub": "test-iot-hub.azure-devices.net",
+        "lastActivityTime": "2021-05-27T00:18:16.3154299Z",
+        "status": "enabled",
+        "statusReason": None,
+        "statusUpdatedTime": "0001-01-01T00:00:00Z"
+    }
+    return device
 
 
 # TODO: To be deprecated asap. Leverage mocked_response fixture for this functionality.

@@ -2069,6 +2069,10 @@ def _iot_device_send_message(
     import ssl
     import os
 
+    device = _iot_device_show(target, device_id)
+    if device is not None and device.get("authentication", {}).get("type", "") != "sas":
+        raise CLIError('D2C send message command only supports symmetric key auth (SAS) based devices')
+
     msgs = []
     if properties:
         properties = validate_key_value_pairs(properties)
@@ -2457,6 +2461,11 @@ def iot_simulate_device(
 
     try:
         if protocol_type == ProtocolType.mqtt.name:
+
+            device = _iot_device_show(target, device_id)
+            if device is not None and device.get("authentication", {}).get("type", "") != "sas":
+                raise CLIError('MQTT simulation is only supported for symmetric key auth (SAS) based devices')
+
             wrap = mqtt_client_wrap(
                 target=target,
                 device_id=device_id,
