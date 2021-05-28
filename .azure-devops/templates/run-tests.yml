@@ -34,6 +34,13 @@ steps:
 
   - template: set-testenv-sentinel.yml
 
+  - ${{ if eq(parameters.runUnitTests, 'true') }}:
+    - script: |
+        pytest -vv ${{ parameters.path }} -k "_unit" --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-unit-${{ parameters.name }}.xml
+      displayName: '${{ parameters.name }} unit tests'
+      env:
+        COVERAGE_FILE: .coverage.${{ parameters.name }}
+
   - ${{ if eq(parameters.runIntTests, 'true') }}:
     - task: AzureCLI@2
       continueOnError: true
@@ -45,13 +52,6 @@ steps:
         inlineScript: |
           export COVERAGE_FILE=.coverage.${{ parameters.name }}
           pytest -vv ${{ parameters.path }} -k "_int" --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int-${{ parameters.name }}.xml
-
-  - ${{ if eq(parameters.runUnitTests, 'true') }}:
-    - script: |
-        pytest -vv ${{ parameters.path }} -k "_unit" --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-unit-${{ parameters.name }}.xml
-      displayName: '${{ parameters.name }} unit tests'
-      env:
-        COVERAGE_FILE: .coverage.${{ parameters.name }}
 
   - task: PublishBuildArtifacts@1
     inputs:
