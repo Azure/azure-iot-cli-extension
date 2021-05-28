@@ -3,13 +3,40 @@
 Release History
 ===============
 
+0.10.14
++++++++++++++++
+
+**IoT Hub updates**
+
+* Fix for "az iot hub c2d-message receive" - the command will use the "ContentEncoding" header value (which indicates the message body encoding)
+  or fallback to utf-8 to decode the received message body.
+
+**Azure Digital Twins updates**
+
+* Addition of the following commands
+
+  * az dt reset - Preview command which deletes all data entities from the target instance (models, twins, twin relationships).
+  
+
+0.10.13
++++++++++++++++
+
+**General updates**
+
+* Min CLI core version raised to 2.17.1
+
+
 0.10.12
 +++++++++++++++
 
 **IoT Central updates**
 
-* Public API GA update - add support for preview and 1.0 routes 
-* Addition of the optional '--av' argument to specify the version of API for the requested operation.
+* Public API GA update
+
+  * Remove preview tag for  api-token, device, device-template, user routes. Default routes use central GA API's.
+  * Add support for preview and 1.0 routes. 
+  * Addition of the optional '--av' argument to specify the version of API for the requested operation.
+
 **IoT Hub updates**
 
 * Removed deprecated edge offline commands and artifacts.

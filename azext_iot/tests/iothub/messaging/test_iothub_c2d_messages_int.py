@@ -8,6 +8,7 @@ import json
 
 from uuid import uuid4
 from azext_iot.tests import IoTLiveScenarioTest
+from azext_iot.common.shared import AuthenticationTypeDataplane
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC
 from azext_iot.common.utility import (
@@ -35,13 +36,13 @@ class TestIoTHubC2DMessages(IoTLiveScenarioTest):
         )
 
         for auth_phase in DATAPLANE_AUTH_TYPES:
-            test_body = str(uuid4())
+            test_ce = "utf-16" if auth_phase == AuthenticationTypeDataplane.login.value else "utf-8"
+            test_body = f"{uuid4()} шеллы 😁"  # Mixed unicode blocks
             test_props = f"key0={str(uuid4())};key1={str(uuid4())}"
             test_cid = str(uuid4())
             test_mid = str(uuid4())
             test_ct = "text/plain"
             test_et = calculate_millisec_since_unix_epoch_utc(3600)  # milliseconds since epoch
-            test_ce = "utf8"
 
             self.kwargs["c2d_json_send_data"] = json.dumps({"data": str(uuid4())})
 

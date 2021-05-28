@@ -16,6 +16,7 @@ from azext_iot.constants import (
     TRACING_PROPERTY,
     TRACING_ALLOWED_FOR_LOCATION,
     TRACING_ALLOWED_FOR_SKU,
+    IOTHUB_TRACK_2_SDK_MIN_VERSION,
 )
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import (
@@ -2308,12 +2309,10 @@ def _iot_c2d_message_receive(target, device_id, lock_timeout=60, ack=None):
             if sys_props:
                 payload["properties"]["system"] = sys_props
 
-            if result.text:
-                payload["data"] = (
-                    result.text
-                    if not isinstance(result.text, six.binary_type)
-                    else result.text.decode("utf-8")
-                )
+            if result.content:
+                target_encoding = result.headers.get("ContentEncoding", "utf-8")
+                logger.info(f"Decoding message data encoded with: {target_encoding}")
+                payload["data"] = result.content.decode(target_encoding)
 
             return payload
         return
@@ -2552,10 +2551,10 @@ def iot_device_export(
     blob_container_uri,
     include_keys=False,
     storage_authentication_type=None,
+    identity=None,
     resource_group_name=None,
 ):
     from azext_iot._factory import iot_hub_service_factory
-
     client = iot_hub_service_factory(cmd.cli_ctx)
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
@@ -2574,11 +2573,30 @@ def iot_device_export(
             if storage_authentication_type
             else None
         )
+
         export_request = ExportDevicesRequest(
             export_blob_container_uri=blob_container_uri,
             exclude_keys=not include_keys,
             authentication_type=storage_authentication_type,
         )
+
+        user_identity = identity not in [None, '[system]']
+        if user_identity and storage_authentication_type != AuthenticationType.identityBased.name:
+            raise CLIError(
+                "Device export with user-assigned identities requires identity-based authentication [--storage-auth-type]"
+            )
+        # Track 2 CLI SDKs provide support for user-assigned identity objects
+        if ensure_iothub_sdk_min_version(IOTHUB_TRACK_2_SDK_MIN_VERSION) and user_identity:
+            from azure.mgmt.iothub.models import ManagedIdentity  # pylint: disable=no-name-in-module
+            export_request.identity = ManagedIdentity(user_assigned_identity=identity)
+
+        # if the user supplied a user-assigned identity, let them know they need a new CLI/SDK
+        elif user_identity:
+            raise CLIError(
+                "Device export with user-assigned identities requires a dependency of azure-mgmt-iothub>={}"
+                .format(IOTHUB_TRACK_2_SDK_MIN_VERSION)
+            )
+
         return client.export_devices(
             target["resourcegroup"],
             hub_name,
@@ -2603,6 +2621,7 @@ def iot_device_import(
     output_blob_container_uri,
     storage_authentication_type=None,
     resource_group_name=None,
+    identity=None,
 ):
     from azext_iot._factory import iot_hub_service_factory
 
@@ -2620,6 +2639,7 @@ def iot_device_import(
 
     if ensure_iothub_sdk_min_version("0.12.0"):
         from azure.mgmt.iothub.models import ImportDevicesRequest
+
         from azext_iot.common.shared import AuthenticationType
 
         storage_authentication_type = (
@@ -2627,6 +2647,7 @@ def iot_device_import(
             if storage_authentication_type
             else None
         )
+
         import_request = ImportDevicesRequest(
             input_blob_container_uri=input_blob_container_uri,
             output_blob_container_uri=output_blob_container_uri,
@@ -2634,6 +2655,23 @@ def iot_device_import(
             output_blob_name=None,
             authentication_type=storage_authentication_type,
         )
+
+        user_identity = identity not in [None, '[system]']
+        if user_identity and storage_authentication_type != AuthenticationType.identityBased.name:
+            raise CLIError(
+                "Device import with user-assigned identities requires identity-based authentication [--storage-auth-type]"
+            )
+        # Track 2 CLI SDKs provide support for user-assigned identity objects
+        if ensure_iothub_sdk_min_version(IOTHUB_TRACK_2_SDK_MIN_VERSION) and user_identity:
+            from azure.mgmt.iothub.models import ManagedIdentity  # pylint: disable=no-name-in-module
+            import_request.identity = ManagedIdentity(user_assigned_identity=identity)
+        # if the user supplied a user-assigned identity, let them know they need a new CLI/SDK
+        elif user_identity:
+            raise CLIError(
+                "Device import with user-assigned identities requires a dependency of azure-mgmt-iothub>={}"
+                .format(IOTHUB_TRACK_2_SDK_MIN_VERSION)
+            )
+
         return client.import_devices(
             target["resourcegroup"],
             hub_name,
@@ -2980,7 +3018,6 @@ def _get_hub_connection_string(
                 hub.name, hub.additional_properties["resourcegroup"], policy_name
             )
         )
-
     if default_eventhub:
         cs_template_eventhub = (
             "Endpoint={};SharedAccessKeyName={};SharedAccessKey={};EntityPath={}"
