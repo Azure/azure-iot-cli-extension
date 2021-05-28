@@ -2,9 +2,28 @@ pr: none
 
 trigger: none
 
-variables:
-  pythonVersion: '3.6.x'
-  architecture: 'x64'
+parameters:
+- name: pythonVersion
+  type: string
+  default: '3.6.x'
+  values:
+  - 3.6.x
+  - 3.9.x
+- name: architecture
+  type: string
+  default: 'x64'
+- name: 'testCentral'
+  type: boolean
+  default: true
+- name: 'testADT'
+  type: boolean
+  default: true
+- name: 'testDPS'
+  type: boolean
+  default: true
+- name: 'testHub'
+  type: boolean
+  default: true
 
 stages:
   - stage: 'build'
@@ -18,8 +37,8 @@ stages:
       steps:
       - task: UsePythonVersion@0
         inputs:
-          versionSpec: $(pythonVersion)
-          architecture: $(architecture)
+          versionSpec: ${{ parameters.pythonVersion }}
+          architecture: ${{ parameters.architecture }}
 
       - template: templates/setup-ci-machine.yml
 
@@ -32,8 +51,8 @@ stages:
       steps:
       - task: UsePythonVersion@0
         inputs:
-          versionSpec: $(pythonVersion)
-          architecture: $(architecture)
+          versionSpec: ${{ parameters.pythonVersion }}
+          architecture: ${{ parameters.architecture }}
 
       - template: templates/setup-ci-machine.yml
 
@@ -45,8 +64,8 @@ stages:
       steps:
       - template: templates/setup-dev-test-env.yml
         parameters:
-          pythonVersion: $(pythonVersion)
-          architecture: $(architecture)
+          pythonVersion: ${{ parameters.pythonVersion }}
+          architecture: ${{ parameters.architecture }}
 
       - template: templates/install-and-record-version.yml
 
@@ -105,8 +124,8 @@ stages:
       steps:
       - template: templates/calculate-code-coverage.yml
         parameters:
-          pythonVersion: $(pythonVersion)
-          architecture: $(architecture)
+          pythonVersion: ${{ parameters.pythonVersion }}
+          architecture: ${{ parameters.architecture }}
 
   - stage: 'release'
     displayName: 'Stage GitHub release'

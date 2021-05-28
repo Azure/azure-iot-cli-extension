@@ -1,7 +1,17 @@
 parameters:
-  pythonVersion: ''
-  architecture: ''
-  azureCLIVersion: 'released'
+- name: pythonVersion
+  type: string
+  default: '3.6.x'
+- name: architecture
+  type: string
+  default: 'x64'
+- name: azureCLIVersion
+  type: string
+  default: 'released'
+  values:
+  - min
+  - released
+  - edge
 
 steps:
   - task: UsePythonVersion@0

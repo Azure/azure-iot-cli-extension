@@ -65,8 +65,8 @@ stages:
       steps:
       - template: templates/run-tests.yml
         parameters:
-          runIntTests: 'true'
-          runUnitTests: 'true'
+          runIntTests: true
+          runUnitTests: true
           azureCLIVersion: 'edge'
     - job: 'azMin'
       dependsOn: 'azEdge'
@@ -74,8 +74,8 @@ stages:
       steps:
       - template: templates/run-tests.yml
         parameters:
-          runIntTests: 'true'
-          runUnitTests: 'true'
+          runIntTests: true
+          runUnitTests: true
           azureCLIVersion: 'min'
           
   - stage: 'kpi'
