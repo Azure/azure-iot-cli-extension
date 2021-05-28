@@ -1,0 +1,5 @@
+steps:
+  - script: |
+      $minCLIVersion = (Get-Content -Raw -Path "./azext_iot/azext_metadata.json" | ConvertFrom-Json).{azext.minCliCoreVersion}
+      pip install --pre azure-cli==$minCLIVersion
+    displayName: 'Install minimum supported version of Azure CLI'

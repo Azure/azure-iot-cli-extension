@@ -1,7 +1,7 @@
 parameters:
   pythonVersion: ''
   architecture: ''
-  runWithAzureCliReleased: 'true'
+  azureCLIVersion: 'released'
 
 steps:
   - task: UsePythonVersion@0
@@ -9,11 +9,14 @@ steps:
       versionSpec: ${{ parameters.pythonVersion }}
       architecture: ${{ parameters.architecture }}
 
-  - ${{ if eq(parameters.runWithAzureCliReleased, 'false') }}:
-    - template: install-azure-cli-edge.yml
+  - ${{ if eq(parameters.azureCLIVersion, 'min') }}:
+    - template: install-azure-cli-min.yml
 
-  - ${{ if eq(parameters.runWithAzureCliReleased, 'true') }}:
+  - ${{ if eq(parameters.azureCLIVersion, 'released') }}:
     - template: install-azure-cli-released.yml
+
+  - ${{ if eq(parameters.azureCLIVersion, 'edge') }}:
+    - template: install-azure-cli-edge.yml
 
   - template: download-install-local-azure-test-sdk.yml
 

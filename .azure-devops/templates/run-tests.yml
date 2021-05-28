@@ -3,7 +3,13 @@ parameters:
   architecture: 'x64'
   runUnitTests: 'false'
   runIntTests: 'true'
-  runWithAzureCliReleased: 'true'
+  -name: runWithAzureCliReleased
+  type: string
+  values:
+    min
+    released
+    edge
+
   path: 'azext_iot/tests'
   name: 'all'
 
