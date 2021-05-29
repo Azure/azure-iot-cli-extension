@@ -56,6 +56,16 @@ class DeviceAuthType(Enum):
     x509_ca = "x509_ca"
 
 
+class HubDeviceAuthType(Enum):
+    """
+    Hub Device Authorization type.
+    """
+
+    sas = "sas"
+    selfSigned = "selfSigned"
+    certificateAuthority = "certificateAuthority"
+
+
 class KeyType(Enum):
     """
     Shared private key.

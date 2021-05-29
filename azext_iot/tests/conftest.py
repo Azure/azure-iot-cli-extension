@@ -14,6 +14,7 @@ from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azure.cli.core.commands import AzCliCommand
 from azure.cli.core.mock import DummyCli
 from azext_iot.tests.generators import generate_generic_id
+from azext_iot.common.shared import HubDeviceAuthType
 
 path_iot_hub_service_factory = "azext_iot._factory.iot_hub_service_factory"
 path_service_client = "msrest.service_client.ServiceClient.send"
@@ -139,7 +140,7 @@ def fixture_monitor_events_entrypoint(mocker):
 
 
 @pytest.fixture()
-def fixture_iot_device_show(mocker):
+def fixture_iot_device_show_sas(mocker):
     device = mocker.patch(path_iot_device_show)
     device.return_value = {
         "authentication": {
@@ -147,7 +148,40 @@ def fixture_iot_device_show(mocker):
                 "primaryKey": "test_pk",
                 "secondaryKey": "test_sk"
             },
-            "type": "sas",
+            "type": HubDeviceAuthType.sas.name,
+            "x509Thumbprint": {
+                "primaryThumbprint": None,
+                "secondaryThumbprint": None
+            }
+        },
+        "capabilities": {
+            "iotEdge": False
+        },
+        "cloudToDeviceMessageCount": 0,
+        "connectionState": "Disconnected",
+        "connectionStateUpdatedTime": "2021-05-27T00:36:11.2861732Z",
+        "deviceId": "Test_Device_1",
+        "etag": "ODgxNTgwOA==",
+        "generationId": "637534345627501371",
+        "hub": "test-iot-hub.azure-devices.net",
+        "lastActivityTime": "2021-05-27T00:18:16.3154299Z",
+        "status": "enabled",
+        "statusReason": None,
+        "statusUpdatedTime": "0001-01-01T00:00:00Z"
+    }
+    return device
+
+
+@pytest.fixture()
+def fixture_self_signed_device_show_self_signed(mocker):
+    device = mocker.patch(path_iot_device_show)
+    device.return_value = {
+        "authentication": {
+            "symmetricKey": {
+                "primaryKey": "test_pk",
+                "secondaryKey": "test_sk"
+            },
+            "type": HubDeviceAuthType.selfSigned.name,
             "x509Thumbprint": {
                 "primaryThumbprint": None,
                 "secondaryThumbprint": None
