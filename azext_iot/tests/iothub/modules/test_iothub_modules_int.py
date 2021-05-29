@@ -240,7 +240,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
 
         swap_keys_module = self.cmd(
             self.set_cmd_auth_type(
-                f"iot hub module-identity renew-key -d {device_ids[0]} -n {LIVE_HUB} -g {LIVE_RG} --kt swap",
+                f"iot hub module-identity renew-key -m {module_ids[0]} -d {device_ids[0]} -n {LIVE_HUB} -g {LIVE_RG} --kt swap",
                 auth_type=auth_phase,
             )
         ).get_output_in_json()
@@ -255,7 +255,8 @@ class TestIoTHubModules(IoTLiveScenarioTest):
 
         self.cmd(
             self.set_cmd_auth_type(
-                f"iot hub module-identity renew-key -d {device_ids[1]} -n {LIVE_HUB} -g {LIVE_RG} --kt secondary",
+                f"iot hub module-identity renew-key -m {module_ids[1]} "
+                f"-d {device_ids[0]} -n {LIVE_HUB} -g {LIVE_RG} --kt secondary",
                 auth_type=auth_phase,
             ),
             expect_failure=True,
