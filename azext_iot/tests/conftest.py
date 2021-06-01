@@ -31,7 +31,6 @@ path_iot_hub_monitor_events_entrypoint = (
 path_iot_device_show = "azext_iot.operations.hub._iot_device_show"
 path_update_device_twin = "azext_iot.operations.hub._iot_device_twin_update"
 hub_entity = "myhub.azure-devices.net"
-path_device_twin_show_entrypoint = "azext_iot.operations.hub._iot_device_twin_show"
 
 instance_name = generate_generic_id()
 hostname = "{}.subdomain.domain".format(instance_name)
