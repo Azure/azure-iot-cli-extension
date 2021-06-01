@@ -63,19 +63,15 @@ stages:
     - job: 'azEdge'
       displayName: 'Test against edge AZ CLI'
       steps:
-      - template: templates/run-tests.yml
+      - template: templates/nightly-tests.yml
         parameters:
-          runIntTests: true
-          runUnitTests: true
           azureCLIVersion: 'edge'
     - job: 'azMin'
       dependsOn: 'azEdge'
       displayName: 'Test against minimum supported AZ CLI'
       steps:
-      - template: templates/run-tests.yml
+      - template: templates/nightly-tests.yml
         parameters:
-          runIntTests: true
-          runUnitTests: true
           azureCLIVersion: 'min'
           
   - stage: 'kpi'
