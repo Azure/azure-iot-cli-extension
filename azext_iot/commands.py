@@ -74,6 +74,7 @@ def load_command_table(self, _):
             getter_name="iot_device_module_show",
             setter_name="iot_device_module_update",
         )
+        cmd_group.command("renew-key", "iot_device_module_key_regenerate")
 
     with self.command_group(
         "iot hub module-identity connection-string", command_type=iothub_ops

@@ -885,6 +885,64 @@ def _parse_auth(parameters):
     return auth, pk, sk
 
 
+def iot_device_module_key_regenerate(
+    cmd,
+    hub_name,
+    device_id,
+    module_id,
+    renew_key_type,
+    resource_group_name=None,
+    login=None,
+    etag=None,
+    auth_type_dataplane=None,
+):
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
+    resolver = SdkResolver(target=target)
+    service_sdk = resolver.get_sdk(SdkType.service_sdk)
+    try:
+        module = service_sdk.modules.get_identity(
+            id=device_id, mid=module_id, raw=True
+        ).response.json()
+    except CloudError as e:
+        raise CLIError(unpack_msrest_error(e))
+
+    if module["authentication"]["type"] != "sas":
+        raise CLIError("Module authentication should be of type sas")
+
+    pk = module["authentication"]["symmetricKey"]["primaryKey"]
+    sk = module["authentication"]["symmetricKey"]["secondaryKey"]
+
+    if renew_key_type == RenewKeyType.primary.value:
+        pk = generate_key()
+    if renew_key_type == RenewKeyType.secondary.value:
+        sk = generate_key()
+    if renew_key_type == RenewKeyType.swap.value:
+        temp = pk
+        pk = sk
+        sk = temp
+
+    module["authentication"]["symmetricKey"]["primaryKey"] = pk
+    module["authentication"]["symmetricKey"]["secondaryKey"] = sk
+
+    try:
+        headers = {}
+        headers["If-Match"] = '"{}"'.format(etag if etag else "*")
+        return service_sdk.modules.create_or_update_identity(
+            id=device_id,
+            mid=module_id,
+            module=module,
+            custom_headers=headers,
+        )
+    except CloudError as e:
+        raise CLIError(unpack_msrest_error(e))
+
+
 def iot_device_module_list(
     cmd,
     device_id,
