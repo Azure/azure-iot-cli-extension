@@ -913,7 +913,7 @@ def iot_device_module_key_regenerate(
         raise CLIError(unpack_msrest_error(e))
 
     if module["authentication"]["type"] != "sas":
-        raise CLIError("Device authentication should be of type sas")
+        raise CLIError("Module authentication should be of type sas")
 
     pk = module["authentication"]["symmetricKey"]["primaryKey"]
     sk = module["authentication"]["symmetricKey"]["secondaryKey"]
