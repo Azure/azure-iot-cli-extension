@@ -473,6 +473,18 @@ helps[
 """
 
 helps[
+    "iot hub module-identity renew-key"
+] = """
+    type: command
+    short-summary: Renew target keys of an IoT Hub device module with sas authentication.
+    examples:
+      - name: Renew the primary key.
+        text: az iot hub module-identity renew-key -m {module_name} -d {device_id} -n {iothub_name} --kt primary
+      - name: Swap the primary and secondary keys.
+        text: az iot hub module-identity renew-key -m {module_name} -d {device_id} -n {iothub_name} --kt swap
+"""
+
+helps[
     "iot hub module-identity delete"
 ] = """
     type: command
