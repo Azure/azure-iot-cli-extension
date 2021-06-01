@@ -17,7 +17,7 @@ stages:
 
     - job: 'Build_Publish_Azure_IoT_CLI_Extension'
       pool:
-        vmImage: 'Ubuntu-16.04'
+        vmImage: 'ubuntu-latest'
 
       steps:
       - task: UsePythonVersion@0
@@ -31,7 +31,7 @@ stages:
 
     - job: 'Build_Publish_Azure_CLI_Test_SDK'
       pool:
-        vmImage: 'Ubuntu-16.04'
+        vmImage: 'ubuntu-latest'
 
       steps:
       - task: UsePythonVersion@0
@@ -57,7 +57,7 @@ stages:
   - stage: 'test'
     displayName: 'Run all tests'
     pool:
-      vmImage: 'Ubuntu-16.04'
+      vmImage: 'ubuntu-latest'
     dependsOn: build
     jobs:
     - job: 'azEdge'

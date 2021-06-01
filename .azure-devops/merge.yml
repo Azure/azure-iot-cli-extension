@@ -18,7 +18,7 @@ jobs:
 
 - job: 'build_and_publish_azure_iot_cli_ext'
   pool:
-    vmImage: 'Ubuntu-16.04'
+    vmImage: 'ubuntu-latest'
 
   steps:
   - task: UsePythonVersion@0
@@ -31,7 +31,7 @@ jobs:
 
 - job: 'build_and_publish_azure_cli_test_sdk'
   pool:
-    vmImage: 'Ubuntu-16.04'
+    vmImage: 'ubuntu-latest'
 
   steps:
   - task: UsePythonVersion@0
@@ -45,7 +45,7 @@ jobs:
 - job: 'run_unit_tests_ubuntu'
   dependsOn: [ 'build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']
   pool:
-    vmImage: 'Ubuntu-16.04'
+    vmImage: 'ubuntu-latest'
   strategy:
     matrix:
       Python36:
@@ -99,7 +99,7 @@ jobs:
 - job: 'run_style_check'
   dependsOn: ['build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']
   pool:
-    vmImage: 'Ubuntu-16.04'
+    vmImage: 'ubuntu-latest'
 
   steps:
   - task: UsePythonVersion@0
@@ -124,7 +124,7 @@ jobs:
   dependsOn: ['build_and_publish_azure_iot_cli_ext']
   displayName: 'Evaluate IoT extension command table'
   pool:
-    vmImage: 'Ubuntu-16.04'
+    vmImage: 'ubuntu-latest'
 
   steps:
   - task: UsePythonVersion@0
