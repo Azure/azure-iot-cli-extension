@@ -22,6 +22,7 @@ LIVE_HUB = settings.env.azext_iot_testhub
 LIVE_RG = settings.env.azext_iot_testrg
 
 LIVE_CONSUMER_GROUPS = ["test1", "test2", "test3"]
+MQTT_CLIENT_SETUP_TIME = 11
 
 
 class TestIoTHubMessaging(IoTLiveScenarioTest):
@@ -323,16 +324,36 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         test_twin_props = {'twin_test_prop_1': 'twin_test_value_1'}
         self.kwargs["twin_desired_properties"] = json.dumps(test_twin_props)
 
+        from azext_iot.operations.hub import iot_simulate_device
+        from azext_iot._factory import iot_hub_service_factory
+        from azure.cli.core.mock import DummyCli
+        from time import sleep
+
+        cli_ctx = DummyCli()
+        client = iot_hub_service_factory(cli_ctx)
+
+        token, thread = execute_onthread(
+            method=iot_simulate_device,
+            args=[
+                client,
+                device_ids[0],
+                LIVE_HUB,
+                "complete",
+                "Testing device twin reported properties update",
+                4,
+                5,
+                "mqtt",
+            ],
+            max_runs=4,
+            return_handle=True,
+        )
+
+        sleep(MQTT_CLIENT_SETUP_TIME)
+
         # invoke device twin property update
         self.cmd(
             """iot hub device-twin update -d {} --login {} --desired '{}'""".format(
                 device_ids[0], self.connection_string, "{twin_desired_properties}"
-            )
-        )
-
-        self.cmd(
-            "iot device simulate -d {} -n {} -g {} --mc {} --mi {} --rs 'complete'".format(
-                device_ids[0], LIVE_HUB, LIVE_RG, 2, 1
             )
         )
 
@@ -344,9 +365,11 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         ).get_output_in_json()
 
         assert result is not None
-
         for key in test_twin_props:
             assert result["properties"]["reported"][key] == result["properties"]["desired"][key]
+
+        token.set()
+        thread.join()
 
     def test_device_messaging(self):
         device_count = 1
