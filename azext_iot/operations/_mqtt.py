@@ -10,6 +10,7 @@ import six
 from time import sleep
 from azext_iot.constants import USER_AGENT, BASE_MQTT_API_VERSION
 from azext_iot.common.utility import url_encode_str
+from azext_iot.operations.hub import _iot_device_twin_show
 from azure.iot.device import IoTHubDeviceClient as mqtt_device_client, Message, MethodResponse
 import json
 
@@ -91,6 +92,20 @@ class mqtt_client(object):
         from tqdm import tqdm
         try:
             for _ in tqdm(range(msg_count), desc='Device simulation in progress'):
+                device_twin = _iot_device_twin_show(self.target, self.device_id)
+                if device_twin:
+                    desired_properties = device_twin.get("properties").get("desired")
+                    reported_properties = device_twin.get("properties").get("reported")
+                    twin_properties_to_update = {}
+
+                    for prop in desired_properties:
+                        if not prop.startswith("$"):
+                            if prop not in reported_properties or desired_properties[prop] != reported_properties[prop]:
+                                twin_properties_to_update[prop] = desired_properties[prop]
+
+                    if twin_properties_to_update:
+                        self.device_client.patch_twin_reported_properties(twin_properties_to_update)
+
                 self.send_d2c_message(message_text=data.generate(True), properties=properties)
                 sleep(publish_delay)
 
