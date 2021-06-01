@@ -1,20 +1,45 @@
 parameters:
-  pythonVersion: '3.6.x'
-  architecture: 'x64'
-  runUnitTests: 'false'
-  runIntTests: 'true'
-  runWithAzureCliReleased: 'true'
-  path: 'azext_iot/tests'
-  name: 'all'
+- name: pythonVersion
+  type: string
+  default: '3.6.x'
+- name: architecture
+  type: string
+  default: 'x64'
+- name: runUnitTests
+  type: boolean
+  default: false
+- name: runIntTests
+  type: boolean
+  default: true
+- name: azureCLIVersion
+  type: string
+  default: released
+  values:
+  - min
+  - released
+  - edge
+- name: path
+  type: string
+  default: 'azext_iot/tests'
+- name: name
+  type: string
+  default: 'all'
 
 steps:
   - template: setup-dev-test-env.yml
     parameters:
       architecture: ${{ parameters.architecture }}
       pythonVersion: ${{ parameters.pythonVersion }}
-      runWithAzureCliReleased: ${{ parameters.runWithAzureCliReleased }}
+      azureCLIVersion: ${{ parameters.azureCLIVersion }}
 
   - template: set-testenv-sentinel.yml
+
+  - ${{ if eq(parameters.runUnitTests, 'true') }}:
+    - script: |
+        pytest -vv ${{ parameters.path }} -k "_unit" --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-unit-${{ parameters.name }}.xml
+      displayName: '${{ parameters.name }} unit tests'
+      env:
+        COVERAGE_FILE: .coverage.${{ parameters.name }}
 
   - ${{ if eq(parameters.runIntTests, 'true') }}:
     - task: AzureCLI@2
@@ -27,13 +52,6 @@ steps:
         inlineScript: |
           export COVERAGE_FILE=.coverage.${{ parameters.name }}
           pytest -vv ${{ parameters.path }} -k "_int" --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int-${{ parameters.name }}.xml
-
-  - ${{ if eq(parameters.runUnitTests, 'true') }}:
-    - script: |
-        pytest -vv ${{ parameters.path }} -k "_unit" --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-unit-${{ parameters.name }}.xml
-      displayName: '${{ parameters.name }} unit tests'
-      env:
-        COVERAGE_FILE: .coverage.${{ parameters.name }}
 
   - task: PublishBuildArtifacts@1
     inputs:
