@@ -513,6 +513,14 @@ def load_arguments(self, _):
             help="To remove all children.",
         )
 
+    with self.argument_context("iot hub module-identity renew-key") as context:
+        context.argument(
+            "renew_key_type",
+            options_list=["--key-type", "--kt"],
+            arg_type=get_enum_type(RenewKeyType),
+            help="Target key type to regenerate.",
+        )
+
     with self.argument_context("iot hub distributed-tracing update") as context:
         context.argument(
             "sampling_mode",
