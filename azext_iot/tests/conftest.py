@@ -14,7 +14,7 @@ from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azure.cli.core.commands import AzCliCommand
 from azure.cli.core.mock import DummyCli
 from azext_iot.tests.generators import generate_generic_id
-from azext_iot.common.shared import HubDeviceAuthType
+from azext_iot.common.shared import DeviceAuthApiType
 
 path_iot_hub_service_factory = "azext_iot._factory.iot_hub_service_factory"
 path_service_client = "msrest.service_client.ServiceClient.send"
@@ -148,7 +148,7 @@ def fixture_iot_device_show_sas(mocker):
                 "primaryKey": "test_pk",
                 "secondaryKey": "test_sk"
             },
-            "type": HubDeviceAuthType.sas.name,
+            "type": DeviceAuthApiType.sas.value,
             "x509Thumbprint": {
                 "primaryThumbprint": None,
                 "secondaryThumbprint": None
@@ -181,7 +181,7 @@ def fixture_self_signed_device_show_self_signed(mocker):
                 "primaryKey": "test_pk",
                 "secondaryKey": "test_sk"
             },
-            "type": HubDeviceAuthType.selfSigned.name,
+            "type": DeviceAuthApiType.selfSigned.value,
             "x509Thumbprint": {
                 "primaryThumbprint": None,
                 "secondaryThumbprint": None

@@ -35,7 +35,7 @@ from azext_iot.tests.conftest import (
     mock_target,
     generate_cs,
 )
-from azext_iot.common.shared import HubDeviceAuthType
+from azext_iot.common.shared import DeviceAuthApiType
 
 device_id = "mydevice"
 child_device_id = "child_device1"
@@ -131,13 +131,13 @@ class TestDeviceCreate:
         assert body["capabilities"]["iotEdge"] == req["ee"]
 
         if req["auth"] == "shared_private_key":
-            assert body["authentication"]["type"] == HubDeviceAuthType.sas.name
+            assert body["authentication"]["type"] == DeviceAuthApiType.sas.value
         elif req["auth"] == "x509_ca":
-            assert body["authentication"]["type"] == HubDeviceAuthType.certificateAuthority.name
+            assert body["authentication"]["type"] == DeviceAuthApiType.certificateAuthority.value
             assert not body["authentication"].get("x509Thumbprint")
             assert not body["authentication"].get("symmetricKey")
         elif req["auth"] == "x509_thumbprint":
-            assert body["authentication"]["type"] == HubDeviceAuthType.selfSigned.name
+            assert body["authentication"]["type"] == DeviceAuthApiType.selfSigned.value
             x509tp = body["authentication"]["x509Thumbprint"]
             assert x509tp["primaryThumbprint"]
             if req["stp"] is None:
@@ -192,7 +192,7 @@ def generate_device_show(**kvp):
         "authentication": {
             "symmetricKey": {"primaryKey": None, "secondaryKey": None},
             "x509Thumbprint": {"primaryThumbprint": None, "secondaryThumbprint": None},
-            "type": HubDeviceAuthType.sas.name,
+            "type": DeviceAuthApiType.sas.value,
         },
         "capabilities": {"iotEdge": True},
         "deviceId": device_id,
@@ -244,7 +244,7 @@ class TestDeviceUpdate:
                 generate_device_show(
                     authentication={
                         "symmetricKey": {"primaryKey": "", "secondaryKey": ""},
-                        "type": HubDeviceAuthType.sas.name,
+                        "type": DeviceAuthApiType.sas.value,
                     }
                 )
             ),
@@ -255,13 +255,13 @@ class TestDeviceUpdate:
                             "primaryThumbprint": "123",
                             "secondaryThumbprint": "321",
                         },
-                        "type": HubDeviceAuthType.selfSigned.name,
+                        "type": DeviceAuthApiType.selfSigned.value,
                     }
                 )
             ),
             (
                 generate_device_show(
-                    authentication={"type": HubDeviceAuthType.certificateAuthority.name},
+                    authentication={"type": DeviceAuthApiType.certificateAuthority.value},
                     etag=generate_generic_id(),
                 )
             ),
@@ -286,10 +286,10 @@ class TestDeviceUpdate:
         assert body["status"] == req["status"]
         assert body["capabilities"]["iotEdge"] == req["capabilities"]["iotEdge"]
         assert req["authentication"]["type"] == body["authentication"]["type"]
-        if req["authentication"]["type"] == HubDeviceAuthType.certificateAuthority.name:
+        if req["authentication"]["type"] == DeviceAuthApiType.certificateAuthority.value:
             assert not body["authentication"].get("x509Thumbprint")
             assert not body["authentication"].get("symmetricKey")
-        elif req["authentication"]["type"] == HubDeviceAuthType.selfSigned.name:
+        elif req["authentication"]["type"] == DeviceAuthApiType.selfSigned.value:
             assert body["authentication"]["x509Thumbprint"]["primaryThumbprint"]
             assert body["authentication"]["x509Thumbprint"]["secondaryThumbprint"]
 
@@ -320,7 +320,7 @@ class TestDeviceUpdate:
             (
                 generate_device_show(
                     authentication={
-                        "type": HubDeviceAuthType.selfSigned.name,
+                        "type": DeviceAuthApiType.selfSigned.value,
                         "symmetricKey": {"primaryKey": None, "secondaryKey": None},
                         "x509Thumbprint": {
                             "primaryThumbprint": "123",
@@ -337,7 +337,7 @@ class TestDeviceUpdate:
             (
                 generate_device_show(
                     authentication={
-                        "type": HubDeviceAuthType.certificateAuthority.name,
+                        "type": DeviceAuthApiType.certificateAuthority.value,
                         "symmetricKey": {"primaryKey": None, "secondaryKey": None},
                         "x509Thumbprint": {
                             "primaryThumbprint": None,
@@ -356,7 +356,7 @@ class TestDeviceUpdate:
             (
                 generate_device_show(
                     authentication={
-                        "type": HubDeviceAuthType.selfSigned.name,
+                        "type": DeviceAuthApiType.selfSigned.value,
                         "symmetricKey": {"primaryKey": None, "secondaryKey": None},
                         "x509Thumbprint": {
                             "primaryThumbprint": "123",
@@ -389,7 +389,7 @@ class TestDeviceUpdate:
             assert instance["statusReason"] == arg["status_reason"]
         if arg["auth_method"]:
             if arg["auth_method"] == "shared_private_key":
-                assert instance["authentication"]["type"] == HubDeviceAuthType.sas.name
+                assert instance["authentication"]["type"] == DeviceAuthApiType.sas.value
                 instance["authentication"]["symmetricKey"]["primaryKey"] == arg[
                     "primary_key"
                 ]
@@ -397,7 +397,7 @@ class TestDeviceUpdate:
                     "secondary_key"
                 ]
             if arg["auth_method"] == "x509_thumbprint":
-                assert instance["authentication"]["type"] == HubDeviceAuthType.selfSigned.name
+                assert instance["authentication"]["type"] == DeviceAuthApiType.selfSigned.value
                 if arg["primary_thumbprint"]:
                     instance["authentication"]["x509Thumbprint"][
                         "primaryThumbprint"
@@ -407,7 +407,7 @@ class TestDeviceUpdate:
                         "secondaryThumbprint"
                     ] = arg["secondary_thumbprint"]
             if arg["auth_method"] == "x509_ca":
-                assert instance["authentication"]["type"] == HubDeviceAuthType.certificateAuthority.name
+                assert instance["authentication"]["type"] == DeviceAuthApiType.certificateAuthority.value
 
     @pytest.mark.parametrize(
         "req, arg, exp",
@@ -437,7 +437,7 @@ class TestDeviceUpdate:
             (
                 generate_device_show(
                     authentication={
-                        "type": HubDeviceAuthType.selfSigned.name,
+                        "type": DeviceAuthApiType.selfSigned.value,
                         "symmetricKey": {"primaryKey": None, "secondaryKey": None},
                         "x509Thumbprint": {
                             "primaryThumbprint": "123",
@@ -474,7 +474,7 @@ class TestDeviceUpdate:
                             "primaryThumbprint": "",
                             "secondaryThumbprint": "",
                         },
-                        "type": HubDeviceAuthType.selfSigned.name,
+                        "type": DeviceAuthApiType.selfSigned.value,
                     }
                 ),
                 CLIError,
@@ -511,7 +511,7 @@ class TestDeviceRegenerateKey:
             "authentication",
             {
                 "symmetricKey": {"primaryKey": "123", "secondaryKey": "321"},
-                "type": HubDeviceAuthType.sas.name,
+                "type": DeviceAuthApiType.sas.value,
             },
         )
         test_side_effect = [
@@ -737,13 +737,13 @@ class TestDeviceModuleCreate:
         assert body["moduleId"] == req["module_id"]
 
         if req["auth"] == "shared_private_key":
-            assert body["authentication"]["type"] == HubDeviceAuthType.sas.name
+            assert body["authentication"]["type"] == DeviceAuthApiType.sas.value
         elif req["auth"] == "x509_ca":
-            assert body["authentication"]["type"] == HubDeviceAuthType.certificateAuthority.name
+            assert body["authentication"]["type"] == DeviceAuthApiType.certificateAuthority.value
             assert not body["authentication"].get("x509Thumbprint")
             assert not body["authentication"].get("symmetricKey")
         elif req["auth"] == "x509_thumbprint":
-            assert body["authentication"]["type"] == HubDeviceAuthType.selfSigned.name
+            assert body["authentication"]["type"] == DeviceAuthApiType.selfSigned.value
             x509tp = body["authentication"]["x509Thumbprint"]
             assert x509tp["primaryThumbprint"]
             if req["stp"] is None:
@@ -783,7 +783,7 @@ class TestDeviceModuleUpdate:
                 generate_device_module_show(
                     authentication={
                         "symmetricKey": {"primaryKey": "", "secondaryKey": ""},
-                        "type": HubDeviceAuthType.sas.name,
+                        "type": DeviceAuthApiType.sas.value,
                     },
                     etag=generate_generic_id(),
                 )
@@ -795,13 +795,13 @@ class TestDeviceModuleUpdate:
                             "primaryThumbprint": "123",
                             "secondaryThumbprint": "321",
                         },
-                        "type": HubDeviceAuthType.selfSigned.name,
+                        "type": DeviceAuthApiType.selfSigned.value,
                     }
                 )
             ),
             (
                 generate_device_module_show(
-                    authentication={"type": HubDeviceAuthType.certificateAuthority.name}
+                    authentication={"type": DeviceAuthApiType.certificateAuthority.value}
                 )
             ),
         ],
@@ -830,10 +830,10 @@ class TestDeviceModuleUpdate:
         assert body["moduleId"] == req["moduleId"]
         assert not body.get("capabilities")
         assert req["authentication"]["type"] == body["authentication"]["type"]
-        if req["authentication"]["type"] == HubDeviceAuthType.certificateAuthority.name:
+        if req["authentication"]["type"] == DeviceAuthApiType.certificateAuthority.value:
             assert not body["authentication"].get("x509Thumbprint")
             assert not body["authentication"].get("symmetricKey")
-        elif req["authentication"]["type"] == HubDeviceAuthType.selfSigned.name:
+        elif req["authentication"]["type"] == DeviceAuthApiType.selfSigned.value:
             assert body["authentication"]["x509Thumbprint"]["primaryThumbprint"]
             assert body["authentication"]["x509Thumbprint"]["secondaryThumbprint"]
 
@@ -851,7 +851,7 @@ class TestDeviceModuleUpdate:
                             "primaryThumbprint": "",
                             "secondaryThumbprint": "",
                         },
-                        "type": HubDeviceAuthType.selfSigned.name,
+                        "type": DeviceAuthApiType.selfSigned.value,
                     }
                 ),
                 CLIError,

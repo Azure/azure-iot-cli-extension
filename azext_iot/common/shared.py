@@ -56,7 +56,7 @@ class DeviceAuthType(Enum):
     x509_ca = "x509_ca"
 
 
-class HubDeviceAuthType(Enum):
+class DeviceAuthApiType(Enum):
     """
     Hub Device Authorization type.
     """

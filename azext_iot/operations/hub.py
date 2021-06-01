@@ -28,7 +28,7 @@ from azext_iot.common.shared import (
     SettleType,
     RenewKeyType,
     IoTHubStateType,
-    HubDeviceAuthType,
+    DeviceAuthApiType,
 )
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
@@ -260,21 +260,21 @@ def _assemble_auth(auth_method, pk, sk):
     )
 
     auth = None
-    if auth_method in [DeviceAuthType.shared_private_key.name, HubDeviceAuthType.sas.name]:
+    if auth_method in [DeviceAuthType.shared_private_key.name, DeviceAuthApiType.sas.value]:
         auth = AuthenticationMechanism(
-            symmetric_key=SymmetricKey(primary_key=pk, secondary_key=sk), type=HubDeviceAuthType.sas.name
+            symmetric_key=SymmetricKey(primary_key=pk, secondary_key=sk), type=DeviceAuthApiType.sas.value
         )
-    elif auth_method in [DeviceAuthType.x509_thumbprint.name, HubDeviceAuthType.selfSigned.name]:
+    elif auth_method in [DeviceAuthType.x509_thumbprint.name, DeviceAuthApiType.selfSigned.value]:
         if not pk:
             raise ValueError("primary thumbprint required with selfSigned auth")
         auth = AuthenticationMechanism(
             x509_thumbprint=X509Thumbprint(
                 primary_thumbprint=pk, secondary_thumbprint=sk
             ),
-            type=HubDeviceAuthType.selfSigned.name,
+            type=DeviceAuthApiType.selfSigned.value,
         )
-    elif auth_method in [DeviceAuthType.x509_ca.name, HubDeviceAuthType.certificateAuthority.name]:
-        auth = AuthenticationMechanism(type=HubDeviceAuthType.certificateAuthority.name)
+    elif auth_method in [DeviceAuthType.x509_ca.name, DeviceAuthApiType.certificateAuthority.value]:
+        auth = AuthenticationMechanism(type=DeviceAuthApiType.certificateAuthority.value)
     else:
         raise ValueError("Authorization method {} invalid.".format(auth_method))
     return auth
@@ -307,7 +307,7 @@ def update_iot_device_custom(
     auth_type = instance["authentication"]["type"]
     if auth_method is not None:
         if auth_method == DeviceAuthType.shared_private_key.name:
-            auth = HubDeviceAuthType.sas.name
+            auth = DeviceAuthApiType.sas.value
             if (primary_key and not secondary_key) or (
                 not primary_key and secondary_key
             ):
@@ -315,7 +315,7 @@ def update_iot_device_custom(
             instance["authentication"]["symmetricKey"]["primaryKey"] = primary_key
             instance["authentication"]["symmetricKey"]["secondaryKey"] = secondary_key
         elif auth_method == DeviceAuthType.x509_thumbprint.name:
-            auth = HubDeviceAuthType.selfSigned.name
+            auth = DeviceAuthApiType.selfSigned.value
             if not any([primary_thumbprint, secondary_thumbprint]):
                 raise CLIError(
                     "primary or secondary Thumbprint required with selfSigned auth"
@@ -329,13 +329,13 @@ def update_iot_device_custom(
                     "secondaryThumbprint"
                 ] = secondary_thumbprint
         elif auth_method == DeviceAuthType.x509_ca.name:
-            auth = HubDeviceAuthType.certificateAuthority.name
+            auth = DeviceAuthApiType.certificateAuthority.value
         else:
             raise ValueError("Authorization method {} invalid.".format(auth_method))
         instance["authentication"]["type"] = auth
 
     # if no new auth_method is provided, validate secondary auth arguments and update accordingly
-    elif auth_type == HubDeviceAuthType.sas.name:
+    elif auth_type == DeviceAuthApiType.sas.value:
         if any([primary_thumbprint, secondary_thumbprint]):
             raise ValueError(
                 "Device authorization method {} does not support primary or secondary thumbprints.".format(
@@ -347,7 +347,7 @@ def update_iot_device_custom(
         if secondary_key:
             instance["authentication"]["symmetricKey"]["secondaryKey"] = secondary_key
 
-    elif auth_type == HubDeviceAuthType.selfSigned.name:
+    elif auth_type == DeviceAuthApiType.selfSigned.value:
         if any([primary_key, secondary_key]):
             raise ValueError(
                 "Device authorization method {} does not support primary or secondary keys.".format(
@@ -477,7 +477,7 @@ def iot_device_key_regenerate(
         auth_type=auth_type_dataplane,
     )
     device = _iot_device_show(target, device_id)
-    if device["authentication"]["type"] != HubDeviceAuthType.sas.name:
+    if device["authentication"]["type"] != DeviceAuthApiType.sas.value:
         raise CLIError("Device authentication should be of type sas")
 
     pk = device["authentication"]["symmetricKey"]["primaryKey"]
@@ -868,15 +868,15 @@ def _handle_module_update_params(parameters):
 
 
 def _parse_auth(parameters):
-    valid_auth = [HubDeviceAuthType.sas.name, HubDeviceAuthType.selfSigned.name, HubDeviceAuthType.certificateAuthority.name]
+    valid_auth = [DeviceAuthApiType.sas.value, DeviceAuthApiType.selfSigned.value, DeviceAuthApiType.certificateAuthority.value]
     auth = parameters["authentication"].get("type")
     if auth not in valid_auth:
         raise CLIError("authentication.type must be one of {}".format(valid_auth))
     pk = sk = None
-    if auth == HubDeviceAuthType.sas.name:
+    if auth == DeviceAuthApiType.sas.value:
         pk = parameters["authentication"]["symmetricKey"]["primaryKey"]
         sk = parameters["authentication"]["symmetricKey"]["secondaryKey"]
-    elif auth == HubDeviceAuthType.selfSigned.name:
+    elif auth == DeviceAuthApiType.selfSigned.value:
         pk = parameters["authentication"]["x509Thumbprint"]["primaryThumbprint"]
         sk = parameters["authentication"]["x509Thumbprint"]["secondaryThumbprint"]
         if not any([pk, sk]):
@@ -1867,7 +1867,7 @@ def iot_get_sas_token(
         )
 
     return {
-        HubDeviceAuthType.sas.name: _iot_build_sas_token(
+        DeviceAuthApiType.sas.value: _iot_build_sas_token(
             cmd,
             hub_name,
             device_id,
@@ -1965,13 +1965,13 @@ def _build_device_or_module_connection_string(entity, key_type="primary"):
     )
     auth = entity["authentication"]
     auth_type = auth["type"].lower()
-    if auth_type == HubDeviceAuthType.sas.name:
+    if auth_type == DeviceAuthApiType.sas.value.lower():
         key = "SharedAccessKey={}".format(
             auth["symmetricKey"]["primaryKey"]
             if key_type == "primary"
             else auth["symmetricKey"]["secondaryKey"]
         )
-    elif auth_type in [HubDeviceAuthType.certificateAuthority.name, HubDeviceAuthType.selfSigned.name]:
+    elif auth_type in [DeviceAuthApiType.certificateAuthority.value.lower(), DeviceAuthApiType.selfSigned.value.lower()]:
         key = "x509=true"
     else:
         raise CLIError("Unable to form target connection string")
@@ -2072,7 +2072,7 @@ def _iot_device_send_message(
     import os
 
     device = _iot_device_show(target, device_id)
-    if device is not None and device.get("authentication", {}).get("type", "") != HubDeviceAuthType.sas.name:
+    if device and device.get("authentication", {}).get("type", "") != DeviceAuthApiType.sas.value:
         raise CLIError('D2C send message command only supports symmetric key auth (SAS) based devices')
 
     msgs = []
@@ -2463,7 +2463,7 @@ def iot_simulate_device(
         if protocol_type == ProtocolType.mqtt.name:
 
             device = _iot_device_show(target, device_id)
-            if device is not None and device.get("authentication", {}).get("type", "") != HubDeviceAuthType.sas.name:
+            if device and device.get("authentication", {}).get("type", "") != DeviceAuthApiType.sas.value:
                 raise CLIError('MQTT simulation is only supported for symmetric key auth (SAS) based devices')
 
             wrap = mqtt_client_wrap(
