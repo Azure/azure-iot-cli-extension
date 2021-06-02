@@ -24,7 +24,6 @@ class mqtt_client(object):
         self.method_response_payload = method_response_payload
         self.device_client.on_twin_desired_properties_patch_received = self.twin_patch_handler
         self.printer = pprint.PrettyPrinter(indent=2)
-        self.output_indent = 2
 
     def send_d2c_message(self, message_text, properties=None):
         message = Message(message_text)
