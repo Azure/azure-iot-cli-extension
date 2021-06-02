@@ -5,13 +5,11 @@
 # --------------------------------------------------------------------------------------------
 
 
-import six
-
 from time import sleep
 from azext_iot.constants import USER_AGENT, BASE_MQTT_API_VERSION
 from azext_iot.common.utility import url_encode_str
 from azure.iot.device import IoTHubDeviceClient as mqtt_device_client, Message, MethodResponse
-import json
+import pprint
 
 
 class mqtt_client(object):
@@ -25,6 +23,8 @@ class mqtt_client(object):
         self.method_response_code = method_response_code
         self.method_response_payload = method_response_payload
         self.device_client.on_twin_desired_properties_patch_received = self.twin_patch_handler
+        self.printer = pprint.PrettyPrinter(indent=2)
+        self.output_indent = 2
 
     def send_d2c_message(self, message_text, properties=None):
         message = Message(message_text)
@@ -32,10 +32,6 @@ class mqtt_client(object):
         self.device_client.send_message(message)
 
     def message_handler(self, message):
-        six.print_()
-        six.print_("_Received C2D message with topic_: /devices/{}/messages/devicebound".format(self.device_id))
-        six.print_("_Payload_: {}".format(message.data))
-
         property_names = [
             "message_id", "expiry_time_utc", "correlation_id", "user_id",
             "content_encoding", "content_type", "_iothub_interface_id"
@@ -49,13 +45,26 @@ class mqtt_client(object):
                 message_properties[item] = message_attributes[item]
 
         message_properties.update(message.custom_properties)
-        six.print_("_Message Properties_: {}".format(message_properties))
+
+        output = {
+            "Topic": "/devices/{}/messages/devicebound".format(self.device_id),
+            "Payload": message.data,
+            "Message Properties": message_properties
+        }
+        print("\nMessage Handler [Received C2D message]:")
+        self.printer.pprint(output)
 
     def method_request_handler(self, method_request):
-        six.print_()
-        six.print_("Received method request with id: '{}' and method name: '{}' for device with id: '{}'".format(
-            method_request.request_id, method_request.name, self.device_id))
-        six.print_("_Payload_: {}".format(method_request.payload))
+
+        output = {
+            "Device Id": self.device_id,
+            "Method Request Id": method_request.request_id,
+            "Method Request Name": method_request.name,
+            "Method Request Payload": method_request.payload
+        }
+
+        print("\nMethod Request Handler [Received direct method invocation request]:")
+        self.printer.pprint(output)
 
         # set response payload
         if self.method_response_payload:
@@ -83,8 +92,8 @@ class mqtt_client(object):
                 modified_properties[prop] = patch[prop]
 
         if modified_properties:
-            formatted_properties = json.dumps(modified_properties, indent=2)
-            six.print_("\nTwin patch handler [Updating device twin reported properties]:\n{}".format(formatted_properties))
+            print("\nTwin patch handler [Updating device twin reported properties]:")
+            self.printer.pprint(modified_properties)
             self.device_client.patch_twin_reported_properties(modified_properties)
 
     def execute(self, data, properties={}, publish_delay=2, msg_count=100):

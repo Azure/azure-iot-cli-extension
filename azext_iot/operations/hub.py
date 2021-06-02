@@ -6,7 +6,6 @@
 
 from os.path import exists, basename
 from time import time, sleep
-import six
 from knack.log import get_logger
 from knack.util import CLIError
 from enum import Enum, EnumMeta
@@ -2018,7 +2017,7 @@ def _iot_c2d_message_receive(target, device_id, lock_timeout=60, ack=None):
             if result.text:
                 payload["data"] = (
                     result.text
-                    if not isinstance(result.text, six.binary_type)
+                    if not isinstance(result.text, bytes)
                     else result.text.decode("utf-8")
                 )
 
@@ -2173,7 +2172,7 @@ def iot_simulate_device(
     def http_wrap(target, device_id, generator):
         d = generator.generate(False)
         _iot_device_send_message_http(target, device_id, d, headers=properties_to_send)
-        six.print_(".", end="", flush=True)
+        print(".", end="", flush=True)
 
     try:
         if protocol_type == ProtocolType.mqtt.name:
@@ -2188,7 +2187,7 @@ def iot_simulate_device(
             )
             client_mqtt.execute(data=generator(), properties=properties_to_send, publish_delay=msg_interval, msg_count=msg_count)
         else:
-            six.print_("Sending and receiving events via https")
+            print("Sending and receiving events via https")
             token, op = execute_onthread(
                 method=http_wrap,
                 args=[target, device_id, generator()],
@@ -2235,17 +2234,17 @@ def _iot_simulate_get_default_properties(protocol):
 def _handle_c2d_msg(target, device_id, receive_settle, lock_timeout=60):
     result = _iot_c2d_message_receive(target, device_id, lock_timeout)
     if result:
-        six.print_()
-        six.print_("__Received C2D Message__")
-        six.print_(result)
+        print()
+        print("__Received C2D Message__")
+        print(result)
         if receive_settle == "reject":
-            six.print_("__Rejecting message__")
+            print("__Rejecting message__")
             _iot_c2d_message_reject(target, device_id, result["etag"])
         elif receive_settle == "abandon":
-            six.print_("__Abandoning message__")
+            print("__Abandoning message__")
             _iot_c2d_message_abandon(target, device_id, result["etag"])
         else:
-            six.print_("__Completing message__")
+            print("__Completing message__")
             _iot_c2d_message_complete(target, device_id, result["etag"])
         return True
     return False
