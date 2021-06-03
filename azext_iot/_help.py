@@ -840,8 +840,11 @@ helps[
     "iot device send-d2c-message"
 ] = """
     type: command
-    short-summary: Send an mqtt device-to-cloud message.
-                   The command supports sending messages with application and system properties.
+    short-summary: |
+                    Send an mqtt device-to-cloud message.
+                    The command supports sending messages with application and system properties.
+
+                    Note: The command only works for symmetric key auth (SAS) based devices
     examples:
     - name: Basic usage
       text: az iot device send-d2c-message -n {iothub_name} -d {device_id}
@@ -863,7 +866,8 @@ helps[
                    While the device simulation is running, the device will automatically receive
                    and acknowledge cloud-to-device (c2d) messages. For mqtt simulation, all c2d messages will
                    be acknowledged with completion. For http simulation c2d acknowledgement is based on user
-                   selection which can be complete, reject or abandon.
+                   selection which can be complete, reject or abandon. Additionally, mqtt simulation is only
+                   supported for symmetric key auth (SAS) based devices
 
                    Note: The command by default will set content-type to application/json and content-encoding
                    to utf-8. This can be overriden.
