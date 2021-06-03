@@ -77,6 +77,7 @@ stages:
     jobs:
     - job: 'testCentral'
       displayName: 'Test IoT Central'
+      condition: eq('${{ parameters.testCentral }}', true)
       steps:
       - template: templates/run-tests.yml
         parameters:
@@ -85,6 +86,7 @@ stages:
     
     - job: 'testADT'
       displayName: 'Test Azure DigitalTwins'
+      condition: eq('${{ parameters.testADT }}', true)
       steps:
       - template: templates/run-tests.yml
         parameters:
@@ -93,6 +95,7 @@ stages:
 
     - job: 'testDPS'
       displayName: 'Test DPS'
+      condition: eq('${{ parameters.testDPS }}', true)
       steps:
       - template: templates/run-tests.yml
         parameters:
@@ -101,6 +104,7 @@ stages:
     
     - job: 'testHub'
       displayName: 'Test IoT Hub'
+      condition: eq('${{ parameters.testHub }}', true)
       steps:
       - template: templates/run-tests.yml
         parameters:
