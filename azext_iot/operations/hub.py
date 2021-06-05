@@ -39,13 +39,13 @@ from azext_iot.common.utility import (
 )
 from azext_iot._factory import SdkResolver, CloudError
 from azext_iot.operations.generic import _execute_query, _process_top
-
+import pprint
 
 logger = get_logger(__name__)
+printer = pprint.PrettyPrinter(indent=2)
 
 
 # Query
-
 
 def iot_query(
     cmd, query_command, hub_name=None, top=None, resource_group_name=None, login=None
@@ -2014,12 +2014,10 @@ def _iot_c2d_message_receive(target, device_id, lock_timeout=60, ack=None):
             if sys_props:
                 payload["properties"]["system"] = sys_props
 
-            if result.text:
-                payload["data"] = (
-                    result.text
-                    if not isinstance(result.text, bytes)
-                    else result.text.decode("utf-8")
-                )
+            if result.content:
+                target_encoding = result.headers.get("ContentEncoding", "utf-8")
+                logger.info(f"Decoding message data encoded with: {target_encoding}")
+                payload["data"] = result.content.decode(encoding=target_encoding)
 
             return payload
         return
@@ -2117,7 +2115,8 @@ def iot_simulate_device(
     import datetime
     import json
     from azext_iot.operations._mqtt import mqtt_client
-    from azext_iot.common.utility import execute_onthread
+    from threading import Event, Thread
+    from tqdm import tqdm
     from azext_iot.constants import (
         MIN_SIM_MSG_INTERVAL,
         MIN_SIM_MSG_COUNT,
@@ -2149,7 +2148,6 @@ def iot_simulate_device(
     target = discovery.get_target(
         hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
-    token = None
 
     if method_response_payload:
         method_response_payload = process_json_arg(
@@ -2169,11 +2167,14 @@ def iot_simulate_device(
             }
             return json.dumps(payload) if jsonify else payload
 
-    def http_wrap(target, device_id, generator):
-        d = generator.generate(False)
-        _iot_device_send_message_http(target, device_id, d, headers=properties_to_send)
-        print(".", end="", flush=True)
+    cancellation_token = Event()
 
+    def http_wrap(target, device_id, generator, msg_interval, msg_count):
+        for _ in tqdm(range(msg_count), desc='Sending and receiving events via https'):
+            d = generator.generate(False)
+            _iot_device_send_message_http(target, device_id, d, headers=properties_to_send)
+            if cancellation_token.wait(msg_interval):
+                break
     try:
         if protocol_type == ProtocolType.mqtt.name:
             device = _iot_device_show(target, device_id)
@@ -2187,14 +2188,9 @@ def iot_simulate_device(
             )
             client_mqtt.execute(data=generator(), properties=properties_to_send, publish_delay=msg_interval, msg_count=msg_count)
         else:
-            print("Sending and receiving events via https")
-            token, op = execute_onthread(
-                method=http_wrap,
-                args=[target, device_id, generator()],
-                interval=msg_interval,
-                max_runs=msg_count,
-                return_handle=True,
-            )
+            op = Thread(target=http_wrap, args=(target, device_id, generator(), msg_interval, msg_count))
+            op.start()
+
             while op.is_alive():
                 _handle_c2d_msg(target, device_id, receive_settle)
                 sleep(SIM_RECEIVE_SLEEP_SEC)
@@ -2204,8 +2200,8 @@ def iot_simulate_device(
     except Exception as x:
         raise CLIError(x)
     finally:
-        if token:
-            token.set()
+        if cancellation_token:
+            cancellation_token.set()
 
 
 def iot_c2d_message_purge(
@@ -2235,16 +2231,16 @@ def _handle_c2d_msg(target, device_id, receive_settle, lock_timeout=60):
     result = _iot_c2d_message_receive(target, device_id, lock_timeout)
     if result:
         print()
-        print("__Received C2D Message__")
-        print(result)
+        print("C2D Message Handler [Received C2D message]:")
+        printer.pprint(result)
         if receive_settle == "reject":
-            print("__Rejecting message__")
+            print("C2D Message Handler [Rejecting message]")
             _iot_c2d_message_reject(target, device_id, result["etag"])
         elif receive_settle == "abandon":
-            print("__Abandoning message__")
+            print("C2D Message Handler [Abandoning message]")
             _iot_c2d_message_abandon(target, device_id, result["etag"])
         else:
-            print("__Completing message__")
+            print("C2D Message Handler [Completing message]")
             _iot_c2d_message_complete(target, device_id, result["etag"])
         return True
     return False

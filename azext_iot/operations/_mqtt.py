@@ -24,6 +24,7 @@ class mqtt_client(object):
         self.method_response_payload = method_response_payload
         self.device_client.on_twin_desired_properties_patch_received = self.twin_patch_handler
         self.printer = pprint.PrettyPrinter(indent=2)
+        self.default_data_encoding = 'utf-8'
 
     def send_d2c_message(self, message_text, properties=None):
         message = Message(message_text)
@@ -45,12 +46,20 @@ class mqtt_client(object):
 
         message_properties.update(message.custom_properties)
 
+        if message.data and "content_encoding" in message_properties:
+            try:
+                payload = message.data.decode(encoding=message_properties["content_encoding"])
+            except Exception as x:
+                raise x
+        else:
+            payload = message.data.decode(encoding=self.default_data_encoding)
+
         output = {
             "Topic": "/devices/{}/messages/devicebound".format(self.device_id),
-            "Payload": message.data,
+            "Payload": payload,
             "Message Properties": message_properties
         }
-        print("\nMessage Handler [Received C2D message]:")
+        print("\nC2D Message Handler [Received C2D message]:")
         self.printer.pprint(output)
 
     def method_request_handler(self, method_request):
