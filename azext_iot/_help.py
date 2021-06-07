@@ -145,14 +145,6 @@ helps[
     - name: Create an edge enabled IoT device with default authorization (shared private key).
       text: >
         az iot hub device-identity create -n {iothub_name} -d {device_id} --ee
-    - name: Create an edge enabled IoT device with default authorization (shared private key) and
-            add child devices as well.
-      text: >
-        az iot hub device-identity create -n {iothub_name} -d {device_id} --ee --cl {child_device_id}
-    - name: Create an IoT device with default authorization (shared private key) and
-            set parent device as well.
-      text: >
-        az iot hub device-identity create -n {iothub_name} -d {device_id} --pd {edge_device_id}
     - name: Create an IoT device with self-signed certificate authorization,
             generate a cert valid for 10 days then use its thumbprint.
       text: >
@@ -235,13 +227,6 @@ helps[
 """
 
 helps[
-    "iot hub device-identity show-connection-string"
-] = """
-    type: command
-    short-summary: Show a given IoT Hub device connection string.
-"""
-
-helps[
     "iot hub device-identity connection-string"
 ] = """
     type: group
@@ -271,6 +256,17 @@ helps[
     - name: Export all device identities to a configured blob container using a file path which contains the SAS uri.
       text: >
         az iot hub device-identity export -n {iothub_name} --bcu {sas_uri_filepath}
+    - name: Export all device identities to a configured blob container and include device keys. Uses system assigned identity that has
+            Storage Blob Data Contributor roles for the storage account. The blob container uri does not need the blob SAS token.
+      text: >
+        az iot hub device-identity export -n {iothub_name} --ik --bcu
+        'https://mystorageaccount.blob.core.windows.net/devices' --auth-type identity --identity [system]
+    - name: Export all device identities to a configured blob container and include device keys. Uses user assigned managed identity
+            that has Storage Blob Data Contributor roles for the storage account and contributor for the IoT hub. The blob container
+            uri does not need the blob SAS token.
+      text: >
+        az iot hub device-identity export -n {iothub_name} --ik --bcu
+        'https://mystorageaccount.blob.core.windows.net/devices' --auth-type identity --identity {managed_identity_resource_id}
 """
 
 helps[
@@ -288,32 +284,15 @@ helps[
     - name: Import all device identities from a blob using a file path which contains SAS uri.
       text: >
         az iot hub device-identity import -n {iothub_name} --ibcu {input_sas_uri_filepath} --obcu {output_sas_uri_filepath}
-"""
-
-helps[
-    "iot hub device-identity get-parent"
-] = """
-    type: command
-    short-summary: Get the parent device of the specified device.
-    examples:
-    - name: Get the parent device of the specified device.
+    - name: Import all device identities from a blob using system assigned identity that has Storage Blob Data Contributor
+            roles for both storage accounts. The blob container uri does not need the blob SAS token.
       text: >
-        az iot hub device-identity get-parent -d {device_id} -n {iothub_name}
-"""
-
-helps[
-    "iot hub device-identity set-parent"
-] = """
-    type: command
-    short-summary: Set the parent device of the specified device.
-    examples:
-    - name: Set the parent device of the specified device.
+        az iot hub device-identity import -n {iothub_name} --ibcu {input_sas_uri} --obcu {output_sas_uri} --auth-type identity --identity [system]
+    - name: Import all device identities from a blob using user assigned managed identity that has Storage Blob Data Contributor
+            roles for both storage accounts and contributor for the IoT hub. The blob container uri does not need the blob SAS token.
       text: >
-        az iot hub device-identity set-parent -d {device_id} --pd {edge_device_id} -n {iothub_name}
-    - name: Set the parent device of the specified device irrespectively the device is
-            already a child of other edge device.
-      text: >
-        az iot hub device-identity set-parent -d {device_id} --pd {edge_device_id} --force -n {iothub_name}
+        az iot hub device-identity import -n {iothub_name} --ibcu {input_sas_uri} --obcu {output_sas_uri}
+        --auth-type identity --identity {managed_identity_resource_id}
 """
 
 helps[
@@ -346,49 +325,6 @@ helps[
     - name: Set the parent device of the specified device and overwrites its original parent.
       text: >
         az iot hub device-identity parent set -d {device_id} --pd {edge_device_id} --force -n {iothub_name}
-"""
-
-helps[
-    "iot hub device-identity add-children"
-] = """
-    type: command
-    short-summary: Add specified comma-separated list of device ids as children of specified edge device.
-    examples:
-    - name: Add devices as a children to the edge device.
-      text: >
-        az iot hub device-identity add-children -d {edge_device_id} --child-list {comma_separated_device_id}
-        -n {iothub_name}
-    - name: Add devices as a children to the edge device irrespectively the device is
-            already a child of other edge device.
-      text: >
-        az iot hub device-identity add-children -d {edge_device_id} --child-list {comma_separated_device_id}
-        -n {iothub_name} -f
-"""
-
-helps[
-    "iot hub device-identity list-children"
-] = """
-    type: command
-    short-summary: Outputs comma-separated list of assigned child devices.
-    examples:
-    - name: Show all assigned devices as comma-separated list.
-      text: >
-        az iot hub device-identity list-children -d {edge_device_id} -n {iothub_name}
-"""
-
-helps[
-    "iot hub device-identity remove-children"
-] = """
-    type: command
-    short-summary: Remove devices as children from specified edge device.
-    examples:
-    - name: Remove all mentioned devices as children of specified device.
-      text: >
-        az iot hub device-identity remove-children -d {edge_device_id} --child-list {comma_separated_device_id}
-        -n {iothub_name}
-    - name: Remove all devices as children specified edge device.
-      text: >
-        az iot hub device-identity remove-children -d {edge_device_id} --remove-all
 """
 
 helps[
@@ -501,13 +437,6 @@ helps[
 """
 
 helps[
-    "iot hub module-identity show-connection-string"
-] = """
-    type: command
-    short-summary: Show a target IoT device module connection string.
-"""
-
-helps[
     "iot hub module-identity create"
 ] = """
     type: command
@@ -541,6 +470,18 @@ helps[
         az iot hub module-identity update -m {module_name} -d {device_id} -n {iothub_name}
         --set authentication.symmetricKey.primaryKey=""
         authentication.symmetricKey.secondaryKey=""
+"""
+
+helps[
+    "iot hub module-identity renew-key"
+] = """
+    type: command
+    short-summary: Renew target keys of an IoT Hub device module with sas authentication.
+    examples:
+      - name: Renew the primary key.
+        text: az iot hub module-identity renew-key -m {module_name} -d {device_id} -n {iothub_name} --kt primary
+      - name: Swap the primary and secondary keys.
+        text: az iot hub module-identity renew-key -m {module_name} -d {device_id} -n {iothub_name} --kt swap
 """
 
 helps[
@@ -899,8 +840,11 @@ helps[
     "iot device send-d2c-message"
 ] = """
     type: command
-    short-summary: Send an mqtt device-to-cloud message.
-                   The command supports sending messages with application and system properties.
+    short-summary: |
+                    Send an mqtt device-to-cloud message.
+                    The command supports sending messages with application and system properties.
+
+                    Note: The command only works for symmetric key auth (SAS) based devices
     examples:
     - name: Basic usage
       text: az iot device send-d2c-message -n {iothub_name} -d {device_id}
@@ -922,7 +866,8 @@ helps[
                    While the device simulation is running, the device will automatically receive
                    and acknowledge cloud-to-device (c2d) messages. For mqtt simulation, all c2d messages will
                    be acknowledged with completion. For http simulation c2d acknowledgement is based on user
-                   selection which can be complete, reject or abandon.
+                   selection which can be complete, reject or abandon. Additionally, mqtt simulation is only
+                   supported for symmetric key auth (SAS) based devices
 
                    Note: The command by default will set content-type to application/json and content-encoding
                    to utf-8. This can be overriden.

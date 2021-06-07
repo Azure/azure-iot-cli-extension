@@ -7,6 +7,7 @@
 
 from knack.util import CLIError
 from requests import Response
+from knack.log import logging
 
 from azext_iot import constants
 from azext_iot.common import auth
@@ -42,3 +43,9 @@ def try_extract_result(response: Response):
         raise CLIError(body["error"])
 
     return body
+
+
+def log_response_debug(response: Response, logger: logging.Logger):
+    logger.debug("Response status code: {}".format(response.status_code))
+    logger.debug("Response url: {}".format(response.url))
+    logger.debug("Response headers: {}".format(response.headers))

@@ -4,12 +4,15 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from typing import List
 from knack.util import CLIError
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
+from azext_iot.central.models.enum import ApiVersion
+from azext_iot.central import models as central_models
 
 
-class CentralDeviceTemplateProvider:
+class CentralDeviceTemplateProviderV1:
     def __init__(self, cmd, app_id, token=None):
         """
         Provider for device_template APIs
@@ -29,7 +32,7 @@ class CentralDeviceTemplateProvider:
 
     def get_device_template(
         self, device_template_id, central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
+    ) -> central_models.TemplateV1:
         # get or add to cache
         device_template = self._device_templates.get(device_template_id)
         if not device_template:
@@ -39,6 +42,7 @@ class CentralDeviceTemplateProvider:
                 device_template_id=device_template_id,
                 token=self._token,
                 central_dns_suffix=central_dns_suffix,
+                api_version=ApiVersion.v1.value,
             )
             self._device_templates[device_template_id] = device_template
 
@@ -51,11 +55,13 @@ class CentralDeviceTemplateProvider:
 
         return device_template
 
-    def list_device_templates(
-        self, central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
+    def list_device_templates(self, central_dns_suffix=CENTRAL_ENDPOINT,) -> List[central_models.TemplateV1]       :
         templates = central_services.device_template.list_device_templates(
-            cmd=self._cmd, app_id=self._app_id, token=self._token
+            cmd=self._cmd,
+            app_id=self._app_id,
+            token=self._token,
+            central_dns_suffix=central_dns_suffix,
+            api_version=ApiVersion.v1.value,
         )
 
         self._device_templates.update({template.id: template for template in templates})
@@ -69,7 +75,10 @@ class CentralDeviceTemplateProvider:
         Maps each template name to the corresponding template id
         """
         templates = central_services.device_template.list_device_templates(
-            cmd=self._cmd, app_id=self._app_id, token=self._token
+            cmd=self._cmd,
+            app_id=self._app_id,
+            token=self._token,
+            api_version=ApiVersion.v1.value,
         )
         return {template.name: template.id for template in templates}
 
@@ -86,6 +95,7 @@ class CentralDeviceTemplateProvider:
             payload=payload,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
+            api_version=ApiVersion.v1.value,
         )
 
         self._device_templates[template.id] = template
@@ -104,6 +114,7 @@ class CentralDeviceTemplateProvider:
             app_id=self._app_id,
             device_template_id=device_template_id,
             central_dns_suffix=central_dns_suffix,
+            api_version=ApiVersion.v1.value,
         )
 
         # remove from cache

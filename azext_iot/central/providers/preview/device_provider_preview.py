@@ -4,20 +4,20 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+
+from typing import List
+from azext_iot.central.models.devicePreview import DevicePreview
 from knack.util import CLIError
 from knack.log import get_logger
-from typing import List
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
-from azext_iot.central.models.enum import DeviceStatus
-from azext_iot.central.models.device import Device
-from azext_iot.dps.services import global_service as dps_global_service
-
+from azext_iot.central.models.enum import DeviceStatus, ApiVersion
+from azext_iot.central import models as central_models
 
 logger = get_logger(__name__)
 
 
-class CentralDeviceProvider:
+class CentralDeviceProviderPreview:
     def __init__(self, cmd, app_id: str, token=None):
         """
         Provider for device APIs
@@ -38,9 +38,9 @@ class CentralDeviceProvider:
         self._device_credentials = {}
         self._device_registration_info = {}
 
-    def get_device(self, device_id, central_dns_suffix=CENTRAL_ENDPOINT) -> Device:
-        if not device_id:
-            raise CLIError("Device id must be specified.")
+    def get_device(
+        self, device_id, central_dns_suffix=CENTRAL_ENDPOINT,
+    ) -> central_models.DevicePreview:
         # get or add to cache
         device = self._devices.get(device_id)
         if not device:
@@ -50,6 +50,7 @@ class CentralDeviceProvider:
                 device_id=device_id,
                 token=self._token,
                 central_dns_suffix=central_dns_suffix,
+                api_version=ApiVersion.preview.value,
             )
             self._devices[device_id] = device
 
@@ -58,12 +59,13 @@ class CentralDeviceProvider:
 
         return device
 
-    def list_devices(self, central_dns_suffix=CENTRAL_ENDPOINT) -> List[Device]:
+    def list_devices(self, central_dns_suffix=CENTRAL_ENDPOINT) -> List[DevicePreview]:
         devices = central_services.device.list_devices(
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
+            api_version=ApiVersion.preview.value,
         )
 
         # add to cache
@@ -75,12 +77,10 @@ class CentralDeviceProvider:
         self,
         device_id,
         device_name=None,
-        instance_of=None,
+        template=None,
         simulated=False,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> Device:
-        if not device_id:
-            raise CLIError("Device id must be specified.")
+    ) -> central_models.DevicePreview:
 
         if device_id in self._devices:
             raise CLIError("Device already exists.")
@@ -90,10 +90,11 @@ class CentralDeviceProvider:
             app_id=self._app_id,
             device_id=device_id,
             device_name=device_name,
-            instance_of=instance_of,
+            template=template,
             simulated=simulated,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
+            api_version=ApiVersion.preview.value,
         )
 
         if not device:
@@ -115,6 +116,7 @@ class CentralDeviceProvider:
             device_id=device_id,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
+            api_version=ApiVersion.preview.value,
         )
 
         # remove from cache
@@ -124,72 +126,6 @@ class CentralDeviceProvider:
 
         return result
 
-    def get_device_credentials(
-        self, device_id, central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> dict:
-        credentials = self._device_credentials.get(device_id)
-
-        if not credentials:
-            credentials = central_services.device.get_device_credentials(
-                cmd=self._cmd,
-                app_id=self._app_id,
-                device_id=device_id,
-                token=self._token,
-                central_dns_suffix=central_dns_suffix,
-            )
-
-        if not credentials:
-            raise CLIError(
-                "Could not find device credentials for device '{}'.".format(device_id)
-            )
-
-        # add to cache
-        self._device_credentials[device_id] = credentials
-
-        return credentials
-
-    def get_device_registration_info(
-        self,
-        device_id,
-        device_status: DeviceStatus,
-        central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> dict:
-        dps_state = {}
-        info = self._device_registration_info.get(device_id)
-
-        if info:
-            return info
-
-        device = self.get_device(device_id, central_dns_suffix)
-        if device.device_status == DeviceStatus.provisioned:
-            credentials = self.get_device_credentials(
-                device_id=device_id, central_dns_suffix=central_dns_suffix
-            )
-            id_scope = credentials["idScope"]
-            key = credentials["symmetricKey"]["primaryKey"]
-            dps_state = dps_global_service.get_registration_state(
-                id_scope=id_scope, key=key, device_id=device_id
-            )
-        dps_state = self._dps_populate_essential_info(dps_state, device.device_status)
-
-        info = {
-            "@device_id": device_id,
-            "dps_state": dps_state,
-            "device_registration_info": device.get_registration_info(),
-        }
-
-        self._device_registration_info[device_id] = info
-
-        return info
-
-    def get_device_registration_summary(self, central_dns_suffix=CENTRAL_ENDPOINT):
-        return central_services.device.get_device_registration_summary(
-            cmd=self._cmd,
-            app_id=self._app_id,
-            token=self._token,
-            central_dns_suffix=central_dns_suffix,
-        )
-
     def run_component_command(
         self,
         device_id: str,
@@ -197,7 +133,7 @@ class CentralDeviceProvider:
         command_name: str,
         payload: dict,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
+    ) -> dict:
         return central_services.device.run_component_command(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -207,6 +143,7 @@ class CentralDeviceProvider:
             command_name=command_name,
             payload=payload,
             central_dns_suffix=central_dns_suffix,
+            api_version=ApiVersion.preview.value,
         )
 
     def get_component_command_history(
@@ -215,7 +152,7 @@ class CentralDeviceProvider:
         interface_id: str,
         command_name: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
+    ) -> dict:
         return central_services.device.get_component_command_history(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -224,9 +161,12 @@ class CentralDeviceProvider:
             interface_id=interface_id,
             command_name=command_name,
             central_dns_suffix=central_dns_suffix,
+            api_version=ApiVersion.preview.value,
         )
 
-    def _dps_populate_essential_info(self, dps_info, device_status: DeviceStatus):
+    def _dps_populate_essential_info(
+        self, dps_info, device_status: DeviceStatus
+    ) -> dict:
         error = {
             DeviceStatus.provisioned: "None.",
             DeviceStatus.registered: "Device is not yet provisioned.",

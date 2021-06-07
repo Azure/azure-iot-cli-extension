@@ -7,8 +7,9 @@
 
 
 from azext_iot.constants import CENTRAL_ENDPOINT
-from azext_iot.central.providers import CentralApiTokenProvider
-from azext_iot.central.models.enum import Role
+from azext_iot.central.providers.preview import CentralApiTokenProviderPreview
+from azext_iot.central.providers.v1 import CentralApiTokenProviderV1
+from azext_iot.central.models.enum import Role, ApiVersion
 
 
 def add_api_token(
@@ -18,36 +19,66 @@ def add_api_token(
     role: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
 ):
-    provider = CentralApiTokenProvider(cmd=cmd, app_id=app_id, token=token)
+    if api_version == ApiVersion.preview.value:
+        provider = CentralApiTokenProviderPreview(cmd=cmd, app_id=app_id, token=token)
+    else:
+        provider = CentralApiTokenProviderV1(cmd=cmd, app_id=app_id, token=token)
+
     return provider.add_api_token(
         token_id=token_id, role=Role[role], central_dns_suffix=central_dns_suffix,
     )
 
 
 def list_api_tokens(
-    cmd, app_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd,
+    app_id: str,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
 ):
-    provider = CentralApiTokenProvider(cmd=cmd, app_id=app_id, token=token)
 
-    return provider.get_api_token_list(central_dns_suffix=central_dns_suffix,)
+    if api_version == ApiVersion.preview.value:
+        provider = CentralApiTokenProviderPreview(cmd=cmd, app_id=app_id, token=token)
+    else:
+        provider = CentralApiTokenProviderV1(cmd=cmd, app_id=app_id, token=token)
+
+    return provider.get_api_token_list(central_dns_suffix=central_dns_suffix)
 
 
 def get_api_token(
-    cmd, app_id: str, token_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd,
+    app_id: str,
+    token_id: str,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
 ):
-    provider = CentralApiTokenProvider(cmd=cmd, app_id=app_id, token=token)
+
+    if api_version == ApiVersion.preview.value:
+        provider = CentralApiTokenProviderPreview(cmd=cmd, app_id=app_id, token=token)
+    else:
+        provider = CentralApiTokenProviderV1(cmd=cmd, app_id=app_id, token=token)
 
     return provider.get_api_token(
-        token_id=token_id, central_dns_suffix=central_dns_suffix
+        token_id=token_id, central_dns_suffix=central_dns_suffix,
     )
 
 
 def delete_api_token(
-    cmd, app_id: str, token_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd,
+    app_id: str,
+    token_id: str,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
 ):
-    provider = CentralApiTokenProvider(cmd=cmd, app_id=app_id, token=token)
+    if api_version == ApiVersion.preview.value:
+        provider = CentralApiTokenProviderPreview(cmd=cmd, app_id=app_id, token=token)
+    else:
+        provider = CentralApiTokenProviderV1(cmd=cmd, app_id=app_id, token=token)
 
     return provider.delete_api_token(
-        token_id=token_id, central_dns_suffix=central_dns_suffix
+        token_id=token_id, central_dns_suffix=central_dns_suffix,
     )

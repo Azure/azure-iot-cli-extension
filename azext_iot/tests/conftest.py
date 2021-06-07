@@ -13,6 +13,8 @@ import os
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azure.cli.core.commands import AzCliCommand
 from azure.cli.core.mock import DummyCli
+from azext_iot.tests.generators import generate_generic_id
+from azext_iot.common.shared import DeviceAuthApiType
 
 path_iot_hub_service_factory = "azext_iot._factory.iot_hub_service_factory"
 path_service_client = "msrest.service_client.ServiceClient.send"
@@ -25,7 +27,11 @@ path_mqtt_client = "azext_iot.operations._mqtt.mqtt.Client"
 path_iot_hub_monitor_events_entrypoint = (
     "azext_iot.operations.hub._iot_hub_monitor_events"
 )
+path_iot_device_show = "azext_iot.operations.hub._iot_device_show"
 hub_entity = "myhub.azure-devices.net"
+
+instance_name = generate_generic_id()
+hostname = "{}.subdomain.domain".format(instance_name)
 
 mock_target = {}
 mock_target["entity"] = hub_entity
@@ -131,6 +137,72 @@ def mqttclient_generic_error(mocker, fixture_ghcs, fixture_sas):
 @pytest.fixture()
 def fixture_monitor_events_entrypoint(mocker):
     return mocker.patch(path_iot_hub_monitor_events_entrypoint)
+
+
+@pytest.fixture()
+def fixture_iot_device_show_sas(mocker):
+    device = mocker.patch(path_iot_device_show)
+    device.return_value = {
+        "authentication": {
+            "symmetricKey": {
+                "primaryKey": "test_pk",
+                "secondaryKey": "test_sk"
+            },
+            "type": DeviceAuthApiType.sas.value,
+            "x509Thumbprint": {
+                "primaryThumbprint": None,
+                "secondaryThumbprint": None
+            }
+        },
+        "capabilities": {
+            "iotEdge": False
+        },
+        "cloudToDeviceMessageCount": 0,
+        "connectionState": "Disconnected",
+        "connectionStateUpdatedTime": "2021-05-27T00:36:11.2861732Z",
+        "deviceId": "Test_Device_1",
+        "etag": "ODgxNTgwOA==",
+        "generationId": "637534345627501371",
+        "hub": "test-iot-hub.azure-devices.net",
+        "lastActivityTime": "2021-05-27T00:18:16.3154299Z",
+        "status": "enabled",
+        "statusReason": None,
+        "statusUpdatedTime": "0001-01-01T00:00:00Z"
+    }
+    return device
+
+
+@pytest.fixture()
+def fixture_self_signed_device_show_self_signed(mocker):
+    device = mocker.patch(path_iot_device_show)
+    device.return_value = {
+        "authentication": {
+            "symmetricKey": {
+                "primaryKey": "test_pk",
+                "secondaryKey": "test_sk"
+            },
+            "type": DeviceAuthApiType.selfSigned.value,
+            "x509Thumbprint": {
+                "primaryThumbprint": None,
+                "secondaryThumbprint": None
+            }
+        },
+        "capabilities": {
+            "iotEdge": False
+        },
+        "cloudToDeviceMessageCount": 0,
+        "connectionState": "Disconnected",
+        "connectionStateUpdatedTime": "2021-05-27T00:36:11.2861732Z",
+        "deviceId": "Test_Device_1",
+        "etag": "ODgxNTgwOA==",
+        "generationId": "637534345627501371",
+        "hub": "test-iot-hub.azure-devices.net",
+        "lastActivityTime": "2021-05-27T00:18:16.3154299Z",
+        "status": "enabled",
+        "statusReason": None,
+        "statusUpdatedTime": "0001-01-01T00:00:00Z"
+    }
+    return device
 
 
 # TODO: To be deprecated asap. Leverage mocked_response fixture for this functionality.
@@ -247,3 +319,42 @@ def fixture_mock_aics_token(mocker):
     )
     patch.return_value = "Bearer token"
     return patch
+
+
+@pytest.fixture
+def fixture_dt_client(mocker, fixture_cmd):
+    from azext_iot.sdk.digitaltwins.controlplane import AzureDigitalTwinsManagementClient
+    from azext_iot.sdk.digitaltwins.dataplane import AzureDigitalTwinsAPI
+    from azext_iot.digitaltwins.providers.auth import DigitalTwinAuthentication
+
+    patched_get_raw_token = mocker.patch(
+        "azure.cli.core._profile.Profile.get_raw_token"
+    )
+    patched_get_raw_token.return_value = (
+        mocker.MagicMock(name="creds"),
+        mocker.MagicMock(name="subscription"),
+        mocker.MagicMock(name="tenant"),
+    )
+
+    control_plane_patch = mocker.patch(
+        "azext_iot.digitaltwins.providers.digitaltwins_service_factory"
+    )
+    control_plane_patch.return_value = AzureDigitalTwinsManagementClient(
+        credentials=DigitalTwinAuthentication(
+            fixture_cmd, "00000000-0000-0000-0000-000000000000"
+        ),
+        subscription_id="00000000-0000-0000-0000-000000000000",
+    )
+
+    data_plane_patch = mocker.patch(
+        "azext_iot.digitaltwins.providers.base.DigitalTwinsProvider.get_sdk"
+    )
+
+    data_plane_patch.return_value = AzureDigitalTwinsAPI(
+        credentials=DigitalTwinAuthentication(
+            fixture_cmd, "00000000-0000-0000-0000-000000000000"
+        ),
+        base_url="https://{}/".format(hostname)
+    )
+
+    return control_plane_patch, data_plane_patch

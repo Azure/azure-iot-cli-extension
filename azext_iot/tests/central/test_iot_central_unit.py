@@ -13,13 +13,14 @@ from datetime import datetime
 from knack.util import CLIError
 from azure.cli.core.mock import DummyCli
 from azext_iot.central import commands_device_twin
+from azext_iot.central import commands_device
 from azext_iot.central import commands_monitor
-from azext_iot.central.providers import (
-    CentralDeviceProvider,
-    CentralDeviceTemplateProvider,
+from azext_iot.central.providers.v1 import (
+    CentralDeviceProviderV1,
+    CentralDeviceTemplateProviderV1,
 )
 from azext_iot.central.models.devicetwin import DeviceTwin
-from azext_iot.central.models.template import Template
+from azext_iot.central import models as central_models
 from azext_iot.monitor.property import PropertyMonitor
 from azext_iot.monitor.models.enum import Severity
 from azext_iot.tests.helpers import load_json
@@ -30,6 +31,7 @@ device_id = "mydevice"
 app_id = "myapp"
 device_twin_result = {"deviceId": "{}".format(device_id)}
 resource = "shared_resource"
+success_resp = {"result": "success"}
 
 
 @pytest.fixture()
@@ -159,7 +161,7 @@ class TestCentralDeviceProvider:
     @mock.patch("azext_iot.central.services.device")
     def test_should_return_device(self, mock_device_svc, mock_device_template_svc):
         # setup
-        provider = CentralDeviceProvider(cmd=None, app_id=app_id)
+        provider = CentralDeviceProviderV1(cmd=None, app_id=app_id)
         mock_device_svc.get_device.return_value = self._device
         mock_device_template_svc.get_device_template.return_value = (
             self._device_template
@@ -182,7 +184,7 @@ class TestCentralDeviceProvider:
         self, mock_device_svc, mock_device_template_svc
     ):
         # setup
-        provider = CentralDeviceTemplateProvider(cmd=None, app_id=app_id)
+        provider = CentralDeviceTemplateProviderV1(cmd=None, app_id=app_id)
         mock_device_svc.get_device.return_value = self._device
         mock_device_template_svc.get_device_template.return_value = (
             self._device_template
@@ -280,7 +282,7 @@ class TestCentralPropertyMonitor:
     ):
 
         # setup
-        mock_device_template_svc.get_device_template.return_value = Template(
+        mock_device_template_svc.get_device_template.return_value = central_models.TemplateV1(
             self._duplicate_property_template
         )
 
@@ -321,7 +323,7 @@ class TestCentralPropertyMonitor:
     ):
 
         # setup
-        mock_device_template_svc.get_device_template.return_value = Template(
+        mock_device_template_svc.get_device_template.return_value = central_models.TemplateV1(
             self._duplicate_property_template
         )
 
@@ -358,7 +360,7 @@ class TestCentralPropertyMonitor:
     ):
 
         # setup
-        mock_device_template_svc.get_device_template.return_value = Template(
+        mock_device_template_svc.get_device_template.return_value = central_models.TemplateV1(
             self._duplicate_property_template
         )
 
@@ -403,7 +405,7 @@ class TestCentralPropertyMonitor:
     ):
 
         # setup
-        mock_device_template_svc.get_device_template.return_value = Template(
+        mock_device_template_svc.get_device_template.return_value = central_models.TemplateV1(
             self._duplicate_property_template
         )
 
@@ -434,3 +436,62 @@ class TestCentralPropertyMonitor:
             "'RS40OccupancySensorV36fy': ['component2prop', 'testComponent', 'component2PropReadonly', "
             "'component2Prop2', 'component1Telemetry']}'. "
         )
+
+
+class TestFailover:
+
+    @pytest.fixture
+    def service_client(
+        self, mocked_response, fixture_cmd, fixture_get_iot_central_tokens
+    ):
+
+        mocked_response.add(
+            method=responses.POST,
+            url="https://myapp.azureiotcentral.com/system/iothub/devices/{}/manual-failover".format(device_id),
+            body=json.dumps(success_resp),
+            status=200,
+            content_type="application/json",
+            match_querystring=False,
+        )
+
+        yield mocked_response
+
+    def test_should_run_manual_failover(
+        self, service_client
+    ):
+        # act
+        result = commands_device.run_manual_failover(fixture_cmd, app_id, device_id, ttl_minutes=10, token="Shared sig")
+        # assert
+        assert result == success_resp
+
+    def test_should_fail_negative_ttl(self):
+        with pytest.raises(CLIError):
+            # act
+            commands_device.run_manual_failover(fixture_cmd, app_id, device_id, ttl_minutes=-10, token="Shared sig")
+
+
+class TestFailback:
+
+    @pytest.fixture
+    def service_client(
+        self, mocked_response, fixture_cmd, fixture_get_iot_central_tokens
+    ):
+
+        mocked_response.add(
+            method=responses.POST,
+            url="https://myapp.azureiotcentral.com/system/iothub/devices/{}/manual-failback".format(device_id),
+            body=json.dumps(success_resp),
+            status=200,
+            content_type="application/json",
+            match_querystring=False,
+        )
+
+        yield mocked_response
+
+    def test_should_run_manual_failover(
+        self, service_client
+    ):
+        # act
+        result = commands_device.run_manual_failback(fixture_cmd, app_id, device_id, token="Shared sig")
+        # assert
+        assert result == success_resp

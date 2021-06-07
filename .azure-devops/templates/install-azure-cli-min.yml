@@ -1,0 +1,14 @@
+steps:
+- task: PythonScript@0
+  displayName: 'Check minimum supported version of Azure CLI'
+  inputs:
+    scriptSource: 'inline'
+    script: |
+      import json
+      with open("$(System.DefaultWorkingDirectory)/azext_iot/azext_metadata.json") as f:
+          metadata = json.load(f)
+          version = metadata['azext.minCliCoreVersion']
+          print('##vso[task.setvariable variable=min_cli_version]{}'.format(version))
+- bash: |
+    pip install azure-cli==$(min_cli_version)
+  displayName: "Install minimum supported CLI version"

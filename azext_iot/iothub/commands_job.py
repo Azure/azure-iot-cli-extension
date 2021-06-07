@@ -29,8 +29,15 @@ def job_create(
     hub_name=None,
     resource_group_name=None,
     login=None,
+    auth_type_dataplane=None,
 ):
-    jobs = JobProvider(cmd=cmd, hub_name=hub_name, rg=resource_group_name, login=login)
+    jobs = JobProvider(
+        cmd=cmd,
+        hub_name=hub_name,
+        rg=resource_group_name,
+        login=login,
+        auth_type_dataplane=auth_type_dataplane,
+    )
     return jobs.create(
         job_id=job_id,
         job_type=job_type,
@@ -48,8 +55,21 @@ def job_create(
     )
 
 
-def job_show(cmd, job_id, hub_name=None, resource_group_name=None, login=None):
-    jobs = JobProvider(cmd=cmd, hub_name=hub_name, rg=resource_group_name, login=login)
+def job_show(
+    cmd,
+    job_id,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
+):
+    jobs = JobProvider(
+        cmd=cmd,
+        hub_name=hub_name,
+        rg=resource_group_name,
+        login=login,
+        auth_type_dataplane=auth_type_dataplane,
+    )
     return jobs.get(job_id)
 
 
@@ -61,11 +81,31 @@ def job_list(
     hub_name=None,
     resource_group_name=None,
     login=None,
+    auth_type_dataplane=None,
 ):
-    jobs = JobProvider(cmd=cmd, hub_name=hub_name, rg=resource_group_name, login=login)
+    jobs = JobProvider(
+        cmd=cmd,
+        hub_name=hub_name,
+        rg=resource_group_name,
+        login=login,
+        auth_type_dataplane=auth_type_dataplane,
+    )
     return jobs.list(job_type=job_type, job_status=job_status, top=top)
 
 
-def job_cancel(cmd, job_id, hub_name=None, resource_group_name=None, login=None):
-    jobs = JobProvider(cmd=cmd, hub_name=hub_name, rg=resource_group_name, login=login)
+def job_cancel(
+    cmd,
+    job_id,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
+):
+    jobs = JobProvider(
+        cmd=cmd,
+        hub_name=hub_name,
+        rg=resource_group_name,
+        login=login,
+        auth_type_dataplane=auth_type_dataplane,
+    )
     return jobs.cancel(job_id)

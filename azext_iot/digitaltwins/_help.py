@@ -113,6 +113,33 @@ def load_digitaltwins_help():
             az dt delete -n {instance_name} -y --no-wait
     """
 
+    helps["dt wait"] = """
+        type: command
+        short-summary: Wait until an operation on an Digital Twins instance is complete.
+
+        examples:
+        - name: Wait until an arbitrary instance is created.
+          text: >
+            az dt wait -n {instance_name} --created
+        - name: Wait until an existing instance is deleted.
+          text: >
+            az dt wait -n {instance_name} --deleted
+        - name: Wait until an existing instance's publicNetworkAccess property is set to Enabled
+          text: >
+            az dt wait -n {instance_name} --custom "publicNetworkAccess=='Enabled'"
+    """
+
+    helps["dt reset"] = """
+        type: command
+        short-summary: Reset an existing Digital Twins instance by deleting associated
+            assets. Currently only supports deleting models and twins.
+
+        examples:
+        - name: Reset all assets for a Digital Twins instance.
+          text: >
+            az dt reset -n {instance_name}
+    """
+
     helps["dt endpoint"] = """
         type: group
         short-summary: Manage and configure Digital Twins instance endpoints.
@@ -221,6 +248,22 @@ def load_digitaltwins_help():
             az dt endpoint delete -n {instance_name} --endpoint-name {endpoint_name} -y --no-wait
     """
 
+    helps["dt endpoint wait"] = """
+        type: command
+        short-summary: Wait until an endpoint operation is done.
+
+        examples:
+        - name: Wait until an endpoint for an instance is created.
+          text: >
+            az dt endpoint wait -n {instance_name} --endpoint-name {endpoint_name} --created
+        - name: Wait until an existing endpoint is deleted from an instance.
+          text: >
+            az dt endpoint wait -n {instance_name} --endpoint-name {endpoint_name} --deleted
+        - name: Wait until an existing endpoint's primaryConnectionString is null.
+          text: >
+            az dt endpoint wait -n {instance_name} --endpoint-name {endpoint_name} --custom "properties.primaryConnectionString==null"
+    """
+
     helps["dt network"] = """
         type: group
         short-summary: Manage Digital Twins network configuration including private links and endpoint connections.
@@ -290,7 +333,6 @@ def load_digitaltwins_help():
         - name: Approve a pending private-endpoint connection associated with the instance and add a description.
           text: >
             az dt network private-endpoint connection set -n {instance_name} --cn {connection_name} --status Approved --desc "A description."
-
         - name: Reject a private-endpoint connection associated with the instance and add a description.
           text: >
             az dt network private-endpoint connection set -n {instance_name} --cn {connection_name} --status Rejected --desc "Does not comply."
@@ -308,6 +350,23 @@ def load_digitaltwins_help():
         - name: Delete the private-endpoint connection named ba8408b6-1372-41b2-aef8-af43afc4729f no confirmation. Return immediately.
           text: >
             az dt network private-endpoint connection delete -n {instance_name} --cn ba8408b6-1372-41b2-aef8-af43afc4729f -y --no-wait
+    """
+
+    helps["dt network private-endpoint connection wait"] = """
+        type: command
+        short-summary: Wait until an operation on a private-endpoint connection is complete.
+
+        examples:
+        - name: Wait until the existing private-endpoint connection named ba8408b6-1372-41b2-aef8-af43afc4729f state is updated.
+          text: >
+            az dt network private-endpoint connection wait -n {instance_name} --cn ba8408b6-1372-41b2-aef8-af43afc4729f --updated
+
+        - name: Wait until the existing private-endpoint connection named ba8408b6-1372-41b2-aef8-af43afc4729f is deleted.
+          text: >
+            az dt network private-endpoint connection wait -n {instance_name} --cn ba8408b6-1372-41b2-aef8-af43afc4729f --deleted
+        - name: Wait until the existing private-endpoint connection named ba8408b6-1372-41b2-aef8-af43afc4729f has no actions required in the privateLinkServiceConnectionState property.
+          text: >
+            az dt network private-endpoint connection wait -n {instance_name} --cn ba8408b6-1372-41b2-aef8-af43afc4729f --custom "properties.privateLinkServiceConnectionState.actionsRequired=='None'"
     """
 
     helps["dt role-assignment"] = """
@@ -796,4 +855,14 @@ def load_digitaltwins_help():
         - name: Delete a target model.
           text: >
             az dt model delete -n {instance_or_hostname} --dtmi "dtmi:com:example:Floor;1"
+    """
+
+    helps["dt model delete-all"] = """
+        type: command
+        short-summary: Delete all models within a Digital Twins instance. Twins configurations are not affected but may be broken without model definitions.
+
+        examples:
+        - name: Delete all models.
+          text: >
+            az dt model delete-all -n {instance_or_hostname}
     """

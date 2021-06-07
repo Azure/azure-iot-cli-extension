@@ -4,6 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from azext_iot.digitaltwins.commands_twins import delete_all_twin
+from azext_iot.digitaltwins.commands_models import delete_all_models
 from azext_iot.digitaltwins.providers.resource import ResourceProvider
 from azext_iot.digitaltwins.common import (
     ADTEndpointType,
@@ -57,6 +59,16 @@ def delete_instance(cmd, name, resource_group_name=None):
     return rp.delete(name=name, resource_group_name=resource_group_name)
 
 
+def wait_instance(cmd, name, resource_group_name=None):
+    rp = ResourceProvider(cmd)
+    return rp.find_instance(name=name, resource_group_name=resource_group_name, wait=True)
+
+
+def reset_instance(cmd, name, resource_group_name=None):
+    delete_all_models(cmd, name, resource_group_name)
+    delete_all_twin(cmd, name, resource_group_name)
+
+
 def list_endpoints(cmd, name, resource_group_name=None):
     rp = ResourceProvider(cmd)
     return rp.list_endpoints(name=name, resource_group_name=resource_group_name)
@@ -73,6 +85,16 @@ def delete_endpoint(cmd, name, endpoint_name, resource_group_name=None):
     rp = ResourceProvider(cmd)
     return rp.delete_endpoint(
         name=name, endpoint_name=endpoint_name, resource_group_name=resource_group_name
+    )
+
+
+def wait_endpoint(cmd, name, endpoint_name, resource_group_name=None):
+    rp = ResourceProvider(cmd)
+    return rp.get_endpoint(
+        name=name,
+        endpoint_name=endpoint_name,
+        resource_group_name=resource_group_name,
+        wait=True
     )
 
 
@@ -217,4 +239,14 @@ def delete_private_endpoint_conn(cmd, name, conn_name, resource_group_name=None)
     rp = ResourceProvider(cmd)
     return rp.delete_private_endpoint_conn(
         name=name, resource_group_name=resource_group_name, conn_name=conn_name
+    )
+
+
+def wait_private_endpoint_conn(cmd, name, conn_name, resource_group_name=None):
+    rp = ResourceProvider(cmd)
+    return rp.get_private_endpoint_conn(
+        name=name,
+        resource_group_name=resource_group_name,
+        conn_name=conn_name,
+        wait=True
     )

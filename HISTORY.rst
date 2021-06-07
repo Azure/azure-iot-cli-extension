@@ -3,6 +3,74 @@
 Release History
 ===============
 
+0.10.14
++++++++++++++++
+
+**IoT Hub updates**
+
+* Fix for "az iot hub c2d-message receive" - the command will use the "ContentEncoding" header value (which indicates the message body encoding)
+  or fallback to utf-8 to decode the received message body.
+
+**Azure Digital Twins updates**
+
+* Addition of the following commands
+
+  * az dt reset - Preview command which deletes all data entities from the target instance (models, twins, twin relationships).
+  
+
+0.10.13
++++++++++++++++
+
+**General updates**
+
+* Min CLI core version raised to 2.17.1
+
+
+0.10.12
++++++++++++++++
+
+**IoT Central updates**
+
+* Public API GA update
+
+  * Remove preview tag for  api-token, device, device-template, user routes. Default routes use central GA API's.
+  * Add support for preview and 1.0 routes. 
+  * Addition of the optional '--av' argument to specify the version of API for the requested operation.
+
+**IoT Hub updates**
+
+* Removed deprecated edge offline commands and artifacts.
+* Removed deprecated device-identity | module-identity show-connection-string commands.
+
+* Most commands against IoT Hub support Azure AD based access. The type of auth
+  used to execute commands can be controlled with the "--auth-type" parameter
+  which accepts the values "key" or "login". The value of "key" is set by default.
+
+  * When "--auth-type" has the value of "key", like before the CLI will auto-discover
+    a suitable policy when interacting with iothub.
+  * When "--auth-type" has the value "login", an access token from the Azure CLI logged in principal
+    will be used for the operation.
+
+  * The following commands currently remain with key based access only.
+
+    * az iot hub monitor-events
+    * az iot device c2d-message receive
+    * az iot device c2d-message complete
+    * az iot device c2d-message abandon
+    * az iot device c2d-message reject
+    * az iot device c2d-message purge
+    * az iot device send-d2c-message
+    * az iot device simulate
+
+For more information about IoT Hub support for AAD visit: https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-dev-guide-azure-ad-rbac
+
+**Azure Digital Twins updates**
+
+* Addition of the following commands
+
+  * az dt model delete-all - Deletes all models associated with the Digital Twins instance.
+
+
 0.10.11
 +++++++++++++++
 
@@ -13,7 +81,15 @@ Release History
   * az iot hub invoke-device-method
   * az iot hub invoke-module-method
 
+* When using "az iot hub connection-string show" against all hubs in a group or subscription, the command will now
+  show a warning instead of raising an error if a problem occurs obtaining a connection-string from a particular hub.
+
 **Azure Digital Twins updates**
+
+* Addition of the following commands
+
+  * az dt twin delete-all - Deletes all digital twins within a Digital Twins instance.
+  * az dt twin relationship delete-all - Deletes all digital twin relationships within a Digital Twins instance
 
 * Fixed an issue in the following update commands where malformed json patch content would not raise an error
   causing the process to call the respective service endpoint with a request payload containing an empty array.
@@ -24,8 +100,12 @@ Release History
 
 **IoT Central updates**
 
-Placeholder
+* Addition of the following commands
 
+  * az iot central device manual-failover - Execute a manual failover of device across multiple IoT Hubs 
+  * az iot central device manual-failback - Reverts the previously executed failover command by moving the device back to it's original IoT Hub
+
+For more information about device high availability visit https://github.com/iot-for-all/iot-central-high-availability-clients#readme
 
 0.10.10
 +++++++++++++++

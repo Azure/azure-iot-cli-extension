@@ -67,7 +67,7 @@ def _load_central_devices_help():
             az iot central device create
             --app-id {appid}
             --device-id {deviceid}
-            --instance-of {devicetemplateid}
+            --template {devicetemplateid}
             --simulated
     """
 
@@ -81,6 +81,37 @@ def _load_central_devices_help():
         - name: Get a device
           text: >
             az iot central device show
+            --app-id {appid}
+            --device-id {deviceid}
+    """
+
+    helps[
+        "iot central device manual-failover"
+    ] = """
+        type: command
+        short-summary: Execute a manual failover of device across multiple IoT Hubs to validate device firmware's ability to reconnect using DPS to a different IoT Hub.
+        long-summary: For more information about high availability and default value for ttl-minutes visit https://github.com/iot-for-all/iot-central-high-availability-clients#readme
+
+        examples:
+        - name: Execute a manual failover of device across multiple IoT Hubs to validate device firmware's ability to reconnect using DPS to a different IoT Hub.
+          text: >
+            az iot central device manual-failover
+            --app-id {appid}
+            --device-id {deviceid}
+            --ttl-minutes {ttl_minutes}
+    """
+
+    helps[
+        "iot central device manual-failback"
+    ] = """
+        type: command
+        short-summary: Reverts the previously executed failover command by moving the device back to it's original IoT Hub
+        long-summary: For more information about high availability visit https://github.com/iot-for-all/iot-central-high-availability-clients#readme
+
+        examples:
+        - name: Reverts the previously executed failover command by moving the device back to it's original IoT Hub
+          text: >
+            az iot central device manual-failback
             --app-id {appid}
             --device-id {deviceid}
     """

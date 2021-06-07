@@ -8,8 +8,10 @@ import sys
 import io
 import os
 
+from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
 from azure.cli.testsdk import LiveScenarioTest
 from contextlib import contextmanager
+from typing import List
 
 PREFIX_DEVICE = "test-device-"
 PREFIX_EDGE_DEVICE = "test-edge-device-"
@@ -76,14 +78,45 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
         self.entity_name = entity_name
         self.entity_rg = entity_rg
-        self.device_ids = []
-        self.config_ids = []
-
-        os.environ["AZURE_CORE_COLLECT_TELEMETRY"] = "no"
 
         super(IoTLiveScenarioTest, self).__init__(test_scenario)
         self.region = self.get_region()
         self.connection_string = self.get_hub_cstring()
+
+    def clean_up(self, device_ids: List[str] = None, config_ids: List[str] = None):
+        if device_ids:
+            device = device_ids.pop()
+            self.cmd(
+                "iot hub device-identity delete -d {} --login {}".format(
+                    device, self.connection_string
+                ),
+                checks=self.is_empty(),
+            )
+
+            for device in device_ids:
+                self.cmd(
+                    "iot hub device-identity delete -d {} -n {} -g {}".format(
+                        device, self.entity_name, self.entity_rg
+                    ),
+                    checks=self.is_empty(),
+                )
+
+        if config_ids:
+            config = config_ids.pop()
+            self.cmd(
+                "iot hub configuration delete -c {} --login {}".format(
+                    config, self.connection_string
+                ),
+                checks=self.is_empty(),
+            )
+
+            for config in config_ids:
+                self.cmd(
+                    "iot hub configuration delete -c {} -n {} -g {}".format(
+                        config, self.entity_name, self.entity_rg
+                    ),
+                    checks=self.is_empty(),
+                )
 
     def generate_device_names(self, count=1, edge=False):
         names = [
@@ -92,7 +125,6 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             )
             for i in range(count)
         ]
-        self.device_ids.extend(names)
         return names
 
     def generate_module_names(self, count=1):
@@ -108,7 +140,6 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             )
             for i in range(count)
         ]
-        self.config_ids.extend(names)
         return names
 
     def generate_job_names(self, count=1):
@@ -117,39 +148,21 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
         ]
 
     def tearDown(self):
-        if self.device_ids:
-            device = self.device_ids.pop()
-            self.cmd(
-                "iot hub device-identity delete -d {} --login {}".format(
-                    device, self.connection_string
-                ),
-                checks=self.is_empty(),
-            )
+        device_list = []
+        device_list.extend(d["deviceId"] for d in self.cmd(
+            f"iot hub device-identity list -n {self.entity_name} -g {self.entity_rg}"
+        ).get_output_in_json())
 
-            for device in self.device_ids:
-                self.cmd(
-                    "iot hub device-identity delete -d {} -n {} -g {}".format(
-                        device, self.entity_name, self.entity_rg
-                    ),
-                    checks=self.is_empty(),
-                )
+        config_list = []
+        config_list.extend(c["id"] for c in self.cmd(
+            f"iot edge deployment list -n {self.entity_name} -g {self.entity_rg}"
+        ).get_output_in_json())
 
-        if self.config_ids:
-            config = self.config_ids.pop()
-            self.cmd(
-                "iot hub configuration delete -c {} --login {}".format(
-                    config, self.connection_string
-                ),
-                checks=self.is_empty(),
-            )
+        config_list.extend(c["id"] for c in self.cmd(
+            f"iot hub configuration list -n {self.entity_name} -g {self.entity_rg}"
+        ).get_output_in_json())
 
-            for config in self.config_ids:
-                self.cmd(
-                    "iot hub configuration delete -c {} -n {} -g {}".format(
-                        config, self.entity_name, self.entity_rg
-                    ),
-                    checks=self.is_empty(),
-                )
+        self.clean_up(device_ids=device_list, config_ids=config_list)
 
     def get_region(self):
         result = self.cmd(
@@ -162,10 +175,20 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
     def get_hub_cstring(self, policy="iothubowner"):
         return self.cmd(
-            "iot hub show-connection-string -n {} -g {} --policy-name {}".format(
+            "iot hub connection-string show -n {} -g {} --policy-name {}".format(
                 self.entity_name, self.entity_rg, policy
             )
         ).get_output_in_json()["connectionString"]
+
+    def set_cmd_auth_type(self, command: str, auth_type: str) -> str:
+        if auth_type not in DATAPLANE_AUTH_TYPES:
+            raise RuntimeError(f"auth_type of: {auth_type} is unsupported.")
+
+        # cstring takes precedence
+        if auth_type == "cstring":
+            return f"{command} --login {self.connection_string}"
+
+        return f"{command} --auth-type {auth_type}"
 
 
 def disable_telemetry(test_function):

@@ -40,51 +40,9 @@ def load_command_table(self, _):
             setter_name="iot_device_update",
             custom_func_name="update_iot_device_custom"
         )
-        cmd_group.command("renew-key", 'iot_device_key_regenerate')
-        cmd_group.command(
-            "show-connection-string",
-            "iot_get_device_connection_string",
-            deprecate_info=self.deprecate(
-                redirect="az iot hub device-identity connection-string show"
-            ),
-        )
+        cmd_group.command("renew-key", "iot_device_key_regenerate")
         cmd_group.command("import", "iot_device_import")
         cmd_group.command("export", "iot_device_export")
-        cmd_group.command(
-            "add-children",
-            "iot_device_children_add",
-            deprecate_info=self.deprecate(
-                redirect="az iot hub device-identity children add"
-            ),
-        )
-        cmd_group.command(
-            "remove-children",
-            "iot_device_children_remove",
-            deprecate_info=self.deprecate(
-                redirect="az iot hub device-identity children remove"
-            ),
-        )
-        cmd_group.command(
-            "list-children",
-            "iot_device_children_list_comma_separated",
-            deprecate_info=self.deprecate(
-                redirect="az iot hub device-identity children list"
-            ),
-        )
-        cmd_group.command(
-            "get-parent",
-            "iot_device_get_parent",
-            deprecate_info=self.deprecate(
-                redirect="az iot hub device-identity parent show"
-            ),
-        )
-        cmd_group.command(
-            "set-parent",
-            "iot_device_set_parent",
-            deprecate_info=self.deprecate(
-                redirect="az iot hub device-identity parent set"
-            ),
-        )
 
     with self.command_group(
         "iot hub device-identity children", command_type=iothub_ops
@@ -116,14 +74,7 @@ def load_command_table(self, _):
             getter_name="iot_device_module_show",
             setter_name="iot_device_module_update",
         )
-
-        cmd_group.show_command(
-            "show-connection-string",
-            "iot_get_module_connection_string",
-            deprecate_info=self.deprecate(
-                redirect="az iot hub module-identity connection-string show"
-            ),
-        )
+        cmd_group.command("renew-key", "iot_device_module_key_regenerate")
 
     with self.command_group(
         "iot hub module-identity connection-string", command_type=iothub_ops

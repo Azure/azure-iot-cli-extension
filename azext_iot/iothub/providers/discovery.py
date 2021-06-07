@@ -8,10 +8,12 @@ from knack.util import CLIError
 from knack.log import get_logger
 from azure.cli.core.commands.client_factory import get_subscription_id
 from azext_iot.common.utility import trim_from_start, ensure_iothub_sdk_min_version
+from azext_iot.common.shared import AuthenticationTypeDataplane
 from azext_iot.iothub.models.iothub_target import IotHubTarget
 from azext_iot._factory import iot_hub_service_factory
 from azext_iot.constants import IOTHUB_TRACK_2_SDK_MIN_VERSION
 from typing import Dict, List
+from types import SimpleNamespace
 from enum import Enum, EnumMeta
 
 PRIVILEDGED_ACCESS_RIGHTS_SET = set(
@@ -142,7 +144,28 @@ class IotHubDiscovery(object):
         if cstring:
             return self.get_target_by_cstring(connection_string=cstring)
 
+        resource_group_name = resource_group_name or kwargs.get("rg")
+
         target_iothub = self.find_iothub(hub_name=hub_name, rg=resource_group_name)
+
+        key_type = kwargs.get("key_type", "primary")
+        include_events = kwargs.get("include_events", False)
+
+        # Azure AD auth path
+        auth_type = kwargs.get("auth_type", AuthenticationTypeDataplane.key.value)
+        if auth_type == AuthenticationTypeDataplane.login.value:
+            logger.info("Using AAD access token for IoT Hub interaction.")
+            policy = SimpleNamespace()
+            policy.key_name = AuthenticationTypeDataplane.login.value
+            policy.primary_key = AuthenticationTypeDataplane.login.value
+            policy.secondary_key = AuthenticationTypeDataplane.login.value
+
+            return self._build_target(
+                iothub=target_iothub,
+                policy=policy,
+                key_type="primary",
+                include_events=include_events
+            )
 
         policy_name = kwargs.get("policy_name", "auto")
         rg = target_iothub.additional_properties.get("resourcegroup")
@@ -151,8 +174,6 @@ class IotHubDiscovery(object):
             hub_name=target_iothub.name, rg=rg, policy_name=policy_name,
         )
 
-        key_type = kwargs.get("key_type", "primary")
-        include_events = kwargs.get("include_events", False)
         return self._build_target(
             iothub=target_iothub,
             policy=target_policy,
@@ -210,5 +231,7 @@ class IotHubDiscovery(object):
                 "events"
             ].partition_ids
             target["events"] = events
+
+        target["cmd"] = self.cmd
 
         return target

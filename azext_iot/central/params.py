@@ -11,7 +11,7 @@ CLI parameter definitions.
 from knack.arguments import CLIArgumentType, CaseInsensitiveList
 from azure.cli.core.commands.parameters import get_three_state_flag
 from azext_iot.monitor.models.enum import Severity
-from azext_iot.central.models.enum import Role
+from azext_iot.central.models.enum import Role, ApiVersion
 from azext_iot._params import event_msg_prop_type, event_timeout_type
 
 severity_type = CLIArgumentType(
@@ -35,6 +35,13 @@ style_type = CLIArgumentType(
     "scroll = deliver errors as they arrive, json = summarize results as json, csv = summarize results as csv",
 )
 
+api_version = CLIArgumentType(
+    options_list=["--api-version", "--av"],
+    choices=CaseInsensitiveList([version.value for version in ApiVersion]),
+    default=ApiVersion.v1.value,
+    help="The API version for the requested operation.",
+)
+
 
 def load_central_arguments(self, _):
     """
@@ -45,8 +52,9 @@ def load_central_arguments(self, _):
             "app_id",
             options_list=["--app-id", "-n"],
             help="The App ID of the IoT Central app you want to manage."
-            " You can find the App ID in the \"About\" page for your application under the help menu."
+            ' You can find the App ID in the "About" page for your application under the help menu.',
         )
+        context.argument("api_version", arg_type=api_version)
         context.argument(
             "token",
             options_list=["--token"],
@@ -105,16 +113,16 @@ def load_central_arguments(self, _):
 
     with self.argument_context("iot central device") as context:
         context.argument(
-            "instance_of",
-            options_list=["--instance-of"],
-            help="Central template id. Example: urn:ojpkindbz:modelDefinition:iild3tm_uo",
+            "template",
+            options_list=["--template"],
+            help="Central template id. Example: dtmi:ojpkindbz:modelDefinition:iild3tm_uo.",
         )
         context.argument(
             "simulated",
             options_list=["--simulated"],
             arg_type=get_three_state_flag(),
             help="Add this flag if you would like IoT Central to set this up as a simulated device. "
-            "--instance-of is required if this is true",
+            "--template is required if this is true",
         )
         context.argument(
             "device_name",
@@ -149,6 +157,15 @@ def load_central_arguments(self, _):
             help="Provide a unique identifier for the device."
             " A case-sensitive string (up to 128 characters long) of ASCII 7-bit alphanumeric characters plus"
             " certain special characters: - . + % _ # * ? ! ( ) , : = @ $ '",
+        )
+    with self.argument_context("iot central device manual-failover") as context:
+        context.argument(
+            "ttl_minutes",
+            type=int,
+            options_list=["--ttl-minutes", "--ttl"],
+            help="A positive integer. TTL in minutes to move device back to the original hub."
+            "Has default value in backend. See documentation on what the latest backend default time to live value"
+            "by visiting https://github.com/iot-for-all/iot-central-high-availability-clients#readme",
         )
 
     with self.argument_context("iot central user") as context:
@@ -194,5 +211,7 @@ def load_central_arguments(self, _):
             "Use 0 for infinity.",
         )
         context.argument(
-            "module_id", options_list=["--module-id", "-m"], help="Provide IoT Edge Module ID if the device type is IoT Edge.",
+            "module_id",
+            options_list=["--module-id", "-m"],
+            help="Provide IoT Edge Module ID if the device type is IoT Edge.",
         )

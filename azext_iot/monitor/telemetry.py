@@ -64,7 +64,8 @@ def start_multiple_monitors(
 
     loop = get_loop()
 
-    future = asyncio.gather(*coroutines, loop=loop, return_exceptions=True)
+    # TODO: Remove direct usage of loop arguments by Python 3.10
+    future = asyncio.gather(*coroutines, loop=loop, return_exceptions=True)  # pylint: disable=deprecated-argument
     result = None
 
     try:
