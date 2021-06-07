@@ -65,7 +65,7 @@ def send_c2d_message(
     if expiry_time_utc:
         msg_props.absolute_expiry_time = int(expiry_time_utc)
 
-    msg_body = str.encode(data)
+    msg_body = data.encode(encoding=content_encoding)
 
     message = uamqp.Message(
         body=msg_body, properties=msg_props, application_properties=app_props
