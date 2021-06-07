@@ -106,36 +106,6 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             checks=self.is_empty(),
         )
 
-        utf_32_encoding = "utf-32"
-        string_payload = "Test payload encoding decoding"
-
-        # Send C2D Message with UTF-32 encoding
-        self.cmd(
-            """iot device c2d-message send -d {} -n {} -g {} --data '{}' --cid {} --mid {} --ct {} --expiry {}
-            --ce {} --props {}""".format(
-                device_ids[0],
-                LIVE_HUB,
-                LIVE_RG,
-                string_payload,
-                test_cid,
-                test_mid,
-                test_ct,
-                test_et,
-                utf_32_encoding,
-                test_props,
-            ),
-            checks=self.is_empty(),
-        )
-
-        result = self.cmd(
-            "iot device c2d-message receive -d {} --hub-name {} -g {}".format(
-                device_ids[0], LIVE_HUB, LIVE_RG
-            )
-        ).get_output_in_json()
-
-        # Verify that the data was decoded correctly
-        assert result["data"] == string_payload
-
         # Send C2D message via --login + application/json content ype
 
         test_ct = "application/json"
