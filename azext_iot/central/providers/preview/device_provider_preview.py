@@ -126,7 +126,7 @@ class CentralDeviceProviderPreview:
 
         return result
 
-    def run_component_command(
+    def run_command(
         self,
         device_id: str,
         interface_id: str,
@@ -134,35 +134,60 @@ class CentralDeviceProviderPreview:
         payload: dict,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> dict:
-        return central_services.device.run_component_command(
-            cmd=self._cmd,
-            app_id=self._app_id,
-            token=self._token,
-            device_id=device_id,
-            interface_id=interface_id,
-            command_name=command_name,
-            payload=payload,
-            central_dns_suffix=central_dns_suffix,
-            api_version=ApiVersion.preview.value,
-        )
 
-    def get_component_command_history(
+        if interface_id:
+            return central_services.device.run_component_command(
+                cmd=self._cmd,
+                app_id=self._app_id,
+                token=self._token,
+                device_id=device_id,
+                interface_id=interface_id,
+                command_name=command_name,
+                payload=payload,
+                central_dns_suffix=central_dns_suffix,
+                api_version=ApiVersion.preview.value,
+            )
+        else:
+            return central_services.device.run_command(
+                cmd=self._cmd,
+                app_id=self._app_id,
+                token=self._token,
+                device_id=device_id,
+                command_name=command_name,
+                payload=payload,
+                central_dns_suffix=central_dns_suffix,
+                api_version=ApiVersion.preview.value,
+            )
+
+    def get_command_history(
         self,
         device_id: str,
         interface_id: str,
         command_name: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> dict:
-        return central_services.device.get_component_command_history(
-            cmd=self._cmd,
-            app_id=self._app_id,
-            token=self._token,
-            device_id=device_id,
-            interface_id=interface_id,
-            command_name=command_name,
-            central_dns_suffix=central_dns_suffix,
-            api_version=ApiVersion.preview.value,
-        )
+
+        if interface_id:
+            return central_services.device.get_component_command_history(
+                cmd=self._cmd,
+                app_id=self._app_id,
+                token=self._token,
+                device_id=device_id,
+                interface_id=interface_id,
+                command_name=command_name,
+                central_dns_suffix=central_dns_suffix,
+                api_version=ApiVersion.preview.value,
+            )
+        else:
+            return central_services.device.get_command_history(
+                cmd=self._cmd,
+                app_id=self._app_id,
+                token=self._token,
+                device_id=device_id,
+                command_name=command_name,
+                central_dns_suffix=central_dns_suffix,
+                api_version=ApiVersion.preview.value,
+            )
 
     def _dps_populate_essential_info(
         self, dps_info, device_status: DeviceStatus
