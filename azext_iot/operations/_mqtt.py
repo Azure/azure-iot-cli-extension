@@ -16,8 +16,8 @@ class mqtt_client(object):
     def __init__(self, target, device_conn_string, device_id, method_response_code=None, method_response_payload=None):
         self.device_id = device_id
         self.target = target
-        self.device_client = mqtt_device_client.create_from_connection_string(device_conn_string)
-        self.device_client.connect()
+        # The client automatically connects when we send/receive a message or method invocation
+        self.device_client = mqtt_device_client.create_from_connection_string(device_conn_string, websockets=True)
         self.device_client.on_message_received = self.message_handler
         self.device_client.on_method_request_received = self.method_request_handler
         self.method_response_code = method_response_code

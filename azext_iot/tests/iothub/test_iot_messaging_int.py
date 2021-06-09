@@ -106,36 +106,6 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             checks=self.is_empty(),
         )
 
-        utf_32_encoding = "utf-32"
-        string_payload = "Test payload encoding decoding"
-
-        # Send C2D Message with UTF-32 encoding
-        self.cmd(
-            """iot device c2d-message send -d {} -n {} -g {} --data '{}' --cid {} --mid {} --ct {} --expiry {}
-            --ce {} --props {}""".format(
-                device_ids[0],
-                LIVE_HUB,
-                LIVE_RG,
-                string_payload,
-                test_cid,
-                test_mid,
-                test_ct,
-                test_et,
-                utf_32_encoding,
-                test_props,
-            ),
-            checks=self.is_empty(),
-        )
-
-        result = self.cmd(
-            "iot device c2d-message receive -d {} --hub-name {} -g {}".format(
-                device_ids[0], LIVE_HUB, LIVE_RG
-            )
-        ).get_output_in_json()
-
-        # Verify that the data was decoded correctly
-        assert result["data"] == string_payload
-
         # Send C2D message via --login + application/json content ype
 
         test_ct = "application/json"
@@ -299,6 +269,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         from azext_iot.operations.hub import iot_simulate_device
         from azext_iot._factory import iot_hub_service_factory
         from azure.cli.core.mock import DummyCli
+        from time import sleep
 
         cli_ctx = DummyCli()
         client = iot_hub_service_factory(cli_ctx)
@@ -311,7 +282,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 LIVE_HUB,
                 "complete",
                 "Testing direct method invocations when simulator is run with custom method response status and payload",
-                2,
+                4,
                 5,
                 "mqtt",
                 None,
@@ -323,6 +294,8 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             max_runs=4,
             return_handle=True,
         )
+
+        sleep(MQTT_CLIENT_SETUP_TIME)
 
         # invoke device method with response status and payload
         result = self.cmd(
