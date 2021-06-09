@@ -147,17 +147,17 @@ class CentralDeviceProviderPreview:
                 central_dns_suffix=central_dns_suffix,
                 api_version=ApiVersion.preview.value,
             )
-        else:
-            return central_services.device.run_command(
-                cmd=self._cmd,
-                app_id=self._app_id,
-                token=self._token,
-                device_id=device_id,
-                command_name=command_name,
-                payload=payload,
-                central_dns_suffix=central_dns_suffix,
-                api_version=ApiVersion.preview.value,
-            )
+
+        return central_services.device.run_command(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            token=self._token,
+            device_id=device_id,
+            command_name=command_name,
+            payload=payload,
+            central_dns_suffix=central_dns_suffix,
+            api_version=ApiVersion.preview.value,
+        )
 
     def get_command_history(
         self,
@@ -178,16 +178,16 @@ class CentralDeviceProviderPreview:
                 central_dns_suffix=central_dns_suffix,
                 api_version=ApiVersion.preview.value,
             )
-        else:
-            return central_services.device.get_command_history(
-                cmd=self._cmd,
-                app_id=self._app_id,
-                token=self._token,
-                device_id=device_id,
-                command_name=command_name,
-                central_dns_suffix=central_dns_suffix,
-                api_version=ApiVersion.preview.value,
-            )
+
+        return central_services.device.get_command_history(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            token=self._token,
+            device_id=device_id,
+            command_name=command_name,
+            central_dns_suffix=central_dns_suffix,
+            api_version=ApiVersion.preview.value,
+        )
 
     def _dps_populate_essential_info(
         self, dps_info, device_status: DeviceStatus

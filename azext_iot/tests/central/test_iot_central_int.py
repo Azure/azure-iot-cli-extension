@@ -699,12 +699,12 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         template_name = template["displayName"]
         template_id = template_name + "id"
 
-        result = self.cmd(
-            "iot central device-template create --app-id {} --device-template-id {} -k '{}'".format(
-                APP_ID, template_id, device_template_path
-            ),
-            checks=[self.check("displayName", template_name)],
+        command = "iot central device-template create --app-id {} --device-template-id {} -k '{}'".format(
+            APP_ID, template_id, device_template_path
         )
+        command = self._appendOptionalArgsToCommand(command, TOKEN, DNS_SUFFIX)
+
+        result = self.cmd(command, checks=[self.check("displayName", template_name), ],)
         json_result = result.get_output_in_json()
 
         assert json_result["@id"] == template_id

@@ -202,7 +202,7 @@ class CentralDeviceProviderV1:
         payload: dict,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
-        if self._is_interface_id_component(
+        if interface_id and self._is_interface_id_component(
             device_id=device_id,
             interface_id=interface_id,
             central_dns_suffix=central_dns_suffix,
@@ -218,17 +218,16 @@ class CentralDeviceProviderV1:
                 central_dns_suffix=central_dns_suffix,
                 api_version=ApiVersion.v1.value,
             )
-        else:
-            return central_services.device.run_command(
-                cmd=self._cmd,
-                app_id=self._app_id,
-                token=self._token,
-                device_id=device_id,
-                command_name=command_name,
-                payload=payload,
-                central_dns_suffix=central_dns_suffix,
-                api_version=ApiVersion.v1.value,
-            )
+        return central_services.device.run_command(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            token=self._token,
+            device_id=device_id,
+            command_name=command_name,
+            payload=payload,
+            central_dns_suffix=central_dns_suffix,
+            api_version=ApiVersion.v1.value,
+        )
 
     def get_command_history(
         self,
@@ -238,7 +237,7 @@ class CentralDeviceProviderV1:
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
 
-        if self._is_interface_id_component(
+        if interface_id and self._is_interface_id_component(
             device_id=device_id,
             interface_id=interface_id,
             central_dns_suffix=central_dns_suffix,
@@ -253,16 +252,16 @@ class CentralDeviceProviderV1:
                 central_dns_suffix=central_dns_suffix,
                 api_version=ApiVersion.v1.value,
             )
-        else:
-            return central_services.device.get_command_history(
-                cmd=self._cmd,
-                app_id=self._app_id,
-                token=self._token,
-                device_id=device_id,
-                command_name=command_name,
-                central_dns_suffix=central_dns_suffix,
-                api_version=ApiVersion.v1.value,
-            )
+
+        return central_services.device.get_command_history(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            token=self._token,
+            device_id=device_id,
+            command_name=command_name,
+            central_dns_suffix=central_dns_suffix,
+            api_version=ApiVersion.v1.value,
+        )
 
     def run_manual_failover(
         self,
