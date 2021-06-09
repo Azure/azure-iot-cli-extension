@@ -3,17 +3,14 @@
 Release History
 ===============
 
-0.10.15
+0.10.14
 +++++++++++++++
+
 **IoT Central updates**
 
   * add support to run root/interface level device commands.
   * add support to get command history for root/interface level device commands.
   * interface_id parameter for commands "device command run" , "device command history" run changed to optional.
-
-
-0.10.14
-+++++++++++++++
 
 **IoT Hub updates**
 
