@@ -319,7 +319,7 @@ def run_command(
     Args:
         cmd: command passed into az
         app_id: name of app (used for forming request URL)
-        device_id: unique case-sensitive device id        
+        device_id: unique case-sensitive device id
         command_name: name of command to execute
         payload: params for command
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
@@ -414,7 +414,7 @@ def get_command_history(
     Args:
         cmd: command passed into az
         app_id: name of app (used for forming request URL)
-        device_id: unique case-sensitive device id        
+        device_id: unique case-sensitive device id
         command_name: name of command to view execution history
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')

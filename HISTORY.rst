@@ -3,6 +3,14 @@
 Release History
 ===============
 
+0.10.15
++++++++++++++++
+**IoT Central updates**
+
+  * add support to run root/interface level device commands 
+  * add support to get command history for root/interface level device commands 
+
+
 0.10.14
 +++++++++++++++
 
