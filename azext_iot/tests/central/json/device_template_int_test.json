@@ -30,6 +30,15 @@
                     ],
                     "displayName": "Component"
                 }
+            },
+            {
+                "@id": "urn:rigado:RS40_Occupancy_Sensor:testRootCommand:9",
+                "@type": "Command",
+                "commandType": "synchronous",
+                "displayName": {
+                    "en": "testRootCommand"
+                },
+                "name": "testRootCommand"
             }
         ],
         "displayName": "larger-telemetry-device",
