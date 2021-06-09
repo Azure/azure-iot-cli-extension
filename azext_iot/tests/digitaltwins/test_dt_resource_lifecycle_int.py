@@ -130,11 +130,12 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         )
 
         # No location specified. Use the resource group location.
-        create_msi_output = self.cmd(
+        create_msi_poller = self.cmd(
             "dt create -n {} -g {} --assign-identity --scopes {}".format(
                 instance_names[1], self.rg, " ".join(scope_ids)
             )
-        ).get_output_in_json()
+        )
+        create_msi_output = create_msi_poller.get_output_in_json()
         self.track_instance(create_msi_output)
 
         assert_common_resource_attributes(
@@ -158,6 +159,9 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             tags=None,
             assign_identity=True,
         )
+
+        # Wait for RBAC to catch-up
+        sleep(60)
 
         role_assignment_egt_list = self.cmd(
             "role assignment list --scope {} --assignee {}".format(
@@ -183,7 +187,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         ).get_output_in_json()
 
         assert_common_resource_attributes(
-            self.wait_for_hostname(remove_msi_output),
+            self.wait_for_hostname(remove_msi_output, interval=10),
             instance_names[1],
             self.rg,
             self.rg_region,

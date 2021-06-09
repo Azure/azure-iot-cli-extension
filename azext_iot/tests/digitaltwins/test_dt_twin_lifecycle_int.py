@@ -712,6 +712,7 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
                 instance_name,
             )
         )
+        sleep(5)  # Wait for API to catch up
 
         model_query_result = self.cmd(
             "dt model list -n {} -g {}".format(instance_name, self.rg)

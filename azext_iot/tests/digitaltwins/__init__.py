@@ -166,7 +166,7 @@ class DTLiveScenarioTest(LiveScenarioTest):
         sleep(wait_in_sec)
 
         self.embedded_cli.invoke(
-            "dt wait -n {} -g {} --custom \"hostName && provisioningState=='Succeeded'\" --interval {} --timeout {}".format(
+            "dt wait -n {} -g {} --created --interval {} --timeout {}".format(
                 instance["name"],
                 instance["resourceGroup"],
                 wait_in_sec,
