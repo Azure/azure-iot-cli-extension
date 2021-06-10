@@ -2487,11 +2487,11 @@ def iot_simulate_device(
                 break
     try:
         if protocol_type == ProtocolType.mqtt.name:
-            
-            device = _iot_device_show(target, device_id)            
+
+            device = _iot_device_show(target, device_id)
             if device and device.get("authentication", {}).get("type", "") != DeviceAuthApiType.sas.value:
                 raise CLIError('MQTT simulation is only supported for symmetric key auth (SAS) based devices')
-            
+
             device_connection_string = _build_device_or_module_connection_string(device, KeyType.primary.value)
             client_mqtt = mqtt_client(
                 target=target,
