@@ -9,13 +9,13 @@ from knack.util import CLIError
 
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
-from azext_iot.central.models.enum import Role
+from azext_iot.central.models.enum import Role, ApiVersion
 
 
 logger = get_logger(__name__)
 
 
-class CentralUserProvider:
+class CentralUserProviderV1:
     def __init__(self, cmd, app_id: str, token=None):
         """
         Provider for device APIs
@@ -39,7 +39,7 @@ class CentralUserProvider:
         object_id: str,
         role: Role,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
+    ) -> dict:
         if not tenant_id:
             raise CLIError("Must specify --tenant-id when adding a service principal")
 
@@ -55,38 +55,36 @@ class CentralUserProvider:
             role=role,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
+            api_version=ApiVersion.v1.value,
         )
 
-    def get_user_list(
-        self, central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
+    def get_user_list(self, central_dns_suffix=CENTRAL_ENDPOINT,) -> dict:
         return central_services.user.get_user_list(
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
+            api_version=ApiVersion.v1.value,
         )
 
-    def get_user(
-        self, assignee, central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
+    def get_user(self, assignee, central_dns_suffix=CENTRAL_ENDPOINT,) -> dict:
         return central_services.user.get_user(
             cmd=self._cmd,
             app_id=self._app_id,
             assignee=assignee,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
+            api_version=ApiVersion.v1.value,
         )
 
-    def delete_user(
-        self, assignee, central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
+    def delete_user(self, assignee, central_dns_suffix=CENTRAL_ENDPOINT,) -> dict:
         return central_services.user.delete_user(
             cmd=self._cmd,
             app_id=self._app_id,
             assignee=assignee,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
+            api_version=ApiVersion.v1.value,
         )
 
     def add_email(
@@ -95,7 +93,7 @@ class CentralUserProvider:
         email: str,
         role: Role,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
+    ) -> dict:
         if not email:
             raise CLIError("Must specify --email when adding a user by email")
 
@@ -107,4 +105,5 @@ class CentralUserProvider:
             role=role,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
+            api_version=ApiVersion.v1.value,
         )

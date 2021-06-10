@@ -14,6 +14,7 @@ from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azure.cli.core.commands import AzCliCommand
 from azure.cli.core.mock import DummyCli
 from azext_iot.tests.generators import generate_generic_id
+from azext_iot.common.shared import DeviceAuthApiType
 
 path_get_device = "azext_iot.operations.hub._iot_device_show"
 path_iot_hub_service_factory = "azext_iot._factory.iot_hub_service_factory"
@@ -27,6 +28,7 @@ path_mqtt_device_client = "azext_iot.operations._mqtt.mqtt_device_client.create_
 path_iot_hub_monitor_events_entrypoint = (
     "azext_iot.operations.hub._iot_hub_monitor_events"
 )
+path_iot_device_show = "azext_iot.operations.hub._iot_device_show"
 hub_entity = "myhub.azure-devices.net"
 
 instance_name = generate_generic_id()
@@ -167,6 +169,72 @@ def mqttclient_generic_error(mocker, fixture_ghcs, fixture_sas):
 @pytest.fixture()
 def fixture_monitor_events_entrypoint(mocker):
     return mocker.patch(path_iot_hub_monitor_events_entrypoint)
+
+
+@pytest.fixture()
+def fixture_iot_device_show_sas(mocker):
+    device = mocker.patch(path_iot_device_show)
+    device.return_value = {
+        "authentication": {
+            "symmetricKey": {
+                "primaryKey": "test_pk",
+                "secondaryKey": "test_sk"
+            },
+            "type": DeviceAuthApiType.sas.value,
+            "x509Thumbprint": {
+                "primaryThumbprint": None,
+                "secondaryThumbprint": None
+            }
+        },
+        "capabilities": {
+            "iotEdge": False
+        },
+        "cloudToDeviceMessageCount": 0,
+        "connectionState": "Disconnected",
+        "connectionStateUpdatedTime": "2021-05-27T00:36:11.2861732Z",
+        "deviceId": "Test_Device_1",
+        "etag": "ODgxNTgwOA==",
+        "generationId": "637534345627501371",
+        "hub": "test-iot-hub.azure-devices.net",
+        "lastActivityTime": "2021-05-27T00:18:16.3154299Z",
+        "status": "enabled",
+        "statusReason": None,
+        "statusUpdatedTime": "0001-01-01T00:00:00Z"
+    }
+    return device
+
+
+@pytest.fixture()
+def fixture_self_signed_device_show_self_signed(mocker):
+    device = mocker.patch(path_iot_device_show)
+    device.return_value = {
+        "authentication": {
+            "symmetricKey": {
+                "primaryKey": "test_pk",
+                "secondaryKey": "test_sk"
+            },
+            "type": DeviceAuthApiType.selfSigned.value,
+            "x509Thumbprint": {
+                "primaryThumbprint": None,
+                "secondaryThumbprint": None
+            }
+        },
+        "capabilities": {
+            "iotEdge": False
+        },
+        "cloudToDeviceMessageCount": 0,
+        "connectionState": "Disconnected",
+        "connectionStateUpdatedTime": "2021-05-27T00:36:11.2861732Z",
+        "deviceId": "Test_Device_1",
+        "etag": "ODgxNTgwOA==",
+        "generationId": "637534345627501371",
+        "hub": "test-iot-hub.azure-devices.net",
+        "lastActivityTime": "2021-05-27T00:18:16.3154299Z",
+        "status": "enabled",
+        "statusReason": None,
+        "statusUpdatedTime": "0001-01-01T00:00:00Z"
+    }
+    return device
 
 
 # TODO: To be deprecated asap. Leverage mocked_response fixture for this functionality.

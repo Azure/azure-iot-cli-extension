@@ -32,7 +32,7 @@ from azext_iot.tests.conftest import (
     mock_target,
     generate_cs,
 )
-
+from azext_iot.common.shared import DeviceAuthApiType
 
 device_id = "mydevice"
 child_device_id = "child_device1"
@@ -58,9 +58,6 @@ def generate_device_create_req(
     status_reason=None,
     valid_days=None,
     output_dir=None,
-    set_parent_id=None,
-    add_children=None,
-    force=False,
 ):
     return {
         "client": None,
@@ -73,10 +70,7 @@ def generate_device_create_req(
         "status": status,
         "status_reason": status_reason,
         "valid_days": valid_days,
-        "output_dir": output_dir,
-        "set_parent_id": set_parent_id,
-        "add_children": add_children,
-        "force": force,
+        "output_dir": output_dir
     }
 
 
@@ -134,181 +128,19 @@ class TestDeviceCreate:
         assert body["capabilities"]["iotEdge"] == req["ee"]
 
         if req["auth"] == "shared_private_key":
-            assert body["authentication"]["type"] == "sas"
+            assert body["authentication"]["type"] == DeviceAuthApiType.sas.value
         elif req["auth"] == "x509_ca":
-            assert body["authentication"]["type"] == "certificateAuthority"
+            assert body["authentication"]["type"] == DeviceAuthApiType.certificateAuthority.value
             assert not body["authentication"].get("x509Thumbprint")
             assert not body["authentication"].get("symmetricKey")
         elif req["auth"] == "x509_thumbprint":
-            assert body["authentication"]["type"] == "selfSigned"
+            assert body["authentication"]["type"] == DeviceAuthApiType.selfSigned.value
             x509tp = body["authentication"]["x509Thumbprint"]
             assert x509tp["primaryThumbprint"]
             if req["stp"] is None:
                 assert x509tp.get("secondaryThumbprint") is None
             else:
                 assert x509tp["secondaryThumbprint"] == req["stp"]
-
-    @pytest.fixture
-    def sc_device_create_setparent(self, mocker, fixture_ghcs, fixture_sas, request):
-        service_client = mocker.patch(path_service_client)
-        test_side_effect = [
-            build_mock_response(mocker, 200, generate_parent_device()),
-            build_mock_response(mocker, 200, {}),
-        ]
-        service_client.side_effect = test_side_effect
-        return service_client
-
-    @pytest.mark.parametrize(
-        "req", [(generate_device_create_req(set_parent_id=device_id))]
-    )
-    def test_device_create_setparent(self, sc_device_create_setparent, req):
-        subject.iot_device_create(
-            fixture_cmd,
-            child_device_id,
-            req["hub_name"],
-            req["ee"],
-            req["auth"],
-            req["ptp"],
-            req["stp"],
-            req["status"],
-            req["status_reason"],
-            req["valid_days"],
-            req["output_dir"],
-            req["set_parent_id"],
-        )
-
-        args = sc_device_create_setparent.call_args
-        url = args[0][0].url
-        body = json.loads(args[0][0].body)
-
-        assert "{}/devices/{}?".format(mock_target["entity"], child_device_id) in url
-        assert args[0][0].method == "PUT"
-
-        assert body["deviceId"] == child_device_id
-        assert body["deviceScope"] == generate_parent_device().get("deviceScope")
-
-    @pytest.fixture(params=[(200, 0)])
-    def sc_invalid_args_device_create_setparent(
-        self, mocker, fixture_ghcs, fixture_sas, request
-    ):
-        service_client = mocker.patch(path_service_client)
-        parent_kvp = {}
-        if request.param[1] == 0:
-            parent_kvp.setdefault("capabilities", {"iotEdge": False})
-        test_side_effect = [
-            build_mock_response(
-                mocker, request.param[0], generate_parent_device(**parent_kvp)
-            )
-        ]
-        service_client.side_effect = test_side_effect
-        return service_client
-
-    @pytest.mark.parametrize("req, exp", [(generate_device_create_req(), CLIError)])
-    def test_device_create_setparent_invalid_args(
-        self, sc_invalid_args_device_create_setparent, req, exp
-    ):
-        with pytest.raises(exp):
-            subject.iot_device_create(
-                fixture_cmd,
-                child_device_id,
-                req["hub_name"],
-                req["ee"],
-                req["auth"],
-                req["ptp"],
-                req["stp"],
-                req["status"],
-                req["status_reason"],
-                req["valid_days"],
-                req["output_dir"],
-                device_id,
-            )
-
-    @pytest.fixture(params=[(200, 0), (200, 1), (200, 1)])
-    def sc_device_create_addchildren(self, mocker, fixture_ghcs, fixture_sas, request):
-        service_client = mocker.patch(path_service_client)
-        child_kvp = {}
-        if request.param[1] == 1:
-            child_kvp.setdefault("parentScopes", ["abcd"])
-        if request.param[1] == 1:
-            child_kvp.setdefault("capabilities", {"iotEdge": True})
-        test_side_effect = [
-            build_mock_response(
-                mocker, request.param[0], generate_child_device(**child_kvp)
-            ),
-            build_mock_response(mocker, request.param[0], generate_parent_device()),
-            build_mock_response(
-                mocker, request.param[0], generate_child_device(**child_kvp)
-            ),
-            build_mock_response(mocker, request.param[0], {}),
-        ]
-        service_client.side_effect = test_side_effect
-        return service_client
-
-    @pytest.mark.parametrize("req", [(generate_device_create_req())])
-    def test_device_create_addchildren(self, sc_device_create_addchildren, req):
-        subject.iot_device_create(
-            fixture_cmd,
-            req["device_id"],
-            req["hub_name"],
-            True,
-            req["auth"],
-            req["ptp"],
-            req["stp"],
-            req["status"],
-            req["status_reason"],
-            req["valid_days"],
-            req["output_dir"],
-            None,
-            child_device_id,
-            True,
-        )
-
-        args = sc_device_create_addchildren.call_args
-        url = args[0][0].url
-        body = json.loads(args[0][0].body)
-        assert "{}/devices/{}?".format(mock_target["entity"], child_device_id) in url
-        assert args[0][0].method == "PUT"
-        assert body["deviceId"] == child_device_id
-        assert body["deviceScope"] == generate_parent_device().get(
-            "deviceScope"
-        ) or body["parentScopes"] == [generate_parent_device().get("deviceScope")]
-
-    @pytest.fixture(params=[(200, 0)])
-    def sc_invalid_args_device_create_addchildren(
-        self, mocker, fixture_ghcs, fixture_sas, request
-    ):
-        service_client = mocker.patch(path_service_client)
-        child_kvp = {}
-        child_kvp.setdefault("parentScopes", ["abcd"])
-        test_side_effect = [
-            build_mock_response(
-                mocker, request.param[0], generate_child_device(**child_kvp)
-            )
-        ]
-        service_client.side_effect = test_side_effect
-        return service_client
-
-    @pytest.mark.parametrize("req, exp", [(generate_device_create_req(), CLIError)])
-    def test_device_create_addchildren_invalid_args(
-        self, sc_invalid_args_device_create_addchildren, req, exp
-    ):
-        with pytest.raises(exp):
-            subject.iot_device_create(
-                fixture_cmd,
-                req["device_id"],
-                req["hub_name"],
-                True,
-                req["auth"],
-                req["ptp"],
-                req["stp"],
-                req["status"],
-                req["status_reason"],
-                req["valid_days"],
-                req["output_dir"],
-                None,
-                child_device_id,
-                False,
-            )
 
     @pytest.mark.parametrize(
         "req, exp",
@@ -357,7 +189,7 @@ def generate_device_show(**kvp):
         "authentication": {
             "symmetricKey": {"primaryKey": None, "secondaryKey": None},
             "x509Thumbprint": {"primaryThumbprint": None, "secondaryThumbprint": None},
-            "type": "sas",
+            "type": DeviceAuthApiType.sas.value,
         },
         "capabilities": {"iotEdge": True},
         "deviceId": device_id,
@@ -409,7 +241,7 @@ class TestDeviceUpdate:
                 generate_device_show(
                     authentication={
                         "symmetricKey": {"primaryKey": "", "secondaryKey": ""},
-                        "type": "sas",
+                        "type": DeviceAuthApiType.sas.value,
                     }
                 )
             ),
@@ -420,13 +252,13 @@ class TestDeviceUpdate:
                             "primaryThumbprint": "123",
                             "secondaryThumbprint": "321",
                         },
-                        "type": "selfSigned",
+                        "type": DeviceAuthApiType.selfSigned.value,
                     }
                 )
             ),
             (
                 generate_device_show(
-                    authentication={"type": "certificateAuthority"},
+                    authentication={"type": DeviceAuthApiType.certificateAuthority.value},
                     etag=generate_generic_id(),
                 )
             ),
@@ -451,10 +283,10 @@ class TestDeviceUpdate:
         assert body["status"] == req["status"]
         assert body["capabilities"]["iotEdge"] == req["capabilities"]["iotEdge"]
         assert req["authentication"]["type"] == body["authentication"]["type"]
-        if req["authentication"]["type"] == "certificateAuthority":
+        if req["authentication"]["type"] == DeviceAuthApiType.certificateAuthority.value:
             assert not body["authentication"].get("x509Thumbprint")
             assert not body["authentication"].get("symmetricKey")
-        elif req["authentication"]["type"] == "selfSigned":
+        elif req["authentication"]["type"] == DeviceAuthApiType.selfSigned.value:
             assert body["authentication"]["x509Thumbprint"]["primaryThumbprint"]
             assert body["authentication"]["x509Thumbprint"]["secondaryThumbprint"]
 
@@ -485,7 +317,7 @@ class TestDeviceUpdate:
             (
                 generate_device_show(
                     authentication={
-                        "type": "selfSigned",
+                        "type": DeviceAuthApiType.selfSigned.value,
                         "symmetricKey": {"primaryKey": None, "secondaryKey": None},
                         "x509Thumbprint": {
                             "primaryThumbprint": "123",
@@ -502,7 +334,7 @@ class TestDeviceUpdate:
             (
                 generate_device_show(
                     authentication={
-                        "type": "certificateAuthority",
+                        "type": DeviceAuthApiType.certificateAuthority.value,
                         "symmetricKey": {"primaryKey": None, "secondaryKey": None},
                         "x509Thumbprint": {
                             "primaryThumbprint": None,
@@ -521,7 +353,7 @@ class TestDeviceUpdate:
             (
                 generate_device_show(
                     authentication={
-                        "type": "selfSigned",
+                        "type": DeviceAuthApiType.selfSigned.value,
                         "symmetricKey": {"primaryKey": None, "secondaryKey": None},
                         "x509Thumbprint": {
                             "primaryThumbprint": "123",
@@ -554,7 +386,7 @@ class TestDeviceUpdate:
             assert instance["statusReason"] == arg["status_reason"]
         if arg["auth_method"]:
             if arg["auth_method"] == "shared_private_key":
-                assert instance["authentication"]["type"] == "sas"
+                assert instance["authentication"]["type"] == DeviceAuthApiType.sas.value
                 instance["authentication"]["symmetricKey"]["primaryKey"] == arg[
                     "primary_key"
                 ]
@@ -562,7 +394,7 @@ class TestDeviceUpdate:
                     "secondary_key"
                 ]
             if arg["auth_method"] == "x509_thumbprint":
-                assert instance["authentication"]["type"] == "selfSigned"
+                assert instance["authentication"]["type"] == DeviceAuthApiType.selfSigned.value
                 if arg["primary_thumbprint"]:
                     instance["authentication"]["x509Thumbprint"][
                         "primaryThumbprint"
@@ -572,7 +404,7 @@ class TestDeviceUpdate:
                         "secondaryThumbprint"
                     ] = arg["secondary_thumbprint"]
             if arg["auth_method"] == "x509_ca":
-                assert instance["authentication"]["type"] == "certificateAuthority"
+                assert instance["authentication"]["type"] == DeviceAuthApiType.certificateAuthority.value
 
     @pytest.mark.parametrize(
         "req, arg, exp",
@@ -602,7 +434,7 @@ class TestDeviceUpdate:
             (
                 generate_device_show(
                     authentication={
-                        "type": "selfSigned",
+                        "type": DeviceAuthApiType.selfSigned.value,
                         "symmetricKey": {"primaryKey": None, "secondaryKey": None},
                         "x509Thumbprint": {
                             "primaryThumbprint": "123",
@@ -639,7 +471,7 @@ class TestDeviceUpdate:
                             "primaryThumbprint": "",
                             "secondaryThumbprint": "",
                         },
-                        "type": "selfSigned",
+                        "type": DeviceAuthApiType.selfSigned.value,
                     }
                 ),
                 CLIError,
@@ -676,7 +508,7 @@ class TestDeviceRegenerateKey:
             "authentication",
             {
                 "symmetricKey": {"primaryKey": "123", "secondaryKey": "321"},
-                "type": "sas",
+                "type": DeviceAuthApiType.sas.value,
             },
         )
         test_side_effect = [
@@ -902,13 +734,13 @@ class TestDeviceModuleCreate:
         assert body["moduleId"] == req["module_id"]
 
         if req["auth"] == "shared_private_key":
-            assert body["authentication"]["type"] == "sas"
+            assert body["authentication"]["type"] == DeviceAuthApiType.sas.value
         elif req["auth"] == "x509_ca":
-            assert body["authentication"]["type"] == "certificateAuthority"
+            assert body["authentication"]["type"] == DeviceAuthApiType.certificateAuthority.value
             assert not body["authentication"].get("x509Thumbprint")
             assert not body["authentication"].get("symmetricKey")
         elif req["auth"] == "x509_thumbprint":
-            assert body["authentication"]["type"] == "selfSigned"
+            assert body["authentication"]["type"] == DeviceAuthApiType.selfSigned.value
             x509tp = body["authentication"]["x509Thumbprint"]
             assert x509tp["primaryThumbprint"]
             if req["stp"] is None:
@@ -948,7 +780,7 @@ class TestDeviceModuleUpdate:
                 generate_device_module_show(
                     authentication={
                         "symmetricKey": {"primaryKey": "", "secondaryKey": ""},
-                        "type": "sas",
+                        "type": DeviceAuthApiType.sas.value,
                     },
                     etag=generate_generic_id(),
                 )
@@ -960,13 +792,13 @@ class TestDeviceModuleUpdate:
                             "primaryThumbprint": "123",
                             "secondaryThumbprint": "321",
                         },
-                        "type": "selfSigned",
+                        "type": DeviceAuthApiType.selfSigned.value,
                     }
                 )
             ),
             (
                 generate_device_module_show(
-                    authentication={"type": "certificateAuthority"}
+                    authentication={"type": DeviceAuthApiType.certificateAuthority.value}
                 )
             ),
         ],
@@ -995,10 +827,10 @@ class TestDeviceModuleUpdate:
         assert body["moduleId"] == req["moduleId"]
         assert not body.get("capabilities")
         assert req["authentication"]["type"] == body["authentication"]["type"]
-        if req["authentication"]["type"] == "certificateAuthority":
+        if req["authentication"]["type"] == DeviceAuthApiType.certificateAuthority.value:
             assert not body["authentication"].get("x509Thumbprint")
             assert not body["authentication"].get("symmetricKey")
-        elif req["authentication"]["type"] == "selfSigned":
+        elif req["authentication"]["type"] == DeviceAuthApiType.selfSigned.value:
             assert body["authentication"]["x509Thumbprint"]["primaryThumbprint"]
             assert body["authentication"]["x509Thumbprint"]["secondaryThumbprint"]
 
@@ -1016,7 +848,7 @@ class TestDeviceModuleUpdate:
                             "primaryThumbprint": "",
                             "secondaryThumbprint": "",
                         },
-                        "type": "selfSigned",
+                        "type": DeviceAuthApiType.selfSigned.value,
                     }
                 ),
                 CLIError,
@@ -2166,7 +1998,7 @@ class TestSasTokenAuth:
 
 class TestDeviceSimulate:
     @pytest.fixture(params=[204])
-    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request, fixture_device):
+    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request, fixture_device, fixture_iot_device_show_sas):
         service_client = mocker.patch(path_service_client)
         service_client.return_value = build_mock_response(mocker, request.param, {})
         return service_client
@@ -2280,6 +2112,12 @@ class TestDeviceSimulate:
             )
 
     def test_device_simulate_mqtt_error(self, mqttclient_generic_error):
+        with pytest.raises(CLIError):
+            subject.iot_simulate_device(
+                fixture_cmd, device_id, hub_name=mock_target["entity"]
+            )
+
+    def test_device_simulate_mqtt_non_sas_device_error(self, fixture_ghcs, fixture_self_signed_device_show_self_signed):
         with pytest.raises(CLIError):
             subject.iot_simulate_device(
                 fixture_cmd, device_id, hub_name=mock_target["entity"]
@@ -2568,7 +2406,7 @@ class TestEdgeOffline:
 
     def test_device_children_add(self, sc_addchildren):
         subject.iot_device_children_add(
-            None, device_id, child_device_id, True, mock_target["entity"]
+            None, device_id, [child_device_id], True, mock_target["entity"]
         )
         args = sc_addchildren.call_args
         url = args[0][0].url
@@ -2604,7 +2442,7 @@ class TestEdgeOffline:
     def test_device_addchildren_invalid_args(self, sc_invalid_args_addchildren, exp):
         with pytest.raises(exp):
             subject.iot_device_children_add(
-                fixture_cmd, device_id, child_device_id, False, mock_target["entity"]
+                fixture_cmd, device_id, [child_device_id], False, mock_target["entity"]
             )
 
     @pytest.fixture(params=[(200, 400), (200, 401), (200, 500)])
@@ -2621,7 +2459,7 @@ class TestEdgeOffline:
     def test_device_addchildren_error(self, sc_addchildren_error):
         with pytest.raises(CLIError):
             subject.iot_device_children_add(
-                fixture_cmd, device_id, child_device_id, True, mock_target["entity"]
+                fixture_cmd, device_id, [child_device_id], True, mock_target["entity"]
             )
 
     @pytest.fixture(params=[(200, 200)])
@@ -2642,7 +2480,7 @@ class TestEdgeOffline:
     def test_device_addchildren_invalid_etag(self, sc_invalid_etag_setparent, exp):
         with pytest.raises(exp):
             subject.iot_device_children_add(
-                fixture_cmd, device_id, child_device_id, True, mock_target["entity"]
+                fixture_cmd, device_id, [child_device_id], True, mock_target["entity"]
             )
 
     # list-children
@@ -2715,7 +2553,7 @@ class TestEdgeOffline:
 
     def test_device_children_remove_list(self, sc_removechildrenlist):
         subject.iot_device_children_remove(
-            fixture_cmd, device_id, child_device_id, False, mock_target["entity"]
+            fixture_cmd, device_id, [child_device_id], False, mock_target["entity"]
         )
         args = sc_removechildrenlist.call_args
         url = args[0][0].url
@@ -2754,7 +2592,7 @@ class TestEdgeOffline:
     ):
         with pytest.raises(exp):
             subject.iot_device_children_remove(
-                fixture_cmd, device_id, child_device_id, False, mock_target["entity"]
+                fixture_cmd, device_id, [child_device_id], False, mock_target["entity"]
             )
 
     @pytest.fixture(params=[(200, 200)])
@@ -2783,7 +2621,7 @@ class TestEdgeOffline:
     ):
         with pytest.raises(exp):
             subject.iot_device_children_remove(
-                fixture_cmd, device_id, child_device_id, False, mock_target["entity"]
+                fixture_cmd, device_id, [child_device_id], False, mock_target["entity"]
             )
 
     @pytest.fixture(params=[(200, 400), (200, 401), (200, 500)])

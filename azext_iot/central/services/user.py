@@ -9,11 +9,11 @@ import requests
 from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
-from azext_iot.central.models.enum import Role, UserType
+from azext_iot.central.models.enum import Role, ApiVersion, UserTypePreview, UserTypeV1
 
 logger = get_logger(__name__)
 
-BASE_PATH = "api/preview/users"
+BASE_PATH = "api/users"
 
 
 def add_service_principal(
@@ -25,7 +25,8 @@ def add_service_principal(
     role: Role,
     token: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-):
+    api_version=ApiVersion.v1.value,
+) -> dict:
     """
     Add a user to a Central app
 
@@ -43,16 +44,25 @@ def add_service_principal(
     """
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, assignee)
 
+    if api_version == ApiVersion.v1.value:
+        user_type = UserTypeV1.service_principal.value
+    else:
+        user_type = UserTypePreview.service_principal.value
+
     payload = {
         "tenantId": tenant_id,
         "objectId": object_id,
-        "type": UserType.service_principal.value,
+        "type": user_type,
         "roles": [{"role": role.value}],
     }
 
     headers = _utility.get_headers(token, cmd, has_json_payload=True)
 
-    response = requests.put(url, headers=headers, json=payload)
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
+    response = requests.put(url, headers=headers, json=payload, params=query_parameters)
     return _utility.try_extract_result(response)
 
 
@@ -64,7 +74,8 @@ def add_email(
     role: Role,
     token: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-):
+    api_version=ApiVersion.v1.value,
+) -> dict:
     """
     Add a user to a Central app
 
@@ -81,21 +92,34 @@ def add_email(
     """
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, assignee)
 
+    if api_version == ApiVersion.v1.value:
+        user_type = UserTypeV1.email.value
+    else:
+        user_type = UserTypePreview.email.value
+
     payload = {
         "email": email,
-        "type": UserType.email.value,
+        "type": user_type,
         "roles": [{"role": role.value}],
     }
 
     headers = _utility.get_headers(token, cmd, has_json_payload=True)
 
-    response = requests.put(url, headers=headers, json=payload)
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
+    response = requests.put(url, headers=headers, json=payload, params=query_parameters)
     return _utility.try_extract_result(response)
 
 
 def get_user_list(
-    cmd, app_id: str, token: str, central_dns_suffix=CENTRAL_ENDPOINT,
-):
+    cmd,
+    app_id: str,
+    token: str,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
+) -> dict:
     """
     Get the list of users for central app.
 
@@ -113,13 +137,22 @@ def get_user_list(
 
     headers = _utility.get_headers(token, cmd)
 
-    response = requests.get(url, headers=headers)
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
+    response = requests.get(url, headers=headers, params=query_parameters)
     return _utility.try_extract_result(response)
 
 
 def get_user(
-    cmd, app_id: str, token: str, assignee: str, central_dns_suffix=CENTRAL_ENDPOINT,
-):
+    cmd,
+    app_id: str,
+    token: str,
+    assignee: str,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
+) -> dict:
     """
     Get information for the specified user.
 
@@ -138,13 +171,22 @@ def get_user(
 
     headers = _utility.get_headers(token, cmd)
 
-    response = requests.get(url, headers=headers)
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
+    response = requests.get(url, headers=headers, params=query_parameters)
     return _utility.try_extract_result(response)
 
 
 def delete_user(
-    cmd, app_id: str, token: str, assignee: str, central_dns_suffix=CENTRAL_ENDPOINT,
-):
+    cmd,
+    app_id: str,
+    token: str,
+    assignee: str,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
+) -> dict:
     """
     delete user from theapp.
 
@@ -163,5 +205,9 @@ def delete_user(
 
     headers = _utility.get_headers(token, cmd)
 
-    response = requests.delete(url, headers=headers)
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
+    response = requests.delete(url, headers=headers, params=query_parameters)
     return _utility.try_extract_result(response)

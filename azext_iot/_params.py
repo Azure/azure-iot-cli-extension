@@ -31,10 +31,29 @@ from azext_iot.common.shared import (
     JobCreateType,
     JobStatusType,
     AuthenticationType,
+    AuthenticationTypeDataplane,
     RenewKeyType,
 )
 from azext_iot._validators import mode2_iot_login_handler
 from azext_iot.assets.user_messages import info_param_properties_device
+from azure.cli.core.local_context import LocalContextAttribute, LocalContextAction
+
+
+auth_type_dataplane_param_type = CLIArgumentType(
+    options_list=["--auth-type"],
+    arg_type=get_enum_type(
+        AuthenticationTypeDataplane, AuthenticationTypeDataplane.key.value
+    ),
+    arg_group="Access Control",
+    help="Indicates whether the operation should auto-derive a policy key or use the current Azure AD session. "
+    "You can configure the default using `az configure --defaults iothub-data-auth-type=<auth-type-value>`",
+    configured_default="iothub-data-auth-type",
+    local_context_attribute=LocalContextAttribute(
+        name="iothub-data-auth-type",
+        actions=[LocalContextAction.SET, LocalContextAction.GET],
+        scopes=["iot"],
+    ),
+)
 
 hub_name_type = CLIArgumentType(
     completer=get_resource_name_completion_list("Microsoft.Devices/IotHubs"),
@@ -106,7 +125,7 @@ def load_arguments(self, _):
             "etag",
             options_list=["--etag", "-e"],
             help="Etag or entity tag corresponding to the last state of the resource. "
-            "If no etag is provided the value '*' is used."
+            "If no etag is provided the value '*' is used.",
         )
         context.argument(
             "top",
@@ -250,6 +269,11 @@ def load_arguments(self, _):
             options_list=["--desired"],
             help="Twin desired properties.",
         )
+        context.argument(
+            "auth_type_dataplane",
+            options_list=["--auth-type"],
+            arg_type=auth_type_dataplane_param_type,
+        )
 
     with self.argument_context("iot hub connection-string") as context:
         context.argument(
@@ -359,7 +383,7 @@ def load_arguments(self, _):
             help="Description for device status.",
         )
 
-    with self.argument_context('iot hub device-identity update') as context:
+    with self.argument_context("iot hub device-identity update") as context:
         context.argument(
             "primary_key",
             options_list=["--primary-key", "--pk"],
@@ -371,39 +395,12 @@ def load_arguments(self, _):
             help="The secondary symmetric shared access key stored in base64 format.",
         )
 
-    with self.argument_context("iot hub device-identity create") as context:
-        context.argument(
-            "force",
-            options_list=["--force", "-f"],
-            arg_type=get_three_state_flag(),
-            help="Overwrites the device's parent device. "
-            "This command parameter has been deprecated and will be removed "
-            "in a future release. Use 'az iot hub device-identity parent set' instead.",
-            deprecate_info=context.deprecate()
-        )
-        context.argument(
-            "set_parent_id",
-            options_list=["--set-parent", "--pd"],
-            help="Id of edge device. "
-            "This command parameter has been deprecated and will be removed "
-            "in a future release. Use 'az iot hub device-identity parent set' instead.",
-            deprecate_info=context.deprecate()
-        )
-        context.argument(
-            "add_children",
-            options_list=["--add-children", "--cl"],
-            help="Child device list (comma separated). "
-            "This command parameter has been deprecated and will be removed "
-            "in a future release. Use 'az iot hub device-identity children add' instead.",
-            deprecate_info=context.deprecate()
-        )
-
-    with self.argument_context('iot hub device-identity renew-key') as context:
+    with self.argument_context("iot hub device-identity renew-key") as context:
         context.argument(
             "renew_key_type",
             options_list=["--key-type", "--kt"],
             arg_type=get_enum_type(RenewKeyType),
-            help="Target key type to regenerate."
+            help="Target key type to regenerate.",
         )
 
     with self.argument_context("iot hub device-identity export") as context:
@@ -413,7 +410,8 @@ def load_arguments(self, _):
             help="Blob Shared Access Signature URI with write, read, and delete access to "
             "a blob container. This is used to output the status of the "
             "job and the results. Note: when using Identity-based authentication an "
-            "https:// URI is still required. Input for this argument can be inline or from a file path.",
+            "https:// URI is still required - but no SAS token is necessary. Input for this argument "
+            "can be inline or from a file path.",
         )
         context.argument(
             "include_keys",
@@ -428,6 +426,15 @@ def load_arguments(self, _):
             arg_type=get_enum_type(AuthenticationType),
             help="Authentication type for communicating with the storage container.",
         )
+        context.argument(
+            "identity",
+            options_list=["--identity"],
+            help="Managed identity type to determine if system assigned managed identity or "
+            "user assigned managed identity is used. For system assigned managed identity, use "
+            "[system]. For user assigned managed identity, provide the user assigned managed "
+            "identity resource id. This identity requires a Storage Blob Data Contributor roles for the Storage "
+            "Account.",
+        )
 
     with self.argument_context("iot hub device-identity import") as context:
         context.argument(
@@ -436,8 +443,8 @@ def load_arguments(self, _):
             help="Blob Shared Access Signature URI with read access to a blob "
             "container. This blob contains the operations to be performed on "
             "the identity registry. Note: when using Identity-based authentication "
-            "an https:// URI is still required. Input for this argument can be inline "
-            "or from a file path.",
+            "an https:// URI is still required - but no SAS token is necessary. Input for this "
+            "argument can be inline or from a file path.",
         )
         context.argument(
             "output_blob_container_uri",
@@ -445,8 +452,8 @@ def load_arguments(self, _):
             help="Blob Shared Access Signature URI with write access "
             "to a blob container. This is used to output the status of "
             "the job and the results. Note: when using Identity-based "
-            "authentication an https:// URI is still required. Input for "
-            "this argument can be inline or from a file path.",
+            "authentication an https:// URI without the SAS token is still required. "
+            "Input for this argument can be inline or from a file path.",
         )
         context.argument(
             "storage_authentication_type",
@@ -454,51 +461,15 @@ def load_arguments(self, _):
             arg_type=get_enum_type(AuthenticationType),
             help="Authentication type for communicating with the storage container.",
         )
-
-    with self.argument_context("iot hub device-identity get-parent") as context:
-        context.argument("device_id", help="Id of device.")
-
-    with self.argument_context("iot hub device-identity set-parent") as context:
-        context.argument("device_id", help="Id of device.")
         context.argument(
-            "parent_id",
-            options_list=["--parent-device-id", "--pd"],
-            help="Id of edge device.",
+            "identity",
+            options_list=["--identity"],
+            help="Managed identity type to determine if system assigned managed identity or "
+            "user assigned managed identity is used. For system assigned managed identity, use "
+            "[system]. For user assigned managed identity, provide the user assigned managed "
+            "identity resource id. This identity requires a Storage Blob Data Contributor role for the target Storage "
+            "Account and Contributor role for the IoT Hub.",
         )
-        context.argument(
-            "force",
-            options_list=["--force", "-f"],
-            help="Overwrites the device's parent device.",
-        )
-
-    with self.argument_context("iot hub device-identity add-children") as context:
-        context.argument("device_id", help="Id of edge device.")
-        context.argument(
-            "child_list",
-            options_list=["--child-list", "--cl"],
-            help="Child device list (comma separated).",
-        )
-        context.argument(
-            "force",
-            options_list=["--force", "-f"],
-            help="Overwrites the child device's parent device.",
-        )
-
-    with self.argument_context("iot hub device-identity remove-children") as context:
-        context.argument("device_id", help="Id of edge device.")
-        context.argument(
-            "child_list",
-            options_list=["--child-list", "--cl"],
-            help="Child device list (comma separated).",
-        )
-        context.argument(
-            "remove_all",
-            options_list=["--remove-all", "-a"],
-            help="To remove all children.",
-        )
-
-    with self.argument_context("iot hub device-identity list-children") as context:
-        context.argument("device_id", help="Id of edge device.")
 
     with self.argument_context("iot hub device-identity parent set") as context:
         context.argument(
@@ -530,6 +501,14 @@ def load_arguments(self, _):
             help="To remove all children.",
         )
 
+    with self.argument_context("iot hub module-identity renew-key") as context:
+        context.argument(
+            "renew_key_type",
+            options_list=["--key-type", "--kt"],
+            arg_type=get_enum_type(RenewKeyType),
+            help="Target key type to regenerate.",
+        )
+
     with self.argument_context("iot hub distributed-tracing update") as context:
         context.argument(
             "sampling_mode",
@@ -558,6 +537,11 @@ def load_arguments(self, _):
         )
 
     with self.argument_context("iot device") as context:
+        context.argument(
+            "auth_type_dataplane",
+            options_list=["--auth-type"],
+            arg_type=auth_type_dataplane_param_type,
+        )
         context.argument("data", options_list=["--data", "--da"], help="Message body.")
         context.argument(
             "properties",
@@ -646,12 +630,12 @@ def load_arguments(self, _):
         context.argument(
             "content_type",
             options_list=["--content-type", "--ct"],
-            help="The content type associated with the C2D message.",
+            help="The content type for the C2D message body.",
         )
         context.argument(
             "content_encoding",
             options_list=["--content-encoding", "--ce"],
-            help="The content encoding associated with the C2D message.",
+            help="The encoding for the C2D message body.",
         )
 
     with self.argument_context("iot device c2d-message send") as context:
@@ -800,6 +784,11 @@ def load_arguments(self, _):
             arg_type=get_three_state_flag(),
             help="Disables client side schema validation for edge deployment creation.",
         )
+        context.argument(
+            "auth_type_dataplane",
+            options_list=["--auth-type"],
+            arg_type=auth_type_dataplane_param_type,
+        )
 
     with self.argument_context("iot dps") as context:
         context.argument(
@@ -932,7 +921,7 @@ def load_arguments(self, _):
             "show_keys",
             options_list=["--show-keys", "--keys"],
             arg_type=get_three_state_flag(),
-            help="Include attestation keys and information in enrollment results"
+            help="Include attestation keys and information in enrollment results",
         )
 
     with self.argument_context("iot dps enrollment update") as context:
@@ -984,7 +973,7 @@ def load_arguments(self, _):
             "show_keys",
             options_list=["--show-keys", "--keys"],
             arg_type=get_three_state_flag(),
-            help="Include attestation keys and information in enrollment group results"
+            help="Include attestation keys and information in enrollment group results",
         )
 
     with self.argument_context("iot dps registration") as context:

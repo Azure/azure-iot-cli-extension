@@ -9,7 +9,7 @@ from msrest.authentication import Authentication
 
 class DigitalTwinAuthentication(Authentication):
     """
-    Shared Access Signature authorization for Azure IoT Hub.
+    Azure AD OAuth for Azure Digital Twins.
 
     """
 

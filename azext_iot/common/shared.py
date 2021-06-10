@@ -56,6 +56,16 @@ class DeviceAuthType(Enum):
     x509_ca = "x509_ca"
 
 
+class DeviceAuthApiType(Enum):
+    """
+    Hub Device Authorization type.
+    """
+
+    sas = "sas"
+    selfSigned = "selfSigned"
+    certificateAuthority = "certificateAuthority"
+
+
 class KeyType(Enum):
     """
     Shared private key.
@@ -213,6 +223,15 @@ class AuthenticationType(Enum):
 
     keyBased = "key"
     identityBased = "identity"
+
+
+class AuthenticationTypeDataplane(Enum):
+    """
+    Use a policy key or Oauth token from Azure AD.
+    """
+
+    key = "key"
+    login = "login"
 
 
 class RenewKeyType(Enum):

@@ -50,9 +50,13 @@ class CentralDeviceTwinProvider:
             endpoint = find_between(sas_token, "SharedAccessSignature sr=", "&sig=")
             target = {"entity": endpoint}
             auth = BasicSasTokenAuthentication(sas_token=sas_token)
-            service_sdk = SdkResolver(target=target, auth_override=auth).get_sdk(SdkType.service_sdk)
+            service_sdk = SdkResolver(target=target, auth_override=auth).get_sdk(
+                SdkType.service_sdk
+            )
             try:
-                return service_sdk.devices.get_twin(id=self._device_id, raw=True).response.json()
+                return service_sdk.devices.get_twin(
+                    id=self._device_id, raw=True
+                ).response.json()
             except CloudError as e:
                 if exception is None:
                     exception = CLIError(unpack_msrest_error(e))

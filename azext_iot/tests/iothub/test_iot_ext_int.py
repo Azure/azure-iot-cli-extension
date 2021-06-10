@@ -6,12 +6,15 @@
 
 import os
 import pytest
-import warnings
+from time import sleep
 
-from azext_iot.common.utility import read_file_content
 from azext_iot.tests import IoTLiveScenarioTest
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC
-from azext_iot.constants import DEVICE_DEVICESCOPE_PREFIX
+from azext_iot.common.utility import ensure_iothub_sdk_min_version
+
+from azext_iot.tests.generators import generate_generic_id
+# TODO: assert DEVICE_DEVICESCOPE_PREFIX format in parent device twin.
+from azext_iot.constants import IOTHUB_TRACK_2_SDK_MIN_VERSION
 
 opt_env_set = ["azext_iot_teststorageuri", "azext_iot_identity_teststorageid"]
 
@@ -24,1394 +27,48 @@ LIVE_RG = settings.env.azext_iot_testrg
 
 # Set this environment variable to your empty blob container sas uri to test device export and enable file upload test.
 # For file upload, you will need to have configured your IoT Hub before running.
-LIVE_STORAGE = settings.env.azext_iot_teststorageuri
+LIVE_STORAGE_URI = settings.env.azext_iot_teststorageuri
 
 # Set this environment variable to enable identity-based integration tests
 # You will need permissions to add and remove role assignments for this storage account
-LIVE_STORAGE_ID = settings.env.azext_iot_identity_teststorageid
-
-LIVE_CONSUMER_GROUPS = ["test1", "test2", "test3"]
+LIVE_STORAGE_RESOURCE_ID = settings.env.azext_iot_identity_teststorageid
 
 CWD = os.path.dirname(os.path.abspath(__file__))
 
-PRIMARY_THUMBPRINT = "A361EA6A7119A8B0B7BBFFA2EAFDAD1F9D5BED8C"
-SECONDARY_THUMBPRINT = "14963E8F3BA5B3984110B3C1CA8E8B8988599087"
-
-
-class TestIoTHub(IoTLiveScenarioTest):
-    def __init__(self, test_case):
-        super(TestIoTHub, self).__init__(test_case, LIVE_HUB, LIVE_RG)
-
-    def test_hub(self):
-        self.cmd(
-            "az iot hub generate-sas-token -n {} -g {}".format(LIVE_HUB, LIVE_RG),
-            checks=[self.exists("sas")],
-        )
-
-        self.cmd(
-            "az iot hub generate-sas-token -n {}".format(LIVE_HUB),
-            checks=[self.exists("sas")],
-        )
-
-        self.cmd(
-            "az iot hub generate-sas-token -n {} --du {}".format(LIVE_HUB, "1000"),
-            checks=[self.exists("sas")],
-        )
-
-        # With connection string
-        self.cmd(
-            "az iot hub generate-sas-token --login {}".format(self.connection_string),
-            checks=[self.exists("sas")],
-        )
-
-        self.cmd(
-            "az iot hub generate-sas-token --login {} --pn somepolicy".format(
-                self.connection_string
-            ),
-            expect_failure=True,
-        )
-
-        # Test 'az iot hub connection-string show'
-        conn_str_pattern = r'^HostName={0}.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey='.format(
-            LIVE_HUB)
-        conn_str_eventhub_pattern = (r'^Endpoint=sb://(.+?)servicebus.windows.net/;SharedAccessKeyName='
-                                     r'iothubowner;SharedAccessKey=(.+?);EntityPath=')
-        defaultpolicy = "iothubowner"
-        nonexistantpolicy = "badpolicy"
-
-        hubs_in_sub = self.cmd('iot hub connection-string show').get_output_in_json()
-        hubs_in_rg = self.cmd('iot hub connection-string show -g {}'.format(LIVE_RG)).get_output_in_json()
-        assert len(hubs_in_sub) >= len(hubs_in_rg)
-
-        self.cmd('iot hub connection-string show -n {0}'.format(LIVE_HUB), checks=[
-            self.check_pattern('connectionString', conn_str_pattern)
-        ])
-
-        self.cmd('iot hub connection-string show -n {0} --pn {1}'.format(LIVE_HUB, defaultpolicy), checks=[
-            self.check_pattern('connectionString', conn_str_pattern)
-        ])
-
-        self.cmd(
-            'iot hub connection-string show -n {0} --pn {1}'.format(LIVE_HUB, nonexistantpolicy),
-            expect_failure=True,
-        )
-
-        self.cmd(
-            'iot hub connection-string show --pn {0}'.format(nonexistantpolicy),
-            checks=[self.check('length(@)', 0)]
-        )
-
-        self.cmd('iot hub connection-string show -n {0} --eh'.format(LIVE_HUB), checks=[
-            self.check_pattern('connectionString', conn_str_eventhub_pattern)
-        ])
-
-        self.cmd('iot hub connection-string show -n {0} -g {1}'.format(LIVE_HUB, LIVE_RG), checks=[
-            self.check('length(@)', 1),
-            self.check_pattern('connectionString', conn_str_pattern)
-        ])
-
-        self.cmd('iot hub connection-string show -n {0} -g {1} --all'.format(LIVE_HUB, LIVE_RG), checks=[
-            self.greater_than('length(connectionString[*])', 0),
-            self.check_pattern('connectionString[0]', conn_str_pattern)
-        ])
-
-        self.cmd('iot hub connection-string show -n {0} -g {1} --all --eh'.format(LIVE_HUB, LIVE_RG), checks=[
-            self.greater_than('length(connectionString[*])', 0),
-            self.check_pattern('connectionString[0]', conn_str_eventhub_pattern)
-        ])
-
-        # With connection string
-        # Error can't change key for a sas token with conn string
-        self.cmd(
-            "az iot hub generate-sas-token --login {} --kt secondary".format(
-                self.connection_string
-            ),
-            expect_failure=True,
-        )
-
-        self.cmd(
-            'iot hub query --hub-name {} -q "{}"'.format(
-                LIVE_HUB, "select * from devices"
-            ),
-            checks=[self.check("length([*])", 0)],
-        )
-
-        # With connection string
-        self.cmd(
-            'iot hub query --query-command "{}" --login {}'.format(
-                "select * from devices", self.connection_string
-            ),
-            checks=[self.check("length([*])", 0)],
-        )
-
-        # Test mode 2 handler
-        self.cmd(
-            'iot hub query -q "{}"'.format("select * from devices"), expect_failure=True
-        )
-
-        self.cmd(
-            'iot hub query -q "{}" -l "{}"'.format(
-                "select * from devices", "Hostname=badlogin;key=1235"
-            ),
-            expect_failure=True,
-        )
-
-
-class TestIoTHubDevices(IoTLiveScenarioTest):
-    def __init__(self, test_case):
-        super(TestIoTHubDevices, self).__init__(
-            test_case, LIVE_HUB, LIVE_RG
-        )
-
-    def test_hub_devices(self):
-        device_count = 5
-        edge_device_count = 2
-        edge_x509_device_count = 2
-        total_edge_device_count = edge_x509_device_count + edge_device_count
-
-        device_ids = self.generate_device_names(device_count)
-        edge_device_ids = self.generate_device_names(edge_device_count, edge=True)
-        edge_x509_device_ids = self.generate_device_names(edge_x509_device_count, edge=True)
-
-        total_devices = device_count + total_edge_device_count
-
-        self.cmd(
-            "iot hub device-identity create -d {} -n {} -g {}".format(
-                device_ids[4], LIVE_HUB, LIVE_RG
-            ),
-            checks=[
-                self.check("deviceId", device_ids[4]),
-                self.check("status", "enabled"),
-                self.check("statusReason", None),
-                self.check("connectionState", "Disconnected"),
-                self.check("capabilities.iotEdge", False),
-                self.exists("authentication.symmetricKey.primaryKey"),
-                self.exists("authentication.symmetricKey.secondaryKey"),
-            ],
-        )
-
-        for edge_device in edge_device_ids:
-            self.cmd(
-                "iot hub device-identity create -d {} -n {} -g {} --ee --add-children {} --force".format(
-                    edge_device, LIVE_HUB, LIVE_RG, device_ids[4]
-                ),
-                checks=[
-                    self.check("deviceId", edge_device),
-                    self.check("status", "enabled"),
-                    self.check("statusReason", None),
-                    self.check("connectionState", "Disconnected"),
-                    self.check("capabilities.iotEdge", True),
-                    self.exists("authentication.symmetricKey.primaryKey"),
-                    self.exists("authentication.symmetricKey.secondaryKey"),
-                ],
-            )
-
-            device_scope_str_pattern = r"^{}{}-".format(
-                DEVICE_DEVICESCOPE_PREFIX, edge_device
-            )
-            self.cmd(
-                "iot hub device-identity show -d {} -n {} -g {}".format(
-                    device_ids[4], LIVE_HUB, LIVE_RG
-                ),
-                checks=[
-                    self.check("deviceId", device_ids[4]),
-                    self.check_pattern("deviceScope", device_scope_str_pattern),
-                ],
-            )
-
-        # All edge devices + child device
-        query_checks = [self.check("length([*])", total_edge_device_count + 1)]
-        for i in edge_device_ids:
-            query_checks.append(self.exists("[?deviceId==`{}`]".format(i)))
-        query_checks.append(self.exists("[?deviceId==`{}`]".format(device_ids[4])))
-
-        # Edge x509_thumbprint
-        self.cmd(
-            "iot hub device-identity create -d {} -n {} -g {} --auth-method x509_thumbprint --ptp {} --stp {} --ee".format(
-                edge_x509_device_ids[0], LIVE_HUB, LIVE_RG, PRIMARY_THUMBPRINT, SECONDARY_THUMBPRINT
-            ),
-            checks=[
-                self.check("deviceId", edge_x509_device_ids[0]),
-                self.check("status", "enabled"),
-                self.check("statusReason", None),
-                self.check("capabilities.iotEdge", True),
-                self.check("connectionState", "Disconnected"),
-                self.check("authentication.symmetricKey.primaryKey", None),
-                self.check("authentication.symmetricKey.secondaryKey", None),
-                self.check(
-                    "authentication.x509Thumbprint.primaryThumbprint",
-                    PRIMARY_THUMBPRINT,
-                ),
-                self.check(
-                    "authentication.x509Thumbprint.secondaryThumbprint",
-                    SECONDARY_THUMBPRINT,
-                ),
-            ]
-        )
-
-        # Edge x509_ca
-        self.cmd(
-            "iot hub device-identity create -d {} -n {} -g {} --auth-method x509_ca --ee".format(
-                edge_x509_device_ids[1], LIVE_HUB, LIVE_RG
-            ),
-            checks=[
-                self.check("deviceId", edge_x509_device_ids[1]),
-                self.check("status", "enabled"),
-                self.check("capabilities.iotEdge", True),
-                self.check("connectionState", "Disconnected"),
-                self.check("authentication.symmetricKey.primaryKey", None),
-                self.check("authentication.symmetricKey.secondaryKey", None),
-                self.check("authentication.x509Thumbprint.primaryThumbprint", None),
-                self.check("authentication.x509Thumbprint.secondaryThumbprint", None),
-                self.check("authentication.type", "certificateAuthority")
-            ]
-        )
-
-        self.cmd(
-            'iot hub query --hub-name {} -g {} -q "{}"'.format(
-                LIVE_HUB, LIVE_RG, "select * from devices"
-            ),
-            checks=query_checks,
-        )
-
-        # With connection string
-        self.cmd(
-            'iot hub query -q "{}" --login {}'.format(
-                "select * from devices", self.connection_string
-            ),
-            checks=query_checks,
-        )
-
-        # -1 for no return limit
-        self.cmd(
-            'iot hub query -q "{}" --login {} --top -1'.format(
-                "select * from devices", self.connection_string
-            ),
-            checks=query_checks,
-        )
-
-        self.cmd(
-            """iot hub device-identity create --device-id {} --hub-name {} --resource-group {}
-                    --auth-method x509_thumbprint --primary-thumbprint {} --secondary-thumbprint {}""".format(
-                device_ids[0],
-                LIVE_HUB,
-                LIVE_RG,
-                PRIMARY_THUMBPRINT,
-                SECONDARY_THUMBPRINT,
-            ),
-            checks=[
-                self.check("deviceId", device_ids[0]),
-                self.check("status", "enabled"),
-                self.check("statusReason", None),
-                self.check("capabilities.iotEdge", False),
-                self.check("connectionState", "Disconnected"),
-                self.check("authentication.symmetricKey.primaryKey", None),
-                self.check("authentication.symmetricKey.secondaryKey", None),
-                self.check(
-                    "authentication.x509Thumbprint.primaryThumbprint",
-                    PRIMARY_THUMBPRINT,
-                ),
-                self.check(
-                    "authentication.x509Thumbprint.secondaryThumbprint",
-                    SECONDARY_THUMBPRINT,
-                ),
-            ],
-        )
-
-        self.cmd(
-            """iot hub device-identity create --device-id {} --hub-name {} --resource-group {}
-                    --auth-method x509_thumbprint --valid-days {}""".format(
-                device_ids[1], LIVE_HUB, LIVE_RG, 10
-            ),
-            checks=[
-                self.check("deviceId", device_ids[1]),
-                self.check("status", "enabled"),
-                self.check("statusReason", None),
-                self.check("capabilities.iotEdge", False),
-                self.check("connectionState", "Disconnected"),
-                self.check("authentication.symmetricKey.primaryKey", None),
-                self.check("authentication.symmetricKey.secondaryKey", None),
-                self.exists("authentication.x509Thumbprint.primaryThumbprint"),
-                self.check("authentication.x509Thumbprint.secondaryThumbprint", None),
-            ],
-        )
-
-        # With connection string
-        status_reason = "Test Status Reason"
-        self.cmd(
-            '''iot hub device-identity create --device-id {} --login {}
-                    --auth-method x509_ca --status disabled --status-reason "{}"'''.format(
-                device_ids[2], self.connection_string, status_reason
-            ),
-            checks=[
-                self.check("deviceId", device_ids[2]),
-                self.check("status", "disabled"),
-                self.check("statusReason", status_reason),
-                self.check("capabilities.iotEdge", False),
-                self.check("connectionState", "Disconnected"),
-                self.check("authentication.symmetricKey.primaryKey", None),
-                self.check("authentication.symmetricKey.secondaryKey", None),
-                self.check("authentication.x509Thumbprint.primaryThumbprint", None),
-                self.check("authentication.x509Thumbprint.secondaryThumbprint", None),
-            ],
-        )
-
-        child_device_scope_str_pattern = r"^{}{}-".format(
-            DEVICE_DEVICESCOPE_PREFIX, edge_device_ids[0]
-        )
-
-        # Create device with parent device
-        self.cmd(
-            """iot hub device-identity create --device-id {} --hub-name {} --resource-group {}
-                    --auth-method x509_thumbprint --valid-days {} --set-parent {}""".format(
-                device_ids[3], LIVE_HUB, LIVE_RG, 10, edge_device_ids[0]
-            ),
-            checks=[
-                self.check("deviceId", device_ids[3]),
-                self.check("status", "enabled"),
-                self.check("statusReason", None),
-                self.check("capabilities.iotEdge", False),
-                self.check("connectionState", "Disconnected"),
-                self.check("authentication.symmetricKey.primaryKey", None),
-                self.check("authentication.symmetricKey.secondaryKey", None),
-                self.exists("authentication.x509Thumbprint.primaryThumbprint"),
-                self.check("authentication.x509Thumbprint.secondaryThumbprint", None),
-                self.exists("deviceScope"),
-                self.exists("parentScopes"),
-                self.check_pattern("deviceScope", child_device_scope_str_pattern),
-            ],
-        )
-
-        self.cmd(
-            "iot hub device-identity show -d {} -n {} -g {}".format(
-                edge_device_ids[0], LIVE_HUB, LIVE_RG
-            ),
-            checks=[
-                self.check("deviceId", edge_device_ids[0]),
-                self.check("status", "enabled"),
-                self.check("statusReason", None),
-                self.check("connectionState", "Disconnected"),
-                self.check("capabilities.iotEdge", True),
-                self.exists("authentication.symmetricKey.primaryKey"),
-                self.exists("authentication.symmetricKey.secondaryKey"),
-            ],
-        )
-
-        # With connection string
-        self.cmd(
-            "iot hub device-identity show -d {} --login {}".format(
-                edge_device_ids[0], self.connection_string
-            ),
-            checks=[
-                self.check("deviceId", edge_device_ids[0]),
-                self.check("status", "enabled"),
-                self.check("statusReason", None),
-                self.check("connectionState", "Disconnected"),
-                self.check("capabilities.iotEdge", True),
-                self.exists("authentication.symmetricKey.primaryKey"),
-                self.exists("authentication.symmetricKey.secondaryKey"),
-            ],
-        )
-
-        # List all devices
-        self.cmd(
-            "iot hub device-identity list --hub-name {} --resource-group {}".format(
-                LIVE_HUB, LIVE_RG
-            ),
-            checks=[self.check("length([*])", total_devices)],
-        )
-
-        self.cmd(
-            "iot hub device-identity list --hub-name {} --resource-group {} --top -1".format(
-                LIVE_HUB, LIVE_RG
-            ),
-            checks=[self.check("length([*])", total_devices)],
-        )
-
-        # List only edge devices
-        self.cmd(
-            "iot hub device-identity list -n {} -g {} --ee".format(LIVE_HUB, LIVE_RG),
-            checks=[self.check("length([*])", total_edge_device_count)],
-        )
-
-        # With connection string
-        self.cmd(
-            "iot hub device-identity list --ee --login {}".format(self.connection_string),
-            checks=[self.check("length([*])", total_edge_device_count)],
-        )
-
-        self.cmd(
-            "iot hub device-identity update -d {} -n {} -g {} --set capabilities.iotEdge={}".format(
-                device_ids[0], LIVE_HUB, LIVE_RG, True
-            ),
-            checks=[
-                self.check("deviceId", device_ids[0]),
-                self.check("status", "enabled"),
-                self.check("capabilities.iotEdge", True),
-                self.check("authentication.symmetricKey.primaryKey", None),
-                self.check("authentication.symmetricKey.secondaryKey", None),
-                self.check(
-                    "authentication.x509Thumbprint.primaryThumbprint",
-                    PRIMARY_THUMBPRINT,
-                ),
-                self.check(
-                    "authentication.x509Thumbprint.secondaryThumbprint",
-                    SECONDARY_THUMBPRINT,
-                ),
-            ],
-        )
-
-        self.cmd(
-            "iot hub device-identity update -d {} -n {} -g {} --ee {} --auth-method {}"
-            .format(device_ids[0], LIVE_HUB, LIVE_RG, False, 'x509_ca'),
-            checks=[
-                self.check("deviceId", device_ids[0]),
-                self.check("status", "enabled"),
-                self.check("capabilities.iotEdge", False),
-                self.check("authentication.symmetricKey.primaryKey", None),
-                self.check("authentication.symmetricKey.secondaryKey", None),
-                self.check("authentication.x509Thumbprint.primaryThumbprint", None),
-                self.check("authentication.x509Thumbprint.secondaryThumbprint", None),
-                self.check("authentication.type", 'certificateAuthority')
-            ]
-        )
-
-        self.cmd(
-            "iot hub device-identity update -d {} -n {} -g {} --status-reason {}"
-            .format(device_ids[0], LIVE_HUB, LIVE_RG, 'TestStatusReason'),
-            checks=[
-                self.check("deviceId", device_ids[0]),
-                self.check("statusReason", 'TestStatusReason'),
-            ]
-        )
-
-        self.cmd(
-            "iot hub device-identity update -d {} -n {} -g {} --ee {} --status {}"
-            " --status-reason {} --auth-method {} --ptp {} --stp {}"
-            .format(device_ids[0], LIVE_HUB, LIVE_RG, False, 'enabled',
-                    'StatusReasonUpdated', 'x509_thumbprint', PRIMARY_THUMBPRINT, SECONDARY_THUMBPRINT),
-            checks=[
-                self.check("deviceId", device_ids[0]),
-                self.check("status", "enabled"),
-                self.check("capabilities.iotEdge", False),
-                self.check("statusReason", 'StatusReasonUpdated'),
-                self.check("authentication.x509Thumbprint.primaryThumbprint", PRIMARY_THUMBPRINT),
-                self.check("authentication.x509Thumbprint.secondaryThumbprint", SECONDARY_THUMBPRINT),
-            ]
-        )
-
-        self.cmd("iot hub device-identity update -d {} -n {} -g {} --auth-method {}"
-                 .format(device_ids[0], LIVE_HUB, LIVE_RG, 'x509_thumbprint'),
-                 expect_failure=True)
-
-        self.cmd("iot hub device-identity update -d {} -n {} -g {} --auth-method {} --pk {}"
-                 .format(device_ids[0], LIVE_HUB, LIVE_RG, 'shared_private_key', '123'),
-                 expect_failure=True)
-
-        self.cmd(
-            '''iot hub device-identity update -d {} -n {} -g {} --primary-key=""
-                    --secondary-key=""'''.format(
-                device_ids[4], LIVE_HUB, LIVE_RG
-            ),
-            checks=[
-                self.check("deviceId", device_ids[4]),
-                self.check("status", "enabled"),
-                self.exists("authentication.symmetricKey.primaryKey"),
-                self.exists("authentication.symmetricKey.secondaryKey"),
-            ],
-        )
-
-        # With connection string
-        self.cmd(
-            '''iot hub device-identity update -d {} --login {} --set authentication.symmetricKey.primaryKey=""
-                 authentication.symmetricKey.secondaryKey=""'''.format(
-                device_ids[4], self.connection_string
-            ),
-            checks=[
-                self.check("deviceId", device_ids[4]),
-                self.check("status", "enabled"),
-                self.exists("authentication.symmetricKey.primaryKey"),
-                self.exists("authentication.symmetricKey.secondaryKey"),
-            ],
-        )
-
-        # Test 'az iot hub device renew-key'
-        device = self.cmd(
-            '''iot hub device-identity renew-key -d {} -n {} -g {} --kt primary
-                    '''.format(
-                edge_device_ids[1], LIVE_HUB, LIVE_RG
-            ),
-            checks=[
-                self.check("deviceId", edge_device_ids[1])
-            ]
-        ).get_output_in_json()
-
-        # Test swap keys 'az iot hub device renew-key'
-        self.cmd(
-            '''iot hub device-identity renew-key -d {} -n {} -g {} --kt swap
-                    '''.format(
-                edge_device_ids[1], LIVE_HUB, LIVE_RG
-            ),
-            checks=[
-                self.check("authentication.symmetricKey.primaryKey", device['authentication']['symmetricKey']['secondaryKey']),
-                self.check("authentication.symmetricKey.secondaryKey", device['authentication']['symmetricKey']['primaryKey'])
-            ],
-        )
-
-        # Test 'az iot hub device renew-key' with non sas authentication
-        self.cmd("iot hub device-identity renew-key -d {} -n {} -g {} --kt secondary"
-                 .format(device_ids[0], LIVE_HUB, LIVE_RG),
-                 expect_failure=True)
-
-        sym_conn_str_pattern = r"^HostName={}\.azure-devices\.net;DeviceId={};SharedAccessKey=".format(
-            LIVE_HUB, edge_device_ids[0]
-        )
-        cer_conn_str_pattern = r"^HostName={}\.azure-devices\.net;DeviceId={};x509=true".format(
-            LIVE_HUB, device_ids[2]
-        )
-
-        self.cmd(
-            "iot hub device-identity show-connection-string -d {} -n {} -g {}".format(
-                edge_device_ids[0], LIVE_HUB, LIVE_RG
-            ),
-            checks=[self.check_pattern("connectionString", sym_conn_str_pattern)],
-        )
-
-        self.cmd(
-            "iot hub device-identity show-connection-string -d {} -n {} -g {} --kt {}".format(
-                edge_device_ids[0], LIVE_HUB, LIVE_RG, "secondary"
-            ),
-            checks=[self.check_pattern("connectionString", sym_conn_str_pattern)],
-        )
-
-        self.cmd(
-            "iot hub device-identity show-connection-string -d {} -n {} -g {}".format(
-                device_ids[2], LIVE_HUB, LIVE_RG
-            ),
-            checks=[self.check_pattern("connectionString", cer_conn_str_pattern)],
-        )
-
-        self.cmd(
-            "iot hub device-identity connection-string show -d {} -n {} -g {}".format(
-                edge_device_ids[0], LIVE_HUB, LIVE_RG
-            ),
-            checks=[self.check_pattern("connectionString", sym_conn_str_pattern)],
-        )
-
-        self.cmd(
-            "iot hub device-identity connection-string show -d {} -n {} -g {} --kt {}".format(
-                edge_device_ids[0], LIVE_HUB, LIVE_RG, "secondary"
-            ),
-            checks=[self.check_pattern("connectionString", sym_conn_str_pattern)],
-        )
-
-        self.cmd(
-            "iot hub device-identity connection-string show -d {} -n {} -g {}".format(
-                device_ids[2], LIVE_HUB, LIVE_RG
-            ),
-            checks=[self.check_pattern("connectionString", cer_conn_str_pattern)],
-        )
-
-        self.cmd(
-            "iot hub generate-sas-token -n {} -g {} -d {}".format(
-                LIVE_HUB, LIVE_RG, edge_device_ids[0]
-            ),
-            checks=[self.exists("sas")],
-        )
-
-        self.cmd(
-            "iot hub generate-sas-token -n {} -g {} -d {} --du {}".format(
-                LIVE_HUB, LIVE_RG, edge_device_ids[0], "1000"
-            ),
-            checks=[self.exists("sas")],
-        )
-
-        # None SAS device auth
-        self.cmd(
-            "iot hub generate-sas-token -n {} -g {} -d {}".format(
-                LIVE_HUB, LIVE_RG, device_ids[1]
-            ),
-            expect_failure=True,
-        )
-
-        self.cmd(
-            'iot hub generate-sas-token -n {} -g {} -d {} --kt "secondary"'.format(
-                LIVE_HUB, LIVE_RG, edge_device_ids[1]
-            ),
-            checks=[self.exists("sas")],
-        )
-
-        # With connection string
-        self.cmd(
-            "iot hub generate-sas-token -d {} --login {}".format(
-                edge_device_ids[0], self.connection_string
-            ),
-            checks=[self.exists("sas")],
-        )
-
-        self.cmd(
-            'iot hub generate-sas-token -d {} --login {} --kt "secondary"'.format(
-                edge_device_ids[1], self.connection_string
-            ),
-            checks=[self.exists("sas")],
-        )
-
-        self.cmd(
-            'iot hub generate-sas-token -d {} --login {} --pn "mypolicy"'.format(
-                edge_device_ids[1], self.connection_string
-            ),
-            expect_failure=True,
-        )
-
-
-class TestIoTHubDeviceTwins(IoTLiveScenarioTest):
-    def __init__(self, test_case):
-        super(TestIoTHubDeviceTwins, self).__init__(
-            test_case, LIVE_HUB, LIVE_RG
-        )
-
-    def test_hub_device_twins(self):
-        self.kwargs["generic_dict"] = {"key": "value"}
-        self.kwargs["bad_format"] = "{'key: 'value'}"
-        self.kwargs["patch_desired"] = {"patchScenario": {"desiredKey": "desiredValue"}}
-        self.kwargs["patch_tags"] = {"patchScenario": {"tagkey": "tagValue"}}
-
-        device_count = 3
-        device_ids = self.generate_device_names(device_count)
-
-        for device in device_ids:
-            self.cmd(
-                "iot hub device-identity create -d {} -n {} -g {}".format(
-                    device, LIVE_HUB, LIVE_RG
-                ),
-                checks=[self.check("deviceId", device)],
-            )
-
-        self.cmd(
-            "iot hub device-twin show -d {} -n {} -g {}".format(
-                device_ids[0], LIVE_HUB, LIVE_RG
-            ),
-            checks=[
-                self.check("deviceId", device_ids[0]),
-                self.check("status", "enabled"),
-                self.exists("properties.desired"),
-                self.exists("properties.reported"),
-            ],
-        )
-
-        # With connection string
-        self.cmd(
-            "iot hub device-twin show -d {} --login {}".format(
-                device_ids[0], self.connection_string
-            ),
-            checks=[
-                self.check("deviceId", device_ids[0]),
-                self.check("status", "enabled"),
-                self.exists("properties.desired"),
-                self.exists("properties.reported"),
-            ],
-        )
-
-        # Patch based twin update of desired props
-        self.cmd(
-            "iot hub device-twin update -d {} -n {} -g {} --desired {}".format(
-                device_ids[2],
-                LIVE_HUB,
-                LIVE_RG,
-                '"{patch_desired}"',
-            ),
-            checks=[
-                self.check("deviceId", device_ids[2]),
-                self.check(
-                    "properties.desired.patchScenario",
-                    self.kwargs["patch_desired"]["patchScenario"],
-                ),
-            ],
-        )
-
-        # Patch based twin update of tags with connection string
-        self.cmd(
-            "iot hub device-twin update -d {} --login {} --tags {}".format(
-                device_ids[2], self.connection_string, '"{patch_tags}"'
-            ),
-            checks=[
-                self.check("deviceId", device_ids[2]),
-                self.check(
-                    "tags.patchScenario", self.kwargs["patch_tags"]["patchScenario"]
-                ),
-            ],
-        )
-
-        # Patch based twin update of desired + tags
-        self.cmd(
-            "iot hub device-twin update -d {} -n {} --desired {} --tags {}".format(
-                device_ids[2],
-                LIVE_HUB,
-                '"{patch_desired}"',
-                '"{patch_tags}"',
-            ),
-            checks=[
-                self.check("deviceId", device_ids[2]),
-                self.check(
-                    "properties.desired.patchScenario",
-                    self.kwargs["patch_desired"]["patchScenario"],
-                ),
-                self.check(
-                    "tags.patchScenario",
-                    self.kwargs["patch_tags"]["patchScenario"]
-                ),
-            ],
-        )
-
-        # Deprecated generic update
-        result = self.cmd(
-            "iot hub device-twin update -d {} -n {} -g {} --set properties.desired.special={}".format(
-                device_ids[0], LIVE_HUB, LIVE_RG, '"{generic_dict}"'
-            )
-        ).get_output_in_json()
-        assert result["deviceId"] == device_ids[0]
-        assert result["properties"]["desired"]["special"]["key"] == "value"
-
-        # Removal of desired property from twin
-        result = self.cmd(
-            'iot hub device-twin update -d {} -n {} -g {} --set properties.desired.special="null"'.format(
-                device_ids[0], LIVE_HUB, LIVE_RG
-            )
-        ).get_output_in_json()
-        assert result["deviceId"] == device_ids[0]
-        assert result["properties"]["desired"].get("special") is None
-
-        # With connection string
-        result = self.cmd(
-            "iot hub device-twin update -d {} --login {} --set properties.desired.special={}".format(
-                device_ids[0], self.connection_string, '"{generic_dict}"'
-            )
-        ).get_output_in_json()
-        assert result["deviceId"] == device_ids[0]
-        assert result["properties"]["desired"]["special"]["key"] == "value"
-
-        # Error case, test type enforcer
-        self.cmd(
-            "iot hub device-twin update -d {} -n {} -g {} --set tags={}".format(
-                device_ids[0], LIVE_HUB, LIVE_RG, '"{bad_format}"'
-            ),
-            expect_failure=True,
-        )
-
-        content_path = os.path.join(CWD, "test_generic_replace.json")
-        self.cmd(
-            "iot hub device-twin replace -d {} -n {} -g {} -j '{}'".format(
-                device_ids[0], LIVE_HUB, LIVE_RG, content_path
-            ),
-            checks=[
-                self.check("deviceId", device_ids[0]),
-                self.check("properties.desired.awesome", 9001),
-                self.check("properties.desired.temperature.min", 10),
-                self.check("properties.desired.temperature.max", 100),
-                self.check("tags.location.region", "US"),
-            ],
-        )
-
-        self.kwargs["twin_payload"] = read_file_content(content_path)
-        self.cmd(
-            "iot hub device-twin replace -d {} -n {} -g {} -j '{}'".format(
-                device_ids[1], LIVE_HUB, LIVE_RG, "{twin_payload}"
-            ),
-            checks=[
-                self.check("deviceId", device_ids[1]),
-                self.check("properties.desired.awesome", 9001),
-                self.check("properties.desired.temperature.min", 10),
-                self.check("properties.desired.temperature.max", 100),
-                self.check("tags.location.region", "US"),
-            ],
-        )
-
-        # With connection string
-        self.cmd(
-            "iot hub device-twin replace -d {} --login {} -j '{}'".format(
-                device_ids[1], self.connection_string, "{twin_payload}"
-            ),
-            checks=[
-                self.check("deviceId", device_ids[1]),
-                self.check("properties.desired.awesome", 9001),
-                self.check("properties.desired.temperature.min", 10),
-                self.check("properties.desired.temperature.max", 100),
-                self.check("tags.location.region", "US"),
-            ],
-        )
-
-        # Region specific test
-        if self.region not in ["West US 2", "North Europe", "Southeast Asia"]:
-            warnings.warn(UserWarning("Skipping distributed-tracing tests. IoT Hub not in supported region!"))
-        else:
-            self.cmd(
-                "iot hub distributed-tracing show -d {} -n {} -g {}".format(
-                    device_ids[2], LIVE_HUB, LIVE_RG
-                ),
-                checks=self.is_empty(),
-            )
-
-            result = self.cmd(
-                "iot hub distributed-tracing update -d {} -n {} -g {} --sm on --sr 50".format(
-                    device_ids[2], LIVE_HUB, LIVE_RG
-                )
-            ).get_output_in_json()
-            assert result["deviceId"] == device_ids[2]
-            assert result["samplingMode"] == "enabled"
-            assert result["samplingRate"] == "50%"
-            assert not result["isSynced"]
-
-
-class TestIoTHubModules(IoTLiveScenarioTest):
-    def __init__(self, test_case):
-        super(TestIoTHubModules, self).__init__(
-            test_case, LIVE_HUB, LIVE_RG
-        )
-
-    def test_hub_modules(self):
-        edge_device_count = 2
-        device_count = 1
-        module_count = 2
-
-        edge_device_ids = self.generate_device_names(edge_device_count, edge=True)
-        device_ids = self.generate_device_names(device_count)
-        module_ids = self.generate_module_names(module_count)
-
-        for edge_device in edge_device_ids:
-            self.cmd(
-                "iot hub device-identity create -d {} -n {} -g {} --ee".format(
-                    edge_device, LIVE_HUB, LIVE_RG
-                ),
-                checks=[self.check("deviceId", edge_device)],
-            )
-
-        self.cmd(
-            "iot hub device-identity create -d {} -n {} -g {}".format(
-                device_ids[0], LIVE_HUB, LIVE_RG
-            ),
-            checks=[self.check("deviceId", device_ids[0])],
-        )
-
-        # Symmetric Key
-        # With connection string
-        self.cmd(
-            "iot hub module-identity create --device-id {} --hub-name {} --resource-group {} --module-id {}".format(
-                edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[1]
-            ),
-            checks=[
-                self.check("deviceId", edge_device_ids[0]),
-                self.check("moduleId", module_ids[1]),
-                self.exists("authentication.symmetricKey.primaryKey"),
-                self.exists("authentication.symmetricKey.secondaryKey"),
-            ],
-        )
-
-        self.cmd(
-            "iot hub module-identity create -d {} --login {} -m {}".format(
-                edge_device_ids[0], self.connection_string, module_ids[0]
-            ),
-            checks=[
-                self.check("deviceId", edge_device_ids[0]),
-                self.check("moduleId", module_ids[0]),
-                self.exists("authentication.symmetricKey.primaryKey"),
-                self.exists("authentication.symmetricKey.secondaryKey"),
-            ],
-        )
-
-        # Error can't get a sas token for module without device
-        self.cmd(
-            "az iot hub generate-sas-token -n {} -g {} -m {}".format(
-                LIVE_HUB, LIVE_RG, module_ids[1]
-            ),
-            expect_failure=True,
-        )
-
-        # sas token for module
-        self.cmd(
-            "iot hub generate-sas-token -n {} -g {} -d {} -m {}".format(
-                LIVE_HUB, LIVE_RG, edge_device_ids[0], module_ids[1]
-            ),
-            checks=[self.exists("sas")],
-        )
-
-        # sas token for module with connection string
-        self.cmd(
-            "iot hub generate-sas-token -d {} -m {} --login {}".format(
-                edge_device_ids[0], module_ids[1], self.connection_string
-            ),
-            checks=[self.exists("sas")],
-        )
-
-        # sas token for module with mixed case connection string
-        mixed_case_cstring = self.connection_string.replace("HostName", "hostname", 1)
-        self.cmd(
-            "iot hub generate-sas-token -d {} -m {} --login {}".format(
-                edge_device_ids[0], module_ids[1], mixed_case_cstring
-            ),
-            checks=[self.exists("sas")],
-        )
-
-        # X509 Thumbprint
-        # With connection string
-        self.cmd(
-            """iot hub module-identity create --module-id {} --device-id {} --login {}
-                    --auth-method x509_thumbprint --primary-thumbprint {} --secondary-thumbprint {}""".format(
-                module_ids[0],
-                device_ids[0],
-                self.connection_string,
-                PRIMARY_THUMBPRINT,
-                SECONDARY_THUMBPRINT,
-            ),
-            checks=[
-                self.check("deviceId", device_ids[0]),
-                self.check("moduleId", module_ids[0]),
-                self.check("connectionState", "Disconnected"),
-                self.check("authentication.symmetricKey.primaryKey", None),
-                self.check("authentication.symmetricKey.secondaryKey", None),
-                self.check(
-                    "authentication.x509Thumbprint.primaryThumbprint",
-                    PRIMARY_THUMBPRINT,
-                ),
-                self.check(
-                    "authentication.x509Thumbprint.secondaryThumbprint",
-                    SECONDARY_THUMBPRINT,
-                ),
-            ],
-        )
-
-        self.cmd(
-            """iot hub module-identity create -m {} -d {} -n {} -g {} --am x509_thumbprint --vd {}""".format(
-                module_ids[1], device_ids[0], LIVE_HUB, LIVE_RG, 10
-            ),
-            checks=[
-                self.check("deviceId", device_ids[0]),
-                self.check("moduleId", module_ids[1]),
-                self.check("connectionState", "Disconnected"),
-                self.check("authentication.symmetricKey.primaryKey", None),
-                self.check("authentication.symmetricKey.secondaryKey", None),
-                self.exists("authentication.x509Thumbprint.primaryThumbprint"),
-                self.check("authentication.x509Thumbprint.secondaryThumbprint", None),
-            ],
-        )
-
-        # X509 CA
-        # With connection string
-        self.cmd(
-            """iot hub module-identity create --module-id {} --device-id {} --login {} --auth-method x509_ca""".format(
-                module_ids[0], edge_device_ids[1], self.connection_string
-            ),
-            checks=[
-                self.check("deviceId", edge_device_ids[1]),
-                self.check("moduleId", module_ids[0]),
-                self.check("connectionState", "Disconnected"),
-                self.check("authentication.symmetricKey.primaryKey", None),
-                self.check("authentication.symmetricKey.secondaryKey", None),
-                self.check("authentication.x509Thumbprint.primaryThumbprint", None),
-                self.check("authentication.x509Thumbprint.secondaryThumbprint", None),
-            ],
-        )
-
-        # Includes $edgeAgent && $edgeHub system modules
-        result = self.cmd(
-            'iot hub query --hub-name {} -g {} -q "{}"'.format(
-                LIVE_HUB,
-                LIVE_RG,
-                "select * from devices.modules where devices.deviceId='{}'".format(
-                    edge_device_ids[0]
-                ),
-            )
-        ).get_output_in_json()
-        assert len(result) == 4
-
-        self.cmd(
-            '''iot hub module-identity update -d {} -n {} -g {} -m {}
-                    --set authentication.symmetricKey.primaryKey="" authentication.symmetricKey.secondaryKey=""'''.format(
-                edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0]
-            ),
-            checks=[
-                self.check("deviceId", edge_device_ids[0]),
-                self.check("moduleId", module_ids[0]),
-                self.exists("authentication.symmetricKey.primaryKey"),
-                self.exists("authentication.symmetricKey.secondaryKey"),
-            ],
-        )
-
-        # With connection string
-        self.cmd(
-            '''iot hub module-identity update -d {} --login {} -m {}
-                    --set authentication.symmetricKey.primaryKey="" authentication.symmetricKey.secondaryKey=""'''.format(
-                edge_device_ids[0], self.connection_string, module_ids[0]
-            ),
-            checks=[
-                self.check("deviceId", edge_device_ids[0]),
-                self.check("moduleId", module_ids[0]),
-                self.exists("authentication.symmetricKey.primaryKey"),
-                self.exists("authentication.symmetricKey.secondaryKey"),
-            ],
-        )
-
-        self.cmd(
-            "iot hub module-identity list -d {} -n {} -g {}".format(
-                edge_device_ids[0], LIVE_HUB, LIVE_RG
-            ),
-            checks=[
-                self.check("length([*])", 4),
-                self.exists("[?moduleId=='$edgeAgent']"),
-                self.exists("[?moduleId=='$edgeHub']"),
-            ],
-        )
-
-        self.cmd(
-            "iot hub module-identity list -d {} -n {} -g {} --top -1".format(
-                edge_device_ids[0], LIVE_HUB, LIVE_RG
-            ),
-            checks=[
-                self.check("length([*])", 3),
-                self.exists("[?moduleId=='$edgeAgent']"),
-                self.exists("[?moduleId=='$edgeHub']"),
-            ],
-        )
-
-        # With connection string
-        self.cmd(
-            "iot hub module-identity list -d {} --login {}".format(
-                edge_device_ids[0], self.connection_string
-            ),
-            checks=[
-                self.check("length([*])", 4),
-                self.exists("[?moduleId=='$edgeAgent']"),
-                self.exists("[?moduleId=='$edgeHub']"),
-            ],
-        )
-
-        self.cmd(
-            "iot hub module-identity show -d {} -n {} -g {} -m {}".format(
-                edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0]
-            ),
-            checks=[
-                self.check("deviceId", edge_device_ids[0]),
-                self.check("moduleId", module_ids[0]),
-                self.exists("authentication.symmetricKey.primaryKey"),
-                self.exists("authentication.symmetricKey.secondaryKey"),
-            ],
-        )
-
-        # With connection string
-        self.cmd(
-            "iot hub module-identity show -d {} --login {} -m {}".format(
-                edge_device_ids[0], self.connection_string, module_ids[0]
-            ),
-            checks=[
-                self.check("deviceId", edge_device_ids[0]),
-                self.check("moduleId", module_ids[0]),
-                self.exists("authentication.symmetricKey.primaryKey"),
-                self.exists("authentication.symmetricKey.secondaryKey"),
-            ],
-        )
-
-        mod_sym_conn_str_pattern = r"^HostName={}\.azure-devices\.net;DeviceId={};ModuleId={};SharedAccessKey=".format(
-            LIVE_HUB, edge_device_ids[0], module_ids[0]
-        )
-        self.cmd(
-            "iot hub module-identity show-connection-string -d {} -n {} -g {} -m {}".format(
-                edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0]
-            ),
-            checks=[self.check_pattern("connectionString", mod_sym_conn_str_pattern)],
-        )
-
-        # With connection string
-        self.cmd(
-            "iot hub module-identity show-connection-string -d {} --login {} -m {}".format(
-                edge_device_ids[0], self.connection_string, module_ids[0]
-            ),
-            checks=[self.check_pattern("connectionString", mod_sym_conn_str_pattern)],
-        )
-
-        self.cmd(
-            "iot hub module-identity show-connection-string -d {} -n {} -g {} -m {} --kt {}".format(
-                edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0], "secondary"
-            ),
-            checks=[self.check_pattern("connectionString", mod_sym_conn_str_pattern)],
-        )
-
-        self.cmd(
-            "iot hub module-identity connection-string show -d {} -n {} -g {} -m {}".format(
-                edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0]
-            ),
-            checks=[self.check_pattern("connectionString", mod_sym_conn_str_pattern)],
-        )
-
-        # With connection string
-        self.cmd(
-            "iot hub module-identity connection-string show -d {} --login {} -m {}".format(
-                edge_device_ids[0], self.connection_string, module_ids[0]
-            ),
-            checks=[self.check_pattern("connectionString", mod_sym_conn_str_pattern)],
-        )
-
-        self.cmd(
-            "iot hub module-identity connection-string show -d {} -n {} -g {} -m {} --kt {}".format(
-                edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0], "secondary"
-            ),
-            checks=[self.check_pattern("connectionString", mod_sym_conn_str_pattern)],
-        )
-
-        for i in module_ids:
-            if module_ids.index(i) == (module_count - 1):
-                # With connection string
-                self.cmd(
-                    "iot hub module-identity delete -d {} --login {} --module-id {}".format(
-                        edge_device_ids[0], self.connection_string, i
-                    ),
-                    checks=self.is_empty(),
-                )
-            else:
-                self.cmd(
-                    "iot hub module-identity delete -d {} -n {} -g {} --module-id {}".format(
-                        edge_device_ids[0], LIVE_HUB, LIVE_RG, i
-                    ),
-                    checks=self.is_empty(),
-                )
-
-
-class TestIoTHubModuleTwins(IoTLiveScenarioTest):
-    def __init__(self, test_case):
-        super(TestIoTHubModuleTwins, self).__init__(
-            test_case, LIVE_HUB, LIVE_RG
-        )
-
-    def test_hub_module_twins(self):
-        self.kwargs["generic_dict"] = {"key": "value"}
-        self.kwargs["bad_format"] = "{'key: 'value'}"
-        self.kwargs["patch_desired"] = {"patchScenario": {"desiredKey": "desiredValue"}}
-        self.kwargs["patch_tags"] = {"patchScenario": {"tagkey": "tagValue"}}
-
-        edge_device_count = 1
-        device_count = 1
-        module_count = 1
-
-        edge_device_ids = self.generate_device_names(edge_device_count, True)
-        device_ids = self.generate_device_names(device_count)
-        module_ids = self.generate_module_names(module_count)
-
-        self.cmd(
-            "iot hub device-identity create -d {} -n {} -g {} --ee".format(
-                edge_device_ids[0], LIVE_HUB, LIVE_RG
-            ),
-            checks=[self.check("deviceId", edge_device_ids[0])],
-        )
-
-        self.cmd(
-            "iot hub device-identity create -d {} -n {} -g {}".format(
-                device_ids[0], LIVE_HUB, LIVE_RG
-            ),
-            checks=[self.check("deviceId", device_ids[0])],
-        )
-
-        self.cmd(
-            "iot hub module-identity create -d {} -n {} -g {} -m {}".format(
-                edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0]
-            ),
-            checks=[
-                self.check("deviceId", edge_device_ids[0]),
-                self.check("moduleId", module_ids[0]),
-                self.exists("authentication.symmetricKey.primaryKey"),
-                self.exists("authentication.symmetricKey.secondaryKey"),
-            ],
-        )
-
-        self.cmd(
-            "iot hub module-identity create -d {} -n {} -g {} -m {}".format(
-                device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0]
-            ),
-            checks=[
-                self.check("deviceId", device_ids[0]),
-                self.check("moduleId", module_ids[0]),
-                self.exists("authentication.symmetricKey.primaryKey"),
-                self.exists("authentication.symmetricKey.secondaryKey"),
-            ],
-        )
-
-        self.cmd(
-            "iot hub module-twin show -d {} -n {} -g {} -m {}".format(
-                edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0]
-            ),
-            checks=[
-                self.check("deviceId", edge_device_ids[0]),
-                self.check("moduleId", module_ids[0]),
-                self.exists("properties.desired"),
-                self.exists("properties.reported"),
-            ],
-        )
-
-        # With connection string
-        self.cmd(
-            "iot hub module-twin show -d {} --login {} -m {}".format(
-                edge_device_ids[0], self.connection_string, module_ids[0]
-            ),
-            checks=[
-                self.check("deviceId", edge_device_ids[0]),
-                self.check("moduleId", module_ids[0]),
-                self.exists("properties.desired"),
-                self.exists("properties.reported"),
-            ],
-        )
-
-        # Patch based twin update of desired props
-        self.cmd(
-            "iot hub module-twin update -d {} -n {} -g {} -m {} --desired {}".format(
-                edge_device_ids[0],
-                LIVE_HUB,
-                LIVE_RG,
-                module_ids[0],
-                '"{patch_desired}"',
-            ),
-            checks=[
-                self.check("deviceId", edge_device_ids[0]),
-                self.check("moduleId", module_ids[0]),
-                self.check(
-                    "properties.desired.patchScenario",
-                    self.kwargs["patch_desired"]["patchScenario"],
-                ),
-            ],
-        )
-
-        # Patch based twin update of tags with connection string
-        self.cmd(
-            "iot hub module-twin update -d {} --login {} -m {} --tags {}".format(
-                edge_device_ids[0], self.connection_string, module_ids[0], '"{patch_tags}"'
-            ),
-            checks=[
-                self.check("deviceId", edge_device_ids[0]),
-                self.check("moduleId", module_ids[0]),
-                self.check(
-                    "tags.patchScenario", self.kwargs["patch_tags"]["patchScenario"]
-                ),
-            ],
-        )
-
-        # Patch based twin update of desired + tags
-        self.cmd(
-            "iot hub module-twin update -d {} -n {} -m {} --desired {} --tags {}".format(
-                device_ids[0],
-                LIVE_HUB,
-                module_ids[0],
-                '"{patch_desired}"',
-                '"{patch_tags}"',
-            ),
-            checks=[
-                self.check("deviceId", device_ids[0]),
-                self.check("moduleId", module_ids[0]),
-                self.check(
-                    "properties.desired.patchScenario",
-                    self.kwargs["patch_desired"]["patchScenario"],
-                ),
-                self.check(
-                    "tags.patchScenario",
-                    self.kwargs["patch_tags"]["patchScenario"]
-                ),
-            ],
-        )
-
-        # Deprecated twin update style
-        self.cmd(
-            "iot hub module-twin update -d {} -n {} -g {} -m {} --set properties.desired.special={}".format(
-                edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0], '"{generic_dict}"'
-            ),
-            checks=[
-                self.check("deviceId", edge_device_ids[0]),
-                self.check("moduleId", module_ids[0]),
-                self.check("properties.desired.special.key", "value"),
-            ],
-        )
-
-        # With connection string
-        self.cmd(
-            "iot hub module-twin update -d {} --login {} -m {} --set properties.desired.special={}".format(
-                edge_device_ids[0], self.connection_string, module_ids[0], '"{generic_dict}"'
-            ),
-            checks=[
-                self.check("deviceId", edge_device_ids[0]),
-                self.check("moduleId", module_ids[0]),
-                self.check("properties.desired.special.key", "value"),
-            ],
-        )
-
-        # Error case test type enforcer
-        self.cmd(
-            "iot hub module-twin update -d {} --login {} -m {} --set properties.desired={}".format(
-                edge_device_ids[0], self.connection_string, module_ids[0], '"{bad_format}"'
-            ),
-            expect_failure=True,
-        )
-
-        self.cmd(
-            "iot hub module-twin update -d {} --login {} -m {} --set tags={}".format(
-                edge_device_ids[0], self.connection_string, module_ids[0], '"{bad_format}"'
-            ),
-            expect_failure=True,
-        )
-
-        content_path = os.path.join(CWD, "test_generic_replace.json")
-        self.cmd(
-            "iot hub module-twin replace -d {} -n {} -g {} -m {} -j '{}'".format(
-                edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0], content_path
-            ),
-            checks=[
-                self.check("deviceId", edge_device_ids[0]),
-                self.check("moduleId", module_ids[0]),
-                self.check("properties.desired.awesome", 9001),
-                self.check("properties.desired.temperature.min", 10),
-                self.check("properties.desired.temperature.max", 100),
-                self.check("tags.location.region", "US"),
-            ],
-        )
-
-        # With connection string
-        self.cmd(
-            "iot hub module-twin replace -d {} --login {} -m {} -j '{}'".format(
-                edge_device_ids[0], self.connection_string, module_ids[0], content_path
-            ),
-            checks=[
-                self.check("deviceId", edge_device_ids[0]),
-                self.check("moduleId", module_ids[0]),
-                self.check("properties.desired.awesome", 9001),
-                self.check("properties.desired.temperature.min", 10),
-                self.check("properties.desired.temperature.max", 100),
-                self.check("tags.location.region", "US"),
-            ],
-        )
-
-        self.kwargs["twin_payload"] = read_file_content(content_path)
-        self.cmd(
-            "iot hub module-twin replace -d {} -n {} -g {} -m {} -j '{}'".format(
-                edge_device_ids[0], LIVE_HUB, LIVE_RG, module_ids[0], "{twin_payload}"
-            ),
-            checks=[
-                self.check("deviceId", edge_device_ids[0]),
-                self.check("moduleId", module_ids[0]),
-                self.check("properties.desired.awesome", 9001),
-                self.check("properties.desired.temperature.min", 10),
-                self.check("properties.desired.temperature.max", 100),
-                self.check("tags.location.region", "US"),
-            ],
-        )
-
-        for i in module_ids:
-            self.cmd(
-                "iot hub module-identity delete -d {} -n {} -g {} --module-id {}".format(
-                    edge_device_ids[0], LIVE_HUB, LIVE_RG, i
-                ),
-                checks=self.is_empty(),
-            )
+user_managed_identity_name = generate_generic_id()
 
 
 class TestIoTStorage(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTStorage, self).__init__(test_case, LIVE_HUB, LIVE_RG)
+        self.managed_identity = None
+
+    def get_managed_identity(self):
+        # Check if there is a managed identity already
+        if self.managed_identity:
+            return self.managed_identity
+
+        # Create managed identity
+        result = self.cmd(
+            "identity create -n {} -g {}".format(
+                user_managed_identity_name, LIVE_RG
+            )).get_output_in_json()
+
+        # ensure resource is created before hub immediately tries to assign it
+        sleep(10)
+
+        self.managed_identity = result
+        return self.managed_identity
+
+    def tearDown(self):
+        if self.managed_identity:
+            self.cmd('identity delete -n {} -g {}'.format(
+                user_managed_identity_name, LIVE_RG
+            ))
+        return super().tearDown()
 
     @pytest.mark.skipif(
-        not LIVE_STORAGE, reason="empty azext_iot_teststorageuri env var"
+        not LIVE_STORAGE_URI, reason="empty azext_iot_teststorageuri env var"
     )
     def test_storage(self):
         device_count = 1
@@ -1443,73 +100,131 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
         self.cmd(
             'iot hub device-identity export -n {} --bcu "{}"'.format(
-                LIVE_HUB, LIVE_STORAGE
+                LIVE_HUB, LIVE_STORAGE_URI
             ),
             checks=[
-                self.check("outputBlobContainerUri", LIVE_STORAGE),
+                self.check("outputBlobContainerUri", LIVE_STORAGE_URI),
                 self.check("failureReason", None),
                 self.check("type", "export"),
+                self.check("excludeKeysInExport", True),
+                self.exists("jobId"),
+            ],
+        )
+
+        # give time to finish job
+        sleep(30)
+
+        self.cmd(
+            'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --ik true'.format(
+                LIVE_HUB, LIVE_STORAGE_URI, "key"
+            ),
+            checks=[
+                self.check("outputBlobContainerUri", LIVE_STORAGE_URI),
+                self.check("failureReason", None),
+                self.check("type", "export"),
+                self.check("excludeKeysInExport", False),
+                self.exists("jobId"),
+            ],
+        )
+
+        # give time to finish job
+        sleep(30)
+
+        self.cmd(
+            'iot hub device-identity import -n {} --ibcu "{}" --obcu "{}" --auth-type {}'.format(
+                LIVE_HUB, LIVE_STORAGE_URI, LIVE_STORAGE_URI, "key"
+            ),
+            checks=[
+                self.check("outputBlobContainerUri", LIVE_STORAGE_URI),
+                self.check("inputBlobContainerUri", LIVE_STORAGE_URI),
+                self.check("failureReason", None),
+                self.check("type", "import"),
+                self.check("storageAuthenticationType", "keyBased"),
                 self.exists("jobId"),
             ],
         )
 
     @pytest.mark.skipif(
-        not all([LIVE_STORAGE_ID, LIVE_STORAGE]),
+        not all([LIVE_STORAGE_RESOURCE_ID, LIVE_STORAGE_URI]),
         reason="azext_iot_identity_teststorageid and azext_iot_teststorageuri env vars not set",
     )
-    def test_identity_storage(self):
+    @pytest.mark.skipif(
+        not ensure_iothub_sdk_min_version(IOTHUB_TRACK_2_SDK_MIN_VERSION),
+        reason="Skipping track 2 tests because SDK is track 1")
+    def test_system_identity_storage(self):
         identity_type_enable = "SystemAssigned"
-        identity_type_disable = "None"
         storage_role = "Storage Blob Data Contributor"
 
         # check hub identity
         identity_enabled = False
 
         hub_identity = self.cmd(
-            "iot hub show -n {}".format(LIVE_HUB)
-        ).get_output_in_json()["identity"]
+            "iot hub identity show -n {}".format(LIVE_HUB)
+        ).get_output_in_json()
 
-        if hub_identity.get("type", None) != identity_type_enable:
+        if identity_type_enable not in hub_identity.get("type", None):
             # enable hub identity and get ID
             hub_identity = self.cmd(
-                'iot hub update -n {} --set identity.type="{}"'.format(
-                    LIVE_HUB, identity_type_enable
+                "iot hub identity assign -n {} --system".format(
+                    LIVE_HUB,
                 )
-            ).get_output_in_json()["identity"]
+            ).get_output_in_json()
 
             identity_enabled = True
 
+        # principal id for system assigned user identity
         hub_id = hub_identity.get("principalId", None)
         assert hub_id
 
         # setup RBAC for storage account
         storage_account_roles = self.cmd(
             'role assignment list --scope "{}" --role "{}" --query "[].principalId"'.format(
-                LIVE_STORAGE_ID, storage_role
+                LIVE_STORAGE_RESOURCE_ID, storage_role
             )
         ).get_output_in_json()
 
         if hub_id not in storage_account_roles:
             self.cmd(
                 'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
-                    hub_id, storage_role, LIVE_STORAGE_ID
+                    hub_id, storage_role, LIVE_STORAGE_RESOURCE_ID
                 )
             )
-            # give RBAC time to catch up
-            from time import sleep
-            sleep(30)
+            # give time to finish job
+            sleep(60)
 
-        # identity-based device-identity export
         self.cmd(
-            'iot hub device-identity export -n {} --bcu "{}" --auth-type {}'.format(
-                LIVE_HUB, LIVE_STORAGE, "identity"
+            'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {} --ik true'.format(
+                LIVE_HUB, LIVE_STORAGE_URI, "identity", "[system]"
             ),
             checks=[
-                self.check("outputBlobContainerUri", LIVE_STORAGE),
+                self.check("outputBlobContainerUri", LIVE_STORAGE_URI),
                 self.check("failureReason", None),
                 self.check("type", "export"),
+                self.check("excludeKeysInExport", False),
+                self.check("storageAuthenticationType", "identityBased"),
                 self.exists("jobId"),
             ],
+        )
+
+        self.cmd(
+            'iot hub device-identity import -n {} --ibcu "{}" --obcu "{}" --auth-type {} --identity {}'.format(
+                LIVE_HUB, LIVE_STORAGE_URI, LIVE_STORAGE_URI, "identity", "[system]"
+            ),
+            checks=[
+                self.check("outputBlobContainerUri", LIVE_STORAGE_URI),
+                self.check("inputBlobContainerUri", LIVE_STORAGE_URI),
+                self.check("failureReason", None),
+                self.check("type", "import"),
+                self.check("storageAuthenticationType", "identityBased"),
+                self.exists("jobId"),
+            ],
+        )
+
+        self.cmd(
+            'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {}'.format(
+                LIVE_HUB, LIVE_STORAGE_URI, "identity", "fake_managed_identity"
+            ),
+            expect_failure=True
         )
 
         # if we enabled identity for this hub, undo identity and RBAC
@@ -1517,241 +232,113 @@ class TestIoTStorage(IoTLiveScenarioTest):
             # delete role assignment first, disabling identity removes the assignee ID from AAD
             self.cmd(
                 'role assignment delete --assignee "{}" --role "{}" --scope "{}"'.format(
-                    hub_id, storage_role, LIVE_STORAGE_ID
+                    hub_id, storage_role, LIVE_STORAGE_RESOURCE_ID
                 )
             )
             self.cmd(
-                "iot hub update -n {} --set 'identity.type=\"{}\"'".format(
-                    LIVE_HUB, identity_type_disable
+                "iot hub identity remove -n {} --system".format(
+                    LIVE_HUB
                 )
             )
 
+    @pytest.mark.skipif(
+        not all([LIVE_STORAGE_RESOURCE_ID, LIVE_STORAGE_URI]),
+        reason="azext_iot_identity_teststorageid and azext_iot_teststorageuri env vars not set",
+    )
+    @pytest.mark.skipif(
+        not ensure_iothub_sdk_min_version(IOTHUB_TRACK_2_SDK_MIN_VERSION),
+        reason="Skipping track 2 tests because SDK is track 1")
+    def test_user_identity_storage(self):
+        # User Assigned Managed Identity
+        storage_role = "Storage Blob Data Contributor"
+        user_identity = self.get_managed_identity()
+        identity_id = user_identity["id"]
+        # check hub identity
+        identity_enabled = False
+        hub_identity = self.cmd(
+            "iot hub identity show -n {}".format(LIVE_HUB)
+        ).get_output_in_json()
 
-class TestIoTEdgeOffline(IoTLiveScenarioTest):
-    def __init__(self, test_case):
-        super(TestIoTEdgeOffline, self).__init__(
-            test_case, LIVE_HUB, LIVE_RG
-        )
+        if hub_identity.get("userAssignedIdentities", None) != user_identity["principalId"]:
+            # enable hub identity and get ID
+            hub_identity = self.cmd(
+                "iot hub identity assign -n {} --user {}".format(
+                    LIVE_HUB, identity_id
+                )
+            ).get_output_in_json()
 
-    def test_edge_offline(self):
-        device_count = 3
-        edge_device_count = 2
+            identity_enabled = True
 
-        device_ids = self.generate_device_names(device_count)
-        edge_device_ids = self.generate_device_names(edge_device_count, True)
+        identity_principal = hub_identity["userAssignedIdentities"][identity_id]["principalId"]
+        assert identity_principal == user_identity["principalId"]
 
-        for edge_device in edge_device_ids:
-            self.cmd(
-                "iot hub device-identity create -d {} -n {} -g {} --ee".format(
-                    edge_device, LIVE_HUB, LIVE_RG
-                ),
-                checks=[
-                    self.check("deviceId", edge_device),
-                    self.check("status", "enabled"),
-                    self.check("statusReason", None),
-                    self.check("connectionState", "Disconnected"),
-                    self.check("capabilities.iotEdge", True),
-                    self.exists("authentication.symmetricKey.primaryKey"),
-                    self.exists("authentication.symmetricKey.secondaryKey"),
-                    self.exists("deviceScope"),
-                ],
+        # setup RBAC for storage account
+        storage_account_roles = self.cmd(
+            'role assignment list --scope "{}" --role "{}" --query "[].principalId"'.format(
+                LIVE_STORAGE_RESOURCE_ID, storage_role
             )
+        ).get_output_in_json()
 
-        for device in device_ids:
+        if identity_principal not in storage_account_roles:
             self.cmd(
-                "iot hub device-identity create -d {} -n {} -g {}".format(
-                    device, LIVE_HUB, LIVE_RG
-                ),
-                checks=[
-                    self.check("deviceId", device),
-                    self.check("status", "enabled"),
-                    self.check("statusReason", None),
-                    self.check("connectionState", "Disconnected"),
-                    self.check("capabilities.iotEdge", False),
-                    self.exists("authentication.symmetricKey.primaryKey"),
-                    self.exists("authentication.symmetricKey.secondaryKey"),
-                    self.check("deviceScope", None),
-                ],
+                'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
+                    identity_principal, storage_role, LIVE_STORAGE_RESOURCE_ID
+                )
             )
+            # give time to finish job
+            sleep(60)
 
-        # get-parent of edge device
+        # identity-based device-identity export
         self.cmd(
-            "iot hub device-identity get-parent -d {} -n {} -g {}".format(
-                edge_device_ids[0], LIVE_HUB, LIVE_RG
-            ),
-            expect_failure=True,
-        )
-
-        # get-parent of device which doesn't have any parent set
-        self.cmd(
-            "iot hub device-identity get-parent -d {} -n {} -g {}".format(
-                device_ids[0], LIVE_HUB, LIVE_RG
-            ),
-            expect_failure=True,
-        )
-
-        # setting non-edge device as a parent of non-edge device
-        self.cmd(
-            "iot hub device-identity set-parent -d {} --pd {} -n {} -g {}".format(
-                device_ids[0], device_ids[1], LIVE_HUB, LIVE_RG
-            ),
-            expect_failure=True,
-        )
-
-        # setting edge device as a parent of edge device
-        self.cmd(
-            "iot hub device-identity set-parent -d {} --pd {} -n {} -g {}".format(
-                edge_device_ids[0], edge_device_ids[1], LIVE_HUB, LIVE_RG
-            ),
-            checks=self.is_empty(),
-        )
-
-        # add device as a child of non-edge device
-        self.cmd(
-            "iot hub device-identity add-children -d {} --child-list {} -n {} -g {}".format(
-                device_ids[0], device_ids[1], LIVE_HUB, LIVE_RG
-            ),
-            expect_failure=True,
-        )
-
-        # add device list as children of edge device
-        self.cmd(
-            "iot hub device-identity add-children -d {} --child-list '{}' -n {} -g {}".format(
-                edge_device_ids[0], ", ".join(device_ids), LIVE_HUB, LIVE_RG
-            ),
-            checks=self.is_empty(),
-        )
-
-        # setting edge device as a parent of non-edge device which already having different parent device
-        self.cmd(
-            "iot hub device-identity set-parent -d {} --pd {} -n {} -g {}".format(
-                device_ids[2], edge_device_ids[1], LIVE_HUB, LIVE_RG
-            ),
-            expect_failure=True,
-        )
-
-        # setting edge device as a parent of non-edge device which already having different parent device by force
-        self.cmd(
-            "iot hub device-identity set-parent -d {} --pd {} -n {} -g {} --force".format(
-                device_ids[2], edge_device_ids[1], LIVE_HUB, LIVE_RG
-            ),
-            checks=self.is_empty(),
-        )
-
-        # get-parent of device
-        self.cmd(
-            "iot hub device-identity get-parent -d {} -n {} -g {}".format(
-                device_ids[0], LIVE_HUB, LIVE_RG
+            'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {} --ik true'.format(
+                LIVE_HUB, LIVE_STORAGE_URI, "identity", identity_id
             ),
             checks=[
-                self.check("deviceId", edge_device_ids[0]),
-                self.exists("deviceScope"),
+                self.check("outputBlobContainerUri", LIVE_STORAGE_URI),
+                self.check("failureReason", None),
+                self.check("type", "export"),
+                self.check("excludeKeysInExport", False),
+                self.check("storageAuthenticationType", "identityBased"),
+                self.exists("jobId"),
             ],
         )
 
-        # add same device as a child of same parent device
+        # give time to finish job
+        sleep(30)
+
         self.cmd(
-            "iot hub device-identity add-children -d {} --child-list {} -n {} -g {}".format(
-                edge_device_ids[0], device_ids[0], LIVE_HUB, LIVE_RG
+            'iot hub device-identity import -n {} --ibcu "{}" --obcu "{}" --auth-type {} --identity {}'.format(
+                LIVE_HUB, LIVE_STORAGE_URI, LIVE_STORAGE_URI, "identity", identity_id
             ),
-            expect_failure=True,
+            checks=[
+                self.check("outputBlobContainerUri", LIVE_STORAGE_URI),
+                self.check("inputBlobContainerUri", LIVE_STORAGE_URI),
+                self.check("failureReason", None),
+                self.check("type", "import"),
+                self.check("storageAuthenticationType", "identityBased"),
+                self.exists("jobId"),
+            ],
         )
 
-        # add same device as a child of another edge device
         self.cmd(
-            "iot hub device-identity add-children -d {} --child-list {} -n {} -g {}".format(
-                edge_device_ids[1], device_ids[0], LIVE_HUB, LIVE_RG
+            'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {}'.format(
+                LIVE_HUB, LIVE_STORAGE_URI, "identity", "fake_managed_identity"
             ),
-            expect_failure=True,
+            expect_failure=True
         )
 
-        # add same device as a child of another edge device by force
-        self.cmd(
-            "iot hub device-identity add-children -d {} --child-list {} -n {} -g {} --force".format(
-                edge_device_ids[1], device_ids[0], LIVE_HUB, LIVE_RG
-            ),
-            checks=self.is_empty(),
-        )
+        # if we enabled identity for this hub, undo identity and RBAC
+        if identity_enabled:
+            # delete role assignment first, disabling identity removes the assignee ID from AAD
+            self.cmd(
+                'role assignment delete --assignee "{}" --role "{}" --scope "{}"'.format(
+                    identity_principal, storage_role, LIVE_STORAGE_RESOURCE_ID
+                )
+            )
+            self.cmd(
+                "iot hub identity remove -n {} --user".format(
+                    LIVE_HUB
+                )
+            )
 
-        # list child devices of edge device
-        output = self.cmd(
-            "iot hub device-identity list-children -d {} -n {} -g {}".format(
-                edge_device_ids[0], LIVE_HUB, LIVE_RG
-            ),
-            expect_failure=False,
-        )
-
-        expected_output = "{}".format(device_ids[1])
-        assert output.get_output_in_json() == expected_output
-
-        # removing all child devices of non-edge device
-        self.cmd(
-            "iot hub device-identity remove-children -d {} -n {} -g {} --remove-all".format(
-                device_ids[0], LIVE_HUB, LIVE_RG
-            ),
-            expect_failure=True,
-        )
-
-        # remove all child devices from edge device
-        self.cmd(
-            "iot hub device-identity remove-children -d {} -n {} -g {} --remove-all".format(
-                edge_device_ids[1], LIVE_HUB, LIVE_RG
-            ),
-            checks=self.is_empty(),
-        )
-
-        # removing all child devices of edge device which doesn't have any child devices
-        self.cmd(
-            "iot hub device-identity remove-children -d {} -n {} -g {} --remove-all".format(
-                edge_device_ids[1], LIVE_HUB, LIVE_RG
-            ),
-            expect_failure=True,
-        )
-
-        # removing child devices of edge device neither passing child devices list nor remove-all parameter
-        self.cmd(
-            "iot hub device-identity remove-children -d {} -n {} -g {}".format(
-                edge_device_ids[1], LIVE_HUB, LIVE_RG
-            ),
-            expect_failure=True,
-        )
-
-        # remove edge device from edge device
-        self.cmd(
-            "iot hub device-identity remove-children -d {} --child-list {} -n {} -g {}".format(
-                edge_device_ids[1], edge_device_ids[0], LIVE_HUB, LIVE_RG
-            ),
-            expect_failure=True,
-        )
-
-        # remove device from edge device but device is a child of another edge device
-        self.cmd(
-            "iot hub device-identity remove-children -d {} --child-list {} -n {} -g {}".format(
-                edge_device_ids[1], device_ids[1], LIVE_HUB, LIVE_RG
-            ),
-            expect_failure=True,
-        )
-
-        # remove device
-        self.cmd(
-            "iot hub device-identity remove-children -d {} --child-list {} -n {} -g {}".format(
-                edge_device_ids[0], device_ids[1], LIVE_HUB, LIVE_RG
-            ),
-            checks=self.is_empty(),
-        )
-
-        # remove device which doesn't have any parent set
-        self.cmd(
-            "iot hub device-identity remove-children -d {} --child-list {} -n {} -g {}".format(
-                edge_device_ids[0], device_ids[0], LIVE_HUB, LIVE_RG
-            ),
-            expect_failure=True,
-        )
-
-        # list child devices of edge device which doesn't have any children
-        self.cmd(
-            "iot hub device-identity list-children -d {} -n {} -g {}".format(
-                edge_device_ids[1], LIVE_HUB, LIVE_RG
-            ),
-            expect_failure=True,
-        )
+        self.tearDown()

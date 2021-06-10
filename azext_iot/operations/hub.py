@@ -14,6 +14,7 @@ from azext_iot.constants import (
     TRACING_PROPERTY,
     TRACING_ALLOWED_FOR_LOCATION,
     TRACING_ALLOWED_FOR_SKU,
+    IOTHUB_TRACK_2_SDK_MIN_VERSION,
 )
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import (
@@ -24,7 +25,8 @@ from azext_iot.common.shared import (
     KeyType,
     SettleType,
     RenewKeyType,
-    IoTHubStateType
+    IoTHubStateType,
+    DeviceAuthApiType,
 )
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
@@ -35,7 +37,7 @@ from azext_iot.common.utility import (
     init_monitoring,
     process_json_arg,
     ensure_iothub_sdk_min_version,
-    generate_key
+    generate_key,
 )
 from azext_iot._factory import SdkResolver, CloudError
 from azext_iot.operations.generic import _execute_query, _process_top
@@ -48,12 +50,21 @@ printer = pprint.PrettyPrinter(indent=2)
 # Query
 
 def iot_query(
-    cmd, query_command, hub_name=None, top=None, resource_group_name=None, login=None
+    cmd,
+    query_command,
+    hub_name=None,
+    top=None,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
 ):
     top = _process_top(top)
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -71,11 +82,19 @@ def iot_query(
 
 
 def iot_device_show(
-    cmd, device_id, hub_name=None, resource_group_name=None, login=None
+    cmd,
+    device_id,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
     return _iot_device_show(target, device_id)
 
@@ -101,13 +120,23 @@ def iot_device_list(
     edge_enabled=False,
     resource_group_name=None,
     login=None,
+    auth_type_dataplane=None,
 ):
     query = (
         "select * from devices where capabilities.iotEdge = true"
         if edge_enabled
         else "select * from devices"
     )
-    result = iot_query(cmd, query, hub_name, top, resource_group_name, login=login)
+    result = iot_query(
+        cmd=cmd,
+        query_command=query,
+        hub_name=hub_name,
+        top=top,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type_dataplane=auth_type_dataplane,
+    )
+
     if not result:
         logger.info('No registered devices found on hub "%s".', hub_name)
     return result
@@ -125,35 +154,19 @@ def iot_device_create(
     status_reason=None,
     valid_days=None,
     output_dir=None,
-    set_parent_id=None,
-    add_children=None,
-    force=False,
     resource_group_name=None,
     login=None,
+    auth_type_dataplane=None,
 ):
-
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
-
-    if add_children:
-        if not edge_enabled:
-            raise CLIError(
-                'The device "{}" should be edge device in order to add children.'.format(device_id)
-            )
-
-        for child_device_id in add_children.split(","):
-            child_device = _iot_device_show(target, child_device_id.strip())
-            _validate_parent_child_relation(child_device, force)
-
-    deviceScope = None
-    if set_parent_id:
-        edge_device = _iot_device_show(target, set_parent_id)
-        _validate_edge_device(edge_device)
-        deviceScope = edge_device["deviceScope"]
 
     if any([valid_days, output_dir]):
         valid_days = 365 if not valid_days else int(valid_days)
@@ -176,18 +189,12 @@ def iot_device_create(
             secondary_thumbprint,
             status,
             status_reason,
-            deviceScope
         )
         output = service_sdk.devices.create_or_update_identity(
             id=device_id, device=device
         )
     except CloudError as e:
         raise CLIError(unpack_msrest_error(e))
-
-    if add_children:
-        for child_device_id in add_children.split(","):
-            child_device = _iot_device_show(target, child_device_id.strip())
-            _update_device_parent(target, child_device, child_device["capabilities"]["iotEdge"], output.device_scope)
 
     return output
 
@@ -250,21 +257,21 @@ def _assemble_auth(auth_method, pk, sk):
     )
 
     auth = None
-    if auth_method in [DeviceAuthType.shared_private_key.name, "sas"]:
+    if auth_method in [DeviceAuthType.shared_private_key.name, DeviceAuthApiType.sas.value]:
         auth = AuthenticationMechanism(
-            symmetric_key=SymmetricKey(primary_key=pk, secondary_key=sk), type="sas"
+            symmetric_key=SymmetricKey(primary_key=pk, secondary_key=sk), type=DeviceAuthApiType.sas.value
         )
-    elif auth_method in [DeviceAuthType.x509_thumbprint.name, "selfSigned"]:
+    elif auth_method in [DeviceAuthType.x509_thumbprint.name, DeviceAuthApiType.selfSigned.value]:
         if not pk:
             raise ValueError("primary thumbprint required with selfSigned auth")
         auth = AuthenticationMechanism(
             x509_thumbprint=X509Thumbprint(
                 primary_thumbprint=pk, secondary_thumbprint=sk
             ),
-            type="selfSigned",
+            type=DeviceAuthApiType.selfSigned.value,
         )
-    elif auth_method in [DeviceAuthType.x509_ca.name, "certificateAuthority"]:
-        auth = AuthenticationMechanism(type="certificateAuthority")
+    elif auth_method in [DeviceAuthType.x509_ca.name, DeviceAuthApiType.certificateAuthority.value]:
+        auth = AuthenticationMechanism(type=DeviceAuthApiType.certificateAuthority.value)
     else:
         raise ValueError("Authorization method {} invalid.".format(auth_method))
     return auth
@@ -294,10 +301,10 @@ def update_iot_device_custom(
     if status_reason is not None:
         instance["statusReason"] = status_reason
 
-    auth_type = instance['authentication']['type']
+    auth_type = instance["authentication"]["type"]
     if auth_method is not None:
         if auth_method == DeviceAuthType.shared_private_key.name:
-            auth = "sas"
+            auth = DeviceAuthApiType.sas.value
             if (primary_key and not secondary_key) or (
                 not primary_key and secondary_key
             ):
@@ -305,7 +312,7 @@ def update_iot_device_custom(
             instance["authentication"]["symmetricKey"]["primaryKey"] = primary_key
             instance["authentication"]["symmetricKey"]["secondaryKey"] = secondary_key
         elif auth_method == DeviceAuthType.x509_thumbprint.name:
-            auth = "selfSigned"
+            auth = DeviceAuthApiType.selfSigned.value
             if not any([primary_thumbprint, secondary_thumbprint]):
                 raise CLIError(
                     "primary or secondary Thumbprint required with selfSigned auth"
@@ -319,13 +326,13 @@ def update_iot_device_custom(
                     "secondaryThumbprint"
                 ] = secondary_thumbprint
         elif auth_method == DeviceAuthType.x509_ca.name:
-            auth = "certificateAuthority"
+            auth = DeviceAuthApiType.certificateAuthority.value
         else:
             raise ValueError("Authorization method {} invalid.".format(auth_method))
         instance["authentication"]["type"] = auth
 
     # if no new auth_method is provided, validate secondary auth arguments and update accordingly
-    elif auth_type == "sas":
+    elif auth_type == DeviceAuthApiType.sas.value:
         if any([primary_thumbprint, secondary_thumbprint]):
             raise ValueError(
                 "Device authorization method {} does not support primary or secondary thumbprints.".format(
@@ -337,7 +344,7 @@ def update_iot_device_custom(
         if secondary_key:
             instance["authentication"]["symmetricKey"]["secondaryKey"] = secondary_key
 
-    elif auth_type == "selfSigned":
+    elif auth_type == DeviceAuthApiType.selfSigned.value:
         if any([primary_key, secondary_key]):
             raise ValueError(
                 "Device authorization method {} does not support primary or secondary keys.".format(
@@ -356,24 +363,34 @@ def update_iot_device_custom(
 
 
 def iot_device_update(
-    cmd, device_id, parameters, hub_name=None, resource_group_name=None, login=None, etag=None
+    cmd,
+    device_id,
+    parameters,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
+    etag=None,
+    auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
 
     auth, pk, sk = _parse_auth(parameters)
     updated_device = _assemble_device(
         True,
-        parameters['deviceId'],
+        parameters["deviceId"],
         auth,
-        parameters['capabilities']['iotEdge'],
+        parameters["capabilities"]["iotEdge"],
         pk,
         sk,
-        parameters['status'].lower(),
-        parameters.get('statusReason'),
-        parameters.get('deviceScope')
+        parameters["status"].lower(),
+        parameters.get("statusReason"),
+        parameters.get("deviceScope"),
     )
     updated_device.etag = etag if etag else "*"
     return _iot_device_update(target, device_id, updated_device)
@@ -387,20 +404,27 @@ def _iot_device_update(target, device_id, device):
         headers = {}
         headers["If-Match"] = '"{}"'.format(device.etag)
         return service_sdk.devices.create_or_update_identity(
-            id=device_id,
-            device=device,
-            custom_headers=headers
+            id=device_id, device=device, custom_headers=headers
         )
     except CloudError as e:
         raise CLIError(unpack_msrest_error(e))
 
 
 def iot_device_delete(
-    cmd, device_id, hub_name=None, resource_group_name=None, login=None, etag=None
+    cmd,
+    device_id,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
+    etag=None,
+    auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -408,9 +432,7 @@ def iot_device_delete(
     try:
         headers = {}
         headers["If-Match"] = '"{}"'.format(etag if etag else "*")
-        service_sdk.devices.delete_identity(
-            id=device_id, custom_headers=headers
-        )
+        service_sdk.devices.delete_identity(id=device_id, custom_headers=headers)
         return
     except CloudError as e:
         raise CLIError(unpack_msrest_error(e))
@@ -434,13 +456,25 @@ def _update_device_key(target, device, auth_method, pk, sk, etag=None):
         raise CLIError(unpack_msrest_error(e))
 
 
-def iot_device_key_regenerate(cmd, hub_name, device_id, renew_key_type, resource_group_name=None, login=None, etag=None):
+def iot_device_key_regenerate(
+    cmd,
+    hub_name,
+    device_id,
+    renew_key_type,
+    resource_group_name=None,
+    login=None,
+    etag=None,
+    auth_type_dataplane=None,
+):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
     device = _iot_device_show(target, device_id)
-    if (device["authentication"]["type"] != "sas"):
+    if device["authentication"]["type"] != DeviceAuthApiType.sas.value:
         raise CLIError("Device authentication should be of type sas")
 
     pk = device["authentication"]["symmetricKey"]["primaryKey"]
@@ -455,15 +489,25 @@ def iot_device_key_regenerate(cmd, hub_name, device_id, renew_key_type, resource
         pk = sk
         sk = temp
 
-    return _update_device_key(target, device, device["authentication"]["type"], pk, sk, etag)
+    return _update_device_key(
+        target, device, device["authentication"]["type"], pk, sk, etag
+    )
 
 
 def iot_device_get_parent(
-    cmd, device_id, hub_name=None, resource_group_name=None, login=None
+    cmd,
+    device_id,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
     child_device = _iot_device_show(target, device_id)
     _validate_child_device(child_device)
@@ -482,17 +526,26 @@ def iot_device_set_parent(
     hub_name=None,
     resource_group_name=None,
     login=None,
+    auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
     parent_device = _iot_device_show(target, parent_id)
     _validate_edge_device(parent_device)
     child_device = _iot_device_show(target, device_id)
     _validate_parent_child_relation(child_device, force)
 
-    _update_device_parent(target, child_device, child_device["capabilities"]["iotEdge"], parent_device["deviceScope"])
+    _update_device_parent(
+        target,
+        child_device,
+        child_device["capabilities"]["iotEdge"],
+        parent_device["deviceScope"],
+    )
 
 
 def iot_device_children_add(
@@ -503,26 +556,31 @@ def iot_device_children_add(
     hub_name=None,
     resource_group_name=None,
     login=None,
+    auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
     devices = []
     edge_device = _iot_device_show(target, device_id)
     _validate_edge_device(edge_device)
     converted_child_list = child_list
-    if isinstance(child_list, str):  # this check would be removed once add-children command is deprecated
-        converted_child_list = child_list.split(",")
     for child_device_id in converted_child_list:
         child_device = _iot_device_show(target, child_device_id.strip())
-        _validate_parent_child_relation(
-            child_device, force
-        )
+        _validate_parent_child_relation(child_device, force)
         devices.append(child_device)
 
     for device in devices:
-        _update_device_parent(target, device, device["capabilities"]["iotEdge"], edge_device["deviceScope"])
+        _update_device_parent(
+            target,
+            device,
+            device["capabilities"]["iotEdge"],
+            edge_device["deviceScope"],
+        )
 
 
 def iot_device_children_remove(
@@ -533,10 +591,14 @@ def iot_device_children_remove(
     hub_name=None,
     resource_group_name=None,
     login=None,
+    auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
     devices = []
     if remove_all:
@@ -556,8 +618,6 @@ def iot_device_children_remove(
         edge_device = _iot_device_show(target, device_id)
         _validate_edge_device(edge_device)
         converted_child_list = child_list
-        if isinstance(child_list, str):  # this check would be removed once remove-children command is deprecated
-            converted_child_list = child_list.split(",")
         for child_device_id in converted_child_list:
             child_device = _iot_device_show(target, child_device_id.strip())
             _validate_child_device(child_device)
@@ -579,42 +639,58 @@ def iot_device_children_remove(
 
 
 def iot_device_children_list(
-    cmd, device_id, hub_name=None, resource_group_name=None, login=None
+    cmd,
+    device_id,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
 ):
     result = _iot_device_children_list(
-        cmd, device_id, hub_name, resource_group_name, login
+        cmd=cmd,
+        device_id=device_id,
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type_dataplane=auth_type_dataplane,
     )
 
     return [device["deviceId"] for device in result]
 
 
-# this method would be removed once remove-children command is deprecated
-def iot_device_children_list_comma_separated(
-    cmd, device_id, hub_name=None, resource_group_name=None, login=None
-):
-    result = _iot_device_children_list(
-        cmd, device_id, hub_name, resource_group_name, login
-    )
-    if not result:
-        raise CLIError(
-            'No registered child devices found for "{}" edge device.'.format(device_id)
-        )
-    return ", ".join([str(x["deviceId"]) for x in result])
-
-
 def _iot_device_children_list(
-    cmd, device_id, hub_name=None, resource_group_name=None, login=None
+    cmd,
+    device_id,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
     device = _iot_device_show(target, device_id)
     _validate_edge_device(device)
-    query = "select deviceId from devices where array_contains(parentScopes, '{}')".format(
-        device["deviceScope"]
+    query = (
+        "select deviceId from devices where array_contains(parentScopes, '{}')".format(
+            device["deviceScope"]
+        )
     )
-    return iot_query(cmd, query, hub_name, None, resource_group_name, login=login)
+
+    # TODO: Inefficient
+    return iot_query(
+        cmd=cmd,
+        query_command=query,
+        hub_name=hub_name,
+        top=None,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type_dataplane=auth_type_dataplane,
+    )
 
 
 def _update_device_parent(target, device, is_edge, device_scope=None):
@@ -664,9 +740,7 @@ def _validate_child_device(device):
         )
     if not device["parentScopes"]:
         raise CLIError(
-            'Device "{}" doesn\'t have any parent device.'.format(
-                device["deviceId"]
-            )
+            'Device "{}" doesn\'t have any parent device.'.format(device["deviceId"])
         )
 
 
@@ -697,6 +771,7 @@ def iot_device_module_create(
     output_dir=None,
     resource_group_name=None,
     login=None,
+    auth_type_dataplane=None,
 ):
 
     if any([valid_days, output_dir]):
@@ -712,7 +787,10 @@ def iot_device_module_create(
 
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -749,10 +827,14 @@ def iot_device_module_update(
     resource_group_name=None,
     login=None,
     etag=None,
+    auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -783,15 +865,15 @@ def _handle_module_update_params(parameters):
 
 
 def _parse_auth(parameters):
-    valid_auth = ["sas", "selfSigned", "certificateAuthority"]
+    valid_auth = [DeviceAuthApiType.sas.value, DeviceAuthApiType.selfSigned.value, DeviceAuthApiType.certificateAuthority.value]
     auth = parameters["authentication"].get("type")
     if auth not in valid_auth:
         raise CLIError("authentication.type must be one of {}".format(valid_auth))
     pk = sk = None
-    if auth == "sas":
+    if auth == DeviceAuthApiType.sas.value:
         pk = parameters["authentication"]["symmetricKey"]["primaryKey"]
         sk = parameters["authentication"]["symmetricKey"]["secondaryKey"]
-    elif auth == "selfSigned":
+    elif auth == DeviceAuthApiType.selfSigned.value:
         pk = parameters["authentication"]["x509Thumbprint"]["primaryThumbprint"]
         sk = parameters["authentication"]["x509Thumbprint"]["secondaryThumbprint"]
         if not any([pk, sk]):
@@ -801,12 +883,79 @@ def _parse_auth(parameters):
     return auth, pk, sk
 
 
-def iot_device_module_list(
-    cmd, device_id, hub_name=None, top=1000, resource_group_name=None, login=None
+def iot_device_module_key_regenerate(
+    cmd,
+    hub_name,
+    device_id,
+    module_id,
+    renew_key_type,
+    resource_group_name=None,
+    login=None,
+    etag=None,
+    auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
+    resolver = SdkResolver(target=target)
+    service_sdk = resolver.get_sdk(SdkType.service_sdk)
+    try:
+        module = service_sdk.modules.get_identity(
+            id=device_id, mid=module_id, raw=True
+        ).response.json()
+    except CloudError as e:
+        raise CLIError(unpack_msrest_error(e))
+
+    if module["authentication"]["type"] != "sas":
+        raise CLIError("Module authentication should be of type sas")
+
+    pk = module["authentication"]["symmetricKey"]["primaryKey"]
+    sk = module["authentication"]["symmetricKey"]["secondaryKey"]
+
+    if renew_key_type == RenewKeyType.primary.value:
+        pk = generate_key()
+    if renew_key_type == RenewKeyType.secondary.value:
+        sk = generate_key()
+    if renew_key_type == RenewKeyType.swap.value:
+        temp = pk
+        pk = sk
+        sk = temp
+
+    module["authentication"]["symmetricKey"]["primaryKey"] = pk
+    module["authentication"]["symmetricKey"]["secondaryKey"] = sk
+
+    try:
+        headers = {}
+        headers["If-Match"] = '"{}"'.format(etag if etag else "*")
+        return service_sdk.modules.create_or_update_identity(
+            id=device_id,
+            mid=module_id,
+            module=module,
+            custom_headers=headers,
+        )
+    except CloudError as e:
+        raise CLIError(unpack_msrest_error(e))
+
+
+def iot_device_module_list(
+    cmd,
+    device_id,
+    hub_name=None,
+    top=1000,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
+):
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -818,11 +967,20 @@ def iot_device_module_list(
 
 
 def iot_device_module_show(
-    cmd, device_id, module_id, hub_name=None, resource_group_name=None, login=None
+    cmd,
+    device_id,
+    module_id,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
     return _iot_device_module_show(target, device_id, module_id)
 
@@ -842,11 +1000,21 @@ def _iot_device_module_show(target, device_id, module_id):
 
 
 def iot_device_module_delete(
-    cmd, device_id, module_id, hub_name=None, resource_group_name=None, login=None, etag=None
+    cmd,
+    device_id,
+    module_id,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
+    etag=None,
+    auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -863,11 +1031,20 @@ def iot_device_module_delete(
 
 
 def iot_device_module_twin_show(
-    cmd, device_id, module_id, hub_name=None, resource_group_name=None, login=None
+    cmd,
+    device_id,
+    module_id,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
     return _iot_device_module_twin_show(
         target=target, device_id=device_id, module_id=module_id
@@ -894,13 +1071,17 @@ def iot_device_module_twin_update(
     hub_name=None,
     resource_group_name=None,
     login=None,
-    etag=None
+    etag=None,
+    auth_type_dataplane=None,
 ):
     from azext_iot.common.utility import verify_transform
 
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -935,11 +1116,15 @@ def iot_device_module_twin_replace(
     hub_name=None,
     resource_group_name=None,
     login=None,
-    etag=None
+    etag=None,
+    auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -959,13 +1144,22 @@ def iot_device_module_twin_replace(
 
 
 def iot_edge_set_modules(
-    cmd, device_id, content, hub_name=None, resource_group_name=None, login=None
+    cmd,
+    device_id,
+    content,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
 ):
     from azext_iot.sdk.iothub.service.models import ConfigurationContent
 
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -996,6 +1190,7 @@ def iot_edge_deployment_create(
     no_validation=False,
     resource_group_name=None,
     login=None,
+    auth_type_dataplane=None,
 ):
     # Short-term fix for --no-validation
     config_type = ConfigType.layered if layered or no_validation else ConfigType.edge
@@ -1011,6 +1206,7 @@ def iot_edge_deployment_create(
         resource_group_name=resource_group_name,
         login=login,
         config_type=config_type,
+        auth_type_dataplane=auth_type_dataplane,
     )
 
 
@@ -1025,6 +1221,7 @@ def iot_hub_configuration_create(
     metrics=None,
     resource_group_name=None,
     login=None,
+    auth_type_dataplane=None,
 ):
     return _iot_hub_configuration_create(
         cmd=cmd,
@@ -1038,6 +1235,7 @@ def iot_hub_configuration_create(
         resource_group_name=resource_group_name,
         login=login,
         config_type=ConfigType.adm,
+        auth_type_dataplane=auth_type_dataplane,
     )
 
 
@@ -1053,6 +1251,7 @@ def _iot_hub_configuration_create(
     metrics=None,
     resource_group_name=None,
     login=None,
+    auth_type_dataplane=None,
 ):
     from azext_iot.sdk.iothub.service.models import (
         Configuration,
@@ -1062,7 +1261,10 @@ def _iot_hub_configuration_create(
 
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -1203,14 +1405,24 @@ def _validate_payload_schema(content):
 
 
 def iot_hub_configuration_update(
-    cmd, config_id, parameters, hub_name=None, resource_group_name=None, login=None, etag=None
+    cmd,
+    config_id,
+    parameters,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
+    etag=None,
+    auth_type_dataplane=None,
 ):
     from azext_iot.sdk.iothub.service.models import Configuration
     from azext_iot.common.utility import verify_transform
 
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -1229,7 +1441,7 @@ def iot_hub_configuration_update(
             content=parameters["content"],
             metrics=parameters.get("metrics", None),
             target_condition=parameters["targetCondition"],
-            priority=parameters["priority"]
+            priority=parameters["priority"],
         )
         return service_sdk.configuration.create_or_update(
             id=config_id, configuration=config, custom_headers=headers
@@ -1241,11 +1453,19 @@ def iot_hub_configuration_update(
 
 
 def iot_hub_configuration_show(
-    cmd, config_id, hub_name=None, resource_group_name=None, login=None
+    cmd,
+    config_id,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
     return _iot_hub_configuration_show(target=target, config_id=config_id)
 
@@ -1261,13 +1481,19 @@ def _iot_hub_configuration_show(target, config_id):
 
 
 def iot_hub_configuration_list(
-    cmd, hub_name=None, top=None, resource_group_name=None, login=None
+    cmd,
+    hub_name=None,
+    top=None,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
 ):
     result = _iot_hub_configuration_list(
-        cmd,
+        cmd=cmd,
         hub_name=hub_name,
         resource_group_name=resource_group_name,
         login=login,
+        auth_type_dataplane=auth_type_dataplane,
     )
     filtered = [
         c
@@ -1281,13 +1507,19 @@ def iot_hub_configuration_list(
 
 
 def iot_edge_deployment_list(
-    cmd, hub_name=None, top=None, resource_group_name=None, login=None
+    cmd,
+    hub_name=None,
+    top=None,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
 ):
     result = _iot_hub_configuration_list(
         cmd,
         hub_name=hub_name,
         resource_group_name=resource_group_name,
         login=login,
+        auth_type_dataplane=auth_type_dataplane,
     )
 
     filtered = [c for c in result if c["content"].get("modulesContent") is not None]
@@ -1295,11 +1527,14 @@ def iot_edge_deployment_list(
 
 
 def _iot_hub_configuration_list(
-    cmd, hub_name=None, resource_group_name=None, login=None
+    cmd, hub_name=None, resource_group_name=None, login=None, auth_type_dataplane=None
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -1314,11 +1549,20 @@ def _iot_hub_configuration_list(
 
 
 def iot_hub_configuration_delete(
-    cmd, config_id, hub_name=None, resource_group_name=None, login=None, etag=None
+    cmd,
+    config_id,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
+    etag=None,
+    auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -1339,6 +1583,7 @@ def iot_edge_deployment_metric_show(
     hub_name=None,
     resource_group_name=None,
     login=None,
+    auth_type_dataplane=None,
 ):
     return iot_hub_configuration_metric_show(
         cmd,
@@ -1348,6 +1593,7 @@ def iot_edge_deployment_metric_show(
         hub_name=hub_name,
         resource_group_name=resource_group_name,
         login=login,
+        auth_type_dataplane=auth_type_dataplane,
     )
 
 
@@ -1359,10 +1605,14 @@ def iot_hub_configuration_metric_show(
     hub_name=None,
     resource_group_name=None,
     login=None,
+    auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -1404,11 +1654,19 @@ def iot_hub_configuration_metric_show(
 
 
 def iot_device_twin_show(
-    cmd, device_id, hub_name=None, resource_group_name=None, login=None
+    cmd,
+    device_id,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
     return _iot_device_twin_show(target=target, device_id=device_id)
 
@@ -1438,13 +1696,23 @@ def iot_twin_update_custom(instance, desired=None, tags=None):
 
 
 def iot_device_twin_update(
-    cmd, device_id, parameters, hub_name=None, resource_group_name=None, login=None, etag=None
+    cmd,
+    device_id,
+    parameters,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
+    etag=None,
+    auth_type_dataplane=None,
 ):
     from azext_iot.common.utility import verify_transform
 
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -1469,11 +1737,21 @@ def iot_device_twin_update(
 
 
 def iot_device_twin_replace(
-    cmd, device_id, target_json, hub_name=None, resource_group_name=None, login=None, etag=None
+    cmd,
+    device_id,
+    target_json,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
+    etag=None,
+    auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -1498,6 +1776,7 @@ def iot_device_method(
     timeout=30,
     resource_group_name=None,
     login=None,
+    auth_type_dataplane=None,
 ):
     from azext_iot.constants import (
         METHOD_INVOKE_MAX_TIMEOUT_SEC,
@@ -1515,7 +1794,10 @@ def iot_device_method(
 
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -1536,7 +1818,9 @@ def iot_device_method(
         }
 
         return service_sdk.devices.invoke_method(
-            device_id=device_id, direct_method_request=request_body, timeout=timeout,
+            device_id=device_id,
+            direct_method_request=request_body,
+            timeout=timeout,
         )
     except CloudError as e:
         raise CLIError(unpack_msrest_error(e))
@@ -1555,6 +1839,7 @@ def iot_device_module_method(
     timeout=30,
     resource_group_name=None,
     login=None,
+    auth_type_dataplane=None,
 ):
     from azext_iot.constants import (
         METHOD_INVOKE_MAX_TIMEOUT_SEC,
@@ -1572,7 +1857,10 @@ def iot_device_module_method(
 
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
@@ -1615,6 +1903,7 @@ def iot_get_sas_token(
     resource_group_name=None,
     login=None,
     module_id=None,
+    auth_type_dataplane=None,
 ):
     key_type = key_type.lower()
     policy_name = policy_name.lower()
@@ -1633,7 +1922,7 @@ def iot_get_sas_token(
         )
 
     return {
-        "sas": _iot_build_sas_token(
+        DeviceAuthApiType.sas.value: _iot_build_sas_token(
             cmd,
             hub_name,
             device_id,
@@ -1643,6 +1932,7 @@ def iot_get_sas_token(
             duration,
             resource_group_name,
             login,
+            auth_type_dataplane,
         ).generate_sas_token()
     }
 
@@ -1657,11 +1947,16 @@ def _iot_build_sas_token(
     duration=3600,
     resource_group_name=None,
     login=None,
+    auth_type_dataplane=None,
 ):
     from azext_iot.common._azure import (
         parse_iot_device_connection_string,
         parse_iot_device_module_connection_string,
     )
+
+    # There is no dataplane operation for a pure IoT Hub sas token
+    if all([device_id is None, module_id is None]):
+        auth_type_dataplane = "key"
 
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
@@ -1669,6 +1964,7 @@ def _iot_build_sas_token(
         resource_group_name=resource_group_name,
         policy_name=policy_name,
         login=login,
+        auth_type=auth_type_dataplane,
     )
     uri = None
     policy = None
@@ -1724,13 +2020,13 @@ def _build_device_or_module_connection_string(entity, key_type="primary"):
     )
     auth = entity["authentication"]
     auth_type = auth["type"].lower()
-    if auth_type == "sas":
+    if auth_type == DeviceAuthApiType.sas.value.lower():
         key = "SharedAccessKey={}".format(
             auth["symmetricKey"]["primaryKey"]
             if key_type == "primary"
             else auth["symmetricKey"]["secondaryKey"]
         )
-    elif auth_type in ["certificateauthority", "selfsigned"]:
+    elif auth_type in [DeviceAuthApiType.certificateAuthority.value.lower(), DeviceAuthApiType.selfSigned.value.lower()]:
         key = "x509=true"
     else:
         raise CLIError("Unable to form target connection string")
@@ -1750,6 +2046,7 @@ def iot_get_device_connection_string(
     key_type="primary",
     resource_group_name=None,
     login=None,
+    auth_type_dataplane=None,
 ):
     result = {}
     device = iot_device_show(
@@ -1758,6 +2055,7 @@ def iot_get_device_connection_string(
         hub_name=hub_name,
         resource_group_name=resource_group_name,
         login=login,
+        auth_type_dataplane=auth_type_dataplane,
     )
     result["connectionString"] = _build_device_or_module_connection_string(
         device, key_type
@@ -1773,6 +2071,7 @@ def iot_get_module_connection_string(
     key_type="primary",
     resource_group_name=None,
     login=None,
+    auth_type_dataplane=None,
 ):
     result = {}
     module = iot_device_module_show(
@@ -1782,6 +2081,7 @@ def iot_get_module_connection_string(
         resource_group_name=resource_group_name,
         hub_name=hub_name,
         login=login,
+        auth_type_dataplane=auth_type_dataplane,
     )
     result["connectionString"] = _build_device_or_module_connection_string(
         module, key_type
@@ -1972,18 +2272,24 @@ def _iot_c2d_message_receive(target, device_id, lock_timeout=60, ack=None):
                     ack_response = {}
                     if ack == SettleType.abandon.value:
                         logger.debug("__Abandoning message__")
-                        ack_response = device_sdk.device.abandon_device_bound_notification(
-                            id=device_id, etag=eTag, raw=True
+                        ack_response = (
+                            device_sdk.device.abandon_device_bound_notification(
+                                id=device_id, etag=eTag, raw=True
+                            )
                         )
                     elif ack == SettleType.reject.value:
                         logger.debug("__Rejecting message__")
-                        ack_response = device_sdk.device.complete_device_bound_notification(
-                            id=device_id, etag=eTag, reject="", raw=True
+                        ack_response = (
+                            device_sdk.device.complete_device_bound_notification(
+                                id=device_id, etag=eTag, reject="", raw=True
+                            )
                         )
                     else:
                         logger.debug("__Completing message__")
-                        ack_response = device_sdk.device.complete_device_bound_notification(
-                            id=device_id, etag=eTag, raw=True
+                        ack_response = (
+                            device_sdk.device.complete_device_bound_notification(
+                                id=device_id, etag=eTag, raw=True
+                            )
                         )
 
                     payload["ack"] = (
@@ -2017,7 +2323,7 @@ def _iot_c2d_message_receive(target, device_id, lock_timeout=60, ack=None):
             if result.content:
                 target_encoding = result.headers.get("ContentEncoding", "utf-8")
                 logger.info(f"Decoding message data encoded with: {target_encoding}")
-                payload["data"] = result.content.decode(encoding=target_encoding)
+                payload["data"] = result.content.decode(target_encoding)
 
             return payload
         return
@@ -2043,6 +2349,7 @@ def iot_c2d_message_send(
     repair=False,
     resource_group_name=None,
     login=None,
+    auth_type_dataplane=None,
 ):
     from azext_iot.common.deps import ensure_uamqp
     from azext_iot.common.utility import validate_min_python_version
@@ -2059,7 +2366,10 @@ def iot_c2d_message_send(
 
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
 
     if properties:
@@ -2179,6 +2489,10 @@ def iot_simulate_device(
         if protocol_type == ProtocolType.mqtt.name:
             device = _iot_device_show(target, device_id)
             device_connection_string = _build_device_or_module_connection_string(device, KeyType.primary.value)
+
+            if device and device.get("authentication", {}).get("type", "") != DeviceAuthApiType.sas.value:
+                raise CLIError('MQTT simulation is only supported for symmetric key auth (SAS) based devices')
+
             client_mqtt = mqtt_client(
                 target=target,
                 device_conn_string=device_connection_string,
@@ -2205,16 +2519,24 @@ def iot_simulate_device(
 
 
 def iot_c2d_message_purge(
-    cmd, device_id, hub_name=None, resource_group_name=None, login=None,
+    cmd,
+    device_id,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
-    return service_sdk.cloud_to_device_messages.purge_cloud_to_device_message_queue(device_id)
+    return service_sdk.cloud_to_device_messages.purge_cloud_to_device_message_queue(
+        device_id
+    )
 
 
 def _iot_simulate_get_default_properties(protocol):
@@ -2252,10 +2574,10 @@ def iot_device_export(
     blob_container_uri,
     include_keys=False,
     storage_authentication_type=None,
+    identity=None,
     resource_group_name=None,
 ):
     from azext_iot._factory import iot_hub_service_factory
-
     client = iot_hub_service_factory(cmd.cli_ctx)
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
@@ -2274,13 +2596,34 @@ def iot_device_export(
             if storage_authentication_type
             else None
         )
+
         export_request = ExportDevicesRequest(
             export_blob_container_uri=blob_container_uri,
             exclude_keys=not include_keys,
             authentication_type=storage_authentication_type,
         )
+
+        user_identity = identity not in [None, '[system]']
+        if user_identity and storage_authentication_type != AuthenticationType.identityBased.name:
+            raise CLIError(
+                "Device export with user-assigned identities requires identity-based authentication [--storage-auth-type]"
+            )
+        # Track 2 CLI SDKs provide support for user-assigned identity objects
+        if ensure_iothub_sdk_min_version(IOTHUB_TRACK_2_SDK_MIN_VERSION) and user_identity:
+            from azure.mgmt.iothub.models import ManagedIdentity  # pylint: disable=no-name-in-module
+            export_request.identity = ManagedIdentity(user_assigned_identity=identity)
+
+        # if the user supplied a user-assigned identity, let them know they need a new CLI/SDK
+        elif user_identity:
+            raise CLIError(
+                "Device export with user-assigned identities requires a dependency of azure-mgmt-iothub>={}"
+                .format(IOTHUB_TRACK_2_SDK_MIN_VERSION)
+            )
+
         return client.export_devices(
-            target["resourcegroup"], hub_name, export_devices_parameters=export_request,
+            target["resourcegroup"],
+            hub_name,
+            export_devices_parameters=export_request,
         )
     if storage_authentication_type:
         raise CLIError(
@@ -2301,6 +2644,7 @@ def iot_device_import(
     output_blob_container_uri,
     storage_authentication_type=None,
     resource_group_name=None,
+    identity=None,
 ):
     from azext_iot._factory import iot_hub_service_factory
 
@@ -2318,6 +2662,7 @@ def iot_device_import(
 
     if ensure_iothub_sdk_min_version("0.12.0"):
         from azure.mgmt.iothub.models import ImportDevicesRequest
+
         from azext_iot.common.shared import AuthenticationType
 
         storage_authentication_type = (
@@ -2325,6 +2670,7 @@ def iot_device_import(
             if storage_authentication_type
             else None
         )
+
         import_request = ImportDevicesRequest(
             input_blob_container_uri=input_blob_container_uri,
             output_blob_container_uri=output_blob_container_uri,
@@ -2332,8 +2678,27 @@ def iot_device_import(
             output_blob_name=None,
             authentication_type=storage_authentication_type,
         )
+
+        user_identity = identity not in [None, '[system]']
+        if user_identity and storage_authentication_type != AuthenticationType.identityBased.name:
+            raise CLIError(
+                "Device import with user-assigned identities requires identity-based authentication [--storage-auth-type]"
+            )
+        # Track 2 CLI SDKs provide support for user-assigned identity objects
+        if ensure_iothub_sdk_min_version(IOTHUB_TRACK_2_SDK_MIN_VERSION) and user_identity:
+            from azure.mgmt.iothub.models import ManagedIdentity  # pylint: disable=no-name-in-module
+            import_request.identity = ManagedIdentity(user_assigned_identity=identity)
+        # if the user supplied a user-assigned identity, let them know they need a new CLI/SDK
+        elif user_identity:
+            raise CLIError(
+                "Device import with user-assigned identities requires a dependency of azure-mgmt-iothub>={}"
+                .format(IOTHUB_TRACK_2_SDK_MIN_VERSION)
+            )
+
         return client.import_devices(
-            target["resourcegroup"], hub_name, import_devices_parameters=import_request,
+            target["resourcegroup"],
+            hub_name,
+            import_devices_parameters=import_request,
         )
     if storage_authentication_type:
         raise CLIError(
@@ -2448,6 +2813,7 @@ def iot_hub_monitor_feedback(
     repair=False,
     resource_group_name=None,
     login=None,
+    auth_type_dataplane=None,
 ):
     from azext_iot.common.deps import ensure_uamqp
     from azext_iot.common.utility import validate_min_python_version
@@ -2459,7 +2825,10 @@ def iot_hub_monitor_feedback(
 
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
 
     return _iot_hub_monitor_feedback(
@@ -2468,11 +2837,17 @@ def iot_hub_monitor_feedback(
 
 
 def iot_hub_distributed_tracing_show(
-    cmd, hub_name, device_id, resource_group_name=None, login=None,
+    cmd,
+    hub_name,
+    device_id,
+    resource_group_name=None,
+    auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        hub_name=hub_name, resource_group_name=resource_group_name, login=login
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        auth_type=auth_type_dataplane,
     )
 
     device_twin = _iot_hub_distributed_tracing_show(target=target, device_id=device_id)
@@ -2565,14 +2940,14 @@ def iot_hub_distributed_tracing_update(
     sampling_mode,
     sampling_rate,
     resource_group_name=None,
-    login=None,
+    auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         hub_name=hub_name,
         resource_group_name=resource_group_name,
         include_events=True,
-        login=login,
+        auth_type=auth_type_dataplane,
     )
 
     if int(sampling_rate) not in range(0, 101):
@@ -2589,7 +2964,7 @@ def iot_hub_distributed_tracing_update(
         1 if sampling_mode.lower() == "on" else 2
     )
     result = iot_device_twin_update(
-        cmd, device_id, device_twin, hub_name, resource_group_name, login
+        cmd, device_id, device_twin, hub_name, resource_group_name
     )
     return _customize_device_tracing_output(
         result.device_id, result.properties.desired, result.properties.reported
@@ -2621,20 +2996,26 @@ def iot_hub_connection_string_show(
         for hub in hubs:
             if hub.properties.state == IoTHubStateType.Active.value:
                 try:
-                    connection_strings.append({
-                        "name": hub.name,
-                        "connectionString": conn_str_getter(hub)
-                        if show_all
-                        else conn_str_getter(hub)[0],
-                    })
+                    connection_strings.append(
+                        {
+                            "name": hub.name,
+                            "connectionString": conn_str_getter(hub)
+                            if show_all
+                            else conn_str_getter(hub)[0],
+                        }
+                    )
                 except:
-                    logger.warning(f"Warning: The IoT Hub {hub.name} in resource group " +
-                                   f"{hub.additional_properties['resourcegroup']} does " +
-                                   f"not have the target policy {policy_name}.")
+                    logger.warning(
+                        f"Warning: The IoT Hub {hub.name} in resource group "
+                        + f"{hub.additional_properties['resourcegroup']} does "
+                        + f"not have the target policy {policy_name}."
+                    )
             else:
-                logger.warning(f"Warning: The IoT Hub {hub.name} in resource group " +
-                               f"{hub.additional_properties['resourcegroup']} is skipped " +
-                               "because the hub is not active.")
+                logger.warning(
+                    f"Warning: The IoT Hub {hub.name} in resource group "
+                    + f"{hub.additional_properties['resourcegroup']} is skipped "
+                    + "because the hub is not active."
+                )
         return connection_strings
 
     hub = discovery.find_iothub(hub_name, resource_group_name)
@@ -2660,7 +3041,6 @@ def _get_hub_connection_string(
                 hub.name, hub.additional_properties["resourcegroup"], policy_name
             )
         )
-
     if default_eventhub:
         cs_template_eventhub = (
             "Endpoint={};SharedAccessKeyName={};SharedAccessKey={};EntityPath={}"
@@ -2677,7 +3057,12 @@ def _get_hub_connection_string(
                 entityPath,
             )
             for p in policies
-            if "serviceconnect" in (p.rights.value.lower() if isinstance(p.rights, (Enum, EnumMeta)) else p.rights.lower())
+            if "serviceconnect"
+            in (
+                p.rights.value.lower()
+                if isinstance(p.rights, (Enum, EnumMeta))
+                else p.rights.lower()
+            )
         ]
 
     hostname = hub.properties.host_name
