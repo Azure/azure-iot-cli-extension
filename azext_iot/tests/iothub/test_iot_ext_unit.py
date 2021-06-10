@@ -18,14 +18,11 @@ import responses
 import re
 from azext_iot.operations import hub as subject
 from azext_iot.common.utility import (
-    validate_min_python_version,
-    url_encode_dict,
-    url_encode_str,
     validate_key_value_pairs,
     read_file_content,
 )
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
-from azext_iot.constants import TRACING_PROPERTY, USER_AGENT, BASE_MQTT_API_VERSION
+from azext_iot.constants import TRACING_PROPERTY
 from azext_iot.tests.generators import create_req_monitor_events, generate_generic_id
 from knack.util import CLIError
 from azext_iot.tests.conftest import (
@@ -2001,33 +1998,28 @@ class TestSasTokenAuth:
 
 class TestDeviceSimulate:
     @pytest.fixture(params=[204])
-    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request, fixture_iot_device_show_sas):
+    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request, fixture_device, fixture_iot_device_show_sas):
         service_client = mocker.patch(path_service_client)
         service_client.return_value = build_mock_response(mocker, request.param, {})
         return service_client
 
     @pytest.mark.parametrize(
-        "rs, mc, mi, protocol, properties",
+        "rs, mc, mi, protocol, properties, mrc, mrp",
         [
-            ("complete", 1, 1, "http", None),
-            ("reject", 1, 1, "http", None),
-            ("abandon", 2, 1, "http", "iothub-app-myprop=myvalue;iothub-messageid=1"),
-            ("complete", 1, 1, "http", "invalidprop;content-encoding=utf-16"),
-            (
-                "complete",
-                1,
-                1,
-                "http",
-                "iothub-app-myprop=myvalue;content-type=application/text",
-            ),
-            ("complete", 3, 1, "mqtt", None),
-            ("complete", 3, 1, "mqtt", "invalid"),
-            ("complete", 2, 1, "mqtt", "myprop=myvalue;$.ce=utf-16"),
-            ("complete", 2, 1, "mqtt", "myinvalidprop;myvalidprop=myvalidpropvalue"),
+            ("complete", 1, 1, "http", None, None, None),
+            ("reject", 1, 1, "http", None, None, None),
+            ("abandon", 2, 1, "http", "iothub-app-myprop=myvalue;iothub-messageid=1", None, None),
+            ("complete", 1, 1, "http", "invalidprop;content-encoding=utf-16", None, None),
+            ("complete", 1, 1, "http", "iothub-app-myprop=myvalue;content-type=application/text", None, None),
+            ("complete", 3, 1, "mqtt", None, None, None),
+            ("complete", 3, 1, "mqtt", "invalid", None, None),
+            ("complete", 2, 1, "mqtt", "myprop=myvalue;$.ce=utf-16", 201, None),
+            ("complete", 2, 1, "mqtt", "myprop=myvalue;$.ce=utf-16", None, "{'result':'method succeded'}"),
+            ("complete", 2, 1, "mqtt", "myinvalidprop;myvalidprop=myvalidpropvalue", 204, "{'result':'method succeded'}"),
         ],
     )
     def test_device_simulate(
-        self, serviceclient, mqttclient, rs, mc, mi, protocol, properties
+        self, serviceclient, mqttclient, rs, mc, mi, protocol, properties, mrc, mrp
     ):
         from azext_iot.operations.hub import _iot_simulate_get_default_properties
 
@@ -2040,6 +2032,8 @@ class TestDeviceSimulate:
             msg_interval=mi,
             protocol_type=protocol,
             properties=properties,
+            method_response_code=mrc,
+            method_response_payload=mrp
         )
 
         properties_to_send = _iot_simulate_get_default_properties(protocol)
@@ -2061,41 +2055,38 @@ class TestDeviceSimulate:
             assert json.dumps(result[0][2])
 
         if protocol == "mqtt":
-            assert mc == mqttclient().publish.call_count
+            assert mc == mqttclient().send_message.call_count
 
-            assert mqttclient().publish.call_args[0][
-                0
-            ] == "devices/{}/messages/events/{}".format(
-                device_id, url_encode_dict(properties_to_send)
-            )
+            if properties is None or properties == "invalid":
+                assert mqttclient().send_message.call_args[0][0].custom_properties == {
+                    '$.ce': 'utf-8', '$.ct': 'application/json'}
 
-            assert mqttclient().username_pw_set.call_args[1][
-                "username"
-            ] == "{}/{}/?api-version={}&DeviceClientType={}".format(
-                mock_target["entity"],
-                device_id,
-                BASE_MQTT_API_VERSION,
-                url_encode_str(USER_AGENT),
-            )
+            elif properties == "myprop=myvalue;$.ce=utf-16":
+                assert mqttclient().send_message.call_args[0][0].custom_properties == {
+                    '$.ce': 'utf-16', '$.ct': 'application/json', 'myprop': 'myvalue'}
+
+            elif properties == "myinvalidprop;myvalidprop=myvalidpropvalue":
+                assert mqttclient().send_message.call_args[0][0].custom_properties == {
+                    '$.ce': 'utf-8', '$.ct': 'application/json', 'myvalidprop': 'myvalidpropvalue'}
 
             # mqtt msg body - which is a json string
-            assert json.loads(mqttclient().publish.call_args[0][1])
-
-            assert mqttclient().tls_set.call_count == 1
-            assert mqttclient().username_pw_set.call_count == 1
+            assert json.loads(mqttclient().send_message.call_args[0][0].data)
             assert serviceclient.call_count == 0
 
     @pytest.mark.parametrize(
-        "rs, mc, mi, protocol, exception",
+        "rs, mc, mi, protocol, exception, mrc, mrp",
         [
-            ("complete", 2, 0, "mqtt", CLIError),
-            ("complete", 0, 1, "mqtt", CLIError),
-            ("reject", 1, 1, "mqtt", CLIError),
-            ("abandon", 1, 0, "http", CLIError),
+            ("complete", 2, 0, "mqtt", CLIError, None, None),
+            ("complete", 0, 1, "mqtt", CLIError, None, None),
+            ("reject", 1, 1, "mqtt", CLIError, None, None),
+            ("abandon", 1, 0, "http", CLIError, None, None),
+            ("complete", 0, 1, "http", CLIError, 201, None),
+            ("complete", 0, 1, "http", CLIError, None, "{'result':'method succeded'}"),
+            ("complete", 0, 1, "http", CLIError, 201, "{'result':'method succeded'}"),
         ],
     )
     def test_device_simulate_invalid_args(
-        self, serviceclient, rs, mc, mi, protocol, exception
+        self, serviceclient, rs, mc, mi, protocol, exception, mrc, mrp
     ):
         with pytest.raises(exception):
             subject.iot_simulate_device(
@@ -2106,6 +2097,9 @@ class TestDeviceSimulate:
                 msg_count=mc,
                 msg_interval=mi,
                 protocol_type=protocol,
+                method_response_code=mrc,
+                method_response_payload=mrp
+
             )
 
     def test_device_simulate_http_error(self, serviceclient_generic_error):
@@ -2130,10 +2124,6 @@ class TestDeviceSimulate:
             )
 
 
-@pytest.mark.skipif(
-    not validate_min_python_version(3, 5, exit_on_fail=False),
-    reason="minimum python version not satisfied",
-)
 class TestMonitorEvents:
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):

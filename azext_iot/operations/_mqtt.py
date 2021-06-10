@@ -5,92 +5,114 @@
 # --------------------------------------------------------------------------------------------
 
 
-import ssl
-import os
-import six
-
 from time import sleep
-from paho.mqtt import client as mqtt
-
-from azext_iot.constants import EXTENSION_ROOT, USER_AGENT, BASE_MQTT_API_VERSION
-from azext_iot.common.sas_token_auth import SasTokenAuthentication
-from azext_iot.common.utility import url_encode_dict, url_encode_str
-
-connection_result = {
-    0: "success",
-    1: "refused - incorrect protocol version",
-    2: "refused - invalid client id",
-    3: "refused - server unavailable",
-    4: "refused - bad username or password",
-    5: "refused - not authorized",
-}
+from azext_iot.constants import USER_AGENT, BASE_MQTT_API_VERSION
+from azext_iot.common.utility import url_encode_str
+from azure.iot.device import IoTHubDeviceClient as mqtt_device_client, Message, MethodResponse
+import pprint
 
 
-class mqtt_client_wrap(object):
-    def __init__(self, target, device_id, properties=None, sas_duration=3600):
-        self.target = target
+class mqtt_client(object):
+    def __init__(self, target, device_conn_string, device_id, method_response_code=None, method_response_payload=None):
         self.device_id = device_id
+        self.target = target
+        # The client automatically connects when we send/receive a message or method invocation
+        self.device_client = mqtt_device_client.create_from_connection_string(device_conn_string, websockets=True)
+        self.device_client.on_message_received = self.message_handler
+        self.device_client.on_method_request_received = self.method_request_handler
+        self.method_response_code = method_response_code
+        self.method_response_payload = method_response_payload
+        self.device_client.on_twin_desired_properties_patch_received = self.twin_patch_handler
+        self.printer = pprint.PrettyPrinter(indent=2)
+        self.default_data_encoding = 'utf-8'
 
-        sas = SasTokenAuthentication(
-            target["entity"],
-            target["policy"],
-            target["primarykey"],
-            sas_duration,
-        ).generate_sas_token()
-        cwd = EXTENSION_ROOT
-        cert_path = os.path.join(cwd, "digicert.pem")
-        tls = {"ca_certs": cert_path, "tls_version": ssl.PROTOCOL_SSLv23}
-        self.topic_publish = "devices/{}/messages/events/{}".format(
-            device_id, url_encode_dict(properties) if properties else ""
-        )
-        self.topic_receive = "devices/{}/messages/devicebound/#".format(device_id)
-        self.connected = False
+    def send_d2c_message(self, message_text, properties=None):
+        message = Message(message_text)
+        message.custom_properties = properties
+        self.device_client.send_message(message)
 
-        self.client = mqtt.Client(protocol=mqtt.MQTTv311, client_id=device_id)
-        self.client.on_connect = self.on_connect
-        self.client.on_message = self.on_message
-        self.client.on_publish = self.on_publish
-        self.client.tls_set(ca_certs=tls["ca_certs"], tls_version=tls["tls_version"])
-        self.client.username_pw_set(username=build_mqtt_device_username(target["entity"], device_id), password=sas)
-        self.client.connect(host=self.target["entity"], port=8883)
+    def message_handler(self, message):
+        property_names = [
+            "message_id", "expiry_time_utc", "correlation_id", "user_id",
+            "content_encoding", "content_type", "_iothub_interface_id"
+        ]
 
-    def on_connect(self, client, userdata, flags, rc):
-        six.print_(
-            "Connected to target IoT Hub MQTT broker with result: {}".format(
-                connection_result[rc]
-            )
-        )
-        self.client.subscribe(self.topic_receive)
-        six.print_("Subscribed to device bound message queue")
-        self.connected = True
+        message_properties = {}
+        message_attributes = vars(message)
 
-    def on_message(self, client, userdata, msg):
-        six.print_()
-        six.print_("_Received C2D message with topic_: {}".format(msg.topic))
-        six.print_("_Payload_: {}".format(msg.payload))
+        for item in message_attributes:
+            if item in property_names and message_attributes[item] is not None:
+                message_properties[item] = message_attributes[item]
 
-    def on_publish(self, client, userdata, mid):
-        six.print_(".", end="", flush=True)
+        message_properties.update(message.custom_properties)
 
-    def is_connected(self):
-        return self.connected
+        if message.data and "content_encoding" in message_properties:
+            try:
+                payload = message.data.decode(encoding=message_properties["content_encoding"])
+            except Exception as x:
+                raise x
+        else:
+            payload = message.data.decode(encoding=self.default_data_encoding)
 
-    def execute(self, data, publish_delay=2, msg_count=100):
+        output = {
+            "Topic": "/devices/{}/messages/devicebound".format(self.device_id),
+            "Payload": payload,
+            "Message Properties": message_properties
+        }
+        print("\nC2D Message Handler [Received C2D message]:")
+        self.printer.pprint(output)
+
+    def method_request_handler(self, method_request):
+
+        output = {
+            "Device Id": self.device_id,
+            "Method Request Id": method_request.request_id,
+            "Method Request Name": method_request.name,
+            "Method Request Payload": method_request.payload
+        }
+
+        print("\nMethod Request Handler [Received direct method invocation request]:")
+        self.printer.pprint(output)
+
+        # set response payload
+        if self.method_response_payload:
+            payload = self.method_response_payload
+        else:
+            payload = {
+                "methodName": method_request.name,
+                "methodRequestId": method_request.request_id,
+                "methodRequestPayload": method_request.payload
+            }
+
+        # set response status code
+        if self.method_response_code:
+            status = self.method_response_code
+        else:
+            status = 200
+
+        method_response = MethodResponse.create_from_method_request(method_request, status, payload)
+        self.device_client.send_method_response(method_response)
+
+    def twin_patch_handler(self, patch):
+        modified_properties = {}
+        for prop in patch:
+            if not prop.startswith("$"):
+                modified_properties[prop] = patch[prop]
+
+        if modified_properties:
+            print("\nTwin patch handler [Updating device twin reported properties]:")
+            self.printer.pprint(modified_properties)
+            self.device_client.patch_twin_reported_properties(modified_properties)
+
+    def execute(self, data, properties={}, publish_delay=2, msg_count=100):
+        from tqdm import tqdm
         try:
-            msgs = 0
-            self.client.loop_start()
-            while True:
-                if self.is_connected():
-                    if msgs < msg_count:
-                        msgs += 1
-                        self.client.publish(self.topic_publish, data.generate(True))
-                    else:
-                        break
+            for _ in tqdm(range(msg_count), desc='Device simulation in progress'):
+                self.send_d2c_message(message_text=data.generate(True), properties=properties)
                 sleep(publish_delay)
+
         except Exception as x:
             raise x
-        finally:
-            self.client.loop_stop()
 
 
 def build_mqtt_device_username(entity, device_id):
