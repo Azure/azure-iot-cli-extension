@@ -33,11 +33,30 @@ class Role(Enum):
     operator = "ae2c9854-393b-4f97-8c42-479d70ce626e"
 
 
-class UserType(Enum):
+class UserTypePreview(Enum):
     """
-    Types of users that can be added to use/manage a Central app
+    Types of users , supported under the preview route, that can be added to use/manage a Central app
     (service principal, email, etc)
     """
 
     service_principal = "ServicePrincipalUser"
     email = "EmailUser"
+
+
+class UserTypeV1(Enum):
+    """
+    Types of users, supported under V1/1.0 route, that can be added to use/manage a Central app
+    (service principal, email, etc)
+    """
+
+    service_principal = "servicePrincipal"
+    email = "email"
+
+
+class ApiVersion(Enum):
+    """
+    API version's supported
+    """
+
+    preview = "preview"
+    v1 = "1.0"

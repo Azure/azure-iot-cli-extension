@@ -140,13 +140,13 @@ You can either manually set the environment variables or use the `pytest.ini.exa
 
 Execute the following command to run the IoT Hub integration tests:
 
-`pytest azext_iot/tests/iothub/test_iot_ext_int.py`
+`pytest azext_iot/tests/iothub/ -k "_int"`
 
 ##### Device Provisioning Service
 
 Execute the following command to run the IoT Hub DPS integration tests:
 
-`pytest azext_iot/tests/dps/test_iot_dps_int.py`
+`pytest azext_iot/tests/dps/ -k "_int"`
 
 #### Unit and Integration Tests Single Command
 

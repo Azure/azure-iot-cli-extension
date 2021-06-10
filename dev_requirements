@@ -3,9 +3,9 @@ pytest-mock
 pytest-cov
 pytest-env
 uamqp~=1.2
-mock;python_version<'3.3'
 responses
-black;python_version>='3.6'
+urllib3[secure]>=1.21.1,<=1.25
+black
 wheel==0.30.0
 pre-commit
 pylint

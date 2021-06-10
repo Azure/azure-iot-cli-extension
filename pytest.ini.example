@@ -2,7 +2,6 @@
 junit_family = xunit1
 addopts =
     -v
-    -p no:warnings
 
 norecursedirs =
     dist

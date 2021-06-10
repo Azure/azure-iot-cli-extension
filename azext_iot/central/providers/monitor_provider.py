@@ -6,9 +6,9 @@
 
 
 from azure.cli.core.commands import AzCliCommand
-from azext_iot.central.providers import (
-    CentralDeviceProvider,
-    CentralDeviceTemplateProvider,
+from azext_iot.central.providers.v1 import (
+    CentralDeviceProviderV1,
+    CentralDeviceTemplateProviderV1,
 )
 
 from azext_iot.monitor.models.arguments import (
@@ -31,10 +31,10 @@ class MonitorProvider:
         central_handler_args: CentralHandlerArguments,
         central_dns_suffix: str,
     ):
-        central_device_provider = CentralDeviceProvider(
+        central_device_provider = CentralDeviceProviderV1(
             cmd=cmd, app_id=app_id, token=token
         )
-        central_template_provider = CentralDeviceTemplateProvider(
+        central_template_provider = CentralDeviceTemplateProviderV1(
             cmd=cmd, app_id=app_id, token=token
         )
         self._targets = self._build_targets(
@@ -91,8 +91,8 @@ class MonitorProvider:
 
     def _build_handler(
         self,
-        central_device_provider: CentralDeviceProvider,
-        central_template_provider: CentralDeviceTemplateProvider,
+        central_device_provider: CentralDeviceProviderV1,
+        central_template_provider: CentralDeviceTemplateProviderV1,
         central_handler_args: CentralHandlerArguments,
     ):
         from azext_iot.monitor.handlers import CentralHandler

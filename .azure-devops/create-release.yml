@@ -2,9 +2,28 @@ pr: none
 
 trigger: none
 
-variables:
-  pythonVersion: '3.6.x'
-  architecture: 'x64'
+parameters:
+- name: pythonVersion
+  type: string
+  default: '3.6.x'
+  values:
+  - 3.6.x
+  - 3.9.x
+- name: architecture
+  type: string
+  default: 'x64'
+- name: 'testCentral'
+  type: boolean
+  default: true
+- name: 'testADT'
+  type: boolean
+  default: true
+- name: 'testDPS'
+  type: boolean
+  default: true
+- name: 'testHub'
+  type: boolean
+  default: true
 
 stages:
   - stage: 'build'
@@ -13,13 +32,13 @@ stages:
 
     - job: 'Build_Publish_Azure_IoT_CLI_Extension'
       pool:
-        vmImage: 'Ubuntu-16.04'
+        vmImage: 'ubuntu-latest'
 
       steps:
       - task: UsePythonVersion@0
         inputs:
-          versionSpec: $(pythonVersion)
-          architecture: $(architecture)
+          versionSpec: ${{ parameters.pythonVersion }}
+          architecture: ${{ parameters.architecture }}
 
       - template: templates/setup-ci-machine.yml
 
@@ -27,13 +46,13 @@ stages:
 
     - job: 'Build_Publish_Azure_CLI_Test_SDK'
       pool:
-        vmImage: 'Ubuntu-16.04'
+        vmImage: 'ubuntu-latest'
 
       steps:
       - task: UsePythonVersion@0
         inputs:
-          versionSpec: $(pythonVersion)
-          architecture: $(architecture)
+          versionSpec: ${{ parameters.pythonVersion }}
+          architecture: ${{ parameters.architecture }}
 
       - template: templates/setup-ci-machine.yml
 
@@ -45,19 +64,20 @@ stages:
       steps:
       - template: templates/setup-dev-test-env.yml
         parameters:
-          pythonVersion: $(pythonVersion)
-          architecture: $(architecture)
+          pythonVersion: ${{ parameters.pythonVersion }}
+          architecture: ${{ parameters.architecture }}
 
       - template: templates/install-and-record-version.yml
 
   - stage: 'test'
     displayName: 'Run tests'
     pool:
-      vmImage: 'Ubuntu-16.04'
+      vmImage: 'ubuntu-latest'
     dependsOn: build
     jobs:
     - job: 'testCentral'
       displayName: 'Test IoT Central'
+      condition: eq('${{ parameters.testCentral }}', true)
       steps:
       - template: templates/run-tests.yml
         parameters:
@@ -66,6 +86,7 @@ stages:
     
     - job: 'testADT'
       displayName: 'Test Azure DigitalTwins'
+      condition: eq('${{ parameters.testADT }}', true)
       steps:
       - template: templates/run-tests.yml
         parameters:
@@ -74,6 +95,7 @@ stages:
 
     - job: 'testDPS'
       displayName: 'Test DPS'
+      condition: eq('${{ parameters.testDPS }}', true)
       steps:
       - template: templates/run-tests.yml
         parameters:
@@ -82,6 +104,7 @@ stages:
     
     - job: 'testHub'
       displayName: 'Test IoT Hub'
+      condition: eq('${{ parameters.testHub }}', true)
       steps:
       - template: templates/run-tests.yml
         parameters:
@@ -105,8 +128,8 @@ stages:
       steps:
       - template: templates/calculate-code-coverage.yml
         parameters:
-          pythonVersion: $(pythonVersion)
-          architecture: $(architecture)
+          pythonVersion: ${{ parameters.pythonVersion }}
+          architecture: ${{ parameters.architecture }}
 
   - stage: 'release'
     displayName: 'Stage GitHub release'

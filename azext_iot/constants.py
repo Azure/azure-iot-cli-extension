@@ -7,7 +7,7 @@
 
 import os
 
-VERSION = "0.10.11"
+VERSION = "0.10.14"
 EXTENSION_NAME = "azure-iot"
 EXTENSION_ROOT = os.path.dirname(os.path.abspath(__file__))
 EXTENSION_CONFIG_ROOT_KEY = "iotext"
@@ -36,9 +36,10 @@ SIM_RECEIVE_SLEEP_SEC = 3
 CENTRAL_ENDPOINT = "azureiotcentral.com"
 DEVICE_DEVICESCOPE_PREFIX = "ms-azure-iot-edge://"
 TRACING_PROPERTY = "azureiot*com^dtracing^1"
-TRACING_ALLOWED_FOR_LOCATION = ("northeurope", "westus2", "west us 2", "southeastasia")
+TRACING_ALLOWED_FOR_LOCATION = ("northeurope", "westus2", "southeastasia")
 TRACING_ALLOWED_FOR_SKU = "standard"
 USER_AGENT = "IoTPlatformCliExtension/{}".format(VERSION)
+IOTHUB_RESOURCE_ID = "https://iothubs.azure.net"
 DIGITALTWINS_RESOURCE_ID = "https://digitaltwins.azure.net"
 DEVICETWIN_POLLING_INTERVAL_SEC = 10
 DEVICETWIN_MONITOR_TIME_SEC = 15
@@ -50,4 +51,4 @@ PNP_DTDLV2_COMPONENT_MARKER = "__t"
 CONFIG_KEY_UAMQP_EXT_VERSION = "uamqp_ext_version"
 
 # Initial Track 2 SDK version
-IOTHUB_TRACK_2_SDK_MIN_VERSION = '1.0.0'
+IOTHUB_TRACK_2_SDK_MIN_VERSION = '2.0.0'
