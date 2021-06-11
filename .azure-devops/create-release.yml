@@ -171,7 +171,7 @@ stages:
 
       - task: GitHubRelease@0
         inputs:
-          gitHubConnection: AzIoTCLIGitHub
+          gitHubConnection: $(GithubReleaseConnection)
           repositoryName: $(Build.Repository.Name)
           action: 'create'
           target: '$(Build.SourceVersion)'
