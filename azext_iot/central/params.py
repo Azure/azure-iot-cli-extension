@@ -132,8 +132,8 @@ def load_central_arguments(self, _):
         context.argument(
             "interface_id",
             options_list=["--interface-id", "-i"],
-            help="The name of the interface as specified in the device template. You can find it by navigating to Device"
-            " Template and view the interface identity under the corresponding device capability.",
+            help="The name of the interface/component as specified in the device template.You can find it by navigating"
+            " to Device Template and view the interface/component identity under the corresponding device capability.",
         )
         context.argument(
             "command_name",
