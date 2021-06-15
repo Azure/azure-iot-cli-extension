@@ -1907,6 +1907,7 @@ def iot_get_sas_token(
     login=None,
     module_id=None,
     auth_type_dataplane=None,
+    connection_string=None,
 ):
     key_type = key_type.lower()
     policy_name = policy_name.lower()
@@ -1924,6 +1925,14 @@ def iot_get_sas_token(
             "You are unable to get sas token for module without device information."
         )
 
+    if connection_string:
+        return {
+            DeviceAuthApiType.sas.value: _iot_build_sas_token_from_cs(
+                connection_string,
+                duration,
+            ).generate_sas_token()
+        }
+
     return {
         DeviceAuthApiType.sas.value: _iot_build_sas_token(
             cmd,
@@ -1938,6 +1947,51 @@ def iot_get_sas_token(
             auth_type_dataplane,
         ).generate_sas_token()
     }
+
+
+def _iot_build_sas_token_from_cs(connection_string, duration=3600):
+    from azext_iot.common._azure import (
+        parse_iot_device_connection_string,
+        parse_iot_device_module_connection_string,
+        parse_pnp_connection_string,
+        parse_iot_hub_connection_string
+    )
+    uri = None
+    policy = None
+    key = None
+
+    parsed_cs = None
+    all_parsers = [
+        ("Module", parse_iot_device_module_connection_string),
+        ("Device", parse_iot_device_connection_string),
+        ("PnP Model Repository", parse_pnp_connection_string),
+        ("IoT Hub", parse_iot_hub_connection_string),
+    ]
+
+    for name_cs, parser in all_parsers:
+        try:
+            parsed_cs = parser(connection_string)
+
+            if "SharedAccessKeyName" in parsed_cs:
+                policy = parsed_cs["SharedAccessKeyName"]
+            key = parsed_cs["SharedAccessKey"]
+
+            if name_cs in ["PnP Model Repository", "IoT Hub"]:
+                uri = parsed_cs["HostName"]
+            elif name_cs == "Module":
+                uri = "{}/devices/{}/modules/{}".format(
+                    parsed_cs["HostName"], parsed_cs["DeviceId"], parsed_cs["ModuleId"]
+                )
+            elif name_cs == "Device":
+                uri = "{}/devices/{}".format(parsed_cs["HostName"], parsed_cs["DeviceId"])
+            else:
+                raise CLIError("Connection String did not match any presets")
+
+            return SasTokenAuthentication(uri, policy, key, duration)
+        except ValueError:
+            continue
+
+    raise CLIError("Connection String did not match any presets")
 
 
 def _iot_build_sas_token(
@@ -1972,6 +2026,7 @@ def _iot_build_sas_token(
     uri = None
     policy = None
     key = None
+
     if device_id:
         logger.info(
             'Obtaining device "%s" details from registry, using IoT Hub policy "%s"',
