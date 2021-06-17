@@ -105,9 +105,9 @@ def run_command(
     cmd,
     app_id: str,
     device_id: str,
-    interface_id: str,
     command_name: str,
     content: str,
+    interface_id=None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
@@ -122,7 +122,7 @@ def run_command(
     else:
         provider = CentralDeviceProviderV1(cmd=cmd, app_id=app_id, token=token)
 
-    return provider.run_component_command(
+    return provider.run_command(
         device_id=device_id,
         interface_id=interface_id,
         command_name=command_name,
@@ -163,9 +163,9 @@ def get_command_history(
     cmd,
     app_id: str,
     device_id: str,
-    interface_id: str,
     command_name: str,
     token=None,
+    interface_id=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
 ):
@@ -174,7 +174,7 @@ def get_command_history(
     else:
         provider = CentralDeviceProviderV1(cmd=cmd, app_id=app_id, token=token)
 
-    return provider.get_component_command_history(
+    return provider.get_command_history(
         device_id=device_id,
         interface_id=interface_id,
         command_name=command_name,

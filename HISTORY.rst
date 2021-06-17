@@ -6,6 +6,12 @@ Release History
 0.10.14
 +++++++++++++++
 
+**IoT Central updates**
+
+  * add support to run root/interface level device commands.
+  * add support to get command history for root/interface level device commands.
+  * interface_id parameter for commands "device command run" , "device command history" run changed to optional.
+
 **IoT Hub updates**
 
 * Fix for "az iot hub c2d-message receive" - the command will use the "ContentEncoding" header value (which indicates the message body encoding)

@@ -194,7 +194,7 @@ class CentralDeviceProviderV1:
             central_dns_suffix=central_dns_suffix,
         )
 
-    def run_component_command(
+    def run_command(
         self,
         device_id: str,
         interface_id: str,
@@ -202,31 +202,62 @@ class CentralDeviceProviderV1:
         payload: dict,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
-        return central_services.device.run_component_command(
+        if interface_id and self._is_interface_id_component(
+            device_id=device_id,
+            interface_id=interface_id,
+            central_dns_suffix=central_dns_suffix,
+        ):
+            return central_services.device.run_component_command(
+                cmd=self._cmd,
+                app_id=self._app_id,
+                token=self._token,
+                device_id=device_id,
+                interface_id=interface_id,
+                command_name=command_name,
+                payload=payload,
+                central_dns_suffix=central_dns_suffix,
+                api_version=ApiVersion.v1.value,
+            )
+        return central_services.device.run_command(
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
             device_id=device_id,
-            interface_id=interface_id,
             command_name=command_name,
             payload=payload,
             central_dns_suffix=central_dns_suffix,
             api_version=ApiVersion.v1.value,
         )
 
-    def get_component_command_history(
+    def get_command_history(
         self,
         device_id: str,
         interface_id: str,
         command_name: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
-        return central_services.device.get_component_command_history(
+
+        if interface_id and self._is_interface_id_component(
+            device_id=device_id,
+            interface_id=interface_id,
+            central_dns_suffix=central_dns_suffix,
+        ):
+            return central_services.device.get_component_command_history(
+                cmd=self._cmd,
+                app_id=self._app_id,
+                token=self._token,
+                device_id=device_id,
+                interface_id=interface_id,
+                command_name=command_name,
+                central_dns_suffix=central_dns_suffix,
+                api_version=ApiVersion.v1.value,
+            )
+
+        return central_services.device.get_command_history(
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
             device_id=device_id,
-            interface_id=interface_id,
             command_name=command_name,
             central_dns_suffix=central_dns_suffix,
             api_version=ApiVersion.v1.value,
@@ -272,3 +303,20 @@ class CentralDeviceProviderV1:
             "error": error.get(device_status),
         }
         return filtered_dps_info
+
+    def _is_interface_id_component(
+        self, device_id: str, interface_id: str, central_dns_suffix=CENTRAL_ENDPOINT,
+    ) -> bool:
+
+        current_device = self.get_device(device_id, central_dns_suffix)
+
+        template = central_services.device_template.get_device_template(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_template_id=current_device.template,
+            token=self._token,
+            central_dns_suffix=central_dns_suffix,
+            api_version=ApiVersion.v1.value,
+        )
+
+        return bool(interface_id in template.components)
