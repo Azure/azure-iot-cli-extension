@@ -3,7 +3,6 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-from msrestazure.polling.arm_polling import ARMPolling
 from azext_iot.digitaltwins.common import (
     ADTEndpointAuthType,
     ADTPublicNetworkAccessType,
@@ -65,15 +64,23 @@ class ResourceProvider(DigitalTwinsResourceManager):
                 identity={"type": "SystemAssigned" if assign_identity else "None"},
                 public_network_access=public_network_access,
             )
-            poller = ARMPolling(60)
 
             create_or_update = self.mgmt_sdk.digital_twins.create_or_update(
                 resource_name=name,
                 resource_group_name=resource_group_name,
                 digital_twins_create=digital_twins_create,
                 long_running_operation_timeout=timeout,
-                polling=poller
             )
+
+            def check_state(lro):
+                from time import sleep
+                instance = lro.resource().as_dict()
+                state = instance.get('provisioning_state', None)
+                while state == "Provisioning":
+                    sleep(1)
+                    lro.update_status()
+                    instance = lro.resource().as_dict()
+                    state = instance.get('provisioning_state', None)
 
             def rbac_handler(lro):
                 instance = lro.resource().as_dict()
@@ -100,19 +107,8 @@ class ResourceProvider(DigitalTwinsResourceManager):
                                 role_type=role_type,
                             )
 
+            create_or_update.add_done_callback(check_state)
             create_or_update.add_done_callback(rbac_handler)
-
-            # create_or_update poller does not seem to act right
-            from time import sleep
-
-            instance = self.get(name, resource_group_name)
-            wait = 1
-            while instance.host_name is None and instance.provisioning_state != "Succeeded":
-                sleep(wait)
-                instance = self.get(name, resource_group_name)
-                wait = wait * 2
-            poller.update_status()
-
             return create_or_update
         except CloudError as e:
             raise e
