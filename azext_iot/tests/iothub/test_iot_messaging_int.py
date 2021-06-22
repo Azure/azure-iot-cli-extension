@@ -255,6 +255,55 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             expect_failure=True,
         )
 
+    def test_mqtt_device_simulation_with_init_reported_properties(self):
+        device_count = 1
+        device_ids = self.generate_device_names(device_count)
+
+        self.cmd(
+            "iot hub device-identity create -d {} -n {} -g {}".format(
+                device_ids[0], LIVE_HUB, LIVE_RG
+            ),
+            checks=[self.check("deviceId", device_ids[0])],
+        )
+
+        from azext_iot.operations.hub import iot_simulate_device
+        from azext_iot._factory import iot_hub_service_factory
+        from azure.cli.core.mock import DummyCli
+
+        cli_ctx = DummyCli()
+        client = iot_hub_service_factory(cli_ctx)
+
+        twin_init_props = {'prop_1': 'val_1', 'prop_2': 'val_2'}
+        twin_props_json = json.dumps(twin_init_props)
+
+        iot_simulate_device(
+            client,
+            device_ids[0],
+            LIVE_HUB,
+            "complete",
+            "Testing init reported twin properties",
+            2,
+            5,
+            "mqtt",
+            None,
+            None,
+            None,
+            None,
+            None,
+            twin_props_json
+        )
+
+        # get device twin
+        result = self.cmd(
+            "iot hub device-twin show -d {} --login {}".format(
+                device_ids[0], self.connection_string
+            )
+        ).get_output_in_json()
+
+        assert result is not None
+        for key in twin_init_props:
+            assert result["properties"]["reported"][key] == twin_init_props[key]
+
     def test_mqtt_device_direct_method_with_custom_response_status_payload(self):
         device_count = 1
         device_ids = self.generate_device_names(device_count)
