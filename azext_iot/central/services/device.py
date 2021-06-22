@@ -303,6 +303,53 @@ def get_device_credentials(
     return _utility.try_extract_result(response)
 
 
+def run_command(
+    cmd,
+    app_id: str,
+    token: str,
+    device_id: str,
+    command_name: str,
+    payload: dict,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
+):
+    """
+    Execute a direct method on a device
+
+    Args:
+        cmd: command passed into az
+        app_id: name of app (used for forming request URL)
+        device_id: unique case-sensitive device id
+        command_name: name of command to execute
+        payload: params for command
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        result (currently a 201)
+    """
+    url = "https://{}.{}/{}/{}/commands/{}".format(
+        app_id, central_dns_suffix, BASE_PATH, device_id, command_name
+    )
+    headers = _utility.get_headers(token, cmd)
+
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
+    response = requests.post(
+        url, headers=headers, json=payload, params=query_parameters
+    )
+
+    # execute command response has caveats in it due to Async/Sync device methods
+    # return the response if we get 201, otherwise try to apply generic logic
+    if response.status_code == 201:
+        return response.json()
+
+    return _utility.try_extract_result(response)
+
+
 def run_component_command(
     cmd,
     app_id: str,
@@ -349,6 +396,43 @@ def run_component_command(
     if response.status_code == 201:
         return response.json()
 
+    return _utility.try_extract_result(response)
+
+
+def get_command_history(
+    cmd,
+    app_id: str,
+    token: str,
+    device_id: str,
+    command_name: str,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
+):
+    """
+    Get command history
+
+    Args:
+        cmd: command passed into az
+        app_id: name of app (used for forming request URL)
+        device_id: unique case-sensitive device id
+        command_name: name of command to view execution history
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        Command history (List) - currently limited to 1 item
+    """
+    url = "https://{}.{}/{}/{}/commands/{}".format(
+        app_id, central_dns_suffix, BASE_PATH, device_id, command_name
+    )
+    headers = _utility.get_headers(token, cmd)
+
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
+    response = requests.get(url, headers=headers, params=query_parameters)
     return _utility.try_extract_result(response)
 
 

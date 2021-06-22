@@ -56,7 +56,7 @@ class mqtt_client_wrap(object):
 
     def on_connect(self, client, userdata, flags, rc):
         six.print_(
-            "Connected to target IoT Hub MQTT broker with result: {}".format(
+            "Connected to target IoT Hub with result: {}".format(
                 connection_result[rc]
             )
         )
