@@ -382,7 +382,43 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         assert device_registration_info.get("status") is None
         assert dps_state.get("error") == "Device is not yet provisioned."
 
-    def test_central_run_command(self):
+    def test_central_run_command_root_level(self):
+        command_name = "testRootCommand"
+        (template_id, _) = self._create_device_template()
+        (device_id, _) = self._create_device(template=template_id, simulated=True)
+
+        self._wait_for_provisioned(device_id)
+
+        run_command_result = self.cmd(
+            "iot central device command run"
+            " -n {}"
+            " -d {}"
+            " --cn {}"
+            " -k '{}'"
+            "".format(APP_ID, device_id, command_name, sync_command_params)
+        )
+
+        show_command_result = self.cmd(
+            "iot central device command history"
+            " -n {}"
+            " -d {}"
+            " --cn {}"
+            "".format(APP_ID, device_id, command_name)
+        )
+
+        self._delete_device(device_id)
+        self._delete_device_template(template_id)
+
+        run_result = run_command_result.get_output_in_json()
+        show_result = show_command_result.get_output_in_json()
+
+        # from file indicated by `sync_command_params`
+        assert run_result["request"] == {"argument": "value"}
+
+        # check that run result and show result indeed match
+        assert run_result["response"] == show_result["value"][0]["response"]
+
+    def test_central_run_command_component(self):
         interface_id = "dtmiIntTestDeviceTemplateV33jl"
         command_name = "testCommand"
         (template_id, _) = self._create_device_template()
@@ -663,12 +699,12 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         template_name = template["displayName"]
         template_id = template_name + "id"
 
-        result = self.cmd(
-            "iot central device-template create --app-id {} --device-template-id {} -k '{}'".format(
-                APP_ID, template_id, device_template_path
-            ),
-            checks=[self.check("displayName", template_name)],
+        command = "iot central device-template create --app-id {} --device-template-id {} -k '{}'".format(
+            APP_ID, template_id, device_template_path
         )
+        command = self._appendOptionalArgsToCommand(command, TOKEN, DNS_SUFFIX)
+
+        result = self.cmd(command, checks=[self.check("displayName", template_name), ],)
         json_result = result.get_output_in_json()
 
         assert json_result["@id"] == template_id
