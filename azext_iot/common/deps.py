@@ -17,7 +17,7 @@ from azext_iot.common._homebrew_patch import HomebrewPipPatch
 
 
 def ensure_uamqp(config, yes=False, repair=False):
-    if get_uamqp_ext_version(config) != EVENT_LIB[1] or repair or not test_import(EVENT_LIB[0]):
+    if (get_uamqp_ext_version(config) != EVENT_LIB[1] and not test_import(EVENT_LIB[0])) or repair:
         if not yes:
             input_txt = ('Dependency update ({} {}) required for IoT extension version: {}. {}'
                          'Continue? (y/n) -> ').format(EVENT_LIB[0], EVENT_LIB[1], VERSION, linesep)
