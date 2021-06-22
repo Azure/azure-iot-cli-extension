@@ -43,7 +43,6 @@ def parse_iot_device_module_connection_string(cs):
     return _parse_connection_string(cs, validate, "Module")
 
 
-
 CONN_STR_TEMPLATE = "HostName={};SharedAccessKeyName={};SharedAccessKey={}"
 
 
