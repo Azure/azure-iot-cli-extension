@@ -100,7 +100,7 @@ class TestEnsureUamqp(object):
         installer = mocker.patch("azext_iot.common.deps.install")
         installer.return_value = True
         get_uamqp.return_value = EVENT_LIB[1]
-        test_import = mocker.patch("azext_iot.common.deps.test_import")
+        test_import = mocker.patch("azext_iot.common.deps.test_import_and_version")
         test_import.return_value = True
         m_exit = mocker.patch("azext_iot.common.deps.sys.exit")
 
@@ -152,7 +152,9 @@ class TestEnsureUamqp(object):
         method = partial(ensure_uamqp, mocker.MagicMock(), **kwargs)
         method()
 
-        if user_cancelled:
+        if uamqp_scenario["test_import"]:
+            pass
+        elif user_cancelled:
             assert uamqp_scenario["exit"].call_args
         else:
             install_args = uamqp_scenario["installer"].call_args
