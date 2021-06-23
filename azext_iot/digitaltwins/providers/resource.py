@@ -6,6 +6,7 @@
 from azext_iot.digitaltwins.common import (
     ADTEndpointAuthType,
     ADTPublicNetworkAccessType,
+    MAX_ADT_CREATE_RETRIES,
 )
 from azext_iot.digitaltwins.providers import (
     DigitalTwinsResourceManager,
@@ -76,11 +77,17 @@ class ResourceProvider(DigitalTwinsResourceManager):
                 from time import sleep
                 instance = lro.resource().as_dict()
                 state = instance.get('provisioning_state', None)
-                while state == "Provisioning":
+                retries = 0
+                while state == "Provisioning" and retries < MAX_ADT_CREATE_RETRIES:
+                    retries += 1
                     sleep(1)
                     lro.update_status()
                     instance = lro.resource().as_dict()
                     state = instance.get('provisioning_state', None)
+                if retries == MAX_ADT_CREATE_RETRIES:
+                    raise CLIError(
+                        "Never finished provisioning the Digital Twins instance. Please try again with a different name."
+                    )
 
             def rbac_handler(lro):
                 instance = lro.resource().as_dict()
