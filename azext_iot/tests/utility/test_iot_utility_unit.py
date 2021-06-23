@@ -131,6 +131,7 @@ class TestEnsureUamqp(object):
     ):
         from functools import partial
 
+        print(f"Eventlib: {EVENT_LIB[0], EVENT_LIB[1]}")
         if case == "importerror":
             uamqp_scenario["test_import"].return_value = False
         elif case == "compatibility":
@@ -149,6 +150,7 @@ class TestEnsureUamqp(object):
             if external_input.lower() == "y":
                 user_cancelled = False
 
+        print(kwargs)
         method = partial(ensure_uamqp, mocker.MagicMock(), **kwargs)
         method()
 
@@ -156,6 +158,8 @@ class TestEnsureUamqp(object):
             assert uamqp_scenario["exit"].call_args
         else:
             install_args = uamqp_scenario["installer"].call_args
+            print(uamqp_scenario["installer"].__dict__)
+            print(install_args)
             assert install_args[0][0] == EVENT_LIB[0]
             assert install_args[1]["compatible_version"] == EVENT_LIB[1]
 
