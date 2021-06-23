@@ -86,7 +86,10 @@ class ResourceProvider(DigitalTwinsResourceManager):
                     state = instance.get('provisioning_state', None)
                 if retries == MAX_ADT_CREATE_RETRIES:
                     raise CLIError(
-                        "Never finished provisioning the Digital Twins instance. Please try again with a different name."
+                        "The resource has been created and has not finished provisioning. Please monitor the status of "
+                        "the Digital Twin instance using az dt show -n {} -g {}".format(
+                            name, resource_group_name
+                        )
                     )
 
             def rbac_handler(lro):
