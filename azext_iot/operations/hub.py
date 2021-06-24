@@ -29,6 +29,7 @@ from azext_iot.common.shared import (
     RenewKeyType,
     IoTHubStateType,
     DeviceAuthApiType,
+    ConnectionStringParser,
 )
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
@@ -1950,25 +1951,19 @@ def iot_get_sas_token(
 
 
 def _iot_build_sas_token_from_cs(connection_string, duration=3600):
-    from azext_iot.common._azure import (
-        parse_iot_device_connection_string,
-        parse_iot_device_module_connection_string,
-        parse_pnp_connection_string,
-        parse_iot_hub_connection_string
-    )
     uri = None
     policy = None
     key = None
 
     parsed_cs = None
     all_parsers = [
-        ("Module", parse_iot_device_module_connection_string),
-        ("Device", parse_iot_device_connection_string),
-        ("PnP Model Repository", parse_pnp_connection_string),
-        ("IoT Hub", parse_iot_hub_connection_string),
+        ConnectionStringParser.Module,
+        ConnectionStringParser.Device,
+        ConnectionStringParser.PnP,
+        ConnectionStringParser.IotHub,
     ]
 
-    for name_cs, parser in all_parsers:
+    for parser in all_parsers:
         try:
             parsed_cs = parser(connection_string)
 
@@ -1976,13 +1971,13 @@ def _iot_build_sas_token_from_cs(connection_string, duration=3600):
                 policy = parsed_cs["SharedAccessKeyName"]
             key = parsed_cs["SharedAccessKey"]
 
-            if name_cs in ["PnP Model Repository", "IoT Hub"]:
+            if parser in [ConnectionStringParser.IotHub, ConnectionStringParser.PnP]:
                 uri = parsed_cs["HostName"]
-            elif name_cs == "Module":
+            elif parser == ConnectionStringParser.Module:
                 uri = "{}/devices/{}/modules/{}".format(
                     parsed_cs["HostName"], parsed_cs["DeviceId"], parsed_cs["ModuleId"]
                 )
-            elif name_cs == "Device":
+            elif parser == ConnectionStringParser.Device:
                 uri = "{}/devices/{}".format(parsed_cs["HostName"], parsed_cs["DeviceId"])
             else:
                 raise CLIError("Connection String did not match any presets")

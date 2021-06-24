@@ -236,8 +236,8 @@ def load_arguments(self, _):
             "connection_string",
             options_list=["--connection-string", "--cs"],
             help="Target connection string. This bypasses the IoT Hub registry and generates the SAS token directly"
-            " from the supplied symmetric key without further validation. All other parameters aside from duration"
-            " will be ignored."
+            " from the supplied symmetric key without further validation. All other command parameters aside from"
+            " duration will be ignored."
         )
 
     with self.argument_context("iot hub") as context:
