@@ -29,6 +29,7 @@ path_iot_hub_monitor_events_entrypoint = (
     "azext_iot.operations.hub._iot_hub_monitor_events"
 )
 path_iot_device_show = "azext_iot.operations.hub._iot_device_show"
+path_update_device_twin = "azext_iot.operations.hub._iot_device_twin_update"
 hub_entity = "myhub.azure-devices.net"
 
 instance_name = generate_generic_id()
@@ -169,6 +170,11 @@ def mqttclient_generic_error(mocker, fixture_ghcs, fixture_sas):
 @pytest.fixture()
 def fixture_monitor_events_entrypoint(mocker):
     return mocker.patch(path_iot_hub_monitor_events_entrypoint)
+
+
+@pytest.fixture()
+def fixture_update_device_twin(mocker):
+    return mocker.patch(path_update_device_twin)
 
 
 @pytest.fixture()

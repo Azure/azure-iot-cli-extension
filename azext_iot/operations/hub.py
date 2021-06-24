@@ -1705,8 +1705,6 @@ def iot_device_twin_update(
     etag=None,
     auth_type_dataplane=None,
 ):
-    from azext_iot.common.utility import verify_transform
-
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         hub_name=hub_name,
@@ -1714,6 +1712,17 @@ def iot_device_twin_update(
         login=login,
         auth_type=auth_type_dataplane,
     )
+    return _iot_device_twin_update(target, device_id, parameters, etag)
+
+
+def _iot_device_twin_update(
+    target,
+    device_id,
+    parameters,
+    etag=None,
+):
+    from azext_iot.common.utility import verify_transform
+
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
@@ -2418,7 +2427,8 @@ def iot_simulate_device(
     resource_group_name=None,
     login=None,
     method_response_code=None,
-    method_response_payload=None
+    method_response_payload=None,
+    init_reported_properties=None
 ):
     import sys
     import uuid
@@ -2449,6 +2459,8 @@ def iot_simulate_device(
             raise CLIError("'method-response-code' not supported, {} doesn't allow direct methods.".format(protocol_type))
         if method_response_payload:
             raise CLIError("'method-response-payload' not supported, {} doesn't allow direct methods.".format(protocol_type))
+        if init_reported_properties:
+            raise CLIError("'init-reported-properties' not supported, {} doesn't allow setting twin props".format(protocol_type))
 
     properties_to_send = _iot_simulate_get_default_properties(protocol_type)
     user_properties = validate_key_value_pairs(properties) or {}
@@ -2462,6 +2474,11 @@ def iot_simulate_device(
     if method_response_payload:
         method_response_payload = process_json_arg(
             method_response_payload, argument_name="method-response-payload"
+        )
+
+    if init_reported_properties:
+        init_reported_properties = process_json_arg(
+            init_reported_properties, argument_name="init-reported-properties"
         )
 
     class generator(object):
@@ -2498,7 +2515,8 @@ def iot_simulate_device(
                 device_conn_string=device_connection_string,
                 device_id=device_id,
                 method_response_code=method_response_code,
-                method_response_payload=method_response_payload
+                method_response_payload=method_response_payload,
+                init_reported_properties=init_reported_properties
             )
             client_mqtt.execute(data=generator(), properties=properties_to_send, publish_delay=msg_interval, msg_count=msg_count)
         else:

@@ -868,7 +868,7 @@ helps[
                    be acknowledged with completion. For http simulation c2d acknowledgement is based on user
                    selection which can be complete, reject or abandon. Additionally, mqtt simulation is only
                    supported for symmetric key auth (SAS) based devices. The mqtt simulation also supports direct
-                   method invocation which can be acknowledged by a response status code and response payload
+                   method invocation which can be acknowledged by a response status code and response payload.
 
                    Note: The command by default will set content-type to application/json and content-encoding
                    to utf-8. This can be overriden.
@@ -881,6 +881,10 @@ helps[
       text: az iot device simulate -n {iothub_name} -d {device_id} --method-response-code 201 --method-response-payload '{"result":"Direct method successful"}'
     - name: Basic usage (mqtt) with sending direct method response status code and direct method response payload as path to local file
       text: az iot device simulate -n {iothub_name} -d {device_id} --method-response-code 201 --method-response-payload '../my_direct_method_payload.json'
+    - name: Basic usage (mqtt) with sending the initial state of device twin properties as raw json for the target device
+      text: az iot device simulate -n {iothub_name} -d {device_id} --init-reported-properties '{"reported_prop_1":"val_1", "reported_prop_2":val_2}'
+    - name: Basic usage (mqtt) with sending the initial state of device twin properties as as path to local file for the target device
+      text: az iot device simulate -n {iothub_name} -d {device_id} --init-reported-properties '../my_device_twin_reported_properties.json'
     - name: Basic usage (http)
       text: az iot device simulate -n {iothub_name} -d {device_id} --protocol http
     - name: Basic usage (http) with sending mixed properties

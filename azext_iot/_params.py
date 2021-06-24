@@ -592,6 +592,12 @@ def load_arguments(self, _):
             help="Payload to be returned when direct method is executed on device. Provide file path or raw json. "
             "Optional param, only supported for mqtt.",
         )
+        context.argument(
+            "init_reported_properties",
+            options_list=["--init-reported-properties", "--irp"],
+            help="Initial state of twin reported properties for the target device when the simulator is run. "
+            "Optional param, only supported for mqtt.",
+        )
 
     with self.argument_context("iot device c2d-message") as context:
         context.argument(
