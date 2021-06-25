@@ -29,7 +29,7 @@ mock_target['entity'] = 'mydps'
 mock_target['primarykey'] = 'rJx/6rJ6rmG4ak890+eW5MYGH+A0uzRvjGNjg3Ve8sfo='
 mock_target['secondarykey'] = 'aCd/6rJ6rmG4ak890+eW5MYGH+A0uzRvjGNjg3Ve8sfo='
 mock_target['policy'] = 'provisioningserviceowner'
-mock_target['subscription'] = "5952cff8-bcd1-4235-9554-af2c0348bf23"
+mock_target['subscription'] = "a386d5ea-ea90-441a-8263-d816368c84a1"
 
 mock_symmetric_key_attestation = {
     "type": "symmetricKey",
@@ -194,6 +194,7 @@ class TestEnrollmentCreate():
     ])
     def test_enrollment_create(self, serviceclient, fixture_cmd, req):
         subject.iot_dps_device_enrollment_create(fixture_cmd,
+                                                 serviceclient,
                                                  req['enrollment_id'],
                                                  req['attestation_type'],
                                                  req['dps_name'], req['rg'],
@@ -287,7 +288,9 @@ class TestEnrollmentCreate():
     ])
     def test_enrollment_create_invalid_args(self, fixture_gdcs, fixture_cmd, req):
         with pytest.raises(CLIError):
-            subject.iot_dps_device_enrollment_create(fixture_cmd, req['enrollment_id'],
+            subject.iot_dps_device_enrollment_create(fixture_cmd,
+                                                     None,
+                                                     req['enrollment_id'],
                                                      req['attestation_type'],
                                                      req['dps_name'], req['rg'],
                                                      req['endorsement_key'],
@@ -308,9 +311,10 @@ class TestEnrollmentCreate():
     @pytest.mark.parametrize("req", [
         (generate_enrollment_create_req(attestation_type='tpm', endorsement_key='mykey'))
     ])
-    def test_enrollment_show_error(self, serviceclient_generic_error, req):
+    def test_enrollment_show_error(self, serviceclient_generic_error, fixture_cmd, req):
         with pytest.raises(CLIError):
-            subject.iot_dps_device_enrollment_create(None,
+            subject.iot_dps_device_enrollment_create(fixture_cmd,
+                                                     None,
                                                      req['enrollment_id'],
                                                      req['attestation_type'],
                                                      req['dps_name'], req['rg'],
@@ -420,8 +424,9 @@ class TestEnrollmentUpdate():
         (generate_enrollment_update_req(edge_enabled=True)),
         (generate_enrollment_update_req(edge_enabled=False))
     ])
-    def test_enrollment_update(self, serviceclient, req):
-        subject.iot_dps_device_enrollment_update(None,
+    def test_enrollment_update(self, serviceclient, fixture_cmd, req):
+        subject.iot_dps_device_enrollment_update(fixture_cmd, 
+                                                 None,
                                                  req['enrollment_id'],
                                                  req['dps_name'],
                                                  req['rg'],
@@ -532,8 +537,8 @@ class TestEnrollmentShow():
         )
         yield mocked_response
 
-    def test_enrollment_show(self, serviceclient):
-        result = subject.iot_dps_device_enrollment_get(None, enrollment_id,
+    def test_enrollment_show(self, fixture_cmd, serviceclient):
+        result = subject.iot_dps_device_enrollment_get(fixture_cmd, None, enrollment_id,
                                                        mock_target['entity'], resource_group)
 
         assert result['registrationId'] == enrollment_id
@@ -545,8 +550,8 @@ class TestEnrollmentShow():
         assert "{}/enrollments/{}?".format(mock_target['entity'], enrollment_id) in url
         assert method == 'GET'
 
-    def test_enrollment_show_with_keys(self, serviceclient_attestation):
-        result = subject.iot_dps_device_enrollment_get(None, enrollment_id,
+    def test_enrollment_show_with_keys(self, fixture_cmd, serviceclient_attestation):
+        result = subject.iot_dps_device_enrollment_get(fixture_cmd, None, enrollment_id,
                                                        mock_target['entity'], resource_group, show_keys=True)
 
         assert result['registrationId'] == enrollment_id
@@ -566,9 +571,9 @@ class TestEnrollmentShow():
         assert "{}/enrollments/{}/attestationmechanism?".format(mock_target['entity'], enrollment_id) in url
         assert method == 'POST'
 
-    def test_enrollment_show_error(self, serviceclient_generic_error):
+    def test_enrollment_show_error(self, fixture_cmd, serviceclient_generic_error):
         with pytest.raises(CLIError):
-            subject.iot_dps_device_enrollment_get(None, enrollment_id,
+            subject.iot_dps_device_enrollment_get(fixture_cmd, None, enrollment_id,
                                                   mock_target['entity'], resource_group)
 
 
@@ -586,8 +591,8 @@ class TestEnrollmentList():
         yield mocked_response
 
     @pytest.mark.parametrize("top", [3, None])
-    def test_enrollment_list(self, serviceclient, top):
-        result = subject.iot_dps_device_enrollment_list(None, mock_target['entity'], resource_group, top)
+    def test_enrollment_list(self, serviceclient, fixture_cmd, top):
+        result = subject.iot_dps_device_enrollment_list(fixture_cmd, None, mock_target['entity'], resource_group, top)
         request = serviceclient.calls[0].request
         headers = request.headers
         url = request.url
@@ -598,9 +603,9 @@ class TestEnrollmentList():
         assert method == "POST"
         assert json.dumps(result)
 
-    def test_enrollment_list_error(self, serviceclient_generic_error):
+    def test_enrollment_list_error(self, fixture_cmd, serviceclient_generic_error):
         with pytest.raises(CLIError):
-            subject.iot_dps_device_enrollment_list(None, mock_target['entity'], resource_group)
+            subject.iot_dps_device_enrollment_list(fixture_cmd, None, mock_target['entity'], resource_group)
 
 
 class TestEnrollmentDelete():
@@ -620,8 +625,8 @@ class TestEnrollmentDelete():
         "etag",
         [None, etag]
     )
-    def test_enrollment_delete(self, serviceclient, etag):
-        subject.iot_dps_device_enrollment_delete(serviceclient, enrollment_id,
+    def test_enrollment_delete(self, serviceclient, fixture_cmd, etag):
+        subject.iot_dps_device_enrollment_delete(fixture_cmd, serviceclient, enrollment_id,
                                                  mock_target['entity'], resource_group, etag=etag)
         request = serviceclient.calls[0].request
         url = request.url
@@ -630,9 +635,9 @@ class TestEnrollmentDelete():
         assert method == 'DELETE'
         assert request.headers["If-Match"] == etag if etag else "*"
 
-    def test_enrollment_delete_error(self, serviceclient_generic_error):
+    def test_enrollment_delete_error(self, serviceclient_generic_error, fixture_cmd):
         with pytest.raises(CLIError):
-            subject.iot_dps_device_enrollment_delete(None, enrollment_id,
+            subject.iot_dps_device_enrollment_delete(fixture_cmd, None, enrollment_id,
                                                      mock_target['entity'], resource_group)
 
 
@@ -730,8 +735,9 @@ class TestEnrollmentGroupCreate():
                                               edge_enabled=True,
                                               initial_twin_properties={'key': ['value1', 'value2']})),
     ])
-    def test_enrollment_group_create(self, serviceclient, req):
-        subject.iot_dps_device_enrollment_group_create(None,
+    def test_enrollment_group_create(self, serviceclient, fixture_cmd, req):
+        subject.iot_dps_device_enrollment_group_create(fixture_cmd,
+                                                       None,
                                                        req['enrollment_id'],
                                                        req['dps_name'],
                                                        req['rg'],
@@ -824,9 +830,10 @@ class TestEnrollmentGroupCreate():
         (generate_enrollment_group_create_req(allocation_policy='static', iot_hubs='hub1 hub2')),
         (generate_enrollment_group_create_req(iot_hubs='hub1 hub2'))
     ])
-    def test_enrollment_group_create_invalid_args(self, req):
+    def test_enrollment_group_create_invalid_args(self, fixture_cmd, req):
         with pytest.raises(CLIError):
-            subject.iot_dps_device_enrollment_group_create(None,
+            subject.iot_dps_device_enrollment_group_create(fixture_cmd,
+                                                           None,
                                                            req['enrollment_id'],
                                                            req['dps_name'],
                                                            req['rg'],
@@ -848,9 +855,10 @@ class TestEnrollmentGroupCreate():
     @pytest.mark.parametrize("req", [
         (generate_enrollment_group_create_req(certificate_path='myCert'))
     ])
-    def test_enrollment_group_show_error(self, serviceclient_generic_error, req):
+    def test_enrollment_group_show_error(self, serviceclient_generic_error, fixture_cmd, req):
         with pytest.raises(CLIError):
-            subject.iot_dps_device_enrollment_group_create(None,
+            subject.iot_dps_device_enrollment_group_create(fixture_cmd,
+                                                           None,
                                                            req['enrollment_id'],
                                                            req['dps_name'],
                                                            req['rg'],
@@ -976,8 +984,9 @@ class TestEnrollmentGroupUpdate():
         (generate_enrollment_group_update_req(edge_enabled=True)),
         (generate_enrollment_group_update_req(edge_enabled=False))
     ])
-    def test_enrollment_group_update(self, serviceclient, req):
-        subject.iot_dps_device_enrollment_group_update(None,
+    def test_enrollment_group_update(self, serviceclient, fixture_cmd, req):
+        subject.iot_dps_device_enrollment_group_update(fixture_cmd,
+                                                       None,
                                                        req['enrollment_id'],
                                                        req['dps_name'],
                                                        req['rg'],
@@ -1075,9 +1084,10 @@ class TestEnrollmentGroupUpdate():
         (generate_enrollment_group_update_req(allocation_policy='static', iot_hubs='hub1 hub2')),
         (generate_enrollment_group_update_req(iot_hubs='hub1 hub2'))
     ])
-    def test_enrollment_group_update_invalid_args(self, req):
+    def test_enrollment_group_update_invalid_args(self, fixture_cmd, req):
         with pytest.raises(CLIError):
-            subject.iot_dps_device_enrollment_group_update(None,
+            subject.iot_dps_device_enrollment_group_update(fixture_cmd,
+                                                           None,
                                                            req['enrollment_id'],
                                                            req['dps_name'],
                                                            req['rg'],
@@ -1135,8 +1145,8 @@ class TestEnrollmentGroupShow():
         )
         yield mocked_response
 
-    def test_enrollment_group_show(self, serviceclient):
-        result = subject.iot_dps_device_enrollment_group_get(None, enrollment_id,
+    def test_enrollment_group_show(self, serviceclient, fixture_cmd):
+        result = subject.iot_dps_device_enrollment_group_get(fixture_cmd, None, enrollment_id,
                                                              mock_target['entity'], resource_group)
         assert result['enrollmentGroupId'] == enrollment_id
         assert result['attestation']
@@ -1147,8 +1157,8 @@ class TestEnrollmentGroupShow():
         assert "{}/enrollmentGroups/{}?".format(mock_target['entity'], enrollment_id) in url
         assert method == 'GET'
 
-    def test_enrollment_group_show_with_keys(self, serviceclient_attestation):
-        result = subject.iot_dps_device_enrollment_group_get(None, enrollment_id,
+    def test_enrollment_group_show_with_keys(self, fixture_cmd, serviceclient_attestation):
+        result = subject.iot_dps_device_enrollment_group_get(fixture_cmd, None, enrollment_id,
                                                              mock_target['entity'], resource_group, show_keys=True)
         assert result['enrollmentGroupId'] == enrollment_id
         assert result['attestation']
@@ -1167,9 +1177,9 @@ class TestEnrollmentGroupShow():
         assert "{}/enrollmentGroups/{}/attestationmechanism?".format(mock_target['entity'], enrollment_id) in url
         assert method == 'POST'
 
-    def test_enrollment_group_show_error(self, serviceclient_generic_error):
+    def test_enrollment_group_show_error(self, fixture_cmd, serviceclient_generic_error):
         with pytest.raises(CLIError):
-            subject.iot_dps_device_enrollment_group_get(None, enrollment_id,
+            subject.iot_dps_device_enrollment_group_get(fixture_cmd, None, enrollment_id,
                                                         mock_target['entity'], resource_group)
 
 
@@ -1187,8 +1197,9 @@ class TestEnrollmentGroupList():
         yield mocked_response
 
     @pytest.mark.parametrize("top", [5, None])
-    def test_enrollment_group_list(self, serviceclient, top):
-        result = subject.iot_dps_device_enrollment_group_list(None, mock_target['entity'],
+    def test_enrollment_group_list(self, serviceclient, fixture_cmd, top):
+        result = subject.iot_dps_device_enrollment_group_list(fixture_cmd, None,
+                                                              mock_target['entity'],
                                                               resource_group, top)
         request = serviceclient.calls[0].request
         headers = request.headers
@@ -1199,9 +1210,10 @@ class TestEnrollmentGroupList():
         assert json.dumps(result)
         assert str(headers.get("x-ms-max-item-count")) == str(top)
 
-    def test_enrollment_group_list_error(self):
+    def test_enrollment_group_list_error(self, fixture_cmd):
         with pytest.raises(CLIError):
-            subject.iot_dps_device_enrollment_group_list(None,
+            subject.iot_dps_device_enrollment_group_list(fixture_cmd,
+                                                         None,
                                                          mock_target['entity'],
                                                          resource_group)
 
@@ -1223,8 +1235,8 @@ class TestEnrollmentGroupDelete():
         "etag",
         [None, etag]
     )
-    def test_enrollment_group_delete(self, serviceclient, etag):
-        subject.iot_dps_device_enrollment_group_delete(None, enrollment_id,
+    def test_enrollment_group_delete(self, serviceclient, fixture_cmd, etag):
+        subject.iot_dps_device_enrollment_group_delete(fixture_cmd, None, enrollment_id,
                                                        mock_target['entity'], resource_group, etag=etag)
         request = serviceclient.calls[0].request
         url = request.url
@@ -1233,9 +1245,9 @@ class TestEnrollmentGroupDelete():
         assert method == 'DELETE'
         assert request.headers["If-Match"] == etag if etag else "*"
 
-    def test_enrollment_group_delete_error(self):
+    def test_enrollment_group_delete_error(self, fixture_cmd):
         with pytest.raises(CLIError):
-            subject.iot_dps_device_enrollment_group_delete(None, enrollment_id,
+            subject.iot_dps_device_enrollment_group_delete(fixture_cmd, None, enrollment_id,
                                                            mock_target['entity'], resource_group)
 
 
@@ -1258,8 +1270,8 @@ class TestRegistrationShow():
         )
         yield mocked_response
 
-    def test_registration_show(self, serviceclient):
-        result = subject.iot_dps_registration_get(None, mock_target['entity'],
+    def test_registration_show(self, fixture_cmd, serviceclient):
+        result = subject.iot_dps_registration_get(fixture_cmd, None, mock_target['entity'],
                                                   resource_group, registration_id)
         assert result['registrationId'] == registration_id
         request = serviceclient.calls[0].request
@@ -1268,9 +1280,9 @@ class TestRegistrationShow():
         assert "{}/registrations/{}?".format(mock_target['entity'], registration_id) in url
         assert method == 'GET'
 
-    def test_registration_show_error(self):
+    def test_registration_show_error(self, fixture_cmd):
         with pytest.raises(CLIError):
-            subject.iot_dps_registration_get(None, registration_id,
+            subject.iot_dps_registration_get(fixture_cmd, None, registration_id,
                                              mock_target['entity'], resource_group)
 
 
@@ -1287,8 +1299,8 @@ class TestRegistrationList():
         )
         yield mocked_response
 
-    def test_registration_list(self, serviceclient):
-        subject.iot_dps_registration_list(None, mock_target['entity'],
+    def test_registration_list(self, serviceclient, fixture_cmd):
+        subject.iot_dps_registration_list(fixture_cmd, None, mock_target['entity'],
                                           resource_group, enrollment_id)
         request = serviceclient.calls[0].request
         url = request.url
@@ -1296,9 +1308,9 @@ class TestRegistrationList():
         assert "{}/registrations/{}/query?".format(mock_target['entity'], enrollment_id) in url
         assert method == 'POST'
 
-    def test_registration_list_error(self):
+    def test_registration_list_error(self, fixture_cmd):
         with pytest.raises(CLIError):
-            subject.iot_dps_registration_list(None, mock_target['entity'],
+            subject.iot_dps_registration_list(fixture_cmd, None, mock_target['entity'],
                                               resource_group, enrollment_id)
 
 
@@ -1319,8 +1331,8 @@ class TestRegistrationDelete():
         "etag",
         [None, etag]
     )
-    def test_registration_delete(self, serviceclient, etag):
-        subject.iot_dps_registration_delete(None, mock_target['entity'],
+    def test_registration_delete(self, serviceclient, fixture_cmd, etag):
+        subject.iot_dps_registration_delete(fixture_cmd, None, mock_target['entity'],
                                             resource_group, registration_id, etag=etag)
         request = serviceclient.calls[0].request
         url = request.url
@@ -1329,9 +1341,9 @@ class TestRegistrationDelete():
         assert method == 'DELETE'
         assert request.headers["If-Match"] == etag if etag else "*"
 
-    def test_registration_delete_error(self):
+    def test_registration_delete_error(self, fixture_cmd):
         with pytest.raises(CLIError):
-            subject.iot_dps_registration_delete(None, registration_id,
+            subject.iot_dps_registration_delete(fixture_cmd, None, registration_id,
                                                 mock_target['entity'], resource_group)
 
 
@@ -1345,7 +1357,7 @@ class TestGetDpsConnString():
         (1, 'dps3', 'provisioningserviceowner', 'myrg', False, 'policy'),
         (1, 'dps4', 'provisioningserviceowner', 'myrg', False, 'dps')
     ])
-    def test_get_dps_conn_string(self, mocker, dpscount, targetdps,
+    def test_get_dps_conn_string(self, mocker, fixture_cmd, dpscount, targetdps,
                                  policy_name, rg_name, exp_success, why):
         def _build_dps(dps, name, rg=None):
             dps.name = name
@@ -1382,7 +1394,7 @@ class TestGetDpsConnString():
         from azext_iot.common._azure import get_iot_dps_connection_string
 
         if exp_success:
-            result = get_iot_dps_connection_string(client, targetdps, rg_name, policy_name)
+            result = get_iot_dps_connection_string(fixture_cmd, client, targetdps, rg_name, policy_name)
             expecting_dps = "{}.{}".format(targetdps, dps_suffix)
             assert result['entity'] == expecting_dps
             assert result['policy'] == policy_name
@@ -1399,4 +1411,4 @@ class TestGetDpsConnString():
 
         else:
             with pytest.raises(CLIError):
-                get_iot_dps_connection_string(client, targetdps, rg_name, policy_name)
+                get_iot_dps_connection_string(fixture_cmd, client, targetdps, rg_name, policy_name)
