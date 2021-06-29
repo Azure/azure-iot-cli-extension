@@ -919,6 +919,9 @@ helps[
     long-summary: |
                   Modules content is json and in the form of {"modulesContent":{...}} or {"content":{"modulesContent":{...}}}.
 
+                  By default properties of system modules $edgeAgent and $edgeHub are validated against schemas installed with the IoT extension.
+                  This can be disabled by using the --no-validation switch.
+
                   Note: Upon execution the command will output the collection of modules applied to the device.
     examples:
     - name: Test edge modules while in development by setting modules on a target device.
@@ -940,6 +943,9 @@ helps[
     short-summary: Create an IoT Edge deployment in a target IoT Hub.
     long-summary: |
                   Deployment content is json and in the form of {"modulesContent":{...}} or {"content":{"modulesContent":{...}}}.
+
+                  By default properties of system modules $edgeAgent and $edgeHub are validated against schemas installed with the IoT extension.
+                  This can be disabled by using the --no-validation switch.
 
                   Edge deployments can be created with user defined metrics for on demand evaluation.
                   User metrics are json and in the form of {"queries":{...}} or {"metrics":{"queries":{...}}}.

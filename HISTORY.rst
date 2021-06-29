@@ -8,14 +8,20 @@ Release History
 
 **IoT Central updates**
 
-  * add support to run root/interface level device commands.
-  * add support to get command history for root/interface level device commands.
-  * interface_id parameter for commands "device command run" , "device command history" run changed to optional.
+* Adds support to run root/interface level device commands.
+* Adds support to get command history for root/interface level device commands.
+* The --interface-id parameter for commands "device command run" , "device command history" changed to optional.
 
 **IoT Hub updates**
 
 * Fix for "az iot hub c2d-message receive" - the command will use the "ContentEncoding" header value (which indicates the message body encoding)
   or fallback to utf-8 to decode the received message body.
+
+* Changes to Edge validation for set-modules and edge deployment creation:
+
+  By default only properties of system modules $edgeAgent and $edgeHub are validated against schemas installed with the IoT extension.
+  This can be disabled by using the --no-validation switch.
+
 
 **Azure Digital Twins updates**
 
