@@ -2178,7 +2178,7 @@ def _iot_device_send_message(
     target, device_id, data, properties=None, msg_count=1, qos=1
 ):
     from azext_iot.operations._mqtt import build_mqtt_device_username
-    import paho.mqtt.publish as publish
+    from paho.mqtt import publish
     from paho.mqtt import client as mqtt
     import ssl
     import os
