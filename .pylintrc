@@ -281,7 +281,8 @@ disable=import-outside-toplevel,
         comprehension-escape,
         not-callable,
         raise-missing-from,
-        super-with-arguments
+        super-with-arguments,
+        consider-using-dict-items,
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option
