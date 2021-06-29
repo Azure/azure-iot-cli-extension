@@ -6,6 +6,7 @@
 
 import random
 import json
+from uuid import uuid4
 
 from azext_iot.tests import IoTLiveScenarioTest
 from azext_iot.tests.conftest import get_context_path

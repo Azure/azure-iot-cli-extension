@@ -4,6 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from uuid import uuid4
+
 from azext_iot.iothub.providers.discovery import (
     IotHubDiscovery,
     PRIVILEDGED_ACCESS_RIGHTS_SET,
@@ -82,13 +84,13 @@ class TestIoTHubDiscovery(IoTLiveScenarioTest):
         )
         assert_target(desired_target, rg=LIVE_RG, include_events=True)
 
-        # sub_targets = discovery.get_targets()
-        # [assert_target(tar) for tar in sub_targets]
+        sub_targets = discovery.get_targets()
+        [assert_target(tar) for tar in sub_targets]
 
         rg_targets = discovery.get_targets(resource_group_name=LIVE_RG, include_events=True)
         [assert_target(tar, rg=LIVE_RG, include_events=True) for tar in rg_targets]
 
-        # assert len(rg_targets) <= len(sub_targets)
+        assert len(rg_targets) <= len(sub_targets)
 
 
 def assert_target(target: dict, by_cstring=False, include_events=False, **kwargs):

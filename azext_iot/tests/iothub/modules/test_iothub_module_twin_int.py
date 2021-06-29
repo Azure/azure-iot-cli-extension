@@ -7,6 +7,7 @@
 import json
 import os
 from pathlib import Path
+from uuid import uuid4
 
 from azext_iot.common.utility import read_file_content
 from azext_iot.tests import IoTLiveScenarioTest

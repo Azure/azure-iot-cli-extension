@@ -5,6 +5,8 @@
 # --------------------------------------------------------------------------------------------
 
 import json
+from uuid import uuid4
+
 from datetime import datetime, timedelta
 from azext_iot.tests import IoTLiveScenarioTest
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC

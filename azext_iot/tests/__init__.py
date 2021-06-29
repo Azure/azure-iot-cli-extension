@@ -124,10 +124,10 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     ),
                     checks=self.is_empty(),
                 )
-            
+
             self.cmd(
-            "iot hub delete --name {} --resource-group {}".format(
-                entity_name, entity_rg
+                "iot hub delete --name {} --resource-group {}".format(
+                    self.entity_name, self.entity_rg
                 )
             )
 

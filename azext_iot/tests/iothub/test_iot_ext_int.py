@@ -6,6 +6,7 @@
 
 import os
 import pytest
+from uuid import uuid4
 from time import sleep
 
 from azext_iot.tests import IoTLiveScenarioTest
@@ -27,7 +28,7 @@ LIVE_RG = settings.env.azext_iot_testrg
 
 # Set this environment variable to your empty blob container sas uri to test device export and enable file upload test.
 # For file upload, you will need to have configured your IoT Hub before running.
-LIVE_STORAGE_URI = '''https://azcliintteststorage.blob.core.windows.net/devices?sp=racwdl&st=2021-06-23T00:29:46Z&se=2021-06-23T08:29:46Z&sv=2020-08-04&sr=c&sig=6myIPCB8Kao4B1M79U0pklnYgv9qPiTKEQ1wzN7qxwA%3D'''
+LIVE_STORAGE_URI = settings.env.azext_iot_teststorageuri
 
 # Set this environment variable to enable identity-based integration tests
 # You will need permissions to add and remove role assignments for this storage account
