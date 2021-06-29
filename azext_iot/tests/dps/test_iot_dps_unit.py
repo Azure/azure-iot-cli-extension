@@ -43,6 +43,13 @@ mock_symmetric_key_attestation = {
 path_service_client = 'msrest.service_client.ServiceClient.send'
 path_gdcs = 'azext_iot.operations.dps.get_iot_dps_connection_string'
 path_sas = 'azext_iot._factory.SasTokenAuthentication'
+path_dps_sub_id = 'azure.cli.core._profile.Profile.get_subscription_id'
+
+
+@pytest.fixture()
+def fixture_get_sub_id(mocker):
+    gsi = mocker.patch(path_dps_sub_id)
+    gsi.return_value = mock_target['subscription']
 
 
 @pytest.fixture()
@@ -425,7 +432,7 @@ class TestEnrollmentUpdate():
         (generate_enrollment_update_req(edge_enabled=False))
     ])
     def test_enrollment_update(self, serviceclient, fixture_cmd, req):
-        subject.iot_dps_device_enrollment_update(fixture_cmd, 
+        subject.iot_dps_device_enrollment_update(fixture_cmd,
                                                  None,
                                                  req['enrollment_id'],
                                                  req['dps_name'],
@@ -1357,13 +1364,12 @@ class TestGetDpsConnString():
         (1, 'dps3', 'provisioningserviceowner', 'myrg', False, 'policy'),
         (1, 'dps4', 'provisioningserviceowner', 'myrg', False, 'dps')
     ])
-    def test_get_dps_conn_string(self, mocker, fixture_cmd, dpscount, targetdps,
-                                 policy_name, rg_name, exp_success, why):
+    def test_get_dps_conn_string(self, mocker, fixture_cmd, fixture_get_sub_id, dpscount,
+                                 targetdps, policy_name, rg_name, exp_success, why):
         def _build_dps(dps, name, rg=None):
             dps.name = name
             dps.properties.service_operations_host_name = "{}.{}".format(name, dps_suffix)
             dps.resourcegroup = rg
-            client.config.subscription_id = mock_target['subscription']
             return dps
 
         def _build_policy(policy, name):
