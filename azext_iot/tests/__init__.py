@@ -80,6 +80,13 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
         self.entity_rg = entity_rg
 
         super(IoTLiveScenarioTest, self).__init__(test_scenario)
+
+        self.cmd(
+            "iot hub create --name {} --resource-group {} --sku S1".format(
+                entity_name, entity_rg
+            )
+        )
+
         self.region = self.get_region()
         self.connection_string = self.get_hub_cstring()
 
@@ -117,6 +124,12 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     ),
                     checks=self.is_empty(),
                 )
+            
+            self.cmd(
+            "iot hub delete --name {} --resource-group {}".format(
+                entity_name, entity_rg
+                )
+            )
 
     def generate_device_names(self, count=1, edge=False):
         names = [

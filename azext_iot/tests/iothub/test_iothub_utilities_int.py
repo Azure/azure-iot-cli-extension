@@ -10,7 +10,7 @@ from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
 
 settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_BASIC)
 
-LIVE_HUB = settings.env.azext_iot_testhub
+LIVE_HUB = "test-hub-" + str(uuid4())
 LIVE_RG = settings.env.azext_iot_testrg
 
 

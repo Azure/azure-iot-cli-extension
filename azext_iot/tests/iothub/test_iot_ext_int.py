@@ -22,12 +22,12 @@ settings = DynamoSettings(
     req_env_set=ENV_SET_TEST_IOTHUB_BASIC, opt_env_set=opt_env_set
 )
 
-LIVE_HUB = settings.env.azext_iot_testhub
+LIVE_HUB = "test-hub-" + str(uuid4())
 LIVE_RG = settings.env.azext_iot_testrg
 
 # Set this environment variable to your empty blob container sas uri to test device export and enable file upload test.
 # For file upload, you will need to have configured your IoT Hub before running.
-LIVE_STORAGE_URI = settings.env.azext_iot_teststorageuri
+LIVE_STORAGE_URI = '''https://azcliintteststorage.blob.core.windows.net/devices?sp=racwdl&st=2021-06-23T00:29:46Z&se=2021-06-23T08:29:46Z&sv=2020-08-04&sr=c&sig=6myIPCB8Kao4B1M79U0pklnYgv9qPiTKEQ1wzN7qxwA%3D'''
 
 # Set this environment variable to enable identity-based integration tests
 # You will need permissions to add and remove role assignments for this storage account
