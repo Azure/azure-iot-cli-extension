@@ -47,8 +47,5 @@ DEVICETWIN_MONITOR_TIME_SEC = 15
 EVENT_LIB = ("uamqp", "1.2", "1.3")
 PNP_DTDLV2_COMPONENT_MARKER = "__t"
 
-# Config Key's
-CONFIG_KEY_UAMQP_EXT_VERSION = "uamqp_ext_version"
-
 # Initial Track 2 SDK version
 IOTHUB_TRACK_2_SDK_MIN_VERSION = '2.0.0'
