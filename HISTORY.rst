@@ -24,6 +24,8 @@ Release History
   By default only properties of system modules $edgeAgent and $edgeHub are validated against schemas installed with the IoT extension.
   This can be disabled by using the --no-validation switch.
 
+* Update Uamqp dependency check to check if package can be imported instead of relying on Azure Config values.
+
 **Azure Digital Twins updates**
 
 * Addition of the following commands
