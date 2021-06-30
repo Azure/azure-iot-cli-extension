@@ -29,6 +29,7 @@ from azext_iot.common.shared import (
     RenewKeyType,
     IoTHubStateType,
     DeviceAuthApiType,
+    ConnectionStringParser,
 )
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
@@ -1958,6 +1959,7 @@ def iot_get_sas_token(
     login=None,
     module_id=None,
     auth_type_dataplane=None,
+    connection_string=None,
 ):
     key_type = key_type.lower()
     policy_name = policy_name.lower()
@@ -1975,6 +1977,14 @@ def iot_get_sas_token(
             "You are unable to get sas token for module without device information."
         )
 
+    if connection_string:
+        return {
+            DeviceAuthApiType.sas.value: _iot_build_sas_token_from_cs(
+                connection_string,
+                duration,
+            ).generate_sas_token()
+        }
+
     return {
         DeviceAuthApiType.sas.value: _iot_build_sas_token(
             cmd,
@@ -1989,6 +1999,44 @@ def iot_get_sas_token(
             auth_type_dataplane,
         ).generate_sas_token()
     }
+
+
+def _iot_build_sas_token_from_cs(connection_string, duration=3600):
+    uri = None
+    policy = None
+    key = None
+
+    parsed_cs = None
+    all_parsers = [
+        ConnectionStringParser.Module,
+        ConnectionStringParser.Device,
+        ConnectionStringParser.IotHub,
+    ]
+
+    for parser in all_parsers:
+        try:
+            parsed_cs = parser(connection_string)
+
+            if "SharedAccessKeyName" in parsed_cs:
+                policy = parsed_cs["SharedAccessKeyName"]
+            key = parsed_cs["SharedAccessKey"]
+
+            if parser == ConnectionStringParser.IotHub:
+                uri = parsed_cs["HostName"]
+            elif parser == ConnectionStringParser.Module:
+                uri = "{}/devices/{}/modules/{}".format(
+                    parsed_cs["HostName"], parsed_cs["DeviceId"], parsed_cs["ModuleId"]
+                )
+            elif parser == ConnectionStringParser.Device:
+                uri = "{}/devices/{}".format(parsed_cs["HostName"], parsed_cs["DeviceId"])
+            else:
+                raise CLIError("Given Connection String was not in a supported format.")
+
+            return SasTokenAuthentication(uri, policy, key, duration)
+        except ValueError:
+            continue
+
+    raise CLIError("Given Connection String was not in a supported format.")
 
 
 def _iot_build_sas_token(
@@ -2023,6 +2071,7 @@ def _iot_build_sas_token(
     uri = None
     policy = None
     key = None
+
     if device_id:
         logger.info(
             'Obtaining device "%s" details from registry, using IoT Hub policy "%s"',
