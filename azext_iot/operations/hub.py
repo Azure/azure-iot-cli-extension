@@ -1985,7 +1985,7 @@ def _iot_build_sas_token_from_cs(connection_string, duration=3600):
         except ValueError:
             continue
 
-    raise CLIError("Connection String did not match any presets")
+    raise CLIError("Given Connection String was not in a supported format.")
 
 
 def _iot_build_sas_token(
