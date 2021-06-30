@@ -24,11 +24,6 @@ def _parse_connection_string(cs, validate=None, cstring_type="entity"):
     return decomposed
 
 
-def parse_pnp_connection_string(cs):
-    validate = ["HostName", "RepositoryId", "SharedAccessKeyName", "SharedAccessKey"]
-    return _parse_connection_string(cs, validate, "PnP Model Repository")
-
-
 def parse_iot_hub_connection_string(cs):
     validate = ["HostName", "SharedAccessKeyName", "SharedAccessKey"]
     return _parse_connection_string(cs, validate, "IoT Hub")
