@@ -11,8 +11,8 @@ VERSION = "0.10.14"
 EXTENSION_NAME = "azure-iot"
 EXTENSION_ROOT = os.path.dirname(os.path.abspath(__file__))
 EXTENSION_CONFIG_ROOT_KEY = "iotext"
-EDGE_DEPLOYMENT_SCHEMA_2_PATH = os.path.join(
-    EXTENSION_ROOT, "assets", "edge-deploy-2.0.schema.json"
+EDGE_DEPLOYMENT_ROOT_SCHEMAS_PATH = os.path.join(
+    EXTENSION_ROOT, "assets"
 )
 BASE_MQTT_API_VERSION = "2018-06-30"
 MESSAGING_HTTP_C2D_SYSTEM_PROPERTIES = [

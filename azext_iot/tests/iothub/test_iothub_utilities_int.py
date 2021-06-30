@@ -64,6 +64,17 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
             expect_failure=True,
         )
 
+        # Offline SAS token generation
+        self.cmd(
+            f"iot hub generate-sas-token --connection-string {self.connection_string}",
+            checks=[self.exists("sas")],
+        )
+
+        self.cmd(
+            f"iot hub generate-sas-token --connection-string {self.connection_string} --du 1000",
+            checks=[self.exists("sas")],
+        )
+
     def test_iothub_connection_string_show(self):
         conn_str_pattern = r"^HostName={0}.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey=".format(
             LIVE_HUB

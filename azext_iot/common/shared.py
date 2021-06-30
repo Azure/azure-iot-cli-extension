@@ -267,3 +267,18 @@ class IoTHubStateType(Enum):
     KeyEncryptionKeyRevoking = "KeyEncryptionKeyRevoking"
     KeyEncryptionKeyRevoked = "KeyEncryptionKeyRevoked"
     ReActivating = "ReActivating"
+
+
+class ConnectionStringParser(Enum):
+    """
+        All connection string parser with respective functions
+    """
+    from azext_iot.common._azure import (
+        parse_iot_device_connection_string,
+        parse_iot_device_module_connection_string,
+        parse_iot_hub_connection_string
+    )
+
+    Module = parse_iot_device_module_connection_string
+    Device = parse_iot_device_connection_string
+    IotHub = parse_iot_hub_connection_string
