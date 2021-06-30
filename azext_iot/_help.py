@@ -577,6 +577,18 @@ helps[
       text: >
         az iot hub generate-sas-token -d {device_id}
         --login 'HostName=myhub.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey=12345'
+    - name: Generate an Iot Hub SAS token using an IoT Hub connection string
+      text: >
+        az iot hub generate-sas-token
+        --connection-string 'HostName=myhub.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey=12345'
+    - name: Generate a Device SAS token using a Device connection string
+      text: >
+        az iot hub generate-sas-token --connection-string
+        'HostName=myhub.azure-devices.net;DeviceId=mydevice;SharedAccessKeyName=iothubowner;SharedAccessKey=12345'
+    - name: Generate a Module SAS token using a Module connection string
+      text: >
+        az iot hub generate-sas-token --connection-string
+        'HostName=myhub.azure-devices.net;DeviceId=mydevice;ModuleId=mymodule;SharedAccessKeyName=iothubowner;SharedAccessKey=12345'
 """
 
 helps[

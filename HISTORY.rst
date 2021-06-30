@@ -17,12 +17,14 @@ Release History
 * Fix for "az iot hub c2d-message receive" - the command will use the "ContentEncoding" header value (which indicates the message body encoding)
   or fallback to utf-8 to decode the received message body.
 
+* Addition for "az iot hub generate-sas-token" - the command will allow offline generation of a SAS Token using a connection string.
+
 **Azure Digital Twins updates**
 
 * Addition of the following commands
 
   * az dt reset - Preview command which deletes all data entities from the target instance (models, twins, twin relationships).
-  
+
 
 0.10.13
 +++++++++++++++
@@ -40,7 +42,7 @@ Release History
 * Public API GA update
 
   * Remove preview tag for  api-token, device, device-template, user routes. Default routes use central GA API's.
-  * Add support for preview and 1.0 routes. 
+  * Add support for preview and 1.0 routes.
   * Addition of the optional '--av' argument to specify the version of API for the requested operation.
 
 **IoT Hub updates**
@@ -108,7 +110,7 @@ For more information about IoT Hub support for AAD visit: https://docs.microsoft
 
 * Addition of the following commands
 
-  * az iot central device manual-failover - Execute a manual failover of device across multiple IoT Hubs 
+  * az iot central device manual-failover - Execute a manual failover of device across multiple IoT Hubs
   * az iot central device manual-failback - Reverts the previously executed failover command by moving the device back to it's original IoT Hub
 
 For more information about device high availability visit https://github.com/iot-for-all/iot-central-high-availability-clients#readme
@@ -144,7 +146,7 @@ For more information about device high availability visit https://github.com/iot
 **IoT Hub updates**
 
 * Improve http debug logging.
-* Fix bug related to issue #296. Adds a clause to device-identity update that allows user to update primary-key / secondary-key 
+* Fix bug related to issue #296. Adds a clause to device-identity update that allows user to update primary-key / secondary-key
   and primary-thumbprint / secondary-thumbprint values (respectively, per auth method) without needing to specify the auth_method in the update command.
 
 

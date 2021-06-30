@@ -276,11 +276,9 @@ class ConnectionStringParser(Enum):
     from azext_iot.common._azure import (
         parse_iot_device_connection_string,
         parse_iot_device_module_connection_string,
-        parse_pnp_connection_string,
         parse_iot_hub_connection_string
     )
 
     Module = parse_iot_device_module_connection_string
     Device = parse_iot_device_connection_string
-    PnP = parse_pnp_connection_string
     IotHub = parse_iot_hub_connection_string

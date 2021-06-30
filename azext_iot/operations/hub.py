@@ -1959,7 +1959,6 @@ def _iot_build_sas_token_from_cs(connection_string, duration=3600):
     all_parsers = [
         ConnectionStringParser.Module,
         ConnectionStringParser.Device,
-        ConnectionStringParser.PnP,
         ConnectionStringParser.IotHub,
     ]
 
@@ -1971,7 +1970,7 @@ def _iot_build_sas_token_from_cs(connection_string, duration=3600):
                 policy = parsed_cs["SharedAccessKeyName"]
             key = parsed_cs["SharedAccessKey"]
 
-            if parser in [ConnectionStringParser.IotHub, ConnectionStringParser.PnP]:
+            if parser == ConnectionStringParser.IotHub:
                 uri = parsed_cs["HostName"]
             elif parser == ConnectionStringParser.Module:
                 uri = "{}/devices/{}/modules/{}".format(
@@ -1980,7 +1979,7 @@ def _iot_build_sas_token_from_cs(connection_string, duration=3600):
             elif parser == ConnectionStringParser.Device:
                 uri = "{}/devices/{}".format(parsed_cs["HostName"], parsed_cs["DeviceId"])
             else:
-                raise CLIError("Connection String did not match any presets")
+                raise CLIError("Given Connection String was not in a supported format.")
 
             return SasTokenAuthentication(uri, policy, key, duration)
         except ValueError:

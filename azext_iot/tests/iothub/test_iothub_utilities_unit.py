@@ -45,7 +45,6 @@ class TestGenerateSasToken:
             (3600, generate_valid_cs(["DeviceId"])),
             (30, generate_valid_cs(["DeviceId"])),
             (60000, generate_valid_cs(["DeviceId"])),
-            (3600, generate_valid_cs(["RepositoryId", "SharedAccessKeyName"])),
             (3600, generate_valid_cs(["SharedAccessKeyName"])),
             (3600, generate_valid_cs(["DeviceId"])),
             (3600, generate_valid_cs(["DeviceId", "ModuleId"])),
@@ -75,7 +74,6 @@ class TestGenerateSasToken:
         [
             (generate_valid_cs()),
             (generate_valid_cs(["ModuleId"])),
-            (generate_valid_cs(["RepositoryId"])),
             (generate_valid_cs(["Test"]))
         ],
     )
