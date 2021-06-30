@@ -81,7 +81,7 @@ setup(
         EXTENSION_REF_NAME: [
             "azext_metadata.json",
             "digicert.pem",
-            "assets/edge-deploy-2.0.schema.json",
+            "assets/*",
         ]
     },
     install_requires=DEPENDENCIES,

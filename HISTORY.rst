@@ -8,9 +8,9 @@ Release History
 
 **IoT Central updates**
 
-  * add support to run root/interface level device commands.
-  * add support to get command history for root/interface level device commands.
-  * interface_id parameter for commands "device command run" , "device command history" run changed to optional.
+* Adds support to run root/interface level device commands.
+* Adds support to get command history for root/interface level device commands.
+* The --interface-id parameter for commands "device command run" , "device command history" changed to optional.
 
 **IoT Hub updates**
 
@@ -18,6 +18,11 @@ Release History
   or fallback to utf-8 to decode the received message body.
 
 * Addition for "az iot hub generate-sas-token" - the command will allow offline generation of a SAS Token using a connection string.
+
+* Changes to Edge validation for set-modules and edge deployment creation:
+
+  By default only properties of system modules $edgeAgent and $edgeHub are validated against schemas installed with the IoT extension.
+  This can be disabled by using the --no-validation switch.
 
 **Azure Digital Twins updates**
 
