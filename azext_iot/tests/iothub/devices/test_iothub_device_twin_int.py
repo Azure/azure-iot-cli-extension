@@ -13,10 +13,11 @@ from azext_iot.tests import IoTLiveScenarioTest
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
+from uuid import uuid4
 
 settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_BASIC)
 
-LIVE_HUB = settings.env.azext_iot_testhub
+LIVE_HUB = settings.env.azext_iot_testhub if settings.env.azext_iot_testhub else "test-hub-" + str(uuid4())
 LIVE_RG = settings.env.azext_iot_testrg
 CWD = os.path.dirname(os.path.abspath(__file__))
 

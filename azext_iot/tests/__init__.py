@@ -12,6 +12,7 @@ from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
 from azure.cli.testsdk import LiveScenarioTest
 from contextlib import contextmanager
 from typing import List
+from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC
 
 PREFIX_DEVICE = "test-device-"
 PREFIX_EDGE_DEVICE = "test-edge-device-"
@@ -19,6 +20,8 @@ PREFIX_DEVICE_MODULE = "test-module-"
 PREFIX_CONFIG = "test-config-"
 PREFIX_EDGE_CONFIG = "test-edgedeploy-"
 PREFIX_JOB = "test-job-"
+
+settings = DynamoSettings(ENV_SET_TEST_IOTHUB_BASIC)
 
 
 @contextmanager
@@ -81,6 +84,13 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
         super(IoTLiveScenarioTest, self).__init__(test_scenario)
 
+        if self.entity_name != settings.env.azext_iot_testhub:
+            self.cmd(
+                "iot hub create --name {} --resource-group {} --sku S1".format(
+                    self.entity_name, self.entity_rg
+                )
+            )
+
         self.region = self.get_region()
         self.connection_string = self.get_hub_cstring()
 
@@ -117,6 +127,13 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                         config, self.entity_name, self.entity_rg
                     ),
                     checks=self.is_empty(),
+                )
+
+            if self.entity_name != settings.env.azext_iot_testhub:
+                self.cmd(
+                    "iot hub delete --name {} --resource-group {}".format(
+                        self.entity_name, self.entity_rg
+                    )
                 )
 
     def generate_device_names(self, count=1, edge=False):
