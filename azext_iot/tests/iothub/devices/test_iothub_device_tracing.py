@@ -5,7 +5,6 @@
 # --------------------------------------------------------------------------------------------
 
 import pytest
-from uuid import uuid4
 
 from azext_iot.tests import IoTLiveScenarioTest
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC
@@ -13,7 +12,7 @@ from azext_iot.common.shared import AuthenticationTypeDataplane
 
 settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_BASIC)
 
-LIVE_HUB = "test-hub-" + str(uuid4())
+LIVE_HUB = settings.env.azext_iot_testhub
 LIVE_RG = settings.env.azext_iot_testrg
 
 

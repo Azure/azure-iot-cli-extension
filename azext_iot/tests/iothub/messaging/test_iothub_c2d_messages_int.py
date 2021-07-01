@@ -17,7 +17,7 @@ from azext_iot.common.utility import (
 )
 
 settings = DynamoSettings(ENV_SET_TEST_IOTHUB_BASIC)
-LIVE_HUB = "test-hub-" + str(uuid4())
+LIVE_HUB = settings.env.azext_iot_testhub
 LIVE_RG = settings.env.azext_iot_testrg
 
 
