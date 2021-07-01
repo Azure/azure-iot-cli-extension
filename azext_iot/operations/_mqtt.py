@@ -120,7 +120,7 @@ class mqtt_client(object):
                     }
                 }
 
-            _iot_device_twin_update(self.target, self.device_id, twin_properties)
+                _iot_device_twin_update(self.target, self.device_id, twin_properties)
 
             for _ in tqdm(range(msg_count), desc='Device simulation in progress'):
                 self.send_d2c_message(message_text=data.generate(True), properties=properties)
