@@ -220,6 +220,13 @@ def load_arguments(self, _):
             arg_type=get_three_state_flag(),
             help="Flag indicating edge enablement.",
         )
+        context.argument(
+            "connection_string",
+            options_list=["--connection-string", "--cs"],
+            help="Target connection string. This bypasses the IoT Hub registry and generates the SAS token directly"
+            " from the supplied symmetric key without further validation. All other command parameters aside from"
+            " duration will be ignored. Supported connection string types: Iot Hub, Device, Module."
+        )
 
     with self.argument_context("iot hub") as context:
         context.argument(

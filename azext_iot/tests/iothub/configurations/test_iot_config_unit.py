@@ -14,7 +14,12 @@ from random import randint
 from knack.cli import CLIError
 from azext_iot.operations import hub as subject
 from azext_iot.common.utility import read_file_content, evaluate_literal
-from azext_iot.tests.conftest import build_mock_response, path_service_client, mock_target, get_context_path
+from azext_iot.tests.conftest import (
+    build_mock_response,
+    path_service_client,
+    mock_target,
+    get_context_path,
+)
 
 config_id = "myconfig-{}".format(str(uuid4()).replace("-", ""))
 
@@ -33,12 +38,25 @@ def sample_config_edge_malformed(set_cwd):
     return result
 
 
-@pytest.fixture(params=["file", "inlineA", "inlineB", "layered", "v1", "v11"])
+@pytest.fixture(
+    params=[
+        "file",
+        "inlineA",
+        "inlineB",
+        "layered",
+        "v1",
+        "v11",
+        "ea_v11_eh_v12",
+        "ea_v90_eh_v91",
+    ]
+)
 def sample_config_edge(set_cwd, request):
     path = "test_edge_deployment.json"
     layered_path = "test_edge_deployment_layered.json"
     v1_path = "test_edge_deployment_v1.json"
     v11_path = "test_edge_deployment_v11.json"
+    ea_v11_eh_v12_path = "test_edge_deployment_ea_v11_eh_v12.json"
+    ea_v90_eh_v91_path = "test_edge_deployment_ea_v90_eh_v91.json"
 
     payload = None
     if request.param == "inlineA":
@@ -53,6 +71,10 @@ def sample_config_edge(set_cwd, request):
         payload = json.dumps(json.loads(read_file_content(v1_path)))
     elif request.param == "v11":
         payload = json.dumps(json.loads(read_file_content(v11_path)))
+    elif request.param == "ea_v11_eh_v12":
+        payload = json.dumps(json.loads(read_file_content(ea_v11_eh_v12_path)))
+    elif request.param == "ea_v90_eh_v91":
+        payload = json.dumps(json.loads(read_file_content(ea_v90_eh_v91_path)))
 
     return (request.param, payload)
 
@@ -102,7 +124,7 @@ class TestConfigMetricShow:
             headers={},
             status=200,
             content_type="application/json",
-            match_querystring=False
+            match_querystring=False,
         )
 
         mocked_response.add(
@@ -112,7 +134,7 @@ class TestConfigMetricShow:
             headers={"x-ms-continuation": ""},
             status=200,
             content_type="application/json",
-            match_querystring=False
+            match_querystring=False,
         )
 
         yield mocked_response
@@ -181,6 +203,7 @@ class TestConfigMetricShow:
         self, fixture_cmd, service_client, metric_id, content_type, metric_type
     ):
         from functools import partial
+
         service_client.assert_all_requests_are_fired = False
 
         with pytest.raises(CLIError):
@@ -293,7 +316,12 @@ class TestConfigCreate:
         assert body.get("priority") == priority
         assert body.get("labels") == evaluate_literal(labels, dict)
 
-        if sample_config_edge[0] == "inlineB" or sample_config_edge[0] == "v11":
+        if (
+            sample_config_edge[0] == "inlineB"
+            or sample_config_edge[0] == "v11"
+            or sample_config_edge[0] == "ea_v11_eh_v12"
+            or sample_config_edge[0] == "ea_v90_eh_v91"
+        ):
             assert (
                 body["content"]["modulesContent"]
                 == json.loads(sample_config_edge[1])["modulesContent"]
@@ -574,7 +602,8 @@ class TestConfigDelete:
         return service_client
 
     @pytest.mark.parametrize(
-        "etag", [generate_generic_id(), None],
+        "etag",
+        [generate_generic_id(), None],
     )
     def test_config_delete(self, serviceclient, fixture_cmd, etag):
         subject.iot_hub_configuration_delete(
@@ -604,7 +633,8 @@ class TestConfigUpdate:
         return service_client
 
     @pytest.mark.parametrize(
-        "etag", [generate_generic_id(), None],
+        "etag",
+        [generate_generic_id(), None],
     )
     def test_config_update(self, fixture_cmd, serviceclient, sample_config_show, etag):
         subject.iot_hub_configuration_update(
@@ -612,7 +642,7 @@ class TestConfigUpdate:
             config_id=config_id,
             hub_name=mock_target["entity"],
             parameters=sample_config_show,
-            etag=etag
+            etag=etag,
         )
         args = serviceclient.call_args
         url = args[0][0].url
@@ -649,9 +679,13 @@ class TestConfigUpdate:
             )
 
         type_name = "class" if "class" in str(type) else "type"
-        assert str(exc_label.value) == ("The property \"labels\" must be of <{0} 'dict'> but is <{0} 'str'>. "
-                                        "Input: not a dictionary. Review inline JSON examples here --> "
-                                        "https://github.com/Azure/azure-iot-cli-extension/wiki/Tips".format(type_name))
+        assert str(exc_label.value) == (
+            "The property \"labels\" must be of <{0} 'dict'> but is <{0} 'str'>. "
+            "Input: not a dictionary. Review inline JSON examples here --> "
+            "https://github.com/Azure/azure-iot-cli-extension/wiki/Tips".format(
+                type_name
+            )
+        )
 
     def test_config_update_error(self, fixture_cmd, serviceclient_generic_error):
         with pytest.raises(CLIError):
@@ -671,18 +705,24 @@ class TestConfigList:
 
         # Create mock edge deployments and ADM device and module configurations
         for i in range(size):
-            result.append({
-                "id": "edgeDeployment{}".format(i),
-                "content": {"modulesContent": {"key": {}}},
-            })
-            result.append({
-                "id": "moduleConfiguration{}".format(i),
-                "content": {"moduleContent": {"key": {}}},
-            })
-            result.append({
-                "id": "deviceConfiguration{}".format(i),
-                "content": {"deviceContent": {"key": {}}},
-            })
+            result.append(
+                {
+                    "id": "edgeDeployment{}".format(i),
+                    "content": {"modulesContent": {"key": {}}},
+                }
+            )
+            result.append(
+                {
+                    "id": "moduleConfiguration{}".format(i),
+                    "content": {"moduleContent": {"key": {}}},
+                }
+            )
+            result.append(
+                {
+                    "id": "deviceConfiguration{}".format(i),
+                    "content": {"deviceContent": {"key": {}}},
+                }
+            )
 
         mocked_response.add(
             method=responses.GET,
@@ -691,7 +731,7 @@ class TestConfigList:
             headers={"x-ms-continuation": ""},
             status=200,
             content_type="application/json",
-            match_querystring=False
+            match_querystring=False,
         )
 
         mocked_response.expected_size = size
@@ -778,7 +818,12 @@ class TestConfigApply:
             in url
         )
 
-        if sample_config_edge[0] == "inlineB" or sample_config_edge[0] == "v11":
+        if (
+            sample_config_edge[0] == "inlineB"
+            or sample_config_edge[0] == "v11"
+            or sample_config_edge[0] == "ea_v11_eh_v12"
+            or sample_config_edge[0] == "ea_v90_eh_v91"
+        ):
             assert (
                 body["modulesContent"]
                 == json.loads(sample_config_edge[1])["modulesContent"]

@@ -80,6 +80,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
         self.entity_rg = entity_rg
 
         super(IoTLiveScenarioTest, self).__init__(test_scenario)
+
         self.region = self.get_region()
         self.connection_string = self.get_hub_cstring()
 

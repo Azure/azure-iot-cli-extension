@@ -27,10 +27,10 @@ from azext_iot.common.shared import (
     RenewKeyType,
     IoTHubStateType,
     DeviceAuthApiType,
+    ConnectionStringParser,
 )
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
-    shell_safe_json_parse,
     read_file_content,
     validate_key_value_pairs,
     unpack_msrest_error,
@@ -257,11 +257,18 @@ def _assemble_auth(auth_method, pk, sk):
     )
 
     auth = None
-    if auth_method in [DeviceAuthType.shared_private_key.name, DeviceAuthApiType.sas.value]:
+    if auth_method in [
+        DeviceAuthType.shared_private_key.name,
+        DeviceAuthApiType.sas.value,
+    ]:
         auth = AuthenticationMechanism(
-            symmetric_key=SymmetricKey(primary_key=pk, secondary_key=sk), type=DeviceAuthApiType.sas.value
+            symmetric_key=SymmetricKey(primary_key=pk, secondary_key=sk),
+            type=DeviceAuthApiType.sas.value,
         )
-    elif auth_method in [DeviceAuthType.x509_thumbprint.name, DeviceAuthApiType.selfSigned.value]:
+    elif auth_method in [
+        DeviceAuthType.x509_thumbprint.name,
+        DeviceAuthApiType.selfSigned.value,
+    ]:
         if not pk:
             raise ValueError("primary thumbprint required with selfSigned auth")
         auth = AuthenticationMechanism(
@@ -270,8 +277,13 @@ def _assemble_auth(auth_method, pk, sk):
             ),
             type=DeviceAuthApiType.selfSigned.value,
         )
-    elif auth_method in [DeviceAuthType.x509_ca.name, DeviceAuthApiType.certificateAuthority.value]:
-        auth = AuthenticationMechanism(type=DeviceAuthApiType.certificateAuthority.value)
+    elif auth_method in [
+        DeviceAuthType.x509_ca.name,
+        DeviceAuthApiType.certificateAuthority.value,
+    ]:
+        auth = AuthenticationMechanism(
+            type=DeviceAuthApiType.certificateAuthority.value
+        )
     else:
         raise ValueError("Authorization method {} invalid.".format(auth_method))
     return auth
@@ -865,7 +877,11 @@ def _handle_module_update_params(parameters):
 
 
 def _parse_auth(parameters):
-    valid_auth = [DeviceAuthApiType.sas.value, DeviceAuthApiType.selfSigned.value, DeviceAuthApiType.certificateAuthority.value]
+    valid_auth = [
+        DeviceAuthApiType.sas.value,
+        DeviceAuthApiType.selfSigned.value,
+        DeviceAuthApiType.certificateAuthority.value,
+    ]
     auth = parameters["authentication"].get("type")
     if auth not in valid_auth:
         raise CLIError("authentication.type must be one of {}".format(valid_auth))
@@ -1377,31 +1393,67 @@ def _process_config_content(content, config_type):
 
 def _validate_payload_schema(content):
     import json
-    from azext_iot.constants import EDGE_DEPLOYMENT_SCHEMA_2_PATH as schema_path
+    from os.path import join
     from azext_iot.models.validators import JsonSchemaType, JsonSchemaValidator
+    from azext_iot.constants import EDGE_DEPLOYMENT_ROOT_SCHEMAS_PATH as root_schema_path
+    from azext_iot.common.utility import shell_safe_json_parse
 
-    if not exists(schema_path):
-        logger.info("Invalid schema path %s, skipping validation...", schema_path)
-        return
+    EDGE_AGENT_SCHEMA_PATH = "azure-iot-edgeagent-deployment-{}.json"
+    EDGE_HUB_SCHEMA_PATH = "azure-iot-edgehub-deployment-{}.json"
+    EDGE_SCHEMA_PATH_DICT = {
+        "$edgeAgent": EDGE_AGENT_SCHEMA_PATH,
+        "$edgeHub": EDGE_HUB_SCHEMA_PATH,
+    }
 
-    logger.info("Validating deployment payload...")
-    schema_content = str(read_file_content(schema_path))
+    modules_content = content["modulesContent"]
+    system_modules_for_validation = ["$edgeAgent", "$edgeHub"]
 
-    try:
-        schema_content = shell_safe_json_parse(schema_content)
-    except CLIError:
-        logger.info("Issue parsing Edge deployment schema, skipping validation...")
-        return
+    for sys_module in system_modules_for_validation:
+        if sys_module in modules_content:
+            if (
+                "properties.desired" in modules_content[sys_module]
+                and "schemaVersion"
+                in modules_content[sys_module]["properties.desired"]
+            ):
+                target_schema_ver = modules_content[sys_module][
+                    "properties.desired"
+                ]["schemaVersion"]
+                target_schema_def_path = join(root_schema_path, f"{EDGE_SCHEMA_PATH_DICT[sys_module].format(target_schema_ver)}")
 
-    v = JsonSchemaValidator(schema_content, JsonSchemaType.draft4)
-    errors = v.validate(content)
-    if errors:
-        # Pretty printing schema validation errors
-        raise CLIError(
-            json.dumps({"validationErrors": errors}, separators=(",", ":"), indent=2)
-        )
+                logger.info("Attempting to fetch schema content from %s...", target_schema_def_path)
+                if not exists(target_schema_def_path):
+                    logger.info("Invalid schema path %s, skipping validation...", target_schema_def_path)
+                    continue
 
-    return
+                try:
+                    target_schema_def = str(read_file_content(target_schema_def_path))
+                    target_schema_def = shell_safe_json_parse(target_schema_def)
+                except Exception:
+                    logger.info(
+                        "Unable to fetch schema content from %s skipping validation...",
+                        target_schema_def_path,
+                    )
+                    continue
+
+                logger.info(f"Validating {sys_module} of deployment payload against schema...")
+                to_validate_content = {
+                    sys_module: modules_content[sys_module]
+                }
+                draft_version = JsonSchemaType.draft4
+                if "$schema" in target_schema_def and "/draft-07/" in target_schema_def["$schema"]:
+                    draft_version = JsonSchemaType.draft7
+
+                v = JsonSchemaValidator(target_schema_def, draft_version)
+                errors = v.validate(to_validate_content)
+                if errors:
+                    # Pretty printing schema validation errors
+                    raise CLIError(
+                        json.dumps(
+                            {"validationErrors": errors},
+                            separators=(",", ":"),
+                            indent=2,
+                        )
+                    )
 
 
 def iot_hub_configuration_update(
@@ -1913,6 +1965,7 @@ def iot_get_sas_token(
     login=None,
     module_id=None,
     auth_type_dataplane=None,
+    connection_string=None,
 ):
     key_type = key_type.lower()
     policy_name = policy_name.lower()
@@ -1930,6 +1983,14 @@ def iot_get_sas_token(
             "You are unable to get sas token for module without device information."
         )
 
+    if connection_string:
+        return {
+            DeviceAuthApiType.sas.value: _iot_build_sas_token_from_cs(
+                connection_string,
+                duration,
+            ).generate_sas_token()
+        }
+
     return {
         DeviceAuthApiType.sas.value: _iot_build_sas_token(
             cmd,
@@ -1944,6 +2005,44 @@ def iot_get_sas_token(
             auth_type_dataplane,
         ).generate_sas_token()
     }
+
+
+def _iot_build_sas_token_from_cs(connection_string, duration=3600):
+    uri = None
+    policy = None
+    key = None
+
+    parsed_cs = None
+    all_parsers = [
+        ConnectionStringParser.Module,
+        ConnectionStringParser.Device,
+        ConnectionStringParser.IotHub,
+    ]
+
+    for parser in all_parsers:
+        try:
+            parsed_cs = parser(connection_string)
+
+            if "SharedAccessKeyName" in parsed_cs:
+                policy = parsed_cs["SharedAccessKeyName"]
+            key = parsed_cs["SharedAccessKey"]
+
+            if parser == ConnectionStringParser.IotHub:
+                uri = parsed_cs["HostName"]
+            elif parser == ConnectionStringParser.Module:
+                uri = "{}/devices/{}/modules/{}".format(
+                    parsed_cs["HostName"], parsed_cs["DeviceId"], parsed_cs["ModuleId"]
+                )
+            elif parser == ConnectionStringParser.Device:
+                uri = "{}/devices/{}".format(parsed_cs["HostName"], parsed_cs["DeviceId"])
+            else:
+                raise CLIError("Given Connection String was not in a supported format.")
+
+            return SasTokenAuthentication(uri, policy, key, duration)
+        except ValueError:
+            continue
+
+    raise CLIError("Given Connection String was not in a supported format.")
 
 
 def _iot_build_sas_token(
@@ -1978,6 +2077,7 @@ def _iot_build_sas_token(
     uri = None
     policy = None
     key = None
+
     if device_id:
         logger.info(
             'Obtaining device "%s" details from registry, using IoT Hub policy "%s"',
@@ -2035,7 +2135,10 @@ def _build_device_or_module_connection_string(entity, key_type="primary"):
             if key_type == "primary"
             else auth["symmetricKey"]["secondaryKey"]
         )
-    elif auth_type in [DeviceAuthApiType.certificateAuthority.value.lower(), DeviceAuthApiType.selfSigned.value.lower()]:
+    elif auth_type in [
+        DeviceAuthApiType.certificateAuthority.value.lower(),
+        DeviceAuthApiType.selfSigned.value.lower(),
+    ]:
         key = "x509=true"
     else:
         raise CLIError("Unable to form target connection string")
@@ -2596,6 +2699,7 @@ def iot_device_export(
     resource_group_name=None,
 ):
     from azext_iot._factory import iot_hub_service_factory
+
     client = iot_hub_service_factory(cmd.cli_ctx)
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
@@ -2621,21 +2725,31 @@ def iot_device_export(
             authentication_type=storage_authentication_type,
         )
 
-        user_identity = identity not in [None, '[system]']
-        if user_identity and storage_authentication_type != AuthenticationType.identityBased.name:
+        user_identity = identity not in [None, "[system]"]
+        if (
+            user_identity
+            and storage_authentication_type != AuthenticationType.identityBased.name
+        ):
             raise CLIError(
                 "Device export with user-assigned identities requires identity-based authentication [--storage-auth-type]"
             )
         # Track 2 CLI SDKs provide support for user-assigned identity objects
-        if ensure_iothub_sdk_min_version(IOTHUB_TRACK_2_SDK_MIN_VERSION) and user_identity:
-            from azure.mgmt.iothub.models import ManagedIdentity  # pylint: disable=no-name-in-module
+        if (
+            ensure_iothub_sdk_min_version(IOTHUB_TRACK_2_SDK_MIN_VERSION)
+            and user_identity
+        ):
+            from azure.mgmt.iothub.models import (
+                ManagedIdentity,
+            )  # pylint: disable=no-name-in-module
+
             export_request.identity = ManagedIdentity(user_assigned_identity=identity)
 
         # if the user supplied a user-assigned identity, let them know they need a new CLI/SDK
         elif user_identity:
             raise CLIError(
-                "Device export with user-assigned identities requires a dependency of azure-mgmt-iothub>={}"
-                .format(IOTHUB_TRACK_2_SDK_MIN_VERSION)
+                "Device export with user-assigned identities requires a dependency of azure-mgmt-iothub>={}".format(
+                    IOTHUB_TRACK_2_SDK_MIN_VERSION
+                )
             )
 
         return client.export_devices(
@@ -2697,20 +2811,30 @@ def iot_device_import(
             authentication_type=storage_authentication_type,
         )
 
-        user_identity = identity not in [None, '[system]']
-        if user_identity and storage_authentication_type != AuthenticationType.identityBased.name:
+        user_identity = identity not in [None, "[system]"]
+        if (
+            user_identity
+            and storage_authentication_type != AuthenticationType.identityBased.name
+        ):
             raise CLIError(
                 "Device import with user-assigned identities requires identity-based authentication [--storage-auth-type]"
             )
         # Track 2 CLI SDKs provide support for user-assigned identity objects
-        if ensure_iothub_sdk_min_version(IOTHUB_TRACK_2_SDK_MIN_VERSION) and user_identity:
-            from azure.mgmt.iothub.models import ManagedIdentity  # pylint: disable=no-name-in-module
+        if (
+            ensure_iothub_sdk_min_version(IOTHUB_TRACK_2_SDK_MIN_VERSION)
+            and user_identity
+        ):
+            from azure.mgmt.iothub.models import (
+                ManagedIdentity,
+            )  # pylint: disable=no-name-in-module
+
             import_request.identity = ManagedIdentity(user_assigned_identity=identity)
         # if the user supplied a user-assigned identity, let them know they need a new CLI/SDK
         elif user_identity:
             raise CLIError(
-                "Device import with user-assigned identities requires a dependency of azure-mgmt-iothub>={}"
-                .format(IOTHUB_TRACK_2_SDK_MIN_VERSION)
+                "Device import with user-assigned identities requires a dependency of azure-mgmt-iothub>={}".format(
+                    IOTHUB_TRACK_2_SDK_MIN_VERSION
+                )
             )
 
         return client.import_devices(
