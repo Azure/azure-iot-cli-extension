@@ -50,6 +50,10 @@ if not PACKAGE_NAME:
 
 DEPENDENCIES = ["paho-mqtt==1.5.0", "jsonschema==3.2.0", "packaging"]
 
+EXTRAS = {
+    "uamqp": ["uamqp~=1.2"]
+}
+
 
 CLASSIFIERS = [
     "Development Status :: 4 - Beta",
@@ -85,5 +89,6 @@ setup(
         ]
     },
     install_requires=DEPENDENCIES,
+    extras_require=EXTRAS,
     zip_safe=False
 )
