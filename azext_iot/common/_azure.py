@@ -7,6 +7,7 @@
 from knack.util import CLIError
 from azext_iot.common.utility import validate_key_value_pairs
 from azext_iot.common.auth import get_aad_token
+from azure.cli.core.commands.client_factory import get_subscription_id
 
 
 def _parse_connection_string(cs, validate=None, cstring_type="entity"):
@@ -42,6 +43,7 @@ CONN_STR_TEMPLATE = "HostName={};SharedAccessKeyName={};SharedAccessKey={}"
 
 
 def get_iot_dps_connection_string(
+    cmd,
     client,
     dps_name,
     resource_group_name,
@@ -109,7 +111,7 @@ def get_iot_dps_connection_string(
     result["policy"] = policy_name
     result["primarykey"] = policy.primary_key
     result["secondarykey"] = policy.secondary_key
-    result["subscription"] = client.config.subscription_id
+    result["subscription"] = get_subscription_id(cmd.cli_ctx)
 
     return result
 

@@ -52,10 +52,8 @@ def iot_service_provisioning_factory(cli_ctx, *_):
         service_client (IotDpsClient): operational resource for
             working with IoT Hub Device Provisioning Service.
     """
-    from azure.cli.core.commands.client_factory import get_mgmt_service_client
-    from azure.mgmt.iothubprovisioningservices.iot_dps_client import IotDpsClient
-
-    return get_mgmt_service_client(cli_ctx, IotDpsClient)
+    from azure.cli.command_modules.iot._client_factory import iot_service_provisioning_factory
+    return iot_service_provisioning_factory(cli_ctx=cli_ctx)
 
 
 class SdkResolver(object):
