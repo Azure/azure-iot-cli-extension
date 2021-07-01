@@ -29,7 +29,7 @@ mock_target['entity'] = 'mydps'
 mock_target['primarykey'] = 'rJx/6rJ6rmG4ak890+eW5MYGH+A0uzRvjGNjg3Ve8sfo='
 mock_target['secondarykey'] = 'aCd/6rJ6rmG4ak890+eW5MYGH+A0uzRvjGNjg3Ve8sfo='
 mock_target['policy'] = 'provisioningserviceowner'
-mock_target['subscription'] = "a386d5ea-ea90-441a-8263-d816368c84a1"
+mock_target['subscription'] = "5952cff8-bcd1-4235-9554-af2c0348bf23"
 
 mock_symmetric_key_attestation = {
     "type": "symmetricKey",
