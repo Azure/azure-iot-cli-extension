@@ -6,8 +6,6 @@
 
 import sys
 from os import linesep
-import six
-from six.moves import input
 from knack.util import CLIError
 from azext_iot.constants import EVENT_LIB, VERSION
 from azext_iot.common.utility import test_import
@@ -25,13 +23,13 @@ def ensure_uamqp(config, yes=False, repair=False):
             if i.lower() != 'y':
                 sys.exit('User has declined update...')
 
-        six.print_('Updating required dependency...')
+        print('Updating required dependency...')
         with HomebrewPipPatch():
             # The version range defined in this custom_version parameter should be stable
             try:
                 install(EVENT_LIB[0], compatible_version='{}'.format(EVENT_LIB[1]))
                 update_uamqp_ext_version(config, EVENT_LIB[1])
-                six.print_('Update complete. Executing command...')
+                print('Update complete. Executing command...')
             except RuntimeError as e:
-                six.print_('Failure updating {}. Aborting...'.format(EVENT_LIB[0]))
+                print('Failure updating {}. Aborting...'.format(EVENT_LIB[0]))
                 raise CLIError(e)

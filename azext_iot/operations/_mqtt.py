@@ -7,7 +7,6 @@
 
 import ssl
 import os
-import six
 
 from time import sleep
 from paho.mqtt import client as mqtt
@@ -55,22 +54,22 @@ class mqtt_client_wrap(object):
         self.client.connect(host=self.target["entity"], port=8883)
 
     def on_connect(self, client, userdata, flags, rc):
-        six.print_(
+        print(
             "Connected to target IoT Hub with result: {}".format(
                 connection_result[rc]
             )
         )
         self.client.subscribe(self.topic_receive)
-        six.print_("Subscribed to device bound message queue")
+        print("Subscribed to device bound message queue")
         self.connected = True
 
     def on_message(self, client, userdata, msg):
-        six.print_()
-        six.print_("_Received C2D message with topic_: {}".format(msg.topic))
-        six.print_("_Payload_: {}".format(msg.payload))
+        print()
+        print("_Received C2D message with topic_: {}".format(msg.topic))
+        print("_Payload_: {}".format(msg.payload))
 
     def on_publish(self, client, userdata, mid):
-        six.print_(".", end="", flush=True)
+        print(".", end="", flush=True)
 
     def is_connected(self):
         return self.connected
