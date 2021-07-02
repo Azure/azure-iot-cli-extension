@@ -12,10 +12,10 @@ from azext_iot.tests.conftest import get_context_path
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC
 from azext_iot.common.utility import read_file_content
-from uuid import uuid4
+from azext_iot.tests.generators import generate_generic_id
 
 settings = DynamoSettings(ENV_SET_TEST_IOTHUB_BASIC)
-LIVE_HUB = settings.env.azext_iot_testhub if settings.env.azext_iot_testhub else "test-hub-" + str(uuid4())
+LIVE_HUB = settings.env.azext_iot_testhub if settings.env.azext_iot_testhub else "test-hub-" + generate_generic_id()
 LIVE_RG = settings.env.azext_iot_testrg
 
 edge_content_path = get_context_path(__file__, "test_edge_deployment.json")

@@ -12,11 +12,11 @@ from azext_iot.tests.iothub import (
     SECONDARY_THUMBPRINT,
     DEVICE_TYPES,
 )
-from uuid import uuid4
+from azext_iot.tests.generators import generate_generic_id
 
 settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_BASIC)
 
-LIVE_HUB = settings.env.azext_iot_testhub if settings.env.azext_iot_testhub else "test-hub-" + str(uuid4())
+LIVE_HUB = settings.env.azext_iot_testhub if settings.env.azext_iot_testhub else "test-hub-" + generate_generic_id()
 LIVE_RG = settings.env.azext_iot_testrg
 
 

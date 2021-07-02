@@ -12,12 +12,12 @@ from azext_iot.common import embedded_cli
 from azext_iot.common.utility import generate_key
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.tests.settings import Setting
-from uuid import uuid4
+from azext_iot.tests.generators import generate_generic_id
 
 # Set these to the proper IoT Hub DPS, IoT Hub and Resource Group for Integration Tests.
 dps = os.environ.get("azext_iot_testdps")
 rg = os.environ.get("azext_iot_testrg")
-hub = os.environ.get("azext_iot_testhub") if os.environ.get("azext_iot_testhub") else "test-hub-" + str(uuid4())
+hub = os.environ.get("azext_iot_testhub") if os.environ.get("azext_iot_testhub") else "test-hub-" + generate_generic_id()
 
 if not all([dps, rg, hub]):
     raise ValueError(

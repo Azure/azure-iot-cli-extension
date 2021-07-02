@@ -12,6 +12,11 @@ ENV_SET_TEST_IOTHUB_BASIC = [
     "azext_iot_testrg",
 ]
 
+ENV_SET_TEST_IOTHUB_STORAGE = [
+    "azext_iot_teststorageconnstring",
+    "azext_iot_teststoragecontainer"
+]
+
 
 class Setting(object):
     pass

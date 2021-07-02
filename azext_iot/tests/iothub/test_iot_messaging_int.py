@@ -16,9 +16,10 @@ from azext_iot.common.utility import (
     calculate_millisec_since_unix_epoch_utc,
     validate_key_value_pairs
 )
+from azext_iot.tests.generators import generate_generic_id
 
 settings = DynamoSettings(ENV_SET_TEST_IOTHUB_BASIC)
-LIVE_HUB = settings.env.azext_iot_testhub if settings.env.azext_iot_testhub else "test-hub-" + str(uuid4())
+LIVE_HUB = settings.env.azext_iot_testhub if settings.env.azext_iot_testhub else "test-hub-" + generate_generic_id()
 LIVE_RG = settings.env.azext_iot_testrg
 
 LIVE_CONSUMER_GROUPS = ["test1", "test2", "test3"]
@@ -266,31 +267,13 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             checks=[self.check("deviceId", device_ids[0])],
         )
 
-        from azext_iot.operations.hub import iot_simulate_device
-        from azext_iot._factory import iot_hub_service_factory
-        from azure.cli.core.mock import DummyCli
-
-        cli_ctx = DummyCli()
-        client = iot_hub_service_factory(cli_ctx)
-
         twin_init_props = {'prop_1': 'val_1', 'prop_2': 'val_2'}
-        twin_props_json = json.dumps(twin_init_props)
+        self.kwargs["twin_props_json"] = json.dumps(twin_init_props)
 
-        iot_simulate_device(
-            client,
-            device_ids[0],
-            LIVE_HUB,
-            "complete",
-            "Testing init reported twin properties",
-            2,
-            5,
-            "mqtt",
-            None,
-            None,
-            None,
-            None,
-            None,
-            twin_props_json
+        self.cmd(
+            """iot device simulate -d {} -n {} -g {} --da '{}' --irp '{}' --mc 2 --mi 3 """.format(
+                device_ids[0], LIVE_HUB, LIVE_RG, "Testing init reported twin properties", "{twin_props_json}"
+            )
         )
 
         # get device twin

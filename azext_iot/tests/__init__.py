@@ -12,7 +12,7 @@ from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
 from azure.cli.testsdk import LiveScenarioTest
 from contextlib import contextmanager
 from typing import List
-from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC
+from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC, ENV_SET_TEST_IOTHUB_STORAGE
 
 PREFIX_DEVICE = "test-device-"
 PREFIX_EDGE_DEVICE = "test-edge-device-"
@@ -21,7 +21,7 @@ PREFIX_CONFIG = "test-config-"
 PREFIX_EDGE_CONFIG = "test-edgedeploy-"
 PREFIX_JOB = "test-job-"
 
-settings = DynamoSettings(ENV_SET_TEST_IOTHUB_BASIC)
+settings = DynamoSettings(ENV_SET_TEST_IOTHUB_BASIC + ENV_SET_TEST_IOTHUB_STORAGE)
 
 
 @contextmanager
@@ -86,8 +86,9 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
         if self.entity_name != settings.env.azext_iot_testhub:
             self.cmd(
-                "iot hub create --name {} --resource-group {} --sku S1".format(
-                    self.entity_name, self.entity_rg
+                "iot hub create --name {} --resource-group {} --fc {} --fcs {} --sku S1 ".format(
+                    self.entity_name, self.entity_rg,
+                    settings.env.azext_iot_teststoragecontainer, settings.env.azext_iot_teststorageconnstring
                 )
             )
 
@@ -129,12 +130,12 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     checks=self.is_empty(),
                 )
 
-            if self.entity_name != settings.env.azext_iot_testhub:
-                self.cmd(
-                    "iot hub delete --name {} --resource-group {}".format(
-                        self.entity_name, self.entity_rg
-                    )
+        if self.entity_name != settings.env.azext_iot_testhub:
+            self.cmd(
+                "iot hub delete --name {} --resource-group {}".format(
+                    self.entity_name, self.entity_rg
                 )
+            )
 
     def generate_device_names(self, count=1, edge=False):
         names = [
