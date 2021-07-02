@@ -22,7 +22,7 @@ settings = DynamoSettings(
     req_env_set=ENV_SET_TEST_IOTHUB_BASIC, opt_env_set=opt_env_set
 )
 
-LIVE_HUB = "test-hub-" + generate_generic_id()
+LIVE_HUB = settings.env.azext_iot_testhub if settings.env.azext_iot_testhub else "test-hub-" + generate_generic_id()
 LIVE_RG = settings.env.azext_iot_testrg
 
 # Set this environment variable to your empty blob container sas uri to test device export and enable file upload test.
