@@ -104,7 +104,7 @@ def load_arguments(self, _):
             validator=mode2_iot_login_handler,
             help="This command supports an entity connection string with rights to perform action. "
             'Use to avoid session login via "az login". '
-            "If both an entity connection string and name are provided the connection string takes priority."
+            "If both an entity connection string and name are provided the connection string takes priority. "
             "Required if --hub-name is not provided.",
             arg_group="IoT Hub Identifier"
         )
