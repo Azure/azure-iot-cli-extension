@@ -36,6 +36,8 @@ def load_central_help():
     _load_central_users_help()
     _load_central_api_token_help()
     _load_central_device_templates_help()
+    _load_central_device_groups_help()
+    _load_central_roles_help()
     _load_central_monitors_help()
     _load_central_command_help()
     _load_central_compute_device_key()
@@ -428,6 +430,60 @@ def _load_central_device_templates_help():
             --device-template-id {devicetemplateid}
     """
 
+def _load_central_device_groups_help():
+    helps[
+        "iot central device-group"
+    ] = """
+        type: group
+        short-summary: Manage and configure IoT Central device groups
+    """
+
+    helps[
+        "iot central device-group list"
+    ] = """
+        type: command
+        short-summary: Get the list of device groups for an IoT Central application.
+
+        examples:
+        - name: List device groups in an application
+          text: >
+            az iot central device-group list
+            --app-id {appid}
+    """
+
+def _load_central_roles_help():
+    helps[
+        "iot central role"
+    ] = """
+        type: group
+        short-summary: Manage and configure IoT Central roles
+    """
+
+    helps[
+        "iot central role list"
+    ] = """
+        type: command
+        short-summary: Get the list of roles for an IoT Central application.
+
+        examples:
+        - name: List roles in an application
+          text: >
+            az iot central role list
+            --app-id {appid}
+    """
+
+    helps[
+        "iot central role show"
+    ] = """
+    type: command
+    short-summary: Get the details of a role by ID
+    examples:
+      - name: Get details of role
+        text: >
+          az iot central role show
+          --app-id {appid}
+          --role-id {roleId}
+    """
 
 def _load_central_monitors_help():
 
