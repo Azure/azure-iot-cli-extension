@@ -20,7 +20,8 @@ from azext_iot.central.providers.v1 import (
     CentralDeviceTemplateProviderV1,
 )
 from azext_iot.central.providers.preview import (
-    CentralDeviceGroupProviderPreview
+    CentralDeviceGroupProviderPreview,
+    CentralRoleProviderPreview
 )
 from azext_iot.central.models.devicetwin import DeviceTwin
 from azext_iot.central import models as central_models
@@ -221,6 +222,40 @@ class TestCentralDeviceGroupProvider:
         # call counts should be at most 1 since the provider has a cache
         assert mock_device_group_svc.list_device_groups.call_count == 1
         assert set(device_groups) == set(map(lambda x: x.id, self._device_groups))
+
+
+class TestCentralRoleProvider:
+    _roles = [
+        central_models.RolePreview(role) for role in load_json(FileNames.central_role_file)]
+
+    @mock.patch("azext_iot.central.services.role")
+    def test_should_return_roles(self, mock_role_svc):
+
+        # setup
+        provider = CentralRoleProviderPreview(cmd=None, app_id=app_id)
+        mock_role_svc.list_roles.return_value = self._roles
+
+        # act
+        roles = provider.list_roles()
+        # verify
+        # call counts should be at most 1 since the provider has a cache
+        assert mock_role_svc.list_roles.call_count == 1
+        assert set(roles) == set(map(lambda x: x.id, self._roles))
+
+    @mock.patch("azext_iot.central.services.role")
+    def test_should_return_role(
+        self, mock_role_svc
+    ):
+        # setup
+        provider = CentralRoleProviderPreview(cmd=None, app_id=app_id)
+        mock_role_svc.get_role.return_value = self._roles[0]
+
+        # act
+        role = provider.get_role(self._roles[0].id)
+        # verify
+        # call counts should be at most 1 since the provider has a cache
+        assert mock_role_svc.get_role.call_count == 1
+        assert role.id == self._roles[0].id
 
 
 class TestCentralPropertyMonitor:
