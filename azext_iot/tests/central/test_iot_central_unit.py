@@ -19,6 +19,9 @@ from azext_iot.central.providers.v1 import (
     CentralDeviceProviderV1,
     CentralDeviceTemplateProviderV1,
 )
+from azext_iot.central.providers.preview import (
+    CentralDeviceGroupProviderPreview
+)
 from azext_iot.central.models.devicetwin import DeviceTwin
 from azext_iot.central import models as central_models
 from azext_iot.monitor.property import PropertyMonitor
@@ -199,6 +202,25 @@ class TestCentralDeviceProvider:
         # call counts should be at most 1 since the provider has a cache
         assert mock_device_template_svc.get_device_template.call_count == 1
         assert template == self._device_template
+
+
+class TestCentralDeviceGroupProvider:
+    _device_groups = [
+        central_models.DeviceGroupPreview(group) for group in load_json(FileNames.central_device_group_file)]
+
+    @mock.patch("azext_iot.central.services.device_group")
+    def test_should_return_device_groups(self, mock_device_group_svc):
+
+        # setup
+        provider = CentralDeviceGroupProviderPreview(cmd=None, app_id=app_id)
+        mock_device_group_svc.list_device_groups.return_value = self._device_groups
+
+        # act
+        device_groups = provider.list_device_groups()
+        # verify
+        # call counts should be at most 1 since the provider has a cache
+        assert mock_device_group_svc.list_device_groups.call_count == 1
+        assert set(device_groups) == set(map(lambda x: x.id, self._device_groups))
 
 
 class TestCentralPropertyMonitor:
