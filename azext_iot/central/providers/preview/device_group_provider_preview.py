@@ -7,12 +7,10 @@
 
 from typing import List
 from azext_iot.central.models.deviceGroupPreview import DeviceGroupPreview
-from knack.util import CLIError
 from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
-from azext_iot.central.models.enum import DeviceStatus, ApiVersion
-from azext_iot.central import models as central_models
+from azext_iot.central.models.enum import ApiVersion
 
 logger = get_logger(__name__)
 
@@ -34,7 +32,6 @@ class CentralDeviceGroupProviderPreview:
         self._app_id = app_id
         self._token = token
         self._device_groups = {}
-
 
     def list_device_groups(self, central_dns_suffix=CENTRAL_ENDPOINT) -> List[DeviceGroupPreview]:
         device_groups = central_services.device_group.list_device_groups(

@@ -430,6 +430,7 @@ def _load_central_device_templates_help():
             --device-template-id {devicetemplateid}
     """
 
+
 def _load_central_device_groups_help():
     helps[
         "iot central device-group"
@@ -450,6 +451,7 @@ def _load_central_device_groups_help():
             az iot central device-group list
             --app-id {appid}
     """
+
 
 def _load_central_roles_help():
     helps[
@@ -484,6 +486,7 @@ def _load_central_roles_help():
           --app-id {appid}
           --role-id {roleId}
     """
+
 
 def _load_central_monitors_help():
 

@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 # This is largely derived from https://docs.microsoft.com/en-us/rest/api/iotcentral/roles
 
-from typing import List, Union
+from typing import List
 import requests
 
 from knack.util import CLIError
@@ -62,6 +62,7 @@ def get_role(
     result = _utility.try_extract_result(response)
 
     return central_models.RolePreview(result)
+
 
 def list_roles(
     cmd,

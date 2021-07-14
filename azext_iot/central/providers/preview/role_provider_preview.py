@@ -35,7 +35,6 @@ class CentralRoleProviderPreview:
         self._token = token
         self._roles = {}
 
-
     def list_roles(self, central_dns_suffix=CENTRAL_ENDPOINT) -> List[RolePreview]:
         roles = central_services.role.list_roles(
             cmd=self._cmd,

@@ -4,8 +4,6 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-
-
 class DeviceGroupPreview:
     def __init__(self, group: dict):
         self.display_name = group.get("displayName")

@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 # This is largely derived from https://docs.microsoft.com/en-us/rest/api/iotcentral/deviceGroups
 
-from typing import List, Union
+from typing import List
 import requests
 
 from knack.util import CLIError
@@ -14,7 +14,7 @@ from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
 from azext_iot.central import models as central_models
-from azext_iot.central.models.enum import  ApiVersion
+from azext_iot.central.models.enum import ApiVersion
 
 logger = get_logger(__name__)
 
@@ -60,7 +60,6 @@ def list_device_groups(
         if "value" not in result:
             raise CLIError("Value is not present in body: {}".format(result))
 
-        
         device_groups = device_groups + [
             central_models.DeviceGroupPreview(device_group) for device_group in result["value"]
         ]
