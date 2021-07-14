@@ -5,9 +5,9 @@
 # --------------------------------------------------------------------------------------------
 
 import json
-import mock
 import pytest
 
+from unittest import mock
 from uamqp.message import Message, MessageProperties
 from azext_iot.central.providers.v1 import (
     CentralDeviceProviderV1,
