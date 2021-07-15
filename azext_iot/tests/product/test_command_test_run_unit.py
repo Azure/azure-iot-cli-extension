@@ -6,9 +6,9 @@
 
 import unittest
 import pytest
-import mock
 import json
 import responses
+from unittest import mock
 from datetime import datetime
 from knack.util import CLIError
 from azext_iot.product.test.command_test_runs import show, submit
