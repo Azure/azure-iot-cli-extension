@@ -112,12 +112,12 @@ def load_central_commands(self, _):
         cmd_group.command("delete", "delete_device_template")
 
     with self.command_group(
-        "iot central device-group", command_type=central_device_groups_ops,
+        "iot central device-group", command_type=central_device_groups_ops, is_preview=True
     ) as cmd_group:
         cmd_group.command("list", "list_device_groups")
 
     with self.command_group(
-        "iot central role", command_type=central_roles_ops,
+        "iot central role", command_type=central_roles_ops, is_preview=True
     ) as cmd_group:
         cmd_group.show_command("show", "get_role")
         cmd_group.command("list", "list_roles")
