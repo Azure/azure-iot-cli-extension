@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import unittest
-import mock
+from unittest import mock
 from knack.util import CLIError
 from azext_iot.product.test.command_test_cases import update
 

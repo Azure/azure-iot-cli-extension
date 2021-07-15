@@ -6,9 +6,10 @@
 
 import unittest
 import pytest
-import mock
 import json
 import responses
+
+from unittest import mock
 from knack.util import CLIError
 from azext_iot.sdk.product.models import DeviceTestTask, TestRun
 from azext_iot.product.test.command_test_tasks import create, delete, show

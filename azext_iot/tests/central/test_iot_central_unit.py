@@ -4,11 +4,11 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import mock
 import pytest
 import json
 import responses
 import ast
+from unittest import mock
 from datetime import datetime
 from knack.util import CLIError
 from azure.cli.core.mock import DummyCli
