@@ -10,13 +10,7 @@ import json
 from azext_iot.tests import IoTLiveScenarioTest
 from azext_iot.tests.conftest import get_context_path
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
-from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC
 from azext_iot.common.utility import read_file_content
-from azext_iot.tests.generators import generate_generic_id
-
-settings = DynamoSettings(ENV_SET_TEST_IOTHUB_BASIC)
-LIVE_HUB = settings.env.azext_iot_testhub if settings.env.azext_iot_testhub else "test-hub-" + generate_generic_id()
-LIVE_RG = settings.env.azext_iot_testrg
 
 edge_content_path = get_context_path(__file__, "test_edge_deployment.json")
 edge_content_layered_path = get_context_path(
@@ -35,7 +29,7 @@ adm_content_device_path = get_context_path(__file__, "test_adm_device_content.js
 class TestIoTEdgeSetModules(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTEdgeSetModules, self).__init__(
-            test_case, LIVE_HUB, LIVE_RG
+            test_case
         )
 
     def test_edge_set_modules(self):
@@ -46,7 +40,7 @@ class TestIoTEdgeSetModules(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot hub device-identity create -d {} -n {} -g {} --ee".format(
-                        edge_device_ids[0], LIVE_HUB, LIVE_RG
+                        edge_device_ids[0], self.entity_name, self.entity_rg
                     ),
                     auth_type=auth_phase,
                 )
@@ -58,7 +52,7 @@ class TestIoTEdgeSetModules(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot edge set-modules -d {} -n {} -g {} --content '{}'".format(
-                        edge_device_ids[0], LIVE_HUB, LIVE_RG, "{edge_content}"
+                        edge_device_ids[0], self.entity_name, self.entity_rg, "{edge_content}"
                     ),
                     auth_type=auth_phase,
                 ),
@@ -69,7 +63,7 @@ class TestIoTEdgeSetModules(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot edge set-modules -d {} -n {} -g {} -k '{}'".format(
-                        edge_device_ids[0], LIVE_HUB, LIVE_RG, edge_content_v1_path
+                        edge_device_ids[0], self.entity_name, self.entity_rg, edge_content_v1_path
                     ),
                     auth_type=auth_phase,
                 ),
@@ -80,7 +74,7 @@ class TestIoTEdgeSetModules(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot edge set-modules -d {} -n {} -g {} -k '{}'".format(
-                        edge_device_ids[0], LIVE_HUB, LIVE_RG, edge_content_malformed_path
+                        edge_device_ids[0], self.entity_name, self.entity_rg, edge_content_malformed_path
                     ),
                     auth_type=auth_phase
                 ),
@@ -91,7 +85,7 @@ class TestIoTEdgeSetModules(IoTLiveScenarioTest):
 class TestIoTEdgeDeployments(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTEdgeDeployments, self).__init__(
-            test_case, LIVE_HUB, LIVE_RG
+            test_case
         )
 
     def test_edge_deployments(self):
@@ -120,8 +114,8 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
                     """iot edge deployment create --deployment-id {} --hub-name {} --resource-group {} --priority {}
                     --target-condition \"{}\" --labels '{}' --content '{}'""".format(
                         config_ids[0],
-                        LIVE_HUB,
-                        LIVE_RG,
+                        self.entity_name,
+                        self.entity_rg,
                         priority,
                         condition,
                         "{labels}",
@@ -155,8 +149,8 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
                         "{labels}",
                         edge_content_path,
                         edge_content_path,
-                        LIVE_HUB,
-                        LIVE_RG
+                        self.entity_name,
+                        self.entity_rg
                     ),
                     auth_type=auth_phase
                 ),
@@ -186,8 +180,8 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
                         config_ids[2].upper(),
                         edge_content_layered_path,
                         generic_metrics_path,
-                        LIVE_HUB,
-                        LIVE_RG,
+                        self.entity_name,
+                        self.entity_rg,
                     ),
                     auth_type=auth_phase
                 ),
@@ -215,8 +209,8 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
                     """iot edge deployment create --deployment-id {} --hub-name {} --resource-group {} --priority {}
                     --target-condition \"{}\" --labels '{}' --content '{}' --metrics '{}'""".format(
                         config_ids[3],
-                        LIVE_HUB,
-                        LIVE_RG,
+                        self.entity_name,
+                        self.entity_rg,
                         priority,
                         condition,
                         "{labels}",
@@ -249,8 +243,8 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
                     """iot edge deployment create --deployment-id {} --hub-name {} --resource-group {} --priority {}
                     --target-condition \"{}\" --labels '{}' --content '{}'""".format(
                         config_ids[1],
-                        LIVE_HUB,
-                        LIVE_RG,
+                        self.entity_name,
+                        self.entity_rg,
                         priority,
                         condition,
                         "{labels}",
@@ -267,8 +261,8 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
                     """iot edge deployment create --deployment-id {} --hub-name {} --resource-group {} --priority {}
                     --target-condition \"{}\" --labels '{}' --content '{}'""".format(
                         config_ids[1],
-                        LIVE_HUB,
-                        LIVE_RG,
+                        self.entity_name,
+                        self.entity_rg,
                         priority,
                         condition,
                         "{labels}",
@@ -285,8 +279,8 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
                     """iot edge deployment create --deployment-id {} --hub-name {} --resource-group {} --priority {}
                     --target-condition \"{}\" --labels '{}' --content '{}'""".format(
                         config_ids[4],
-                        LIVE_HUB,
-                        LIVE_RG,
+                        self.entity_name,
+                        self.entity_rg,
                         priority,
                         condition,
                         "{labels}",
@@ -311,7 +305,7 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot edge deployment show --deployment-id {} --hub-name {} --resource-group {}".format(
-                        config_ids[0], LIVE_HUB, LIVE_RG
+                        config_ids[0], self.entity_name, self.entity_rg
                     ),
                     auth_type=auth_phase,
                 ),
@@ -331,8 +325,8 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
                 self.set_cmd_auth_type(
                     "iot edge deployment update -d {} -n {} -g {} --set priority={} targetCondition=\"{}\" labels='{}'".format(
                         config_ids[0],
-                        LIVE_HUB,
-                        LIVE_RG,
+                        self.entity_name,
+                        self.entity_rg,
                         new_priority,
                         new_condition,
                         "{new_labels}",
@@ -354,8 +348,8 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
                 self.set_cmd_auth_type(
                     "iot edge deployment show --deployment-id {} -n {} -g {}".format(
                         config_ids[1],
-                        LIVE_HUB,
-                        LIVE_RG
+                        self.entity_name,
+                        self.entity_rg
                     ),
                     auth_type=auth_phase
                 )
@@ -365,7 +359,7 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot edge deployment show-metric --metric-id {} --deployment-id {} --hub-name {}".format(
-                        user_metric_name, config_ids[1], LIVE_HUB
+                        user_metric_name, config_ids[1], self.entity_name
                     ),
                     auth_type=auth_phase
                 ),
@@ -381,7 +375,7 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot edge deployment show-metric --metric-id {} --deployment-id {} --metric-type {} -n {} -g {}".format(
-                        system_metric_name, config_ids[1], "system", LIVE_HUB, LIVE_RG
+                        system_metric_name, config_ids[1], "system", self.entity_name, self.entity_rg
                     ),
                     auth_type=auth_phase
                 ),
@@ -398,7 +392,7 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot edge deployment show-metric -m {} -d {} -n {} -g {}".format(
-                        "doesnotexist", config_ids[0], LIVE_HUB, LIVE_RG
+                        "doesnotexist", config_ids[0], self.entity_name, self.entity_rg
                     ),
                     auth_type=auth_phase
                 ),
@@ -416,7 +410,7 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
             # List all edge deployments
             self.cmd(
                 self.set_cmd_auth_type(
-                    "iot edge deployment list -n {} -g {}".format(LIVE_HUB, LIVE_RG),
+                    "iot edge deployment list -n {} -g {}".format(self.entity_name, self.entity_rg),
                     auth_type=auth_phase
                 ),
                 checks=config_list_check,
@@ -426,7 +420,7 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot edge deployment delete -d {} -n {} -g {}".format(
-                        config_ids[0], LIVE_HUB, LIVE_RG
+                        config_ids[0], self.entity_name, self.entity_rg
                     ),
                     auth_type=auth_phase
                 )
@@ -436,7 +430,7 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot edge deployment show -d {} -n {} -g {}".format(
-                        config_ids[0], LIVE_HUB, LIVE_RG
+                        config_ids[0], self.entity_name, self.entity_rg
                     ),
                     auth_type=auth_phase
                 ),
@@ -449,7 +443,7 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
 class TestIoTHubConfigurations(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTHubConfigurations, self).__init__(
-            test_case, LIVE_HUB, LIVE_RG
+            test_case
         )
 
     def test_device_configurations(self):
@@ -474,8 +468,8 @@ class TestIoTHubConfigurations(IoTLiveScenarioTest):
                     """iot hub configuration create --config-id {} --hub-name {} --resource-group {} --priority {}
                     --target-condition \"{}\" --labels '{}' --content '{}'""".format(
                         config_ids[0],
-                        LIVE_HUB,
-                        LIVE_RG,
+                        self.entity_name,
+                        self.entity_rg,
                         priority,
                         condition,
                         "{labels}",
@@ -511,8 +505,8 @@ class TestIoTHubConfigurations(IoTLiveScenarioTest):
                         "{labels}",
                         adm_content_module_path,
                         adm_content_module_path,
-                        LIVE_HUB,
-                        LIVE_RG
+                        self.entity_name,
+                        self.entity_rg
                     ),
                     auth_type=auth_phase,
                 ),
@@ -543,8 +537,8 @@ class TestIoTHubConfigurations(IoTLiveScenarioTest):
                         config_ids[2].upper(),
                         adm_content_device_path,
                         generic_metrics_path,
-                        LIVE_HUB,
-                        LIVE_RG
+                        self.entity_name,
+                        self.entity_rg
                     ),
                     auth_type=auth_phase
                 ),
@@ -573,8 +567,8 @@ class TestIoTHubConfigurations(IoTLiveScenarioTest):
                     """iot hub configuration create --config-id {} --hub-name {} --resource-group {} --priority {}
                     --target-condition \"{}\" --labels '{}' --content '{}'""".format(
                         config_ids[1],
-                        LIVE_HUB,
-                        LIVE_RG,
+                        self.entity_name,
+                        self.entity_rg,
                         priority,
                         condition,
                         "{labels}",
@@ -592,8 +586,8 @@ class TestIoTHubConfigurations(IoTLiveScenarioTest):
                     "iot hub configuration create -c {} -k '{}' -n {} -g {}".format(
                         config_ids[1].upper(),
                         adm_content_module_path,
-                        LIVE_HUB,
-                        LIVE_RG
+                        self.entity_name,
+                        self.entity_rg
                     ),
                     auth_type=auth_phase
                 ),
@@ -604,7 +598,7 @@ class TestIoTHubConfigurations(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot hub configuration show --config-id {} --hub-name {} --resource-group {}".format(
-                        config_ids[0], LIVE_HUB, LIVE_RG
+                        config_ids[0], self.entity_name, self.entity_rg
                     ),
                     auth_type=auth_phase
                 ),
@@ -624,8 +618,8 @@ class TestIoTHubConfigurations(IoTLiveScenarioTest):
                 self.set_cmd_auth_type(
                     "iot hub configuration update -c {} -n {} -g {} --set priority={} targetCondition=\"{}\" labels='{}'".format(
                         config_ids[0],
-                        LIVE_HUB,
-                        LIVE_RG,
+                        self.entity_name,
+                        self.entity_rg,
                         new_priority,
                         new_condition,
                         "{new_labels}",
@@ -646,7 +640,7 @@ class TestIoTHubConfigurations(IoTLiveScenarioTest):
             config_output = self.cmd(
                 self.set_cmd_auth_type(
                     "iot hub configuration show --config-id {} -n {} -g {}".format(
-                        config_ids[1], LIVE_HUB, LIVE_RG
+                        config_ids[1], self.entity_name, self.entity_rg
                     ),
                     auth_type=auth_phase,
                 )
@@ -656,7 +650,7 @@ class TestIoTHubConfigurations(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot hub configuration show-metric --metric-id {} --config-id {} --hub-name {}".format(
-                        user_metric_name, config_ids[1], LIVE_HUB
+                        user_metric_name, config_ids[1], self.entity_name
                     ),
                     auth_type=auth_phase
                 ),
@@ -672,7 +666,7 @@ class TestIoTHubConfigurations(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot hub configuration show-metric --metric-id {} --config-id {} --metric-type {} -n {} -g {}".format(
-                        system_metric_name, config_ids[1], "system", LIVE_HUB, LIVE_RG
+                        system_metric_name, config_ids[1], "system", self.entity_name, self.entity_rg
                     ),
                     auth_type=auth_phase,
                 ),
@@ -689,7 +683,7 @@ class TestIoTHubConfigurations(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot hub configuration show-metric -m {} -c {} -n {} -g {}".format(
-                        "doesnotexist", config_ids[0], LIVE_HUB, LIVE_RG
+                        "doesnotexist", config_ids[0], self.entity_name, self.entity_rg
                     ),
                     auth_type=auth_phase,
                 ),
@@ -701,8 +695,8 @@ class TestIoTHubConfigurations(IoTLiveScenarioTest):
                 self.set_cmd_auth_type(
                     """iot edge deployment create --deployment-id {} --hub-name {} --resource-group {} --content '{}'""".format(
                         edge_config_ids[0],
-                        LIVE_HUB,
-                        LIVE_RG,
+                        self.entity_name,
+                        self.entity_rg,
                         "{edge_content}",
                     ),
                     auth_type=auth_phase
@@ -719,7 +713,7 @@ class TestIoTHubConfigurations(IoTLiveScenarioTest):
             # List all ADM configurations
             self.cmd(
                 self.set_cmd_auth_type(
-                    "iot hub configuration list -n {} -g {}".format(LIVE_HUB, LIVE_RG),
+                    "iot hub configuration list -n {} -g {}".format(self.entity_name, self.entity_rg),
                     auth_type=auth_phase
                 ),
                 checks=config_list_check,
@@ -729,7 +723,7 @@ class TestIoTHubConfigurations(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot hub configuration delete -c {} -n {} -g {}".format(
-                        config_ids[0], LIVE_HUB, LIVE_RG
+                        config_ids[0], self.entity_name, self.entity_rg
                     ),
                     auth_type=auth_phase
                 )
@@ -739,7 +733,7 @@ class TestIoTHubConfigurations(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot hub configuration show -c {} -n {} -g {}".format(
-                        config_ids[0], LIVE_HUB, LIVE_RG
+                        config_ids[0], self.entity_name, self.entity_rg
                     ),
                     auth_type=auth_phase,
                 ),

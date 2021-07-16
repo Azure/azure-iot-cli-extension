@@ -48,7 +48,7 @@ if not PACKAGE_NAME:
 # though that is installed out of band (managed by the extension)
 # for compatibility reasons.
 
-DEPENDENCIES = ["jsonschema==3.2.0", "packaging", "azure-iot-device~=2.5", "tqdm"]
+DEPENDENCIES = ["jsonschema==3.2.0", "packaging", "azure-iot-device~=2.5", "tqdm", "azure-storage-blob"]
 
 
 CLASSIFIERS = [

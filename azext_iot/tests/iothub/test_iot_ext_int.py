@@ -9,25 +9,19 @@ import pytest
 from time import sleep
 
 from azext_iot.tests import IoTLiveScenarioTest
-from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC
+from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
 from azext_iot.common.utility import ensure_iothub_sdk_min_version
 
 from azext_iot.tests.generators import generate_generic_id
 # TODO: assert DEVICE_DEVICESCOPE_PREFIX format in parent device twin.
 from azext_iot.constants import IOTHUB_TRACK_2_SDK_MIN_VERSION
 
-opt_env_set = ["azext_iot_teststorageuri", "azext_iot_identity_teststorageid"]
+opt_env_set = ENV_SET_TEST_IOTHUB_OPTIONAL + ["azext_iot_identity_teststorageid"]
 
 settings = DynamoSettings(
-    req_env_set=ENV_SET_TEST_IOTHUB_BASIC, opt_env_set=opt_env_set
+    req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED, opt_env_set=opt_env_set
 )
-
-LIVE_HUB = settings.env.azext_iot_testhub if settings.env.azext_iot_testhub else "test-hub-" + generate_generic_id()
-LIVE_RG = settings.env.azext_iot_testrg
-
-# Set this environment variable to your empty blob container sas uri to test device export and enable file upload test.
-# For file upload, you will need to have configured your IoT Hub before running.
-LIVE_STORAGE_URI = settings.env.azext_iot_teststorageuri
+LIVE_STORAGE_ACCOUNT = settings.env.azext_iot_teststorageaccount
 
 # Set this environment variable to enable identity-based integration tests
 # You will need permissions to add and remove role assignments for this storage account
@@ -40,8 +34,39 @@ user_managed_identity_name = generate_generic_id()
 
 class TestIoTStorage(IoTLiveScenarioTest):
     def __init__(self, test_case):
-        super(TestIoTStorage, self).__init__(test_case, LIVE_HUB, LIVE_RG)
+
+        super(TestIoTStorage, self).__init__(test_case)
         self.managed_identity = None
+        if LIVE_STORAGE_ACCOUNT:
+            self.live_storage_uri = self.get_container_sas_url()
+
+    def get_container_sas_url(self):
+        from datetime import datetime, timedelta
+        from azure.storage.blob import ResourceTypes, AccountSasPermissions, generate_account_sas, BlobServiceClient
+
+        storage_account_connenction = self.cmd(
+            "storage account show-connection-string --name {}".format(
+                LIVE_STORAGE_ACCOUNT
+            )
+        ).get_output_in_json()
+
+        blob_service_client = BlobServiceClient.from_connection_string(conn_str=storage_account_connenction["connectionString"])
+
+        sas_token = generate_account_sas(
+            blob_service_client.account_name,
+            account_key=blob_service_client.credential.account_key,
+            resource_types=ResourceTypes(object=True),
+            permission=AccountSasPermissions(
+                read=True, add=True, create=True, delete=True, filter=True, list=True, update=True, write=True
+            ),
+            expiry=datetime.utcnow() + timedelta(hours=1)
+        )
+
+        container_name = settings.env.azext_iot_teststoragecontainer if settings.env.azext_iot_teststoragecontainer else "devices"
+
+        container_sas_url = "https://" + LIVE_STORAGE_ACCOUNT + ".blob.core.windows.net" + "/" + container_name + "?" + sas_token
+
+        return container_sas_url
 
     def get_managed_identity(self):
         # Check if there is a managed identity already
@@ -51,7 +76,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
         # Create managed identity
         result = self.cmd(
             "identity create -n {} -g {}".format(
-                user_managed_identity_name, LIVE_RG
+                user_managed_identity_name, self.entity_rg
             )).get_output_in_json()
 
         # ensure resource is created before hub immediately tries to assign it
@@ -63,12 +88,12 @@ class TestIoTStorage(IoTLiveScenarioTest):
     def tearDown(self):
         if self.managed_identity:
             self.cmd('identity delete -n {} -g {}'.format(
-                user_managed_identity_name, LIVE_RG
+                user_managed_identity_name, self.entity_rg
             ))
         return super().tearDown()
 
     @pytest.mark.skipif(
-        not LIVE_STORAGE_URI, reason="empty azext_iot_teststorageuri env var"
+        not LIVE_STORAGE_ACCOUNT, reason="empty azext_iot_teststorageaccount env var"
     )
     def test_storage(self):
         device_count = 1
@@ -78,14 +103,14 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
         self.cmd(
             "iot hub device-identity create -d {} -n {} -g {} --ee".format(
-                device_ids[0], LIVE_HUB, LIVE_RG
+                device_ids[0], self.entity_name, self.entity_rg
             ),
             checks=[self.check("deviceId", device_ids[0])],
         )
 
         self.cmd(
             'iot device upload-file -d {} -n {} --fp "{}" --ct {}'.format(
-                device_ids[0], LIVE_HUB, content_path, "application/json"
+                device_ids[0], self.entity_name, content_path, "application/json"
             ),
             checks=self.is_empty(),
         )
@@ -100,10 +125,10 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
         self.cmd(
             'iot hub device-identity export -n {} --bcu "{}"'.format(
-                LIVE_HUB, LIVE_STORAGE_URI
+                self.entity_name, self.live_storage_uri
             ),
             checks=[
-                self.check("outputBlobContainerUri", LIVE_STORAGE_URI),
+                self.check("outputBlobContainerUri", self.live_storage_uri),
                 self.check("failureReason", None),
                 self.check("type", "export"),
                 self.check("excludeKeysInExport", True),
@@ -116,10 +141,10 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
         self.cmd(
             'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --ik true'.format(
-                LIVE_HUB, LIVE_STORAGE_URI, "key"
+                self.entity_name, self.live_storage_uri, "key"
             ),
             checks=[
-                self.check("outputBlobContainerUri", LIVE_STORAGE_URI),
+                self.check("outputBlobContainerUri", self.live_storage_uri),
                 self.check("failureReason", None),
                 self.check("type", "export"),
                 self.check("excludeKeysInExport", False),
@@ -132,11 +157,11 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
         self.cmd(
             'iot hub device-identity import -n {} --ibcu "{}" --obcu "{}" --auth-type {}'.format(
-                LIVE_HUB, LIVE_STORAGE_URI, LIVE_STORAGE_URI, "key"
+                self.entity_name, self.live_storage_uri, self.live_storage_uri, "key"
             ),
             checks=[
-                self.check("outputBlobContainerUri", LIVE_STORAGE_URI),
-                self.check("inputBlobContainerUri", LIVE_STORAGE_URI),
+                self.check("outputBlobContainerUri", self.live_storage_uri),
+                self.check("inputBlobContainerUri", self.live_storage_uri),
                 self.check("failureReason", None),
                 self.check("type", "import"),
                 self.check("storageAuthenticationType", "keyBased"),
@@ -145,8 +170,8 @@ class TestIoTStorage(IoTLiveScenarioTest):
         )
 
     @pytest.mark.skipif(
-        not all([LIVE_STORAGE_RESOURCE_ID, LIVE_STORAGE_URI]),
-        reason="azext_iot_identity_teststorageid and azext_iot_teststorageuri env vars not set",
+        not all([LIVE_STORAGE_RESOURCE_ID, LIVE_STORAGE_ACCOUNT]),
+        reason="azext_iot_identity_teststorageid and azext_iot_teststorageaccount env vars not set",
     )
     @pytest.mark.skipif(
         not ensure_iothub_sdk_min_version(IOTHUB_TRACK_2_SDK_MIN_VERSION),
@@ -159,14 +184,14 @@ class TestIoTStorage(IoTLiveScenarioTest):
         identity_enabled = False
 
         hub_identity = self.cmd(
-            "iot hub identity show -n {}".format(LIVE_HUB)
+            "iot hub identity show -n {}".format(self.entity_name)
         ).get_output_in_json()
 
         if identity_type_enable not in hub_identity.get("type", None):
             # enable hub identity and get ID
             hub_identity = self.cmd(
                 "iot hub identity assign -n {} --system".format(
-                    LIVE_HUB,
+                    self.entity_name,
                 )
             ).get_output_in_json()
 
@@ -194,10 +219,10 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
         self.cmd(
             'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {} --ik true'.format(
-                LIVE_HUB, LIVE_STORAGE_URI, "identity", "[system]"
+                self.entity_name, self.live_storage_uri, "identity", "[system]"
             ),
             checks=[
-                self.check("outputBlobContainerUri", LIVE_STORAGE_URI),
+                self.check("outputBlobContainerUri", self.live_storage_uri),
                 self.check("failureReason", None),
                 self.check("type", "export"),
                 self.check("excludeKeysInExport", False),
@@ -208,11 +233,11 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
         self.cmd(
             'iot hub device-identity import -n {} --ibcu "{}" --obcu "{}" --auth-type {} --identity {}'.format(
-                LIVE_HUB, LIVE_STORAGE_URI, LIVE_STORAGE_URI, "identity", "[system]"
+                self.entity_name, self.live_storage_uri, self.live_storage_uri, "identity", "[system]"
             ),
             checks=[
-                self.check("outputBlobContainerUri", LIVE_STORAGE_URI),
-                self.check("inputBlobContainerUri", LIVE_STORAGE_URI),
+                self.check("outputBlobContainerUri", self.live_storage_uri),
+                self.check("inputBlobContainerUri", self.live_storage_uri),
                 self.check("failureReason", None),
                 self.check("type", "import"),
                 self.check("storageAuthenticationType", "identityBased"),
@@ -222,7 +247,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
         self.cmd(
             'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {}'.format(
-                LIVE_HUB, LIVE_STORAGE_URI, "identity", "fake_managed_identity"
+                self.entity_name, self.live_storage_uri, "identity", "fake_managed_identity"
             ),
             expect_failure=True
         )
@@ -237,13 +262,13 @@ class TestIoTStorage(IoTLiveScenarioTest):
             )
             self.cmd(
                 "iot hub identity remove -n {} --system".format(
-                    LIVE_HUB
+                    self.entity_name
                 )
             )
 
     @pytest.mark.skipif(
-        not all([LIVE_STORAGE_RESOURCE_ID, LIVE_STORAGE_URI]),
-        reason="azext_iot_identity_teststorageid and azext_iot_teststorageuri env vars not set",
+        not all([LIVE_STORAGE_RESOURCE_ID, LIVE_STORAGE_ACCOUNT]),
+        reason="azext_iot_identity_teststorageid and azext_iot_teststorageaccount env vars not set",
     )
     @pytest.mark.skipif(
         not ensure_iothub_sdk_min_version(IOTHUB_TRACK_2_SDK_MIN_VERSION),
@@ -256,14 +281,14 @@ class TestIoTStorage(IoTLiveScenarioTest):
         # check hub identity
         identity_enabled = False
         hub_identity = self.cmd(
-            "iot hub identity show -n {}".format(LIVE_HUB)
+            "iot hub identity show -n {}".format(self.entity_name)
         ).get_output_in_json()
 
         if hub_identity.get("userAssignedIdentities", None) != user_identity["principalId"]:
             # enable hub identity and get ID
             hub_identity = self.cmd(
                 "iot hub identity assign -n {} --user {}".format(
-                    LIVE_HUB, identity_id
+                    self.entity_name, identity_id
                 )
             ).get_output_in_json()
 
@@ -291,10 +316,10 @@ class TestIoTStorage(IoTLiveScenarioTest):
         # identity-based device-identity export
         self.cmd(
             'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {} --ik true'.format(
-                LIVE_HUB, LIVE_STORAGE_URI, "identity", identity_id
+                self.entity_name, self.live_storage_uri, "identity", identity_id
             ),
             checks=[
-                self.check("outputBlobContainerUri", LIVE_STORAGE_URI),
+                self.check("outputBlobContainerUri", self.live_storage_uri),
                 self.check("failureReason", None),
                 self.check("type", "export"),
                 self.check("excludeKeysInExport", False),
@@ -308,11 +333,11 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
         self.cmd(
             'iot hub device-identity import -n {} --ibcu "{}" --obcu "{}" --auth-type {} --identity {}'.format(
-                LIVE_HUB, LIVE_STORAGE_URI, LIVE_STORAGE_URI, "identity", identity_id
+                self.entity_name, self.live_storage_uri, self.live_storage_uri, "identity", identity_id
             ),
             checks=[
-                self.check("outputBlobContainerUri", LIVE_STORAGE_URI),
-                self.check("inputBlobContainerUri", LIVE_STORAGE_URI),
+                self.check("outputBlobContainerUri", self.live_storage_uri),
+                self.check("inputBlobContainerUri", self.live_storage_uri),
                 self.check("failureReason", None),
                 self.check("type", "import"),
                 self.check("storageAuthenticationType", "identityBased"),
@@ -322,7 +347,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
         self.cmd(
             'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {}'.format(
-                LIVE_HUB, LIVE_STORAGE_URI, "identity", "fake_managed_identity"
+                self.entity_name, self.live_storage_uri, "identity", "fake_managed_identity"
             ),
             expect_failure=True
         )
@@ -337,7 +362,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
             )
             self.cmd(
                 "iot hub identity remove -n {} --user".format(
-                    LIVE_HUB
+                    self.entity_name
                 )
             )
 

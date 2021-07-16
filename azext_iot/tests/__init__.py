@@ -12,7 +12,8 @@ from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
 from azure.cli.testsdk import LiveScenarioTest
 from contextlib import contextmanager
 from typing import List
-from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC, ENV_SET_TEST_IOTHUB_STORAGE
+from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
+from azext_iot.tests.generators import generate_generic_id
 
 PREFIX_DEVICE = "test-device-"
 PREFIX_EDGE_DEVICE = "test-edge-device-"
@@ -21,7 +22,7 @@ PREFIX_CONFIG = "test-config-"
 PREFIX_EDGE_CONFIG = "test-edgedeploy-"
 PREFIX_JOB = "test-job-"
 
-settings = DynamoSettings(ENV_SET_TEST_IOTHUB_BASIC + ENV_SET_TEST_IOTHUB_STORAGE)
+settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED, opt_env_set=ENV_SET_TEST_IOTHUB_OPTIONAL)
 
 
 @contextmanager
@@ -74,23 +75,36 @@ class CaptureOutputLiveScenarioTest(LiveScenarioTest):
 
 
 class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
-    def __init__(self, test_scenario, entity_name, entity_rg):
+    def __init__(self, test_scenario):
         assert test_scenario
-        assert entity_name
-        assert entity_rg
-
-        self.entity_name = entity_name
-        self.entity_rg = entity_rg
+        self.entity_rg = settings.env.azext_iot_testrg
 
         super(IoTLiveScenarioTest, self).__init__(test_scenario)
 
-        if self.entity_name != settings.env.azext_iot_testhub:
-            self.cmd(
-                "iot hub create --name {} --resource-group {} --fc {} --fcs {} --sku S1 ".format(
-                    self.entity_name, self.entity_rg,
-                    settings.env.azext_iot_teststoragecontainer, settings.env.azext_iot_teststorageconnstring
+        if settings.env.azext_iot_testhub:
+            self.entity_name = settings.env.azext_iot_testhub
+        else:
+            self.entity_name = "test-hub-" + generate_generic_id()
+
+            if settings.env.azext_iot_teststoragecontainer and settings.env.azext_iot_teststorageaccount:
+                storage_account_connenction = self.cmd(
+                    "storage account show-connection-string --name {}".format(
+                        settings.env.azext_iot_teststorageaccount
+                    )
+                ).get_output_in_json()
+
+                self.cmd(
+                    "iot hub create --name {} --resource-group {} --fc {} --fcs {} --sku S1 ".format(
+                        self.entity_name, self.entity_rg,
+                        settings.env.azext_iot_teststoragecontainer, storage_account_connenction["connectionString"]
+                    )
                 )
-            )
+            else:
+                self.cmd(
+                    "iot hub create --name {} --resource-group {} --sku S1 ".format(
+                        self.entity_name, self.entity_rg
+                    )
+                )
 
         self.region = self.get_region()
         self.connection_string = self.get_hub_cstring()
@@ -130,7 +144,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     checks=self.is_empty(),
                 )
 
-        if self.entity_name != settings.env.azext_iot_testhub:
+        if not settings.env.azext_iot_testhub:
             self.cmd(
                 "iot hub delete --name {} --resource-group {}".format(
                     self.entity_name, self.entity_rg

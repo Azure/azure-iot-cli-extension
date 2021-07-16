@@ -10,22 +10,16 @@ from uuid import uuid4
 from azext_iot.tests import IoTLiveScenarioTest
 from azext_iot.common.shared import AuthenticationTypeDataplane
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
-from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC
 from azext_iot.common.utility import (
     calculate_millisec_since_unix_epoch_utc,
     validate_key_value_pairs
 )
-from azext_iot.tests.generators import generate_generic_id
-
-settings = DynamoSettings(ENV_SET_TEST_IOTHUB_BASIC)
-LIVE_HUB = settings.env.azext_iot_testhub if settings.env.azext_iot_testhub else "test-hub-" + generate_generic_id()
-LIVE_RG = settings.env.azext_iot_testrg
 
 
 class TestIoTHubC2DMessages(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTHubC2DMessages, self).__init__(
-            test_case, LIVE_HUB, LIVE_RG
+            test_case
         )
 
     def test_iothub_c2d_messages(self):
@@ -33,7 +27,7 @@ class TestIoTHubC2DMessages(IoTLiveScenarioTest):
         device_ids = self.generate_device_names(device_count)
 
         self.cmd(
-            f"iot hub device-identity create -d {device_ids[0]} -n {LIVE_HUB} -g {LIVE_RG}"
+            f"iot hub device-identity create -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg}"
         )
 
         for auth_phase in DATAPLANE_AUTH_TYPES:
@@ -50,15 +44,16 @@ class TestIoTHubC2DMessages(IoTLiveScenarioTest):
             # Send C2D message
             self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot device c2d-message send -d {device_ids[0]} -n {LIVE_HUB} -g {LIVE_RG} --data '{test_body}' "
-                    f"--cid {test_cid} --mid {test_mid} --ct {test_ct} --expiry {test_et} --ce {test_ce} -p '{test_props}'",
+                    f"iot device c2d-message send -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg} "
+                    f"--data '{test_body}' --cid {test_cid} --mid {test_mid} --ct {test_ct} --expiry {test_et} "
+                    f"--ce {test_ce} -p '{test_props}'",
                     auth_type=auth_phase
                 ),
                 checks=self.is_empty(),
             )
 
             c2d_receive_result = self.cmd(
-                f"iot device c2d-message receive -d {device_ids[0]} --hub-name {LIVE_HUB} -g {LIVE_RG} --complete",
+                f"iot device c2d-message receive -d {device_ids[0]} --hub-name {self.entity_name} -g {self.entity_rg} --complete",
             ).get_output_in_json()
 
             assert c2d_receive_result["data"] == test_body
