@@ -286,8 +286,10 @@ class TestIoTHubModules(IoTLiveScenarioTest):
             f"HostName={self.entity_name}.azure-devices.net;DeviceId={device_ids[0]};"
             f"ModuleId={module_ids[0]};SharedAccessKey=#"
         )
-        cer_cstring_pattern = f"HostName={self.entity_name}.azure-devices.net;"
-        f"DeviceId={device_ids[0]};ModuleId={module_ids[1]};x509=true"
+        cer_cstring_pattern = (
+            f"HostName={self.entity_name}.azure-devices.net;"
+            f"DeviceId={device_ids[0]};ModuleId={module_ids[1]};x509=true"
+        )
 
         for auth_phase in DATAPLANE_AUTH_TYPES:
             primary_key_cstring = self.cmd(
