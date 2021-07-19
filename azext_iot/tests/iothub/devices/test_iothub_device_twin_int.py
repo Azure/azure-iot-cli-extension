@@ -167,9 +167,8 @@ class TestIoTHubDeviceTwin(IoTLiveScenarioTest):
             )
             self.cmd(
                 self.set_cmd_auth_type(
-                    "iot hub device-twin replace -d {} -n {} -g {} -j '{}'".format(
-                        device_ids[0], self.entity_name, self.entity_rg, replace_twin_content_path
-                    ),
+                    f"iot hub device-twin replace "
+                    f"-d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg} -j '{replace_twin_content_path}'",
                     auth_type=auth_phase,
                 ),
                 checks=[

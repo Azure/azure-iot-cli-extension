@@ -67,9 +67,8 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
             # Error - Set non-edge device as a parent of a non-edge device
             self.cmd(
                 self.set_cmd_auth_type(
-                    "iot hub device-identity parent set -d {} --pd {} -n {} -g {}".format(
-                        device_ids[0], device_ids[1], self.entity_name, self.entity_rg
-                    ),
+                    f"iot hub device-identity parent set "
+                    f"-d {device_ids[0]} --pd {device_ids[1]} -n {self.entity_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 ),
                 expect_failure=True,
@@ -108,9 +107,8 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
             # Error - setting edge device as a parent of non-edge device which already having different parent device
             self.cmd(
                 self.set_cmd_auth_type(
-                    "iot hub device-identity parent set -d {} --pd {} -n {} -g {}".format(
-                        device_ids[2], edge_device_ids[1], self.entity_name, self.entity_rg
-                    ),
+                    f"iot hub device-identity parent set "
+                    f"-d {device_ids[2]} --pd {edge_device_ids[1]} -n {self.entity_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 ),
                 expect_failure=True,
@@ -180,9 +178,8 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
             # Error - Remove all child devices of non-edge device
             self.cmd(
                 self.set_cmd_auth_type(
-                    "iot hub device-identity children remove -d {} -n {} -g {} --remove-all".format(
-                        device_ids[0], self.entity_name, self.entity_rg
-                    ),
+                    f"iot hub device-identity children remove "
+                    f"-d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg} --remove-all",
                     auth_type=auth_phase,
                 ),
                 expect_failure=True,
@@ -191,9 +188,8 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
             # Remove all child devices from edge device
             self.cmd(
                 self.set_cmd_auth_type(
-                    "iot hub device-identity children remove -d {} -n {} -g {} --remove-all".format(
-                        edge_device_ids[1], self.entity_name, self.entity_rg
-                    ),
+                    f"iot hub device-identity children remove "
+                    f"-d {edge_device_ids[1]} -n {self.entity_name} -g {self.entity_rg} --remove-all",
                     auth_type=auth_phase,
                 ),
                 checks=self.is_empty(),
@@ -202,9 +198,8 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
             # Error - remove all child devices of edge device which does not have any child devices
             self.cmd(
                 self.set_cmd_auth_type(
-                    "iot hub device-identity children remove -d {} -n {} -g {} --remove-all".format(
-                        edge_device_ids[1], self.entity_name, self.entity_rg
-                    ),
+                    f"iot hub device-identity children remove "
+                    f"-d {edge_device_ids[1]} -n {self.entity_name} -g {self.entity_rg} --remove-all",
                     auth_type=auth_phase,
                 ),
                 expect_failure=True,

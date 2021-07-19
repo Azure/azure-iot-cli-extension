@@ -42,9 +42,8 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
                 # Symmetric key device creation
                 self.cmd(
                     self.set_cmd_auth_type(
-                        "iot hub device-identity create -d {} -n {} -g {} {}".format(
-                            device_ids[0], self.entity_name, self.entity_rg, edge_enabled
-                        ),
+                        f"iot hub device-identity create "
+                        f"-d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg} {edge_enabled}",
                         auth_type=auth_phase,
                     ),
                     checks=d0_device_checks,
@@ -272,9 +271,8 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
         for auth_phase in DATAPLANE_AUTH_TYPES:
             renew_primary_key_device = self.cmd(
                 self.set_cmd_auth_type(
-                    "iot hub device-identity renew-key -d {} -n {} -g {} --kt primary".format(
-                        device_ids[0], self.entity_name, self.entity_rg
-                    ),
+                    f"iot hub device-identity renew-key "
+                    f"-d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg} --kt primary",
                     auth_type=auth_phase,
                 )
             ).get_output_in_json()
@@ -332,9 +330,8 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
         for auth_phase in DATAPLANE_AUTH_TYPES:
             primary_key_cstring = self.cmd(
                 self.set_cmd_auth_type(
-                    "iot hub device-identity connection-string show -d {} -n {} -g {}".format(
-                        device_ids[0], self.entity_name, self.entity_rg
-                    ),
+                    f"iot hub device-identity connection-string show "
+                    f"-d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 )
             ).get_output_in_json()
@@ -363,9 +360,8 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
 
             x509_cstring = self.cmd(
                 self.set_cmd_auth_type(
-                    "iot hub device-identity connection-string show -d {} -n {} -g {}".format(
-                        device_ids[1], self.entity_name, self.entity_rg
-                    ),
+                    f"iot hub device-identity connection-string show "
+                    f"-d {device_ids[1]} -n {self.entity_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 )
             ).get_output_in_json()
