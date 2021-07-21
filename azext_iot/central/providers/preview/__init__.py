@@ -17,10 +17,19 @@ from azext_iot.central.providers.preview.user_provider_preview import (
 from azext_iot.central.providers.preview.api_token_provider_preview import (
     CentralApiTokenProviderPreview,
 )
+from azext_iot.central.providers.preview.device_group_provider_preview import (
+    CentralDeviceGroupProviderPreview
+)
+from azext_iot.central.providers.preview.role_provider_preview import (
+    CentralRoleProviderPreview
+)
 
 __all__ = [
     "CentralDeviceProviderPreview",
     "CentralDeviceTemplateProviderPreview",
     "CentralUserProviderPreview",
     "CentralApiTokenProviderPreview",
+    "CentralDeviceGroupProviderPreview",
+    "CentralRoleProviderPreview"
+
 ]
