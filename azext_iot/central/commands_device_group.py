@@ -18,5 +18,4 @@ def list_device_groups(
     api_version=ApiVersion.preview.value,
 ):
     provider = CentralDeviceGroupProviderPreview(cmd=cmd, app_id=app_id, token=token)
-
     return provider.list_device_groups(central_dns_suffix=central_dns_suffix)
