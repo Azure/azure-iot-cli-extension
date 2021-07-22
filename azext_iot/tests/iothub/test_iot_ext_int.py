@@ -15,6 +15,7 @@ from azext_iot.common.utility import ensure_iothub_sdk_min_version
 from azext_iot.tests.generators import generate_generic_id
 # TODO: assert DEVICE_DEVICESCOPE_PREFIX format in parent device twin.
 from azext_iot.constants import IOTHUB_TRACK_2_SDK_MIN_VERSION
+from azext_iot.tests import DEFAULT_CONTAINER
 
 opt_env_set = ENV_SET_TEST_IOTHUB_OPTIONAL + ["azext_iot_identity_teststorageid"]
 
@@ -62,7 +63,9 @@ class TestIoTStorage(IoTLiveScenarioTest):
             expiry=datetime.utcnow() + timedelta(hours=1)
         )
 
-        container_name = settings.env.azext_iot_teststoragecontainer if settings.env.azext_iot_teststoragecontainer else "devices"
+        container_name = (
+            settings.env.azext_iot_teststoragecontainer if settings.env.azext_iot_teststoragecontainer else DEFAULT_CONTAINER
+        )
 
         container_sas_url = "https://" + LIVE_STORAGE_ACCOUNT + ".blob.core.windows.net" + "/" + container_name + "?" + sas_token
 

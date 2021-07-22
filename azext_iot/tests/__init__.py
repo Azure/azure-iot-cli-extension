@@ -7,6 +7,7 @@
 import sys
 import io
 import os
+import pytest
 
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
 from azure.cli.testsdk import LiveScenarioTest
@@ -14,6 +15,8 @@ from contextlib import contextmanager
 from typing import List
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
 from azext_iot.tests.generators import generate_generic_id
+from azure.cli.core._profile import Profile
+from azure.cli.core.mock import DummyCli
 
 PREFIX_DEVICE = "test-device-"
 PREFIX_EDGE_DEVICE = "test-edge-device-"
@@ -21,8 +24,16 @@ PREFIX_DEVICE_MODULE = "test-module-"
 PREFIX_CONFIG = "test-config-"
 PREFIX_EDGE_CONFIG = "test-edgedeploy-"
 PREFIX_JOB = "test-job-"
+USER_ROLE = "IoT Hub Data Contributor"
+DEFAULT_CONTAINER = "devices"
 
 settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED, opt_env_set=ENV_SET_TEST_IOTHUB_OPTIONAL)
+
+ENTITY_RG = settings.env.azext_iot_testrg
+ENTITY_NAME = settings.env.azext_iot_testhub if settings.env.azext_iot_testhub else "test-hub-" + generate_generic_id()
+STORAGE_CONTAINER = (
+    settings.env.azext_iot_teststoragecontainer if settings.env.azext_iot_teststoragecontainer else DEFAULT_CONTAINER
+)
 
 
 @contextmanager
@@ -77,32 +88,52 @@ class CaptureOutputLiveScenarioTest(LiveScenarioTest):
 class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def __init__(self, test_scenario):
         assert test_scenario
-        self.entity_rg = settings.env.azext_iot_testrg
-
+        self.entity_rg = ENTITY_RG
+        self.entity_name = ENTITY_NAME
         super(IoTLiveScenarioTest, self).__init__(test_scenario)
 
-        if settings.env.azext_iot_testhub:
-            self.entity_name = settings.env.azext_iot_testhub
-        else:
-            self.entity_name = "test-hub-" + generate_generic_id()
+        if not settings.env.azext_iot_testhub:
+            hubs_list = self.cmd(
+                '''iot hub list -g "{}"'''.format(self.entity_rg)
+            ).get_output_in_json()
 
-            if settings.env.azext_iot_teststoragecontainer and settings.env.azext_iot_teststorageaccount:
-                storage_account_connenction = self.cmd(
-                    "storage account show-connection-string --name {}".format(
-                        settings.env.azext_iot_teststorageaccount
+            target_hub = None
+            for hub in hubs_list:
+                if hub["name"] == self.entity_name:
+                    target_hub = hub
+                    break
+
+            if not target_hub:
+                if settings.env.azext_iot_teststorageaccount:
+                    storage_account_connenction = self.cmd(
+                        "storage account show-connection-string --name {}".format(
+                            settings.env.azext_iot_teststorageaccount
+                        )
+                    ).get_output_in_json()
+
+                    self.cmd(
+                        "iot hub create --name {} --resource-group {} --fc {} --fcs {} --sku S1 ".format(
+                            self.entity_name, self.entity_rg,
+                            STORAGE_CONTAINER, storage_account_connenction["connectionString"]
+                        )
                     )
+                else:
+                    self.cmd(
+                        "iot hub create --name {} --resource-group {} --sku S1 ".format(
+                            self.entity_name, self.entity_rg
+                        )
+                    )
+
+                profile = Profile(cli_ctx=DummyCli())
+                user_id = profile.get_current_account_user()
+                new_hub = self.cmd(
+                    "iot hub show -n {} -g {}".format(self.entity_name, self.entity_rg)
                 ).get_output_in_json()
 
+                # assign IoT Hub Data Contributor role to current user
                 self.cmd(
-                    "iot hub create --name {} --resource-group {} --fc {} --fcs {} --sku S1 ".format(
-                        self.entity_name, self.entity_rg,
-                        settings.env.azext_iot_teststoragecontainer, storage_account_connenction["connectionString"]
-                    )
-                )
-            else:
-                self.cmd(
-                    "iot hub create --name {} --resource-group {} --sku S1 ".format(
-                        self.entity_name, self.entity_rg
+                    '''role assignment create --assignee {} --role "{}" --scope "{}"'''.format(
+                        user_id, USER_ROLE, new_hub["id"]
                     )
                 )
 
@@ -143,13 +174,6 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     ),
                     checks=self.is_empty(),
                 )
-
-        if not settings.env.azext_iot_testhub:
-            self.cmd(
-                "iot hub delete --name {} --resource-group {}".format(
-                    self.entity_name, self.entity_rg
-                )
-            )
 
     def generate_device_names(self, count=1, edge=False):
         names = [
@@ -222,6 +246,16 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             return f"{command} --login {self.connection_string}"
 
         return f"{command} --auth-type {auth_type}"
+
+    @pytest.fixture(scope='session', autouse=True)
+    def tearDownSuite(self):
+        yield None
+        if not settings.env.azext_iot_testhub:
+            self.cmd(
+                "iot hub delete --name {} --resource-group {}".format(
+                    ENTITY_NAME, ENTITY_RG
+                )
+            )
 
 
 def disable_telemetry(test_function):
