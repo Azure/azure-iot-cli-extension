@@ -78,13 +78,13 @@ class TestIoTHubDiscovery(IoTLiveScenarioTest):
         )
         assert_target(desired_target, rg=self.entity_rg, include_events=True)
 
-        # sub_targets = discovery.get_targets()
-        # [assert_target(tar) for tar in sub_targets]
+        sub_targets = discovery.get_targets()
+        [assert_target(tar) for tar in sub_targets]
 
         rg_targets = discovery.get_targets(resource_group_name=self.entity_rg, include_events=True)
         [assert_target(tar, rg=self.entity_rg, include_events=True) for tar in rg_targets]
 
-        # assert len(rg_targets) <= len(sub_targets)
+        assert len(rg_targets) <= len(sub_targets)
 
 
 def assert_target(target: dict, by_cstring=False, include_events=False, **kwargs):
