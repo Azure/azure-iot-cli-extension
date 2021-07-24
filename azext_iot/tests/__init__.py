@@ -8,6 +8,7 @@ import sys
 import io
 import os
 import pytest
+import time
 
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
 from azure.cli.testsdk import LiveScenarioTest
@@ -34,7 +35,7 @@ ENTITY_NAME = settings.env.azext_iot_testhub if settings.env.azext_iot_testhub e
 STORAGE_CONTAINER = (
     settings.env.azext_iot_teststoragecontainer if settings.env.azext_iot_teststoragecontainer else DEFAULT_CONTAINER
 )
-
+ROLE_ASSIGNMENT_REFRESH_TIME = 30
 
 @contextmanager
 def capture_output():
@@ -136,6 +137,8 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                         user_id, USER_ROLE, new_hub["id"]
                     )
                 )
+                profile.refresh_accounts()
+                time.sleep(ROLE_ASSIGNMENT_REFRESH_TIME)
 
         self.region = self.get_region()
         self.connection_string = self.get_hub_cstring()
@@ -247,7 +250,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
         return f"{command} --auth-type {auth_type}"
 
-    @pytest.fixture(scope='session', autouse=True)
+    @pytest.fixture(scope='class', autouse=True)
     def tearDownSuite(self):
         yield None
         if not settings.env.azext_iot_testhub:
