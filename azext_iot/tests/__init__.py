@@ -37,6 +37,7 @@ STORAGE_CONTAINER = (
 )
 ROLE_ASSIGNMENT_REFRESH_TIME = 30
 
+
 @contextmanager
 def capture_output():
     class stream_buffer_tee(object):
