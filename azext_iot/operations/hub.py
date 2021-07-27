@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import re
 from os.path import exists, basename
 from time import time, sleep
 from knack.log import get_logger
@@ -29,6 +30,7 @@ from azext_iot.common.shared import (
     IoTHubStateType,
     DeviceAuthApiType,
     ConnectionStringParser,
+    TopicSpaceType,
 )
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
@@ -3301,3 +3303,122 @@ def _customize_device_tracing_output(device_id, desired, reported):
         ):
             output["isSynced"] = True
     return output
+
+# Topic Space Preview
+
+
+def iot_hub_topic_space_create_or_update(
+    cmd,
+    topic_name,
+    topic_template,
+    topic_type,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
+):
+    topic_type = TopicSpaceType(topic_type)
+    if topic_type == TopicSpaceType.HighFanout:
+        raise CLIError("Only LowFanout and PublishOnly topic types are supported right now")
+
+    topic_template = list(re.split("\s|,", topic_template.strip("[]")))
+
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
+    resolver = SdkResolver(target=target)
+    service_sdk = resolver.get_sdk(SdkType.service_sdk)
+
+    try:
+        return service_sdk.topic_space.put_topic_space(
+            id=topic_name,
+            name=topic_name,
+            properties={
+                "topicspace_type": topic_type,
+                "topic_templates": topic_template
+            },
+            raw=True
+        ).response.json()
+    except CloudError as e:
+        raise CLIError(unpack_msrest_error(e))
+
+
+def iot_hub_topic_space_show(
+    cmd,
+    topic_name,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
+):
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
+    resolver = SdkResolver(target=target)
+    service_sdk = resolver.get_sdk(SdkType.service_sdk)
+
+    try:
+        return service_sdk.topic_space.get_topic_space(
+            id=topic_name, raw=True
+        ).response.json()
+    except CloudError as e:
+        raise CLIError(unpack_msrest_error(e))
+
+
+def iot_hub_topic_space_list(
+    cmd,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
+):
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
+    resolver = SdkResolver(target=target)
+    service_sdk = resolver.get_sdk(SdkType.service_sdk)
+
+    try:
+        return service_sdk.topic_space.list_topic_spaces(
+            raw=True
+        ).response.json()
+    except CloudError as e:
+        raise CLIError(unpack_msrest_error(e))
+
+
+def iot_hub_topic_space_delete(
+    cmd,
+    topic_name,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
+):
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
+    resolver = SdkResolver(target=target)
+    service_sdk = resolver.get_sdk(SdkType.service_sdk)
+
+    try:
+        return service_sdk.topic_space.delete_topic_space(
+            id=topic_name
+        )
+    except CloudError as e:
+        raise CLIError(unpack_msrest_error(e))
