@@ -132,6 +132,15 @@ def load_command_table(self, _):
     ) as cmd_group:
         cmd_group.show_command("show", "iot_hub_connection_string_show")
 
+    with self.command_group(
+        "iot hub topic-space", command_type=iothub_ops
+    ) as cmd_group:
+        cmd_group.show_command("create", "iot_hub_topic_space_create_or_update")
+        cmd_group.show_command("show", "iot_hub_topic_space_show")
+        cmd_group.show_command("update", "iot_hub_topic_space_create_or_update")
+        cmd_group.show_command("list", "iot_hub_topic_space_list")
+        cmd_group.show_command("delete", "iot_hub_topic_space_delete")
+
     with self.command_group("iot edge", command_type=iothub_ops) as cmd_group:
         cmd_group.command("set-modules", "iot_edge_set_modules")
 

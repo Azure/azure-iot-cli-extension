@@ -764,6 +764,66 @@ helps[
 """
 
 helps[
+    "iot hub topic-space"
+] = """
+    type: group
+    short-summary: Manage topic spaces within an IoT Hub.
+"""
+
+helps[
+    "iot hub topic-space show"
+] = """
+    type: command
+    short-summary: Show details of an exisiting topic space within an IoT Hub.
+"""
+
+helps[
+    "iot hub topic-space delete"
+] = """
+    type: command
+    short-summary: Delete an exisiting topic space within an IoT Hub.
+"""
+
+helps[
+    "iot hub topic-space list"
+] = """
+    type: command
+    short-summary: List exisiting topic space within an IoT Hub.
+"""
+
+helps[
+    "iot hub topic-space create"
+] = """
+    type: command
+    short-summary: Create a topic space within an IoT Hub.
+    examples:
+    - name: Create a topic space within an IoT Hub with one template.
+      text: >
+        az iot hub topic-space create -n {hub_name} --topic-space-name {topic_space_name}
+        --topic-type {topic_type} --topic-template {topic_template}
+    - name: Create a topic space within an IoT Hub with multiple templates.
+      text: >
+        az iot hub topic-space create -n {hub_name} --topic-space-name {topic_space_name}
+        --topic-type {topic_type} --topic-template "{topic_template1} {topic_template2} {topic_template3}"
+"""
+
+helps[
+    "iot hub topic-space update"
+] = """
+    type: command
+    short-summary: Update a topic space within an IoT Hub.
+    examples:
+    - name: Update a topic space within an IoT Hub with one template.
+      text: >
+        az iot hub topic-space update -n {hub_name} --topic-space-name {topic_space_name}
+        --topic-type {topic_type} --topic-template {topic_template}
+    - name: Update a topic space within an IoT Hub with multiple templates.
+      text: >
+        az iot hub topic-space update -n {hub_name} --topic-space-name {topic_space_name}
+        --topic-type {topic_type} --topic-template "{topic_template1} {topic_template2} {topic_template3}"
+"""
+
+helps[
     "iot device"
 ] = """
     type: group

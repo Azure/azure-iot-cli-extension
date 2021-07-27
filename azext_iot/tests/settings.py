@@ -12,6 +12,10 @@ ENV_SET_TEST_IOTHUB_BASIC = [
     "azext_iot_testrg",
 ]
 
+ENV_SET_TEST_IOTHUB_CONNECTION_STRING = [
+    "azext_iot_testhub_connection_string"
+]
+
 
 class Setting(object):
     pass

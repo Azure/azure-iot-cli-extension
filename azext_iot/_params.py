@@ -33,6 +33,7 @@ from azext_iot.common.shared import (
     AuthenticationType,
     AuthenticationTypeDataplane,
     RenewKeyType,
+    TopicSpaceType,
 )
 from azext_iot._validators import mode2_iot_login_handler
 from azext_iot.assets.user_messages import info_param_properties_device
@@ -558,6 +559,24 @@ def load_arguments(self, _):
             options_list=["--top"],
             type=int,
             help="Maximum number of elements to return. By default query has no cap.",
+        )
+
+    with self.argument_context("iot hub topic-space") as context:
+        context.argument(
+            "topic_name",
+            options_list=["--topic-name", "--name", "--tn"],
+            help="Topic space name.",
+        )
+        context.argument(
+            "topic_template",
+            options_list=["--topic-template", "--template"],
+            help="List of topic space template paths. Can be provided as a space-seperated list.",
+        )
+        context.argument(
+            "topic_type",
+            options_list=["--topic-type", "--type"],
+            arg_type=get_enum_type(TopicSpaceType),
+            help="Topic space type. Currently, only LowFanout and PublishOnly are supported.",
         )
 
     with self.argument_context("iot device") as context:
