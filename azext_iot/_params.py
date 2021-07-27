@@ -92,11 +92,15 @@ def load_arguments(self, _):
             validator=mode2_iot_login_handler,
             help="This command supports an entity connection string with rights to perform action. "
             'Use to avoid session login via "az login". '
-            "If both an entity connection string and name are provided the connection string takes priority.",
+            "If both an entity connection string and name are provided the connection string takes priority. "
+            "Required if --hub-name is not provided.",
+            arg_group="IoT Hub Identifier"
         )
         context.argument("resource_group_name", arg_type=resource_group_name_type)
         context.argument(
-            "hub_name", options_list=["--hub-name", "-n"], arg_type=hub_name_type
+            "hub_name", options_list=["--hub-name", "-n"], arg_type=hub_name_type,
+            help="IoT Hub name. Required if --login is not provided.",
+            arg_group="IoT Hub Identifier"
         )
         context.argument(
             "device_id", options_list=["--device-id", "-d"], help="Target Device."
@@ -320,7 +324,8 @@ def load_arguments(self, _):
             "start_time",
             options_list=["--start-time", "--start"],
             help="The scheduled start of the job in ISO 8601 date time format. "
-            "If no start time is provided, the job is queued for asap execution.",
+            "If no start time is provided, the job is queued for asap execution. "
+            "Using a custom start time that's in the past may cause the operation to fail.",
         )
         context.argument(
             "ttl",

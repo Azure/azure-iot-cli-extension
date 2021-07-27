@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import unittest
-import mock
+from unittest import mock
 from knack.util import CLIError
 from azext_iot.product.test.command_tests import search
 from azext_iot.sdk.product.models import DeviceTestSearchOptions

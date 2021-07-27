@@ -5,10 +5,10 @@
 # --------------------------------------------------------------------------------------------
 
 import json
-import mock
 import pytest
 import os
 
+from unittest import mock
 from knack.util import CLIError
 from azure.cli.core.extension import get_extension_path
 from azext_iot.common.utility import (

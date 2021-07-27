@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import unittest
-import mock
+from unittest import mock
 from knack.util import CLIError
 from azext_iot.product.test.command_tests import create, _process_models_directory as process_models
 from azext_iot.product.shared import BadgeType, AttestationType, DeviceType, ValidationType

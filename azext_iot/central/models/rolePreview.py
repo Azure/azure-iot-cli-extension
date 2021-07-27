@@ -4,7 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from azext_iot.central.services import device, device_template, user, api_token, device_group, role
-
-
-__all__ = ["device", "device_template", "user", "api_token", "device_group", "role"]
+class RolePreview:
+    def __init__(self, device: dict):
+        self.display_name = device.get("displayName")
+        self.id = device.get("id")
+        pass
