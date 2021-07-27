@@ -5,18 +5,24 @@
 # --------------------------------------------------------------------------------------------
 
 from azext_iot.tests import IoTLiveScenarioTest
+from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
+
+settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_BASIC)
+
+LIVE_HUB = settings.env.azext_iot_testhub
+LIVE_RG = settings.env.azext_iot_testrg
 
 
 class TestIoTHubUtilities(IoTLiveScenarioTest):
     def __init__(self, test_case):
-        super(TestIoTHubUtilities, self).__init__(test_case)
+        super(TestIoTHubUtilities, self).__init__(test_case, LIVE_HUB, LIVE_RG)
 
     def test_iothub_generate_sas_token(self):
         for auth_phase in DATAPLANE_AUTH_TYPES:
             self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub generate-sas-token -n {self.entity_name} -g {self.entity_rg}",
+                    f"iot hub generate-sas-token -n {LIVE_HUB} -g {LIVE_RG}",
                     auth_type=auth_phase,
                 ),
                 checks=[self.exists("sas")],
@@ -25,7 +31,7 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
             # Custom duration
             self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub generate-sas-token -n {self.entity_name} --du 1000",
+                    f"iot hub generate-sas-token -n {LIVE_HUB} --du 1000",
                     auth_type=auth_phase,
                 ),
                 checks=[self.exists("sas")],
@@ -35,7 +41,7 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
                 # Custom policy
                 self.cmd(
                     self.set_cmd_auth_type(
-                        f"iot hub generate-sas-token -n {self.entity_name} -g {self.entity_rg} --pn service",
+                        f"iot hub generate-sas-token -n {LIVE_HUB} -g {LIVE_RG} --pn service",
                         auth_type=auth_phase,
                     ),
                     checks=[self.exists("sas")],
@@ -44,7 +50,7 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
             # Error - non-existent custom policy
             self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub generate-sas-token --pn somepolicy -n {self.entity_name} -g {self.entity_rg}",
+                    f"iot hub generate-sas-token --pn somepolicy -n {LIVE_HUB} -g {LIVE_RG}",
                     auth_type=auth_phase,
                 ),
                 expect_failure=True,
@@ -69,7 +75,7 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
 
     def test_iothub_connection_string_show(self):
         conn_str_pattern = r"^HostName={0}.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey=".format(
-            self.entity_name
+            LIVE_HUB
         )
         conn_str_eventhub_pattern = (
             r"^Endpoint=sb://(.+?)servicebus.windows.net/;SharedAccessKeyName="
@@ -81,21 +87,21 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
 
         hubs_in_sub = self.cmd("iot hub connection-string show").get_output_in_json()
 
-        hubs_in_rg = self.cmd(f"iot hub connection-string show -g {self.entity_rg}").get_output_in_json()
+        hubs_in_rg = self.cmd(f"iot hub connection-string show -g {LIVE_RG}").get_output_in_json()
         assert len(hubs_in_sub) >= len(hubs_in_rg)
 
         self.cmd(
-            f"iot hub connection-string show -n {self.entity_name}",
+            f"iot hub connection-string show -n {LIVE_HUB}",
             checks=[self.check_pattern("connectionString", conn_str_pattern)],
         )
 
         self.cmd(
-            f"iot hub connection-string show -n {self.entity_name} --pn {default_policy}",
+            f"iot hub connection-string show -n {LIVE_HUB} --pn {default_policy}",
             checks=[self.check_pattern("connectionString", conn_str_pattern)],
         )
 
         self.cmd(
-            f"iot hub connection-string show -n {self.entity_name} -g {self.entity_rg} --pn {nonexistent_policy}",
+            f"iot hub connection-string show -n {LIVE_HUB} -g {LIVE_RG} --pn {nonexistent_policy}",
             expect_failure=True,
         )
 
@@ -105,12 +111,12 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
         )
 
         self.cmd(
-            f"iot hub connection-string show -n {self.entity_name} --eh",
+            f"iot hub connection-string show -n {LIVE_HUB} --eh",
             checks=[self.check_pattern("connectionString", conn_str_eventhub_pattern)],
         )
 
         self.cmd(
-            f"iot hub connection-string show -n {self.entity_name} -g {self.entity_rg}",
+            f"iot hub connection-string show -n {LIVE_HUB} -g {LIVE_RG}",
             checks=[
                 self.check("length(@)", 1),
                 self.check_pattern("connectionString", conn_str_pattern),
@@ -118,7 +124,7 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
         )
 
         self.cmd(
-            f"iot hub connection-string show -n {self.entity_name} -g {self.entity_rg} --all",
+            f"iot hub connection-string show -n {LIVE_HUB} -g {LIVE_RG} --all",
             checks=[
                 self.greater_than("length(connectionString[*])", 0),
                 self.check_pattern("connectionString[0]", conn_str_pattern),
@@ -126,7 +132,7 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
         )
 
         self.cmd(
-            f"iot hub connection-string show -n {self.entity_name} -g {self.entity_rg} --all --eh",
+            f"iot hub connection-string show -n {LIVE_HUB} -g {LIVE_RG} --all --eh",
             checks=[
                 self.greater_than("length(connectionString[*])", 0),
                 self.check_pattern(
@@ -139,7 +145,7 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
         for auth_phase in DATAPLANE_AUTH_TYPES:
             self.cmd(
                 self.set_cmd_auth_type(
-                    f'iot hub query --hub-name {self.entity_name} -q "select * from devices"',
+                    f'iot hub query --hub-name {LIVE_HUB} -q "select * from devices"',
                     auth_type=auth_phase,
                 ),
                 checks=[self.check("length([*])", 0)],

@@ -7,14 +7,9 @@
 from os import environ
 
 
-ENV_SET_TEST_IOTHUB_REQUIRED = [
-    "azext_iot_testrg"
-]
-
-ENV_SET_TEST_IOTHUB_OPTIONAL = [
+ENV_SET_TEST_IOTHUB_BASIC = [
     "azext_iot_testhub",
-    "azext_iot_teststorageaccount",
-    "azext_iot_teststoragecontainer"
+    "azext_iot_testrg",
 ]
 
 

@@ -324,7 +324,8 @@ def load_arguments(self, _):
             "start_time",
             options_list=["--start-time", "--start"],
             help="The scheduled start of the job in ISO 8601 date time format. "
-            "If no start time is provided, the job is queued for asap execution.",
+            "If no start time is provided, the job is queued for asap execution. "
+            "Using a custom start time that's in the past may cause the operation to fail.",
         )
         context.argument(
             "ttl",

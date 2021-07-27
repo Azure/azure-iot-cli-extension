@@ -23,6 +23,7 @@ def load_iothub_help():
         long-summary: |
                       When scheduling a twin update job, the twin patch is a required argument.
                       When scheduling a device method job, the method name and payload are required arguments.
+                      PLEASE NOTE: Using a custom start time that's in the past may cause the operation to fail.
 
         examples:
         - name: Create and schedule a job to update the twin tags of all devices.
@@ -37,7 +38,7 @@ def load_iothub_help():
         - name: Create a job to update a desired twin property on a subset of devices, scheduled to run at an arbitrary future time.
           text: >
             az iot hub job create --job-id {job_name} --job-type scheduleUpdateTwin -n {iothub_name} --twin-patch '{"properties":{"desired": {"temperatureF": 65}}}'
-            --start-time "2020-01-08T12:19:56.868Z" --query-condition "deviceId IN ['MyDevice1', 'MyDevice2', 'MyDevice3']"
+            --start-time "2050-01-08T12:19:56.868Z" --query-condition "deviceId IN ['MyDevice1', 'MyDevice2', 'MyDevice3']"
 
         - name: Create and schedule a job to invoke a device method for a set of devices meeting a query condition.
           text: >

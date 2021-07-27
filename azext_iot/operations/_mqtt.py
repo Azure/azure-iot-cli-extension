@@ -109,11 +109,18 @@ class mqtt_client(object):
             self.device_client.patch_twin_reported_properties(modified_properties)
 
     def execute(self, data, properties={}, publish_delay=2, msg_count=100):
+        from azext_iot.operations.hub import _iot_device_twin_update
         from tqdm import tqdm
 
         try:
             if self.init_reported_properties:
-                self.device_client.patch_twin_reported_properties(self.init_reported_properties)
+                twin_properties = {
+                    "properties": {
+                        "desired": self.init_reported_properties
+                    }
+                }
+
+                _iot_device_twin_update(self.target, self.device_id, twin_properties)
 
             for _ in tqdm(range(msg_count), desc='Device simulation in progress'):
                 self.send_d2c_message(message_text=data.generate(True), properties=properties)

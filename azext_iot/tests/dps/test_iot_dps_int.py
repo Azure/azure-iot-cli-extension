@@ -12,12 +12,11 @@ from azext_iot.common import embedded_cli
 from azext_iot.common.utility import generate_key
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.tests.settings import Setting
-from azext_iot.tests.generators import generate_generic_id
 
 # Set these to the proper IoT Hub DPS, IoT Hub and Resource Group for Integration Tests.
 dps = os.environ.get("azext_iot_testdps")
 rg = os.environ.get("azext_iot_testrg")
-hub = os.environ.get("azext_iot_testhub") if os.environ.get("azext_iot_testhub") else "test-hub-" + generate_generic_id()
+hub = os.environ.get("azext_iot_testhub")
 
 if not all([dps, rg, hub]):
     raise ValueError(
@@ -102,13 +101,6 @@ class TestDPSEnrollments(LiveScenarioTest):
         self.cmd_shell = Setting()
         setattr(self.cmd_shell, "cli_ctx", self.cli_ctx)
 
-        if hub != os.environ.get("azext_iot_testhub"):
-            self.cmd(
-                "iot hub create --name {} --resource-group {} --sku S1".format(
-                    hub, rg
-                )
-            )
-
         _ensure_dps_hub_link(self, dps, rg, hub)
 
         output_dir = os.getcwd()
@@ -132,13 +124,6 @@ class TestDPSEnrollments(LiveScenarioTest):
     def __del__(self):
         if os.path.exists(cert_path):
             os.remove(cert_path)
-
-        if hub != os.environ.get("azext_iot_testhub"):
-            self.cmd(
-                "iot hub delete --name {} --resource-group {}".format(
-                    hub, rg
-                )
-            )
 
     def test_dps_compute_device_key(self):
         device_key = self.cmd(

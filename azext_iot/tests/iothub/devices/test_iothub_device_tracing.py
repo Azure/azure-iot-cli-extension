@@ -7,7 +7,14 @@
 import pytest
 
 from azext_iot.tests import IoTLiveScenarioTest
+from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC
 from azext_iot.common.shared import AuthenticationTypeDataplane
+
+settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_BASIC)
+
+LIVE_HUB = settings.env.azext_iot_testhub
+LIVE_RG = settings.env.azext_iot_testrg
+
 
 # The current implementation of preview distributed tracing commands do not work with a cstring.
 
@@ -19,7 +26,7 @@ custom_auth_types = [
 
 class TestIoTHubDistributedTracing(IoTLiveScenarioTest):
     def __init__(self, test_case):
-        super(TestIoTHubDistributedTracing, self).__init__(test_case)
+        super(TestIoTHubDistributedTracing, self).__init__(test_case, LIVE_HUB, LIVE_RG)
 
     def test_iothub_device_distributed_tracing(self):
         # Region specific test
@@ -35,14 +42,14 @@ class TestIoTHubDistributedTracing(IoTLiveScenarioTest):
 
             self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub device-identity create -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg}",
+                    f"iot hub device-identity create -d {device_ids[0]} -n {LIVE_HUB} -g {LIVE_RG}",
                     auth_type=auth_phase,
                 )
             )
 
             self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub distributed-tracing show -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg}",
+                    f"iot hub distributed-tracing show -d {device_ids[0]} -n {LIVE_HUB} -g {LIVE_RG}",
                     auth_type=auth_phase,
                 ),
                 checks=self.is_empty(),
@@ -50,8 +57,7 @@ class TestIoTHubDistributedTracing(IoTLiveScenarioTest):
 
             result = self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub distributed-tracing update "
-                    f"-d {device_ids[0]} -n {self.entity_name} -g { self.entity_rg} --sm on --sr 50",
+                    f"iot hub distributed-tracing update -d {device_ids[0]} -n {LIVE_HUB} -g {LIVE_RG} --sm on --sr 50",
                     auth_type=auth_phase,
                 )
             ).get_output_in_json()
