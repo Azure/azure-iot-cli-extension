@@ -14,8 +14,9 @@ steps:
             "azext_iot_testrg": os.environ.get("AZEXT_IOT_TESTRG", sentinel_value),
             "azext_iot_testhub": os.environ.get("AZEXT_IOT_TESTHUB", sentinel_value),
             "azext_iot_testdps": os.environ.get("AZEXT_IOT_TESTDPS", sentinel_value),
-            "azext_iot_teststorageuri": os.environ.get("AZEXT_IOT_TESTSTORAGEURI", sentinel_value),
-            "azext_iot_identity_teststorageid": os.environ.get("AZEXT_IOT_IDENTITY_TESTSTORAGEID", sentinel_value),
+            "azext_iot_identity_teststorageid": os.environ.get("AZEXT_IOT_IDENTITY_TESTSTORAGEID", sentinel_value),           
+            "azext_iot_teststorageaccount": os.environ.get("AZEXT_IOT_TESTSTORAGEACCOUNT", sentinel_value),
+            "azext_iot_teststoragecontainer": os.environ.get("AZEXT_IOT_TESTSTORAGECONTAINER", sentinel_value),
             "azext_iot_central_app_id": os.environ.get("AZEXT_IOT_CENTRAL_APP_ID", sentinel_value),
             "azext_dt_ep_eventgrid_topic": os.environ.get("AZEXT_DT_EP_EVENTGRID_TOPIC", sentinel_value),
             "azext_dt_ep_servicebus_namespace": os.environ.get("AZEXT_DT_EP_SERVICEBUS_NAMESPACE", sentinel_value),
@@ -39,8 +40,9 @@ steps:
       AZEXT_IOT_TESTRG: $(azext_iot_testrg)
       AZEXT_IOT_TESTHUB: $(azext_iot_testhub)
       AZEXT_IOT_TESTDPS: $(azext_iot_testdps)
-      AZEXT_IOT_TESTSTORAGEURI: $(azext_iot_teststorageuri)
       AZEXT_IOT_IDENTITY_TESTSTORAGEID: $(azext_iot_identity_teststorageid)
+      AZEXT_IOT_TESTSTORAGEACCOUNT: $(azext_iot_teststorageaccount)
+      AZEXT_IOT_TESTSTORAGECONTAINER: $(azext_iot_teststoragecontainer)
       AZEXT_IOT_CENTRAL_APP_ID: $(azext_iot_central_app_id)
       AZEXT_DT_EP_EVENTGRID_TOPIC: $(azext_dt_ep_eventgrid_topic)
       AZEXT_DT_EP_SERVICEBUS_NAMESPACE: $(azext_dt_ep_servicebus_namespace)
