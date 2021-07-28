@@ -7,6 +7,7 @@
 import json
 import pytest
 import os
+import sys
 
 from unittest import mock
 from knack.util import CLIError
@@ -379,3 +380,34 @@ class TestCliInit(object):
 
         if invalid_directories:
             pytest.fail(", ".join(invalid_directories))
+
+    def test_ensure_azure_namespace_path(self):
+        import azure
+
+        from azext_iot.common.utility import ensure_azure_namespace_path
+        from azure.cli.core.extension import get_extension_path
+        from azext_iot.constants import EXTENSION_NAME
+
+        ext_path = get_extension_path(EXTENSION_NAME)
+        original_sys_path = list(sys.path)
+        original_azure_namespace_path = list(azure.__path__)
+        ext_azure_dir = os.path.join(ext_path, "azure")
+
+        try:
+            ensure_azure_namespace_path()
+            modified_sys_path = list(sys.path)
+            modified_azure_namespace_path = list(azure.__path__)
+        finally:
+            if isinstance(azure.__path__, list):
+                azure.__path__[:] = original_azure_namespace_path
+            else:
+                list(azure.__path__)
+            sys.path[:] = original_sys_path
+
+        assert original_azure_namespace_path == modified_azure_namespace_path[1:]
+        assert modified_azure_namespace_path[0] == ext_azure_dir
+        assert original_azure_namespace_path == list(azure.__path__)
+
+        assert original_sys_path == modified_sys_path[1:]
+        assert modified_sys_path[0] == ext_path
+        assert original_sys_path == list(sys.path)

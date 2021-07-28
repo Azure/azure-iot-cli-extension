@@ -500,3 +500,20 @@ def generate_key(byte_length=32):
 
     token_bytes = secrets.token_bytes(byte_length)
     return base64.b64encode(token_bytes).decode("utf8")
+
+
+def ensure_azure_namespace_path():
+    """
+    Run prior to importing azure namespace packages (azure.*) to ensure the
+    extension root path is configured for package import.
+    """
+    from azure.cli.core.extension import get_extension_path
+    from azext_iot.constants import EXTENSION_NAME
+    ext_path = get_extension_path(EXTENSION_NAME)
+
+    ext_azure_dir = os.path.join(ext_path, "azure")
+    if os.path.isdir(ext_azure_dir):
+        import azure
+        if ext_azure_dir not in azure.__path__:
+            azure.__path__.insert(0, ext_azure_dir)
+        sys.path.insert(0, ext_path)
