@@ -215,3 +215,10 @@ def load_central_arguments(self, _):
             options_list=["--module-id", "-m"],
             help="Provide IoT Edge Module ID if the device type is IoT Edge.",
         )
+
+    with self.argument_context("iot central role") as context:
+        context.argument(
+            "role_id",
+            options_list=["--role-id", "-r"],
+            help="Provide a unique identifier for the role"
+        )

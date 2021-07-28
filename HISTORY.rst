@@ -3,6 +3,14 @@
 Release History
 ===============
 
+0.10.15
++++++++++++++++
+
+**IoT Central updates**
+
+* Adds support for listing device groups
+* Adds support for listing roles and get role by id
+
 0.10.14
 +++++++++++++++
 

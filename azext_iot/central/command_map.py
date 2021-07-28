@@ -17,6 +17,14 @@ central_device_templates_ops = CliCommandType(
     operations_tmpl="azext_iot.central.commands_device_template#{}"
 )
 
+central_device_groups_ops = CliCommandType(
+    operations_tmpl="azext_iot.central.commands_device_group#{}"
+)
+
+central_roles_ops = CliCommandType(
+    operations_tmpl="azext_iot.central.commands_role#{}"
+)
+
 central_device_twin_ops = CliCommandType(
     operations_tmpl="azext_iot.central.commands_device_twin#{}"
 )
@@ -102,6 +110,17 @@ def load_central_commands(self, _):
         cmd_group.show_command("show", "get_device_template")
         cmd_group.command("create", "create_device_template")
         cmd_group.command("delete", "delete_device_template")
+
+    with self.command_group(
+        "iot central device-group", command_type=central_device_groups_ops, is_preview=True
+    ) as cmd_group:
+        cmd_group.command("list", "list_device_groups")
+
+    with self.command_group(
+        "iot central role", command_type=central_roles_ops, is_preview=True
+    ) as cmd_group:
+        cmd_group.show_command("show", "get_role")
+        cmd_group.command("list", "list_roles")
 
     with self.command_group(
         "iot central device twin", command_type=central_device_twin_ops,

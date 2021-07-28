@@ -343,6 +343,16 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
         self._delete_device_template(template_id)
 
+    def test_central_device_groups_list(self):
+        result = self._list_device_groups()
+        # assert object is empty or populated but not null
+        assert result is not None and (result == {} or bool(result) is True)
+
+    def test_central_roles_list(self):
+        result = self._list_roles()
+        # assert object is empty or populated but not null
+        assert result is not None and (result == {} or bool(result) is True)
+
     def test_central_device_registration_info_registered(self):
         (template_id, _) = self._create_device_template()
         (device_id, device_name) = self._create_device(
@@ -725,6 +735,18 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
                 return
             except:
                 time.sleep(10)
+
+    def _list_device_groups(self):
+        return self.cmd(
+            "iot central device-group list --app-id {}".format(
+                APP_ID)
+        ).get_output_in_json()
+
+    def _list_roles(self):
+        return self.cmd(
+            "iot central role list --app-id {}".format(
+                APP_ID)
+        ).get_output_in_json()
 
     def _get_credentials(self, device_id):
         return self.cmd(
