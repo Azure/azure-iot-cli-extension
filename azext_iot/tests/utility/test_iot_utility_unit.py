@@ -7,6 +7,7 @@
 import json
 import pytest
 import os
+import sys
 
 from unittest import mock
 from knack.util import CLIError
@@ -375,7 +376,34 @@ class TestCliInit(object):
         invalid_directories = []
         for directory in directory_structure:
             if directory_structure[directory] is None:
-                invalid_directories.append("Directory: '{}' missing __init__.py".format(directory))
+                invalid_directories.append(
+                    "Directory: '{}' missing __init__.py".format(directory)
+                )
 
         if invalid_directories:
             pytest.fail(", ".join(invalid_directories))
+
+    def test_ensure_azure_namespace_path(self):
+        import azure
+        from azext_iot.common.utility import ensure_azure_namespace_path
+        from azure.cli.core.extension import get_extension_path
+        from azext_iot.constants import EXTENSION_NAME
+
+        ext_path = get_extension_path(EXTENSION_NAME)
+
+        original_sys_path = list(sys.path)
+        original_azure_namespace_path = list(azure.__path__)
+        ext_azure_dir = os.path.join(ext_path, "azure")
+
+        os.makedirs(ext_azure_dir, exist_ok=True)
+
+        ensure_azure_namespace_path()
+        modified_sys_path = list(sys.path)
+        modified_azure_namespace_path = list(azure.__path__)
+
+        original_azure_namespace_path.append(ext_azure_dir)
+        assert set(original_azure_namespace_path) == set(modified_azure_namespace_path)
+
+        original_sys_path.insert(0, ext_path)
+        assert set(original_sys_path) == set(modified_sys_path)
+        assert modified_sys_path[0] == ext_path

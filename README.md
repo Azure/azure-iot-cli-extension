@@ -6,7 +6,8 @@
 The **Azure IoT extension for Azure CLI** aims to accelerate the development, management and automation of Azure IoT solutions. It does this via addition of rich features and functionality to the official [Azure CLI](https://docs.microsoft.com/en-us/cli/azure).
 
 ## News
-- Starting with version `0.10.13` of the IoT extension, you will need an Azure CLI core version of `2.17.1` or higher. IoT extension version `0.10.11` remains on the extension index to support environments that cannot upgrade core CLI versions. 
+
+- Starting with version `0.10.13` of the IoT extension, you will need an Azure CLI core version of `2.17.1` or higher. IoT extension version `0.10.11` remains on the extension index to support environments that cannot upgrade core CLI versions.
 
 - Azure CLI `2.24.0` requires an `azure-iot` extension update to `0.10.11` or later for IoT Hub commands to work properly. This can be done with `az extension update --name azure-iot`. A common error that arises when using an older `azure-iot` with Azure CLI `2.24.0` looks like `AttributeError: 'IotHubResourceOperations' object has no attribute 'config'`.
 
@@ -15,7 +16,8 @@ The **Azure IoT extension for Azure CLI** aims to accelerate the development, ma
     Uninstall the legacy extension with the following command: `az extension remove --name azure-cli-iot-ext`.
 
     Related - if you see an error with a stacktrace similar to:
-    ```
+
+    ```text
     ...
     azure-cli-iot-ext/azext_iot/common/_azure.py, ln 90, in get_iot_hub_connection_string
         client = iot_hub_service_factory(cmd.cli_ctx)
