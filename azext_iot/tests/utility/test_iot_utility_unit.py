@@ -401,8 +401,9 @@ class TestCliInit(object):
         modified_sys_path = list(sys.path)
         modified_azure_namespace_path = list(azure.__path__)
 
-        assert set(original_azure_namespace_path) == set(modified_azure_namespace_path[:-1])
-        assert modified_azure_namespace_path[-1] == ext_azure_dir
+        original_azure_namespace_path.append(ext_azure_dir)
+        assert set(original_azure_namespace_path) == set(modified_azure_namespace_path)
 
-        assert set(original_sys_path) == set(modified_sys_path[1:])
+        original_sys_path.insert(0, ext_path)
+        assert set(original_sys_path) == set(modified_sys_path)
         assert modified_sys_path[0] == ext_path

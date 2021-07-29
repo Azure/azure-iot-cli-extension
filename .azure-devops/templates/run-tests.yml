@@ -51,7 +51,7 @@ steps:
         scriptLocation: inlineScript
         inlineScript: |
           export COVERAGE_FILE=.coverage.${{ parameters.name }}
-          pytest -vv ${{ parameters.path }} -k "_int" --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int-${{ parameters.name }}.xml
+          pytest -s -vv ${{ parameters.path }} -k "_int" --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int-${{ parameters.name }}.xml
 
   - task: PublishBuildArtifacts@1
     inputs:
