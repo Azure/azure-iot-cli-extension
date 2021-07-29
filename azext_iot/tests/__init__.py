@@ -131,10 +131,10 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 new_hub = self.cmd(
                     "iot hub show -n {} -g {}".format(self.entity_name, self.entity_rg)
                 ).get_output_in_json()
-
+                user_id = "00000000-0000-0000-0000-000000000000"
                 # assign IoT Hub Data Contributor role to current user
                 self.cmd(
-                    '''role assignment create --assignee {} --role "{}" --scope "{}"'''.format(
+                    '''role assignment create --assignee "{}" --role "{}" --scope "{}"'''.format(
                         user_id, USER_ROLE, new_hub["id"]
                     )
                 )
