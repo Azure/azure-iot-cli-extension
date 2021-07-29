@@ -32,7 +32,7 @@ steps:
     continueOnError: true
     displayName: 'All integration tests'
     inputs:
-      azureSubscription: az-cli-nightly
+      azureSubscription: avin_nightly_connection
       scriptType: bash
       scriptLocation: inlineScript
       inlineScript: |
