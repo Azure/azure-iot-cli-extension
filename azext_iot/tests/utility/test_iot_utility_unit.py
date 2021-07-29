@@ -390,29 +390,19 @@ class TestCliInit(object):
         from azext_iot.constants import EXTENSION_NAME
 
         ext_path = get_extension_path(EXTENSION_NAME)
+
         original_sys_path = list(sys.path)
         original_azure_namespace_path = list(azure.__path__)
         ext_azure_dir = os.path.join(ext_path, "azure")
 
-        # TODO: Delete after adding azure.* dependency.
-        if not os.path.exists(ext_azure_dir):
-            os.makedirs(ext_azure_dir)
+        os.makedirs(ext_azure_dir, exist_ok=True)
 
-        try:
-            ensure_azure_namespace_path()
-            modified_sys_path = list(sys.path)
-            modified_azure_namespace_path = list(azure.__path__)
-        finally:
-            if isinstance(azure.__path__, list):
-                azure.__path__[:] = original_azure_namespace_path
-            else:
-                list(azure.__path__)
-            sys.path[:] = original_sys_path
+        ensure_azure_namespace_path()
+        modified_sys_path = list(sys.path)
+        modified_azure_namespace_path = list(azure.__path__)
 
-        assert original_azure_namespace_path == modified_azure_namespace_path[:-1]
+        assert set(original_azure_namespace_path) == set(modified_azure_namespace_path[:-1])
         assert modified_azure_namespace_path[-1] == ext_azure_dir
-        assert original_azure_namespace_path == list(azure.__path__)
 
-        assert original_sys_path == modified_sys_path[1:]
+        assert set(original_sys_path) == set(modified_sys_path[1:])
         assert modified_sys_path[0] == ext_path
-        assert original_sys_path == list(sys.path)

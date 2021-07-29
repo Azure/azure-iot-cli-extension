@@ -36,7 +36,7 @@ steps:
 
   - ${{ if eq(parameters.runUnitTests, 'true') }}:
     - script: |
-        pytest -vv ${{ parameters.path }} -k "_unit" --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-unit-${{ parameters.name }}.xml
+        pytest -s -vv ${{ parameters.path }} -k "_unit" --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-unit-${{ parameters.name }}.xml
       displayName: '${{ parameters.name }} unit tests'
       env:
         COVERAGE_FILE: .coverage.${{ parameters.name }}

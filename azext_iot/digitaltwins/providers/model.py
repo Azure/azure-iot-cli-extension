@@ -190,7 +190,7 @@ class ModelProvider(DigitalTwinsProvider):
             try:
                 self.delete(model_id)
             except CLIError as e:
-                logger.warn(f"Could not delete model {model_id}; error is {e}")
+                logger.warning(f"Could not delete model {model_id}; error is {e}")
 
         while len(parsed_models) > 0:
             model_id = next(iter(parsed_models))

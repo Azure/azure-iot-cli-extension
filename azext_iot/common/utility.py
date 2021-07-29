@@ -517,6 +517,10 @@ def ensure_azure_namespace_path():
     if os.path.isdir(ext_azure_dir):
         import azure
 
-        if ext_azure_dir not in azure.__path__:
-            azure.__path__.append(ext_azure_dir)  # _NamespacePath
-    sys.path.insert(0, ext_path)
+        if getattr(azure, "__path__", None) and ext_azure_dir not in azure.__path__:
+            azure.__path__.append(ext_azure_dir)  # _NamespacePath /w PEP420
+
+    if sys.path and sys.path[0] != ext_path:
+        sys.path.insert(0, ext_path)
+
+    return
