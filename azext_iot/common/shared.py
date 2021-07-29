@@ -152,16 +152,6 @@ class DistributedTracingSamplingModeType(Enum):
     on = "on"
 
 
-class PnPModelType(Enum):
-    """
-    Type of PnP Model.
-    """
-
-    any = "any"
-    interface = "Interface"
-    capabilityModel = "capabilityModel"
-
-
 class ConfigType(Enum):
     """
     Type of configuration deployment.

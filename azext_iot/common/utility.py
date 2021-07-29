@@ -115,7 +115,7 @@ def validate_key_value_pairs(string):
 
 
 def process_json_arg(content, argument_name, preserve_order=False):
-    """ Primary processor of json input """
+    """Primary processor of json input"""
 
     json_from_file = None
 
@@ -142,9 +142,9 @@ def process_json_arg(content, argument_name, preserve_order=False):
 
 
 def shell_safe_json_parse(json_or_dict_string, preserve_order=False):
-    """ Allows the passing of JSON or Python dictionary strings. This is needed because certain
+    """Allows the passing of JSON or Python dictionary strings. This is needed because certain
     JSON strings in CMD shell are not received in main's argv. This allows the user to specify
-    the alternative notation, which does not have this problem (but is technically not JSON). """
+    the alternative notation, which does not have this problem (but is technically not JSON)."""
     try:
         if not preserve_order:
             return json.loads(json_or_dict_string)
@@ -188,15 +188,15 @@ def read_file_content(file_path, allow_binary=False):
 
 
 def trim_from_start(s, substring):
-    """ Trims a substring from the target string (if it exists) returning the trimmed string.
-    Otherwise returns original target string. """
+    """Trims a substring from the target string (if it exists) returning the trimmed string.
+    Otherwise returns original target string."""
     if s.startswith(substring):
         s = s[len(substring) :]
     return s
 
 
 def validate_min_python_version(major, minor, error_msg=None, exit_on_fail=True):
-    """ If python version does not match AT LEAST requested values, will throw non 0 exit code."""
+    """If python version does not match AT LEAST requested values, will throw non 0 exit code."""
     version = sys.version_info
     result = False
     if version.major > major:
@@ -219,7 +219,7 @@ def validate_min_python_version(major, minor, error_msg=None, exit_on_fail=True)
 
 
 def unicode_binary_map(target):
-    """ Decode binary keys and values of map to unicode."""
+    """Decode binary keys and values of map to unicode."""
     # Assumes no iteritems()
     result = {}
 
@@ -311,7 +311,7 @@ def url_encode_str(s, plus=False):
 
 
 def test_import(package):
-    """ Used to determine if a dependency is loading correctly """
+    """Used to determine if a dependency is loading correctly"""
     import importlib
 
     try:
@@ -332,7 +332,7 @@ def unpack_pnp_http_error(e):
 
 
 def unpack_msrest_error(e):
-    """ Obtains full response text from an msrest error """
+    """Obtains full response text from an msrest error"""
 
     op_err = None
     try:
@@ -345,7 +345,7 @@ def unpack_msrest_error(e):
 
 
 def dict_transform_lower_case_key(d):
-    """ Converts a dictionary to an identical one with all lower case keys """
+    """Converts a dictionary to an identical one with all lower case keys"""
     return {k.lower(): v for k, v in d.items()}
 
 
@@ -381,7 +381,7 @@ def init_monitoring(cmd, timeout, properties, enqueued_time, repair, yes):
 
 
 def dict_clean(d):
-    """ Remove None from dictionary """
+    """Remove None from dictionary"""
     if not isinstance(d, dict):
         return d
     return dict((k, dict_clean(v)) for k, v in d.items() if v is not None)
@@ -440,6 +440,7 @@ class ISO8601Validator:
 
 def ensure_iothub_sdk_min_version(min_ver):
     from packaging import version
+
     try:
         from azure.mgmt.iothub import __version__ as iot_sdk_version
     except ImportError:
@@ -500,3 +501,26 @@ def generate_key(byte_length=32):
 
     token_bytes = secrets.token_bytes(byte_length)
     return base64.b64encode(token_bytes).decode("utf8")
+
+
+def ensure_azure_namespace_path():
+    """
+    Run prior to importing azure namespace packages (azure.*) to ensure the
+    extension root path is configured for package import.
+    """
+    from azure.cli.core.extension import get_extension_path
+    from azext_iot.constants import EXTENSION_NAME
+
+    ext_path = get_extension_path(EXTENSION_NAME)
+
+    ext_azure_dir = os.path.join(ext_path, "azure")
+    if os.path.isdir(ext_azure_dir):
+        import azure
+
+        if getattr(azure, "__path__", None) and ext_azure_dir not in azure.__path__:
+            azure.__path__.append(ext_azure_dir)  # _NamespacePath /w PEP420
+
+    if sys.path and sys.path[0] != ext_path:
+        sys.path.insert(0, ext_path)
+
+    return

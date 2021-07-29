@@ -127,7 +127,7 @@ class TwinProvider(DigitalTwinsProvider):
                 if not only_relationships:
                     self.delete(twin_id=twin["$dtId"])
             except CLIError as e:
-                logger.warn(f"Could not delete twin {twin['$dtId']}. The error is {e}")
+                logger.warning(f"Could not delete twin {twin['$dtId']}. The error is {e}")
 
     def add_relationship(
         self,
@@ -260,7 +260,7 @@ class TwinProvider(DigitalTwinsProvider):
                         relationship_id=relationship.relationship_id
                     )
             except CLIError as e:
-                logger.warn(f"Could not delete relationship {relationship}. The error is {e}.")
+                logger.warning(f"Could not delete relationship {relationship}. The error is {e}.")
 
     def get_component(self, twin_id, component_path):
         try:

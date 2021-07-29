@@ -14,7 +14,7 @@ You must fork and clone the repositories below. Follow the videos and instructio
 
 > IMPORTANT: When cloning the repositories and environments, ensure they are all siblings to each other. This makes things much easier down the line.
 
-```
+```text
 source-directory/
 |-- azure-cli/
 |-- azure-iot-cli-extension/
@@ -31,8 +31,6 @@ After following the videos, ensure you have:
 
 #### Environment Variables
 
-It is recommended that you set the following environment variables in a way such that they are persisted through machine restarts.
-
 You can run this setup in `bash` or `cmd` environments, this documentation just show the `powershell` flavor.
 
 1. Create a directory for your development extensions to live in
@@ -47,20 +45,12 @@ You can run this setup in `bash` or `cmd` environments, this documentation just 
     $env:AZURE_EXTENSION_DIR="path/to/source/extensions"
     ```
 
-3. Set `PYTHONPATH` to the following. Order matters here so be careful.
-
-    ```powershell
-    $env:PYTHONPATH="path/to/source/azure-iot-cli-extension;path/to/source/extensions/azure-iot"
-    ```
-
-Restart any PowerShell windows you may have open and reactivate your python environment. Check that the environment variables created above have persisted.
-
 #### azdev Steps
 
-Similar to the video, just execute the following command.
+Similar to the video, have your virtual environment activated then execute the following command
 
 ```powershell
-azdev setup -c path/to/source/azure-cli
+(.env3) azdev setup -c path/to/source/azure-cli
 ```
 
 #### Install dev extension
