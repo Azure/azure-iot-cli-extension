@@ -7,9 +7,13 @@ The **Azure IoT extension for Azure CLI** aims to accelerate the development, ma
 
 ## News
 
-- Starting with version `0.10.13` of the IoT extension, you will need an Azure CLI core version of `2.17.1` or higher. IoT extension version `0.10.11` remains on the extension index to support environments that cannot upgrade core CLI versions.
+- ❗ When upgrading your Azure CLI core version, for the best experience and to avoid breaking changes, we recommend updating your `azure-iot` extension to the [latest available](https://github.com/Azure/azure-iot-cli-extension/releases).
 
-- Azure CLI `2.24.0` requires an `azure-iot` extension update to `0.10.11` or later for IoT Hub commands to work properly. This can be done with `az extension update --name azure-iot`. A common error that arises when using an older `azure-iot` with Azure CLI `2.24.0` looks like `AttributeError: 'IotHubResourceOperations' object has no attribute 'config'`.
+- Azure CLI `2.24.0` requires an `azure-iot` extension update to `0.10.11` or later for IoT Hub commands to work properly. However **we recommend** at least `azure-iot` `0.10.14`. Updating the extension can be done with `az extension update --name azure-iot`.
+
+> Note: A common error that arises when using an older `azure-iot` with Azure CLI `2.24.0+` shows as follows: `AttributeError: 'IotHubResourceOperations' object has no attribute 'config'`.
+
+- Starting with version `0.10.13` of the IoT extension, you will need an Azure CLI core version of `2.17.1` or higher. IoT extension version `0.10.11` remains on the extension index to support environments that cannot upgrade core CLI versions.
 
 - The legacy IoT extension Id `azure-cli-iot-ext` is deprecated in favor of the new modern Id `azure-iot`. `azure-iot` is a superset of `azure-cli-iot-ext` and any new features or fixes will apply to `azure-iot` only. Also the legacy and modern IoT extension should **never** co-exist in the same CLI environment.
 

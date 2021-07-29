@@ -3,12 +3,24 @@ trigger:
     include:
       - dev
       - master
+  paths:
+    exclude:
+    - README.md
+    - docs/alt-install-methods.md
+    - docs/install-help.md
+    - docs/scenario-automation.md
 
 pr:
   branches:
     include:
       - dev
       - master
+  paths:
+    exclude:
+    - README.md
+    - docs/alt-install-methods.md
+    - docs/install-help.md
+    - docs/scenario-automation.md
 
 variables:
   iot_ext_package: azure-iot
