@@ -7,6 +7,7 @@
 import sys
 import io
 import os
+from azure.cli.core.cloud import set_cloud_subscription
 import pytest
 import time
 
@@ -18,6 +19,7 @@ from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRE
 from azext_iot.tests.generators import generate_generic_id
 from azure.cli.core._profile import Profile
 from azure.cli.core.mock import DummyCli
+from knack.log import get_logger
 
 PREFIX_DEVICE = "test-device-"
 PREFIX_EDGE_DEVICE = "test-edge-device-"
@@ -36,6 +38,7 @@ STORAGE_CONTAINER = (
     settings.env.azext_iot_teststoragecontainer if settings.env.azext_iot_teststoragecontainer else DEFAULT_CONTAINER
 )
 ROLE_ASSIGNMENT_REFRESH_TIME = 30
+logger = get_logger(__name__)
 
 
 @contextmanager
@@ -92,8 +95,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
         assert test_scenario
         self.entity_rg = ENTITY_RG
         self.entity_name = ENTITY_NAME
-        super(IoTLiveScenarioTest, self).__init__(test_scenario)
-
+        super(IoTLiveScenarioTest, self).__init__(test_scenario)        
         if not settings.env.azext_iot_testhub:
             hubs_list = self.cmd(
                 '''iot hub list -g "{}"'''.format(self.entity_rg)
@@ -126,11 +128,17 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                         )
                     )
 
+                # import pdb; pdb.set_trace()
                 profile = Profile(cli_ctx=DummyCli())
                 user_id = profile.get_current_account_user()
                 new_hub = self.cmd(
                     "iot hub show -n {} -g {}".format(self.entity_name, self.entity_rg)
                 ).get_output_in_json()
+                subscription = profile.get_subscription()
+                logger.warning(user_id)
+                logger.warning(subscription)
+                # import pdb; pdb.set_trace()
+                
                 
                 user_id = "cd22f07c-7c98-4587-85f8-4b16984ef9c8"
                 # user_id = "d8fac070-515f-4569-bfeb-1d7df7458b73"
@@ -146,6 +154,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     )
                 )
                 profile.refresh_accounts()
+                sys.exit()
                 time.sleep(ROLE_ASSIGNMENT_REFRESH_TIME)
 
         self.region = self.get_region()
