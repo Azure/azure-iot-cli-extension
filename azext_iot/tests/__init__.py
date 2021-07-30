@@ -147,14 +147,6 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     userType = user["type"]
                     raise CLIError(f"User type {userType} not supported. Can't run test(s).")
 
-                # user_id = "d8fac070-515f-4569-bfeb-1d7df7458b73"
-                # assign IoT Hub Data Contributor role to current user
-                # self.cmd(
-                #     '''role assignment create --assignee-object-id "{}" --assignee-principal-type "ServicePrincipal" --role "{}" --scope "{}"'''.format(
-                #         user_id, USER_ROLE, new_hub["id"]
-                #     )
-                # )
-
                 # assign IoT Hub Data Contributor role to current user
                 self.cmd(
                     '''role assignment create --assignee "{}" --role "{}" --scope "{}"'''.format(
