@@ -7,7 +7,6 @@
 import sys
 import io
 import os
-from azure.cli.core.cloud import set_cloud_subscription
 from knack.util import CLIError
 import pytest
 import time
@@ -94,8 +93,8 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
         assert test_scenario
         self.entity_rg = ENTITY_RG
         self.entity_name = ENTITY_NAME
-        super(IoTLiveScenarioTest, self).__init__(test_scenario)        
-        
+        super(IoTLiveScenarioTest, self).__init__(test_scenario)
+
         if not settings.env.azext_iot_testhub:
             hubs_list = self.cmd(
                 '''iot hub list -g "{}"'''.format(self.entity_rg)
