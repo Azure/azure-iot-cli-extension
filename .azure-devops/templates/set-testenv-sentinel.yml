@@ -26,6 +26,7 @@ steps:
             "azext_dt_ep_eventhub_policy": os.environ.get("AZEXT_DT_EP_EVENTHUB_POLICY", sentinel_value),
             "azext_dt_ep_eventhub_topic": os.environ.get("AZEXT_DT_EP_EVENTHUB_TOPIC", sentinel_value),
             "azext_dt_ep_rg": os.environ.get("AZEXT_DT_EP_RG", sentinel_value),
+            "azext_iot_testserviceprincipal": os.environ.get("AZEXT_IOT_TESTSERVICEPRINCIPAL", sentinel_value),
         }
         f = open("./pytest.ini", "w+")
         f.write("[pytest]\n")
@@ -52,3 +53,4 @@ steps:
       AZEXT_DT_EP_EVENTHUB_POLICY: $(azext_dt_ep_eventhub_policy)
       AZEXT_DT_EP_EVENTHUB_TOPIC: $(azext_dt_ep_eventhub_topic)
       AZEXT_DT_EP_RG: $(azext_dt_ep_rg)
+      AZEXT_IOT_TESTSERVICEPRINCIPAL: $(azext_iot_testserviceprincipal)

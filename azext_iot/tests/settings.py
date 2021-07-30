@@ -4,8 +4,9 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import enum
 from os import environ
-
+from enum import Enum
 
 ENV_SET_TEST_IOTHUB_REQUIRED = [
     "azext_iot_testrg"
@@ -14,8 +15,14 @@ ENV_SET_TEST_IOTHUB_REQUIRED = [
 ENV_SET_TEST_IOTHUB_OPTIONAL = [
     "azext_iot_testhub",
     "azext_iot_teststorageaccount",
-    "azext_iot_teststoragecontainer"
+    "azext_iot_teststoragecontainer",
+    "azext_iot_testserviceprincipal"
 ]
+
+
+class UserTypes(Enum):
+    user = "user"
+    servicePrincipal = "servicePrincipal"
 
 
 class Setting(object):
