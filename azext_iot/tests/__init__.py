@@ -162,7 +162,6 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     )
                 )
                 profile.refresh_accounts()
-                sys.exit()
                 time.sleep(ROLE_ASSIGNMENT_REFRESH_TIME)
 
         self.region = self.get_region()
