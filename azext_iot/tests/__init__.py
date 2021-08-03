@@ -36,7 +36,7 @@ ENTITY_NAME = settings.env.azext_iot_testhub if settings.env.azext_iot_testhub e
 STORAGE_CONTAINER = (
     settings.env.azext_iot_teststoragecontainer if settings.env.azext_iot_teststoragecontainer else DEFAULT_CONTAINER
 )
-ROLE_ASSIGNMENT_REFRESH_TIME = 30
+ROLE_ASSIGNMENT_REFRESH_TIME = 60
 
 
 @contextmanager
