@@ -18,14 +18,12 @@ class TestIoTHubTopicSpace(CaptureOutputLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTHubTopicSpace, self).__init__(test_case)
 
-    def test_topic_space(self):
+    def test_overall_topic_space(self):
         topic_names = [f"ts_{generate_generic_id()}" for _ in range(10)]
         topic_types = ["LowFanout", "PublishOnly"]
         topic_templates = [
             f"t{generate_generic_id()}",
-            f"'t{generate_generic_id()} t{generate_generic_id()}'",
             f"t{generate_generic_id()},t{generate_generic_id()}",
-            f"'[t{generate_generic_id()} t{generate_generic_id()}]'",
             f"'[t{generate_generic_id()},t{generate_generic_id()}]'",
             f"t{generate_generic_id()}/#",
             f"t{generate_generic_id()}/+",
@@ -129,6 +127,31 @@ class TestIoTHubTopicSpace(CaptureOutputLiveScenarioTest):
             )
         ).get_output_in_json()
         assert len(topics) == initial_count
+
+    def test_topic_space_templates(self):
+        topic_name = generate_generic_id()
+        working_templates = [
+            " ", "/", "+", "#", "\\", "/+", "/#", "//", "/ ", "+/", " /", "/ /", "+/+",
+            "hello,HELLO", "hello,/hello", "+,/finance", "+,+/+,+/+/+,+/+/+/+",
+            "d${hello}", "/${hello}"
+        ]
+        non_working_templates = [
+            " #", " +", "h#", "h+", "#/", "+ ", "$", "$d", "/$", "/$d", "${d}#", "${d}+",
+            "hello,hello", "#,an/y/th/in/g", "+,#", "+,finance", "+/+,/+", "+/+,+/", "+/+,/",
+            "/${hello},/${hello  }", ""
+        ]
+
+        for template in working_templates:
+            topic = self.cmd(
+                "iot hub topic-space create -l {} --name {} --type {} --template {}".format(
+                    LIVE_HUB_CS,
+                    topic_name,
+                    "LowFanout",
+                    template
+                )
+            ).get_output_in_json()
+            assert_topic_space_attributes(topic, topic_name, "LowFanout", template)
+
 
 
 def assert_topic_space_attributes(result, expected_name, expected_type, input_template):
