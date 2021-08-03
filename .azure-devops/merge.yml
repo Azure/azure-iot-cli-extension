@@ -26,11 +26,20 @@ variables:
   iot_ext_package: azure-iot
   iot_ext_venv: venv
 
+parameters:
+- name: linuxImage
+  type: string
+  default: 'ubuntu-16.04'
+  values:
+  - 'ubuntu-16.04'
+  - 'ubuntu-18.04'
+  - 'ubuntu-latest'
+
 jobs:
 
 - job: 'build_and_publish_azure_iot_cli_ext'
   pool:
-    vmImage: 'Ubuntu-16.04'
+    vmImage: ${{ parameters.linuxImage }}
 
   steps:
   - task: UsePythonVersion@0
@@ -43,7 +52,7 @@ jobs:
 
 - job: 'build_and_publish_azure_cli_test_sdk'
   pool:
-    vmImage: 'Ubuntu-16.04'
+    vmImage: ${{ parameters.linuxImage }}
 
   steps:
   - task: UsePythonVersion@0
@@ -57,7 +66,7 @@ jobs:
 - job: 'run_unit_tests_ubuntu'
   dependsOn: [ 'build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']
   pool:
-    vmImage: 'Ubuntu-16.04'
+    vmImage: ${{ parameters.linuxImage }}
   strategy:
     matrix:
       Python36:
@@ -111,7 +120,7 @@ jobs:
 - job: 'run_style_check'
   dependsOn: ['build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']
   pool:
-    vmImage: 'Ubuntu-16.04'
+    vmImage: ${{ parameters.linuxImage }}
 
   steps:
   - task: UsePythonVersion@0
@@ -136,7 +145,7 @@ jobs:
   dependsOn: ['build_and_publish_azure_iot_cli_ext']
   displayName: 'Evaluate IoT extension command table'
   pool:
-    vmImage: 'Ubuntu-16.04'
+    vmImage: ${{ parameters.linuxImage }}
 
   steps:
   - task: UsePythonVersion@0
