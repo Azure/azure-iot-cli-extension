@@ -37,7 +37,7 @@ steps:
       scriptLocation: inlineScript
       inlineScript: |
         export COVERAGE_FILE=.coverage.all
-        pytest -vv azext_iot/tests/iothub/messaging -k "_int" --dist=loadfile -n 1 --reruns 2 --reruns-delay 60 --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml
+        pytest -vv azext_iot/tests/iothub/test_iothub_discovery_int.py -k "_int" --dist=loadfile -n 1 --reruns 2 --reruns-delay 60 --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml
 
   - task: PublishBuildArtifacts@1
     inputs:
