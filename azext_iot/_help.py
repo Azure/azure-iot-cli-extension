@@ -800,11 +800,20 @@ helps[
     - name: Create a topic space within an IoT Hub with one template.
       text: >
         az iot hub topic-space create -n {hub_name} --topic-space-name {topic_space_name}
-        --topic-type {topic_type} --topic-template {topic_template}
+        --topic-type {topic_type} --topic-template topic/template
+    - name: Create a topic space within an IoT Hub with templates read from a file.
+      text: >
+        az iot hub topic-space create -n {hub_name} --topic-space-name {topic_space_name}
+        --topic-type {topic_type} --topic-template {topic_template_txt_path}
     - name: Create a topic space within an IoT Hub with multiple templates.
       text: >
         az iot hub topic-space create -n {hub_name} --topic-space-name {topic_space_name}
-        --topic-type {topic_type} --topic-template "{topic_template1} {topic_template2} {topic_template3}"
+        --topic-type {topic_type} --topic-template "topic/template1,topic/template2,topic/template3"
+    - name: Create a topic space within an IoT Hub with variables in the template.
+            Ensure you have the single and double quotes. This will only work for Powershell.
+      text: >
+        az iot hub topic-space create -n {hub_name} --topic-space-name {topic_space_name}
+        --topic-type {topic_type} --topic-template '"device/${serviceId|portalId}/#"'
 """
 
 helps[

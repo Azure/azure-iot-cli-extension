@@ -570,11 +570,12 @@ def load_arguments(self, _):
         context.argument(
             "topic_template",
             options_list=["--topic-space-template", "--topic-template", "--tstemplate"],
-            help="List of topic space template paths. Can be provided as a space-seperated list.",
+            help="List of topic space template paths or a text file containing a list of topic "
+            "template paths. Only accepts a comma-seperated list.",
         )
         context.argument(
             "topic_type",
-            options_list=["--topic-space-type","--topic-type", "--tstype"],
+            options_list=["--topic-space-type", "--topic-type", "--tstype"],
             arg_type=get_enum_type(TopicSpaceType),
             help="Topic space type. Currently, only LowFanout and PublishOnly are supported.",
         )

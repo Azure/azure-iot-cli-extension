@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import os
 import re
 from os.path import exists, basename
 from time import time, sleep
@@ -3317,11 +3318,23 @@ def iot_hub_topic_space_create_or_update(
     login=None,
     auth_type_dataplane=None,
 ):
+    print(f"What the cli sees: ->{topic_template}<-")
     topic_type = TopicSpaceType(topic_type)
     if topic_type == TopicSpaceType.HighFanout:
         raise CLIError("Only LowFanout and PublishOnly topic types are supported right now")
 
-    topic_template = list(re.split("\s|,", topic_template.strip("[]")))
+    if os.path.exists(topic_template) and topic_template.endswith(".txt"):
+        print("this be file")
+        try:
+            topic_template = read_file_content(topic_template)
+        except OSError as e:
+            raise CLIError("Could not read file {}. Error: {}".format(topic_template, e))
+
+    # MQTT is space senitive, expression language is not
+    # Remove spaces from expression language, starting and ending brackets if provided
+    # Split topics by commas.
+    topic_template = list(re.split(r'[,]+', topic_template.strip("[]")))
+    print(f"What the list is like: ->{topic_template}<-")
 
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
@@ -3333,6 +3346,7 @@ def iot_hub_topic_space_create_or_update(
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
+    print("Now I send the stuffs")
     try:
         return service_sdk.topic_space.put_topic_space(
             id=topic_name,
