@@ -13,7 +13,7 @@ variables:
 parameters:
 - name: vmImage
   type: string
-  default: 'ubuntu-16.04'
+  default: 'ubuntu-18.04'
   values:
   - 'ubuntu-16.04'
   - 'ubuntu-18.04'
