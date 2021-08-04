@@ -814,6 +814,11 @@ helps[
       text: >
         az iot hub topic-space create -n {hub_name} --topic-space-name {topic_space_name}
         --topic-type {topic_type} --topic-template '"device/${serviceId|portalId}/#"'
+    - name: Create a topic space within an IoT Hub with variables in the template.
+            Ensure you use single quotes. This will only work for Bash.
+      text: >
+        az iot hub topic-space create -n {hub_name} --topic-space-name {topic_space_name}
+        --topic-type {topic_type} --topic-template 'device/${serviceId|portalId}/#'
 """
 
 helps[

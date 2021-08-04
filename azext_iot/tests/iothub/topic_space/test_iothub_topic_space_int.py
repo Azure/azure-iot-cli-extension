@@ -41,12 +41,11 @@ class TestIoTHubTopicSpace(CaptureOutputLiveScenarioTest):
             }
         )
 
-        initial_count =self.cmd(
+        initial_count = self.cmd(
             "iot hub topic-space list -l {}".format(
                 LIVE_HUB_CS
             )
         ).get_output_in_json()
-
 
         if len(initial_count) != 0:
             for topic in initial_count:
@@ -175,8 +174,8 @@ class TestIoTHubTopicSpace(CaptureOutputLiveScenarioTest):
             "d${hello}x{hello}"
         ]
         non_working_multiples = [
-            # "hello,hello", "#,an/y/th/in/g", "+,#", "/+,/finance", "+/+,/+", "+/+,+/", "+/+,/",
-            # "/${hello},/${hello  }", ""
+            "hello,hello", "#,an/y/th/in/g", "+,#", "/+,/finance", "+/+,/+", "+/+,+/", "+/+,/",
+            "/${hello},/${hello  }", ""
         ]
         non_working_templates = [
             " #", " +", "h#", "h+", "#/", "+ ", "$", "$d", "/$", "/$d", "${d}#", "${d}+", ",d",
@@ -184,7 +183,7 @@ class TestIoTHubTopicSpace(CaptureOutputLiveScenarioTest):
             # "hello,hello", "#,an/y/th/in/g", "+,#", "/+,/finance", "+/+,/+", "+/+,+/", "+/+,/",
             # "/${hello},/${hello  }", ""
         ]
-        non_working_templates.extend(non_working_multiples)
+        # non_working_templates.extend(non_working_multiples)
 
         for template in working_templates:
             topic = self.cmd(
@@ -207,16 +206,50 @@ class TestIoTHubTopicSpace(CaptureOutputLiveScenarioTest):
                 ),
                 expect_failure=True
             )
+
+        non_working_multiples = [t.split(",") for t in non_working_multiples]
+        topic_name2 = "ts_{}".format(generate_generic_id())
+
+        for pair in non_working_multiples:
+            # So this does not affect the pair
+            self.cmd(
+                "iot hub topic-space delete -l {} --topic-name {}".format(
+                    LIVE_HUB_CS,
+                    topic_name,
+                )
+            )
+            self.cmd(
+                "iot hub topic-space create -l {} --topic-name {} --topic-type {} --topic-template '{}'".format(
+                    LIVE_HUB_CS,
+                    topic_name,
+                    "LowFanout",
+                    pair[0]
+                )
+            )
+            self.cmd(
+                "iot hub topic-space create -l {} --topic-name {} --topic-type {} --topic-template '{}'".format(
+                    LIVE_HUB_CS,
+                    topic_name2,
+                    "LowFanout",
+                    pair[1]
+                ),
+                expect_failure=True
+            )
+
+        # Multiple topic_names
+        # Add limit tests?
         self.cmd(
             "iot hub topic-space delete -l {} --topic-name {}".format(
                 LIVE_HUB_CS,
                 topic_name,
             )
         )
-
-
-        # Multiple topic_names
-        # Add limit tests?
+        self.cmd(
+            "iot hub topic-space delete -l {} --topic-name {}".format(
+                LIVE_HUB_CS,
+                topic_name2,
+            )
+        )
 
 
 def assert_topic_space_attributes(result, expected_name, expected_type, input_template):
