@@ -9,7 +9,7 @@ from azext_iot.common.certops import create_self_signed_certificate
 from azext_iot.common.shared import AuthenticationTypeDataplane
 
 DATAPLANE_AUTH_TYPES = [
-    # AuthenticationTypeDataplane.key.value,
+    AuthenticationTypeDataplane.key.value,
     AuthenticationTypeDataplane.login.value,
     "cstring",
 ]
