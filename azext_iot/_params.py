@@ -564,18 +564,18 @@ def load_arguments(self, _):
     with self.argument_context("iot hub topic-space") as context:
         context.argument(
             "topic_name",
-            options_list=["--topic-space-name", "--topic-name", "--tn"],
+            options_list=["--topic-space-name", "--topic-name"],
             help="Topic space name.",
         )
         context.argument(
             "topic_template",
-            options_list=["--topic-space-template", "--topic-template", "--tstemplate"],
+            options_list=["--topic-space-template", "--topic-template"],
             help="List of topic space template paths or a text file containing a list of topic "
             "template paths. Only accepts a comma-seperated list.",
         )
         context.argument(
             "topic_type",
-            options_list=["--topic-space-type", "--topic-type", "--tstype"],
+            options_list=["--topic-space-type", "--topic-type"],
             arg_type=get_enum_type(TopicSpaceType),
             help="Topic space type. Currently, only LowFanout and PublishOnly are supported.",
         )
