@@ -213,7 +213,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
         if hub_id not in storage_account_roles:
             self.cmd(
-                'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
+                'role assignment create --assignee-object-id "{}" --assignee-principal-type ServicePrincipal --role "{}" --scope "{}"'.format(
                     hub_id, storage_role, LIVE_STORAGE_RESOURCE_ID
                 )
             )
@@ -309,7 +309,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
         if identity_principal not in storage_account_roles:
             self.cmd(
-                'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
+                'role assignment create --assignee-object-id "{}" --assignee-principal-type ServicePrincipal --role "{}" --scope "{}"'.format(
                     identity_principal, storage_role, LIVE_STORAGE_RESOURCE_ID
                 )
             )
