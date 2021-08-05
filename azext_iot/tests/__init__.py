@@ -19,6 +19,8 @@ from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRE
 from azext_iot.tests.generators import generate_generic_id
 from azure.cli.core._profile import Profile
 from azure.cli.core.mock import DummyCli
+from azext_iot._factory import iot_hub_service_factory
+from azext_iot.common.deps import ensure_uamqp
 
 PREFIX_DEVICE = "test-device-"
 PREFIX_EDGE_DEVICE = "test-edge-device-"
@@ -131,27 +133,36 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     "iot hub show -n {} -g {}".format(self.entity_name, self.entity_rg)
                 ).get_output_in_json()
 
-                profile = Profile(cli_ctx=DummyCli())
-                subscription = profile.get_subscription()
-                user = subscription["user"]
+                cli_ctx = DummyCli()
+                client = iot_hub_service_factory(cli_ctx)
+                config = client.cli_ctx.config
+                ensure_uamqp(config, yes=True)
+                
+                profile = Profile(cli_ctx=cli_ctx)
+                # subscription = profile.get_subscription()
+                # user = subscription["user"]
 
-                if user["type"] == UserTypes.user.value:
-                    user_name = user["name"]
-                elif user["type"] == UserTypes.servicePrincipal.value:
-                    if settings.env.azext_iot_testserviceprincipal:
-                        user_name = settings.env.azext_iot_testserviceprincipal
-                    else:
-                        raise CLIError("Service Principal name not provided! Can't run test(s).")
-                else:
-                    userType = user["type"]
-                    raise CLIError(f"User type {userType} not supported. Can't run test(s).")
+                # if user["type"] == UserTypes.user.value:
+                #     user_name = user["name"]
+                # elif user["type"] == UserTypes.servicePrincipal.value:
+                #     if settings.env.azext_iot_testserviceprincipal:
+                #         user_name = settings.env.azext_iot_testserviceprincipal
+                #     else:
+                #         raise CLIError("Service Principal name not provided! Can't run test(s).")
+                # else:
+                #     userType = user["type"]
+                #     raise CLIError(f"User type {userType} not supported. Can't run test(s).")
+
+                account = self.cmd("account show").get_output_in_json()
+                user = account["user"]
 
                 # assign IoT Hub Data Contributor role to current user
                 self.cmd(
                     '''role assignment create --assignee "{}" --role "{}" --scope "{}"'''.format(
-                        user_name, USER_ROLE, new_hub["id"]
+                        user["name"], USER_ROLE, new_hub["id"]
                     )
                 )
+                sys.exit()
                 profile.refresh_accounts()
                 time.sleep(ROLE_ASSIGNMENT_REFRESH_TIME)
 

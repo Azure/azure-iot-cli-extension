@@ -103,13 +103,6 @@ class TestEnsureUamqp(object):
         test_import = mocker.patch("azext_iot.common.deps.test_import")
         test_import.return_value = True
         m_exit = mocker.patch("azext_iot.common.deps.sys.exit")
-        get_subscription = mocker.patch("azure.cli.core._profile.Profile.get_subscription")
-        get_subscription.return_value = {
-            "user": {
-                "name": "testUser",
-                "type": "user"
-            }
-        }
 
         return {
             "get_uamqp": get_uamqp,
