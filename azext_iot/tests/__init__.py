@@ -133,12 +133,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     "iot hub show -n {} -g {}".format(self.entity_name, self.entity_rg)
                 ).get_output_in_json()
 
-                cli_ctx = DummyCli()
-                client = iot_hub_service_factory(cli_ctx)
-                config = client.cli_ctx.config
-                ensure_uamqp(config, yes=True)
-                
-                profile = Profile(cli_ctx=cli_ctx)
+                profile = Profile(cli_ctx=DummyCli())
                 # subscription = profile.get_subscription()
                 # user = subscription["user"]
 
