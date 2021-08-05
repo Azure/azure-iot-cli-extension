@@ -23,10 +23,10 @@ def ensure_uamqp(config, yes=False, repair=False):
         subscription = profile.get_subscription()
         user = subscription["user"]
 
-        # System user cannot provide input so interactive flow is skipped and dependency is updated 
+        # System user cannot provide input so interactive flow is skipped and dependency is updated
         if not yes and user["type"] != UserTypes.servicePrincipal.value:
             input_txt = ('Dependency update ({} {}) required for IoT extension version: {}. {}'
-                        'Continue? (y/n) -> ').format(EVENT_LIB[0], EVENT_LIB[1], VERSION, linesep)
+                         'Continue? (y/n) -> ').format(EVENT_LIB[0], EVENT_LIB[1], VERSION, linesep)
             i = input(input_txt)
             if i.lower() != 'y':
                 sys.exit('User has declined update...')

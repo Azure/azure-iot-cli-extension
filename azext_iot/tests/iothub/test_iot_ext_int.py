@@ -42,11 +42,11 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
         super(TestIoTStorage, self).__init__(test_case)
         self.managed_identity = None
-        
+
         profile = Profile(cli_ctx=DummyCli())
         subscription = profile.get_subscription()
         self.user = subscription["user"]
-        
+
         if LIVE_STORAGE_ACCOUNT:
             self.live_storage_uri = self.get_container_sas_url()
 
@@ -96,7 +96,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
         self.managed_identity = result
         return self.managed_identity
-    
+
     def assign_storage_role(self, assignee):
         if self.user["type"] == UserTypes.user.value:
             self.cmd(
@@ -106,8 +106,8 @@ class TestIoTStorage(IoTLiveScenarioTest):
             )
         elif self.user["type"] == UserTypes.servicePrincipal.value:
             self.cmd(
-                'role assignment create --assignee-object-id "{}" --role "{}" --scope "{}" --assignee-principal-type ServicePrincipal'.format(
-                    assignee, STORAGE_ROLE, LIVE_STORAGE_RESOURCE_ID
+                'role assignment create --assignee-object-id "{}" --role "{}" --scope "{}" --assignee-principal-type "{}"'.format(
+                    assignee, STORAGE_ROLE, LIVE_STORAGE_RESOURCE_ID, "ServicePrincipal"
                 )
             )
         else:
