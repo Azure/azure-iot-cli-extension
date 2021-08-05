@@ -142,11 +142,11 @@ class TestIoTHubTopicSpace(CaptureOutputLiveScenarioTest):
                 LIVE_HUB_CS,
                 file_topic_name,
                 topic_types[0],
-                "./example_file.txt"
+                "./example_json.json"
             )
         ).get_output_in_json()
-        with open("./example_file.txt") as f:
-            expected_template = f.read().split("\n")
+        with open("./example_json.json") as f:
+            expected_template = json.loads(f.read())
             assert_topic_space_attributes(topic, file_topic_name, topic_types[0], expected_template)
 
         self.cmd(

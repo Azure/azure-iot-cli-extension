@@ -801,7 +801,7 @@ helps[
       text: >
         az iot hub topic-space create -n {hub_name} --tsn {topic_space_name}
         --tst {topic_type} --template topic/template
-    - name: Create a topic space within an IoT Hub with templates read from a file.
+    - name: Create a topic space within an IoT Hub with templates from a json file.
       text: >
         az iot hub topic-space create -n {hub_name} --tsn {topic_space_name}
         --tst {topic_type} --template {topic_template_txt_path}

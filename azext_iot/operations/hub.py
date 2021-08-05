@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import os
+import json
 from os.path import exists, basename
 from time import time, sleep
 from knack.log import get_logger
@@ -3331,9 +3332,9 @@ def iot_hub_topic_space_create(
     if topic_type == TopicSpaceType.HighFanout:
         raise CLIError("Only LowFanout and PublishOnly topic types are supported right now")
 
-    if topic_template[0].endswith(".txt") and os.path.exists(topic_template[0]):
+    if topic_template[0].endswith(".json") and os.path.exists(topic_template[0]):
         try:
-            topic_template = read_file_content(topic_template[0]).splitlines()
+            topic_template = json.loads(read_file_content(topic_template[0]))
         except OSError as e:
             raise CLIError("Could not read file {}. Error: {}".format(topic_template, e))
 
@@ -3429,9 +3430,9 @@ def iot_hub_topic_space_update(
     except CloudError as e:
         raise CLIError(unpack_msrest_error(e))
 
-    if topic_template[0].endswith(".txt") and os.path.exists(topic_template[0]):
+    if topic_template[0].endswith(".json") and os.path.exists(topic_template[0]):
         try:
-            topic_template = read_file_content(topic_template[0]).splitlines()
+            topic_template = json.loads(read_file_content(topic_template[0]))
         except OSError as e:
             raise CLIError("Could not read file {}. Error: {}".format(topic_template, e))
 
