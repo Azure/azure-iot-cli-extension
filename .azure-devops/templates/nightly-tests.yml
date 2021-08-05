@@ -37,7 +37,7 @@ steps:
       scriptLocation: inlineScript
       inlineScript: |
         export COVERAGE_FILE=.coverage.all
-        pytest azext_iot/tests/central/test_iot_central_int.py -k "test_central_api_token_methods_CRD" --dist=loadfile -n 1 --reruns 2 --reruns-delay 60 --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml
+        pytest -vv azext_iot/tests/iothub -k "_int" --dist=loadfile -n 12 --reruns 2 --reruns-delay 60 --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml
 
   - task: PublishBuildArtifacts@1
     inputs:
