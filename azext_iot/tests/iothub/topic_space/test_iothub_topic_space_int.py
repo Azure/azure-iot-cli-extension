@@ -4,7 +4,6 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import re
 import json
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests import CaptureOutputLiveScenarioTest
@@ -22,12 +21,11 @@ class TestIoTHubTopicSpace(CaptureOutputLiveScenarioTest):
         topic_types = ["LowFanout", "PublishOnly"]
         topic_templates = [
             f"t{generate_generic_id()}",
-            f"t{generate_generic_id()},t{generate_generic_id()}",
-            f"'[t{generate_generic_id()},t{generate_generic_id()}]'",
+            f"t{generate_generic_id()} t{generate_generic_id()}",
             f"t{generate_generic_id()}/#",
             f"t{generate_generic_id()}/+",
             f"t{generate_generic_id()}/+/t{generate_generic_id()}",
-            f"'\"t{generate_generic_id()}/+/" + "${service.device}\"'",
+            f"t{generate_generic_id()}/+/" + "${service.device}",
             f"t{generate_generic_id()}/+/" + "${service.device|service.pipeline}",
         ]
         topic_names = [
@@ -50,7 +48,7 @@ class TestIoTHubTopicSpace(CaptureOutputLiveScenarioTest):
         if len(initial_count) != 0:
             for topic in initial_count:
                 self.cmd(
-                    "iot hub topic-space delete -l {} --topic-name {}".format(
+                    "iot hub topic-space delete -l {} --tsn {}".format(
                         LIVE_HUB_CS,
                         topic["name"],
                     )
@@ -61,41 +59,41 @@ class TestIoTHubTopicSpace(CaptureOutputLiveScenarioTest):
             tname = topic_names[x]
             ttype = topic_types[x % len(topic_types)]
             ttemplate = topic_templates[x]
-            print(tname, ttype, ttemplate)
+            expected_template = ttemplate.split(" ")
 
             topic = self.cmd(
-                "iot hub topic-space create -l {} --topic-name {} --topic-type {} --topic-template {}".format(
+                "iot hub topic-space create -l {} --tsn {} --tst {} --template {}".format(
                     LIVE_HUB_CS,
                     tname,
                     ttype,
                     ttemplate
                 )
             ).get_output_in_json()
-            assert_topic_space_attributes(topic, tname, ttype, ttemplate)
+            assert_topic_space_attributes(topic, tname, ttype, expected_template)
 
             # Update templates
             ttemplate = ttemplate.replace("t", "d")
+            expected_template = ttemplate.split(" ")
             topic = self.cmd(
-                "iot hub topic-space update -l {} --topic-name {} --topic-type {} --topic-template {}".format(
+                "iot hub topic-space update -l {} --tsn {} --template {}".format(
                     LIVE_HUB_CS,
                     tname,
-                    ttype,
                     ttemplate
                 )
             ).get_output_in_json()
-            assert_topic_space_attributes(topic, tname, ttype, ttemplate)
+            assert_topic_space_attributes(topic, tname, ttype, expected_template)
 
             topic = self.cmd(
-                "iot hub topic-space show -l {} --topic-name {} ".format(
+                "iot hub topic-space show -l {} --tsn {} ".format(
                     LIVE_HUB_CS,
                     tname
                 )
             ).get_output_in_json()
-            assert_topic_space_attributes(topic, tname, ttype, ttemplate)
+            assert_topic_space_attributes(topic, tname, ttype, expected_template)
 
         # Check that type cannot be changed
         self.cmd(
-            "iot hub topic-space create -l {} --topic-name {} --topic-type {} --topic-template {}".format(
+            "iot hub topic-space create -l {} --tsn {} --tst {} --template {}".format(
                 LIVE_HUB_CS,
                 topic_names[0],
                 topic_types[1],
@@ -106,7 +104,7 @@ class TestIoTHubTopicSpace(CaptureOutputLiveScenarioTest):
 
         # Check that templates cannot be overlapped
         self.cmd(
-            "iot hub topic-space create -l {} --topic-name {} --topic-type {} --topic-template {}".format(
+            "iot hub topic-space create -l {} --tsn {} --tst {} --template {}".format(
                 LIVE_HUB_CS,
                 generate_generic_id(),
                 topic_types[0],
@@ -124,7 +122,7 @@ class TestIoTHubTopicSpace(CaptureOutputLiveScenarioTest):
 
         for tname in topic_names:
             self.cmd(
-                "iot hub topic-space delete -l {} --topic-name {}".format(
+                "iot hub topic-space delete -l {} --tsn {}".format(
                     LIVE_HUB_CS,
                     tname,
                 )
@@ -137,6 +135,27 @@ class TestIoTHubTopicSpace(CaptureOutputLiveScenarioTest):
         ).get_output_in_json()
         assert len(topics) == 0
 
+        # File read check
+        file_topic_name = "ts_{}".format(generate_generic_id())
+        topic = self.cmd(
+            "iot hub topic-space create -l {} --tsn {} --tst {} --template {}".format(
+                LIVE_HUB_CS,
+                file_topic_name,
+                topic_types[0],
+                "./example_file.txt"
+            )
+        ).get_output_in_json()
+        with open("./example_file.txt") as f:
+            expected_template = f.read().split("\n")
+            assert_topic_space_attributes(topic, file_topic_name, topic_types[0], expected_template)
+
+        self.cmd(
+            "iot hub topic-space delete -l {} --tsn {}".format(
+                LIVE_HUB_CS,
+                file_topic_name,
+            )
+        )
+
     def test_topic_space_templates(self):
         # Clear topics if need be
         topics = self.cmd(
@@ -147,7 +166,7 @@ class TestIoTHubTopicSpace(CaptureOutputLiveScenarioTest):
         if len(topics) != 0:
             for topic in topics:
                 self.cmd(
-                    "iot hub topic-space delete -l {} --topic-name {}".format(
+                    "iot hub topic-space delete -l {} --tsn {}".format(
                         LIVE_HUB_CS,
                         topic["name"],
                     )
@@ -175,7 +194,7 @@ class TestIoTHubTopicSpace(CaptureOutputLiveScenarioTest):
         ]
         non_working_multiples = [
             "hello,hello", "#,an/y/th/in/g", "+,#", "/+,/finance", "+/+,/+", "+/+,+/", "+/+,/",
-            "/${hello},/${hello  }", ""
+            "/${hello},/${hello  }"
         ]
         non_working_templates = [
             " #", " +", "h#", "h+", "#/", "+ ", "$", "$d", "/$", "/$d", "${d}#", "${d}+", ",d",
@@ -186,19 +205,23 @@ class TestIoTHubTopicSpace(CaptureOutputLiveScenarioTest):
         # non_working_templates.extend(non_working_multiples)
 
         for template in working_templates:
+            expected_template = template.split(",")
+            template = "' '".join(expected_template)
             topic = self.cmd(
-                "iot hub topic-space create -l {} --topic-name {} --topic-type {} --topic-template '{}'".format(
+                "iot hub topic-space create -l {} --tsn {} --tst {} --template '{}'".format(
                     LIVE_HUB_CS,
                     topic_name,
                     "LowFanout",
                     template
                 )
             ).get_output_in_json()
-            assert_topic_space_attributes(topic, topic_name, "LowFanout", template)
+            assert_topic_space_attributes(topic, topic_name, "LowFanout", expected_template)
 
         for template in non_working_templates:
+            expected_template = template.split(",")
+            template = "' '".join(expected_template)
             topic = self.cmd(
-                "iot hub topic-space create -l {} --topic-name {} --topic-type {} --topic-template '{}'".format(
+                "iot hub topic-space create -l {} --tsn {} --tst {} --template '{}'".format(
                     LIVE_HUB_CS,
                     topic_name,
                     "LowFanout",
@@ -213,13 +236,13 @@ class TestIoTHubTopicSpace(CaptureOutputLiveScenarioTest):
         for pair in non_working_multiples:
             # So this does not affect the pair
             self.cmd(
-                "iot hub topic-space delete -l {} --topic-name {}".format(
+                "iot hub topic-space delete -l {} --tsn {}".format(
                     LIVE_HUB_CS,
                     topic_name,
                 )
             )
             self.cmd(
-                "iot hub topic-space create -l {} --topic-name {} --topic-type {} --topic-template '{}'".format(
+                "iot hub topic-space create -l {} --tsn {} --tst {} --template {}".format(
                     LIVE_HUB_CS,
                     topic_name,
                     "LowFanout",
@@ -227,7 +250,7 @@ class TestIoTHubTopicSpace(CaptureOutputLiveScenarioTest):
                 )
             )
             self.cmd(
-                "iot hub topic-space create -l {} --topic-name {} --topic-type {} --topic-template '{}'".format(
+                "iot hub topic-space create -l {} --tsn {} --tst {} --template {}".format(
                     LIVE_HUB_CS,
                     topic_name2,
                     "LowFanout",
@@ -239,21 +262,20 @@ class TestIoTHubTopicSpace(CaptureOutputLiveScenarioTest):
         # Multiple topic_names
         # Add limit tests?
         self.cmd(
-            "iot hub topic-space delete -l {} --topic-name {}".format(
+            "iot hub topic-space delete -l {} --tsn {}".format(
                 LIVE_HUB_CS,
                 topic_name,
             )
         )
-        self.cmd(
-            "iot hub topic-space delete -l {} --topic-name {}".format(
-                LIVE_HUB_CS,
-                topic_name2,
-            )
-        )
+        # self.cmd(
+        #     "iot hub topic-space delete -l {} --tsn {}".format(
+        #         LIVE_HUB_CS,
+        #         topic_name2,
+        #     )
+        # )
 
 
-def assert_topic_space_attributes(result, expected_name, expected_type, input_template):
-    expected_template = list(re.split(",", input_template.strip("[]'")))
+def assert_topic_space_attributes(result, expected_name, expected_type, expected_template):
     assert result["name"] == expected_name
     assert result["properties"]["topicspaceType"] == expected_type
     assert result["properties"]["topicTemplates"] == expected_template

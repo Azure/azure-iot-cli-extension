@@ -5,7 +5,6 @@
 # --------------------------------------------------------------------------------------------
 
 import os
-import re
 from os.path import exists, basename
 from time import time, sleep
 from knack.log import get_logger
@@ -3308,7 +3307,7 @@ def _customize_device_tracing_output(device_id, desired, reported):
 # Topic Space Preview
 
 
-def iot_hub_topic_space_create_or_update(
+def iot_hub_topic_space_create(
     cmd,
     topic_name,
     topic_template,
@@ -3318,18 +3317,6 @@ def iot_hub_topic_space_create_or_update(
     login=None,
     auth_type_dataplane=None,
 ):
-    topic_type = TopicSpaceType(topic_type)
-    if topic_type == TopicSpaceType.HighFanout:
-        raise CLIError("Only LowFanout and PublishOnly topic types are supported right now")
-
-    if os.path.exists(topic_template) and topic_template.endswith(".txt"):
-        try:
-            topic_template = read_file_content(topic_template)
-        except OSError as e:
-            raise CLIError("Could not read file {}. Error: {}".format(topic_template, e))
-
-    topic_template = list(re.split(r'[,]+', topic_template.strip("[]")))
-
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         hub_name=hub_name,
@@ -3339,6 +3326,16 @@ def iot_hub_topic_space_create_or_update(
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
+
+    topic_type = TopicSpaceType(topic_type)
+    if topic_type == TopicSpaceType.HighFanout:
+        raise CLIError("Only LowFanout and PublishOnly topic types are supported right now")
+
+    if topic_template[0].endswith(".txt") and os.path.exists(topic_template[0]):
+        try:
+            topic_template = read_file_content(topic_template[0]).splitlines()
+        except OSError as e:
+            raise CLIError("Could not read file {}. Error: {}".format(topic_template, e))
 
     try:
         return service_sdk.topic_space.put_topic_space(
@@ -3399,6 +3396,53 @@ def iot_hub_topic_space_list(
 
     try:
         return service_sdk.topic_space.list_topic_spaces(
+            raw=True
+        ).response.json()
+    except CloudError as e:
+        raise CLIError(unpack_msrest_error(e))
+
+
+def iot_hub_topic_space_update(
+    cmd,
+    topic_name,
+    topic_template,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
+):
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
+    resolver = SdkResolver(target=target)
+    service_sdk = resolver.get_sdk(SdkType.service_sdk)
+
+    try:
+        topic_instance = service_sdk.topic_space.get_topic_space(
+            id=topic_name, raw=True
+        ).response.json()
+        topic_type = topic_instance["properties"]["topicspaceType"]
+    except CloudError as e:
+        raise CLIError(unpack_msrest_error(e))
+
+    if topic_template[0].endswith(".txt") and os.path.exists(topic_template[0]):
+        try:
+            topic_template = read_file_content(topic_template[0]).splitlines()
+        except OSError as e:
+            raise CLIError("Could not read file {}. Error: {}".format(topic_template, e))
+
+    try:
+        return service_sdk.topic_space.put_topic_space(
+            id=topic_name,
+            name=topic_name,
+            properties={
+                "topicspace_type": topic_type,
+                "topic_templates": topic_template
+            },
             raw=True
         ).response.json()
     except CloudError as e:
