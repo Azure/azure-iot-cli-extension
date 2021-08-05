@@ -106,7 +106,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
             )
         elif self.user["type"] == UserTypes.servicePrincipal.value:
             self.cmd(
-                'role assignment create --assignee-object-id "{}" --role "{}" --scope "{}" --assignee-principal-type "{}"'.format(
+                'role assignment create --assignee-object-id "{}" --role "{}" --scope "{}" --assignee-principal-type {}'.format(
                     assignee, STORAGE_ROLE, LIVE_STORAGE_RESOURCE_ID, "ServicePrincipal"
                 )
             )
