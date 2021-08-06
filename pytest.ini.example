@@ -28,4 +28,3 @@ env =
     azext_dt_ep_eventhub_policy=
     azext_dt_ep_eventhub_topic=
     azext_dt_ep_rg=
-    azext_iot_testserviceprincipal=
