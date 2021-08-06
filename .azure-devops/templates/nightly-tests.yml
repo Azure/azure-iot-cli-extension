@@ -12,6 +12,15 @@ parameters:
   - min
   - released
   - edge
+- name: num_threads
+  type: int
+  default: 6
+- name: num_reruns
+  type: int
+  default: 2
+- name: reruns_delay
+  type: int
+  default: 60
 
 steps:
   - template: setup-dev-test-env.yml
@@ -37,7 +46,7 @@ steps:
       scriptLocation: inlineScript
       inlineScript: |
         export COVERAGE_FILE=.coverage.all
-        pytest -vv azext_iot/tests/dps -k "_int" --dist=loadfile -n 1 --reruns 2 --reruns-delay 60 --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml
+        pytest -vv azext_iot/tests/iothub -k "_int" --dist=loadfile -n $({parameters.num_threads}) --reruns $({parameters.num_reruns}) --reruns-delay $({parameters.reruns_delay}) --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml
 
   - task: PublishBuildArtifacts@1
     inputs:
