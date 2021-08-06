@@ -7,7 +7,6 @@
 import sys
 import io
 import os
-from knack.util import CLIError
 import pytest
 import time
 
@@ -15,12 +14,10 @@ from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
 from azure.cli.testsdk import LiveScenarioTest
 from contextlib import contextmanager
 from typing import List
-from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL, UserTypes
+from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
 from azext_iot.tests.generators import generate_generic_id
 from azure.cli.core._profile import Profile
 from azure.cli.core.mock import DummyCli
-from azext_iot._factory import iot_hub_service_factory
-from azext_iot.common.deps import ensure_uamqp
 
 PREFIX_DEVICE = "test-device-"
 PREFIX_EDGE_DEVICE = "test-edge-device-"
@@ -133,8 +130,6 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     "iot hub show -n {} -g {}".format(self.entity_name, self.entity_rg)
                 ).get_output_in_json()
 
-                profile = Profile(cli_ctx=DummyCli())
-
                 account = self.cmd("account show").get_output_in_json()
                 user = account["user"]
 
@@ -145,6 +140,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     )
                 )
 
+                profile = Profile(cli_ctx=DummyCli())
                 profile.refresh_accounts()
                 time.sleep(ROLE_ASSIGNMENT_REFRESH_TIME)
 
