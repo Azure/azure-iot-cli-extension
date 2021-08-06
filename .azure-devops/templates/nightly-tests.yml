@@ -39,14 +39,25 @@ steps:
 
   - task: AzureCLI@2
     continueOnError: true
-    displayName: 'All integration tests'
+    displayName: 'IoTHub integration tests'
     inputs:
       azureSubscription: az_cli_nightly_conn
       scriptType: bash
       scriptLocation: inlineScript
       inlineScript: |
         export COVERAGE_FILE=.coverage.all
-        pytest -vv azext_iot/tests -k "_int" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml
+        pytest -vv azext_iot/tests/iothub -k "_int" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --deselect=azext_iot\tests\iothub\test_iothub_discovery_int.py::TestIoTHubDiscovery::test_iothub_targets
+
+  - task: AzureCLI@2
+    continueOnError: true
+    displayName: 'Non IoTHub integration tests'
+    inputs:
+      azureSubscription: az_cli_nightly_conn
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: |
+        export COVERAGE_FILE=.coverage.all
+        pytest -vv azext_iot/tests -k "_int" --ignore=azext_iot/tests/iothub --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml
 
   - task: PublishBuildArtifacts@1
     inputs:
