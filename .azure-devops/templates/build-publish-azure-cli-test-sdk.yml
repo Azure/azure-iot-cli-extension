@@ -2,7 +2,7 @@ steps:
   - script: 'rm -rf ../azure-cli'
     displayName: 'delete azure cli directory'
 
-  - script: 'git clone -q --single-branch -b master https://github.com/Azure/azure-cli.git ../azure-cli'
+  - script: 'git clone -q --single-branch -b main https://github.com/Azure/azure-cli.git ../azure-cli'
     displayName: 'Clone Azure CLI repository'
 
   - script: 'pip install --upgrade .'
