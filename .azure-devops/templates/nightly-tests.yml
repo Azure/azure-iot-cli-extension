@@ -13,13 +13,13 @@ parameters:
   - released
   - edge
 - name: num_threads
-  type: int
+  type: integer
   default: 6
 - name: num_reruns
-  type: int
+  type: integer
   default: 2
 - name: reruns_delay
-  type: int
+  type: integer
   default: 60
 
 steps:
