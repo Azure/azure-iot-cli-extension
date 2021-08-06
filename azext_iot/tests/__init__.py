@@ -134,19 +134,6 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 ).get_output_in_json()
 
                 profile = Profile(cli_ctx=DummyCli())
-                # subscription = profile.get_subscription()
-                # user = subscription["user"]
-
-                # if user["type"] == UserTypes.user.value:
-                #     user_name = user["name"]
-                # elif user["type"] == UserTypes.servicePrincipal.value:
-                #     if settings.env.azext_iot_testserviceprincipal:
-                #         user_name = settings.env.azext_iot_testserviceprincipal
-                #     else:
-                #         raise CLIError("Service Principal name not provided! Can't run test(s).")
-                # else:
-                #     userType = user["type"]
-                #     raise CLIError(f"User type {userType} not supported. Can't run test(s).")
 
                 account = self.cmd("account show").get_output_in_json()
                 user = account["user"]
@@ -157,7 +144,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                         user["name"], USER_ROLE, new_hub["id"]
                     )
                 )
-                sys.exit()
+
                 profile.refresh_accounts()
                 time.sleep(ROLE_ASSIGNMENT_REFRESH_TIME)
 

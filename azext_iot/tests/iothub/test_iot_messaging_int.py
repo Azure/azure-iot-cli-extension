@@ -52,7 +52,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         # Send C2D message
         self.cmd(
             """iot device c2d-message send -d {} -n {} -g {} --data '{}' --cid {} --mid {} --ct {} --expiry {}
-            --ce {} --props {}""".format(
+            --ce {} --props {} -y""".format(
                 device_ids[0],
                 self.entity_name,
                 self.entity_rg,
@@ -108,7 +108,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         self.cmd(
             """iot device c2d-message send -d {} --login {} --data '{}' --cid {} --mid {} --ct {} --expiry {}
-            --ce {} --ack positive --props {}""".format(
+            --ce {} --ack positive --props {} -y""".format(
                 device_ids[0],
                 self.connection_string,
                 "{c2d_json_send_data}",
@@ -911,7 +911,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         num_messages = 3
         for i in range(num_messages):
             self.cmd(
-                "iot device c2d-message send -d {} --login {}".format(
+                "iot device c2d-message send -d {} --login {} -y".format(
                     device_ids[0], self.connection_string
                 ),
                 checks=self.is_empty(),
@@ -948,7 +948,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         # Receive with auto-ack
         for ack_test in ["complete", "abandon", "reject"]:
             self.cmd(
-                "iot device c2d-message send -d {} --login {}".format(
+                "iot device c2d-message send -d {} --login {} -y".format(
                     device_ids[0], self.connection_string
                 ),
                 checks=self.is_empty(),

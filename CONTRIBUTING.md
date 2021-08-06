@@ -131,7 +131,6 @@ You can either manually set the environment variables or use the `pytest.ini.exa
     azext_iot_identity_teststorageid="Storage Account ID"
     azext_iot_teststorageaccount="Storage Account Name"
     azext_iot_teststoragecontainer="Blob container name"
-    azext_iot_testserviceprincipal="Service Prinicipal name / AAD App ID of the service connection used by Azure DevOps agent for running integration tests"
 ```
 
 `azext_iot_identity_teststorageid` is optional and only required when you want to test Identity-Based device export and file upload functionality. During this test, your hub will be assigned a System-Assigned AAD identity, and will be granted the role of "Storage Blob Data Contributor" on the storage account you provide. Both the hub's identity and the RBAC role will be removed once the test completes.
