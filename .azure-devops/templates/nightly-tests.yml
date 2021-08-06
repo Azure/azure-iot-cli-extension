@@ -14,7 +14,7 @@ parameters:
   - edge
 - name: num_threads
   type: number
-  default: 6
+  default: 1
 - name: num_reruns
   type: number
   default: 2
@@ -46,7 +46,7 @@ steps:
       scriptLocation: inlineScript
       inlineScript: |
         export COVERAGE_FILE=.coverage.all
-        pytest -vv azext_iot/tests/iothub -k "_int" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml
+        pytest -vv azext_iot/tests/dps -k "_int" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml
 
   - task: PublishBuildArtifacts@1
     inputs:
