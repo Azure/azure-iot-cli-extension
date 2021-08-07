@@ -14,7 +14,7 @@ parameters:
   - edge
 - name: num_threads
   type: number
-  default: 6
+  default: 7
 - name: num_reruns
   type: number
   default: 2
