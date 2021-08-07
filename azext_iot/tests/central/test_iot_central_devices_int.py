@@ -13,7 +13,7 @@ from azext_iot.tests.conftest import get_context_path
 
 from azext_iot.central.models.enum import DeviceStatus
 
-from azext_iot.tests import CaptureOutputLiveScenarioTest, helpers
+from azext_iot.tests import helpers
 from azext_iot.tests.central.test_iot_central_int import TestIotCentral
 
 APP_ID = os.environ.get("azext_iot_central_app_id")
@@ -29,12 +29,12 @@ if not all([APP_ID]):
     raise ValueError("Set azext_iot_central_app_id to run central integration tests.")
 
 
-class TestIotCentralDevices(CaptureOutputLiveScenarioTest):
+class TestIotCentralDevices(TestIotCentral):
     def __init__(self, test_scenario):
         super(TestIotCentralDevices, self).__init__(test_scenario=test_scenario)
 
     def test_central_device_twin_show_fail(self):
-        (device_id, _) = TestIotCentral._create_device()
+        (device_id, _) = self._create_device()
 
         # Verify incorrect app-id throws error
         self.cmd(
@@ -67,11 +67,11 @@ class TestIotCentralDevices(CaptureOutputLiveScenarioTest):
             expect_failure=True,
         )
 
-        TestIotCentral._delete_device(device_id)
+        self._delete_device(device_id)
 
     def test_central_device_twin_show_success(self):
-        (template_id, _) = TestIotCentral._create_device_template()
-        (device_id, _) = TestIotCentral._create_device(template=template_id, simulated=True)
+        (template_id, _) = self._create_device_template()
+        (device_id, _) = self._create_device(template=template_id, simulated=True)
 
         # wait about a few seconds for simulator to kick in so that provisioning completes
         time.sleep(60)
@@ -90,8 +90,8 @@ class TestIotCentralDevices(CaptureOutputLiveScenarioTest):
             checks=[self.check("deviceId", device_id)],
         )
 
-        TestIotCentral._delete_device(device_id)
-        TestIotCentral._delete_device_template(template_id)
+        self._delete_device(device_id)
+        self._delete_device_template(template_id)
 
     @pytest.mark.skipif(
         not APP_SCOPE_ID, reason="empty azext_iot_central_scope_id env var"
@@ -119,13 +119,13 @@ class TestIotCentralDevices(CaptureOutputLiveScenarioTest):
             checks=[self.check("id", device_id)],
         )
 
-        TestIotCentral._delete_device(device_id)
+        self._delete_device(device_id)
 
         assert device_client.connected
 
     def test_central_device_methods_CRD(self):
 
-        (device_id, device_name) = TestIotCentral._create_device()
+        (device_id, device_name) = self._create_device()
 
         self.cmd(
             "iot central device show --app-id {} -d {}".format(APP_ID, device_id),
@@ -137,11 +137,11 @@ class TestIotCentralDevices(CaptureOutputLiveScenarioTest):
             ],
         )
 
-        TestIotCentral._delete_device(device_id)
+        self._delete_device(device_id)
 
     def test_central_device_template_methods_CRD(self):
         # currently: create, show, list, delete
-        (template_id, template_name) = TestIotCentral._create_device_template()
+        (template_id, template_name) = self._create_device_template()
 
         result = self.cmd(
             "iot central device-template show --app-id {} --device-template-id {}".format(
@@ -154,7 +154,7 @@ class TestIotCentralDevices(CaptureOutputLiveScenarioTest):
 
         assert json_result["@id"] == template_id
 
-        TestIotCentral._delete_device_template(template_id)
+        self._delete_device_template(template_id)
 
     def test_central_device_groups_list(self):
         result = self._list_device_groups()
@@ -162,8 +162,8 @@ class TestIotCentralDevices(CaptureOutputLiveScenarioTest):
         assert result is not None and (result == {} or bool(result) is True)
 
     def test_central_device_registration_info_registered(self):
-        (template_id, _) = TestIotCentral._create_device_template()
-        (device_id, device_name) = TestIotCentral._create_device(
+        (template_id, _) = self._create_device_template()
+        (device_id, device_name) = self._create_device(
             template=template_id, simulated=False
         )
 
@@ -173,8 +173,8 @@ class TestIotCentralDevices(CaptureOutputLiveScenarioTest):
             )
         )
 
-        TestIotCentral._delete_device(device_id)
-        TestIotCentral._delete_device_template(template_id)
+        self._delete_device(device_id)
+        self._delete_device_template(template_id)
 
         json_result = result.get_output_in_json()
 
@@ -202,7 +202,7 @@ class TestIotCentralDevices(CaptureOutputLiveScenarioTest):
 
     def test_central_device_registration_info_unassociated(self):
 
-        (device_id, device_name) = TestIotCentral._create_device()
+        (device_id, device_name) = self._create_device()
 
         result = self.cmd(
             "iot central device registration-info --app-id {} -d {}".format(
@@ -210,7 +210,7 @@ class TestIotCentralDevices(CaptureOutputLiveScenarioTest):
             )
         )
 
-        TestIotCentral._delete_device(device_id)
+        self._delete_device(device_id)
 
         json_result = result.get_output_in_json()
 
@@ -258,13 +258,13 @@ class TestIotCentralDevices(CaptureOutputLiveScenarioTest):
     def test_central_device_should_start_failover_and_failback(self):
 
         # created device template & device
-        (template_id, _) = TestIotCentral._create_device_template()
-        (device_id, _) = TestIotCentral._create_device(instance_of=template_id, simulated=False)
+        (template_id, _) = self._create_device_template()
+        (device_id, _) = self._create_device(instance_of=template_id, simulated=False)
 
         command = "iot central device show-credentials --device-id {} --app-id {}".format(
             device_id, APP_ID
         )
-        command = TestIotCentral._appendOptionalArgsToCommand(command, TOKEN, DNS_SUFFIX)
+        command = self._appendOptionalArgsToCommand(command, TOKEN, DNS_SUFFIX)
 
         credentials = self.cmd(command).get_output_in_json()
 
@@ -274,7 +274,7 @@ class TestIotCentralDevices(CaptureOutputLiveScenarioTest):
             APP_ID, device_id, 5
         )
 
-        command = TestIotCentral._appendOptionalArgsToCommand(command, TOKEN, DNS_SUFFIX)
+        command = self._appendOptionalArgsToCommand(command, TOKEN, DNS_SUFFIX)
 
         # initiating failover
         result = self.cmd(command)
@@ -290,7 +290,7 @@ class TestIotCentralDevices(CaptureOutputLiveScenarioTest):
             APP_ID, device_id
         )
 
-        command = TestIotCentral._appendOptionalArgsToCommand(command, TOKEN, DNS_SUFFIX)
+        command = self._appendOptionalArgsToCommand(command, TOKEN, DNS_SUFFIX)
 
         # Initiating failback
         fb_result = self.cmd(command)
@@ -308,14 +308,14 @@ class TestIotCentralDevices(CaptureOutputLiveScenarioTest):
             " --device-id {}"
             " --ttl {}".format(APP_ID, device_id, 5)
         )
-        command = TestIotCentral._appendOptionalArgsToCommand(command, TOKEN, DNS_SUFFIX)
+        command = self._appendOptionalArgsToCommand(command, TOKEN, DNS_SUFFIX)
 
         json_result = result.get_output_in_json()
         hubIdentifierFinal = json_result["hubIdentifier"]
 
         # Cleanup
-        TestIotCentral._delete_device(device_id)
-        TestIotCentral._delete_device_template(template_id)
+        self._delete_device(device_id)
+        self._delete_device_template(template_id)
 
         assert len(hubIdentifierOriginal) > 0
         assert len(hubIdentifierFailOver) > 0
@@ -334,4 +334,4 @@ class TestIotCentralDevices(CaptureOutputLiveScenarioTest):
         device_client.get_twin()
         device_client.disconnect()
         device_client.shutdown()
-        TestIotCentral._wait_for_provisioned(device_id)
+        self._wait_for_provisioned(device_id)
