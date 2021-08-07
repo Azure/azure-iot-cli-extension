@@ -37,8 +37,8 @@ APP_SCOPE_ID = os.environ.get("azext_iot_central_scope_id")
 DEVICE_ID = os.environ.get("azext_iot_central_device_id")
 TOKEN = os.environ.get("azext_iot_central_token")
 DNS_SUFFIX = os.environ.get("azext_iot_central_dns_suffix")
-device_template_path = get_context_path(__file__, "json/device_template_int_test.json")
-sync_command_params = get_context_path(__file__, "json/sync_command_args.json")
+device_template_path = get_context_path(__file__, "central/json/device_template_int_test.json")
+sync_command_params = get_context_path(__file__, "central/json/sync_command_args.json")
 
 settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED, opt_env_set=ENV_SET_TEST_IOTHUB_OPTIONAL)
 
