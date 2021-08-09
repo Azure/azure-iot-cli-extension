@@ -14,7 +14,7 @@ parameters:
   - edge
 - name: num_threads
   type: number
-  default: 7
+  default: 6
 - name: num_reruns
   type: number
   default: 2
@@ -61,14 +61,25 @@ steps:
         
   - task: AzureCLI@2
     continueOnError: true
-    displayName: 'Non IoTHub integration tests'
+    displayName: 'Central, DPS and Product integration tests'
     inputs:
       azureSubscription: az_cli_nightly_conn
       scriptType: bash
       scriptLocation: inlineScript
       inlineScript: |
         export COVERAGE_FILE=.coverage.all
-        pytest -vv azext_iot/tests -k "_int.py" --ignore=azext_iot/tests/iothub --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml
+        pytest -vv azext_iot/tests/central azext_iot/tests/dps azext_iot/tests/product -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml
+
+  - task: AzureCLI@2
+    continueOnError: true
+    displayName: 'Digital Twins integration tests'
+    inputs:
+      azureSubscription: az_cli_nightly_conn
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: |
+        export COVERAGE_FILE=.coverage.all
+        pytest -vv azext_iot/tests/digitaltwins -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml
         
   - task: PublishBuildArtifacts@1
     inputs:
