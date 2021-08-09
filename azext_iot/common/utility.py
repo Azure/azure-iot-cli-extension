@@ -310,15 +310,16 @@ def url_encode_str(s, plus=False):
     return quote_plus(s) if plus else quote(s)
 
 
-def test_import(package):
-    """Used to determine if a dependency is loading correctly"""
+def test_import_and_version(package, expected_version):
+    """ Used to determine if a dependency is loading correctly """
     import importlib
+    from importlib.metadata import version
 
     try:
         importlib.import_module(package)
+        return version(package) >= expected_version
     except ImportError:
         return False
-    return True
 
 
 def unpack_pnp_http_error(e):

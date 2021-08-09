@@ -96,18 +96,13 @@ class TestMode2Handler(object):
 class TestEnsureUamqp(object):
     @pytest.fixture()
     def uamqp_scenario(self, mocker):
-        get_uamqp = mocker.patch("azext_iot.common.deps.get_uamqp_ext_version")
-        update_uamqp = mocker.patch("azext_iot.common.deps.update_uamqp_ext_version")
         installer = mocker.patch("azext_iot.common.deps.install")
         installer.return_value = True
-        get_uamqp.return_value = EVENT_LIB[1]
-        test_import = mocker.patch("azext_iot.common.deps.test_import")
+        test_import = mocker.patch("azext_iot.common.deps.test_import_and_version")
         test_import.return_value = True
         m_exit = mocker.patch("azext_iot.common.deps.sys.exit")
 
         return {
-            "get_uamqp": get_uamqp,
-            "update_uamqp": update_uamqp,
             "installer": installer,
             "test_import": test_import,
             "exit": m_exit,
@@ -119,9 +114,6 @@ class TestEnsureUamqp(object):
             ("importerror", None, "y"),
             ("importerror", None, "n"),
             ("importerror", "yes;", None),
-            ("compatibility", None, "y"),
-            ("compatibility", None, "n"),
-            ("compatibility", "yes;", None),
             ("repair", "repair;", "y"),
             ("repair", "repair;yes;", None),
             ("repair", "repair;", "n"),
@@ -134,8 +126,6 @@ class TestEnsureUamqp(object):
 
         if case == "importerror":
             uamqp_scenario["test_import"].return_value = False
-        elif case == "compatibility":
-            uamqp_scenario["get_uamqp"].return_value = "0.0.0"
 
         kwargs = {}
         user_cancelled = True
@@ -153,7 +143,9 @@ class TestEnsureUamqp(object):
         method = partial(ensure_uamqp, mocker.MagicMock(), **kwargs)
         method()
 
-        if user_cancelled:
+        if uamqp_scenario["test_import"]:
+            pass
+        elif user_cancelled:
             assert uamqp_scenario["exit"].call_args
         else:
             install_args = uamqp_scenario["installer"].call_args
