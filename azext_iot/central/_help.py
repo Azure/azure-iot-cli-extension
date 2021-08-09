@@ -52,6 +52,18 @@ def _load_central_devices_help():
     """
 
     helps[
+        "iot central device list"
+    ] = """
+        type: command
+        short-summary: List devices in IoT Central.
+        examples:
+        - name: List all devices in an application, sorted by device Id (default)
+          text: >
+            az iot central device list
+            --app-id {appid}
+    """
+
+    helps[
         "iot central device create"
     ] = """
         type: command
