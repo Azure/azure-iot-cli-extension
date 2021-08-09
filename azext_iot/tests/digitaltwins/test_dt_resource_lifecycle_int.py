@@ -138,7 +138,8 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         self.track_instance(create_msi_output)
 
         assert_common_resource_attributes(
-            self.wait_for_hostname(create_msi_output),
+            self.wait_for_hostname(
+                create_msi_output, wait_in_sec=15, interval=20, extra_condition="identity!='None'"),
             instance_names[1],
             self.rg,
             self.rg_region,
@@ -158,9 +159,6 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             tags=None,
             assign_identity=True,
         )
-
-        # Wait for RBAC to catch up
-        sleep(10)
 
         role_assignment_egt_list = self.cmd(
             "role assignment list --scope {} --assignee {}".format(

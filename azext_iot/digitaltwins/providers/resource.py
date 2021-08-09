@@ -6,6 +6,7 @@
 from azext_iot.digitaltwins.common import (
     ADTEndpointAuthType,
     ADTPublicNetworkAccessType,
+    MAX_ADT_CREATE_RETRIES,
 )
 from azext_iot.digitaltwins.providers import (
     DigitalTwinsResourceManager,
@@ -71,6 +72,25 @@ class ResourceProvider(DigitalTwinsResourceManager):
                 long_running_operation_timeout=timeout,
             )
 
+            def check_state(lro):
+                from time import sleep
+                instance = lro.resource().as_dict()
+                state = instance.get('provisioning_state', None)
+                retries = 0
+                while state == "Provisioning" and retries < MAX_ADT_CREATE_RETRIES:
+                    retries += 1
+                    sleep(1)
+                    lro.update_status()
+                    instance = lro.resource().as_dict()
+                    state = instance.get('provisioning_state', None)
+                if retries == MAX_ADT_CREATE_RETRIES:
+                    logger.warning(
+                        "The resource has been created and has not finished provisioning. Please monitor the status of "
+                        "the Digital Twin instance using az dt show -n {} -g {}".format(
+                            name, resource_group_name
+                        )
+                    )
+
             def rbac_handler(lro):
                 instance = lro.resource().as_dict()
                 identity = instance.get("identity")
@@ -97,6 +117,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
                             )
 
             create_or_update.add_done_callback(rbac_handler)
+            create_or_update.add_done_callback(check_state)
             return create_or_update
         except CloudError as e:
             raise e
