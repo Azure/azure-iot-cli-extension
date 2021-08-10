@@ -133,7 +133,7 @@ def load_command_table(self, _):
         cmd_group.show_command("show", "iot_hub_connection_string_show")
 
     with self.command_group(
-        "iot hub topic-space", command_type=iothub_ops
+        "iot hub topic-space", command_type=iothub_ops, is_preview=True
     ) as cmd_group:
         cmd_group.show_command("create", "iot_hub_topic_space_create")
         cmd_group.show_command("show", "iot_hub_topic_space_show")

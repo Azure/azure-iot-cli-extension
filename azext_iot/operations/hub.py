@@ -36,6 +36,7 @@ from azext_iot.common.shared import (
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
     read_file_content,
+    shell_safe_json_parse,
     validate_key_value_pairs,
     url_encode_dict,
     unpack_msrest_error,
@@ -3334,7 +3335,7 @@ def iot_hub_topic_space_create(
 
     if topic_template[0].endswith(".json") and os.path.exists(topic_template[0]):
         try:
-            topic_template = json.loads(read_file_content(topic_template[0]))
+            topic_template = shell_safe_json_parse(read_file_content(topic_template[0]))
         except OSError as e:
             raise CLIError("Could not read file {}. Error: {}".format(topic_template, e))
 
