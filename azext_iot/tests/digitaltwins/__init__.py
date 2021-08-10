@@ -160,19 +160,25 @@ class DTLiveScenarioTest(LiveScenarioTest):
 
     # Needed because the DT service will indicate provisioning is finished before it actually is.
     def wait_for_hostname(
-        self, instance: dict, wait_in_sec: int = 10, interval: int = 7
+        self, instance: dict, wait_in_sec: int = 10, interval: int = 7, extra_condition: str = None
     ):
         from time import sleep
         sleep(wait_in_sec)
 
+        jmes = "hostName && provisioningState=='Succeeded'"
+        if extra_condition:
+            jmes += "&& {}".format(extra_condition)
+
         self.embedded_cli.invoke(
-            "dt wait -n {} -g {} --custom \"hostName && provisioningState=='Succeeded'\" --interval {} --timeout {}".format(
+            "dt wait -n {} -g {} --custom \"{}\" --interval {} --timeout {}".format(
                 instance["name"],
                 instance["resourceGroup"],
+                jmes,
                 wait_in_sec,
                 wait_in_sec * interval
             )
         )
+
         refereshed_instance = self.embedded_cli.invoke(
             "dt show -n {} -g {}".format(
                 instance["name"], instance["resourceGroup"]

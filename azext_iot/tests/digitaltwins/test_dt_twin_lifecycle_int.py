@@ -713,6 +713,9 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
             )
         )
 
+        # dt reset can return too early at times
+        sleep(5)
+
         model_query_result = self.cmd(
             "dt model list -n {} -g {}".format(instance_name, self.rg)
         ).get_output_in_json()
