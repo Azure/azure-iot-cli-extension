@@ -11,7 +11,7 @@ class TemplatePreview:
     def __init__(self, template: dict):
         self.raw_template = template
         try:
-            self.id = template.get("@id")
+            self.id = template.get("id")
             self.name = template.get("displayName")
             self.interfaces = self._extract_interfaces(template)
             self.schema_names = self._extract_schema_names(self.interfaces)
@@ -20,7 +20,7 @@ class TemplatePreview:
                 self.component_schema_names = self._extract_schema_names(
                     self.components
                 )
-
+        
         except:
             raise CLIError("Could not parse iot central device template.")
 
@@ -77,7 +77,7 @@ class TemplatePreview:
 
             interfaces = []
             dcm = template.get("capabilityModel", {})
-
+            
             if dcm.get("contents"):
                 interfaces.append(self._extract_root_interface_contents(dcm))
 
@@ -85,10 +85,10 @@ class TemplatePreview:
                 interfaces.extend(dcm.get("implements"))
 
             return {
-                interface["@id"]: self._extract_schemas(interface)
+                (interface["schema"]["@id"] if interface.get("@type") else interface["@id"]): self._extract_schemas(interface)
                 for interface in interfaces
             }
-        except Exception:
+        except:
             details = "Unable to extract device schema from template '{}'.".format(
                 self.id
             )
@@ -97,6 +97,8 @@ class TemplatePreview:
     def _extract_schemas(self, entity: dict) -> dict:
         if entity.get("schema"):
             return {schema["name"]: schema for schema in entity["schema"]["contents"]}
+        else:
+            return {schema["name"]: schema for schema in entity["contents"]}
 
     def _extract_schema_names(self, entity: dict) -> dict:
         return {
