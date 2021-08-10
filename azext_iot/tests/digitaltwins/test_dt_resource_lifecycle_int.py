@@ -137,6 +137,9 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         ).get_output_in_json()
         self.track_instance(create_msi_output)
 
+        # wait for identity assignment
+        sleep(60)
+
         assert_common_resource_attributes(
             self.wait_for_hostname(create_msi_output),
             instance_names[1],
