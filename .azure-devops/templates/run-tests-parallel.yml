@@ -55,7 +55,7 @@ steps:
       continueOnError: true
       displayName: '${{ parameters.name }} integration tests'
       inputs:
-        azureSubscription: AzIoTCLIService
+        azureSubscription: az_cli_nightly_conn
         scriptType: bash
         scriptLocation: inlineScript
         inlineScript: |
