@@ -8,14 +8,13 @@ import sys
 from os import linesep
 from knack.util import CLIError
 from azext_iot.constants import EVENT_LIB, VERSION
-from azext_iot.common.utility import test_import
-from azext_iot.common.config import get_uamqp_ext_version, update_uamqp_ext_version
+from azext_iot.common.utility import test_import_and_version
 from azext_iot.common.pip import install
 from azext_iot.common._homebrew_patch import HomebrewPipPatch
 
 
 def ensure_uamqp(config, yes=False, repair=False):
-    if get_uamqp_ext_version(config) != EVENT_LIB[1] or repair or not test_import(EVENT_LIB[0]):
+    if repair or not test_import_and_version(EVENT_LIB[0], EVENT_LIB[1]):
         if not yes:
             input_txt = ('Dependency update ({} {}) required for IoT extension version: {}. {}'
                          'Continue? (y/n) -> ').format(EVENT_LIB[0], EVENT_LIB[1], VERSION, linesep)
@@ -28,7 +27,6 @@ def ensure_uamqp(config, yes=False, repair=False):
             # The version range defined in this custom_version parameter should be stable
             try:
                 install(EVENT_LIB[0], compatible_version='{}'.format(EVENT_LIB[1]))
-                update_uamqp_ext_version(config, EVENT_LIB[1])
                 print('Update complete. Executing command...')
             except RuntimeError as e:
                 print('Failure updating {}. Aborting...'.format(EVENT_LIB[0]))
