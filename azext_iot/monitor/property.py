@@ -161,7 +161,7 @@ class PropertyMonitor:
         return issues_handler.get_issues_with_minimum_severity(minimum_severity)
 
     def _get_device_template(self):
-        device = self._central_device_provider.get_device(self._device_id)
+        device = self._central_device_provider.get_device(self._device_id, central_dns_suffix=self._central_dns_suffix)
         template = self._central_template_provider.get_device_template(
             device_template_id=device.template,
             central_dns_suffix=self._central_dns_suffix,
