@@ -20,7 +20,7 @@ class TemplatePreview:
                 self.component_schema_names = self._extract_schema_names(
                     self.components
                 )
-        
+
         except:
             raise CLIError("Could not parse iot central device template.")
 
@@ -77,7 +77,7 @@ class TemplatePreview:
 
             interfaces = []
             dcm = template.get("capabilityModel", {})
-            
+
             if dcm.get("contents"):
                 interfaces.append(self._extract_root_interface_contents(dcm))
 
