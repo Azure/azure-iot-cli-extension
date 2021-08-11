@@ -502,7 +502,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         )
 
     @pytest.mark.skipif(
-        not DEVICE_ID, reason="empty azext_iot_central_primarykey env var"
+        not DEVICE_ID, reason="empty azext_iot_central_device_id env var"
     )
     def test_central_device_registration_summary(self):
 
