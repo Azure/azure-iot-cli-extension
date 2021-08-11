@@ -67,7 +67,7 @@ steps:
       continueOnError: true
       displayName: '${{ parameters.name }} integration tests'
       inputs:
-        azureSubscription: az_cli_nightly_conn
+        azureSubscription: AzIoTCLIService
         scriptType: bash
         scriptLocation: inlineScript
         ${{ if containsValue(parameters.serial_execution_dirs, parameters.path) }}:
