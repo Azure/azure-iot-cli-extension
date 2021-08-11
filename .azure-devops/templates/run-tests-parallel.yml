@@ -29,7 +29,7 @@ parameters:
   default: 6
 - name: num_iothub_threads
   type: number
-  default: 3
+  default: 6
 - name: num_reruns
   type: number
   default: 2
@@ -82,7 +82,7 @@ steps:
           inlineScript: |
             export COVERAGE_FILE=.coverage.${{ parameters.name }}
             pytest -vv ${{ parameters.path }} -k "_int.py" --dist=loadfile -n ${{ parameters.num_iothub_threads }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --deselect=azext_iot/tests/iothub/core/test_iothub_discovery_int.py::TestIoTHubDiscovery::test_iothub_targets
-            pytest --last-failed --last-failed-no-failures none
+            pytest --last-failed --last-failed-no-failures none --dist=loadfile -n ${{ parameters.num_iothub_threads }}
 
   - task: PublishBuildArtifacts@1
     inputs:
