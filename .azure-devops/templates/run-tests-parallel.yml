@@ -75,7 +75,7 @@ steps:
           inlineScript: |
             export COVERAGE_FILE=.coverage.${{ parameters.name }}
             pytest -vv ${{ parameters.path }} -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml        
-         ${{ if eq('azext_iot/tests/iothub', parameters.path) }}:
+        ${{ if eq('azext_iot/tests/iothub', parameters.path) }}:
           inlineScript: |
             export COVERAGE_FILE=.coverage.${{ parameters.name }}
             pytest -vv azext_iot/tests/iothub/devices azext_iot/tests/iothub/messaging azext_iot/tests/iothub/modules -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml
