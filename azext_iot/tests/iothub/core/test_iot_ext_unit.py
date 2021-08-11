@@ -990,7 +990,7 @@ def change_dir():
 def generate_device_twin_show(file_handle=False, **kvp):
     if file_handle:
         change_dir()
-        path = os.path.realpath("test_generic_twin.json")
+        path = os.path.realpath("../test_generic_twin.json")
         return path
 
     payload = {"deviceId": device_id}

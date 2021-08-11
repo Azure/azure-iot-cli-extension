@@ -197,7 +197,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
             )
 
             # Wait for child devices to be removed to prevent failures
-            sleep(30)
+            sleep(60)
 
             # Error - remove all child devices of edge device which does not have any child devices
             self.cmd(
