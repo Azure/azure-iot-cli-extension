@@ -102,7 +102,7 @@ def list_devices(
     )
 
     pages_processed = 0
-    while (max_pages == 0 or pages_processed <= max_pages) and url:
+    while (max_pages == 0 or pages_processed < max_pages) and url:
         response = requests.get(url, headers=headers, params=query_parameters if pages_processed == 0 else None)
         result = _utility.try_extract_result(response)
 
@@ -110,13 +110,13 @@ def list_devices(
             raise CLIError("Value is not present in body: {}".format(result))
 
         if api_version == ApiVersion.preview.value:
-            devices = devices + [
+            devices.extend([
                 central_models.DevicePreview(device) for device in result["value"]
-            ]
+            ])
         else:
-            devices = devices + [
+            devices.extend([
                 central_models.DeviceV1(device) for device in result["value"]
-            ]
+            ])
 
         url = result.get("nextLink", None)
         pages_processed = pages_processed + 1

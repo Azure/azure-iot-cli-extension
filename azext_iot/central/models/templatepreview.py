@@ -85,7 +85,7 @@ class TemplatePreview:
                 interfaces.extend(dcm.get("implements"))
 
             return {
-                (interface["schema"]["@id"] if interface.get("@type") else interface["@id"]): self._extract_schemas(interface)
+                self._get_interface_id(interface): self._extract_schemas(interface)
                 for interface in interfaces
             }
         except:
@@ -113,3 +113,6 @@ class TemplatePreview:
             for interface, schema in self.schema_names.items()
             if property_name in schema
         ]
+
+    def _get_interface_id(self, interface) -> list:
+        return interface["schema"]["@id"] if interface.get("@type") else interface["@id"]

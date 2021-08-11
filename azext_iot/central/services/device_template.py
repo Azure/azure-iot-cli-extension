@@ -96,7 +96,7 @@ def list_device_templates(
     )
 
     pages_processed = 0
-    while (max_pages == 0 or pages_processed <= max_pages) and url:
+    while (max_pages == 0 or pages_processed < max_pages) and url:
         response = requests.get(url, headers=headers, params=query_parameters if pages_processed == 0 else None)
         result = _utility.try_extract_result(response)
 

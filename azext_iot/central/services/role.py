@@ -68,7 +68,7 @@ def list_roles(
     cmd,
     app_id: str,
     token: str,
-    max_pages=1,
+    max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.preview.value,
 ) -> List[central_models.RolePreview]:
@@ -96,7 +96,7 @@ def list_roles(
     query_parameters["api-version"] = api_version
 
     pages_processed = 0
-    while (pages_processed <= max_pages) and url:
+    while (max_pages == 0 or pages_processed < max_pages) and url:
         response = requests.get(
             url,
             headers=headers,
@@ -108,14 +108,11 @@ def list_roles(
         if "value" not in result:
             raise CLIError("Value is not present in body: {}".format(result))
 
-        roles = roles + [
+        roles.extend([
             central_models.RolePreview(role) for role in result["value"]
-        ]
+        ])
 
-        try:
-            url = result.get("nextLink", params=query_parameters)
-        except:
-            pass
+        url = result.get("nextLink", None)
         pages_processed = pages_processed + 1
 
     return roles
