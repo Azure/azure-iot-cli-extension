@@ -374,7 +374,8 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         ).get_output_in_json()
 
         created_dev_temp_count = len(created_device_template_list)
-        assert created_dev_temp_count == (start_dev_temp_count + 1)
+        # assert number of device templates changed by 1 or none in case template was already present in the application
+        assert (created_dev_temp_count == (start_dev_temp_count + 1)) or (created_dev_temp_count == start_dev_temp_count)
         assert template_id in created_device_template_list.keys()
 
         self._delete_device_template(template_id)
