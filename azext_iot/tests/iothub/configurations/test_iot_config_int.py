@@ -90,6 +90,8 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
         )
 
     def test_edge_deployments(self):
+        # Wait for permissions to flow in
+        sleep(60)
         for auth_phase in DATAPLANE_AUTH_TYPES:
             config_count = 5
             config_ids = self.generate_config_names(config_count)
@@ -107,9 +109,6 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
 
             priority = random.randint(1, 10)
             condition = "tags.building=9 and tags.environment='test'"
-
-            # Wait for permissions to flow in
-            sleep(60)
 
             # Content inline
             # Note: $schema is included as a nested property in the sample content.
