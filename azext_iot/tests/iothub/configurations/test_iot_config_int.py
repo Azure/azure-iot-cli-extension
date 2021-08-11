@@ -7,6 +7,7 @@
 import random
 import json
 
+from time import sleep
 from azext_iot.tests import IoTLiveScenarioTest
 from azext_iot.tests.conftest import get_context_path
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
@@ -106,6 +107,9 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
 
             priority = random.randint(1, 10)
             condition = "tags.building=9 and tags.environment='test'"
+
+            # Wait for permissions to flow in
+            sleep(60)
 
             # Content inline
             # Note: $schema is included as a nested property in the sample content.
