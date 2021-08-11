@@ -33,6 +33,15 @@ parameters:
 - name: reruns_delay
   type: number
   default: 60
+- name: parallel_execution_dirs
+  type: object
+  default:
+  - 'azext_iot/tests/central'
+  - 'azext_iot/tests/digitaltwins'
+- name: serial_execution_dirs
+  type: object
+  default:
+  - 'azext_iot/tests/dps'
 
 steps:
   - template: setup-dev-test-env.yml
@@ -58,19 +67,19 @@ steps:
         azureSubscription: az_cli_nightly_conn
         scriptType: bash
         scriptLocation: inlineScript
-        ${{ if containsValue(['azext_iot/tests/central', 'azext_iot/tests/digitaltwins'], parameters.path) }}:
+        ${{ if containsValue(serial_execution_dirs, parameters.path) }}:
           inlineScript: |
             export COVERAGE_FILE=.coverage.${{ parameters.name }}
-            pytest -vv ${{ parameters.path }} -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml
-        ${{ if eq(parameters.path, 'azext_iot/tests/iothub') }}:
+            pytest -vv ${{ parameters.path }} -k "_int.py" --dist=loadfile --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml
+        ${{ if containsValue(parallel_execution_dirs, parameters.path) }}:
+          inlineScript: |
+            export COVERAGE_FILE=.coverage.${{ parameters.name }}
+            pytest -vv ${{ parameters.path }} -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml        
+         ${{ if eq('azext_iot/tests/iothub', parameters.path) }}:
           inlineScript: |
             export COVERAGE_FILE=.coverage.${{ parameters.name }}
             pytest -vv azext_iot/tests/iothub/devices azext_iot/tests/iothub/messaging azext_iot/tests/iothub/modules -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml
             pytest -vv azext_iot/tests/iothub --ignore=azext_iot/tests/iothub/devices --ignore=azext_iot/tests/iothub/messaging --ignore=azext_iot/tests/iothub/modules -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --deselect=azext_iot/tests/iothub/test_iothub_discovery_int.py::TestIoTHubDiscovery::test_iothub_targets
-        ${{ if eq(parameters.path, 'azext_iot/tests/dps') }}:
-          inlineScript: |
-            export COVERAGE_FILE=.coverage.${{ parameters.name }}
-            pytest -vv ${{ parameters.path }} -k "_int.py" --dist=loadfile --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml
   
   - task: PublishBuildArtifacts@1
     inputs:
