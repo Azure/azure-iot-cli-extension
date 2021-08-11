@@ -102,7 +102,7 @@ stages:
           path: 'azext_iot/tests/dps'
           name: 'device-provisioning-service'
     
-    - job: 'testHub'
+    - job: 'testHub_job_1'
       displayName: 'Test IoT Hub - config, core and jobs'
       condition: eq('${{ parameters.testHub }}', true)
       steps:
@@ -111,7 +111,7 @@ stages:
           path: 'azext_iot/tests/iothub/configurations azext_iot/tests/iothub/core azext_iot/tests/iothub/jobs'
           name: 'iot-hub'
     
-    - job: 'testHub'
+    - job: 'testHub_job_2'
       displayName: 'Test IoT Hub - devices, messaging and modules'
       condition: eq('${{ parameters.testHub }}', true)
       steps:
