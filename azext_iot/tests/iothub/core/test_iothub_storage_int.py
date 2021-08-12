@@ -97,28 +97,42 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
         self.managed_identity = result
         return self.managed_identity
-
-    def assign_storage_role(self, assignee):
-        if self.user["type"] == UserTypes.user.value:
-            self.cmd(
-                'role assignment create --assignee"{}" --role "{}" --scope "{}"'.format(
-                    assignee, STORAGE_ROLE, LIVE_STORAGE_RESOURCE_ID
-                )
+    
+    def get_storage_account_roles(self):
+        # setup RBAC for storage account
+        storage_account_roles = self.cmd(
+            'role assignment list --scope "{}" --role "{}" --query "[].principalId"'.format(
+                LIVE_STORAGE_RESOURCE_ID, STORAGE_ROLE
             )
-        elif self.user["type"] == UserTypes.servicePrincipal.value:
-            self.cmd(
-                'role assignment create --assignee-object-id "{}" --role "{}" --scope "{}" --assignee-principal-type {}'.format(
-                    assignee, STORAGE_ROLE, LIVE_STORAGE_RESOURCE_ID, "ServicePrincipal"
+        ).get_output_in_json()
+
+    def assign_storage_role_if_needed(self, assignee):
+        
+        storage_account_roles = self.get_storage_account_roles()
+
+        if assignee not in storage_account_roles:
+            if self.user["type"] == UserTypes.user.value:
+                self.cmd(
+                    'role assignment create --assignee"{}" --role "{}" --scope "{}"'.format(
+                        assignee, STORAGE_ROLE, LIVE_STORAGE_RESOURCE_ID
+                    )
                 )
-            )
-        else:
-            userType = self.user["type"]
-            raise CLIError(f"User type {userType} not supported. Can't run test(s).")
+            elif self.user["type"] == UserTypes.servicePrincipal.value:
+                self.cmd(
+                    'role assignment create --assignee-object-id "{}" --role "{}" --scope "{}" --assignee-principal-type {}'.format(
+                        assignee, STORAGE_ROLE, LIVE_STORAGE_RESOURCE_ID, "ServicePrincipal"
+                    )
+                )
+            else:
+                userType = self.user["type"]
+                raise CLIError(f"User type {userType} not supported. Can't run test(s).")
 
-        self.profile.refresh_accounts()
+            self.profile.refresh_accounts()
 
-        # time for role assignments to update
-        sleep(60)
+            while assignee not in storage_account_roles:
+                storage_account_roles = self.get_storage_account_roles()
+                # wait for role assignment to update before retrying
+                sleep(10)
 
     def tearDown(self):
         if self.managed_identity:
@@ -235,15 +249,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
         hub_id = hub_identity.get("principalId", None)
         assert hub_id
 
-        # setup RBAC for storage account
-        storage_account_roles = self.cmd(
-            'role assignment list --scope "{}" --role "{}" --query "[].principalId"'.format(
-                LIVE_STORAGE_RESOURCE_ID, STORAGE_ROLE
-            )
-        ).get_output_in_json()
-
-        if hub_id not in storage_account_roles:
-            self.assign_storage_role(hub_id)
+        self.assign_storage_role_if_needed(hub_id)
 
         self.cmd(
             'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {} --ik true'.format(
@@ -324,18 +330,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
         identity_principal = hub_identity["userAssignedIdentities"][identity_id]["principalId"]
         assert identity_principal == user_identity["principalId"]
 
-        # setup RBAC for storage account
-        storage_account_roles = self.cmd(
-            'role assignment list --scope "{}" --role "{}" --query "[].principalId"'.format(
-                LIVE_STORAGE_RESOURCE_ID, STORAGE_ROLE
-            )
-        ).get_output_in_json()
-
-        if identity_principal not in storage_account_roles:
-            self.assign_storage_role(identity_principal)
-
-        # additional time is needed to ensure user identity assignment is complete
-        sleep(60)
+        self.assign_storage_role_if_needed(identity_principal)
 
         # identity-based device-identity export
         self.cmd(
