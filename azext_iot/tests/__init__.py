@@ -35,7 +35,6 @@ ENTITY_NAME = settings.env.azext_iot_testhub if settings.env.azext_iot_testhub e
 STORAGE_CONTAINER = (
     settings.env.azext_iot_teststoragecontainer if settings.env.azext_iot_teststoragecontainer else DEFAULT_CONTAINER
 )
-ROLE_ASSIGNMENT_REFRESH_TIME = 60
 
 
 @contextmanager
@@ -140,16 +139,15 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     )
                 )
 
-                profile = Profile(cli_ctx=DummyCli())
-                profile.refresh_accounts()
-                sleep(ROLE_ASSIGNMENT_REFRESH_TIME)
-
                 # ensure role assignment is complete
                 role_assignment_principal_names = []
                 while user["name"] not in role_assignment_principal_names:
                     role_assignments = self.get_role_assignments(new_hub["id"], USER_ROLE)
                     role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
                     sleep(10)
+                
+                profile = Profile(cli_ctx=DummyCli())
+                profile.refresh_accounts()
 
         self.region = self.get_region()
         self.connection_string = self.get_hub_cstring()

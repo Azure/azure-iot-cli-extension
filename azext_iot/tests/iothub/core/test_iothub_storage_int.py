@@ -120,13 +120,13 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 userType = self.user["type"]
                 raise CLIError(f"User type {userType} not supported. Can't run test(s).")
 
-            self.profile.refresh_accounts()
-
             # ensure role assignment is complete
             while assignee not in role_assignment_principal_ids:
                 role_assignments = self.get_role_assignments(LIVE_STORAGE_RESOURCE_ID, STORAGE_ROLE)
                 role_assignment_principal_ids = [assignment["principalId"] for assignment in role_assignments]
                 sleep(10)
+            
+            self.profile.refresh_accounts()
 
     def tearDown(self):
         if self.managed_identity:
