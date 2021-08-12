@@ -27,9 +27,9 @@ adm_content_module_path = get_context_path(__file__, "test_adm_module_content.js
 adm_content_device_path = get_context_path(__file__, "test_adm_device_content.json")
 
 
-class TestIoTEdgeSetModules(IoTLiveScenarioTest):
+class TestIoTConfigurations(IoTLiveScenarioTest):
     def __init__(self, test_case):
-        super(TestIoTEdgeSetModules, self).__init__(
+        super(TestIoTConfigurations, self).__init__(
             test_case
         )
 
@@ -82,16 +82,7 @@ class TestIoTEdgeSetModules(IoTLiveScenarioTest):
                 expect_failure=True,
             )
 
-
-class TestIoTEdgeDeployments(IoTLiveScenarioTest):
-    def __init__(self, test_case):
-        super(TestIoTEdgeDeployments, self).__init__(
-            test_case
-        )
-
     def test_edge_deployments(self):
-        # Wait for permissions to flow in
-        sleep(60)
         for auth_phase in DATAPLANE_AUTH_TYPES:
             config_count = 5
             config_ids = self.generate_config_names(config_count)
@@ -441,13 +432,6 @@ class TestIoTEdgeDeployments(IoTLiveScenarioTest):
             )
 
             self.tearDown()
-
-
-class TestIoTHubConfigurations(IoTLiveScenarioTest):
-    def __init__(self, test_case):
-        super(TestIoTHubConfigurations, self).__init__(
-            test_case
-        )
 
     def test_device_configurations(self):
         config_count = 3
