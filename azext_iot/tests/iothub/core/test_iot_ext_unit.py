@@ -33,7 +33,9 @@ from azext_iot.tests.conftest import (
     generate_cs,
 )
 from azext_iot.common.shared import DeviceAuthApiType
+from pathlib import Path
 
+CWD = os.path.dirname(os.path.abspath(__file__))
 device_id = "mydevice"
 child_device_id = "child_device1"
 module_id = "mymod"
@@ -990,7 +992,7 @@ def change_dir():
 def generate_device_twin_show(file_handle=False, **kvp):
     if file_handle:
         change_dir()
-        path = os.path.realpath("../test_generic_twin.json")
+        path = os.path.join(Path(CWD).parent, "test_generic_twin.json")
         return path
 
     payload = {"deviceId": device_id}

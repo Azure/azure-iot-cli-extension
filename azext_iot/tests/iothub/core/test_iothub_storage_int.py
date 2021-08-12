@@ -8,6 +8,7 @@ import os
 import pytest
 from time import sleep
 from knack.util import CLIError
+from pathlib import Path
 
 from azext_iot.tests import IoTLiveScenarioTest
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL, UserTypes
@@ -130,7 +131,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
     def test_storage(self):
         device_count = 1
 
-        content_path = os.path.join(CWD, "../test_generic_replace.json")
+        content_path = os.path.join(Path(CWD).parent, "test_generic_replace.json")
         device_ids = self.generate_device_names(device_count)
 
         self.cmd(

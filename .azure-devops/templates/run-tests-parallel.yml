@@ -24,6 +24,9 @@ parameters:
 - name: name
   type: string
   default: 'all'
+- name: azureSubscription
+  type: string
+  default: 'AzIoTCLIService'
 - name: num_threads
   type: number
   default: 6
@@ -67,7 +70,7 @@ steps:
       continueOnError: true
       displayName: '${{ parameters.name }} integration tests'
       inputs:
-        azureSubscription: AzIoTCLIService
+        azureSubscription: ${{ parameters.azureSubscription }}
         scriptType: bash
         scriptLocation: inlineScript
         ${{ if containsValue(parameters.serial_execution_dirs, parameters.path) }}:

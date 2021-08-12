@@ -24,6 +24,9 @@ parameters:
 - name: 'testHub'
   type: boolean
   default: true
+- name: azureSubscription
+  type: string
+  default: 'az_cli_nightly_conn'
 
 stages:
   - stage: 'build'
@@ -83,6 +86,7 @@ stages:
         parameters:
           path: 'azext_iot/tests/central'
           name: 'iot-central'
+          azureSubscription: ${{ parameters.azureSubscription }}
     
     - job: 'testADT'
       displayName: 'Test Azure DigitalTwins'
@@ -92,6 +96,7 @@ stages:
         parameters:
           path: 'azext_iot/tests/digitaltwins'
           name: 'azure-digitaltwins'
+          azureSubscription: ${{ parameters.azureSubscription }}
 
     - job: 'testDPS'
       displayName: 'Test DPS'
@@ -101,6 +106,7 @@ stages:
         parameters:
           path: 'azext_iot/tests/dps'
           name: 'device-provisioning-service'
+          azureSubscription: ${{ parameters.azureSubscription }}
     
     - job: 'testHub_job_1'
       displayName: 'Test IoT Hub - config, core and jobs'
@@ -109,7 +115,8 @@ stages:
       - template: templates/run-tests-parallel.yml
         parameters:
           path: 'azext_iot/tests/iothub/configurations azext_iot/tests/iothub/core azext_iot/tests/iothub/jobs'
-          name: 'iot-hub'
+          name: 'iot-hub-1'
+          azureSubscription: ${{ parameters.azureSubscription }}
     
     - job: 'testHub_job_2'
       displayName: 'Test IoT Hub - devices, messaging and modules'
@@ -118,7 +125,8 @@ stages:
       - template: templates/run-tests-parallel.yml
         parameters:
           path: 'azext_iot/tests/iothub/devices azext_iot/tests/iothub/messaging azext_iot/tests/iothub/modules'
-          name: 'iot-hub'
+          name: 'iot-hub-2'
+          azureSubscription: ${{ parameters.azureSubscription }}
 
     - job: 'unitTests'
       displayName: 'Unit tests and code coverage'

@@ -13,8 +13,8 @@ from azext_iot.tests.conftest import get_context_path
 from azure.iot.device import Message
 from azext_iot.common import utility
 from azext_iot.monitor.parsers import strings
-
-from azext_iot.tests import CaptureOutputLiveScenarioTest, helpers
+from azext_iot.tests import helpers
+from azext_iot.tests.central import CentralLiveScenarioTest
 
 APP_ID = os.environ.get("azext_iot_central_app_id")
 APP_PRIMARY_KEY = os.environ.get("azext_iot_central_primarykey")
@@ -29,7 +29,7 @@ if not all([APP_ID]):
     raise ValueError("Set azext_iot_central_app_id to run central integration tests.")
 
 
-class TestIotCentral(CaptureOutputLiveScenarioTest):
+class TestIotCentral(CentralLiveScenarioTest):
     def __init__(self, test_scenario):
         super(TestIotCentral, self).__init__(test_scenario=test_scenario)
 

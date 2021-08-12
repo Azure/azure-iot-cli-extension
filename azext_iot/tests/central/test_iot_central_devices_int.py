@@ -10,10 +10,9 @@ import time
 import pytest
 
 from azext_iot.tests.conftest import get_context_path
-
 from azext_iot.central.models.enum import DeviceStatus
-
-from azext_iot.tests import CaptureOutputLiveScenarioTest, helpers
+from azext_iot.tests import helpers
+from azext_iot.tests.central import CentralLiveScenarioTest
 
 APP_ID = os.environ.get("azext_iot_central_app_id")
 APP_PRIMARY_KEY = os.environ.get("azext_iot_central_primarykey")
@@ -28,7 +27,7 @@ if not all([APP_ID]):
     raise ValueError("Set azext_iot_central_app_id to run central integration tests.")
 
 
-class TestIotCentralDevices(CaptureOutputLiveScenarioTest):
+class TestIotCentralDevices(CentralLiveScenarioTest):
     def __init__(self, test_scenario):
         super(TestIotCentralDevices, self).__init__(test_scenario=test_scenario)
 
