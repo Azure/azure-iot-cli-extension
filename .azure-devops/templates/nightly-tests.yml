@@ -38,7 +38,7 @@ stages:
     displayName: 'Run tests'
     pool:
       vmImage: 'Ubuntu-16.04'
-    dependsOn: build
+    dependsOn: setup
     jobs:
     - job: 'testCentral'
       displayName: 'Test IoT Central'
