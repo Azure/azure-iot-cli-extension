@@ -16,79 +16,72 @@ parameters:
   type: string
   default: 'az_cli_nightly_conn'
 
-stages:
-  - stage: 'setup'
-    displayName: 'Setup dev test environment'
-    jobs:
+jobs:
 
-    - job: 'Setup_Test_Environment'
-      pool:
-        vmImage: 'Ubuntu-16.04'
+- job: 'Setup_Test_Environment'
+  steps:
+  - template: setup-dev-test-env.yml
+    parameters:
+      architecture: ${{ parameters.architecture }}
+      pythonVersion: ${{ parameters.pythonVersion }}
+      azureCLIVersion: ${{ parameters.azureCLIVersion }}
+  - template: set-testenv-sentinel.yml
 
-      steps:
-      - template: setup-dev-test-env.yml
-        parameters:
-          architecture: ${{ parameters.architecture }}
-          pythonVersion: ${{ parameters.pythonVersion }}
-          azureCLIVersion: ${{ parameters.azureCLIVersion }}
+- job: 'testCentral'
+  displayName: 'Test IoT Central'
+  dependsOn: setup
+  steps:
+  - template: run-tests-parallel.yml
+    parameters:
+      path: 'azext_iot/tests/central'
+      name: 'iot-central'
+      azureSubscription: ${{ parameters.azureSubscription }}
 
-      - template: set-testenv-sentinel.yml
+- job: 'testADT'
+  displayName: 'Test Azure DigitalTwins'
+  dependsOn: setup
+  steps:
+  - template: run-tests-parallel.yml
+    parameters:
+      path: 'azext_iot/tests/digitaltwins'
+      name: 'azure-digitaltwins'
+      azureSubscription: ${{ parameters.azureSubscription }}
 
-  - stage: 'test'
-    displayName: 'Run tests'
-    pool:
-      vmImage: 'Ubuntu-16.04'
-    dependsOn: setup
-    jobs:
-    - job: 'testCentral'
-      displayName: 'Test IoT Central'
-      steps:
-      - template: run-tests-parallel.yml
-        parameters:
-          path: 'azext_iot/tests/central'
-          name: 'iot-central'
-          azureSubscription: ${{ parameters.azureSubscription }}
-    
-    - job: 'testADT'
-      displayName: 'Test Azure DigitalTwins'
-      steps:
-      - template: run-tests-parallel.yml
-        parameters:
-          path: 'azext_iot/tests/digitaltwins'
-          name: 'azure-digitaltwins'
-          azureSubscription: ${{ parameters.azureSubscription }}
+- job: 'testDPS'
+  displayName: 'Test DPS'
+  dependsOn: setup
+  steps:
+  - template: run-tests-parallel.yml
+    parameters:
+      path: 'azext_iot/tests/dps'
+      name: 'device-provisioning-service'
+      azureSubscription: ${{ parameters.azureSubscription }}
 
-    - job: 'testDPS'
-      displayName: 'Test DPS'
-      steps:
-      - template: run-tests-parallel.yml
-        parameters:
-          path: 'azext_iot/tests/dps'
-          name: 'device-provisioning-service'
-          azureSubscription: ${{ parameters.azureSubscription }}
-    
-    - job: 'testHub_job_1'
-      displayName: 'Test IoT Hub - config, core and jobs'
-      steps:
-      - template: run-tests-parallel.yml
-        parameters:
-          path: 'azext_iot/tests/iothub/configurations azext_iot/tests/iothub/core azext_iot/tests/iothub/jobs'
-          name: 'iot-hub-1'
-          azureSubscription: ${{ parameters.azureSubscription }}
-    
-    - job: 'testHub_job_2'
-      displayName: 'Test IoT Hub - devices, messaging and modules'
-      steps:
-      - template: run-tests-parallel.yml
-        parameters:
-          path: 'azext_iot/tests/iothub/devices azext_iot/tests/iothub/messaging azext_iot/tests/iothub/modules'
-          name: 'iot-hub-2'
-          azureSubscription: ${{ parameters.azureSubscription }}
+- job: 'testHub_job_1'
+  displayName: 'Test IoT Hub - config, core and jobs'
+  dependsOn: setup
+  steps:
+  - template: run-tests-parallel.yml
+    parameters:
+      path: 'azext_iot/tests/iothub/configurations azext_iot/tests/iothub/core azext_iot/tests/iothub/jobs'
+      name: 'iot-hub-1'
+      azureSubscription: ${{ parameters.azureSubscription }}
 
-    - job: 'unitTests'
-      displayName: 'Unit tests and code coverage'
-      steps:
-      - template: run-tests-parallel.yml
-        parameters:
-          runIntTests: 'false'
-          runUnitTests: 'true'
+- job: 'testHub_job_2'
+  displayName: 'Test IoT Hub - devices, messaging and modules'
+  dependsOn: setup
+  steps:
+  - template: run-tests-parallel.yml
+    parameters:
+      path: 'azext_iot/tests/iothub/devices azext_iot/tests/iothub/messaging azext_iot/tests/iothub/modules'
+      name: 'iot-hub-2'
+      azureSubscription: ${{ parameters.azureSubscription }}
+
+- job: 'unitTests'
+  displayName: 'Unit tests and code coverage'
+  dependsOn: setup
+  steps:
+  - template: run-tests-parallel.yml
+    parameters:
+      runIntTests: 'false'
+      runUnitTests: 'true'
