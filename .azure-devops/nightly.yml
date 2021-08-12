@@ -61,6 +61,8 @@ stages:
     dependsOn: build
     jobs:
     - template: templates/nightly-tests.yml
+      parameters:
+        azureCLIVersion: edge
           
   - stage: 'kpi'
     displayName: 'Build KPIs'
