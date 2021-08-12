@@ -129,9 +129,9 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
             self.profile.refresh_accounts()
 
+            # ensure role assignment is complete
             while assignee not in storage_account_roles:
                 storage_account_roles = self.get_storage_account_roles()
-                # wait for role assignment to update before retrying
                 sleep(10)
 
     def tearDown(self):
