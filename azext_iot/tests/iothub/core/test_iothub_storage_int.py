@@ -125,8 +125,9 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 role_assignments = self.get_role_assignments(LIVE_STORAGE_RESOURCE_ID, STORAGE_ROLE)
                 role_assignment_principal_ids = [assignment["principalId"] for assignment in role_assignments]
                 sleep(10)
-            
+
             self.profile.refresh_accounts()
+            sleep(60)
 
     def tearDown(self):
         if self.managed_identity:
