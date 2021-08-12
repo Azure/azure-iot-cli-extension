@@ -167,6 +167,9 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
                 checks=self.is_empty(),
             )
 
+            # Wait for API to catch up
+            sleep(10)
+
             # List child devices of edge device
             output = self.cmd(
                 self.set_cmd_auth_type(
@@ -197,7 +200,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
             )
 
             # Wait for child devices to be removed to prevent failures
-            sleep(60)
+            sleep(40)
 
             # Error - remove all child devices of edge device which does not have any child devices
             self.cmd(
