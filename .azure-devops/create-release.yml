@@ -148,56 +148,55 @@ stages:
           pythonVersion: ${{ parameters.pythonVersion }}
           architecture: ${{ parameters.architecture }}
 
-  # - stage: 'release'
-  #   displayName: 'Stage GitHub release'
-  #   dependsOn: [build, test]
-  #   jobs:
-  #   - deployment: 'StageGitHub'
-  #     displayName: 'Stage CLI extension on GitHub'
-  #     environment: 'production'
+  - stage: 'release'
+    displayName: 'Stage GitHub release'
+    dependsOn: [build, test]
+    jobs:
+    - deployment: 'StageGitHub'
+      displayName: 'Stage CLI extension on GitHub'
+      environment: 'production'
 
-  #   - job: 'Calculate_Sha_And_Create_Release'
-  #     pool:
-  #       vmImage: 'vs2017-win2016'
-  #     variables:
-  #       CLIVersion: $[ stageDependencies.build.recordVersion.outputs['setupVersion.CLIVersion'] ]
-  #       ReleaseTitle: $[ stageDependencies.build.recordVersion.outputs['setupVersion.ReleaseTitle'] ]
+    - job: 'Calculate_Sha_And_Create_Release'
+      pool:
+        vmImage: 'vs2017-win2016'
+      variables:
+        CLIVersion: $[ stageDependencies.build.recordVersion.outputs['setupVersion.CLIVersion'] ]
+        ReleaseTitle: $[ stageDependencies.build.recordVersion.outputs['setupVersion.ReleaseTitle'] ]
 
-  #     steps:
-  #     - task: DownloadBuildArtifacts@0
-  #       displayName : 'Download Extension wheel from Build Artifacts'
-  #       inputs:
-  #         buildType: 'current'
-  #         downloadType: 'single'
-  #         artifactName: 'azure-iot'
-  #         downloadPath: '$(System.ArtifactsDirectory)/extension'
+      steps:
+      - task: DownloadBuildArtifacts@0
+        displayName : 'Download Extension wheel from Build Artifacts'
+        inputs:
+          buildType: 'current'
+          downloadType: 'single'
+          artifactName: 'azure-iot'
+          downloadPath: '$(System.ArtifactsDirectory)/extension'
 
-  #     - task: PowerShell@2
-  #       displayName: 'Calculate sha for downloaded extension'
-  #       inputs:
-  #         targetType: 'inline'
-  #         script: |
-  #           $extensions = Get-ChildItem -Filter "*.whl" -Recurse | Select-Object FullName
-  #           Foreach ($extension in $extensions)
-  #           {
-  #               Write-Host "calculating sha256 for " $extension.FullName   
-  #               (Get-Filehash -Path $extension.Fullname -Algorithm SHA256).Hash.ToLower()
-  #           }
-  #           Write-Host "done"
-  #         workingDirectory: '$(System.ArtifactsDirectory)/extension'
+      - task: PowerShell@2
+        displayName: 'Calculate sha for downloaded extension'
+        inputs:
+          targetType: 'inline'
+          script: |
+            $extensions = Get-ChildItem -Filter "*.whl" -Recurse | Select-Object FullName
+            Foreach ($extension in $extensions)
+            {
+                Write-Host "calculating sha256 for " $extension.FullName   
+                (Get-Filehash -Path $extension.Fullname -Algorithm SHA256).Hash.ToLower()
+            }
+            Write-Host "done"
+          workingDirectory: '$(System.ArtifactsDirectory)/extension'
 
-  #     - task: GitHubRelease@0
-  #       inputs:
-  #         gitHubConnection: $(GithubReleaseConnection)
-  #         repositoryName: $(Build.Repository.Name)
-  #         action: 'create'
-  #         target: '$(Build.SourceVersion)'
-  #         tagSource: manual
-  #         tag: 'v$(CLIVersion)'
-  #         title: $(ReleaseTitle)
-  #         assets: '$(System.ArtifactsDirectory)/extension/**/*.whl' 
-  #         assetUploadMode: 'replace'
-  #         isDraft: true
-  #         isPreRelease: false
-  #         addChangeLog: false
-  
+      - task: GitHubRelease@0
+        inputs:
+          gitHubConnection: $(GithubReleaseConnection)
+          repositoryName: $(Build.Repository.Name)
+          action: 'create'
+          target: '$(Build.SourceVersion)'
+          tagSource: manual
+          tag: 'v$(CLIVersion)'
+          title: $(ReleaseTitle)
+          assets: '$(System.ArtifactsDirectory)/extension/**/*.whl' 
+          assetUploadMode: 'replace'
+          isDraft: true
+          isPreRelease: false
+          addChangeLog: false
