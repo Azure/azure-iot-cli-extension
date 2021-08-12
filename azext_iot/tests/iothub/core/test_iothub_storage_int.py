@@ -97,7 +97,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
         self.managed_identity = result
         return self.managed_identity
-    
+
     def get_storage_account_roles(self):
         # setup RBAC for storage account
         storage_account_roles = self.cmd(
@@ -106,8 +106,10 @@ class TestIoTStorage(IoTLiveScenarioTest):
             )
         ).get_output_in_json()
 
+        return storage_account_roles
+
     def assign_storage_role_if_needed(self, assignee):
-        
+
         storage_account_roles = self.get_storage_account_roles()
 
         if assignee not in storage_account_roles:
@@ -119,7 +121,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 )
             elif self.user["type"] == UserTypes.servicePrincipal.value:
                 self.cmd(
-                    'role assignment create --assignee-object-id "{}" --role "{}" --scope "{}" --assignee-principal-type {}'.format(
+                    'role assignment create --assignee-object-id {} --role "{}" --scope "{}" --assignee-principal-type {}'.format(
                         assignee, STORAGE_ROLE, LIVE_STORAGE_RESOURCE_ID, "ServicePrincipal"
                     )
                 )
