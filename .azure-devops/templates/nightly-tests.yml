@@ -29,7 +29,7 @@ jobs:
 
 - job: 'testCentral'
   displayName: 'Test IoT Central'
-  dependsOn: setup
+  dependsOn: Setup_Test_Environment
   steps:
   - template: run-tests-parallel.yml
     parameters:
@@ -39,7 +39,7 @@ jobs:
 
 - job: 'testADT'
   displayName: 'Test Azure DigitalTwins'
-  dependsOn: setup
+  dependsOn: Setup_Test_Environment
   steps:
   - template: run-tests-parallel.yml
     parameters:
@@ -49,7 +49,7 @@ jobs:
 
 - job: 'testDPS'
   displayName: 'Test DPS'
-  dependsOn: setup
+  dependsOn: Setup_Test_Environment
   steps:
   - template: run-tests-parallel.yml
     parameters:
@@ -59,7 +59,7 @@ jobs:
 
 - job: 'testHub_job_1'
   displayName: 'Test IoT Hub - config, core and jobs'
-  dependsOn: setup
+  dependsOn: Setup_Test_Environment
   steps:
   - template: run-tests-parallel.yml
     parameters:
@@ -69,7 +69,7 @@ jobs:
 
 - job: 'testHub_job_2'
   displayName: 'Test IoT Hub - devices, messaging and modules'
-  dependsOn: setup
+  dependsOn: Setup_Test_Environment
   steps:
   - template: run-tests-parallel.yml
     parameters:
@@ -79,7 +79,7 @@ jobs:
 
 - job: 'unitTests'
   displayName: 'Unit tests and code coverage'
-  dependsOn: setup
+  dependsOn: Setup_Test_Environment
   steps:
   - template: run-tests-parallel.yml
     parameters:
