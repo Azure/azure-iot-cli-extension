@@ -7,7 +7,7 @@ parameters:
   default: 'x64'
 - name: azureCLIVersion
   type: string
-  default: min
+  default: released
   values:
   - min
   - released

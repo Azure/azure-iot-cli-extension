@@ -54,8 +54,8 @@ stages:
 
       - template: templates/install-and-record-version.yml
 
-  - stage: 'test'
-    displayName: 'Run all tests'
+  - stage: 'test_edge'
+    displayName: 'Run all tests with edge CLI'
     pool:
       vmImage: 'Ubuntu-16.04'
     dependsOn: build
@@ -63,10 +63,20 @@ stages:
     - template: templates/nightly-tests.yml
       parameters:
         azureCLIVersion: edge
+  
+  - stage: 'test_min'
+    displayName: 'Run all tests with min CLI'
+    pool:
+      vmImage: 'Ubuntu-16.04'
+    dependsOn: test_edge
+    jobs:
+    - template: templates/nightly-tests.yml
+      parameters:
+        azureCLIVersion: min
           
   - stage: 'kpi'
     displayName: 'Build KPIs'
-    dependsOn: [build, test]
+    dependsOn: [build, test_edge, test_min]
     jobs:
     - job: 'calculateCodeCoverage'
       displayName: 'Calculate distributed code coverage'
