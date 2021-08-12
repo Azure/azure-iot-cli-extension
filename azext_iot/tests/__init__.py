@@ -8,8 +8,8 @@ import sys
 import io
 import os
 import pytest
-import time
 
+from time import sleep
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
 from azure.cli.testsdk import LiveScenarioTest
 from contextlib import contextmanager
@@ -142,7 +142,14 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
                 profile = Profile(cli_ctx=DummyCli())
                 profile.refresh_accounts()
-                time.sleep(ROLE_ASSIGNMENT_REFRESH_TIME)
+                sleep(ROLE_ASSIGNMENT_REFRESH_TIME)
+
+                # ensure role assignment is complete
+                role_assignment_principal_names = []
+                while user["name"] not in role_assignment_principal_names:
+                    role_assignments = self.get_role_assignments(new_hub["id"], USER_ROLE)
+                    role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
+                    sleep(10)
 
         self.region = self.get_region()
         self.connection_string = self.get_hub_cstring()
@@ -253,6 +260,16 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             return f"{command} --login {self.connection_string}"
 
         return f"{command} --auth-type {auth_type}"
+
+    def get_role_assignments(self, scope, role):
+
+        role_assignments = self.cmd(
+            'role assignment list --scope "{}" --role "{}"'.format(
+                scope, role
+            )
+        ).get_output_in_json()
+
+        return role_assignments
 
     @pytest.fixture(scope='class', autouse=True)
     def tearDownSuite(self):

@@ -98,21 +98,12 @@ class TestIoTStorage(IoTLiveScenarioTest):
         self.managed_identity = result
         return self.managed_identity
 
-    def get_storage_account_roles(self):
-        # setup RBAC for storage account
-        storage_account_roles = self.cmd(
-            'role assignment list --scope "{}" --role "{}" --query "[].principalId"'.format(
-                LIVE_STORAGE_RESOURCE_ID, STORAGE_ROLE
-            )
-        ).get_output_in_json()
-
-        return storage_account_roles
-
     def assign_storage_role_if_needed(self, assignee):
 
-        storage_account_roles = self.get_storage_account_roles()
+        role_assignments = self.get_role_assignments(LIVE_STORAGE_RESOURCE_ID, STORAGE_ROLE)
+        role_assignment_principal_ids = [assignment["principalId"] for assignment in role_assignments]
 
-        if assignee not in storage_account_roles:
+        if assignee not in role_assignment_principal_ids:
             if self.user["type"] == UserTypes.user.value:
                 self.cmd(
                     'role assignment create --assignee"{}" --role "{}" --scope "{}"'.format(
@@ -132,8 +123,9 @@ class TestIoTStorage(IoTLiveScenarioTest):
             self.profile.refresh_accounts()
 
             # ensure role assignment is complete
-            while assignee not in storage_account_roles:
-                storage_account_roles = self.get_storage_account_roles()
+            while assignee not in role_assignment_principal_ids:
+                role_assignments = self.get_role_assignments(LIVE_STORAGE_RESOURCE_ID, STORAGE_ROLE)
+                role_assignment_principal_ids = [assignment["principalId"] for assignment in role_assignments]
                 sleep(10)
 
     def tearDown(self):
