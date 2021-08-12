@@ -148,6 +148,11 @@ class TestDPSEnrollments(LiveScenarioTest):
         yield None
         if not settings.env.azext_iot_testhub:
             self.cmd(
+                "iot dps linked-hub delete --dps-name {} --linked-hub {} --resource-group {}".format(
+                    dps, hub, rg
+                )
+            )
+            self.cmd(
                 "iot hub delete --name {} --resource-group {}".format(
                     hub, rg
                 )

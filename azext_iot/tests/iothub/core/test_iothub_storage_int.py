@@ -116,7 +116,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
             raise CLIError(f"User type {userType} not supported. Can't run test(s).")
 
         # give time to finish job
-        sleep(60)
+        sleep(90)
 
     def tearDown(self):
         if self.managed_identity:
