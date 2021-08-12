@@ -334,6 +334,9 @@ class TestIoTStorage(IoTLiveScenarioTest):
         if identity_principal not in storage_account_roles:
             self.assign_storage_role(identity_principal)
 
+        # additional time is needed to ensure user identity assignment is complete
+        sleep(60)
+
         # identity-based device-identity export
         self.cmd(
             'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {} --ik true'.format(
