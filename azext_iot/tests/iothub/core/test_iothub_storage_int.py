@@ -44,8 +44,8 @@ class TestIoTStorage(IoTLiveScenarioTest):
         super(TestIoTStorage, self).__init__(test_case)
         self.managed_identity = None
 
-        profile = Profile(cli_ctx=DummyCli())
-        subscription = profile.get_subscription()
+        self.profile = Profile(cli_ctx=DummyCli())
+        subscription = self.profile.get_subscription()
         self.user = subscription["user"]
 
         if LIVE_STORAGE_ACCOUNT:
@@ -115,8 +115,10 @@ class TestIoTStorage(IoTLiveScenarioTest):
             userType = self.user["type"]
             raise CLIError(f"User type {userType} not supported. Can't run test(s).")
 
-        # give time to finish job
-        sleep(90)
+        self.profile.refresh_accounts()
+
+        # time for role assignments to update
+        sleep(60)
 
     def tearDown(self):
         if self.managed_identity:

@@ -147,9 +147,11 @@ class TestDPSEnrollments(LiveScenarioTest):
     def tearDownSuite(self):
         yield None
         if not settings.env.azext_iot_testhub:
+            hub_attributes = self.cmd("iot hub show -n {} -g {}".format(hub, rg)).get_output_in_json()
+
             self.cmd(
                 "iot dps linked-hub delete --dps-name {} --linked-hub {} --resource-group {}".format(
-                    dps, hub, rg
+                    dps, hub_attributes["hostName"], rg
                 )
             )
             self.cmd(
