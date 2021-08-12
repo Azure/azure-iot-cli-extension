@@ -60,17 +60,9 @@ stages:
       vmImage: 'Ubuntu-16.04'
     dependsOn: build
     jobs:
-    - job: 'azEdge'
-      displayName: 'Test against edge AZ CLI'
-      template: templates/nightly-tests.yml
+    - template: templates/nightly-tests.yml
         parameters:
           azureCLIVersion: 'edge'
-    - job: 'azMin'
-      dependsOn: 'azEdge'
-      displayName: 'Test against minimum supported AZ CLI'
-      template: templates/nightly-tests.yml
-        parameters:
-          azureCLIVersion: 'min'
           
   - stage: 'kpi'
     displayName: 'Build KPIs'
