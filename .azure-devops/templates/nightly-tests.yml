@@ -43,7 +43,7 @@ stages:
     - job: 'testCentral'
       displayName: 'Test IoT Central'
       steps:
-      - template: templates/run-tests-parallel.yml
+      - template: run-tests-parallel.yml
         parameters:
           path: 'azext_iot/tests/central'
           name: 'iot-central'
@@ -52,7 +52,7 @@ stages:
     - job: 'testADT'
       displayName: 'Test Azure DigitalTwins'
       steps:
-      - template: templates/run-tests-parallel.yml
+      - template: run-tests-parallel.yml
         parameters:
           path: 'azext_iot/tests/digitaltwins'
           name: 'azure-digitaltwins'
@@ -61,7 +61,7 @@ stages:
     - job: 'testDPS'
       displayName: 'Test DPS'
       steps:
-      - template: templates/run-tests-parallel.yml
+      - template: run-tests-parallel.yml
         parameters:
           path: 'azext_iot/tests/dps'
           name: 'device-provisioning-service'
@@ -70,7 +70,7 @@ stages:
     - job: 'testHub_job_1'
       displayName: 'Test IoT Hub - config, core and jobs'
       steps:
-      - template: templates/run-tests-parallel.yml
+      - template: run-tests-parallel.yml
         parameters:
           path: 'azext_iot/tests/iothub/configurations azext_iot/tests/iothub/core azext_iot/tests/iothub/jobs'
           name: 'iot-hub-1'
@@ -79,7 +79,7 @@ stages:
     - job: 'testHub_job_2'
       displayName: 'Test IoT Hub - devices, messaging and modules'
       steps:
-      - template: templates/run-tests-parallel.yml
+      - template: run-tests-parallel.yml
         parameters:
           path: 'azext_iot/tests/iothub/devices azext_iot/tests/iothub/messaging azext_iot/tests/iothub/modules'
           name: 'iot-hub-2'
@@ -88,7 +88,7 @@ stages:
     - job: 'unitTests'
       displayName: 'Unit tests and code coverage'
       steps:
-      - template: templates/run-tests-parallel.yml
+      - template: run-tests-parallel.yml
         parameters:
           runIntTests: 'false'
           runUnitTests: 'true'
