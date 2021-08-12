@@ -151,7 +151,7 @@ class TestDPSEnrollments(LiveScenarioTest):
 
             self.cmd(
                 "iot dps linked-hub delete --dps-name {} --linked-hub {} --resource-group {}".format(
-                    dps, hub_attributes["hostName"], rg
+                    dps, hub_attributes["properties"]["hostName"], rg
                 )
             )
             self.cmd(
