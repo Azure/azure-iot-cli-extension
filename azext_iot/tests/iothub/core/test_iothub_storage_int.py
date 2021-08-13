@@ -125,7 +125,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 role_assignments = self.get_role_assignments(LIVE_STORAGE_RESOURCE_ID, STORAGE_ROLE)
                 role_assignment_principal_ids = [assignment["principalId"] for assignment in role_assignments]
                 sleep(10)
-            
+
             sleep(30)
 
     def tearDown(self):
