@@ -760,8 +760,10 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         if not asserts:
             asserts = []
 
-        command = self._appendOptionalArgsToCommand("iot central diagnostics validate-messages --app-id {} -d {} --et {} --duration {} --mm {} -y --style json".format(
-            APP_ID, device_id, enqueued_time, duration, max_messages), TOKEN, DNS_SUFFIX)
+        command = self._appendOptionalArgsToCommand(
+            "iot central diagnostics validate-messages --app-id {} -d {} --et {} --duration {} --mm {} -y --style json"
+            .format(
+                APP_ID, device_id, enqueued_time, duration, max_messages), TOKEN, DNS_SUFFIX)
         output = self.command_execute_assert(
             command,
             asserts,
