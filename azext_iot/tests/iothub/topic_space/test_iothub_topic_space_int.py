@@ -259,20 +259,12 @@ class TestIoTHubTopicSpace(CaptureOutputLiveScenarioTest):
                 expect_failure=True
             )
 
-        # Multiple topic_names
-        # Add limit tests?
         self.cmd(
             "iot hub topic-space delete -l {} --tsn {}".format(
                 LIVE_HUB_CS,
                 topic_name,
             )
         )
-        # self.cmd(
-        #     "iot hub topic-space delete -l {} --tsn {}".format(
-        #         LIVE_HUB_CS,
-        #         topic_name2,
-        #     )
-        # )
 
 
 def assert_topic_space_attributes(result, expected_name, expected_type, expected_template):

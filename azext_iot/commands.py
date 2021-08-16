@@ -43,6 +43,11 @@ def load_command_table(self, _):
         cmd_group.command("renew-key", "iot_device_key_regenerate")
         cmd_group.command("import", "iot_device_import")
         cmd_group.command("export", "iot_device_export")
+        cmd_group.show_command(
+            "generate-user-credentials",
+            "iot_hub_device_identity_generate_user_credentials",
+            is_preview=True
+        )
 
     with self.command_group(
         "iot hub device-identity children", command_type=iothub_ops

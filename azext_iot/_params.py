@@ -496,6 +496,41 @@ def load_arguments(self, _):
             "Account and Contributor role for the IoT Hub.",
         )
 
+    with self.argument_context("iot hub device-identity generate-user-credentials") as context:
+        context.argument(
+            "connection_string",
+            options_list=["--connection-string", "--cs"],
+            help="Target connection string. This bypasses the IoT Hub registry and generates the user credentials directly "
+                 "from the supplied symmetric key without further validation. All other command parameters aside from "
+                 "password-creation-time and password-expiry-time will be ignored. Supported connection string types: Device, "
+                 "Module."
+        )
+        context.argument(
+            "password_expiry_time",
+            options_list=["--password-expiry-time", "--pet"],
+            help="Integer representing time in seconds representing the password expiry time.",
+        )
+        context.argument(
+            "password_creation_time",
+            options_list=["--password-creation-time", "--pct"],
+            help="Integer representing time in seconds representing the password creation time.",
+        )
+        context.argument(
+            "product_info",
+            options_list=["--product-info", "--pi"],
+            help="Description of the product.",
+        )
+        context.argument(
+            "shared_access_key_name",
+            options_list=["--shared_access_key_name", "--sakn"],
+            help="Shared access key name.",
+        )
+        context.argument(
+            "dtmi",
+            options_list=["--dtmi"],
+            help="Digital Twins model Id. Example: dtmi:com:example:Room;2",
+        )
+
     with self.argument_context("iot hub device-identity parent set") as context:
         context.argument(
             "parent_id",
@@ -568,9 +603,9 @@ def load_arguments(self, _):
             help="Topic space name.",
         )
         context.argument(
-            "topic_template",
+            "topic_templates",
             nargs="*",
-            options_list=["--topic-space-template", "--template"],
+            options_list=["--topic-space-templates", "--templates"],
             help="List of topic space template paths or a text file containing a list of topic "
             "template paths. Accepts a space-seperated list.",
         )

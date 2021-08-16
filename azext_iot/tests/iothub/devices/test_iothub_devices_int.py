@@ -425,3 +425,126 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
             f"iot hub generate-sas-token -d {device_ids[0]} --login {mixed_case_cstring}",
             checks=[self.exists("sas")],
         )
+
+    def test_generate_user_credentials(self):
+        props = {
+            "device_id": f"d_{generate_generic_id()}",
+            "hub_name": LIVE_HUB,
+        }
+
+        self.cmd(
+            f"iot hub device-identity create -d {props['device_id']} -n {LIVE_HUB} -g {LIVE_RG}"
+        )
+
+        # Device ID + Hub name
+        credentials = self.cmd(
+            "iot hub device-identity generate-user-credentials -n {} -d {} -g {}".format(
+                props["hub_name"],
+                props["device_id"],
+                LIVE_RG
+            )
+        )
+
+        assert_username_password(credentials, props)
+
+        props.update({
+            "module_id": f"m_{generate_generic_id()}",
+            "dtmi": f"dtmi_{generate_generic_id()}",
+            "password_creation_time": 100,
+            "password_expiry_time": 1000,
+            "product_info": f"pa_{generate_generic_id()}",
+            "shared_access_key_name": None,
+        })
+
+        self.cmd(
+            f"iot hub module-identity create -d {props['device_id']} -m {props['module_id']}-n {LIVE_HUB} -g {LIVE_RG}"
+        )
+
+        # All Optional Params
+        credentials = self.cmd(
+            "iot hub device-identity generate-user-credentials -n {} -d {} -m {} --dtmi {} -g {}"
+            "--pct {} --pet {} --pi {} --sakn {}".format(
+                props["hub_name"],
+                props["device_id"],
+                props["module_id"],
+                props["dtmi"],
+                props["password_creation_time"],
+                props["password_expiry_time"],
+                props["product_info"],
+                props["shared_access_key_name"],
+                LIVE_RG
+            )
+        )
+
+        assert_username_password(credentials, props)
+
+        # Connection String
+        props = {
+            "device_id": props["device_id"],
+            "hub_name": LIVE_HUB,
+            "module_id": props["module_id"],
+        }
+        device_cs = "HostName={}.azure-devices.net;DeviceId={};SharedAccessKey={}".format(
+            props["hub_name"],
+            props["device_id"],
+            generate_generic_id()
+        )
+        module_cs = device_cs + ";ModuleId={}".format(props["module_id"])
+        credentials = self.cmd(
+            "iot hub device-identity generate-user-credentials --cs {}".format(
+                module_cs,
+            )
+        )
+        assert_username_password(credentials, props)
+
+        props = {
+            "device_id": props["device_id"],
+            "hub_name": LIVE_HUB,
+        }
+        credentials = self.cmd(
+            "iot hub device-identity generate-user-credentials --cs {}".format(
+                device_cs
+            )
+        )
+        assert_username_password(credentials, props)
+
+        props.update({
+            "password_creation_time": 100,
+            "password_expiry_time": 1000,
+        })
+        credentials = self.cmd(
+            "iot hub device-identity generate-user-credentials --cs {} --pct {} --pet {}".format(
+                device_cs,
+                props["password_creation_time"],
+                props["password_expiry_time"],
+            )
+        )
+        assert_username_password(credentials, props)
+
+        self.cmd(
+            f"iot hub device-identity delete -d {props['device_id']} -n {LIVE_HUB} -g {LIVE_RG}"
+        )
+
+
+def assert_username_password(result, expected_props):
+    username = result["username"]
+    assert "am=SASb64" in username
+    assert "av=2021-06-30-preview" in username
+    assert f"h={expected_props['hub_name']}" in username
+    assert f"did={expected_props['device_id']}" in username
+    assert f"se={expected_props['password_expiry_time']*1000}" in username
+    assert f"sa={expected_props['password_creation_time']*1000}" in username
+
+    if expected_props.get("module_id", None):
+        assert f"mid={expected_props['module_id']}" in username
+
+    if expected_props.get("dtmi", None):
+        assert f"dtmi={expected_props['dtmi']}" in username
+
+    if expected_props.get("product_info", None):
+        assert f"pa={expected_props['product_info']}" in username
+
+    if expected_props.get("shared_access_key_name", None):
+        assert f"sp={expected_props['shared_access_key_name']}" in username
+
+    assert result.get("password")
