@@ -46,7 +46,7 @@ class TestIoTHubC2DMessages(IoTLiveScenarioTest):
                 self.set_cmd_auth_type(
                     f"iot device c2d-message send -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg} "
                     f"--data '{test_body}' --cid {test_cid} --mid {test_mid} --ct {test_ct} --expiry {test_et} "
-                    f"--ce {test_ce} -p '{test_props}'",
+                    f"--ce {test_ce} -p '{test_props}' -y",
                     auth_type=auth_phase
                 ),
                 checks=self.is_empty(),

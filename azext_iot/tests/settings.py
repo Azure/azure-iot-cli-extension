@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from os import environ
-
+from enum import Enum
 
 ENV_SET_TEST_IOTHUB_REQUIRED = [
     "azext_iot_testrg"
@@ -16,6 +16,11 @@ ENV_SET_TEST_IOTHUB_OPTIONAL = [
     "azext_iot_teststorageaccount",
     "azext_iot_teststoragecontainer"
 ]
+
+
+class UserTypes(Enum):
+    user = "user"
+    servicePrincipal = "servicePrincipal"
 
 
 class Setting(object):

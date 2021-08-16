@@ -8,8 +8,8 @@ import sys
 import io
 import os
 import pytest
-import time
 
+from time import sleep
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
 from azure.cli.testsdk import LiveScenarioTest
 from contextlib import contextmanager
@@ -35,7 +35,7 @@ ENTITY_NAME = settings.env.azext_iot_testhub if settings.env.azext_iot_testhub e
 STORAGE_CONTAINER = (
     settings.env.azext_iot_teststoragecontainer if settings.env.azext_iot_teststoragecontainer else DEFAULT_CONTAINER
 )
-ROLE_ASSIGNMENT_REFRESH_TIME = 30
+ROLE_ASSIGNMENT_REFRESH_TIME = 60
 
 
 @contextmanager
@@ -126,20 +126,30 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                         )
                     )
 
-                profile = Profile(cli_ctx=DummyCli())
-                user_id = profile.get_current_account_user()
                 new_hub = self.cmd(
                     "iot hub show -n {} -g {}".format(self.entity_name, self.entity_rg)
                 ).get_output_in_json()
 
+                account = self.cmd("account show").get_output_in_json()
+                user = account["user"]
+
                 # assign IoT Hub Data Contributor role to current user
                 self.cmd(
-                    '''role assignment create --assignee {} --role "{}" --scope "{}"'''.format(
-                        user_id, USER_ROLE, new_hub["id"]
+                    '''role assignment create --assignee "{}" --role "{}" --scope "{}"'''.format(
+                        user["name"], USER_ROLE, new_hub["id"]
                     )
                 )
+
+                # ensure role assignment is complete
+                role_assignment_principal_names = []
+                while user["name"] not in role_assignment_principal_names:
+                    role_assignments = self.get_role_assignments(new_hub["id"], USER_ROLE)
+                    role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
+                    sleep(10)
+
+                profile = Profile(cli_ctx=DummyCli())
                 profile.refresh_accounts()
-                time.sleep(ROLE_ASSIGNMENT_REFRESH_TIME)
+                sleep(ROLE_ASSIGNMENT_REFRESH_TIME)
 
         self.region = self.get_region()
         self.connection_string = self.get_hub_cstring()
@@ -250,6 +260,16 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             return f"{command} --login {self.connection_string}"
 
         return f"{command} --auth-type {auth_type}"
+
+    def get_role_assignments(self, scope, role):
+
+        role_assignments = self.cmd(
+            'role assignment list --scope "{}" --role "{}"'.format(
+                scope, role
+            )
+        ).get_output_in_json()
+
+        return role_assignments
 
     @pytest.fixture(scope='class', autouse=True)
     def tearDownSuite(self):

@@ -7,15 +7,19 @@
 import os
 import pytest
 from time import sleep
+from knack.util import CLIError
+from pathlib import Path
 
 from azext_iot.tests import IoTLiveScenarioTest
-from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
+from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL, UserTypes
 from azext_iot.common.utility import ensure_iothub_sdk_min_version
 
 from azext_iot.tests.generators import generate_generic_id
 # TODO: assert DEVICE_DEVICESCOPE_PREFIX format in parent device twin.
 from azext_iot.constants import IOTHUB_TRACK_2_SDK_MIN_VERSION
 from azext_iot.tests import DEFAULT_CONTAINER
+from azure.cli.core._profile import Profile
+from azure.cli.core.mock import DummyCli
 
 opt_env_set = ENV_SET_TEST_IOTHUB_OPTIONAL + ["azext_iot_identity_teststorageid"]
 
@@ -27,6 +31,7 @@ LIVE_STORAGE_ACCOUNT = settings.env.azext_iot_teststorageaccount
 # Set this environment variable to enable identity-based integration tests
 # You will need permissions to add and remove role assignments for this storage account
 LIVE_STORAGE_RESOURCE_ID = settings.env.azext_iot_identity_teststorageid
+STORAGE_ROLE = "Storage Blob Data Contributor"
 
 CWD = os.path.dirname(os.path.abspath(__file__))
 
@@ -38,6 +43,11 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
         super(TestIoTStorage, self).__init__(test_case)
         self.managed_identity = None
+
+        self.profile = Profile(cli_ctx=DummyCli())
+        subscription = self.profile.get_subscription()
+        self.user = subscription["user"]
+
         if LIVE_STORAGE_ACCOUNT:
             self.live_storage_uri = self.get_container_sas_url()
 
@@ -88,6 +98,36 @@ class TestIoTStorage(IoTLiveScenarioTest):
         self.managed_identity = result
         return self.managed_identity
 
+    def assign_storage_role_if_needed(self, assignee):
+
+        role_assignments = self.get_role_assignments(LIVE_STORAGE_RESOURCE_ID, STORAGE_ROLE)
+        role_assignment_principal_ids = [assignment["principalId"] for assignment in role_assignments]
+
+        if assignee not in role_assignment_principal_ids:
+            if self.user["type"] == UserTypes.user.value:
+                self.cmd(
+                    'role assignment create --assignee"{}" --role "{}" --scope "{}"'.format(
+                        assignee, STORAGE_ROLE, LIVE_STORAGE_RESOURCE_ID
+                    )
+                )
+            elif self.user["type"] == UserTypes.servicePrincipal.value:
+                self.cmd(
+                    'role assignment create --assignee-object-id {} --role "{}" --scope "{}" --assignee-principal-type {}'.format(
+                        assignee, STORAGE_ROLE, LIVE_STORAGE_RESOURCE_ID, "ServicePrincipal"
+                    )
+                )
+            else:
+                userType = self.user["type"]
+                raise CLIError(f"User type {userType} not supported. Can't run test(s).")
+
+            # ensure role assignment is complete
+            while assignee not in role_assignment_principal_ids:
+                role_assignments = self.get_role_assignments(LIVE_STORAGE_RESOURCE_ID, STORAGE_ROLE)
+                role_assignment_principal_ids = [assignment["principalId"] for assignment in role_assignments]
+                sleep(10)
+
+            sleep(30)
+
     def tearDown(self):
         if self.managed_identity:
             self.cmd('identity delete -n {} -g {}'.format(
@@ -101,7 +141,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
     def test_storage(self):
         device_count = 1
 
-        content_path = os.path.join(CWD, "test_generic_replace.json")
+        content_path = os.path.join(Path(CWD).parent, "test_generic_replace.json")
         device_ids = self.generate_device_names(device_count)
 
         self.cmd(
@@ -181,7 +221,6 @@ class TestIoTStorage(IoTLiveScenarioTest):
         reason="Skipping track 2 tests because SDK is track 1")
     def test_system_identity_storage(self):
         identity_type_enable = "SystemAssigned"
-        storage_role = "Storage Blob Data Contributor"
 
         # check hub identity
         identity_enabled = False
@@ -204,21 +243,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
         hub_id = hub_identity.get("principalId", None)
         assert hub_id
 
-        # setup RBAC for storage account
-        storage_account_roles = self.cmd(
-            'role assignment list --scope "{}" --role "{}" --query "[].principalId"'.format(
-                LIVE_STORAGE_RESOURCE_ID, storage_role
-            )
-        ).get_output_in_json()
-
-        if hub_id not in storage_account_roles:
-            self.cmd(
-                'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
-                    hub_id, storage_role, LIVE_STORAGE_RESOURCE_ID
-                )
-            )
-            # give time to finish job
-            sleep(60)
+        self.assign_storage_role_if_needed(hub_id)
 
         self.cmd(
             'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {} --ik true'.format(
@@ -260,7 +285,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
             # delete role assignment first, disabling identity removes the assignee ID from AAD
             self.cmd(
                 'role assignment delete --assignee "{}" --role "{}" --scope "{}"'.format(
-                    hub_id, storage_role, LIVE_STORAGE_RESOURCE_ID
+                    hub_id, STORAGE_ROLE, LIVE_STORAGE_RESOURCE_ID
                 )
             )
             self.cmd(
@@ -278,7 +303,6 @@ class TestIoTStorage(IoTLiveScenarioTest):
         reason="Skipping track 2 tests because SDK is track 1")
     def test_user_identity_storage(self):
         # User Assigned Managed Identity
-        storage_role = "Storage Blob Data Contributor"
         user_identity = self.get_managed_identity()
         identity_id = user_identity["id"]
         # check hub identity
@@ -300,21 +324,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
         identity_principal = hub_identity["userAssignedIdentities"][identity_id]["principalId"]
         assert identity_principal == user_identity["principalId"]
 
-        # setup RBAC for storage account
-        storage_account_roles = self.cmd(
-            'role assignment list --scope "{}" --role "{}" --query "[].principalId"'.format(
-                LIVE_STORAGE_RESOURCE_ID, storage_role
-            )
-        ).get_output_in_json()
-
-        if identity_principal not in storage_account_roles:
-            self.cmd(
-                'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
-                    identity_principal, storage_role, LIVE_STORAGE_RESOURCE_ID
-                )
-            )
-            # give time to finish job
-            sleep(60)
+        self.assign_storage_role_if_needed(identity_principal)
 
         # identity-based device-identity export
         self.cmd(
@@ -360,7 +370,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
             # delete role assignment first, disabling identity removes the assignee ID from AAD
             self.cmd(
                 'role assignment delete --assignee "{}" --role "{}" --scope "{}"'.format(
-                    identity_principal, storage_role, LIVE_STORAGE_RESOURCE_ID
+                    identity_principal, STORAGE_ROLE, LIVE_STORAGE_RESOURCE_ID
                 )
             )
             self.cmd(

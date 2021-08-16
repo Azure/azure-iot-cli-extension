@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from azext_iot.tests import IoTLiveScenarioTest
+from time import sleep
 from azext_iot.tests.iothub import (
     DATAPLANE_AUTH_TYPES,
     PRIMARY_THUMBPRINT,
@@ -155,6 +156,9 @@ class TestIoTHubModules(IoTLiveScenarioTest):
                 if device_type == "edge":
                     query_checks.append(self.exists("[?moduleId=='$edgeAgent']"))
                     query_checks.append(self.exists("[?moduleId=='$edgeHub']"))
+
+                # wait for API to catch up before query
+                sleep(10)
 
                 # Query device modules. Edge devices include the $edgeAgent and $edgeHub system modules.
                 module_query_result = self.cmd(

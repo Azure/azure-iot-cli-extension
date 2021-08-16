@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import os
+import pytest
 from azure.cli.testsdk import LiveScenarioTest
 from azext_iot.common.shared import EntityStatusType, AttestationType, AllocationType
 from azext_iot.common.certops import create_self_signed_certificate
@@ -13,11 +14,13 @@ from azext_iot.common.utility import generate_key
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.tests.settings import Setting
 from azext_iot.tests.generators import generate_generic_id
+from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
 
 # Set these to the proper IoT Hub DPS, IoT Hub and Resource Group for Integration Tests.
 dps = os.environ.get("azext_iot_testdps")
-rg = os.environ.get("azext_iot_testrg")
-hub = os.environ.get("azext_iot_testhub") if os.environ.get("azext_iot_testhub") else "test-hub-" + generate_generic_id()
+settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED, opt_env_set=ENV_SET_TEST_IOTHUB_OPTIONAL)
+rg = settings.env.azext_iot_testrg
+hub = settings.env.azext_iot_testhub if settings.env.azext_iot_testhub else "test-hub-" + generate_generic_id()
 
 if not all([dps, rg, hub]):
     raise ValueError(
@@ -102,12 +105,19 @@ class TestDPSEnrollments(LiveScenarioTest):
         self.cmd_shell = Setting()
         setattr(self.cmd_shell, "cli_ctx", self.cli_ctx)
 
-        if hub != os.environ.get("azext_iot_testhub"):
-            self.cmd(
-                "iot hub create --name {} --resource-group {} --sku S1".format(
-                    hub, rg
+        if not settings.env.azext_iot_testhub:
+            hubs_list = self.cmd(
+                '''iot hub list -g "{}"'''.format(rg)
+            ).get_output_in_json()
+
+            hub_names = [iot_hub["name"] for iot_hub in hubs_list]
+
+            if hub not in hub_names:
+                self.cmd(
+                    "iot hub create --name {} --resource-group {} --sku S1".format(
+                        hub, rg
+                    )
                 )
-            )
 
         _ensure_dps_hub_link(self, dps, rg, hub)
 
@@ -133,7 +143,17 @@ class TestDPSEnrollments(LiveScenarioTest):
         if os.path.exists(cert_path):
             os.remove(cert_path)
 
-        if hub != os.environ.get("azext_iot_testhub"):
+    @pytest.fixture(scope='class', autouse=True)
+    def tearDownSuite(self):
+        yield None
+        if not settings.env.azext_iot_testhub:
+            hub_attributes = self.cmd("iot hub show -n {} -g {}".format(hub, rg)).get_output_in_json()
+
+            self.cmd(
+                "iot dps linked-hub delete --dps-name {} --linked-hub {} --resource-group {}".format(
+                    dps, hub_attributes["properties"]["hostName"], rg
+                )
+            )
             self.cmd(
                 "iot hub delete --name {} --resource-group {}".format(
                     hub, rg

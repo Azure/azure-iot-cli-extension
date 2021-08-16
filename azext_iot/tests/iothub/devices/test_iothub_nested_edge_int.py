@@ -6,6 +6,7 @@
 
 from azext_iot.tests import IoTLiveScenarioTest
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
+from time import sleep
 
 # TODO: assert device scope format in device twin.
 # from azext_iot.constants import DEVICE_DEVICESCOPE_PREFIX
@@ -166,6 +167,9 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
                 checks=self.is_empty(),
             )
 
+            # Wait for API to catch up
+            sleep(10)
+
             # List child devices of edge device
             output = self.cmd(
                 self.set_cmd_auth_type(
@@ -194,6 +198,9 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
                 ),
                 checks=self.is_empty(),
             )
+
+            # Wait for child devices to be removed to prevent failures
+            sleep(40)
 
             # Error - remove all child devices of edge device which does not have any child devices
             self.cmd(
