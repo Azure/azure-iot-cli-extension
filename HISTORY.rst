@@ -3,6 +3,14 @@
 Release History
 ===============
 
+0.10.16
++++++++++++++++
+
+**IoT Central updates**
+
+* Adds support for listing devices
+* Adds support for listing device templates
+
 0.10.15
 +++++++++++++++
 
