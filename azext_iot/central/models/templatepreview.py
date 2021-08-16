@@ -85,10 +85,10 @@ class TemplatePreview:
                 interfaces.extend(dcm.get("implements"))
 
             return {
-                interface["@id"]: self._extract_schemas(interface)
+                self._get_interface_id(interface): self._extract_schemas(interface)
                 for interface in interfaces
             }
-        except Exception:
+        except:
             details = "Unable to extract device schema from template '{}'.".format(
                 self.id
             )
@@ -97,6 +97,8 @@ class TemplatePreview:
     def _extract_schemas(self, entity: dict) -> dict:
         if entity.get("schema"):
             return {schema["name"]: schema for schema in entity["schema"]["contents"]}
+        else:
+            return {schema["name"]: schema for schema in entity["contents"]}
 
     def _extract_schema_names(self, entity: dict) -> dict:
         return {
@@ -111,3 +113,6 @@ class TemplatePreview:
             for interface, schema in self.schema_names.items()
             if property_name in schema
         ]
+
+    def _get_interface_id(self, interface) -> list:
+        return interface["schema"]["@id"] if interface.get("@type") else interface["@id"]

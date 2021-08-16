@@ -66,7 +66,7 @@ class CentralDeviceTemplateProviderPreview:
             api_version=ApiVersion.preview.value,
         )
 
-        self._device_templates.update({template.id: template for template in templates})
+        self._device_templates.update({template.id: template.raw_template for template in templates})
 
         return self._device_templates
 

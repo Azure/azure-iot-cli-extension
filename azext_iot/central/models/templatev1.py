@@ -12,7 +12,7 @@ class TemplateV1:
     def __init__(self, template: dict):
         self.raw_template = template
         try:
-            self.id = template.get("id")
+            self.id = template.get("@id")
             self.name = template.get("displayName")
             self.interfaces = self._extract_interfaces(template)
             self.schema_names = self._extract_schema_names(self.interfaces)

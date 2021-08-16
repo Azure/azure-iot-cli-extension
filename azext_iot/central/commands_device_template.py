@@ -50,7 +50,7 @@ def list_device_templates(
         provider = CentralDeviceTemplateProviderV1(cmd=cmd, app_id=app_id, token=token)
 
     templates = provider.list_device_templates(central_dns_suffix=central_dns_suffix)
-    return {template.id: template.raw_template for template in templates.values()}
+    return templates
 
 
 def map_device_templates(
