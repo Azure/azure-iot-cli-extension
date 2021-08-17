@@ -7,7 +7,7 @@ schedules:
     - dev
 
 variables:
-  pythonVersion: '3.6.x'
+  pythonVersion: '3.9.x'
   architecture: 'x64'
 
 parameters:
