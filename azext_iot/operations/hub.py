@@ -1397,7 +1397,6 @@ def _process_config_content(content, config_type):
 
 
 def _validate_payload_schema(content):
-    import json
     from os.path import join
     from azext_iot.models.validators import JsonSchemaType, JsonSchemaValidator
     from azext_iot.constants import EDGE_DEPLOYMENT_ROOT_SCHEMAS_PATH as root_schema_path
@@ -3548,8 +3547,8 @@ def iot_hub_device_identity_generate_user_credentials(
         hub_name,
         device_id,
         "SASb64",
-        password_expiry_time,
-        password_creation_time,
+        int(password_expiry_time) * 1000,
+        int(password_creation_time) * 1000,
     )
 
     if module_id:
@@ -3589,5 +3588,5 @@ def iot_hub_device_identity_generate_user_credentials(
 
     return {
         "username": username,
-        "password": encoded_key
+        "password": base64.b64encode(encoded_key)
     }

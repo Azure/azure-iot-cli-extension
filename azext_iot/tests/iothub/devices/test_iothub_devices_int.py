@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import re
 from azext_iot.tests import IoTLiveScenarioTest
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC
 from azext_iot.tests.generators import generate_generic_id
@@ -430,6 +431,8 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
         props = {
             "device_id": f"d_{generate_generic_id()}",
             "hub_name": LIVE_HUB,
+            "password_creation_time": 0,
+            "password_expiry_time": 3600,
         }
 
         self.cmd(
@@ -443,7 +446,7 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
                 props["device_id"],
                 LIVE_RG
             )
-        )
+        ).get_output_in_json()
 
         assert_username_password(credentials, props)
 
@@ -457,24 +460,24 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
         })
 
         self.cmd(
-            f"iot hub module-identity create -d {props['device_id']} -m {props['module_id']}-n {LIVE_HUB} -g {LIVE_RG}"
+            f"iot hub module-identity create -d {props['device_id']} -m {props['module_id']} -n {LIVE_HUB} -g {LIVE_RG}"
         )
 
         # All Optional Params
         credentials = self.cmd(
-            "iot hub device-identity generate-user-credentials -n {} -d {} -m {} --dtmi {} -g {}"
+            "iot hub device-identity generate-user-credentials -n {} -d {} -m {} --dtmi {} -g {} "
             "--pct {} --pet {} --pi {} --sakn {}".format(
                 props["hub_name"],
                 props["device_id"],
                 props["module_id"],
                 props["dtmi"],
+                LIVE_RG,
                 props["password_creation_time"],
                 props["password_expiry_time"],
                 props["product_info"],
                 props["shared_access_key_name"],
-                LIVE_RG
             )
-        )
+        ).get_output_in_json()
 
         assert_username_password(credentials, props)
 
@@ -483,6 +486,8 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
             "device_id": props["device_id"],
             "hub_name": LIVE_HUB,
             "module_id": props["module_id"],
+            "password_creation_time": 0,
+            "password_expiry_time": 3600,
         }
         device_cs = "HostName={}.azure-devices.net;DeviceId={};SharedAccessKey={}".format(
             props["hub_name"],
@@ -494,18 +499,24 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
             "iot hub device-identity generate-user-credentials --cs {}".format(
                 module_cs,
             )
-        )
+        ).get_output_in_json()
         assert_username_password(credentials, props)
+
+        self.cmd(
+            f"iot hub module-identity delete -d {props['device_id']} -m {props['module_id']} -n {LIVE_HUB} -g {LIVE_RG}"
+        )
 
         props = {
             "device_id": props["device_id"],
             "hub_name": LIVE_HUB,
+            "password_creation_time": 0,
+            "password_expiry_time": 3600,
         }
         credentials = self.cmd(
             "iot hub device-identity generate-user-credentials --cs {}".format(
                 device_cs
             )
-        )
+        ).get_output_in_json()
         assert_username_password(credentials, props)
 
         props.update({
@@ -518,7 +529,7 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
                 props["password_creation_time"],
                 props["password_expiry_time"],
             )
-        )
+        ).get_output_in_json()
         assert_username_password(credentials, props)
 
         self.cmd(
@@ -532,8 +543,17 @@ def assert_username_password(result, expected_props):
     assert "av=2021-06-30-preview" in username
     assert f"h={expected_props['hub_name']}" in username
     assert f"did={expected_props['device_id']}" in username
-    assert f"se={expected_props['password_expiry_time']*1000}" in username
-    assert f"sa={expected_props['password_creation_time']*1000}" in username
+
+    result_diff = (
+        int(re.search(r"se\=(.*?)(\&|$)", username).group(1)) -
+        int(re.search(r"sa\=(.*?)(\&|$)", username).group(1))
+    )
+
+    expected_diff = (
+        expected_props['password_expiry_time'] - expected_props['password_creation_time']
+    ) * 1000
+
+    assert result_diff == expected_diff
 
     if expected_props.get("module_id", None):
         assert f"mid={expected_props['module_id']}" in username
@@ -542,7 +562,7 @@ def assert_username_password(result, expected_props):
         assert f"dtmi={expected_props['dtmi']}" in username
 
     if expected_props.get("product_info", None):
-        assert f"pa={expected_props['product_info']}" in username
+        assert f"ca={expected_props['product_info']}" in username
 
     if expected_props.get("shared_access_key_name", None):
         assert f"sp={expected_props['shared_access_key_name']}" in username
