@@ -26,6 +26,7 @@ jobs:
       path: 'azext_iot/tests/central'
       name: 'iot-central'
       azureSubscription: ${{ parameters.azureSubscription }}
+      pythonVersion: ${{ parameters.pythonVersion }}
 
 - job: 'testADT'
   displayName: 'Test Azure DigitalTwins'
@@ -35,6 +36,7 @@ jobs:
       path: 'azext_iot/tests/digitaltwins'
       name: 'azure-digitaltwins'
       azureSubscription: ${{ parameters.azureSubscription }}
+      pythonVersion: ${{ parameters.pythonVersion }}
 
 - job: 'testDPS'
   displayName: 'Test DPS'
@@ -44,6 +46,7 @@ jobs:
       path: 'azext_iot/tests/dps'
       name: 'device-provisioning-service'
       azureSubscription: ${{ parameters.azureSubscription }}
+      pythonVersion: ${{ parameters.pythonVersion }}
 
 - job: 'testHub_job_1'
   displayName: 'Test IoT Hub - config, core and jobs'
@@ -53,6 +56,7 @@ jobs:
       path: 'azext_iot/tests/iothub/configurations azext_iot/tests/iothub/core azext_iot/tests/iothub/jobs'
       name: 'iot-hub-1'
       azureSubscription: ${{ parameters.azureSubscription }}
+      pythonVersion: ${{ parameters.pythonVersion }}
 
 - job: 'testHub_job_2'
   displayName: 'Test IoT Hub - devices, messaging and modules'
@@ -62,6 +66,7 @@ jobs:
       path: 'azext_iot/tests/iothub/devices azext_iot/tests/iothub/messaging azext_iot/tests/iothub/modules'
       name: 'iot-hub-2'
       azureSubscription: ${{ parameters.azureSubscription }}
+      pythonVersion: ${{ parameters.pythonVersion }}
 
 - job: 'unitTests'
   displayName: 'Unit tests and code coverage'
@@ -70,3 +75,4 @@ jobs:
     parameters:
       runIntTests: 'false'
       runUnitTests: 'true'
+      pythonVersion: ${{ parameters.pythonVersion }}
