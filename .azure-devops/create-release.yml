@@ -176,13 +176,13 @@ stages:
             Write-Host "done"
           workingDirectory: '$(System.ArtifactsDirectory)/extension'
 
-      - task: GitHubRelease@0
+      - task: GitHubRelease@1
         inputs:
           gitHubConnection: $(GithubReleaseConnection)
           repositoryName: $(Build.Repository.Name)
           action: 'create'
           target: '$(Build.SourceVersion)'
-          tagSource: manual
+          tagSource: userSpecifiedTag
           tag: 'v$(CLIVersion)'
           title: $(ReleaseTitle)
           assets: '$(System.ArtifactsDirectory)/extension/**/*.whl' 
