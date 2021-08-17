@@ -296,7 +296,7 @@ helps[
 """
 
 helps[
-    "iot hub device-identity generate-user-credentials"
+    "iot hub device-identity generate-mqtt-credentials"
 ] = """
     type: command
     short-summary: Generate user credentials for MQTT Device sign in.
@@ -305,17 +305,17 @@ helps[
     examples:
     - name: Generate user credentials using device id.
       text: >
-        az iot hub device-identity generate-user-credentials -n {iothub_name} -d {device_id}
+        az iot hub device-identity generate-mqtt-credentials -n {iothub_name} -d {device_id}
     - name: Generate user credentials using device id, DTMI, module id, product information, and custom password creation and expiry time.
       text: >
-        az iot hub device-identity generate-user-credentials -n {iothub_name} -d {device_id} -m {module_id} --dtmi {dtmi}
+        az iot hub device-identity generate-mqtt-credentials -n {iothub_name} -d {device_id} -m {module_id} --dtmi {dtmi}
         --pct {password_creation_time} --pet {password_expiration_time} --pi {product_info}
     - name: Generate user credentials using a Device connection string.
       text: >
-        az iot hub device-identity generate-user-credentials -n {iothub_name} --cs {connection_string}
+        az iot hub device-identity generate-mqtt-credentials -n {iothub_name} --cs {connection_string}
     - name: Generate user credentials using a Device connection string and custom password creation and expiry time.
       text: >
-        az iot hub device-identity generate-user-credentials -n {iothub_name} --cs {connection_string} --pct
+        az iot hub device-identity generate-mqtt-credentials -n {iothub_name} --cs {connection_string} --pct
         {password_creation_time} --pet {password_expiration_time}
 """
 

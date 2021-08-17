@@ -496,7 +496,7 @@ def load_arguments(self, _):
             "Account and Contributor role for the IoT Hub.",
         )
 
-    with self.argument_context("iot hub device-identity generate-user-credentials") as context:
+    with self.argument_context("iot hub device-identity generate-mqtt-credentials") as context:
         context.argument(
             "connection_string",
             options_list=["--connection-string", "--cs"],

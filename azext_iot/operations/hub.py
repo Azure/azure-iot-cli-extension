@@ -3472,7 +3472,7 @@ def iot_hub_topic_space_delete(
 
 # TODO: Move when finished to correct section
 
-def iot_hub_device_identity_generate_user_credentials(
+def iot_hub_device_identity_generate_mqtt_credentials(
     cmd,
     device_id=None,
     connection_string=None,

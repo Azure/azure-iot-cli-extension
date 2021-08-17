@@ -441,7 +441,7 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
 
         # Device ID + Hub name
         credentials = self.cmd(
-            "iot hub device-identity generate-user-credentials -n {} -d {} -g {}".format(
+            "iot hub device-identity generate-mqtt-credentials -n {} -d {} -g {}".format(
                 props["hub_name"],
                 props["device_id"],
                 LIVE_RG
@@ -465,7 +465,7 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
 
         # All Optional Params
         credentials = self.cmd(
-            "iot hub device-identity generate-user-credentials -n {} -d {} -m {} --dtmi {} -g {} "
+            "iot hub device-identity generate-mqtt-credentials -n {} -d {} -m {} --dtmi {} -g {} "
             "--pct {} --pet {} --pi {} --sakn {}".format(
                 props["hub_name"],
                 props["device_id"],
@@ -496,7 +496,7 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
         )
         module_cs = device_cs + ";ModuleId={}".format(props["module_id"])
         credentials = self.cmd(
-            "iot hub device-identity generate-user-credentials --cs {}".format(
+            "iot hub device-identity generate-mqtt-credentials --cs {}".format(
                 module_cs,
             )
         ).get_output_in_json()
@@ -513,7 +513,7 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
             "password_expiry_time": 3600,
         }
         credentials = self.cmd(
-            "iot hub device-identity generate-user-credentials --cs {}".format(
+            "iot hub device-identity generate-mqtt-credentials --cs {}".format(
                 device_cs
             )
         ).get_output_in_json()
@@ -524,7 +524,7 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
             "password_expiry_time": 1000,
         })
         credentials = self.cmd(
-            "iot hub device-identity generate-user-credentials --cs {} --pct {} --pet {}".format(
+            "iot hub device-identity generate-mqtt-credentials --cs {} --pct {} --pet {}".format(
                 device_cs,
                 props["password_creation_time"],
                 props["password_expiry_time"],
