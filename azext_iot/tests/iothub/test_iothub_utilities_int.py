@@ -9,7 +9,7 @@ from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
 
 class TestIoTHubUtilities(IoTLiveScenarioTest):
     def __init__(self, test_case):
-        super(TestIoTHubUtilities, self).__init__(test_case, self.entity_name, self.entity_rg)
+        super(TestIoTHubUtilities, self).__init__(test_case)
 
     def test_iothub_generate_sas_token(self):
         for auth_phase in DATAPLANE_AUTH_TYPES:
