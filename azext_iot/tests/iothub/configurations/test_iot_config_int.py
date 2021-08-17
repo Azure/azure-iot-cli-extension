@@ -454,19 +454,6 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
 
             self.tearDown()
 
-            # Validate deletion
-            self.cmd(
-                self.set_cmd_auth_type(
-                    "iot edge deployment show -d {} -n {} -g {}".format(
-                        config_ids[0], self.entity_name, self.entity_rg
-                    ),
-                    auth_type=auth_phase
-                ),
-                expect_failure=True
-            )
-
-            self.tearDown()
-
     def test_device_configurations(self):
         config_count = 3
         config_ids = self.generate_config_names(config_count)
