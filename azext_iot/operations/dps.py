@@ -78,7 +78,7 @@ def iot_dps_device_enrollment_get(
                 ).response.json()
                 enrollment["attestation"] = attestation
             else:
-                logger.warn(
+                logger.warning(
                     "--show-keys argument was provided, but requested enrollment has an attestation type of '{}'."
                     " Currently, --show-keys is only supported for symmetric key enrollments".format(
                         enrollment_type
@@ -325,7 +325,7 @@ def iot_dps_device_enrollment_group_get(
                 ).response.json()
                 enrollment_group["attestation"] = attestation
             else:
-                logger.warn(
+                logger.warning(
                     "--show-keys argument was provided, but requested enrollment group has an attestation type of '{}'."
                     " Currently, --show-keys is only supported for symmetric key enrollment groups".format(
                         enrollment_type

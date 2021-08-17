@@ -34,9 +34,15 @@ steps:
 
   - template: set-testenv-sentinel.yml
 
+  # Fix for DNS resolution issues: https://github.com/actions/virtual-environments/issues/798
+  - script: |
+      sudo ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
+    displayName: Bypass local DNS server to workaround issue resolving ADT hostnames
+    condition: and(succeededOrFailed(), eq( variables['Agent.OS'], 'Linux' ))
+
   - ${{ if eq(parameters.runUnitTests, 'true') }}:
     - script: |
-        pytest -vv ${{ parameters.path }} -k "_unit" --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-unit-${{ parameters.name }}.xml
+        pytest -s -vv ${{ parameters.path }} -k "_unit" --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-unit-${{ parameters.name }}.xml
       displayName: '${{ parameters.name }} unit tests'
       env:
         COVERAGE_FILE: .coverage.${{ parameters.name }}
@@ -51,7 +57,7 @@ steps:
         scriptLocation: inlineScript
         inlineScript: |
           export COVERAGE_FILE=.coverage.${{ parameters.name }}
-          pytest -vv ${{ parameters.path }} -k "_int" --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int-${{ parameters.name }}.xml
+          pytest -s -vv ${{ parameters.path }} -k "_int" --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int-${{ parameters.name }}.xml
 
   - task: PublishBuildArtifacts@1
     inputs:
