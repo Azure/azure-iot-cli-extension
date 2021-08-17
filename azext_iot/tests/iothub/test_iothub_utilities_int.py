@@ -7,6 +7,7 @@
 from azext_iot.tests import IoTLiveScenarioTest
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
 
+
 class TestIoTHubUtilities(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTHubUtilities, self).__init__(test_case)
