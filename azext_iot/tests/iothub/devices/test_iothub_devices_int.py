@@ -427,7 +427,7 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
             checks=[self.exists("sas")],
         )
 
-    def test_generate_user_credentials(self):
+    def test_generate_mqtt_credentials(self):
         props = {
             "device_id": f"d_{generate_generic_id()}",
             "hub_name": LIVE_HUB,
@@ -466,14 +466,14 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
         # All Optional Params
         credentials = self.cmd(
             "iot hub device-identity generate-mqtt-credentials -n {} -d {} -m {} --dtmi {} -g {} "
-            "--pct {} --pet {} --pi {} --sakn {}".format(
+            "--pct {} --pes {} --pi {} --sakn {}".format(
                 props["hub_name"],
                 props["device_id"],
                 props["module_id"],
                 props["dtmi"],
                 LIVE_RG,
                 props["password_creation_time"],
-                props["password_expiry_time"],
+                props["password_expiry_time"] - props["password_creation_time"],
                 props["product_info"],
                 props["shared_access_key_name"],
             )
@@ -524,10 +524,10 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
             "password_expiry_time": 1000,
         })
         credentials = self.cmd(
-            "iot hub device-identity generate-mqtt-credentials --cs {} --pct {} --pet {}".format(
+            "iot hub device-identity generate-mqtt-credentials --cs {} --pct {} --pes {}".format(
                 device_cs,
                 props["password_creation_time"],
-                props["password_expiry_time"],
+                props["password_expiry_time"] - props["password_creation_time"],
             )
         ).get_output_in_json()
         assert_username_password(credentials, props)
@@ -537,34 +537,45 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
         )
 
 
-def assert_username_password(result, expected_props):
+def assert_username_password(result, expected_props, version=2):
     username = result["username"]
-    assert "am=SASb64" in username
-    assert "av=2021-06-30-preview" in username
-    assert f"h={expected_props['hub_name']}" in username
-    assert f"did={expected_props['device_id']}" in username
+    password = result["password"]
+    if version == 1:
+        client_id = result["client_id"]
+        assert "api-version=2019-10-01" in username
+        assert expected_props['hub_name'] in username
+        assert expected_props['hub_name'] in password
+        assert expected_props['device_id'] in username
+        assert expected_props['device_id'] in client_id
+        assert expected_props['device_id'] in password
 
-    result_diff = (
-        int(re.search(r"se\=(.*?)(\&|$)", username).group(1)) -
-        int(re.search(r"sa\=(.*?)(\&|$)", username).group(1))
-    )
+        if expected_props.get("module_id", None):
+            assert expected_props['module_id'] in username
+            assert expected_props['module_id'] in client_id
+            assert expected_props['module_id'] in password
 
-    expected_diff = (
-        expected_props['password_expiry_time'] - expected_props['password_creation_time']
-    ) * 1000
+        assert "SharedAccessSignature" in password
 
-    assert result_diff == expected_diff
+    else:
+        assert "am=SASb64" in username
+        assert "av=2021-06-30-preview" in username
+        assert f"h={expected_props['hub_name']}" in username
+        assert f"did={expected_props['device_id']}" in username
 
-    if expected_props.get("module_id", None):
-        assert f"mid={expected_props['module_id']}" in username
+        result_diff = (
+            int(re.search(r"se\=(.*?)(\&|$)", username).group(1)) -
+            int(re.search(r"sa\=(.*?)(\&|$)", username).group(1))
+        )
+        expected_diff = (
+            expected_props['password_expiry_time'] - expected_props['password_creation_time']
+        ) * 1000
+        assert result_diff == expected_diff
 
-    if expected_props.get("dtmi", None):
-        assert f"dtmi={expected_props['dtmi']}" in username
-
-    if expected_props.get("product_info", None):
-        assert f"ca={expected_props['product_info']}" in username
-
-    if expected_props.get("shared_access_key_name", None):
-        assert f"sp={expected_props['shared_access_key_name']}" in username
-
-    assert result.get("password")
+        if expected_props.get("module_id", None):
+            assert f"mid={expected_props['module_id']}" in username
+        if expected_props.get("dtmi", None):
+            assert f"dtmi={expected_props['dtmi']}" in username
+        if expected_props.get("product_info", None):
+            assert f"ca={expected_props['product_info']}" in username
+        if expected_props.get("shared_access_key_name", None):
+            assert f"sp={expected_props['shared_access_key_name']}" in username

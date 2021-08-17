@@ -502,18 +502,20 @@ def load_arguments(self, _):
             options_list=["--connection-string", "--cs"],
             help="Target connection string. This bypasses the IoT Hub registry and generates the user credentials directly "
                  "from the supplied symmetric key without further validation. All other command parameters aside from "
-                 "password-creation-time and password-expiry-time will be ignored. Supported connection string types: Device, "
+                 "password-creation-time and password-expiry-in-secs will be ignored. Supported connection string types: Device, "
                  "Module."
         )
         context.argument(
-            "password_expiry_time",
-            options_list=["--password-expiry-time", "--pet"],
-            help="Integer representing time in seconds representing the password expiry time.",
+            "password_expiry_in_secs",
+            options_list=["--password-expiry-in-secs", "--pes"],
+            type=int,
+            help="Valid password duration in seconds.",
         )
         context.argument(
             "password_creation_time",
             options_list=["--password-creation-time", "--pct"],
-            help="Integer representing time in seconds representing the password creation time.",
+            type=int,
+            help="Valid time in seconds for password creation.  Default:  Current time.",
         )
         context.argument(
             "product_info",
@@ -529,6 +531,12 @@ def load_arguments(self, _):
             "dtmi",
             options_list=["--dtmi"],
             help="Digital Twins model Id. Example: dtmi:com:example:Room;2",
+        )
+        context.argument(
+            "version",
+            options_list=["--format-version", "--fv"],
+            help="MQTT Connect Credentials Format Version to use when generating the credentials. Supported values: v1, v2."
+                 " Default: v2",
         )
 
     with self.argument_context("iot hub device-identity parent set") as context:

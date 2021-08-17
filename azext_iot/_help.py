@@ -306,17 +306,20 @@ helps[
     - name: Generate user credentials using device id.
       text: >
         az iot hub device-identity generate-mqtt-credentials -n {iothub_name} -d {device_id}
-    - name: Generate user credentials using device id, DTMI, module id, product information, and custom password creation and expiry time.
+    - name: Generate user credentials using device id, DTMI, module id, product information, custom password creation time and expiry in seconds.
       text: >
         az iot hub device-identity generate-mqtt-credentials -n {iothub_name} -d {device_id} -m {module_id} --dtmi {dtmi}
-        --pct {password_creation_time} --pet {password_expiration_time} --pi {product_info}
+        --pct {password_creation_time} --pes {password_expiry_in_secs} --pi {product_info}
+    - name: Generate user credentials using device id using MQTT Connect Credentials Format Version 1.
+      text: >
+        az iot hub device-identity generate-mqtt-credentials -n {iothub_name} -d {device_id} --fv v1
     - name: Generate user credentials using a Device connection string.
       text: >
         az iot hub device-identity generate-mqtt-credentials -n {iothub_name} --cs {connection_string}
-    - name: Generate user credentials using a Device connection string and custom password creation and expiry time.
+    - name: Generate user credentials using a Device connection string and custom password creation time and expiry in seconds.
       text: >
-        az iot hub device-identity generate-mqtt-credentials -n {iothub_name} --cs {connection_string} --pct
-        {password_creation_time} --pet {password_expiration_time}
+        az iot hub device-identity generate-mqtt-credentials -n {iothub_name} --cs {connection_string} --pes
+        {password_creation_time} --pet {password_expiry_in_secs}
 """
 
 helps[

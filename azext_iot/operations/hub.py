@@ -3480,9 +3480,10 @@ def iot_hub_device_identity_generate_mqtt_credentials(
     hub_name=None,
     module_id=None,
     password_creation_time=None,
-    password_expiry_time=None,
+    password_expiry_in_secs=3600,
     product_info=None,
     shared_access_key_name=None,
+    version="v2",
     resource_group_name=None,
     login=None,
     auth_type_dataplane=None,
@@ -3532,61 +3533,77 @@ def iot_hub_device_identity_generate_mqtt_credentials(
     shared_access_key = parsed_cs["SharedAccessKey"]
     module_id = parsed_cs.get("ModuleId", None)
 
-    # Constants update
-    api_version = "2021-06-30-preview"
+    # Time updates
     if not password_creation_time:
         password_creation_time = int(time())
-    if not password_expiry_time:
-        password_expiry_time = int(
-            password_creation_time + 3600
+    password_expiry_time = password_creation_time + password_expiry_in_secs
+
+    client_id = f"{device_id}/{module_id}" if module_id else device_id
+
+    # Version 2
+    if version == "v2":
+        api_version = "2021-06-30-preview"
+        # Username
+        username = "av={}&h={}&did={}&am={}&se={}&sa={}".format(
+            api_version,
+            hub_name,
+            device_id,
+            "SASb64",
+            int(password_expiry_time) * 1000,
+            int(password_creation_time) * 1000,
         )
 
-    # Username
-    username = "av={}&h={}&did={}&am={}&se={}&sa={}".format(
-        api_version,
-        hub_name,
-        device_id,
-        "SASb64",
-        int(password_expiry_time) * 1000,
-        int(password_creation_time) * 1000,
-    )
+        if module_id:
+            username += f"&mid={module_id}"
 
-    if module_id:
-        username += f"&mid={module_id}"
+        if dtmi:
+            username += f"&dtmi={dtmi}"
 
-    if dtmi:
-        username += f"&dtmi={dtmi}"
+        if product_info:
+            username += f"&ca={product_info}"
 
-    if product_info:
-        username += f"&ca={product_info}"
+        if shared_access_key_name:
+            username += f"&sp={shared_access_key_name}"
 
-    if shared_access_key_name:
-        username += f"&sp={shared_access_key_name}"
+        # Password
+        password = "{}\n{}\n{}\n{}\n{}".format(
+            hub_name,
+            client_id,
+            shared_access_key_name if shared_access_key_name else "",
+            password_creation_time * 1000,
+            password_expiry_time * 1000,
+        )
 
-    # Password
-    password = "{}\n{}\n{}\n{}\n{}".format(
-        hub_name,
-        f"{device_id}/{module_id}" if module_id else device_id,
-        shared_access_key_name if shared_access_key_name else "",
-        password_creation_time * 1000,
-        password_expiry_time * 1000,
-    )
+        decoded_key = base64.b64decode(shared_access_key)
 
-    decoded_key = base64.b64decode(shared_access_key)
+        try:
+            payload_to_sign = password.encode("utf-8")  # type: ignore
+        except AttributeError:
+            # If byte string, no need to encode
+            pass
 
-    try:
-        payload_to_sign = password.encode("utf-8")  # type: ignore
-    except AttributeError:
-        # If byte string, no need to encode
-        pass
+        encoded_key = hmac.HMAC(
+            key=decoded_key,
+            msg=payload_to_sign,  # type: ignore
+            digestmod=hashlib.sha256,
+        ).digest()
 
-    encoded_key = hmac.HMAC(
-        key=decoded_key,
-        msg=payload_to_sign,  # type: ignore
-        digestmod=hashlib.sha256,
-    ).digest()
+        return {
+            "username": username,
+            "password": base64.b64encode(encoded_key)
+        }
 
-    return {
-        "username": username,
-        "password": base64.b64encode(encoded_key)
-    }
+    else:
+        api_version = "2019-10-01"
+        username = "{}/{}/?api-version={}".format(
+            hub_name, client_id, api_version
+        )
+
+        return {
+            "username": username,
+            "client_id": client_id,
+            "password": _iot_build_sas_token_from_cs(
+                connection_string,
+                password_expiry_time - int(time()), # Creation time can be in the past
+            ).generate_sas_token()
+        }
