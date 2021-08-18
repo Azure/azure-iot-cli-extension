@@ -29,10 +29,3 @@ License notice for paho-mqtt v1.5.0, obtained from https://github.com/eclipse/pa
 
 This project is dual licensed under the Eclipse Public License 1.0 and the
 Eclipse Distribution License 1.0 as described in the epl-v10 and edl-v10 files.
-
------------------------------------------------------------------------------------------------------------------------
-License notice for packaging, obtained from https://github.com/pypa/packaging/blob/main/LICENSE
-
-This software is made available under the terms of *either* of the licenses
-found in LICENSE.APACHE or LICENSE.BSD. Contributions to this software is made
-under the terms of *both* these licenses.
