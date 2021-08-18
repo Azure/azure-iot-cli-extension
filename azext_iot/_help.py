@@ -304,20 +304,20 @@ helps[
     - name: Generate MQTT credentials using device id.
       text: >
         az iot hub device-identity generate-mqtt-credentials -n {iothub_name} -d {device_id}
-    - name: Generate MQTT credentials using device id, DTMI, module id, product information, custom password creation time and expiry in seconds.
+    - name: Generate MQTT credentials using device id, DTMI, module id, product information, custom valid password duration.
       text: >
         az iot hub device-identity generate-mqtt-credentials -n {iothub_name} -d {device_id} -m {module_id} --dtmi {dtmi}
-        --pct {password_creation_time} --pes {password_expiry_in_secs} --pi {product_info}
+        --du {duration} --pi {product_info}
     - name: Generate MQTT credentials using device id using MQTT Connect Credentials Format Version 1.
       text: >
         az iot hub device-identity generate-mqtt-credentials -n {iothub_name} -d {device_id} --fv v1
     - name: Generate MQTT credentials using a Device connection string.
       text: >
         az iot hub device-identity generate-mqtt-credentials -n {iothub_name} --cs {connection_string}
-    - name: Generate MQTT credentials using a Device connection string and custom password creation time and expiry in seconds.
+    - name: Generate MQTT credentials using a Device connection string and custom valid password duration.
       text: >
-        az iot hub device-identity generate-mqtt-credentials -n {iothub_name} --cs {connection_string} --pes
-        {password_creation_time} --pet {password_expiry_in_secs}
+        az iot hub device-identity generate-mqtt-credentials -n {iothub_name} --cs {connection_string} --du
+         {duration}
 """
 
 helps[

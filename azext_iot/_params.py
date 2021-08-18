@@ -506,16 +506,10 @@ def load_arguments(self, _):
                  "Module."
         )
         context.argument(
-            "password_expiry_in_secs",
-            options_list=["--password-expiry-in-secs", "--pes"],
+            "duration",
+            options_list=["--duration", "--du"],
             type=int,
             help="Valid password duration in seconds.",
-        )
-        context.argument(
-            "password_creation_time",
-            options_list=["--password-creation-time", "--pct"],
-            type=int,
-            help="Valid time in seconds for password creation.  Default:  Current time.",
         )
         context.argument(
             "product_info",

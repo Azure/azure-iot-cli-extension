@@ -34,7 +34,6 @@ from azext_iot.common.shared import (
 )
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
-    looks_like_file,
     read_file_content,
     validate_key_value_pairs,
     url_encode_dict,
@@ -3335,8 +3334,14 @@ def iot_hub_topic_space_create(
     if topic_type == TopicSpaceType.HighFanout:
         raise CLIError("Only LowFanout and PublishOnly topic types are supported right now")
 
-    if len(topic_templates) == 1 and looks_like_file(topic_templates[0]):
-        topic_templates = process_json_arg(topic_templates[0], "Topic Space Templates")
+    parsed_templates = []
+    for template in topic_templates:
+        try:
+            parsed_templates.extend(process_json_arg(template, "Topic Space Templates"))
+            logger.info(f"Parsed {template} as file with topic space templates.")
+        except:
+            parsed_templates.append(template)
+            logger.info(f"Parsed {template} as a topic space template.")
 
     try:
         return service_sdk.topic_space.put_topic_space(
@@ -3344,7 +3349,7 @@ def iot_hub_topic_space_create(
             name=topic_name,
             properties={
                 "topicspace_type": topic_type,
-                "topic_templates": topic_templates
+                "topic_templates": parsed_templates
             },
             raw=True
         ).response.json()
@@ -3479,8 +3484,7 @@ def iot_hub_device_identity_generate_mqtt_credentials(
     dtmi=None,
     hub_name=None,
     module_id=None,
-    password_creation_time=None,
-    password_expiry_in_secs=3600,
+    duration=3600,
     policy_name=None,
     product_info=None,
     version="v2",
@@ -3534,9 +3538,8 @@ def iot_hub_device_identity_generate_mqtt_credentials(
     module_id = parsed_cs.get("ModuleId", None)
 
     # Time updates
-    if not password_creation_time:
-        password_creation_time = int(time())
-    password_expiry_time = password_creation_time + password_expiry_in_secs
+    password_creation_time = int(time())
+    password_expiry_time = password_creation_time + duration
 
     client_id = f"{device_id}/{module_id}" if module_id else device_id
 
@@ -3604,6 +3607,6 @@ def iot_hub_device_identity_generate_mqtt_credentials(
             "client_id": client_id,
             "password": _iot_build_sas_token_from_cs(
                 connection_string,
-                password_expiry_time - int(time()), # Creation time can be in the past
+                duration
             ).generate_sas_token()
         }

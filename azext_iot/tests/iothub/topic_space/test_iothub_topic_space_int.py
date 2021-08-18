@@ -18,6 +18,7 @@ class TestIoTHubTopicSpace(CaptureOutputLiveScenarioTest):
         super(TestIoTHubTopicSpace, self).__init__(test_case)
 
     def test_overall_topic_space(self):
+        file_name = "./example_json.json"
         topic_types = ["LowFanout", "PublishOnly"]
         topic_templates = [
             f"t{generate_generic_id()}",
@@ -136,17 +137,20 @@ class TestIoTHubTopicSpace(CaptureOutputLiveScenarioTest):
         assert len(topics) == 0
 
         # File read check
+        fake_file = "./example_json2.json"
         file_topic_name = "ts_{}".format(generate_generic_id())
         topic = self.cmd(
-            "iot hub topic-space create -l {} --tsn {} --tst {} --template {}".format(
+            "iot hub topic-space create -l {} --tsn {} --tst {} --template {} {}".format(
                 LIVE_HUB_CS,
                 file_topic_name,
                 topic_types[0],
-                "./example_json.json"
+                file_name,
+                fake_file
             )
         ).get_output_in_json()
-        with open("./example_json.json") as f:
+        with open(file_name) as f:
             expected_template = json.loads(f.read())
+            expected_template.append(fake_file)
             assert_topic_space_attributes(topic, file_topic_name, topic_types[0], expected_template)
 
         self.cmd(
