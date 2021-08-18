@@ -49,7 +49,6 @@ DEPENDENCIES = [
     "paho-mqtt==1.5.0",
     "jsonschema==3.2.0",
     "importlib_metadata;python_version<'3.8'",
-    "packaging",
 ]
 EXTRAS = {"uamqp": ["uamqp~=1.2"]}
 
