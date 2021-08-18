@@ -15,7 +15,6 @@ parameters:
   type: string
   default: 'ubuntu-18.04'
   values:
-  - 'ubuntu-16.04'
   - 'ubuntu-18.04'
   - 'ubuntu-latest'
 
