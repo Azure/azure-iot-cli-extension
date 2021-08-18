@@ -313,7 +313,7 @@ def url_encode_str(s, plus=False):
 def test_import_and_version(package, expected_version):
     """ Used to determine if a dependency is loading correctly """
     import importlib
-    from importlib.metadata import version
+    from importlib_metadata import version
 
     try:
         importlib.import_module(package)

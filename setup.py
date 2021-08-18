@@ -48,7 +48,7 @@ if not PACKAGE_NAME:
 # though that is installed out of band (managed by the extension)
 # for compatibility reasons.
 
-DEPENDENCIES = ["paho-mqtt==1.5.0", "jsonschema==3.2.0", "packaging"]
+DEPENDENCIES = ["paho-mqtt==1.5.0", "jsonschema==3.2.0", "packaging", "importlib_metadata==4.4"]
 EXTRAS = {"uamqp": ["uamqp~=1.2"]}
 
 CLASSIFIERS = [
