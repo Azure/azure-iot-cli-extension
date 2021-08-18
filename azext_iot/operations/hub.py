@@ -3335,7 +3335,7 @@ def iot_hub_topic_space_create(
     if topic_type == TopicSpaceType.HighFanout:
         raise CLIError("Only LowFanout and PublishOnly topic types are supported right now")
 
-    if topic_templates and looks_like_file(topic_templates[0]):
+    if len(topic_templates) == 1 and looks_like_file(topic_templates[0]):
         topic_templates = process_json_arg(topic_templates[0], "Topic Space Templates")
 
     try:
@@ -3481,8 +3481,8 @@ def iot_hub_device_identity_generate_mqtt_credentials(
     module_id=None,
     password_creation_time=None,
     password_expiry_in_secs=3600,
+    policy_name=None,
     product_info=None,
-    shared_access_key_name=None,
     version="v2",
     resource_group_name=None,
     login=None,
@@ -3562,14 +3562,14 @@ def iot_hub_device_identity_generate_mqtt_credentials(
         if product_info:
             username += f"&ca={product_info}"
 
-        if shared_access_key_name:
-            username += f"&sp={shared_access_key_name}"
+        if policy_name:
+            username += f"&sp={policy_name}"
 
         # Password
         password = "{}\n{}\n{}\n{}\n{}\n".format(
             hub_name,
             client_id,
-            shared_access_key_name if shared_access_key_name else "",
+            policy_name if policy_name else "",
             password_creation_time * 1000,
             password_expiry_time * 1000,
         )

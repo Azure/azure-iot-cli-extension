@@ -466,7 +466,7 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
         # All Optional Params
         credentials = self.cmd(
             "iot hub device-identity generate-mqtt-credentials -n {} -d {} -m {} --dtmi {} -g {} "
-            "--pct {} --pes {} --pi {} --sakn {}".format(
+            "--pct {} --pes {} --pi {} --pn {}".format(
                 props["hub_name"],
                 props["device_id"],
                 props["module_id"],

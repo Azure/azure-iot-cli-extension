@@ -523,11 +523,6 @@ def load_arguments(self, _):
             help="Description of the product.",
         )
         context.argument(
-            "shared_access_key_name",
-            options_list=["--shared_access_key_name", "--sakn"],
-            help="Shared access key name.",
-        )
-        context.argument(
             "dtmi",
             options_list=["--dtmi"],
             help="Digital Twins model Id. Example: dtmi:com:example:Room;2",
