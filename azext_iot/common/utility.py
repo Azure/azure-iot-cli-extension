@@ -311,14 +311,20 @@ def url_encode_str(s, plus=False):
 
 
 def test_import_and_version(package, expected_version):
-    """ Used to determine if a dependency is loading correctly """
-    import importlib
-    from importlib_metadata import version
+    """
+    Used to determine if a package dependency, installed with metadata,
+    is at least the expected version. This utility will not work for packages
+    that are installed without metadata.
+    """
 
     try:
-        importlib.import_module(package)
-        return version(package) >= expected_version
+        from importlib import metadata
     except ImportError:
+        import importlib_metadata as metadata
+
+    try:
+        return metadata.version(package) >= expected_version
+    except metadata.PackageNotFoundError:
         return False
 
 
