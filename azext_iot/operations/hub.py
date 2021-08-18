@@ -3566,7 +3566,7 @@ def iot_hub_device_identity_generate_mqtt_credentials(
             username += f"&sp={shared_access_key_name}"
 
         # Password
-        password = "{}\n{}\n{}\n{}\n{}".format(
+        password = "{}\n{}\n{}\n{}\n{}\n".format(
             hub_name,
             client_id,
             shared_access_key_name if shared_access_key_name else "",
