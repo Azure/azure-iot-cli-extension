@@ -81,28 +81,6 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
                 expect_failure=True,
             )
 
-            # Content from file
-            self.cmd(
-                self.set_cmd_auth_type(
-                    "iot edge set-modules -d {} -n {} -g {} -k '{}'".format(
-                        edge_device_ids[0], self.entity_name, self.entity_rg, edge_content_v1_path
-                    ),
-                    auth_type=auth_phase,
-                ),
-                checks=[self.check("length([*])", 4)],
-            )
-
-            # Error schema validation - Malformed deployment
-            self.cmd(
-                self.set_cmd_auth_type(
-                    "iot edge set-modules -d {} -n {} -g {} -k '{}'".format(
-                        edge_device_ids[0], self.entity_name, self.entity_rg, edge_content_malformed_path
-                    ),
-                    auth_type=auth_phase
-                ),
-                expect_failure=True,
-            )
-
     def test_edge_deployments(self):
         for auth_phase in DATAPLANE_AUTH_TYPES:
             config_count = 5
