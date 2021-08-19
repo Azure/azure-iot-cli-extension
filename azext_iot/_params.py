@@ -502,14 +502,13 @@ def load_arguments(self, _):
             options_list=["--connection-string", "--cs"],
             help="Target connection string. This bypasses the IoT Hub registry and generates the user credentials directly "
                  "from the supplied symmetric key without further validation. All other command parameters aside from "
-                 "password-creation-time and password-expiry-in-secs will be ignored. Supported connection string types: Device, "
-                 "Module."
+                 "duration will be ignored. Supported connection string types: Device, Module."
         )
         context.argument(
             "duration",
             options_list=["--duration", "--du"],
             type=int,
-            help="Valid password duration in seconds.",
+            help="Indicates the duration in seconds, for which the mqtt credentials will remain valid.",
         )
         context.argument(
             "product_info",
@@ -524,8 +523,7 @@ def load_arguments(self, _):
         context.argument(
             "version",
             options_list=["--format-version", "--fv"],
-            help="MQTT Connect Credentials Format Version to use when generating the credentials. Supported values: v1, v2."
-                 " Default: v2",
+            help="MQTT connect credentials format version to use when generating the credentials. Supported values: v1, v2.",
         )
 
     with self.argument_context("iot hub device-identity parent set") as context:
@@ -603,8 +601,8 @@ def load_arguments(self, _):
             "topic_templates",
             nargs="*",
             options_list=["--topic-space-templates", "--templates"],
-            help="List of topic space template paths or a text file containing a list of topic "
-            "template paths. Accepts a space-seperated list.",
+            help="Space separated list of tokens which can be inline topic space template values, or"
+            " paths to files containing a json-formatted list of topic space template values.",
         )
         context.argument(
             "topic_type",

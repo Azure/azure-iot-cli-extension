@@ -304,7 +304,7 @@ helps[
     - name: Generate MQTT credentials using device id.
       text: >
         az iot hub device-identity generate-mqtt-credentials -n {iothub_name} -d {device_id}
-    - name: Generate MQTT credentials using device id, DTMI, module id, product information, custom valid password duration.
+    - name: Generate MQTT credentials using device id, DTMI, module id, product information, custom duration.
       text: >
         az iot hub device-identity generate-mqtt-credentials -n {iothub_name} -d {device_id} -m {module_id} --dtmi {dtmi}
         --du {duration} --pi {product_info}
@@ -314,7 +314,7 @@ helps[
     - name: Generate MQTT credentials using a Device connection string.
       text: >
         az iot hub device-identity generate-mqtt-credentials -n {iothub_name} --cs {connection_string}
-    - name: Generate MQTT credentials using a Device connection string and custom valid password duration.
+    - name: Generate MQTT credentials using a Device connection string and custom duration.
       text: >
         az iot hub device-identity generate-mqtt-credentials -n {iothub_name} --cs {connection_string} --du
          {duration}
