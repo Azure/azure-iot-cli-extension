@@ -5,6 +5,12 @@ trigger:
     exclude:
       - dev
       - master
+  paths:
+    exclude:
+    - README.md
+    - docs/alt-install-methods.md
+    - docs/install-help.md
+    - docs/scenario-automation.md
 
 pr:
   branches:
@@ -13,16 +19,30 @@ pr:
     exclude:
       - dev
       - master
+  paths:
+    exclude:
+    - README.md
+    - docs/alt-install-methods.md
+    - docs/install-help.md
+    - docs/scenario-automation.md
 
 variables:
   iot_ext_package: azure-iot
   iot_ext_venv: venv
 
+parameters:
+- name: linuxImage
+  type: string
+  default: 'ubuntu-18.04'
+  values:
+  - 'ubuntu-18.04'
+  - 'ubuntu-latest'
+
 jobs:
 
 - job: 'build_and_publish_azure_iot_cli_ext'
   pool:
-    vmImage: 'Ubuntu-16.04'
+    vmImage: ${{ parameters.linuxImage }}
 
   steps:
   - task: UsePythonVersion@0
@@ -35,7 +55,7 @@ jobs:
 
 - job: 'build_and_publish_azure_cli_test_sdk'
   pool:
-    vmImage: 'Ubuntu-16.04'
+    vmImage: ${{ parameters.linuxImage }}
 
   steps:
   - task: UsePythonVersion@0
@@ -49,7 +69,7 @@ jobs:
 - job: 'run_unit_tests_ubuntu'
   dependsOn: [ 'build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']
   pool:
-    vmImage: 'Ubuntu-16.04'
+    vmImage: ${{ parameters.linuxImage }}
   strategy:
     matrix:
       Python36:
@@ -63,11 +83,11 @@ jobs:
   steps:
   - bash: sudo rm -R -f /usr/local/lib/azureExtensionDir
 
-  - template: templates/run-tests.yml
+  - template: templates/run-tests-parallel.yml
     parameters:
       pythonVersion: '$(python.version)'
-      runUnitTests: 'true'
-      runIntTests: 'false'
+      runUnitTests: true
+      runIntTests: false
 
 - job: 'run_unit_tests_macOs'
   dependsOn: ['build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']
@@ -75,11 +95,11 @@ jobs:
     vmImage: 'macOS-10.14'
 
   steps:
-  - template: templates/run-tests.yml
+  - template: templates/run-tests-parallel.yml
     parameters:
       pythonVersion: '3.8.x'
-      runUnitTests: 'true'
-      runIntTests: 'false'
+      runUnitTests: true
+      runIntTests: false
 
   - template: templates/calculate-code-coverage.yml
 
@@ -94,16 +114,16 @@ jobs:
       targetType: 'inline'
       script : 'ren "C:\Program Files\Common Files\AzureCliExtensionDirectory" "C:\Program Files\Common Files\AzureCliExtensionDirectory1"'
 
-  - template: templates/run-tests.yml
+  - template: templates/run-tests-parallel.yml
     parameters:
       pythonVersion: '3.8.x'
-      runUnitTests: 'true'
-      runIntTests: 'false'
+      runUnitTests: true
+      runIntTests: false
 
 - job: 'run_style_check'
   dependsOn: ['build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']
   pool:
-    vmImage: 'Ubuntu-16.04'
+    vmImage: ${{ parameters.linuxImage }}
 
   steps:
   - task: UsePythonVersion@0
@@ -128,7 +148,7 @@ jobs:
   dependsOn: ['build_and_publish_azure_iot_cli_ext']
   displayName: 'Evaluate IoT extension command table'
   pool:
-    vmImage: 'Ubuntu-16.04'
+    vmImage: ${{ parameters.linuxImage }}
 
   steps:
   - task: UsePythonVersion@0

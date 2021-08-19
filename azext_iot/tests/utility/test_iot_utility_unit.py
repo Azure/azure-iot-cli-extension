@@ -7,6 +7,7 @@
 import json
 import pytest
 import os
+import sys
 
 from unittest import mock
 from knack.util import CLIError
@@ -95,18 +96,13 @@ class TestMode2Handler(object):
 class TestEnsureUamqp(object):
     @pytest.fixture()
     def uamqp_scenario(self, mocker):
-        get_uamqp = mocker.patch("azext_iot.common.deps.get_uamqp_ext_version")
-        update_uamqp = mocker.patch("azext_iot.common.deps.update_uamqp_ext_version")
         installer = mocker.patch("azext_iot.common.deps.install")
         installer.return_value = True
-        get_uamqp.return_value = EVENT_LIB[1]
-        test_import = mocker.patch("azext_iot.common.deps.test_import")
+        test_import = mocker.patch("azext_iot.common.deps.test_import_and_version")
         test_import.return_value = True
         m_exit = mocker.patch("azext_iot.common.deps.sys.exit")
 
         return {
-            "get_uamqp": get_uamqp,
-            "update_uamqp": update_uamqp,
             "installer": installer,
             "test_import": test_import,
             "exit": m_exit,
@@ -118,9 +114,6 @@ class TestEnsureUamqp(object):
             ("importerror", None, "y"),
             ("importerror", None, "n"),
             ("importerror", "yes;", None),
-            ("compatibility", None, "y"),
-            ("compatibility", None, "n"),
-            ("compatibility", "yes;", None),
             ("repair", "repair;", "y"),
             ("repair", "repair;yes;", None),
             ("repair", "repair;", "n"),
@@ -133,8 +126,6 @@ class TestEnsureUamqp(object):
 
         if case == "importerror":
             uamqp_scenario["test_import"].return_value = False
-        elif case == "compatibility":
-            uamqp_scenario["get_uamqp"].return_value = "0.0.0"
 
         kwargs = {}
         user_cancelled = True
@@ -152,7 +143,9 @@ class TestEnsureUamqp(object):
         method = partial(ensure_uamqp, mocker.MagicMock(), **kwargs)
         method()
 
-        if user_cancelled:
+        if uamqp_scenario["test_import"]:
+            pass
+        elif user_cancelled:
             assert uamqp_scenario["exit"].call_args
         else:
             install_args = uamqp_scenario["installer"].call_args
@@ -375,7 +368,34 @@ class TestCliInit(object):
         invalid_directories = []
         for directory in directory_structure:
             if directory_structure[directory] is None:
-                invalid_directories.append("Directory: '{}' missing __init__.py".format(directory))
+                invalid_directories.append(
+                    "Directory: '{}' missing __init__.py".format(directory)
+                )
 
         if invalid_directories:
             pytest.fail(", ".join(invalid_directories))
+
+    def test_ensure_azure_namespace_path(self):
+        import azure
+        from azext_iot.common.utility import ensure_azure_namespace_path
+        from azure.cli.core.extension import get_extension_path
+        from azext_iot.constants import EXTENSION_NAME
+
+        ext_path = get_extension_path(EXTENSION_NAME)
+
+        original_sys_path = list(sys.path)
+        original_azure_namespace_path = list(azure.__path__)
+        ext_azure_dir = os.path.join(ext_path, "azure")
+
+        os.makedirs(ext_azure_dir, exist_ok=True)
+
+        ensure_azure_namespace_path()
+        modified_sys_path = list(sys.path)
+        modified_azure_namespace_path = list(azure.__path__)
+
+        original_azure_namespace_path.append(ext_azure_dir)
+        assert set(original_azure_namespace_path) == set(modified_azure_namespace_path)
+
+        original_sys_path.insert(0, ext_path)
+        assert set(original_sys_path) == set(modified_sys_path)
+        assert modified_sys_path[0] == ext_path

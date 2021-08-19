@@ -70,7 +70,7 @@ def list_devices(
     cmd,
     app_id: str,
     token: str,
-    max_pages=1,
+    max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
 ) -> List[Union[central_models.DevicePreview, central_models.DeviceV1]]:
@@ -97,24 +97,28 @@ def list_devices(
     query_parameters = {}
     query_parameters["api-version"] = api_version
 
+    logger.warning(
+        "This command may take a long time to complete if your app contains a lot of devices"
+    )
+
     pages_processed = 0
-    while (pages_processed <= max_pages) and url:
-        response = requests.get(url, headers=headers, params=query_parameters)
+    while (max_pages == 0 or pages_processed < max_pages) and url:
+        response = requests.get(url, headers=headers, params=query_parameters if pages_processed == 0 else None)
         result = _utility.try_extract_result(response)
 
         if "value" not in result:
             raise CLIError("Value is not present in body: {}".format(result))
 
         if api_version == ApiVersion.preview.value:
-            devices = devices + [
+            devices.extend([
                 central_models.DevicePreview(device) for device in result["value"]
-            ]
+            ])
         else:
-            devices = devices + [
+            devices.extend([
                 central_models.DeviceV1(device) for device in result["value"]
-            ]
+            ])
 
-        url = result.get("nextLink", params=query_parameters)
+        url = result.get("nextLink", None)
         pages_processed = pages_processed + 1
 
     return devices

@@ -3,6 +3,12 @@ pr: none
 trigger: none
 
 parameters:
+- name: vmImage
+  type: string
+  default: 'ubuntu-18.04'
+  values:
+  - 'ubuntu-18.04'
+  - 'ubuntu-latest'
 - name: pythonVersion
   type: string
   default: '3.6.x'
@@ -35,7 +41,7 @@ stages:
 
     - job: 'Build_Publish_Azure_IoT_CLI_Extension'
       pool:
-        vmImage: 'Ubuntu-16.04'
+        vmImage: ${{ parameters.vmImage }}
 
       steps:
       - task: UsePythonVersion@0
@@ -49,7 +55,7 @@ stages:
 
     - job: 'Build_Publish_Azure_CLI_Test_SDK'
       pool:
-        vmImage: 'Ubuntu-16.04'
+        vmImage: ${{ parameters.vmImage }}
 
       steps:
       - task: UsePythonVersion@0
@@ -75,7 +81,7 @@ stages:
   - stage: 'test'
     displayName: 'Run tests'
     pool:
-      vmImage: 'Ubuntu-16.04'
+      vmImage: ${{ parameters.vmImage }}
     dependsOn: build
     jobs:
     - job: 'testCentral'
@@ -87,6 +93,7 @@ stages:
           path: 'azext_iot/tests/central'
           name: 'iot-central'
           azureSubscription: ${{ parameters.azureSubscription }}
+          pythonVersion: ${{ parameters.pythonVersion }}
     
     - job: 'testADT'
       displayName: 'Test Azure DigitalTwins'
@@ -97,6 +104,7 @@ stages:
           path: 'azext_iot/tests/digitaltwins'
           name: 'azure-digitaltwins'
           azureSubscription: ${{ parameters.azureSubscription }}
+          pythonVersion: ${{ parameters.pythonVersion }}
 
     - job: 'testDPS'
       displayName: 'Test DPS'
@@ -107,6 +115,7 @@ stages:
           path: 'azext_iot/tests/dps'
           name: 'device-provisioning-service'
           azureSubscription: ${{ parameters.azureSubscription }}
+          pythonVersion: ${{ parameters.pythonVersion }}
     
     - job: 'testHub_job_1'
       displayName: 'Test IoT Hub - config, core and jobs'
@@ -117,6 +126,7 @@ stages:
           path: 'azext_iot/tests/iothub/configurations azext_iot/tests/iothub/core azext_iot/tests/iothub/jobs'
           name: 'iot-hub-1'
           azureSubscription: ${{ parameters.azureSubscription }}
+          pythonVersion: ${{ parameters.pythonVersion }}
     
     - job: 'testHub_job_2'
       displayName: 'Test IoT Hub - devices, messaging and modules'
@@ -127,6 +137,7 @@ stages:
           path: 'azext_iot/tests/iothub/devices azext_iot/tests/iothub/messaging azext_iot/tests/iothub/modules'
           name: 'iot-hub-2'
           azureSubscription: ${{ parameters.azureSubscription }}
+          pythonVersion: ${{ parameters.pythonVersion }}
 
     - job: 'unitTests'
       displayName: 'Unit tests and code coverage'
@@ -135,6 +146,7 @@ stages:
         parameters:
           runIntTests: 'false'
           runUnitTests: 'true'
+          pythonVersion: ${{ parameters.pythonVersion }}
 
   - stage: 'kpi'
     displayName: 'Build KPIs'
@@ -186,13 +198,13 @@ stages:
             Write-Host "done"
           workingDirectory: '$(System.ArtifactsDirectory)/extension'
 
-      - task: GitHubRelease@0
+      - task: GitHubRelease@1
         inputs:
           gitHubConnection: $(GithubReleaseConnection)
           repositoryName: $(Build.Repository.Name)
           action: 'create'
           target: '$(Build.SourceVersion)'
-          tagSource: manual
+          tagSource: userSpecifiedTag
           tag: 'v$(CLIVersion)'
           title: $(ReleaseTitle)
           assets: '$(System.ArtifactsDirectory)/extension/**/*.whl' 
