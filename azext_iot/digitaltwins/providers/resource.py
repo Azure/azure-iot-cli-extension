@@ -6,7 +6,9 @@
 from azext_iot.digitaltwins.common import (
     ADTEndpointAuthType,
     ADTPublicNetworkAccessType,
+    ADT_CREATE_RETRY_AFTER,
     MAX_ADT_CREATE_RETRIES,
+    ProvisioningStateType,
 )
 from azext_iot.digitaltwins.providers import (
     DigitalTwinsResourceManager,
@@ -77,13 +79,13 @@ class ResourceProvider(DigitalTwinsResourceManager):
                 instance = lro.resource().as_dict()
                 state = instance.get('provisioning_state', None)
                 retries = 0
-                while state == "Provisioning" and retries < MAX_ADT_CREATE_RETRIES:
+                while (state.lower() not in ProvisioningStateType.FINISHED.value) and retries < MAX_ADT_CREATE_RETRIES:
                     retries += 1
-                    sleep(1)
+                    sleep(ADT_CREATE_RETRY_AFTER)
                     lro.update_status()
                     instance = lro.resource().as_dict()
                     state = instance.get('provisioning_state', None)
-                if retries == MAX_ADT_CREATE_RETRIES:
+                if state.lower() not in ProvisioningStateType.FINISHED.value:
                     logger.warning(
                         "The resource has been created and has not finished provisioning. Please monitor the status of "
                         "the Digital Twin instance using az dt show -n {} -g {}".format(
