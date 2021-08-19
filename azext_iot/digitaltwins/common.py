@@ -12,6 +12,7 @@ shared: Define shared data types(enums)
 from enum import Enum
 
 MAX_ADT_CREATE_RETRIES = 5
+ADT_CREATE_RETRY_AFTER = 10
 
 
 class ADTEndpointType(Enum):
@@ -51,3 +52,12 @@ class ADTPublicNetworkAccessType(Enum):
 
     enabled = "Enabled"
     disabled = "Disabled"
+
+
+class ProvisioningStateType(Enum):
+    """
+    ARM poller provisioning states
+    """
+    FINISHED = frozenset(['succeeded', 'canceled', 'failed'])
+    FAILED = frozenset(['canceled', 'failed'])
+    SUCCEEDED = frozenset(['succeeded'])
