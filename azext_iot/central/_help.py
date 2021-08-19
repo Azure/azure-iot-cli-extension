@@ -52,6 +52,18 @@ def _load_central_devices_help():
     """
 
     helps[
+        "iot central device list"
+    ] = """
+        type: command
+        short-summary: List devices in IoT Central.
+        examples:
+        - name: List all devices in an application, sorted by device Id (default)
+          text: >
+            az iot central device list
+            --app-id {appid}
+    """
+
+    helps[
         "iot central device create"
     ] = """
         type: command
@@ -376,6 +388,18 @@ def _load_central_device_templates_help():
     ] = """
         type: group
         short-summary: Manage and configure IoT Central device templates
+    """
+
+    helps[
+        "iot central device-template list"
+    ] = """
+        type: command
+        short-summary: List device templates in IoT Central.
+        examples:
+        - name: List all device templates in an application, sorted by template Id (default)
+          text: >
+            az iot central device-template list
+            --app-id {appid}
     """
 
     helps[
