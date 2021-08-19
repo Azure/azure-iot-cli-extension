@@ -259,9 +259,8 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
     def test_central_device_methods_CRD(self):
 
         # list devices and get count
-        start_device_list = self.cmd(
-            "iot central device list --app-id {}".format(APP_ID)
-        ).get_output_in_json()
+        start_device_list = self.cmd(self._appendOptionalArgsToCommand(
+            "iot central device list --app-id {}".format(APP_ID), TOKEN, DNS_SUFFIX)).get_output_in_json()
 
         start_dev_count = len(start_device_list)
         (device_id, device_name) = self._create_device()
@@ -278,18 +277,16 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             ],
         )
 
-        created_device_list = self.cmd(
-            "iot central device list --app-id {}".format(APP_ID)
-        ).get_output_in_json()
+        created_device_list = self.cmd(self._appendOptionalArgsToCommand(
+            "iot central device list --app-id {}".format(APP_ID), TOKEN, DNS_SUFFIX)).get_output_in_json()
 
         created_dev_count = len(created_device_list)
         assert created_dev_count == (start_dev_count + 1)
         assert device_id in created_device_list.keys()
         self._delete_device(device_id)
 
-        deleted_device_list = self.cmd(
-            "iot central device list --app-id {}".format(APP_ID)
-        ).get_output_in_json()
+        deleted_device_list = self.cmd(self._appendOptionalArgsToCommand(
+            "iot central device list --app-id {}".format(APP_ID), TOKEN, DNS_SUFFIX)).get_output_in_json()
 
         deleted_dev_count = len(deleted_device_list)
         assert deleted_dev_count == start_dev_count
@@ -353,9 +350,8 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         # currently: create, show, list, delete
 
         # list device templates and get count
-        start_device_template_list = self.cmd(
-            "iot central device-template list --app-id {}".format(APP_ID)
-        ).get_output_in_json()
+        start_device_template_list = self.cmd(self._appendOptionalArgsToCommand(
+            "iot central device-template list --app-id {}".format(APP_ID), TOKEN, DNS_SUFFIX)).get_output_in_json()
 
         start_dev_temp_count = len(start_device_template_list)
         (template_id, template_name) = self._create_device_template()
@@ -373,9 +369,8 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
         assert json_result["@id"] == template_id
 
-        created_device_template_list = self.cmd(
-            "iot central device-template list --app-id {}".format(APP_ID)
-        ).get_output_in_json()
+        created_device_template_list = self.cmd(self._appendOptionalArgsToCommand(
+            "iot central device-template list --app-id {}".format(APP_ID), TOKEN, DNS_SUFFIX)).get_output_in_json()
 
         created_dev_temp_count = len(created_device_template_list)
         # assert number of device templates changed by 1 or none in case template was already present in the application
@@ -383,9 +378,8 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         assert template_id in created_device_template_list.keys()
 
         self._delete_device_template(template_id)
-        deleted_device_template_list = self.cmd(
-            "iot central device-template list --app-id {}".format(APP_ID)
-        ).get_output_in_json()
+        deleted_device_template_list = self.cmd(self._appendOptionalArgsToCommand(
+            "iot central device-template list --app-id {}".format(APP_ID), TOKEN, DNS_SUFFIX)).get_output_in_json()
 
         deleted_dev_temp_count = len(deleted_device_template_list)
         assert deleted_dev_temp_count == start_dev_temp_count
@@ -545,7 +539,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             == "Device does not have a valid template associated with it."
         )
 
-    @pytest.mark.skipif(
+    @ pytest.mark.skipif(
         not DEVICE_ID, reason="empty azext_iot_central_device_id env var"
     )
     def test_central_device_registration_summary(self):

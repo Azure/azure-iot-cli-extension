@@ -552,7 +552,7 @@ class TestCentralParser:
         )
 
         # haven't found a better way to force the error to occur within parser
-        parser._central_template_provider.get_device_template = lambda x: central_models.TemplateV1(
+        parser._central_template_provider.get_device_template = lambda x, central_dns_suffix: central_models.TemplateV1(
             device_template
         )
 
