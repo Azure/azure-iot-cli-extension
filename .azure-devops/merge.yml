@@ -79,7 +79,7 @@ jobs:
   steps:
   - bash: sudo rm -R -f /usr/local/lib/azureExtensionDir
 
-  - template: templates/run-tests.yml
+  - template: templates/run-tests-parallel.yml
     parameters:
       pythonVersion: '$(python.version)'
       runUnitTests: true
@@ -91,7 +91,7 @@ jobs:
     vmImage: 'macOS-10.14'
 
   steps:
-  - template: templates/run-tests.yml
+  - template: templates/run-tests-parallel.yml
     parameters:
       pythonVersion: '3.8.x'
       runUnitTests: true
@@ -110,7 +110,7 @@ jobs:
       targetType: 'inline'
       script : 'ren "C:\Program Files\Common Files\AzureCliExtensionDirectory" "C:\Program Files\Common Files\AzureCliExtensionDirectory1"'
 
-  - template: templates/run-tests.yml
+  - template: templates/run-tests-parallel.yml
     parameters:
       pythonVersion: '3.8.x'
       runUnitTests: true
