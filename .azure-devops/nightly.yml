@@ -15,7 +15,6 @@ parameters:
   type: string
   default: 'ubuntu-18.04'
   values:
-  - 'ubuntu-16.04'
   - 'ubuntu-18.04'
   - 'ubuntu-latest'
 
@@ -63,29 +62,29 @@ stages:
 
       - template: templates/install-and-record-version.yml
 
-  - stage: 'test'
-    displayName: 'Run all tests'
+  - stage: 'test_edge'
+    displayName: 'Run all tests with edge CLI'
     pool:
       vmImage: ${{ parameters.vmImage }}
     dependsOn: build
     jobs:
-    - job: 'azEdge'
-      displayName: 'Test against edge AZ CLI'
-      steps:
-      - template: templates/nightly-tests.yml
-        parameters:
-          azureCLIVersion: 'edge'
-    - job: 'azMin'
-      dependsOn: 'azEdge'
-      displayName: 'Test against minimum supported AZ CLI'
-      steps:
-      - template: templates/nightly-tests.yml
-        parameters:
-          azureCLIVersion: 'min'
+    - template: templates/nightly-tests.yml
+      parameters:
+        azureCLIVersion: edge
+  
+  - stage: 'test_min'
+    displayName: 'Run all tests with min CLI'
+    pool:
+      vmImage: ${{ parameters.vmImage }}
+    dependsOn: test_edge
+    jobs:
+    - template: templates/nightly-tests.yml
+      parameters:
+        azureCLIVersion: min
           
   - stage: 'kpi'
     displayName: 'Build KPIs'
-    dependsOn: [build, test]
+    dependsOn: [build, test_edge, test_min]
     jobs:
     - job: 'calculateCodeCoverage'
       displayName: 'Calculate distributed code coverage'

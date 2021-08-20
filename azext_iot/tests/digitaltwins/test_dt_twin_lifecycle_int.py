@@ -713,8 +713,8 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
             )
         )
 
-        # dt reset can return too early at times
-        sleep(5)
+        # Wait for API to catch up
+        sleep(10)
 
         model_query_result = self.cmd(
             "dt model list -n {} -g {}".format(instance_name, self.rg)
