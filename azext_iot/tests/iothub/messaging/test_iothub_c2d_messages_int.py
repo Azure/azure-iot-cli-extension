@@ -6,6 +6,7 @@
 
 import json
 
+from time import sleep
 from uuid import uuid4
 from azext_iot.tests import IoTLiveScenarioTest
 from azext_iot.common.shared import AuthenticationTypeDataplane
@@ -25,6 +26,9 @@ class TestIoTHubC2DMessages(IoTLiveScenarioTest):
     def test_iothub_c2d_messages(self):
         device_count = 1
         device_ids = self.generate_device_names(device_count)
+
+        # Ensure role assignment is complete
+        sleep(30)
 
         self.cmd(
             f"iot hub device-identity create -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg}"

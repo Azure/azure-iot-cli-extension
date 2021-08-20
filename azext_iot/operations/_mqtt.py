@@ -4,12 +4,10 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-
+import pprint
 from time import sleep
 from azext_iot.constants import USER_AGENT, BASE_MQTT_API_VERSION
-from azext_iot.common.utility import url_encode_str
-from azure.iot.device import IoTHubDeviceClient as mqtt_device_client, Message, MethodResponse
-import pprint
+from azext_iot.common.utility import url_encode_str, ensure_azure_namespace_path
 
 
 class mqtt_client(object):
@@ -17,6 +15,9 @@ class mqtt_client(object):
         self, target, device_conn_string, device_id,
         method_response_code=None, method_response_payload=None, init_reported_properties=None
     ):
+        ensure_azure_namespace_path()
+        from azure.iot.device import IoTHubDeviceClient as mqtt_device_client
+
         self.device_id = device_id
         self.target = target
         # The client automatically connects when we send/receive a message or method invocation
@@ -30,12 +31,19 @@ class mqtt_client(object):
         self.default_data_encoding = 'utf-8'
         self.init_reported_properties = init_reported_properties
 
-    def send_d2c_message(self, message_text, properties=None):
+    def send_d2c_message(
+        self, message_text, properties=None
+    ):
+        ensure_azure_namespace_path()
+        from azure.iot.device import Message
+
         message = Message(message_text)
         message.custom_properties = properties
         self.device_client.send_message(message)
 
-    def message_handler(self, message):
+    def message_handler(
+        self, message
+    ):
         property_names = [
             "message_id", "expiry_time_utc", "correlation_id", "user_id",
             "content_encoding", "content_type", "_iothub_interface_id"
@@ -66,7 +74,11 @@ class mqtt_client(object):
         print("\nC2D Message Handler [Received C2D message]:")
         self.printer.pprint(output)
 
-    def method_request_handler(self, method_request):
+    def method_request_handler(
+        self, method_request
+    ):
+        ensure_azure_namespace_path()
+        from azure.iot.device import MethodResponse
 
         output = {
             "Device Id": self.device_id,
@@ -97,7 +109,9 @@ class mqtt_client(object):
         method_response = MethodResponse.create_from_method_request(method_request, status, payload)
         self.device_client.send_method_response(method_response)
 
-    def twin_patch_handler(self, patch):
+    def twin_patch_handler(
+        self, patch
+    ):
         modified_properties = {}
         for prop in patch:
             if not prop.startswith("$"):
@@ -108,7 +122,9 @@ class mqtt_client(object):
             self.printer.pprint(modified_properties)
             self.device_client.patch_twin_reported_properties(modified_properties)
 
-    def execute(self, data, properties={}, publish_delay=2, msg_count=100):
+    def execute(
+        self, data, properties={}, publish_delay=2, msg_count=100
+    ):
         from tqdm import tqdm
 
         try:
@@ -123,7 +139,9 @@ class mqtt_client(object):
             raise x
 
 
-def build_mqtt_device_username(entity, device_id):
+def build_mqtt_device_username(
+    entity, device_id
+):
     return "{}/{}/?api-version={}&DeviceClientType={}".format(
         entity, device_id, BASE_MQTT_API_VERSION, url_encode_str(USER_AGENT)
     )
