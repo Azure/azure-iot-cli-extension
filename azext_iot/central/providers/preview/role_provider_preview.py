@@ -50,7 +50,9 @@ class CentralRoleProviderPreview:
         return self._roles
 
     def get_role(
-        self, role_id, central_dns_suffix=CENTRAL_ENDPOINT,
+        self,
+        role_id,
+        central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> central_models.RolePreview:
         # get or add to cache
         role = self._roles.get(role_id)

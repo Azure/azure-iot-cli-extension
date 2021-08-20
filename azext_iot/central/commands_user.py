@@ -58,7 +58,9 @@ def list_users(
     else:
         provider = CentralUserProviderV1(cmd=cmd, app_id=app_id, token=token)
 
-    return provider.get_user_list(central_dns_suffix=central_dns_suffix,)
+    return provider.get_user_list(
+        central_dns_suffix=central_dns_suffix,
+    )
 
 
 def get_user(
@@ -74,7 +76,10 @@ def get_user(
     else:
         provider = CentralUserProviderV1(cmd=cmd, app_id=app_id, token=token)
 
-    return provider.get_user(assignee=assignee, central_dns_suffix=central_dns_suffix,)
+    return provider.get_user(
+        assignee=assignee,
+        central_dns_suffix=central_dns_suffix,
+    )
 
 
 def delete_user(
@@ -91,5 +96,6 @@ def delete_user(
         provider = CentralUserProviderV1(cmd=cmd, app_id=app_id, token=token)
 
     return provider.delete_user(
-        assignee=assignee, central_dns_suffix=central_dns_suffix,
+        assignee=assignee,
+        central_dns_suffix=central_dns_suffix,
     )
