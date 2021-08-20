@@ -34,7 +34,6 @@ class mqtt_client(object):
     def send_d2c_message(
         self, message_text, properties=None
     ):
-        ensure_azure_namespace_path()
         from azure.iot.device import Message
 
         message = Message(message_text)
@@ -77,7 +76,6 @@ class mqtt_client(object):
     def method_request_handler(
         self, method_request
     ):
-        ensure_azure_namespace_path()
         from azure.iot.device import MethodResponse
 
         output = {
