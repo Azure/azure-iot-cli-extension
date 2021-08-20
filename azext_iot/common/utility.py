@@ -23,6 +23,7 @@ from threading import Event, Thread
 from datetime import datetime
 from knack.log import get_logger
 from knack.util import CLIError
+from azext_iot.constants import IOTHUB_MGMT_SDK_PACKAGE_NAME
 
 logger = get_logger(__name__)
 
@@ -446,14 +447,7 @@ class ISO8601Validator:
 
 
 def ensure_iothub_sdk_min_version(min_ver):
-    from packaging import version
-
-    try:
-        from azure.mgmt.iothub import __version__ as iot_sdk_version
-    except ImportError:
-        from azure.mgmt.iothub._configuration import VERSION as iot_sdk_version
-
-    return version.parse(iot_sdk_version) >= version.parse(min_ver)
+    return test_import_and_version(IOTHUB_MGMT_SDK_PACKAGE_NAME, min_ver)
 
 
 def scantree(path):

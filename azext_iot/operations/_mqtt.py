@@ -129,7 +129,7 @@ class mqtt_client(object):
             if self.init_reported_properties:
                 self.device_client.patch_twin_reported_properties(self.init_reported_properties)
 
-            for _ in tqdm(range(msg_count), desc='Device simulation in progress'):
+            for _ in tqdm(range(msg_count), desc='Device simulation in progress', ascii=' #'):
                 self.send_d2c_message(message_text=data.generate(True), properties=properties)
                 sleep(publish_delay)
 
