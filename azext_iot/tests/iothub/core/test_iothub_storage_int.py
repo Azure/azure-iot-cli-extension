@@ -12,7 +12,7 @@ from pathlib import Path
 
 from azext_iot.tests import IoTLiveScenarioTest
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL, UserTypes
-from azext_iot.common.utility import ensure_iothub_sdk_min_version
+from azext_iot.common.utility import ensure_iothub_sdk_min_version, ensure_azure_namespace_path
 
 from azext_iot.tests.generators import generate_generic_id
 # TODO: assert DEVICE_DEVICESCOPE_PREFIX format in parent device twin.
@@ -53,6 +53,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
     def get_container_sas_url(self):
         from datetime import datetime, timedelta
+        ensure_azure_namespace_path()
         from azure.storage.blob import ResourceTypes, AccountSasPermissions, generate_account_sas, BlobServiceClient
 
         storage_account_connenction = self.cmd(
@@ -325,6 +326,9 @@ class TestIoTStorage(IoTLiveScenarioTest):
         assert identity_principal == user_identity["principalId"]
 
         self.assign_storage_role_if_needed(identity_principal)
+
+        # user identity assignment takes longer than expected
+        sleep(30)
 
         # identity-based device-identity export
         self.cmd(

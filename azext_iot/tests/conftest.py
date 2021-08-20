@@ -24,7 +24,7 @@ path_discovery_init = (
     "azext_iot.iothub.providers.discovery.IotHubDiscovery._initialize_client"
 )
 path_sas = "azext_iot._factory.SasTokenAuthentication"
-path_mqtt_device_client = "azext_iot.operations._mqtt.mqtt_device_client.create_from_connection_string"
+path_mqtt_device_client = "azure.iot.device.IoTHubDeviceClient.create_from_connection_string"
 path_iot_hub_monitor_events_entrypoint = (
     "azext_iot.operations.hub._iot_hub_monitor_events"
 )
