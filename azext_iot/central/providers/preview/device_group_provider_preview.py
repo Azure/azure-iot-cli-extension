@@ -33,7 +33,9 @@ class CentralDeviceGroupProviderPreview:
         self._token = token
         self._device_groups = {}
 
-    def list_device_groups(self, central_dns_suffix=CENTRAL_ENDPOINT) -> List[DeviceGroupPreview]:
+    def list_device_groups(
+        self, central_dns_suffix=CENTRAL_ENDPOINT
+    ) -> List[DeviceGroupPreview]:
         device_groups = central_services.device_group.list_device_groups(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -43,6 +45,8 @@ class CentralDeviceGroupProviderPreview:
         )
 
         # add to cache
-        self._device_groups.update({device_group.id: device_group for device_group in device_groups})
+        self._device_groups.update(
+            {device_group.id: device_group for device_group in device_groups}
+        )
 
         return self._device_groups

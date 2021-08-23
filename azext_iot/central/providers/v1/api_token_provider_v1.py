@@ -32,7 +32,10 @@ class CentralApiTokenProviderV1:
         self._token = token
 
     def add_api_token(
-        self, token_id: str, role: Role, central_dns_suffix=CENTRAL_ENDPOINT,
+        self,
+        token_id: str,
+        role: Role,
+        central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> dict:
 
         return central_services.api_token.add_api_token(
@@ -55,7 +58,11 @@ class CentralApiTokenProviderV1:
             central_dns_suffix=central_dns_suffix,
         )
 
-    def get_api_token(self, token_id, central_dns_suffix=CENTRAL_ENDPOINT,) -> dict:
+    def get_api_token(
+        self,
+        token_id,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ) -> dict:
         return central_services.api_token.get_api_token(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -65,7 +72,11 @@ class CentralApiTokenProviderV1:
             central_dns_suffix=central_dns_suffix,
         )
 
-    def delete_api_token(self, token_id, central_dns_suffix=CENTRAL_ENDPOINT,) -> dict:
+    def delete_api_token(
+        self,
+        token_id,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ) -> dict:
         return central_services.api_token.delete_api_token(
             cmd=self._cmd,
             app_id=self._app_id,

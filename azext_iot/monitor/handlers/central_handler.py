@@ -29,6 +29,7 @@ class CentralHandler(CommonHandler):
         central_device_provider: CentralDeviceProviderV1,
         central_template_provider: CentralDeviceTemplateProviderV1,
         central_handler_args: CentralHandlerArguments,
+        central_dns_suffix: str
     ):
         super(CentralHandler, self).__init__(
             common_handler_args=central_handler_args.common_handler_args
@@ -41,6 +42,7 @@ class CentralHandler(CommonHandler):
 
         self._messages = []
         self._issues: List[Issue] = []
+        self._central_dns_suffix = central_dns_suffix
 
         if self._central_handler_args.duration:
             loop = get_loop()
@@ -55,6 +57,7 @@ class CentralHandler(CommonHandler):
             common_parser_args=self._common_handler_args.common_parser_args,
             central_device_provider=self._central_device_provider,
             central_template_provider=self._central_template_provider,
+            central_dns_suffix=self._central_dns_suffix
         )
 
         if not self._should_process_device(parser.device_id):

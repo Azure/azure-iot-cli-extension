@@ -7,7 +7,8 @@
 
 class DeviceTwin:
     def __init__(
-        self, device_twin: dict,
+        self,
+        device_twin: dict,
     ):
         self.device_twin = device_twin
         self.device_id = device_twin.get("deviceId")
@@ -25,7 +26,10 @@ class DeviceTwin:
 
 class Property:
     def __init__(
-        self, name: str, props: dict, device_id,
+        self,
+        name: str,
+        props: dict,
+        device_id,
     ):
         self.name = name
         self.props = props

@@ -60,9 +60,12 @@ def list_device_groups(
         if "value" not in result:
             raise CLIError("Value is not present in body: {}".format(result))
 
-        device_groups.extend([
-            central_models.DeviceGroupPreview(device_group) for device_group in result["value"]
-        ])
+        device_groups.extend(
+            [
+                central_models.DeviceGroupPreview(device_group)
+                for device_group in result["value"]
+            ]
+        )
 
         url = result.get("nextLink", None)
         pages_processed = pages_processed + 1

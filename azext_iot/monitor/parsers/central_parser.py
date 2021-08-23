@@ -18,6 +18,7 @@ from azext_iot.monitor.central_validator import validate, extract_schema_type
 from azext_iot.monitor.models.arguments import CommonParserArguments
 from azext_iot.monitor.models.enum import Severity
 from azext_iot.monitor.parsers.common_parser import CommonParser
+from azext_iot.constants import CENTRAL_ENDPOINT
 
 
 class CentralParser(CommonParser):
@@ -27,12 +28,14 @@ class CentralParser(CommonParser):
         common_parser_args: CommonParserArguments,
         central_device_provider: CentralDeviceProviderV1,
         central_template_provider: CentralDeviceTemplateProviderV1,
+        central_dns_suffix=CENTRAL_ENDPOINT
     ):
         super(CentralParser, self).__init__(
             message=message, common_parser_args=common_parser_args
         )
         self._central_device_provider = central_device_provider
         self._central_template_provider = central_template_provider
+        self._central_dns_suffix = central_dns_suffix
         self._template_id = None
 
     def _add_central_issue(self, severity: Severity, details: str):
@@ -118,9 +121,9 @@ class CentralParser(CommonParser):
 
     def _get_template(self):
         try:
-            device = self._central_device_provider.get_device(self.device_id)
+            device = self._central_device_provider.get_device(self.device_id, central_dns_suffix=self._central_dns_suffix)
             template = self._central_template_provider.get_device_template(
-                device.template
+                device.template, central_dns_suffix=self._central_dns_suffix
             )
             self._template_id = template.id
             return template

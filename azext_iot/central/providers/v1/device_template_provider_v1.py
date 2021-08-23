@@ -31,7 +31,9 @@ class CentralDeviceTemplateProviderV1:
         self._device_templates = {}
 
     def get_device_template(
-        self, device_template_id, central_dns_suffix=CENTRAL_ENDPOINT,
+        self,
+        device_template_id,
+        central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> central_models.TemplateV1:
         # get or add to cache
         device_template = self._device_templates.get(device_template_id)
@@ -55,7 +57,10 @@ class CentralDeviceTemplateProviderV1:
 
         return device_template
 
-    def list_device_templates(self, central_dns_suffix=CENTRAL_ENDPOINT,) -> List[central_models.TemplateV1]       :
+    def list_device_templates(
+        self,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ) -> List[central_models.TemplateV1]:
         templates = central_services.device_template.list_device_templates(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -64,11 +69,14 @@ class CentralDeviceTemplateProviderV1:
             api_version=ApiVersion.v1.value,
         )
 
-        self._device_templates.update({template.id: template.raw_template for template in templates})
+        self._device_templates.update(
+            {template.id: template.raw_template for template in templates}
+        )
         return self._device_templates
 
     def map_device_templates(
-        self, central_dns_suffix=CENTRAL_ENDPOINT,
+        self,
+        central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         """
         Maps each template name to the corresponding template id
@@ -102,7 +110,9 @@ class CentralDeviceTemplateProviderV1:
         return template
 
     def delete_device_template(
-        self, device_template_id, central_dns_suffix=CENTRAL_ENDPOINT,
+        self,
+        device_template_id,
+        central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         if not device_template_id:
             raise CLIError("Device template id must be specified.")
