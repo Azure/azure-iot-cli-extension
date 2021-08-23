@@ -221,5 +221,5 @@ def load_central_arguments(self, _):
         context.argument(
             "role_id",
             options_list=["--role-id", "-r"],
-            help="Provide a unique identifier for the role"
+            help="Provide a unique identifier for the role",
         )

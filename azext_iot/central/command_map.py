@@ -21,9 +21,7 @@ central_device_groups_ops = CliCommandType(
     operations_tmpl="azext_iot.central.commands_device_group#{}"
 )
 
-central_roles_ops = CliCommandType(
-    operations_tmpl="azext_iot.central.commands_role#{}"
-)
+central_roles_ops = CliCommandType(operations_tmpl="azext_iot.central.commands_role#{}")
 
 central_device_twin_ops = CliCommandType(
     operations_tmpl="azext_iot.central.commands_device_twin#{}"
@@ -51,24 +49,29 @@ def load_central_commands(self, _):
     ) as cmd_group:
         cmd_group.command("monitor-events", "monitor_events")
         cmd_group.command(
-            "validate-messages", "validate_messages",
+            "validate-messages",
+            "validate_messages",
         )
         cmd_group.command(
-            "monitor-properties", "monitor_properties",
+            "monitor-properties",
+            "monitor_properties",
         )
         cmd_group.command(
-            "validate-properties", "validate_properties",
+            "validate-properties",
+            "validate_properties",
         )
 
     with self.command_group(
         "iot central diagnostics", command_type=central_device_ops, is_preview=True
     ) as cmd_group:
         cmd_group.command(
-            "registration-summary", "registration_summary",
+            "registration-summary",
+            "registration_summary",
         )
 
     with self.command_group(
-        "iot central user", command_type=central_user_ops,
+        "iot central user",
+        command_type=central_user_ops,
     ) as cmd_group:
         cmd_group.command("create", "add_user")
         cmd_group.command("list", "list_users")
@@ -76,7 +79,8 @@ def load_central_commands(self, _):
         cmd_group.command("delete", "delete_user")
 
     with self.command_group(
-        "iot central api-token", command_type=central_api_token_ops,
+        "iot central api-token",
+        command_type=central_api_token_ops,
     ) as cmd_group:
         cmd_group.command("create", "add_api_token")
         cmd_group.command("list", "list_api_tokens")
@@ -84,7 +88,8 @@ def load_central_commands(self, _):
         cmd_group.command("delete", "delete_api_token")
 
     with self.command_group(
-        "iot central device", command_type=central_device_ops,
+        "iot central device",
+        command_type=central_device_ops,
     ) as cmd_group:
         cmd_group.command("list", "list_devices")
         cmd_group.show_command("show", "get_device")
@@ -97,13 +102,15 @@ def load_central_commands(self, _):
         cmd_group.command("manual-failback", "run_manual_failback")
 
     with self.command_group(
-        "iot central device command", command_type=central_device_ops,
+        "iot central device command",
+        command_type=central_device_ops,
     ) as cmd_group:
         cmd_group.command("run", "run_command")
         cmd_group.command("history", "get_command_history")
 
     with self.command_group(
-        "iot central device-template", command_type=central_device_templates_ops,
+        "iot central device-template",
+        command_type=central_device_templates_ops,
     ) as cmd_group:
         cmd_group.command("list", "list_device_templates")
         # cmd_group.command("map", "map_device_templates")
@@ -112,7 +119,9 @@ def load_central_commands(self, _):
         cmd_group.command("delete", "delete_device_template")
 
     with self.command_group(
-        "iot central device-group", command_type=central_device_groups_ops, is_preview=True
+        "iot central device-group",
+        command_type=central_device_groups_ops,
+        is_preview=True,
     ) as cmd_group:
         cmd_group.command("list", "list_device_groups")
 
@@ -123,8 +132,10 @@ def load_central_commands(self, _):
         cmd_group.command("list", "list_roles")
 
     with self.command_group(
-        "iot central device twin", command_type=central_device_twin_ops,
+        "iot central device twin",
+        command_type=central_device_twin_ops,
     ) as cmd_group:
         cmd_group.show_command(
-            "show", "device_twin_show",
+            "show",
+            "device_twin_show",
         )
