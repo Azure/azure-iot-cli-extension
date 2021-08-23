@@ -64,6 +64,7 @@ def list_device_templates(
     cmd,
     app_id: str,
     token: str,
+    max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
 ) -> List[Union[central_models.TemplatePreview, central_models.TemplateV1]]:
@@ -78,8 +79,10 @@ def list_device_templates(
         central_dns_suffix: {centralDnsSuffixInPath} as found in docs
 
     Returns:
-        device: dict
+        device_templates: dict
     """
+
+    device_templates = []
 
     url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
     headers = _utility.get_headers(token, cmd)
@@ -88,17 +91,37 @@ def list_device_templates(
     query_parameters = {}
     query_parameters["api-version"] = api_version
 
-    response = requests.get(url, headers=headers, params=query_parameters)
+    logger.warning(
+        "This command may take a long time to complete if your app contains a lot of device templates"
+    )
 
-    result = _utility.try_extract_result(response)
+    pages_processed = 0
+    while (max_pages == 0 or pages_processed < max_pages) and url:
+        response = requests.get(
+            url,
+            headers=headers,
+            params=query_parameters if pages_processed == 0 else None,
+        )
+        result = _utility.try_extract_result(response)
 
-    if "value" not in result:
-        raise CLIError("Value is not present in body: {}".format(result))
+        if "value" not in result:
+            raise CLIError("Value is not present in body: {}".format(result))
 
-    if api_version == ApiVersion.preview.value:
-        return [central_models.TemplatePreview(item) for item in result["value"]]
-    else:
-        return [central_models.TemplateV1(item) for item in result["value"]]
+        if api_version == ApiVersion.preview.value:
+            device_templates = device_templates + [
+                central_models.TemplatePreview(device_template)
+                for device_template in result["value"]
+            ]
+        else:
+            device_templates = device_templates + [
+                central_models.TemplateV1(device_template)
+                for device_template in result["value"]
+            ]
+
+        url = result.get("nextLink", None)
+        pages_processed = pages_processed + 1
+
+    return device_templates
 
 
 def create_device_template(

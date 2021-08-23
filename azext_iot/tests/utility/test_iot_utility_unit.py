@@ -288,10 +288,13 @@ class TestVersionComparison(object):
         ],
     )
     def test_ensure_iothub_sdk_min_version(self, mocker, current, minimum, expected):
+        def get_version(package):
+            return current
+
         try:
-            mocker.patch("azure.mgmt.iothub.__version__", current)
-        except:
-            mocker.patch("azure.mgmt.iothub._configuration.VERSION", current)
+            mocker.patch("importlib.metadata.version", get_version)
+        except ModuleNotFoundError:
+            mocker.patch("importlib_metadata.version", get_version)
 
         assert ensure_iothub_sdk_min_version(minimum) == expected
 

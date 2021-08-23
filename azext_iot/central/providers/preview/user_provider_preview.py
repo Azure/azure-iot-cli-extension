@@ -58,7 +58,10 @@ class CentralUserProviderPreview:
             api_version=ApiVersion.preview.value,
         )
 
-    def get_user_list(self, central_dns_suffix=CENTRAL_ENDPOINT,) -> dict:
+    def get_user_list(
+        self,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ) -> dict:
         return central_services.user.get_user_list(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -67,7 +70,11 @@ class CentralUserProviderPreview:
             api_version=ApiVersion.preview.value,
         )
 
-    def get_user(self, assignee, central_dns_suffix=CENTRAL_ENDPOINT,) -> dict:
+    def get_user(
+        self,
+        assignee,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ) -> dict:
         return central_services.user.get_user(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -77,7 +84,11 @@ class CentralUserProviderPreview:
             api_version=ApiVersion.preview.value,
         )
 
-    def delete_user(self, assignee, central_dns_suffix=CENTRAL_ENDPOINT,) -> dict:
+    def delete_user(
+        self,
+        assignee,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ) -> dict:
         return central_services.user.delete_user(
             cmd=self._cmd,
             app_id=self._app_id,

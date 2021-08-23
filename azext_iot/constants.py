@@ -7,7 +7,7 @@
 
 import os
 
-VERSION = "0.10.15"
+VERSION = "0.10.16"
 EXTENSION_NAME = "azure-iot"
 EXTENSION_ROOT = os.path.dirname(os.path.abspath(__file__))
 EXTENSION_CONFIG_ROOT_KEY = "iotext"
@@ -51,4 +51,5 @@ PNP_DTDLV2_COMPONENT_MARKER = "__t"
 CONFIG_KEY_UAMQP_EXT_VERSION = "uamqp_ext_version"
 
 # Initial Track 2 SDK version
+IOTHUB_MGMT_SDK_PACKAGE_NAME = 'azure-mgmt-iothub'
 IOTHUB_TRACK_2_SDK_MIN_VERSION = '2.0.0'

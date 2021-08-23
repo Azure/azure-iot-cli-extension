@@ -23,6 +23,7 @@ from threading import Event, Thread
 from datetime import datetime
 from knack.log import get_logger
 from knack.util import CLIError
+from azext_iot.constants import IOTHUB_MGMT_SDK_PACKAGE_NAME
 
 logger = get_logger(__name__)
 
@@ -311,14 +312,20 @@ def url_encode_str(s, plus=False):
 
 
 def test_import_and_version(package, expected_version):
-    """ Used to determine if a dependency is loading correctly """
-    import importlib
-    from importlib.metadata import version
+    """
+    Used to determine if a package dependency, installed with metadata,
+    is at least the expected version. This utility will not work for packages
+    that are installed without metadata.
+    """
 
     try:
-        importlib.import_module(package)
-        return version(package) >= expected_version
+        from importlib import metadata
     except ImportError:
+        import importlib_metadata as metadata
+
+    try:
+        return metadata.version(package) >= expected_version
+    except metadata.PackageNotFoundError:
         return False
 
 
@@ -440,14 +447,7 @@ class ISO8601Validator:
 
 
 def ensure_iothub_sdk_min_version(min_ver):
-    from packaging import version
-
-    try:
-        from azure.mgmt.iothub import __version__ as iot_sdk_version
-    except ImportError:
-        from azure.mgmt.iothub._configuration import VERSION as iot_sdk_version
-
-    return version.parse(iot_sdk_version) >= version.parse(min_ver)
+    return test_import_and_version(IOTHUB_MGMT_SDK_PACKAGE_NAME, min_ver)
 
 
 def scantree(path):

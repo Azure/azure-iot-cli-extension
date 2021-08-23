@@ -25,7 +25,7 @@ def list_device_groups(
     cmd,
     app_id: str,
     token: str,
-    max_pages=1,
+    max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.preview.value,
 ) -> List[central_models.DeviceGroupPreview]:
@@ -53,21 +53,21 @@ def list_device_groups(
     query_parameters["api-version"] = api_version
 
     pages_processed = 0
-    while (pages_processed <= max_pages) and url:
+    while (max_pages == 0 or pages_processed < max_pages) and url:
         response = requests.get(url, headers=headers, params=query_parameters)
         result = _utility.try_extract_result(response)
 
         if "value" not in result:
             raise CLIError("Value is not present in body: {}".format(result))
 
-        device_groups = device_groups + [
-            central_models.DeviceGroupPreview(device_group) for device_group in result["value"]
-        ]
+        device_groups.extend(
+            [
+                central_models.DeviceGroupPreview(device_group)
+                for device_group in result["value"]
+            ]
+        )
 
-        try:
-            url = result.get("nextLink", params=query_parameters)
-        except:
-            pass
+        url = result.get("nextLink", None)
         pages_processed = pages_processed + 1
 
     return device_groups

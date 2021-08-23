@@ -92,7 +92,8 @@ def load_central_arguments(self, _):
         context.argument(
             "device_template_id",
             options_list=["--device-template-id", "--dtid"],
-            help="Unique ID for the Device template.",
+            help="Digital Twin Model Identifier of the device template."
+            " Learn more at https://aka.ms/iotcentraldtmi.",
         )
 
     with self.argument_context("iot central api-token") as context:
@@ -220,5 +221,5 @@ def load_central_arguments(self, _):
         context.argument(
             "role_id",
             options_list=["--role-id", "-r"],
-            help="Provide a unique identifier for the role"
+            help="Provide a unique identifier for the role",
         )

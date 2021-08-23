@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-
+from azext_iot.constants import CENTRAL_ENDPOINT
 from azure.cli.core.commands import AzCliCommand
 from azext_iot.central.providers.v1 import (
     CentralDeviceProviderV1,
@@ -48,6 +48,7 @@ class MonitorProvider:
             central_device_provider=central_device_provider,
             central_template_provider=central_template_provider,
             central_handler_args=central_handler_args,
+            central_dns_suffix=central_dns_suffix,
         )
 
     def start_monitor_events(self, telemetry_args: TelemetryArguments):
@@ -94,6 +95,7 @@ class MonitorProvider:
         central_device_provider: CentralDeviceProviderV1,
         central_template_provider: CentralDeviceTemplateProviderV1,
         central_handler_args: CentralHandlerArguments,
+        central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         from azext_iot.monitor.handlers import CentralHandler
 
@@ -101,4 +103,5 @@ class MonitorProvider:
             central_device_provider=central_device_provider,
             central_template_provider=central_template_provider,
             central_handler_args=central_handler_args,
+            central_dns_suffix=central_dns_suffix,
         )
