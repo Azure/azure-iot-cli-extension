@@ -2600,7 +2600,7 @@ def iot_simulate_device(
     cancellation_token = Event()
 
     def http_wrap(target, device_id, generator, msg_interval, msg_count):
-        for _ in tqdm(range(msg_count), desc='Sending and receiving events via https'):
+        for _ in tqdm(range(0, msg_count), desc='Sending and receiving events via https', ascii=' #'):
             d = generator.generate(False)
             _iot_device_send_message_http(target, device_id, d, headers=properties_to_send)
             if cancellation_token.wait(msg_interval):

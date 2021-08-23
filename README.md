@@ -6,7 +6,6 @@
 The **Azure IoT extension for Azure CLI** aims to accelerate the development, management and automation of Azure IoT solutions. It does this via addition of rich features and functionality to the official [Azure CLI](https://docs.microsoft.com/en-us/cli/azure).
 
 ## News
-- Starting with version `0.10.13` of the IoT extension, you will need an Azure CLI core version of `2.17.1` or higher. IoT extension version `0.10.11` remains on the extension index to support environments that cannot upgrade core CLI versions. 
 
 - ❗ When upgrading your Azure CLI core version, for the best experience and to avoid breaking changes, we recommend updating your `azure-iot` extension to the [latest available](https://github.com/Azure/azure-iot-cli-extension/releases).
 
