@@ -104,7 +104,7 @@ class CentralParser(CommonParser):
 
         if not template.components:
             # template does not have any valid components
-            details = strings.invalid_component_name(self.component_name, list())
+            details = strings.invalid_component_name(self.component_name, [])
             self._add_central_issue(severity=Severity.warning, details=details)
             return
 
