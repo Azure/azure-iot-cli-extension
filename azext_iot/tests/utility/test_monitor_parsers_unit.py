@@ -433,7 +433,7 @@ class TestCentralParser:
         assert properties["system"]["content_type"] == self.content_type
         assert properties["application"] == self.app_properties
 
-        expected_details = strings.invalid_component_name(self.component_name, list())
+        expected_details = strings.invalid_component_name(self.component_name, [])
 
         _validate_issues(parser, Severity.warning, 1, 1, [expected_details])
 
