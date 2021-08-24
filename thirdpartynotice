@@ -25,12 +25,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 -----------------------------------------------------------------------------------------------------------------------
-License notice for paho-mqtt v1.5.0, obtained from https://github.com/eclipse/paho.mqtt.python/blob/v1.5.0/LICENSE.txt
-
-This project is dual licensed under the Eclipse Public License 1.0 and the
-Eclipse Distribution License 1.0 as described in the epl-v10 and edl-v10 files.
-
------------------------------------------------------------------------------------------------------------------------
 License notice for jsonschema v3.2.0, obtained from https://github.com/Julian/jsonschema/blob/main/COPYING
 
 Copyright (c) 2013 Julian Berman
