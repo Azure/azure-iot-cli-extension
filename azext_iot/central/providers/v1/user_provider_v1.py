@@ -4,8 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from azure.cli.core.azclierror import RequiredArgumentMissingError
 from knack.log import get_logger
-from knack.util import CLIError
 
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
@@ -41,10 +41,10 @@ class CentralUserProviderV1:
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> dict:
         if not tenant_id:
-            raise CLIError("Must specify --tenant-id when adding a service principal")
+            raise RequiredArgumentMissingError("Must specify --tenant-id when adding a service principal")
 
         if not object_id:
-            raise CLIError("Must specify --object-id when adding a service principal")
+            raise RequiredArgumentMissingError("Must specify --object-id when adding a service principal")
 
         return central_services.user.add_service_principal(
             cmd=self._cmd,
@@ -95,7 +95,7 @@ class CentralUserProviderV1:
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> dict:
         if not email:
-            raise CLIError("Must specify --email when adding a user by email")
+            raise RequiredArgumentMissingError("Must specify --email when adding a user by email")
 
         return central_services.user.add_email(
             cmd=self._cmd,

@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 # Dev note - think of this as a controller
 
-from knack.util import CLIError
+from azure.cli.core.azclierror import InvalidArgumentValueError
 
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.common import utility
@@ -80,7 +80,7 @@ def create_device_template(
     api_version=ApiVersion.v1.value,
 ):
     if not isinstance(content, str):
-        raise CLIError("content must be a string: {}".format(content))
+        raise InvalidArgumentValueError("content must be a string: {}".format(content))
 
     payload = utility.process_json_arg(content, argument_name="content")
 

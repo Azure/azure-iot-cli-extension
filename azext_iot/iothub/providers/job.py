@@ -6,10 +6,10 @@
 
 from time import sleep
 from datetime import datetime, timedelta
+from azure.cli.core.azclierror import CLIInternalError, InvalidArgumentValueError, RequiredArgumentMissingError
 from knack.log import get_logger
-from knack.util import CLIError
 from azext_iot.common.shared import SdkType, JobStatusType, JobType, JobVersionType
-from azext_iot.common.utility import unpack_msrest_error, process_json_arg
+from azext_iot.common.utility import handle_service_exception, process_json_arg
 from azext_iot.operations.generic import _execute_query, _process_top
 from azext_iot.iothub.providers.base import IoTHubProvider, CloudError, SerializationError
 
@@ -34,7 +34,7 @@ class JobProvider(IoTHubProvider):
                 return service_sdk.jobs.get_scheduled_job(id=job_id, raw=True).response.json()
             return self._convert_v1_to_v2(service_sdk.jobs.get_import_export_job(id=job_id))
         except CloudError as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     def cancel(self, job_id):
         job_result = self.get(job_id)
@@ -53,7 +53,7 @@ class JobProvider(IoTHubProvider):
                 return service_sdk.jobs.cancel_scheduled_job(id=job_id, raw=True).response.json()
             return service_sdk.jobs.cancel_import_export_job(id=job_id)
         except CloudError as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     def list(self, job_type=None, job_status=None, top=None):
         top = _process_top(top)
@@ -100,7 +100,7 @@ class JobProvider(IoTHubProvider):
 
             return jobs_collection
         except CloudError as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     def create(
         self,
@@ -128,7 +128,7 @@ class JobProvider(IoTHubProvider):
             in [JobType.scheduleUpdateTwin.value, JobType.scheduleDeviceMethod.value]
             and not query_condition
         ):
-            raise CLIError(
+            raise RequiredArgumentMissingError(
                 "The query condition is required when job type is {} or {}. "
                 "Use query condition '*' if you need to run job on all devices.".format(
                     JobType.scheduleUpdateTwin.value, JobType.scheduleDeviceMethod.value
@@ -136,14 +136,14 @@ class JobProvider(IoTHubProvider):
             )
 
         if poll_duration < 1:
-            raise CLIError("--poll-duration must be greater than 0!")
+            raise InvalidArgumentValueError("--poll-duration must be greater than 0!")
 
         if poll_interval < 1:
-            raise CLIError("--poll-interval must be greater than 0!")
+            raise InvalidArgumentValueError("--poll-interval must be greater than 0!")
 
         if job_type == JobType.scheduleUpdateTwin.value:
             if not twin_patch:
-                raise CLIError(
+                raise RequiredArgumentMissingError(
                     "The {} job type requires --twin-patch.".format(
                         JobType.scheduleUpdateTwin.value
                     )
@@ -151,14 +151,14 @@ class JobProvider(IoTHubProvider):
 
             twin_patch = process_json_arg(twin_patch, argument_name="twin-patch")
             if not isinstance(twin_patch, dict):
-                raise CLIError(
+                raise InvalidArgumentValueError(
                     "Twin patches must be objects. Received type: {}".format(
                         type(twin_patch)
                     )
                 )
         elif job_type == JobType.scheduleDeviceMethod.value:
             if not method_name:
-                raise CLIError(
+                raise RequiredArgumentMissingError(
                     "The {} job type requires --method-name.".format(
                         JobType.scheduleDeviceMethod.value
                     )
@@ -219,10 +219,10 @@ class JobProvider(IoTHubProvider):
 
             return job_result
         except CloudError as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
         except SerializationError as se:
             # ISO8601 parsing is handled by msrest
-            raise CLIError(se)
+            raise CLIInternalError(se)
 
     def _convert_v1_to_v2(self, job_v1):
         v2_result = {}

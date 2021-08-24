@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from knack.util import CLIError
+from azure.cli.core.azclierror import ResourceNotFoundError
 from knack.log import get_logger
 from azure.cli.core.commands.client_factory import get_subscription_id
 from azext_iot.common.utility import trim_from_start, ensure_iothub_sdk_min_version
@@ -15,6 +15,8 @@ from azext_iot.constants import IOTHUB_TRACK_2_SDK_MIN_VERSION
 from typing import Dict, List
 from types import SimpleNamespace
 from enum import Enum, EnumMeta
+
+from msrest.exceptions import ClientRequestError
 
 PRIVILEDGED_ACCESS_RIGHTS_SET = set(
     ["RegistryWrite", "ServiceConnect", "DeviceConnect"]
@@ -88,7 +90,7 @@ class IotHubDiscovery(object):
             try:
                 return self.client.get(resource_group_name=rg, resource_name=hub_name)
             except:  # pylint: disable=broad-except
-                raise CLIError(
+                raise ResourceNotFoundError(
                     "Unable to find IoT Hub: {} in resource group: {}".format(
                         hub_name, rg
                     )
@@ -103,7 +105,7 @@ class IotHubDiscovery(object):
             if target_hub:
                 return target_hub
 
-        raise CLIError(
+        raise ResourceNotFoundError(
             "Unable to find IoT Hub: {} in current subscription {}.".format(
                 hub_name, self.sub_id
             )
@@ -127,7 +129,7 @@ class IotHubDiscovery(object):
                 )
                 return policy
 
-        raise CLIError(
+        raise ClientRequestError(
             "Unable to discover a priviledged policy for IoT Hub: {}, in subscription {}. "
             "When interfacing with an IoT Hub, the IoT extension requires any single policy with "
             "'RegistryWrite', 'ServiceConnect' and 'DeviceConnect' rights.".format(

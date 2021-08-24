@@ -11,6 +11,18 @@ utility: Defines common utility functions and components.
 
 import ast
 import base64
+
+from azure.cli.core.azclierror import (
+    AzureInternalError,
+    AzureResponseError,
+    BadRequestError,
+    CLIInternalError,
+    FileOperationError,
+    ForbiddenError,
+    InvalidArgumentValueError,
+    ResourceNotFoundError,
+    UnauthorizedError,
+)
 import isodate
 import json
 import os
@@ -22,7 +34,6 @@ import hashlib
 from threading import Event, Thread
 from datetime import datetime
 from knack.log import get_logger
-from knack.util import CLIError
 from azext_iot.constants import IOTHUB_MGMT_SDK_PACKAGE_NAME
 
 logger = get_logger(__name__)
@@ -126,7 +137,7 @@ def process_json_arg(content, argument_name, preserve_order=False):
 
     try:
         return shell_safe_json_parse(content, preserve_order)
-    except CLIError as ex:
+    except CLIInternalError as ex:
         if looks_like_file(content):
             logger.warning(
                 "The json payload for argument '%s' looks like its intended from a file. "
@@ -135,7 +146,7 @@ def process_json_arg(content, argument_name, preserve_order=False):
             )
 
         file_content_error = "from file: '{}' ".format(json_from_file)
-        raise CLIError(
+        raise CLIInternalError(
             "Failed to parse json {}for argument '{}' with exception:\n    {}".format(
                 file_content_error if json_from_file else "", argument_name, ex
             )
@@ -156,12 +167,12 @@ def shell_safe_json_parse(json_or_dict_string, preserve_order=False):
         try:
             return ast.literal_eval(json_or_dict_string)
         except SyntaxError:
-            raise CLIError(json_ex)
+            raise CLIInternalError(json_ex)
         except ValueError as ex:
             logger.debug(
                 ex
             )  # log the exception which could be a python dict parsing error.
-            raise CLIError(
+            raise CLIInternalError(
                 json_ex
             )  # raise json_ex error which is more readable and likely.
 
@@ -185,7 +196,7 @@ def read_file_content(file_path, allow_binary=False):
                 return base64.b64encode(input_file.read()).decode("utf-8")
         except Exception:  # pylint: disable=broad-except
             pass
-    raise CLIError("Failed to decode file {} - unknown decoding".format(file_path))
+    raise FileOperationError("Failed to decode file {} - unknown decoding".format(file_path))
 
 
 def trim_from_start(s, substring):
@@ -352,6 +363,28 @@ def unpack_msrest_error(e):
     return op_err
 
 
+def handle_service_exception(e):
+    op_status = None
+    err = unpack_msrest_error(e)
+    try:
+        op_status = getattr(e.response, 'status_code', None)
+        if op_status in [400, 409]:
+            raise BadRequestError(err)
+        if op_status == 401:
+            raise UnauthorizedError(err)
+        if op_status == 403:
+            raise ForbiddenError(err)
+        if op_status == 404:
+            raise ResourceNotFoundError(err)
+        if op_status in [500, 503, 504]:
+            raise AzureInternalError(err)
+        # Otherwise, fail with generic error
+        raise AzureResponseError(err)
+
+    except:
+        raise AzureResponseError(err)
+
+
 def dict_transform_lower_case_key(d):
     """Converts a dictionary to an identical one with all lower case keys"""
     return {k.lower(): v for k, v in d.items()}
@@ -365,12 +398,11 @@ def calculate_millisec_since_unix_epoch_utc(offset_seconds: int = 0):
 
 def init_monitoring(cmd, timeout, properties, enqueued_time, repair, yes):
     from azext_iot.common.deps import ensure_uamqp
-    from knack.util import CLIError
 
     validate_min_python_version(3, 5)
 
     if timeout < 0:
-        raise CLIError("Monitoring timeout must be 0 (inf) or greater.")
+        raise InvalidArgumentValueError("Monitoring timeout must be 0 (inf) or greater.")
     timeout = timeout * 1000
 
     config = cmd.cli_ctx.config

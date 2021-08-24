@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 # Dev note - think of this as a controller
 
-from knack.util import CLIError
+from azure.cli.core.azclierror import InvalidArgumentValueError, RequiredArgumentMissingError
 
 from azext_iot.common import utility
 from azext_iot.constants import CENTRAL_ENDPOINT
@@ -57,7 +57,7 @@ def create_device(
     api_version=ApiVersion.v1.value,
 ):
     if simulated and not template:
-        raise CLIError(
+        raise RequiredArgumentMissingError(
             "Error: if you supply --simulated you must also specify --template"
         )
 
@@ -113,7 +113,7 @@ def run_command(
     api_version=ApiVersion.v1.value,
 ):
     if not isinstance(content, str):
-        raise CLIError("content must be a string: {}".format(content))
+        raise InvalidArgumentValueError("content must be a string: {}".format(content))
 
     payload = utility.process_json_arg(content, argument_name="content")
 
@@ -140,7 +140,7 @@ def run_manual_failover(
     central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     if ttl_minutes and ttl_minutes < 1:
-        raise CLIError("TTL value should be a positive integer: {}".format(ttl_minutes))
+        raise InvalidArgumentValueError("TTL value should be a positive integer: {}".format(ttl_minutes))
 
     provider = CentralDeviceProviderV1(cmd=cmd, app_id=app_id, token=token)
     return provider.run_manual_failover(

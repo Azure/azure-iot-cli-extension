@@ -6,8 +6,18 @@
 
 from os.path import exists, basename
 from time import time, sleep
+from azure.cli.core.azclierror import (
+    ArgumentUsageError,
+    CLIInternalError,
+    ClientRequestError,
+    FileOperationError,
+    InvalidArgumentValueError,
+    MutuallyExclusiveArgumentError,
+    RequiredArgumentMissingError,
+    ResourceNotFoundError,
+    ValidationError,
+)
 from knack.log import get_logger
-from knack.util import CLIError
 from enum import Enum, EnumMeta
 from azext_iot.constants import (
     EXTENSION_ROOT,
@@ -32,10 +42,10 @@ from azext_iot.common.shared import (
 )
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
+    handle_service_exception,
     read_file_content,
     validate_key_value_pairs,
     url_encode_dict,
-    unpack_msrest_error,
     init_monitoring,
     process_json_arg,
     ensure_iothub_sdk_min_version,
@@ -77,7 +87,7 @@ def iot_query(
 
         return _execute_query(query_args, query_method, top)
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
 
 
 # Device
@@ -112,7 +122,7 @@ def _iot_device_show(target, device_id):
         device["hub"] = target.get("entity")
         return device
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
 
 
 def iot_device_list(
@@ -173,7 +183,7 @@ def iot_device_create(
     if any([valid_days, output_dir]):
         valid_days = 365 if not valid_days else int(valid_days)
         if output_dir and not exists(output_dir):
-            raise CLIError(
+            raise InvalidArgumentValueError(
                 "certificate output directory of '{}' does not exist.".format(
                     output_dir
                 )
@@ -196,7 +206,7 @@ def iot_device_create(
             id=device_id, device=device
         )
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
 
     return output
 
@@ -322,13 +332,13 @@ def update_iot_device_custom(
             if (primary_key and not secondary_key) or (
                 not primary_key and secondary_key
             ):
-                raise CLIError("primary + secondary Key required with sas auth")
+                raise RequiredArgumentMissingError("primary + secondary Key required with sas auth")
             instance["authentication"]["symmetricKey"]["primaryKey"] = primary_key
             instance["authentication"]["symmetricKey"]["secondaryKey"] = secondary_key
         elif auth_method == DeviceAuthType.x509_thumbprint.name:
             auth = DeviceAuthApiType.selfSigned.value
             if not any([primary_thumbprint, secondary_thumbprint]):
-                raise CLIError(
+                raise RequiredArgumentMissingError(
                     "primary or secondary Thumbprint required with selfSigned auth"
                 )
             if primary_thumbprint:
@@ -421,7 +431,7 @@ def _iot_device_update(target, device_id, device):
             id=device_id, device=device, custom_headers=headers
         )
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
 
 
 def iot_device_delete(
@@ -449,7 +459,7 @@ def iot_device_delete(
         service_sdk.devices.delete_identity(id=device_id, custom_headers=headers)
         return
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
 
 
 def _update_device_key(target, device, auth_method, pk, sk, etag=None):
@@ -467,7 +477,7 @@ def _update_device_key(target, device, auth_method, pk, sk, etag=None):
             custom_headers=headers,
         )
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
 
 
 def iot_device_key_regenerate(
@@ -489,7 +499,7 @@ def iot_device_key_regenerate(
     )
     device = _iot_device_show(target, device_id)
     if device["authentication"]["type"] != DeviceAuthApiType.sas.value:
-        raise CLIError("Device authentication should be of type sas")
+        raise ClientRequestError("Device authentication should be of type sas")
 
     pk = device["authentication"]["symmetricKey"]["primaryKey"]
     sk = device["authentication"]["symmetricKey"]["secondaryKey"]
@@ -620,7 +630,7 @@ def iot_device_children_remove(
             cmd, device_id, hub_name, resource_group_name, login
         )
         if not result:
-            raise CLIError(
+            raise ClientRequestError(
                 'No registered child devices found for "{}" edge device.'.format(
                     device_id
                 )
@@ -638,13 +648,13 @@ def iot_device_children_remove(
             if child_device["parentScopes"] == [edge_device["deviceScope"]]:
                 devices.append(child_device)
             else:
-                raise CLIError(
+                raise ClientRequestError(
                     'The entered child device "{}" isn\'t assigned as a child of edge device "{}"'.format(
                         child_device_id.strip(), device_id
                     )
                 )
     else:
-        raise CLIError(
+        raise RequiredArgumentMissingError(
             "Please specify child list or use --remove-all to remove all children."
         )
 
@@ -733,27 +743,27 @@ def _update_device_parent(target, device, is_edge, device_scope=None):
             return
         raise LookupError("device etag not found.")
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
     except LookupError as err:
-        raise CLIError(err)
+        raise CLIInternalError(err)
 
 
 def _validate_edge_device(device):
     if not device["capabilities"]["iotEdge"]:
-        raise CLIError(
-            'The device "{}" should be edge device.'.format(device["deviceId"])
+        raise ClientRequestError(
+            'The device "{}" should be an edge device.'.format(device["deviceId"])
         )
 
 
 def _validate_child_device(device):
     if "parentScopes" not in device:
-        raise CLIError(
+        raise ClientRequestError(
             'Device "{}" doesn\'t support parent device functionality.'.format(
                 device["deviceId"]
             )
         )
     if not device["parentScopes"]:
-        raise CLIError(
+        raise ClientRequestError(
             'Device "{}" doesn\'t have any parent device.'.format(device["deviceId"])
         )
 
@@ -763,7 +773,7 @@ def _validate_parent_child_relation(child_device, force):
         return
     else:
         if not force:
-            raise CLIError(
+            raise ClientRequestError(
                 "The entered device \"{}\" already has a parent device, please use '--force'"
                 " to overwrite".format(child_device["deviceId"])
             )
@@ -791,7 +801,7 @@ def iot_device_module_create(
     if any([valid_days, output_dir]):
         valid_days = 365 if not valid_days else int(valid_days)
         if output_dir and not exists(output_dir):
-            raise CLIError(
+            raise FileOperationError(
                 "certificate output directory of '{}' does not exist.".format(
                     output_dir
                 )
@@ -821,7 +831,7 @@ def iot_device_module_create(
             id=device_id, mid=module_id, module=module
         )
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
 
 
 def _assemble_module(device_id, module_id, auth_method, pk=None, sk=None):
@@ -864,7 +874,7 @@ def iot_device_module_update(
             custom_headers=headers,
         )
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
 
 
 def _handle_module_update_params(parameters):
@@ -886,7 +896,7 @@ def _parse_auth(parameters):
     ]
     auth = parameters["authentication"].get("type")
     if auth not in valid_auth:
-        raise CLIError("authentication.type must be one of {}".format(valid_auth))
+        raise InvalidArgumentValueError("authentication.type must be one of {}".format(valid_auth))
     pk = sk = None
     if auth == DeviceAuthApiType.sas.value:
         pk = parameters["authentication"]["symmetricKey"]["primaryKey"]
@@ -895,7 +905,7 @@ def _parse_auth(parameters):
         pk = parameters["authentication"]["x509Thumbprint"]["primaryThumbprint"]
         sk = parameters["authentication"]["x509Thumbprint"]["secondaryThumbprint"]
         if not any([pk, sk]):
-            raise CLIError(
+            raise RequiredArgumentMissingError(
                 "primary + secondary Thumbprint required with selfSigned auth"
             )
     return auth, pk, sk
@@ -926,10 +936,10 @@ def iot_device_module_key_regenerate(
             id=device_id, mid=module_id, raw=True
         ).response.json()
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
 
     if module["authentication"]["type"] != "sas":
-        raise CLIError("Module authentication should be of type sas")
+        raise ClientRequestError("Module authentication should be of type sas")
 
     pk = module["authentication"]["symmetricKey"]["primaryKey"]
     sk = module["authentication"]["symmetricKey"]["secondaryKey"]
@@ -956,7 +966,7 @@ def iot_device_module_key_regenerate(
             custom_headers=headers,
         )
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
 
 
 def iot_device_module_list(
@@ -981,7 +991,7 @@ def iot_device_module_list(
     try:
         return service_sdk.modules.get_modules_on_device(device_id)[:top]
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
 
 
 def iot_device_module_show(
@@ -1014,7 +1024,7 @@ def _iot_device_module_show(target, device_id, module_id):
         module["hub"] = target.get("entity")
         return module
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
 
 
 def iot_device_module_delete(
@@ -1045,7 +1055,7 @@ def iot_device_module_delete(
         )
         return
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
 
 
 def iot_device_module_twin_show(
@@ -1078,7 +1088,7 @@ def _iot_device_module_twin_show(target, device_id, module_id):
             id=device_id, mid=module_id, raw=True
         ).response.json()
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
 
 
 def iot_device_module_twin_update(
@@ -1121,9 +1131,9 @@ def iot_device_module_twin_update(
             custom_headers=headers,
         )
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
     except (AttributeError, TypeError) as err:
-        raise CLIError(err)
+        raise CLIInternalError(err)
 
 
 def iot_device_module_twin_replace(
@@ -1158,7 +1168,7 @@ def iot_device_module_twin_replace(
             custom_headers=headers,
         )
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
 
 
 def iot_edge_set_modules(
@@ -1192,7 +1202,7 @@ def iot_edge_set_modules(
         service_sdk.configuration.apply_on_edge_device(id=device_id, content=content)
         return iot_device_module_list(cmd, device_id, hub_name=hub_name, login=login)
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
 
 
 def iot_edge_deployment_create(
@@ -1297,7 +1307,7 @@ def _iot_hub_configuration_create(
         required_target_prefix = "from devices.modules where"
         lower_target_condition = target_condition.lower()
         if not lower_target_condition.startswith(required_target_prefix):
-            raise CLIError(
+            raise InvalidArgumentValueError(
                 "The target condition for a module configuration must start with '{}'".format(
                     required_target_prefix
                 )
@@ -1309,7 +1319,7 @@ def _iot_hub_configuration_create(
         if "metrics" in metrics:
             metrics = metrics["metrics"]
         if metrics_key not in metrics:
-            raise CLIError(
+            raise InvalidArgumentValueError(
                 "metrics json must include the '{}' property".format(metrics_key)
             )
         metrics = metrics[metrics_key]
@@ -1336,7 +1346,7 @@ def _iot_hub_configuration_create(
             id=config_id, configuration=config
         )
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
 
 
 def _process_config_content(content, config_type):
@@ -1356,7 +1366,7 @@ def _process_config_content(content, config_type):
                     processed_content[to_snake_case(key)] = content[key]
                     return processed_content
 
-        raise CLIError(
+        raise InvalidArgumentValueError(
             "Automatic device configuration payloads require property: {}".format(
                 " or ".join(map(str, valid_adm_keys))
             )
@@ -1388,7 +1398,7 @@ def _process_config_content(content, config_type):
 
             return processed_content
 
-        raise CLIError(
+        raise InvalidArgumentValueError(
             "Edge deployment payloads require property: {}".format(valid_edge_key)
         )
 
@@ -1449,7 +1459,7 @@ def _validate_payload_schema(content):
                 errors = v.validate(to_validate_content)
                 if errors:
                     # Pretty printing schema validation errors
-                    raise CLIError(
+                    raise ValidationError(
                         json.dumps(
                             {"validationErrors": errors},
                             separators=(",", ":"),
@@ -1501,9 +1511,9 @@ def iot_hub_configuration_update(
             id=config_id, configuration=config, custom_headers=headers
         )
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
     except (AttributeError, TypeError) as err:
-        raise CLIError(err)
+        raise CLIInternalError(err)
 
 
 def iot_hub_configuration_show(
@@ -1531,7 +1541,7 @@ def _iot_hub_configuration_show(target, config_id):
     try:
         return service_sdk.configuration.get(id=config_id, raw=True).response.json()
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
 
 
 def iot_hub_configuration_list(
@@ -1599,7 +1609,7 @@ def _iot_hub_configuration_list(
             logger.info('No configurations found on hub "%s".', hub_name)
         return result
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
 
 
 def iot_hub_configuration_delete(
@@ -1626,7 +1636,7 @@ def iot_hub_configuration_delete(
         headers["If-Match"] = '"{}"'.format(etag if etag else "*")
         service_sdk.configuration.delete(id=config_id, custom_headers=headers)
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
 
 
 def iot_edge_deployment_metric_show(
@@ -1681,7 +1691,7 @@ def iot_hub_configuration_metric_show(
             metric_collection = config["metrics"].get("queries")
 
         if metric_id not in metric_collection:
-            raise CLIError(
+            raise InvalidArgumentValueError(
                 "The {} metric '{}' is not defined in the configuration '{}'".format(
                     metric_type, metric_id, config_id
                 )
@@ -1701,7 +1711,7 @@ def iot_hub_configuration_metric_show(
 
         return output
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
 
 
 # Device Twin
@@ -1732,7 +1742,7 @@ def _iot_device_twin_show(target, device_id):
     try:
         return service_sdk.devices.get_twin(id=device_id, raw=True).response.json()
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
 
 
 def iot_twin_update_custom(instance, desired=None, tags=None):
@@ -1785,9 +1795,9 @@ def iot_device_twin_update(
             id=device_id, device_twin_info=parameters, custom_headers=headers
         )
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
     except (AttributeError, TypeError) as err:
-        raise CLIError(err)
+        raise CLIInternalError(err)
 
 
 def iot_device_twin_replace(
@@ -1818,7 +1828,7 @@ def iot_device_twin_replace(
             id=device_id, device_twin_info=target_json, custom_headers=headers
         )
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
 
 
 def iot_device_method(
@@ -1838,11 +1848,11 @@ def iot_device_method(
     )
 
     if timeout > METHOD_INVOKE_MAX_TIMEOUT_SEC:
-        raise CLIError(
+        raise InvalidArgumentValueError(
             "timeout must not be over {} seconds".format(METHOD_INVOKE_MAX_TIMEOUT_SEC)
         )
     if timeout < METHOD_INVOKE_MIN_TIMEOUT_SEC:
-        raise CLIError(
+        raise InvalidArgumentValueError(
             "timeout must be at least {} seconds".format(METHOD_INVOKE_MIN_TIMEOUT_SEC)
         )
 
@@ -1877,7 +1887,7 @@ def iot_device_method(
             timeout=timeout,
         )
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
 
 
 # Device Module Method Invoke
@@ -1901,11 +1911,11 @@ def iot_device_module_method(
     )
 
     if timeout > METHOD_INVOKE_MAX_TIMEOUT_SEC:
-        raise CLIError(
+        raise InvalidArgumentValueError(
             "timeout must not be over {} seconds".format(METHOD_INVOKE_MAX_TIMEOUT_SEC)
         )
     if timeout < METHOD_INVOKE_MIN_TIMEOUT_SEC:
-        raise CLIError(
+        raise InvalidArgumentValueError(
             "timeout must not be over {} seconds".format(METHOD_INVOKE_MIN_TIMEOUT_SEC)
         )
 
@@ -1941,7 +1951,7 @@ def iot_device_module_method(
             timeout=timeout,
         )
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
 
 
 # Utility
@@ -1964,15 +1974,15 @@ def iot_get_sas_token(
     policy_name = policy_name.lower()
 
     if login and policy_name != "iothubowner":
-        raise CLIError(
+        raise ArgumentUsageError(
             "You are unable to change the sas policy with a hub connection string login."
         )
     if login and key_type != "primary" and not device_id:
-        raise CLIError(
+        raise ArgumentUsageError(
             "For non-device sas, you are unable to change the key type with a connection string login."
         )
     if module_id and not device_id:
-        raise CLIError(
+        raise ArgumentUsageError(
             "You are unable to get sas token for module without device information."
         )
 
@@ -2029,13 +2039,13 @@ def _iot_build_sas_token_from_cs(connection_string, duration=3600):
             elif parser == ConnectionStringParser.Device:
                 uri = "{}/devices/{}".format(parsed_cs["HostName"], parsed_cs["DeviceId"])
             else:
-                raise CLIError("Given Connection String was not in a supported format.")
+                raise InvalidArgumentValueError("Given Connection String was not in a supported format.")
 
             return SasTokenAuthentication(uri, policy, key, duration)
         except ValueError:
             continue
 
-    raise CLIError("Given Connection String was not in a supported format.")
+    raise InvalidArgumentValueError("Given Connection String was not in a supported format.")
 
 
 def _iot_build_sas_token(
@@ -2090,7 +2100,7 @@ def _iot_build_sas_token(
                 parsed_module_cs = parse_iot_device_module_connection_string(module_cs)
             except ValueError as e:
                 logger.debug(e)
-                raise CLIError("This module does not support SAS auth.")
+                raise CLIInternalError("This module does not support SAS auth.")
 
             key = parsed_module_cs["SharedAccessKey"]
         else:
@@ -2102,7 +2112,7 @@ def _iot_build_sas_token(
                 parsed_device_cs = parse_iot_device_connection_string(device_cs)
             except ValueError as e:
                 logger.debug(e)
-                raise CLIError("This device does not support SAS auth.")
+                raise CLIInternalError("This device does not support SAS auth.")
 
             key = parsed_device_cs["SharedAccessKey"]
     else:
@@ -2134,7 +2144,7 @@ def _build_device_or_module_connection_string(entity, key_type="primary"):
     ]:
         key = "x509=true"
     else:
-        raise CLIError("Unable to form target connection string")
+        raise CLIInternalError("Unable to form target connection string")
 
     if is_device:
         return template.format(entity.get("hub"), entity.get("deviceId"), key)
@@ -2237,7 +2247,7 @@ def _iot_device_send_message(
         and device.get("authentication", {}).get("type", "")
         != DeviceAuthApiType.sas.value
     ):
-        raise CLIError(
+        raise ClientRequestError(
             "D2C send message command only supports symmetric key auth (SAS) based devices"
         )
 
@@ -2273,7 +2283,7 @@ def _iot_device_send_message(
         )
         return
     except Exception as x:
-        raise CLIError(x)
+        raise CLIInternalError(x)
 
 
 def iot_device_send_message_http(
@@ -2301,7 +2311,7 @@ def _iot_device_send_message_http(target, device_id, data, headers=None):
             id=device_id, message=data, custom_headers=headers
         )
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
 
 
 def iot_c2d_message_complete(
@@ -2323,7 +2333,7 @@ def _iot_c2d_message_complete(target, device_id, etag):
             id=device_id, etag=etag
         )
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
 
 
 def iot_c2d_message_reject(
@@ -2345,7 +2355,7 @@ def _iot_c2d_message_reject(target, device_id, etag):
             id=device_id, etag=etag, reject=""
         )
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
 
 
 def iot_c2d_message_abandon(
@@ -2367,7 +2377,7 @@ def _iot_c2d_message_abandon(target, device_id, etag):
             id=device_id, etag=etag
         )
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
 
 
 def iot_c2d_message_receive(
@@ -2385,7 +2395,7 @@ def iot_c2d_message_receive(
     ack_vals = [abandon, complete, reject]
     if any(ack_vals):
         if len(list(filter(lambda val: val, ack_vals))) > 1:
-            raise CLIError(
+            raise MutuallyExclusiveArgumentError(
                 "Only one c2d-message ack argument can be used [--complete, --abandon, --reject]"
             )
         if abandon:
@@ -2484,7 +2494,7 @@ def _iot_c2d_message_receive(target, device_id, lock_timeout=60, ack=None):
             return payload
         return
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
 
 
 def iot_c2d_message_send(
@@ -2513,7 +2523,7 @@ def iot_c2d_message_send(
     validate_min_python_version(3, 4)
 
     if wait_on_feedback and not ack:
-        raise CLIError(
+        raise RequiredArgumentMissingError(
             'To wait on device feedback, ack must be "full", "negative" or "positive"'
         )
 
@@ -2535,7 +2545,7 @@ def iot_c2d_message_send(
         now_in_milli = int(time() * 1000)
         user_msg_expiry = int(expiry_time_utc)
         if user_msg_expiry < now_in_milli:
-            raise CLIError("Message expiry time utc is in the past!")
+            raise InvalidArgumentValueError("Message expiry time utc is in the past!")
 
     from azext_iot.monitor import event
 
@@ -2553,7 +2563,7 @@ def iot_c2d_message_send(
         ack=ack,
     )
     if errors:
-        raise CLIError(
+        raise CLIInternalError(
             "C2D message error: {}, use --debug for more details.".format(errors)
         )
 
@@ -2589,13 +2599,13 @@ def iot_simulate_device(
     protocol_type = protocol_type.lower()
     if protocol_type == ProtocolType.mqtt.name:
         if receive_settle != "complete":
-            raise CLIError('mqtt protocol only supports settle type of "complete"')
+            raise InvalidArgumentValueError('mqtt protocol only supports settle type of "complete"')
 
     if msg_interval < MIN_SIM_MSG_INTERVAL:
-        raise CLIError("msg interval must be at least {}".format(MIN_SIM_MSG_INTERVAL))
+        raise InvalidArgumentValueError("msg interval must be at least {}".format(MIN_SIM_MSG_INTERVAL))
 
     if msg_count < MIN_SIM_MSG_COUNT:
-        raise CLIError("msg count must be at least {}".format(MIN_SIM_MSG_COUNT))
+        raise InvalidArgumentValueError("msg count must be at least {}".format(MIN_SIM_MSG_COUNT))
 
     properties_to_send = _iot_simulate_get_default_properties(protocol_type)
     user_properties = validate_key_value_pairs(properties) or {}
@@ -2634,7 +2644,7 @@ def iot_simulate_device(
                 and device.get("authentication", {}).get("type", "")
                 != DeviceAuthApiType.sas.value
             ):
-                raise CLIError(
+                raise ClientRequestError(
                     "MQTT simulation is only supported for symmetric key auth (SAS) based devices"
                 )
 
@@ -2662,7 +2672,7 @@ def iot_simulate_device(
     except KeyboardInterrupt:
         sys.exit()
     except Exception as x:
-        raise CLIError(x)
+        raise CLIInternalError(x)
     finally:
         if token:
             token.set()
@@ -2759,7 +2769,7 @@ def iot_device_export(
             user_identity
             and storage_authentication_type != AuthenticationType.identityBased.name
         ):
-            raise CLIError(
+            raise ClientRequestError(
                 "Device export with user-assigned identities requires identity-based authentication [--storage-auth-type]"
             )
         # Track 2 CLI SDKs provide support for user-assigned identity objects
@@ -2775,7 +2785,7 @@ def iot_device_export(
 
         # if the user supplied a user-assigned identity, let them know they need a new CLI/SDK
         elif user_identity:
-            raise CLIError(
+            raise CLIInternalError(
                 "Device export with user-assigned identities requires a dependency of azure-mgmt-iothub>={}".format(
                     IOTHUB_TRACK_2_SDK_MIN_VERSION
                 )
@@ -2787,7 +2797,7 @@ def iot_device_export(
             export_devices_parameters=export_request,
         )
     if storage_authentication_type:
-        raise CLIError(
+        raise CLIInternalError(
             "Device export authentication-type properties require a dependency of azure-mgmt-iothub>=0.12.0"
         )
     return client.export_devices(
@@ -2845,7 +2855,7 @@ def iot_device_import(
             user_identity
             and storage_authentication_type != AuthenticationType.identityBased.name
         ):
-            raise CLIError(
+            raise ClientRequestError(
                 "Device import with user-assigned identities requires identity-based authentication [--storage-auth-type]"
             )
         # Track 2 CLI SDKs provide support for user-assigned identity objects
@@ -2860,7 +2870,7 @@ def iot_device_import(
             import_request.identity = ManagedIdentity(user_assigned_identity=identity)
         # if the user supplied a user-assigned identity, let them know they need a new CLI/SDK
         elif user_identity:
-            raise CLIError(
+            raise CLIInternalError(
                 "Device import with user-assigned identities requires a dependency of azure-mgmt-iothub>={}".format(
                     IOTHUB_TRACK_2_SDK_MIN_VERSION
                 )
@@ -2872,7 +2882,7 @@ def iot_device_import(
             import_devices_parameters=import_request,
         )
     if storage_authentication_type:
-        raise CLIError(
+        raise CLIInternalError(
             "Device import authentication-type properties require a dependency of azure-mgmt-iothub>=0.12.0"
         )
     return client.import_devices(
@@ -2903,7 +2913,7 @@ def iot_device_upload_file(
     device_sdk = resolver.get_sdk(SdkType.device_sdk)
 
     if not exists(file_path):
-        raise CLIError('File path "{}" does not exist!'.format(file_path))
+        raise FileOperationError('File path "{}" does not exist!'.format(file_path))
 
     content = read_file_content(file_path)
     file_name = basename(file_path)
@@ -2933,7 +2943,7 @@ def iot_device_upload_file(
             device_id=device_id, file_upload_completion_status=completion_status
         )
     except CloudError as e:
-        raise CLIError(unpack_msrest_error(e))
+        handle_service_exception(e)
 
 
 def iot_hub_monitor_events(
@@ -2972,7 +2982,7 @@ def iot_hub_monitor_events(
             device_query=device_query,
         )
     except RuntimeError as e:
-        raise CLIError(e)
+        raise CLIInternalError(e)
 
 
 def iot_hub_monitor_feedback(
@@ -3122,7 +3132,7 @@ def iot_hub_distributed_tracing_update(
     )
 
     if int(sampling_rate) not in range(0, 101):
-        raise CLIError(
+        raise InvalidArgumentValueError(
             "Sampling rate is a percentage, So only values from 0 to 100(inclusive) are permitted."
         )
     device_twin = _iot_hub_distributed_tracing_show(target=target, device_id=device_id)
@@ -3156,7 +3166,7 @@ def iot_hub_connection_string_show(
     if hub_name is None:
         hubs = discovery.get_iothubs(resource_group_name)
         if hubs is None:
-            raise CLIError("No IoT Hub found.")
+            raise ResourceNotFoundError("No IoT Hub found.")
 
         def conn_str_getter(hub):
             return _get_hub_connection_string(
@@ -3264,20 +3274,20 @@ def _iot_hub_distributed_tracing_show(target, device_id):
 
 def _validate_device_tracing(target, device_twin):
     if target["location"].lower() not in TRACING_ALLOWED_FOR_LOCATION:
-        raise CLIError(
+        raise ClientRequestError(
             'Distributed tracing isn\'t supported for the hub located at "{}" location.'.format(
                 target["location"]
             )
         )
     if target["sku_tier"].lower() != TRACING_ALLOWED_FOR_SKU:
-        raise CLIError(
+        raise ClientRequestError(
             'Distributed tracing isn\'t supported for the hub belongs to "{}" sku tier.'.format(
                 target["sku_tier"]
             )
         )
     if device_twin["capabilities"]["iotEdge"]:
-        raise CLIError(
-            'The device "{}" should be non-edge device.'.format(device_twin["deviceId"])
+        raise ClientRequestError(
+            'The device "{}" should be a non-edge device.'.format(device_twin["deviceId"])
         )
 
 

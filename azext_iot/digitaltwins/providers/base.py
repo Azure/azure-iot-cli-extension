@@ -4,12 +4,12 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from azure.cli.core.azclierror import AzureResponseError
 from azext_iot.digitaltwins.providers.resource import ResourceProvider
 from azext_iot.sdk.digitaltwins.dataplane import AzureDigitalTwinsAPI
 from azext_iot.sdk.digitaltwins.dataplane.models import ErrorResponseException
 from azext_iot.constants import DIGITALTWINS_RESOURCE_ID, USER_AGENT
 from azext_iot.common.utility import valid_hostname
-from knack.cli import CLIError
 
 __all__ = ["DigitalTwinsProvider", "ErrorResponseException"]
 
@@ -41,7 +41,7 @@ class DigitalTwinsProvider(object):
             )
             host_name = instance.host_name
             if not host_name:
-                raise CLIError("Instance has invalid hostName. Aborting operation...")
+                raise AzureResponseError("Instance has invalid hostName. Aborting operation...")
         else:
             host_name = self.name
 

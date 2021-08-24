@@ -5,8 +5,9 @@
 # --------------------------------------------------------------------------------------------
 
 from typing import List
+
+from azure.cli.core.azclierror import BadRequestError, CLIInternalError, RequiredArgumentMissingError, ResourceNotFoundError
 from azext_iot.central.models.devicev1 import DeviceV1
-from knack.util import CLIError
 from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
@@ -54,7 +55,7 @@ class CentralDeviceProviderV1:
             self._devices[device_id] = device
 
         if not device:
-            raise CLIError("No device found with id: '{}'.".format(device_id))
+            raise ResourceNotFoundError("No device found with id: '{}'.".format(device_id))
 
         return device
 
@@ -81,10 +82,10 @@ class CentralDeviceProviderV1:
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> DeviceV1:
         if not device_id:
-            raise CLIError("Device id must be specified.")
+            raise RequiredArgumentMissingError("Device id must be specified.")
 
         if device_id in self._devices:
-            raise CLIError("Device already exists.")
+            raise BadRequestError("Device already exists.")
 
         device = central_services.device.create_device(
             cmd=self._cmd,
@@ -99,7 +100,7 @@ class CentralDeviceProviderV1:
         )
 
         if not device:
-            raise CLIError("No device found with id: '{}'.".format(device_id))
+            raise ResourceNotFoundError("No device found with id: '{}'.".format(device_id))
 
         # add to cache
         self._devices[device.id] = device
@@ -108,7 +109,7 @@ class CentralDeviceProviderV1:
 
     def delete_device(self, device_id, central_dns_suffix=CENTRAL_ENDPOINT,) -> dict:
         if not device_id:
-            raise CLIError("Device id must be specified.")
+            raise RequiredArgumentMissingError("Device id must be specified.")
 
         # get or add to cache
         result = central_services.device.delete_device(
@@ -143,7 +144,7 @@ class CentralDeviceProviderV1:
             )
 
         if not credentials:
-            raise CLIError(
+            raise CLIInternalError(
                 "Could not find device credentials for device '{}'.".format(device_id)
             )
 

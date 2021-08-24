@@ -4,8 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from knack.util import CLIError
 from azext_iot.assets.user_messages import error_no_hub_or_login_on_input
+from azure.cli.core.azclierror import RequiredArgumentMissingError
 
 
 def mode2_iot_login_handler(cmd, namespace):
@@ -29,4 +29,4 @@ def mode2_iot_login_handler(cmd, namespace):
                 offline = args['connection_string']
 
             if not any([login_value, entity_value, offline]):
-                raise CLIError(error_no_hub_or_login_on_input(iot_cmd_type))
+                raise RequiredArgumentMissingError(error_no_hub_or_login_on_input(iot_cmd_type))

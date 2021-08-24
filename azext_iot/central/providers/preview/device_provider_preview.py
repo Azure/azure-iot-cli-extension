@@ -6,8 +6,9 @@
 
 
 from typing import List
+
+from azure.cli.core.azclierror import BadRequestError, RequiredArgumentMissingError, ResourceNotFoundError
 from azext_iot.central.models.devicePreview import DevicePreview
-from knack.util import CLIError
 from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
@@ -55,7 +56,7 @@ class CentralDeviceProviderPreview:
             self._devices[device_id] = device
 
         if not device:
-            raise CLIError("No device found with id: '{}'.".format(device_id))
+            raise ResourceNotFoundError("No device found with id: '{}'.".format(device_id))
 
         return device
 
@@ -83,7 +84,7 @@ class CentralDeviceProviderPreview:
     ) -> central_models.DevicePreview:
 
         if device_id in self._devices:
-            raise CLIError("Device already exists.")
+            raise BadRequestError("Device already exists.")
 
         device = central_services.device.create_device(
             cmd=self._cmd,
@@ -98,7 +99,7 @@ class CentralDeviceProviderPreview:
         )
 
         if not device:
-            raise CLIError("No device found with id: '{}'.".format(device_id))
+            raise ResourceNotFoundError("No device found with id: '{}'.".format(device_id))
 
         # add to cache
         self._devices[device.id] = device
@@ -107,7 +108,7 @@ class CentralDeviceProviderPreview:
 
     def delete_device(self, device_id, central_dns_suffix=CENTRAL_ENDPOINT,) -> dict:
         if not device_id:
-            raise CLIError("Device id must be specified.")
+            raise RequiredArgumentMissingError("Device id must be specified.")
 
         # get or add to cache
         result = central_services.device.delete_device(

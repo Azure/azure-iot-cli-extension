@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 # Nothing in this file should be used outside of service/central
 
-from knack.util import CLIError
+from azure.cli.core.azclierror import AzureResponseError, CLIInternalError
 from requests import Response
 from knack.log import logging
 
@@ -37,10 +37,10 @@ def try_extract_result(response: Response):
     try:
         body = response.json()
     except:
-        raise CLIError("Error parsing response body")
+        raise CLIInternalError("Error parsing response body")
 
     if "error" in body:
-        raise CLIError(body["error"])
+        raise AzureResponseError(body["error"])
 
     return body
 

@@ -4,8 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from azure.cli.core.azclierror import CLIInternalError
 from azext_iot.common.embedded_cli import EmbeddedCLI
-from knack.util import CLIError
 
 
 class RbacProvider(object):
@@ -29,7 +29,7 @@ class RbacProvider(object):
         )
 
         if not list_op.success():
-            raise CLIError("Unable to determine assignments.")
+            raise CLIInternalError("Unable to determine assignments.")
 
         return list_op.as_json()
 
@@ -40,7 +40,7 @@ class RbacProvider(object):
             )
         )
         if not assign_op.success():
-            raise CLIError("Unable to assign role.")
+            raise CLIInternalError("Unable to assign role.")
 
         return assign_op.as_json()
 
@@ -55,7 +55,7 @@ class RbacProvider(object):
             )
         )
         if not delete_op.success():
-            raise CLIError("Unable to remove role assignment.")
+            raise CLIInternalError("Unable to remove role assignment.")
         return
 
     def assign_role_flex(self, principal_id, scope, principal_type="ServicePrincipal", role_type="Contributor"):
@@ -65,6 +65,6 @@ class RbacProvider(object):
             )
         )
         if not assign_op.success():
-            raise CLIError("Unable to assign role.")
+            raise CLIInternalError("Unable to assign role.")
 
         return assign_op.as_json()

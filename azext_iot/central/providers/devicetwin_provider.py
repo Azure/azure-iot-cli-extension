@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from knack.util import CLIError
+from azure.cli.core.azclierror import AzureResponseError, CLIInternalError
 from knack.log import get_logger
 from azext_iot.common.utility import find_between
 from azext_iot._factory import SdkResolver, CloudError
@@ -59,6 +59,6 @@ class CentralDeviceTwinProvider:
                 ).response.json()
             except CloudError as e:
                 if exception is None:
-                    exception = CLIError(unpack_msrest_error(e))
+                    exception = AzureResponseError(unpack_msrest_error(e))
 
-        raise CLIError("Could not get device twin")
+        raise CLIInternalError("Could not get device twin")

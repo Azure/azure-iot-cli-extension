@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 
-from knack.util import CLIError
+from azure.cli.core.azclierror import CLIInternalError
 
 
 class TemplateV1:
@@ -23,7 +23,7 @@ class TemplateV1:
                 )
 
         except:
-            raise CLIError("Could not parse iot central device template.")
+            raise CLIInternalError("Could not parse iot central device template.")
 
     def get_schema(self, name, is_component=False, identifier="") -> dict:
         entities = self.components if is_component else self.interfaces
@@ -63,7 +63,7 @@ class TemplateV1:
             details = "Unable to extract schema for component from template '{}'.".format(
                 self.id
             )
-            raise CLIError(details)
+            raise CLIInternalError(details)
 
     def _extract_root_interface_contents(self, dcm: dict) -> dict:
         rootContents = dcm.get("contents", {})
@@ -92,7 +92,7 @@ class TemplateV1:
             details = "Unable to extract device schema from template '{}'.".format(
                 self.id
             )
-            raise CLIError(details)
+            raise CLIInternalError(details)
 
     def _extract_schemas(self, entity: dict) -> dict:
         if entity.get("schema"):

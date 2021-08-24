@@ -4,10 +4,10 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from azure.cli.core.azclierror import CLIInternalError
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.digitaltwins.common import ADTEndpointAuthType
 from abc import ABC, abstractmethod
-from knack.util import CLIError
 from knack.log import get_logger
 
 from azext_iot.sdk.digitaltwins.controlplane.models import (
@@ -83,7 +83,7 @@ class EventGridEndpointBuilder(BaseEndpointBuilder):
             subscription=self.endpoint_subscription,
         )
         if not eg_topic_keys_op.success():
-            raise CLIError("{} Event Grid topic keys.".format(self.error_prefix))
+            raise CLIInternalError("{} Event Grid topic keys.".format(self.error_prefix))
         eg_topic_keys = eg_topic_keys_op.as_json()
 
         eg_topic_endpoint_op = self.cli.invoke(
@@ -93,7 +93,7 @@ class EventGridEndpointBuilder(BaseEndpointBuilder):
             subscription=self.endpoint_subscription,
         )
         if not eg_topic_endpoint_op.success():
-            raise CLIError("{} Event Grid topic endpoint.".format(self.error_prefix))
+            raise CLIInternalError("{} Event Grid topic endpoint.".format(self.error_prefix))
         eg_topic_endpoint = eg_topic_endpoint_op.as_json()
 
         # TODO: Potentionally have shared attributes handled by build_endpoint()
@@ -106,7 +106,7 @@ class EventGridEndpointBuilder(BaseEndpointBuilder):
         )
 
     def build_identity_based(self):
-        raise CLIError(
+        raise CLIInternalError(
             "Identity based EventGrid endpoint creation is not yet supported. "
         )
 
@@ -146,7 +146,7 @@ class ServiceBusEndpointBuilder(BaseEndpointBuilder):
             subscription=self.endpoint_subscription,
         )
         if not sb_topic_keys_op.success():
-            raise CLIError("{} Service Bus topic keys.".format(self.error_prefix))
+            raise CLIInternalError("{} Service Bus topic keys.".format(self.error_prefix))
         sb_topic_keys = sb_topic_keys_op.as_json()
 
         return ServiceBusEndpointProperties(
@@ -165,7 +165,7 @@ class ServiceBusEndpointBuilder(BaseEndpointBuilder):
             subscription=self.endpoint_subscription,
         )
         if not sb_namespace_op.success():
-            raise CLIError("{} Service Bus Namespace.".format(self.error_prefix))
+            raise CLIInternalError("{} Service Bus Namespace.".format(self.error_prefix))
         sb_namespace_meta = sb_namespace_op.as_json()
         sb_endpoint = sb_namespace_meta["serviceBusEndpoint"]
 
@@ -179,7 +179,7 @@ class ServiceBusEndpointBuilder(BaseEndpointBuilder):
         )
 
         if not sb_topic_op.success():
-            raise CLIError("{} Service Bus Topic.".format(self.error_prefix))
+            raise CLIInternalError("{} Service Bus Topic.".format(self.error_prefix))
 
         return ServiceBusEndpointProperties(
             endpoint_uri=transform_sb_hostname_to_schemauri(sb_endpoint),
@@ -224,7 +224,7 @@ class EventHubEndpointBuilder(BaseEndpointBuilder):
             subscription=self.endpoint_subscription,
         )
         if not eventhub_topic_keys_op.success():
-            raise CLIError("{} Event Hub keys.".format(self.error_prefix))
+            raise CLIInternalError("{} Event Hub keys.".format(self.error_prefix))
         eventhub_topic_keys = eventhub_topic_keys_op.as_json()
 
         return EventHubEndpointProperties(
@@ -247,7 +247,7 @@ class EventHubEndpointBuilder(BaseEndpointBuilder):
             subscription=self.endpoint_subscription,
         )
         if not sb_namespace_op.success():
-            raise CLIError("{} EventHub Namespace.".format(self.error_prefix))
+            raise CLIInternalError("{} EventHub Namespace.".format(self.error_prefix))
         sb_namespace_meta = sb_namespace_op.as_json()
         sb_endpoint = sb_namespace_meta["serviceBusEndpoint"]
 
@@ -261,7 +261,7 @@ class EventHubEndpointBuilder(BaseEndpointBuilder):
         )
 
         if not sb_topic_op.success():
-            raise CLIError("{} EventHub.".format(self.error_prefix))
+            raise CLIInternalError("{} EventHub.".format(self.error_prefix))
 
         return EventHubEndpointProperties(
             endpoint_uri=transform_sb_hostname_to_schemauri(sb_endpoint),
