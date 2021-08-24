@@ -282,3 +282,12 @@ class TopicSpaceType(Enum):
     LowFanout = "LowFanout"
     HighFanout = "HighFanout"
     PublishOnly = "PublishOnly"
+
+
+class MQTTConnectVersionType(Enum):
+    """
+    Type of MQTT connect credentials format version.
+    """
+
+    v1 = "v1"
+    v2 = "v2"

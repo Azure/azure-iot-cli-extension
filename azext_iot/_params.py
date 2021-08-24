@@ -17,6 +17,7 @@ from azure.cli.core.commands.parameters import (
 )
 from azext_iot.common.shared import (
     EntityStatusType,
+    MQTTConnectVersionType,
     SettleType,
     DeviceAuthType,
     KeyType,
@@ -522,8 +523,9 @@ def load_arguments(self, _):
         )
         context.argument(
             "version",
+            arg_type=get_enum_type(MQTTConnectVersionType),
             options_list=["--format-version", "--fv"],
-            help="MQTT connect credentials format version to use when generating the credentials. Supported values: v1, v2.",
+            help="MQTT connect credentials format version to use when generating the credentials.",
         )
 
     with self.argument_context("iot hub device-identity parent set") as context:
@@ -601,8 +603,9 @@ def load_arguments(self, _):
             "topic_templates",
             nargs="*",
             options_list=["--topic-space-templates", "--templates"],
-            help="Space separated list of tokens which can be inline topic space template values, or"
-            " paths to files containing a json-formatted list of topic space template values.",
+            help="Space separated or json-formatted list of tokens which can be inline topic space "
+            "template values, or paths to json files containing a json-formatted list of topic space"
+            " template values.",
         )
         context.argument(
             "topic_type",

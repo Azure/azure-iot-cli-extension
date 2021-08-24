@@ -21,6 +21,7 @@ from azext_iot.constants import (
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import (
     DeviceAuthType,
+    MQTTConnectVersionType,
     SdkType,
     ProtocolType,
     ConfigType,
@@ -3487,7 +3488,7 @@ def iot_hub_device_identity_generate_mqtt_credentials(
     duration=3600,
     policy_name=None,
     product_info=None,
-    version="v2",
+    version=MQTTConnectVersionType.v2.value,
     resource_group_name=None,
     login=None,
     auth_type_dataplane=None,
@@ -3544,7 +3545,7 @@ def iot_hub_device_identity_generate_mqtt_credentials(
     client_id = f"{device_id}/{module_id}" if module_id else device_id
 
     # Version 2
-    if version == "v2":
+    if version == MQTTConnectVersionType.v2:
         api_version = "2021-06-30-preview"
         # Username
         username = "av={}&h={}&did={}&am={}&se={}&sa={}".format(
