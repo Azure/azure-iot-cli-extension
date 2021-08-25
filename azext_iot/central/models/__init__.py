@@ -19,5 +19,5 @@ __all__ = [
     "DeviceTwin",
     "TemplatePreview",
     "TemplateV1",
-    "RolePreview"
+    "RolePreview",
 ]

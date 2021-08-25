@@ -59,8 +59,10 @@ class TemplatePreview:
                 return {}
             return {}
         except Exception:
-            details = "Unable to extract schema for component from template '{}'.".format(
-                self.id
+            details = (
+                "Unable to extract schema for component from template '{}'.".format(
+                    self.id
+                )
             )
             raise CLIInternalError(details)
 
@@ -115,4 +117,6 @@ class TemplatePreview:
         ]
 
     def _get_interface_id(self, interface) -> list:
-        return interface["schema"]["@id"] if interface.get("@type") else interface["@id"]
+        return (
+            interface["schema"]["@id"] if interface.get("@type") else interface["@id"]
+        )

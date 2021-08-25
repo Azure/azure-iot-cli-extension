@@ -60,8 +60,10 @@ class TemplateV1:
                 return {}
             return {}
         except Exception:
-            details = "Unable to extract schema for component from template '{}'.".format(
-                self.id
+            details = (
+                "Unable to extract schema for component from template '{}'.".format(
+                    self.id
+                )
             )
             raise CLIInternalError(details)
 

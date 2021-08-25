@@ -30,7 +30,8 @@ def get_device_template(
         provider = CentralDeviceTemplateProviderV1(cmd=cmd, app_id=app_id, token=token)
 
     template = provider.get_device_template(
-        device_template_id=device_template_id, central_dns_suffix=central_dns_suffix,
+        device_template_id=device_template_id,
+        central_dns_suffix=central_dns_suffix,
     )
     return template.raw_template
 
@@ -115,5 +116,6 @@ def delete_device_template(
         provider = CentralDeviceTemplateProviderV1(cmd=cmd, app_id=app_id, token=token)
 
     return provider.delete_device_template(
-        device_template_id=device_template_id, central_dns_suffix=central_dns_suffix,
+        device_template_id=device_template_id,
+        central_dns_suffix=central_dns_suffix,
     )

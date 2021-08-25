@@ -5,7 +5,7 @@ steps:
     scriptSource: 'inline'
     script: |
       import json
-      with open("$(System.DefaultWorkingDirectory)/azext_iot/azext_metadata.json") as f:
+      with open("$(System.DefaultWorkingDirectory)/azext_iot/azext_metadata.json", encoding="utf-8") as f:
           metadata = json.load(f)
           version = metadata['azext.minCliCoreVersion']
           print('##vso[task.setvariable variable=min_cli_version]{}'.format(version))

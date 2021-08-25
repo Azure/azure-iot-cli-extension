@@ -97,7 +97,11 @@ def list_device_templates(
 
     pages_processed = 0
     while (max_pages == 0 or pages_processed < max_pages) and url:
-        response = requests.get(url, headers=headers, params=query_parameters if pages_processed == 0 else None)
+        response = requests.get(
+            url,
+            headers=headers,
+            params=query_parameters if pages_processed == 0 else None,
+        )
         result = _utility.try_extract_result(response)
 
         if "value" not in result:
@@ -105,11 +109,13 @@ def list_device_templates(
 
         if api_version == ApiVersion.preview.value:
             device_templates = device_templates + [
-                central_models.TemplatePreview(device_template) for device_template in result["value"]
+                central_models.TemplatePreview(device_template)
+                for device_template in result["value"]
             ]
         else:
             device_templates = device_templates + [
-                central_models.TemplateV1(device_template) for device_template in result["value"]
+                central_models.TemplateV1(device_template)
+                for device_template in result["value"]
             ]
 
         url = result.get("nextLink", None)

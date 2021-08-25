@@ -40,7 +40,9 @@ class CentralDeviceProviderPreview:
         self._device_registration_info = {}
 
     def get_device(
-        self, device_id, central_dns_suffix=CENTRAL_ENDPOINT,
+        self,
+        device_id,
+        central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> central_models.DevicePreview:
         # get or add to cache
         device = self._devices.get(device_id)
@@ -106,7 +108,11 @@ class CentralDeviceProviderPreview:
 
         return device
 
-    def delete_device(self, device_id, central_dns_suffix=CENTRAL_ENDPOINT,) -> dict:
+    def delete_device(
+        self,
+        device_id,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ) -> dict:
         if not device_id:
             raise RequiredArgumentMissingError("Device id must be specified.")
 
