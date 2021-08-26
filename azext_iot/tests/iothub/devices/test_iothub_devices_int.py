@@ -7,6 +7,7 @@
 from azext_iot.tests import IoTLiveScenarioTest
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_BASIC
 from azext_iot.tests.generators import generate_generic_id
+from azext_iot.common.utility import generate_key
 from azext_iot.tests.iothub import (
     DATAPLANE_AUTH_TYPES,
     PRIMARY_THUMBPRINT,
@@ -45,7 +46,26 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
                     self.exists("authentication.symmetricKey.secondaryKey"),
                 ]
 
-                # Symmetric key device creation
+                # Symmetric key device creation with custom keys
+                self.cmd(
+                    self.set_cmd_auth_type(
+                        f"iot hub device-identity create -d {device_ids[0]} -n {LIVE_HUB} -g {LIVE_RG} "
+                        f"--pk {generate_key()} --sk {generate_key()} {edge_enabled}",
+                        auth_type=auth_phase,
+                    ),
+                    checks=d0_device_checks,
+                )
+
+                # Delete device identity with custom symmetric keys
+                self.cmd(
+                    self.set_cmd_auth_type(
+                        f"iot hub device-identity delete -d {device_ids[0]} -n {LIVE_HUB} -g {LIVE_RG}",
+                        auth_type=auth_phase,
+                    ),
+                    checks=self.is_empty(),
+                )
+
+                # Symmetric key device creation with generated keys
                 self.cmd(
                     self.set_cmd_auth_type(
                         f"iot hub device-identity create -d {device_ids[0]} -n {LIVE_HUB} -g {LIVE_RG} {edge_enabled}",

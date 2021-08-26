@@ -8,8 +8,12 @@ Release History
 
 **IoT Central updates**
 
-* Adds support for listing devices
-* Adds support for listing device templates
+* Adds support for listing devices.
+* Adds support for listing device templates.
+
+**IoT Hub updates**
+
+* Device and module identity creation support usage of custom symmetric keys.
 
 0.10.15
 +++++++++++++++
