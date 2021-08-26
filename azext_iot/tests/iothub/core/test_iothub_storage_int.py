@@ -21,20 +21,12 @@ from azext_iot.tests import DEFAULT_CONTAINER
 from azure.cli.core._profile import Profile
 from azure.cli.core.mock import DummyCli
 
-opt_env_set = ENV_SET_TEST_IOTHUB_OPTIONAL + ["azext_iot_identity_teststorageid"]
-
 settings = DynamoSettings(
-    req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED, opt_env_set=opt_env_set
+    req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED, opt_env_set=ENV_SET_TEST_IOTHUB_OPTIONAL
 )
 LIVE_STORAGE_ACCOUNT = settings.env.azext_iot_teststorageaccount
-
-# Set this environment variable to enable identity-based integration tests
-# You will need permissions to add and remove role assignments for this storage account
-LIVE_STORAGE_RESOURCE_ID = settings.env.azext_iot_identity_teststorageid
 STORAGE_ROLE = "Storage Blob Data Contributor"
-
 CWD = os.path.dirname(os.path.abspath(__file__))
-
 user_managed_identity_name = generate_generic_id()
 
 
@@ -50,6 +42,12 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
         if LIVE_STORAGE_ACCOUNT:
             self.live_storage_uri = self.get_container_sas_url()
+
+            storage_account = self.cmd(
+                "storage account show --name {}".format(LIVE_STORAGE_ACCOUNT)
+            ).get_output_in_json()
+
+            self.live_storage_id = storage_account["id"]
 
     def get_container_sas_url(self):
         from datetime import datetime, timedelta
@@ -101,20 +99,20 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
     def assign_storage_role_if_needed(self, assignee):
 
-        role_assignments = self.get_role_assignments(LIVE_STORAGE_RESOURCE_ID, STORAGE_ROLE)
+        role_assignments = self.get_role_assignments(self.live_storage_id, STORAGE_ROLE)
         role_assignment_principal_ids = [assignment["principalId"] for assignment in role_assignments]
 
         if assignee not in role_assignment_principal_ids:
             if self.user["type"] == UserTypes.user.value:
                 self.cmd(
                     'role assignment create --assignee"{}" --role "{}" --scope "{}"'.format(
-                        assignee, STORAGE_ROLE, LIVE_STORAGE_RESOURCE_ID
+                        assignee, STORAGE_ROLE, self.live_storage_id
                     )
                 )
             elif self.user["type"] == UserTypes.servicePrincipal.value:
                 self.cmd(
                     'role assignment create --assignee-object-id {} --role "{}" --scope "{}" --assignee-principal-type {}'.format(
-                        assignee, STORAGE_ROLE, LIVE_STORAGE_RESOURCE_ID, "ServicePrincipal"
+                        assignee, STORAGE_ROLE, self.live_storage_id, "ServicePrincipal"
                     )
                 )
             else:
@@ -123,7 +121,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
             # ensure role assignment is complete
             while assignee not in role_assignment_principal_ids:
-                role_assignments = self.get_role_assignments(LIVE_STORAGE_RESOURCE_ID, STORAGE_ROLE)
+                role_assignments = self.get_role_assignments(self.live_storage_id, STORAGE_ROLE)
                 role_assignment_principal_ids = [assignment["principalId"] for assignment in role_assignments]
                 sleep(10)
 
@@ -214,8 +212,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
         )
 
     @pytest.mark.skipif(
-        not all([LIVE_STORAGE_RESOURCE_ID, LIVE_STORAGE_ACCOUNT]),
-        reason="azext_iot_identity_teststorageid and azext_iot_teststorageaccount env vars not set",
+        not LIVE_STORAGE_ACCOUNT, reason="azext_iot_teststorageaccount env var not set",
     )
     @pytest.mark.skipif(
         not ensure_iothub_sdk_min_version(IOTHUB_TRACK_2_SDK_MIN_VERSION),
@@ -286,7 +283,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
             # delete role assignment first, disabling identity removes the assignee ID from AAD
             self.cmd(
                 'role assignment delete --assignee "{}" --role "{}" --scope "{}"'.format(
-                    hub_id, STORAGE_ROLE, LIVE_STORAGE_RESOURCE_ID
+                    hub_id, STORAGE_ROLE, self.live_storage_id
                 )
             )
             self.cmd(
@@ -296,8 +293,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
             )
 
     @pytest.mark.skipif(
-        not all([LIVE_STORAGE_RESOURCE_ID, LIVE_STORAGE_ACCOUNT]),
-        reason="azext_iot_identity_teststorageid and azext_iot_teststorageaccount env vars not set",
+        not LIVE_STORAGE_ACCOUNT, reason="azext_iot_teststorageaccount env var not set",
     )
     @pytest.mark.skipif(
         not ensure_iothub_sdk_min_version(IOTHUB_TRACK_2_SDK_MIN_VERSION),
@@ -374,7 +370,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
             # delete role assignment first, disabling identity removes the assignee ID from AAD
             self.cmd(
                 'role assignment delete --assignee "{}" --role "{}" --scope "{}"'.format(
-                    identity_principal, STORAGE_ROLE, LIVE_STORAGE_RESOURCE_ID
+                    identity_principal, STORAGE_ROLE, self.live_storage_id
                 )
             )
             self.cmd(

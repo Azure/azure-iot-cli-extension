@@ -6,8 +6,7 @@
 
 import pprint
 from time import sleep
-from azext_iot.constants import USER_AGENT, BASE_MQTT_API_VERSION
-from azext_iot.common.utility import url_encode_str, ensure_azure_namespace_path
+from azext_iot.common.utility import ensure_azure_namespace_path
 
 
 class mqtt_client(object):
@@ -135,11 +134,3 @@ class mqtt_client(object):
 
         except Exception as x:
             raise x
-
-
-def build_mqtt_device_username(
-    entity, device_id
-):
-    return "{}/{}/?api-version={}&DeviceClientType={}".format(
-        entity, device_id, BASE_MQTT_API_VERSION, url_encode_str(USER_AGENT)
-    )

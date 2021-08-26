@@ -15,7 +15,6 @@ env =
     azext_iot_testrg=
     azext_iot_testhub=
     azext_iot_testdps=
-    azext_iot_identity_teststorageid=
     azext_iot_teststorageaccount=
     azext_iot_teststoragecontainer=
     azext_iot_central_app_id=

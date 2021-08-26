@@ -118,12 +118,13 @@ You can either manually set the environment variables or use the `pytest.ini.exa
     azext_iot_testrg="Resource Group that contains your IoT Hub"
     azext_iot_testhub="IoT Hub Name"
     azext_iot_testdps="IoT Hub DPS Name"
-    azext_iot_identity_teststorageid="Storage Account ID"
     azext_iot_teststorageaccount="Storage Account Name"
     azext_iot_teststoragecontainer="Blob container name"
 ```
 
-`azext_iot_identity_teststorageid` is optional and only required when you want to test Identity-Based device export and file upload functionality. During this test, your hub will be assigned a System-Assigned AAD identity, and will be granted the role of "Storage Blob Data Contributor" on the storage account you provide. Both the hub's identity and the RBAC role will be removed once the test completes.
+`azext_iot_teststorageaccount` is the storage account used for running iothub storage tests. Optional variable, specify only when you want to run storage tests. During these tests, your hub will be assigned a System-Assigned AAD identity, and will be granted the role of "Storage Blob Data Contributor" on the storage account you provide. Both the hub's identity and the RBAC role will be removed once the test completes.
+
+`azext_iot_teststoragecontainer` is the name of blob container belonging to the above mentioned storage account. Optional environment variable, defaults to 'devices' when not specified.
 
 ##### IoT Hub
 

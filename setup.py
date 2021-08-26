@@ -49,7 +49,7 @@ DEPENDENCIES = [
     "jsonschema==3.2.0",
     "importlib_metadata;python_version<'3.8'",
     "azure-iot-device~=2.5", 
-    "tqdm"
+    "tqdm~=4.62"
 ]
 EXTRAS = {"uamqp": ["uamqp~=1.2"]}
 
