@@ -45,7 +45,7 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
                 custom_secondary_key = generate_key()
                 self.cmd(
                     self.set_cmd_auth_type(
-                        f"iot hub device-identity create -d {device_ids[0]} -n {LIVE_HUB} -g {LIVE_RG} "
+                        f"iot hub device-identity create -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg} "
                         f"--pk {custom_primary_key} --sk {custom_secondary_key} {edge_enabled}",
                         auth_type=auth_phase,
                     ),
@@ -65,7 +65,7 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
                 # Delete device identity with custom symmetric keys
                 self.cmd(
                     self.set_cmd_auth_type(
-                        f"iot hub device-identity delete -d {device_ids[0]} -n {LIVE_HUB} -g {LIVE_RG}",
+                        f"iot hub device-identity delete -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg}",
                         auth_type=auth_phase,
                     ),
                     checks=self.is_empty(),
