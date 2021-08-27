@@ -10,6 +10,7 @@ from azext_iot.central.models.templatepreview import TemplatePreview
 from azext_iot.central.models.templatev1 import TemplateV1
 from azext_iot.central.models.deviceGroupPreview import DeviceGroupPreview
 from azext_iot.central.models.rolePreview import RolePreview
+from azext_iot.central.models.organizationPreview import OrganizationPreview
 
 
 __all__ = [
@@ -19,5 +20,6 @@ __all__ = [
     "DeviceTwin",
     "TemplatePreview",
     "TemplateV1",
-    "RolePreview"
+    "RolePreview",
+    "OrganizationPreview",
 ]

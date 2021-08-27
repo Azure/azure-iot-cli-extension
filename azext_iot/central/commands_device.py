@@ -52,6 +52,7 @@ def create_device(
     device_name=None,
     template=None,
     simulated=False,
+    organizations=None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
@@ -71,6 +72,7 @@ def create_device(
         device_name=device_name,
         template=template,
         simulated=simulated,
+        organizations=organizations,
         central_dns_suffix=central_dns_suffix,
     )
 
@@ -92,12 +94,18 @@ def delete_device(
 
 
 def registration_info(
-    cmd, app_id: str, device_id, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd,
+    app_id: str,
+    device_id,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     provider = CentralDeviceProviderV1(cmd=cmd, app_id=app_id, token=token)
 
     return provider.get_device_registration_info(
-        device_id=device_id, central_dns_suffix=central_dns_suffix, device_status=None,
+        device_id=device_id,
+        central_dns_suffix=central_dns_suffix,
+        device_status=None,
     )
 
 
@@ -151,7 +159,11 @@ def run_manual_failover(
 
 
 def run_manual_failback(
-    cmd, app_id: str, device_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd,
+    app_id: str,
+    device_id: str,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     provider = CentralDeviceProviderV1(cmd=cmd, app_id=app_id, token=token)
     return provider.run_manual_failback(
@@ -183,20 +195,36 @@ def get_command_history(
 
 
 def registration_summary(
-    cmd, app_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd,
+    app_id: str,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
 ):
-    provider = CentralDeviceProviderV1(cmd=cmd, app_id=app_id, token=token,)
+    provider = CentralDeviceProviderV1(
+        cmd=cmd,
+        app_id=app_id,
+        token=token,
+    )
     return provider.get_device_registration_summary(
         central_dns_suffix=central_dns_suffix,
     )
 
 
 def get_credentials(
-    cmd, app_id: str, device_id, token=None, central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd,
+    app_id: str,
+    device_id,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
 ):
-    provider = CentralDeviceProviderV1(cmd=cmd, app_id=app_id, token=token,)
+    provider = CentralDeviceProviderV1(
+        cmd=cmd,
+        app_id=app_id,
+        token=token,
+    )
     return provider.get_device_credentials(
-        device_id=device_id, central_dns_suffix=central_dns_suffix,
+        device_id=device_id,
+        central_dns_suffix=central_dns_suffix,
     )
 
 

@@ -38,7 +38,11 @@ class CentralDeviceProviderV1:
         self._device_credentials = {}
         self._device_registration_info = {}
 
-    def get_device(self, device_id, central_dns_suffix=CENTRAL_ENDPOINT,) -> DeviceV1:
+    def get_device(
+        self,
+        device_id,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ) -> DeviceV1:
 
         # get or add to cache
         device = self._devices.get(device_id)
@@ -58,7 +62,10 @@ class CentralDeviceProviderV1:
 
         return device
 
-    def list_devices(self, central_dns_suffix=CENTRAL_ENDPOINT,) -> List[DeviceV1]:
+    def list_devices(
+        self,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ) -> List[DeviceV1]:
         devices = central_services.device.list_devices(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -78,6 +85,7 @@ class CentralDeviceProviderV1:
         device_name=None,
         template=None,
         simulated=False,
+        organizations=None,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> DeviceV1:
         if not device_id:
@@ -94,6 +102,7 @@ class CentralDeviceProviderV1:
             template=template,
             simulated=simulated,
             token=self._token,
+            organizations=None,
             central_dns_suffix=central_dns_suffix,
             api_version=ApiVersion.v1.value,
         )
@@ -106,7 +115,11 @@ class CentralDeviceProviderV1:
 
         return device
 
-    def delete_device(self, device_id, central_dns_suffix=CENTRAL_ENDPOINT,) -> dict:
+    def delete_device(
+        self,
+        device_id,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ) -> dict:
         if not device_id:
             raise CLIError("Device id must be specified.")
 
@@ -128,7 +141,9 @@ class CentralDeviceProviderV1:
         return result
 
     def get_device_credentials(
-        self, device_id, central_dns_suffix=CENTRAL_ENDPOINT,
+        self,
+        device_id,
+        central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> dict:
         credentials = self._device_credentials.get(device_id)
 
@@ -167,7 +182,8 @@ class CentralDeviceProviderV1:
         device = self.get_device(device_id, central_dns_suffix)
         if device.device_status == DeviceStatus.provisioned:
             credentials = self.get_device_credentials(
-                device_id=device_id, central_dns_suffix=central_dns_suffix,
+                device_id=device_id,
+                central_dns_suffix=central_dns_suffix,
             )
             id_scope = credentials["idScope"]
             key = credentials["symmetricKey"]["primaryKey"]
@@ -279,7 +295,9 @@ class CentralDeviceProviderV1:
         )
 
     def run_manual_failback(
-        self, device_id: str, central_dns_suffix=CENTRAL_ENDPOINT,
+        self,
+        device_id: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         return central_services.device.run_manual_failback(
             cmd=self._cmd,
@@ -305,7 +323,10 @@ class CentralDeviceProviderV1:
         return filtered_dps_info
 
     def _is_interface_id_component(
-        self, device_id: str, interface_id: str, central_dns_suffix=CENTRAL_ENDPOINT,
+        self,
+        device_id: str,
+        interface_id: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> bool:
 
         current_device = self.get_device(device_id, central_dns_suffix)

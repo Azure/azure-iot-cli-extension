@@ -38,6 +38,7 @@ def load_central_help():
     _load_central_device_templates_help()
     _load_central_device_groups_help()
     _load_central_roles_help()
+    _load_central_organizations_help()
     _load_central_monitors_help()
     _load_central_command_help()
     _load_central_compute_device_key()
@@ -509,6 +510,41 @@ def _load_central_roles_help():
           az iot central role show
           --app-id {appid}
           --role-id {roleId}
+    """
+
+
+def _load_central_organizations_help():
+    helps[
+        "iot central organization"
+    ] = """
+        type: group
+        short-summary: Manage and configure IoT Central organizations
+    """
+
+    helps[
+        "iot central organization list"
+    ] = """
+        type: command
+        short-summary: Get the list of organizations for an IoT Central application.
+
+        examples:
+        - name: List organizations in an application
+          text: >
+            az iot central organization list
+            --app-id {appid}
+    """
+
+    helps[
+        "iot central organization show"
+    ] = """
+    type: command
+    short-summary: Get the details of a organization by ID
+    examples:
+      - name: Get details of organization
+        text: >
+          az iot central organization show
+          --app-id {appid}
+          --organization-id {organizationId}
     """
 
 

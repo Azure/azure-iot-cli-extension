@@ -159,6 +159,13 @@ def load_central_arguments(self, _):
             " A case-sensitive string (up to 128 characters long) of ASCII 7-bit alphanumeric characters plus"
             " certain special characters: - . + % _ # * ? ! ( ) , : = @ $ '",
         )
+        context.argument(
+            "organizations",
+            options_list=["--organizations", "--org"],
+            help="Assign the device to the specified organizations."
+            " Comma separated list of organization ids."
+            " Minimum supported version: 1.1-preview.",
+        )
     with self.argument_context("iot central device manual-failover") as context:
         context.argument(
             "ttl_minutes",
@@ -221,5 +228,5 @@ def load_central_arguments(self, _):
         context.argument(
             "role_id",
             options_list=["--role-id", "-r"],
-            help="Provide a unique identifier for the role"
+            help="Provide a unique identifier for the role",
         )
