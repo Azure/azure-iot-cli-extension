@@ -181,7 +181,7 @@ def load_arguments(self, _):
             "auth_method",
             options_list=["--auth-method", "--am"],
             arg_type=get_enum_type(DeviceAuthType),
-            help="The authorization type an entity is to be created with.",
+            help="The authorization method an entity is to be created with.",
         )
         context.argument(
             "metric_type",
@@ -259,14 +259,25 @@ def load_arguments(self, _):
             "primary_thumbprint",
             arg_group="X.509",
             options_list=["--primary-thumbprint", "--ptp"],
-            help="Explicit self-signed certificate thumbprint to use for primary key.",
+            help="Self-signed certificate thumbprint to use for the primary thumbprint.",
         )
         context.argument(
             "secondary_thumbprint",
             arg_group="X.509",
             options_list=["--secondary-thumbprint", "--stp"],
-            help="Explicit self-signed certificate thumbprint to "
-            "use for secondary key.",
+            help="Self-signed certificate thumbprint to use for the secondary thumbprint.",
+        )
+        context.argument(
+            "primary_key",
+            options_list=["--primary-key", "--pk"],
+            help="The primary symmetric shared access key stored in base64 format.",
+            arg_group="Symmetric Key",
+        )
+        context.argument(
+            "secondary_key",
+            options_list=["--secondary-key", "--sk"],
+            help="The secondary symmetric shared access key stored in base64 format.",
+            arg_group="Symmetric Key",
         )
         context.argument(
             "valid_days",
@@ -405,18 +416,6 @@ def load_arguments(self, _):
             "status_reason",
             options_list=["--status-reason", "--star"],
             help="Description for device status.",
-        )
-
-    with self.argument_context("iot hub device-identity update") as context:
-        context.argument(
-            "primary_key",
-            options_list=["--primary-key", "--pk"],
-            help="The primary symmetric shared access key stored in base64 format.",
-        )
-        context.argument(
-            "secondary_key",
-            options_list=["--secondary-key", "--sk"],
-            help="The secondary symmetric shared access key stored in base64 format.",
         )
 
     with self.argument_context("iot hub device-identity renew-key") as context:
