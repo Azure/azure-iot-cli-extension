@@ -103,20 +103,24 @@ def list_devices(
 
     pages_processed = 0
     while (max_pages == 0 or pages_processed < max_pages) and url:
-        response = requests.get(url, headers=headers, params=query_parameters if pages_processed == 0 else None)
+        response = requests.get(
+            url,
+            headers=headers,
+            params=query_parameters if pages_processed == 0 else None,
+        )
         result = _utility.try_extract_result(response)
 
         if "value" not in result:
             raise CLIError("Value is not present in body: {}".format(result))
 
         if api_version == ApiVersion.preview.value:
-            devices.extend([
-                central_models.DevicePreview(device) for device in result["value"]
-            ])
+            devices.extend(
+                [central_models.DevicePreview(device) for device in result["value"]]
+            )
         else:
-            devices.extend([
-                central_models.DeviceV1(device) for device in result["value"]
-            ])
+            devices.extend(
+                [central_models.DeviceV1(device) for device in result["value"]]
+            )
 
         url = result.get("nextLink", None)
         pages_processed = pages_processed + 1
@@ -125,7 +129,10 @@ def list_devices(
 
 
 def get_device_registration_summary(
-    cmd, app_id: str, token: str, central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd,
+    app_id: str,
+    token: str,
+    central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> dict:
     """
     Get device registration summary for a given app
@@ -179,6 +186,7 @@ def create_device(
     device_name: str,
     template: str,
     simulated: bool,
+    organizations: str,
     token: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
@@ -212,22 +220,17 @@ def create_device(
     query_parameters = {}
     query_parameters["api-version"] = api_version
 
+    payload = {
+        "displayName": device_name,
+        "simulated": simulated,
+        "enabled": True,
+    }
+    if template:
+        payload["template"] = template
+
     if api_version == ApiVersion.preview.value:
-        payload = {
-            "displayName": device_name,
-            "simulated": simulated,
-            "approved": True,
-        }
-        if template:
-            payload["instanceOf"] = template
-    else:
-        payload = {
-            "displayName": device_name,
-            "simulated": simulated,
-            "enabled": True,
-        }
-        if template:
-            payload["template"] = template
+        if organizations:
+            payload["organizations"] = organizations.split(",")
 
     response = requests.put(url, headers=headers, json=payload, params=query_parameters)
     result = _utility.try_extract_result(response)
@@ -525,7 +528,11 @@ def run_manual_failover(
 
 
 def run_manual_failback(
-    cmd, app_id: str, device_id: str, token: str, central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd,
+    app_id: str,
+    device_id: str,
+    token: str,
+    central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     """
     Execute a manual failback for device. Reverts the previously executed failover

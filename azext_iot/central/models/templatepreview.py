@@ -11,7 +11,7 @@ class TemplatePreview:
     def __init__(self, template: dict):
         self.raw_template = template
         try:
-            self.id = template.get("id")
+            self.id = template.get("@id")
             self.name = template.get("displayName")
             self.interfaces = self._extract_interfaces(template)
             self.schema_names = self._extract_schema_names(self.interfaces)
@@ -59,8 +59,10 @@ class TemplatePreview:
                 return {}
             return {}
         except Exception:
-            details = "Unable to extract schema for component from template '{}'.".format(
-                self.id
+            details = (
+                "Unable to extract schema for component from template '{}'.".format(
+                    self.id
+                )
             )
             raise CLIError(details)
 
@@ -81,11 +83,11 @@ class TemplatePreview:
             if dcm.get("contents"):
                 interfaces.append(self._extract_root_interface_contents(dcm))
 
-            if dcm.get("implements"):
-                interfaces.extend(dcm.get("implements"))
+            if dcm.get("extends"):
+                interfaces.extend(dcm.get("extends"))
 
             return {
-                self._get_interface_id(interface): self._extract_schemas(interface)
+                interface["@id"]: self._extract_schemas(interface)
                 for interface in interfaces
             }
         except:
@@ -113,6 +115,3 @@ class TemplatePreview:
             for interface, schema in self.schema_names.items()
             if property_name in schema
         ]
-
-    def _get_interface_id(self, interface) -> list:
-        return interface["schema"]["@id"] if interface.get("@type") else interface["@id"]

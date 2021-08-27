@@ -39,7 +39,9 @@ class CentralDeviceProviderPreview:
         self._device_registration_info = {}
 
     def get_device(
-        self, device_id, central_dns_suffix=CENTRAL_ENDPOINT,
+        self,
+        device_id,
+        central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> central_models.DevicePreview:
         # get or add to cache
         device = self._devices.get(device_id)
@@ -79,6 +81,7 @@ class CentralDeviceProviderPreview:
         device_name=None,
         template=None,
         simulated=False,
+        organizations=None,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> central_models.DevicePreview:
 
@@ -92,6 +95,7 @@ class CentralDeviceProviderPreview:
             device_name=device_name,
             template=template,
             simulated=simulated,
+            organizations=organizations,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
             api_version=ApiVersion.preview.value,
@@ -105,7 +109,11 @@ class CentralDeviceProviderPreview:
 
         return device
 
-    def delete_device(self, device_id, central_dns_suffix=CENTRAL_ENDPOINT,) -> dict:
+    def delete_device(
+        self,
+        device_id,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ) -> dict:
         if not device_id:
             raise CLIError("Device id must be specified.")
 

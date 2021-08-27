@@ -58,5 +58,5 @@ class ApiVersion(Enum):
     API version's supported
     """
 
-    preview = "preview"
+    preview = "1.1-preview"
     v1 = "1.0"
