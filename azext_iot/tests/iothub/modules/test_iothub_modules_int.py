@@ -6,6 +6,7 @@
 
 from azext_iot.tests import IoTLiveScenarioTest
 from time import sleep
+from azext_iot.common.utility import generate_key
 from azext_iot.tests.iothub import (
     DATAPLANE_AUTH_TYPES,
     PRIMARY_THUMBPRINT,
@@ -45,7 +46,38 @@ class TestIoTHubModules(IoTLiveScenarioTest):
                     self.exists("authentication.symmetricKey.secondaryKey"),
                 ]
 
-                # Create module identity with symmetric keys
+                # Module identity creation with custom symmetric keys
+                custom_primary_key = generate_key()
+                custom_secondary_key = generate_key()
+                self.cmd(
+                    self.set_cmd_auth_type(
+                        f"iot hub module-identity create --module-id {module_ids[0]} --device-id {device_ids[0]} "
+                        f"--hub-name {LIVE_HUB} --resource-group {LIVE_RG} --primary-key {custom_primary_key} "
+                        f"--secondary-key {custom_secondary_key}",
+                        auth_type=auth_phase,
+                    ),
+                    checks=m0_d0_checks + [
+                        self.check(
+                            "authentication.symmetricKey.primaryKey",
+                            custom_primary_key
+                        ),
+                        self.check(
+                            "authentication.symmetricKey.secondaryKey",
+                            custom_secondary_key,
+                        ),
+                    ],
+                )
+
+                # Delete module identity with custom symmetric keys.
+                self.cmd(
+                    self.set_cmd_auth_type(
+                        f"iot hub module-identity delete -m {module_ids[0]} -d {device_ids[0]} -n {LIVE_HUB} -g {LIVE_RG}",
+                        auth_type=auth_phase,
+                    ),
+                    checks=self.is_empty(),
+                )
+
+                # Create module identity with generated symmetric keys
                 self.cmd(
                     self.set_cmd_auth_type(
                         f"iot hub module-identity create --module-id {module_ids[0]} --device-id {device_ids[0]} "

@@ -141,6 +141,9 @@ helps[
 ] = """
     type: command
     short-summary: Create a device in an IoT Hub.
+    long-summary: |
+                  When using the auth method of shared_private_key (also known as symmetric keys),
+                  if no custom keys are provided the service will generate them for the device.
     examples:
     - name: Create an edge enabled IoT device with default authorization (shared private key).
       text: >
@@ -441,6 +444,9 @@ helps[
 ] = """
     type: command
     short-summary: Create a module on a target IoT device in an IoT Hub.
+    long-summary: |
+                  When using the auth method of shared_private_key (also known as symmetric keys),
+                  if no custom keys are provided the service will generate them for the module.
 """
 
 helps[
