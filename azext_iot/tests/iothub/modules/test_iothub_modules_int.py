@@ -71,7 +71,8 @@ class TestIoTHubModules(IoTLiveScenarioTest):
                 # Delete module identity with custom symmetric keys.
                 self.cmd(
                     self.set_cmd_auth_type(
-                        f"iot hub module-identity delete -m {module_ids[0]} -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg}",
+                        f"iot hub module-identity delete -m {module_ids[0]} -d {device_ids[0]} "
+                        f"-n {self.entity_name} -g {self.entity_rg}",
                         auth_type=auth_phase,
                     ),
                     checks=self.is_empty(),
