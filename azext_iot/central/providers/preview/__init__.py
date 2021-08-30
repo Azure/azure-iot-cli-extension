@@ -28,6 +28,9 @@ from azext_iot.central.providers.preview.organization_provider_preview import (
 from azext_iot.central.providers.preview.job_provider_preview import (
     CentralJobProviderPreview,
 )
+from azext_iot.central.providers.preview.fileupload_provider_preview import (
+    CentralFileUploadProviderPreview,
+)
 
 __all__ = [
     "CentralDeviceProviderPreview",
@@ -38,4 +41,5 @@ __all__ = [
     "CentralRoleProviderPreview",
     "CentralOrganizationProviderPreview",
     "CentralJobProviderPreview",
+    "CentralFileUploadProviderPreview",
 ]

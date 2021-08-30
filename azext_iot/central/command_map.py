@@ -23,6 +23,10 @@ central_device_groups_ops = CliCommandType(
 
 central_roles_ops = CliCommandType(operations_tmpl="azext_iot.central.commands_role#{}")
 
+central_file_uploads_ops = CliCommandType(
+    operations_tmpl="azext_iot.central.commands_file_upload#{}"
+)
+
 central_orgs_ops = CliCommandType(
     operations_tmpl="azext_iot.central.commands_organization#{}"
 )
@@ -136,6 +140,15 @@ def load_central_commands(self, _):
     ) as cmd_group:
         cmd_group.show_command("show", "get_role")
         cmd_group.command("list", "list_roles")
+
+    with self.command_group(
+        "iot central file-upload",
+        command_type=central_file_uploads_ops,
+        is_preview=True,
+    ) as cmd_group:
+        cmd_group.show_command("show", "get_fileupload")
+        cmd_group.show_command("delete", "delete_fileupload")
+        cmd_group.show_command("create", "create_fileupload")
 
     with self.command_group(
         "iot central organization", command_type=central_orgs_ops, is_preview=True

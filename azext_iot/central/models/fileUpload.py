@@ -4,27 +4,12 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from azext_iot.central.services import (
-    device,
-    device_template,
-    user,
-    api_token,
-    device_group,
-    role,
-    organization,
-    job,
-    file_upload
-)
 
-
-__all__ = [
-    "device",
-    "device_template",
-    "user",
-    "api_token",
-    "device_group",
-    "role",
-    "organization",
-    "job",
-    "file_upload"
-]
+class FileUploadPreview:
+    def __init__(self, fileupload: dict):
+        self.account = fileupload.get("account")
+        self.connection_string = fileupload.get("connectionString")
+        self.container = fileupload.get("container")
+        self.sasttl = fileupload.get("sasTtl")
+        self.state = fileupload.get("state")
+        pass

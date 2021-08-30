@@ -12,6 +12,7 @@ from azext_iot.central.models.deviceGroupPreview import DeviceGroupPreview
 from azext_iot.central.models.rolePreview import RolePreview
 from azext_iot.central.models.organizationPreview import OrganizationPreview
 from azext_iot.central.models.jobPreview import JobPreview
+from azext_iot.central.models.fileUpload import FileUploadPreview
 
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "RolePreview",
     "OrganizationPreview",
     "JobPreview",
+    "FileUploadPreview",
 ]

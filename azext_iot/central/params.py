@@ -231,6 +231,29 @@ def load_central_arguments(self, _):
             help="Provide a unique identifier for the role",
         )
 
+    with self.argument_context("iot central file-upload create") as context:
+        context.argument(
+            "connection_string",
+            options_list=["--connection-string", "-s"],
+            help="Provide the connection string used to configure the storage account",
+        )
+        context.argument(
+            "container",
+            options_list=["--container", "-c"],
+            help="Provide the name of the container inside the storage account",
+        )
+        context.argument(
+            "account",
+            options_list=["--account", "-a"],
+            help="The storage account name where to upload the file to",
+        )
+        context.argument(
+            "sasTtl",
+            options_list=["--sas-ttl"],
+            help="The amount of time the device’s request to upload a file is valid before it expires."
+            " ISO 8601 duration standard. Default 1h.",
+        )
+
     with self.argument_context("iot central job") as context:
         context.argument(
             "job_id",

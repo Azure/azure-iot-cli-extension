@@ -38,6 +38,7 @@ def load_central_help():
     _load_central_device_templates_help()
     _load_central_device_groups_help()
     _load_central_roles_help()
+    _load_central_file_uploads_help()
     _load_central_organizations_help()
     _load_central_jobs_help()
     _load_central_monitors_help()
@@ -476,6 +477,53 @@ def _load_central_device_groups_help():
           text: >
             az iot central device-group list
             --app-id {appid}
+    """
+
+
+def _load_central_file_uploads_help():
+    helps[
+        "iot central file-upload"
+    ] = """
+          type: group
+          short-summary: Manage and configure IoT Central file uploads
+      """
+
+    helps[
+        "iot central file-upload show"
+    ] = """
+    type: command
+    short-summary: Get the details of file upload storage account configuration
+    examples:
+      - name: Get details of file upload
+        text: >
+          az iot central file-upload show
+          --app-id {appid}
+    """
+
+    helps[
+        "iot central file-upload delete"
+    ] = """
+    type: command
+    short-summary: Delete file upload storage account configuration
+    examples:
+      - name: Delete file upload
+        text: >
+          az iot central file-upload delete
+          --app-id {appid}
+    """
+
+    helps[
+        "iot central file-upload create"
+    ] = """
+    type: command
+    short-summary: Create file upload storage account configuration
+    examples:
+      - name: Create file upload
+        text: >
+          az iot central file-upload create
+          --app-id {appid}
+          --connection-string {conn_string}
+          --container {container}
     """
 
 
