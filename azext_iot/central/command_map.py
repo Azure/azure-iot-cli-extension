@@ -153,6 +153,7 @@ def load_central_commands(self, _):
         cmd_group.command("stop", "stop_job")
         cmd_group.command("resume", "resume_job")
         cmd_group.command("get-devices", "get_job_devices")
+        cmd_group.command("rerun", "rerun_job")
 
     with self.command_group(
         "iot central device twin",

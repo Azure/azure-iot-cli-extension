@@ -227,6 +227,45 @@ def resume_job(
     return central_models.JobPreview(result)
 
 
+def rerun_job(
+    cmd,
+    app_id: str,
+    job_id: str,
+    rerun_id: str,
+    token: str,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.preview.value,
+) -> central_models.JobPreview:
+    """
+    Rerun a job on failed devices
+
+    Args:
+        cmd: command passed into az
+        job_id: unique case-sensitive job id,
+        rerun_id: unique case-sensitive rerun id,
+        app_id: name of app (used for forming request URL)
+        token: (OPTIONAL) authorization token to fetch job details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        job: dict
+    """
+
+    result = _call_job(
+        cmd=cmd,
+        method="put",
+        path="rerun/{}".format(rerun_id),
+        app_id=app_id,
+        job_id=job_id,
+        body=None,
+        token=token,
+        central_dns_suffix=central_dns_suffix,
+        api_version=api_version,
+    )
+    return central_models.JobPreview(result)
+
+
 def get_job_devices(
     cmd,
     app_id: str,

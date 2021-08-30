@@ -238,6 +238,13 @@ def load_central_arguments(self, _):
             help="Provide a unique identifier for the job.",
         )
 
+    with self.argument_context("iot central job rerun") as context:
+        context.argument(
+            "rerun_id",
+            options_list=["--rerun-id"],
+            help="Provide a unique identifier for the rerun.",
+        )
+
     with self.argument_context("iot central job create") as context:
         context.argument(
             "job_name",

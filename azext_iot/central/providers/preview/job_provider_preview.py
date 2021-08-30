@@ -112,6 +112,28 @@ class CentralJobProviderPreview:
 
         return job
 
+    def rerun_job(
+        self,
+        job_id,
+        rerun_id,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ) -> central_models.JobPreview:
+        # get or add to cache
+        job = central_services.job.rerun_job(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            job_id=job_id,
+            rerun_id=rerun_id,
+            token=self._token,
+            central_dns_suffix=central_dns_suffix,
+            api_version=ApiVersion.preview.value,
+        )
+
+        if not job:
+            raise CLIError("No job found with id: '{}'.".format(job_id))
+
+        return job
+
     def get_job_devices(self, job_id, central_dns_suffix=CENTRAL_ENDPOINT) -> List:
         devices = central_services.job.get_job_devices(
             cmd=self._cmd,

@@ -51,6 +51,22 @@ def resume_job(
     return provider.resume_job(job_id=job_id, central_dns_suffix=central_dns_suffix)
 
 
+def rerun_job(
+    cmd,
+    app_id: str,
+    job_id: str,
+    rerun_id: str,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.preview.value,
+):
+    provider = CentralJobProviderPreview(cmd=cmd, app_id=app_id, token=token)
+
+    return provider.rerun_job(
+        job_id=job_id, rerun_id=rerun_id, central_dns_suffix=central_dns_suffix
+    )
+
+
 def get_job_devices(
     cmd,
     app_id: str,
