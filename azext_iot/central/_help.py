@@ -626,6 +626,20 @@ def _load_central_jobs_help():
     """
 
     helps[
+        "iot central job rerun"
+    ] = """
+    type: command
+    short-summary: Rerun a job on failed devices
+    examples:
+      - name: Rerun a job
+        text: >
+          az iot central job rerun
+          --app-id {appid}
+          --job-id {jobId}
+          --rerun-id {rerunId}
+    """
+
+    helps[
         "iot central job get-devices"
     ] = """
     type: command
