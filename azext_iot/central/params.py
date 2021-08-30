@@ -230,3 +230,65 @@ def load_central_arguments(self, _):
             options_list=["--role-id", "-r"],
             help="Provide a unique identifier for the role",
         )
+
+    with self.argument_context("iot central job") as context:
+        context.argument(
+            "job_id",
+            options_list=["--job-id", "-j"],
+            help="Provide a unique identifier for the job.",
+        )
+
+    with self.argument_context("iot central job create") as context:
+        context.argument(
+            "job_name",
+            options_list=["--job-name"],
+            help="Display name of the job.",
+        )
+        context.argument(
+            "group_id",
+            options_list=["--group-id", "-g"],
+            help="Provide the ID of the device group on which to execute the job",
+        )
+        context.argument(
+            "content",
+            options_list=["--content", "-k"],
+            help="The job data definition. Provide path to JSON file or raw stringified JSON."
+            " [File Path Example:./path/to/file.json]"
+            " [Example of stringified JSON:[{<Job Data JSON>}]. The request body must contain array of JobData.",
+        )
+        context.argument(
+            "batch_percentage",
+            options_list=["--batch-percentage"],
+            default=False,
+            help="Specify if batching is done on a number of devices or a percentage of the total. Default: False",
+        )
+        context.argument(
+            "batch",
+            type=int,
+            options_list=["--batch"],
+            help="The number or percentage of devices on which batching is done.",
+        )
+        context.argument(
+            "threshold",
+            type=int,
+            options_list=["--threshold"],
+            help="The number or percentage of devices on which the cancellation threshold is applied.",
+        )
+        context.argument(
+            "threshold_percentage",
+            options_list=["--threshold-percentage"],
+            default=False,
+            help="Specify if cancellation threshold applies for a number of devices or a percentage of the total. Default: False",
+        )
+        context.argument(
+            "threshold_batch",
+            options_list=["--threshold-batch"],
+            default=False,
+            help="Whether the cancellation threshold applies per-batch or to the overall job. Default: False",
+        )
+        context.argument(
+            "description",
+            type=str,
+            options_list=["--description", "--desc"],
+            help="Detailed description of the job.",
+        )

@@ -23,6 +23,15 @@ class DeviceStatus(Enum):
     unassociated = "unassociated"
 
 
+class JobStatus(Enum):
+    """
+    Type of Job status.
+    """
+
+    running = "running"
+    starting = "starting"
+
+
 class Role(Enum):
     """
     Types of roles a user can have in Central (admin, builder, etc)

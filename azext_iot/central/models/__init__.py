@@ -11,6 +11,7 @@ from azext_iot.central.models.templatev1 import TemplateV1
 from azext_iot.central.models.deviceGroupPreview import DeviceGroupPreview
 from azext_iot.central.models.rolePreview import RolePreview
 from azext_iot.central.models.organizationPreview import OrganizationPreview
+from azext_iot.central.models.jobPreview import JobPreview
 
 
 __all__ = [
@@ -22,4 +23,5 @@ __all__ = [
     "TemplateV1",
     "RolePreview",
     "OrganizationPreview",
+    "JobPreview",
 ]

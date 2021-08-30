@@ -12,6 +12,7 @@ from azext_iot.central.services import (
     device_group,
     role,
     organization,
+    job,
 )
 
 
@@ -23,4 +24,5 @@ __all__ = [
     "device_group",
     "role",
     "organization",
+    "job",
 ]

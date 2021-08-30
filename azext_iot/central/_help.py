@@ -39,6 +39,7 @@ def load_central_help():
     _load_central_device_groups_help()
     _load_central_roles_help()
     _load_central_organizations_help()
+    _load_central_jobs_help()
     _load_central_monitors_help()
     _load_central_command_help()
     _load_central_compute_device_key()
@@ -545,6 +546,96 @@ def _load_central_organizations_help():
           az iot central organization show
           --app-id {appid}
           --organization-id {organizationId}
+    """
+
+
+def _load_central_jobs_help():
+    helps[
+        "iot central job"
+    ] = """
+        type: group
+        short-summary: Manage and configure IoT Central jobs
+    """
+
+    helps[
+        "iot central job list"
+    ] = """
+        type: command
+        short-summary: Get the list of jobs for an IoT Central application.
+
+        examples:
+        - name: List jobs in an application
+          text: >
+            az iot central job list
+            --app-id {appid}
+    """
+
+    helps[
+        "iot central job create"
+    ] = """
+    type: command
+    short-summary: Create and execute a job via its job definition
+    examples:
+      - name: Create a job
+        text: >
+          az iot central job create
+          --app-id {appid}
+          --job-id {jobId}
+          --group-id {groupId}
+          --job-name {jobName}
+          --content {creationJSONPath}
+    """
+
+    helps[
+        "iot central job show"
+    ] = """
+    type: command
+    short-summary: Get the details of a job by ID
+    examples:
+      - name: Get details of job
+        text: >
+          az iot central job show
+          --app-id {appid}
+          --job-id {jobId}
+    """
+
+    helps[
+        "iot central job stop"
+    ] = """
+    type: command
+    short-summary: Stop a running job
+    examples:
+      - name: Stop a job
+        text: >
+          az iot central job stop
+          --app-id {appid}
+          --job-id {jobId}
+    """
+
+    helps[
+        "iot central job resume"
+    ] = """
+    type: command
+    short-summary: Resume a stopped job
+    examples:
+      - name: Resume a job
+        text: >
+          az iot central job resume
+          --app-id {appid}
+          --job-id {jobId}
+    """
+
+    helps[
+        "iot central job get-devices"
+    ] = """
+    type: command
+    short-summary: Get job device statuses
+    examples:
+      - name: Get the list of individual device statuses by job ID
+        text: >
+          az iot central job get-devices
+          --app-id {appid}
+          --job-id {jobId}
     """
 
 

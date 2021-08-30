@@ -10,7 +10,6 @@ from azext_iot.central.providers.preview.device_provider_preview import (
 from azext_iot.central.providers.preview.device_template_provider_preview import (
     CentralDeviceTemplateProviderPreview,
 )
-
 from azext_iot.central.providers.preview.user_provider_preview import (
     CentralUserProviderPreview,
 )
@@ -26,6 +25,9 @@ from azext_iot.central.providers.preview.role_provider_preview import (
 from azext_iot.central.providers.preview.organization_provider_preview import (
     CentralOrganizationProviderPreview,
 )
+from azext_iot.central.providers.preview.job_provider_preview import (
+    CentralJobProviderPreview,
+)
 
 __all__ = [
     "CentralDeviceProviderPreview",
@@ -35,4 +37,5 @@ __all__ = [
     "CentralDeviceGroupProviderPreview",
     "CentralRoleProviderPreview",
     "CentralOrganizationProviderPreview",
+    "CentralJobProviderPreview",
 ]

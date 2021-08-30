@@ -27,6 +27,8 @@ central_orgs_ops = CliCommandType(
     operations_tmpl="azext_iot.central.commands_organization#{}"
 )
 
+central_jobs_ops = CliCommandType(operations_tmpl="azext_iot.central.commands_job#{}")
+
 central_device_twin_ops = CliCommandType(
     operations_tmpl="azext_iot.central.commands_device_twin#{}"
 )
@@ -141,6 +143,16 @@ def load_central_commands(self, _):
         cmd_group.show_command("show", "get_org")
         cmd_group.command("list", "list_orgs")
         cmd_group.command("create", "create_org")
+
+    with self.command_group(
+        "iot central job", command_type=central_jobs_ops, is_preview=True
+    ) as cmd_group:
+        cmd_group.show_command("show", "get_job")
+        cmd_group.command("list", "list_jobs")
+        cmd_group.command("create", "create_job")
+        cmd_group.command("stop", "stop_job")
+        cmd_group.command("resume", "resume_job")
+        cmd_group.command("get-devices", "get_job_devices")
 
     with self.command_group(
         "iot central device twin",
