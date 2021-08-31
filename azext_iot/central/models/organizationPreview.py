@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 class OrganizationPreview:
-    def __init__(self, device: dict):
-        self.display_name = device.get("displayName")
-        self.id = device.get("id")
+    def __init__(self, org: dict):
+        self.display_name = org.get("displayName")
+        self.id = org.get("id")
         pass

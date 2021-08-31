@@ -21,7 +21,10 @@ from azext_iot.central.providers.v1 import (
 )
 from azext_iot.central.providers.preview import (
     CentralDeviceGroupProviderPreview,
-    CentralRoleProviderPreview
+    CentralRoleProviderPreview,
+    CentralOrganizationProviderPreview,
+    CentralJobProviderPreview,
+    CentralFileUploadProviderPreview,
 )
 from azext_iot.central.models.devicetwin import DeviceTwin
 from azext_iot.central import models as central_models
@@ -207,7 +210,9 @@ class TestCentralDeviceProvider:
 
 class TestCentralDeviceGroupProvider:
     _device_groups = [
-        central_models.DeviceGroupPreview(group) for group in load_json(FileNames.central_device_group_file)]
+        central_models.DeviceGroupPreview(group)
+        for group in load_json(FileNames.central_device_group_file)
+    ]
 
     @mock.patch("azext_iot.central.services.device_group")
     def test_should_return_device_groups(self, mock_device_group_svc):
@@ -226,7 +231,9 @@ class TestCentralDeviceGroupProvider:
 
 class TestCentralRoleProvider:
     _roles = [
-        central_models.RolePreview(role) for role in load_json(FileNames.central_role_file)]
+        central_models.RolePreview(role)
+        for role in load_json(FileNames.central_role_file)
+    ]
 
     @mock.patch("azext_iot.central.services.role")
     def test_should_return_roles(self, mock_role_svc):
@@ -243,9 +250,7 @@ class TestCentralRoleProvider:
         assert set(roles) == set(map(lambda x: x.id, self._roles))
 
     @mock.patch("azext_iot.central.services.role")
-    def test_should_return_role(
-        self, mock_role_svc
-    ):
+    def test_should_return_role(self, mock_role_svc):
         # setup
         provider = CentralRoleProviderPreview(cmd=None, app_id=app_id)
         mock_role_svc.get_role.return_value = self._roles[0]
@@ -256,6 +261,92 @@ class TestCentralRoleProvider:
         # call counts should be at most 1 since the provider has a cache
         assert mock_role_svc.get_role.call_count == 1
         assert role.id == self._roles[0].id
+
+
+class TestCentralOrganizationProvider:
+    _orgs = [
+        central_models.OrganizationPreview(org)
+        for org in load_json(FileNames.central_organization_file)
+    ]
+
+    @mock.patch("azext_iot.central.services.organization")
+    def test_should_return_orgs(self, mock_org_svc):
+
+        # setup
+        provider = CentralOrganizationProviderPreview(cmd=None, app_id=app_id)
+        mock_org_svc.list_orgs.return_value = self._orgs
+
+        # act
+        orgs = provider.list_organizations()
+        # verify
+        # call counts should be at most 1 since the provider has a cache
+        assert mock_org_svc.list_orgs.call_count == 1
+        assert set(orgs) == set(map(lambda x: x.id, self._orgs))
+
+    @mock.patch("azext_iot.central.services.organization")
+    def test_should_return_org(self, mock_org_svc):
+        # setup
+        provider = CentralOrganizationProviderPreview(cmd=None, app_id=app_id)
+        mock_org_svc.get_org.return_value = self._orgs[0]
+
+        # act
+        org = provider.get_organization(self._orgs[0].id)
+        # verify
+        # call counts should be at most 1 since the provider has a cache
+        assert mock_org_svc.get_org.call_count == 1
+        assert org.id == self._orgs[0].id
+
+
+class TestCentralJobProvider:
+    _jobs = [
+        central_models.JobPreview(job) for job in load_json(FileNames.central_job_file)
+    ]
+
+    @mock.patch("azext_iot.central.services.job")
+    def test_should_return_jobs(self, mock_job_svc):
+
+        # setup
+        provider = CentralJobProviderPreview(cmd=None, app_id=app_id)
+        mock_job_svc.list_jobs.return_value = self._jobs
+
+        # act
+        jobs = provider.list_jobs()
+        # verify
+        # call counts should be at most 1 since the provider has a cache
+        assert mock_job_svc.list_jobs.call_count == 1
+        assert set(jobs) == set(map(lambda x: x.id, self._jobs))
+
+    @mock.patch("azext_iot.central.services.job")
+    def test_should_return_job(self, mock_job_svc):
+        # setup
+        provider = CentralJobProviderPreview(cmd=None, app_id=app_id)
+        mock_job_svc.get_job.return_value = self._jobs[0]
+
+        # act
+        job = provider.get_job(self._jobs[0].id)
+        # verify
+        # call counts should be at most 1 since the provider has a cache
+        assert mock_job_svc.get_job.call_count == 1
+        assert job.id == self._jobs[0].id
+
+
+class TestCentralFileuploadProvider:
+    _fileupload = central_models.FileUploadPreview(
+        load_json(FileNames.central_fileupload_file)
+    )
+
+    @mock.patch("azext_iot.central.services.file_upload")
+    def test_should_return_fileupload(self, mock_fileupload_svc):
+        # setup
+        provider = CentralFileUploadProviderPreview(cmd=None, app_id=app_id)
+        mock_fileupload_svc.get_fileupload.return_value = self._fileupload
+
+        # act
+        fileupload = provider.get_fileupload()
+        # verify
+        # call counts should be at most 1 since the provider has a cache
+        assert mock_fileupload_svc.get_fileupload.call_count == 1
+        assert fileupload.connection_string == self._fileupload.connection_string
 
 
 class TestCentralPropertyMonitor:
@@ -339,8 +430,8 @@ class TestCentralPropertyMonitor:
     ):
 
         # setup
-        mock_device_template_svc.get_device_template.return_value = central_models.TemplateV1(
-            self._duplicate_property_template
+        mock_device_template_svc.get_device_template.return_value = (
+            central_models.TemplateV1(self._duplicate_property_template)
         )
 
         monitor = PropertyMonitor(
@@ -354,7 +445,9 @@ class TestCentralPropertyMonitor:
         model = {"Model": "test_model"}
 
         issues = monitor._validate_payload_against_entities(
-            model, list(model.keys())[0], Severity.warning,
+            model,
+            list(model.keys())[0],
+            Severity.warning,
         )
 
         assert (
@@ -368,7 +461,9 @@ class TestCentralPropertyMonitor:
         version = {"OsName": "test_osName"}
 
         issues = monitor._validate_payload_against_entities(
-            version, list(version.keys())[0], Severity.warning,
+            version,
+            list(version.keys())[0],
+            Severity.warning,
         )
 
         assert len(issues) == 0
@@ -380,8 +475,8 @@ class TestCentralPropertyMonitor:
     ):
 
         # setup
-        mock_device_template_svc.get_device_template.return_value = central_models.TemplateV1(
-            self._duplicate_property_template
+        mock_device_template_svc.get_device_template.return_value = (
+            central_models.TemplateV1(self._duplicate_property_template)
         )
 
         monitor = PropertyMonitor(
@@ -396,7 +491,9 @@ class TestCentralPropertyMonitor:
         definition = {"definition": "test_definition"}
 
         issues = monitor._validate_payload_against_entities(
-            definition, list(definition.keys())[0], Severity.warning,
+            definition,
+            list(definition.keys())[0],
+            Severity.warning,
         )
 
         assert (
@@ -417,8 +514,8 @@ class TestCentralPropertyMonitor:
     ):
 
         # setup
-        mock_device_template_svc.get_device_template.return_value = central_models.TemplateV1(
-            self._duplicate_property_template
+        mock_device_template_svc.get_device_template.return_value = (
+            central_models.TemplateV1(self._duplicate_property_template)
         )
 
         monitor = PropertyMonitor(
@@ -433,7 +530,9 @@ class TestCentralPropertyMonitor:
         definition = {"definition": "test_definition"}
 
         issues = monitor._validate_payload_against_entities(
-            definition, list(definition.keys())[0], Severity.info,
+            definition,
+            list(definition.keys())[0],
+            Severity.info,
         )
 
         assert (
@@ -450,7 +549,9 @@ class TestCentralPropertyMonitor:
 
         # severity level error
         issues = monitor._validate_payload_against_entities(
-            definition, list(definition.keys())[0], Severity.error,
+            definition,
+            list(definition.keys())[0],
+            Severity.error,
         )
 
         assert len(issues) == 0
@@ -462,8 +563,8 @@ class TestCentralPropertyMonitor:
     ):
 
         # setup
-        mock_device_template_svc.get_device_template.return_value = central_models.TemplateV1(
-            self._duplicate_property_template
+        mock_device_template_svc.get_device_template.return_value = (
+            central_models.TemplateV1(self._duplicate_property_template)
         )
 
         monitor = PropertyMonitor(
@@ -481,7 +582,9 @@ class TestCentralPropertyMonitor:
         }
 
         issues = monitor._validate_payload_against_entities(
-            definition, list(definition.keys())[0], Severity.warning,
+            definition,
+            list(definition.keys())[0],
+            Severity.warning,
         )
 
         assert (
@@ -496,7 +599,6 @@ class TestCentralPropertyMonitor:
 
 
 class TestFailover:
-
     @pytest.fixture
     def service_client(
         self, mocked_response, fixture_cmd, fixture_get_iot_central_tokens
@@ -504,7 +606,9 @@ class TestFailover:
 
         mocked_response.add(
             method=responses.POST,
-            url="https://myapp.azureiotcentral.com/system/iothub/devices/{}/manual-failover".format(device_id),
+            url="https://myapp.azureiotcentral.com/system/iothub/devices/{}/manual-failover".format(
+                device_id
+            ),
             body=json.dumps(success_resp),
             status=200,
             content_type="application/json",
@@ -513,22 +617,23 @@ class TestFailover:
 
         yield mocked_response
 
-    def test_should_run_manual_failover(
-        self, service_client
-    ):
+    def test_should_run_manual_failover(self, service_client):
         # act
-        result = commands_device.run_manual_failover(fixture_cmd, app_id, device_id, ttl_minutes=10, token="Shared sig")
+        result = commands_device.run_manual_failover(
+            fixture_cmd, app_id, device_id, ttl_minutes=10, token="Shared sig"
+        )
         # assert
         assert result == success_resp
 
     def test_should_fail_negative_ttl(self):
         with pytest.raises(CLIError):
             # act
-            commands_device.run_manual_failover(fixture_cmd, app_id, device_id, ttl_minutes=-10, token="Shared sig")
+            commands_device.run_manual_failover(
+                fixture_cmd, app_id, device_id, ttl_minutes=-10, token="Shared sig"
+            )
 
 
 class TestFailback:
-
     @pytest.fixture
     def service_client(
         self, mocked_response, fixture_cmd, fixture_get_iot_central_tokens
@@ -536,7 +641,9 @@ class TestFailback:
 
         mocked_response.add(
             method=responses.POST,
-            url="https://myapp.azureiotcentral.com/system/iothub/devices/{}/manual-failback".format(device_id),
+            url="https://myapp.azureiotcentral.com/system/iothub/devices/{}/manual-failback".format(
+                device_id
+            ),
             body=json.dumps(success_resp),
             status=200,
             content_type="application/json",
@@ -545,10 +652,10 @@ class TestFailback:
 
         yield mocked_response
 
-    def test_should_run_manual_failover(
-        self, service_client
-    ):
+    def test_should_run_manual_failover(self, service_client):
         # act
-        result = commands_device.run_manual_failback(fixture_cmd, app_id, device_id, token="Shared sig")
+        result = commands_device.run_manual_failback(
+            fixture_cmd, app_id, device_id, token="Shared sig"
+        )
         # assert
         assert result == success_resp
