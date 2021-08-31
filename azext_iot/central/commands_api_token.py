@@ -27,7 +27,9 @@ def add_api_token(
         provider = CentralApiTokenProviderV1(cmd=cmd, app_id=app_id, token=token)
 
     return provider.add_api_token(
-        token_id=token_id, role=Role[role], central_dns_suffix=central_dns_suffix,
+        token_id=token_id,
+        role=Role[role],
+        central_dns_suffix=central_dns_suffix,
     )
 
 
@@ -62,7 +64,8 @@ def get_api_token(
         provider = CentralApiTokenProviderV1(cmd=cmd, app_id=app_id, token=token)
 
     return provider.get_api_token(
-        token_id=token_id, central_dns_suffix=central_dns_suffix,
+        token_id=token_id,
+        central_dns_suffix=central_dns_suffix,
     )
 
 
@@ -80,5 +83,6 @@ def delete_api_token(
         provider = CentralApiTokenProviderV1(cmd=cmd, app_id=app_id, token=token)
 
     return provider.delete_api_token(
-        token_id=token_id, central_dns_suffix=central_dns_suffix,
+        token_id=token_id,
+        central_dns_suffix=central_dns_suffix,
     )

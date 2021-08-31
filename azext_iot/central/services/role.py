@@ -101,16 +101,14 @@ def list_roles(
             url,
             headers=headers,
             params=query_parameters,
-            verify=not should_disable_connection_verify()
+            verify=not should_disable_connection_verify(),
         )
         result = _utility.try_extract_result(response)
 
         if "value" not in result:
             raise CLIError("Value is not present in body: {}".format(result))
 
-        roles.extend([
-            central_models.RolePreview(role) for role in result["value"]
-        ])
+        roles.extend([central_models.RolePreview(role) for role in result["value"]])
 
         url = result.get("nextLink", None)
         pages_processed = pages_processed + 1

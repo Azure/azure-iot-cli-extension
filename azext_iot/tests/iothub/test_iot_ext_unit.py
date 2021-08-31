@@ -55,6 +55,8 @@ mock_target["cs"] = generate_cs()
 def generate_device_create_req(
     ee=False,
     auth="shared_private_key",
+    pk=None,
+    sk=None,
     ptp="123",
     stp="321",
     status="enabled",
@@ -68,6 +70,8 @@ def generate_device_create_req(
         "hub_name": mock_target["entity"],
         "ee": ee,
         "auth": auth,
+        "pk": pk,
+        "sk": sk,
         "ptp": ptp,
         "stp": stp,
         "status": status,
@@ -88,6 +92,7 @@ class TestDeviceCreate:
         "req",
         [
             (generate_device_create_req()),
+            (generate_device_create_req(pk=generate_generic_id(), sk=generate_generic_id())),
             (generate_device_create_req(ee=True)),
             (generate_device_create_req(ee=True, auth="x509_ca")),
             (generate_device_create_req(ee=True, auth="x509_thumbprint")),
@@ -110,6 +115,8 @@ class TestDeviceCreate:
             req["hub_name"],
             req["ee"],
             req["auth"],
+            req["pk"],
+            req["sk"],
             req["ptp"],
             req["stp"],
             req["status"],
@@ -132,6 +139,11 @@ class TestDeviceCreate:
 
         if req["auth"] == "shared_private_key":
             assert body["authentication"]["type"] == DeviceAuthApiType.sas.value
+            if all([req["pk"], req["pk"]]):
+                assert body["authentication"]["symmetricKey"]["primaryKey"] == req["pk"]
+                assert body["authentication"]["symmetricKey"]["secondaryKey"] == req["sk"]
+            else:
+                assert body["authentication"]["symmetricKey"] == {}
         elif req["auth"] == "x509_ca":
             assert body["authentication"]["type"] == DeviceAuthApiType.certificateAuthority.value
             assert not body["authentication"].get("x509Thumbprint")
@@ -150,13 +162,15 @@ class TestDeviceCreate:
         [
             (
                 generate_device_create_req(ee=True, auth="x509_thumbprint", ptp=None),
-                ValueError,
+                CLIError,
             ),
-            (generate_device_create_req(auth="doesnotexist"), ValueError),
+            (generate_device_create_req(auth="doesnotexist"), CLIError),
             (
                 generate_device_create_req(auth="x509_thumbprint", ptp=None, stp=""),
-                ValueError,
+                CLIError,
             ),
+            (generate_device_create_req(pk=generate_generic_id()), CLIError),
+            (generate_device_create_req(sk=generate_generic_id()), CLIError)
         ],
     )
     def test_device_create_invalid_args(self, serviceclient, req, exp):
@@ -167,6 +181,8 @@ class TestDeviceCreate:
                 req["hub_name"],
                 req["ee"],
                 req["auth"],
+                req["pk"],
+                req["sk"],
                 req["ptp"],
                 req["stp"],
                 req["status"],
@@ -181,6 +197,8 @@ class TestDeviceCreate:
                 req["hub_name"],
                 req["ee"],
                 req["auth"],
+                req["pk"],
+                req["sk"],
                 req["ptp"],
                 req["stp"],
                 req["status"],
@@ -683,9 +701,9 @@ class TestDeviceList:
 
 
 def generate_module_create_req(
-    mid=module_id, auth="shared_private_key", ptp="123", stp="321", **kwargs
+    mid=module_id, **kwargs
 ):
-    r = generate_device_create_req(auth=auth, ptp=ptp, stp=stp, **kwargs)
+    r = generate_device_create_req(**kwargs)
     r["module_id"] = mid
     return r
 
@@ -701,6 +719,7 @@ class TestDeviceModuleCreate:
         "req",
         [
             (generate_module_create_req(auth="shared_private_key")),
+            (generate_module_create_req(pk=generate_generic_id(), sk=generate_generic_id())),
             (generate_module_create_req(auth="x509_ca")),
             (generate_module_create_req(auth="x509_thumbprint")),
             (generate_module_create_req(auth="x509_thumbprint", stp=None)),
@@ -718,6 +737,8 @@ class TestDeviceModuleCreate:
             hub_name=req["hub_name"],
             module_id=req["module_id"],
             auth_method=req["auth"],
+            primary_key=req["pk"],
+            secondary_key=req["sk"],
             primary_thumbprint=req["ptp"],
             secondary_thumbprint=req["stp"],
             valid_days=req.get("valid_days"),
@@ -738,6 +759,11 @@ class TestDeviceModuleCreate:
 
         if req["auth"] == "shared_private_key":
             assert body["authentication"]["type"] == DeviceAuthApiType.sas.value
+            if all([req["pk"], req["pk"]]):
+                assert body["authentication"]["symmetricKey"]["primaryKey"] == req["pk"]
+                assert body["authentication"]["symmetricKey"]["secondaryKey"] == req["sk"]
+            else:
+                assert body["authentication"]["symmetricKey"] == {}
         elif req["auth"] == "x509_ca":
             assert body["authentication"]["type"] == DeviceAuthApiType.certificateAuthority.value
             assert not body["authentication"].get("x509Thumbprint")
@@ -750,6 +776,35 @@ class TestDeviceModuleCreate:
                 assert x509tp.get("secondaryThumbprint") is None
             else:
                 assert x509tp["secondaryThumbprint"] == req["stp"]
+
+    @pytest.mark.parametrize(
+        "req, exp",
+        [
+            (
+                generate_module_create_req(ee=True, auth="x509_thumbprint", ptp=None),
+                CLIError,
+            ),
+            (generate_module_create_req(auth="doesnotexist"), CLIError),
+            (
+                generate_module_create_req(auth="x509_thumbprint", ptp=None, stp=""),
+                CLIError,
+            ),
+            (generate_module_create_req(pk=generate_generic_id()), CLIError),
+            (generate_module_create_req(sk=generate_generic_id()), CLIError)
+        ],
+    )
+    def test_device_module_create_invalid_args(self, serviceclient, req, exp):
+        with pytest.raises(exp):
+            subject.iot_device_module_create(
+                fixture_cmd,
+                device_id=req["device_id"],
+                module_id=req["module_id"],
+                hub_name=req["hub_name"],
+                auth_method=req["auth"],
+                primary_key=req["pk"],
+                secondary_key=req["sk"],
+                primary_thumbprint=req["ptp"],
+            )
 
     @pytest.mark.parametrize("req", [(generate_module_create_req())])
     def test_device_module_create_error(self, serviceclient_generic_error, req):

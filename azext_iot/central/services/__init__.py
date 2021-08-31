@@ -13,7 +13,7 @@ from azext_iot.central.services import (
     role,
     organization,
     job,
-    file_upload
+    file_upload,
 )
 
 
@@ -26,5 +26,5 @@ __all__ = [
     "role",
     "organization",
     "job",
-    "file_upload"
+    "file_upload",
 ]

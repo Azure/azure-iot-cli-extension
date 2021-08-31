@@ -275,7 +275,7 @@ def _process_models_directory(from_directory):
 
 
 def _read_certificate_from_file(certificate_path):
-    with open(file=certificate_path, mode="rb") as f:
+    with open(file=certificate_path, mode="rb", encoding="utf-8") as f:
         data = f.read()
 
         from base64 import b64encode  # pylint: disable=no-name-in-module
