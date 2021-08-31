@@ -6,10 +6,13 @@
 
 
 from typing import List
-
-from azure.cli.core.azclierror import BadRequestError, RequiredArgumentMissingError, ResourceNotFoundError
-from azext_iot.central.models.devicePreview import DevicePreview
 from knack.log import get_logger
+from azure.cli.core.azclierror import (
+    ClientRequestError,
+    RequiredArgumentMissingError,
+    ResourceNotFoundError,
+)
+from azext_iot.central.models.devicePreview import DevicePreview
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.enum import DeviceStatus, ApiVersion
@@ -86,7 +89,7 @@ class CentralDeviceProviderPreview:
     ) -> central_models.DevicePreview:
 
         if device_id in self._devices:
-            raise BadRequestError("Device already exists.")
+            raise ClientRequestError("Device already exists.")
 
         device = central_services.device.create_device(
             cmd=self._cmd,

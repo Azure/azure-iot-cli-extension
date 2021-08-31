@@ -4,6 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import os
+from knack.log import get_logger
 from azure.cli.core.azclierror import (
     ArgumentUsageError,
     FileOperationError,
@@ -12,8 +14,6 @@ from azure.cli.core.azclierror import (
 from azext_iot.product.providers.aics import AICSProvider
 from azext_iot.sdk.product.models import DeviceTestSearchOptions
 from azext_iot.product.shared import BadgeType, AttestationType, ValidationType
-from knack.log import get_logger
-import os
 
 logger = get_logger(__name__)
 

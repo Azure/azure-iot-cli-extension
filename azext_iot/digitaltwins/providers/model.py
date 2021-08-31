@@ -5,12 +5,11 @@
 # --------------------------------------------------------------------------------------------
 
 import json
-
+from knack.log import get_logger
 from azure.cli.core.azclierror import ForbiddenError, RequiredArgumentMissingError
 from azext_iot.common.utility import process_json_arg, handle_service_exception, scantree
 from azext_iot.digitaltwins.providers.base import DigitalTwinsProvider
 from azext_iot.sdk.digitaltwins.dataplane.models import ErrorResponseException
-from knack.log import get_logger
 
 logger = get_logger(__name__)
 

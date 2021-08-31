@@ -6,6 +6,8 @@
 
 from os.path import exists, basename
 from time import time, sleep
+from knack.log import get_logger
+from enum import Enum, EnumMeta
 from azure.cli.core.azclierror import (
     ArgumentUsageError,
     CLIInternalError,
@@ -17,8 +19,6 @@ from azure.cli.core.azclierror import (
     ResourceNotFoundError,
     ValidationError,
 )
-from knack.log import get_logger
-from enum import Enum, EnumMeta
 from azext_iot.constants import (
     EXTENSION_ROOT,
     DEVICE_DEVICESCOPE_PREFIX,
@@ -186,7 +186,7 @@ def iot_device_create(
     if any([valid_days, output_dir]):
         valid_days = 365 if not valid_days else int(valid_days)
         if output_dir and not exists(output_dir):
-            raise InvalidArgumentValueError(
+            raise FileOperationError(
                 "certificate output directory of '{}' does not exist.".format(
                     output_dir
                 )

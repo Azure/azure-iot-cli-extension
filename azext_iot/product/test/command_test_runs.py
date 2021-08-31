@@ -5,7 +5,6 @@
 # --------------------------------------------------------------------------------------------
 
 from time import sleep
-
 from azure.cli.core.azclierror import ResourceNotFoundError
 from azext_iot.product.providers.aics import AICSProvider
 from azext_iot.product.shared import DeviceTestTaskStatus as Status

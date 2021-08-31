@@ -5,8 +5,10 @@
 # --------------------------------------------------------------------------------------------
 
 from typing import List
-
-from azure.cli.core.azclierror import RequiredArgumentMissingError, ResourceNotFoundError
+from azure.cli.core.azclierror import (
+    RequiredArgumentMissingError,
+    ResourceNotFoundError,
+)
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.enum import ApiVersion

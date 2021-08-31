@@ -5,10 +5,13 @@
 # --------------------------------------------------------------------------------------------
 # Nothing in this file should be used outside of service/central
 
-from azure.cli.core.azclierror import AzureResponseError, CLIInternalError
 from requests import Response
 from knack.log import logging
 
+from azure.cli.core.azclierror import (
+    AzureResponseError,
+    CLIInternalError,
+)
 from azext_iot import constants
 from azext_iot.common import auth
 

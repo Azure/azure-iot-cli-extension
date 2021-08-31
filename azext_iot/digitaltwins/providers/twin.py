@@ -5,7 +5,6 @@
 # --------------------------------------------------------------------------------------------
 
 import json
-
 from azure.cli.core.azclierror import InvalidArgumentValueError
 from azext_iot.digitaltwins.providers.base import (
     DigitalTwinsProvider,

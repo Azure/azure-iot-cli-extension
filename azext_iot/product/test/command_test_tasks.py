@@ -5,8 +5,11 @@
 # --------------------------------------------------------------------------------------------
 
 from time import sleep
-
-from azure.cli.core.azclierror import CLIInternalError, RequiredArgumentMissingError, ClientRequestError
+from azure.cli.core.azclierror import (
+    CLIInternalError,
+    RequiredArgumentMissingError,
+    ClientRequestError,
+)
 from azext_iot.product.shared import TaskType, DeviceTestTaskStatus as Status
 from azext_iot.product.providers.aics import AICSProvider
 

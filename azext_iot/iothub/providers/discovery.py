@@ -4,8 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from azure.cli.core.azclierror import ResourceNotFoundError
 from knack.log import get_logger
+from azure.cli.core.azclierror import ResourceNotFoundError, ClientRequestError
 from azure.cli.core.commands.client_factory import get_subscription_id
 from azext_iot.common.utility import trim_from_start, ensure_iothub_sdk_min_version
 from azext_iot.common.shared import AuthenticationTypeDataplane
@@ -15,8 +15,6 @@ from azext_iot.constants import IOTHUB_TRACK_2_SDK_MIN_VERSION
 from typing import Dict, List
 from types import SimpleNamespace
 from enum import Enum, EnumMeta
-
-from msrest.exceptions import ClientRequestError
 
 PRIVILEDGED_ACCESS_RIGHTS_SET = set(
     ["RegistryWrite", "ServiceConnect", "DeviceConnect"]

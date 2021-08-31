@@ -11,18 +11,6 @@ utility: Defines common utility functions and components.
 
 import ast
 import base64
-
-from azure.cli.core.azclierror import (
-    AzureInternalError,
-    AzureResponseError,
-    BadRequestError,
-    CLIInternalError,
-    FileOperationError,
-    ForbiddenError,
-    InvalidArgumentValueError,
-    ResourceNotFoundError,
-    UnauthorizedError,
-)
 import isodate
 import json
 import os
@@ -34,6 +22,11 @@ import hashlib
 from threading import Event, Thread
 from datetime import datetime
 from knack.log import get_logger
+from azure.cli.core.azclierror import (
+    CLIInternalError,
+    FileOperationError,
+    InvalidArgumentValueError,
+)
 from azext_iot.constants import IOTHUB_MGMT_SDK_PACKAGE_NAME
 
 logger = get_logger(__name__)
@@ -364,6 +357,14 @@ def unpack_msrest_error(e):
 
 
 def handle_service_exception(e):
+    from azure.cli.core.azclierror import (
+        AzureInternalError,
+        AzureResponseError,
+        BadRequestError,
+        ForbiddenError,
+        ResourceNotFoundError,
+        UnauthorizedError,
+    )
     op_status = None
     err = unpack_msrest_error(e)
     try:

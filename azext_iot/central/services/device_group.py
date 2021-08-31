@@ -6,11 +6,11 @@
 # This is largely derived from https://docs.microsoft.com/en-us/rest/api/iotcentral/deviceGroups
 
 from typing import List
-from azure.cli.core.azclierror import AzureResponseError
 import requests
 
 from knack.log import get_logger
 
+from azure.cli.core.azclierror import AzureResponseError
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
 from azext_iot.central import models as central_models

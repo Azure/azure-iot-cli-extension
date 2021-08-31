@@ -5,10 +5,14 @@
 # --------------------------------------------------------------------------------------------
 
 from typing import List
-
-from azure.cli.core.azclierror import BadRequestError, CLIInternalError, RequiredArgumentMissingError, ResourceNotFoundError
-from azext_iot.central.models.devicev1 import DeviceV1
 from knack.log import get_logger
+from azure.cli.core.azclierror import (
+    ClientRequestError,
+    CLIInternalError,
+    RequiredArgumentMissingError,
+    ResourceNotFoundError,
+)
+from azext_iot.central.models.devicev1 import DeviceV1
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.enum import DeviceStatus, ApiVersion
@@ -92,7 +96,7 @@ class CentralDeviceProviderV1:
             raise RequiredArgumentMissingError("Device id must be specified.")
 
         if device_id in self._devices:
-            raise BadRequestError("Device already exists.")
+            raise ClientRequestError("Device already exists.")
 
         device = central_services.device.create_device(
             cmd=self._cmd,

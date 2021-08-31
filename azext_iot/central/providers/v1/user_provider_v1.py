@@ -4,9 +4,9 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from azure.cli.core.azclierror import RequiredArgumentMissingError
 from knack.log import get_logger
 
+from azure.cli.core.azclierror import RequiredArgumentMissingError
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.enum import Role, ApiVersion

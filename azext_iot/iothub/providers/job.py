@@ -6,8 +6,12 @@
 
 from time import sleep
 from datetime import datetime, timedelta
-from azure.cli.core.azclierror import CLIInternalError, InvalidArgumentValueError, RequiredArgumentMissingError
 from knack.log import get_logger
+from azure.cli.core.azclierror import (
+    CLIInternalError,
+    InvalidArgumentValueError,
+    RequiredArgumentMissingError,
+)
 from azext_iot.common.shared import SdkType, JobStatusType, JobType, JobVersionType
 from azext_iot.common.utility import handle_service_exception, process_json_arg
 from azext_iot.operations.generic import _execute_query, _process_top
