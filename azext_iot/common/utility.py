@@ -180,7 +180,7 @@ def read_file_content(file_path, allow_binary=False):
 
     if allow_binary:
         try:
-            with open(file_path, "rb", encoding="utf-8") as input_file:
+            with open(file_path, "rb") as input_file:
                 logger.debug("Attempting to read file %s as binary", file_path)
                 return base64.b64encode(input_file.read()).decode("utf-8")
         except Exception:  # pylint: disable=broad-except
