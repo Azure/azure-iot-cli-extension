@@ -3,6 +3,19 @@
 Release History
 ===============
 
+0.11.0
++++++++++++++++
+
+**IoT Central updates**
+
+* Adds preview commands (v1.1-preview).
+* Adds x-ms-client-request-id header for each request
+
+**Breaking Changes**
+
+* `az iot central device-template show` for preview version now returns DTDLV2 models.
+  This means that some model keys differ from previous deprecated preview version.
+
 0.10.16
 +++++++++++++++
 
