@@ -11,6 +11,7 @@ from knack.log import logging
 
 from azext_iot import constants
 from azext_iot.common import auth
+import uuid
 
 
 def get_headers(token, cmd, has_json_payload=False):
@@ -18,14 +19,16 @@ def get_headers(token, cmd, has_json_payload=False):
         aad_token = auth.get_aad_token(cmd, resource="https://apps.azureiotcentral.com")
         token = "Bearer {}".format(aad_token["accessToken"])
 
-    if has_json_payload:
-        return {
-            "Authorization": token,
-            "User-Agent": constants.USER_AGENT,
-            "Content-Type": "application/json",
-        }
+    headers = {
+        "Authorization": token,
+        "User-Agent": constants.USER_AGENT,
+        "x-ms-client-request-id": str(uuid.uuid1()),
+    }
 
-    return {"Authorization": token, "User-Agent": constants.USER_AGENT}
+    if has_json_payload:
+        headers["Content-Type"] = "application/json"
+    
+    return headers
 
 
 def try_extract_result(response: Response):
