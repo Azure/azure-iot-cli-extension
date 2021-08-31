@@ -23,6 +23,8 @@ APP_ID = os.environ.get("azext_iot_central_app_id")
 APP_PRIMARY_KEY = os.environ.get("azext_iot_central_primarykey")
 APP_SCOPE_ID = os.environ.get("azext_iot_central_scope_id")
 DEVICE_ID = os.environ.get("azext_iot_central_device_id")
+STORAGE_CSTRING = os.environ.get("azext_iot_central_storage_cstring")
+STORAGE_CONTAINER = os.environ.get("azext_iot_central_storage_container")
 TOKEN = os.environ.get("azext_iot_central_token")
 DNS_SUFFIX = os.environ.get("azext_iot_central_dns_suffix")
 device_template_path = get_context_path(__file__, "json/device_template_int_test.json")
@@ -410,6 +412,21 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         assert deleted_dev_temp_count == start_dev_temp_count
         assert template_id not in deleted_device_template_list.keys()
 
+    @pytest.mark.skipif(
+        not STORAGE_CSTRING or not STORAGE_CONTAINER,
+        reason="empty azext_iot_central_storage_cstring or azext_iot_central_storage_container env var",
+    )
+    def test_central_fileupload_methods_CRD(self):
+        file_upload = self._create_fileupload()
+        self._wait_for_storage_configured()
+        command = self._appendOptionalArgsToCommand(
+            "iot central file-upload show -n {}".format(APP_ID), TOKEN, DNS_SUFFIX
+        )
+        result = self.cmd(command).get_output_in_json()
+        assert result["connectionString"] == file_upload["connectionString"]
+        assert result["container"] == file_upload["container"]
+        self._delete_fileupload()
+
     def test_central_device_groups_list(self):
         result = self._list_device_groups()
         # assert object is empty or populated but not null
@@ -757,6 +774,36 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             checks=[self.check("result", "success")],
         )
 
+    def _create_fileupload(self):
+        command = self._appendOptionalArgsToCommand(
+            'iot central file-upload create --app-id {} -s "{}" -c "{}"'.format(
+                APP_ID, STORAGE_CSTRING, STORAGE_CONTAINER
+            ),
+            TOKEN,
+            DNS_SUFFIX,
+        )
+        print("Command: {}".format(command))
+        return self.cmd(
+            command,
+            checks=[
+                self.check("connectionString", STORAGE_CSTRING),
+                self.check("container", STORAGE_CONTAINER),
+            ],
+        ).get_output_in_json()
+
+    def _delete_fileupload(self):
+        command = self._appendOptionalArgsToCommand(
+            "iot central file-upload delete --app-id {}".format(APP_ID),
+            TOKEN,
+            DNS_SUFFIX,
+        )
+        self.cmd(
+            command,
+            checks=[
+                self.check("result", "success"),
+            ],
+        )
+
     def _wait_for_provisioned(self, device_id):
         command = "iot central device show --app-id {} -d {}".format(APP_ID, device_id)
         command = self._appendOptionalArgsToCommand(command, TOKEN, DNS_SUFFIX)
@@ -767,6 +814,21 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
 
             # return when its provisioned
             if device.get("provisioned"):
+                return
+
+            # wait 10 seconds for provisioning to complete
+            time.sleep(10)
+
+    def _wait_for_storage_configured(self):
+        command = "iot central file-upload show --app-id {}".format(APP_ID)
+        command = self._appendOptionalArgsToCommand(command, TOKEN, DNS_SUFFIX)
+
+        while True:
+            result = self.cmd(command)
+            file_upload = result.get_output_in_json()
+
+            # return when its provisioned
+            if file_upload.get("state") == "succeeded":
                 return
 
             # wait 10 seconds for provisioning to complete
