@@ -39,6 +39,7 @@ from azext_iot.common.shared import (
     IoTHubStateType,
     DeviceAuthApiType,
     ConnectionStringParser,
+    EntityStatusType
 )
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
@@ -159,10 +160,12 @@ def iot_device_create(
     device_id,
     hub_name=None,
     edge_enabled=False,
-    auth_method="shared_private_key",
+    auth_method=DeviceAuthType.shared_private_key.value,
+    primary_key=None,
+    secondary_key=None,
     primary_thumbprint=None,
     secondary_thumbprint=None,
-    status="enabled",
+    status=EntityStatusType.enabled.value,
     status_reason=None,
     valid_days=None,
     output_dir=None,
@@ -197,8 +200,8 @@ def iot_device_create(
             device_id,
             auth_method,
             edge_enabled,
-            primary_thumbprint,
-            secondary_thumbprint,
+            primary_thumbprint if auth_method == DeviceAuthType.x509_thumbprint.value else primary_key,
+            secondary_thumbprint if auth_method == DeviceAuthType.x509_thumbprint.value else secondary_key,
             status,
             status_reason,
         )
@@ -207,6 +210,8 @@ def iot_device_create(
         )
     except CloudError as e:
         handle_service_exception(e)
+    except ValueError as ve:
+        raise InvalidArgumentValueError(ve)
 
     return output
 
@@ -218,7 +223,7 @@ def _assemble_device(
     edge_enabled,
     pk=None,
     sk=None,
-    status="enabled",
+    status=EntityStatusType.enabled.value,
     status_reason=None,
     device_scope=None,
 ):
@@ -273,6 +278,9 @@ def _assemble_auth(auth_method, pk, sk):
         DeviceAuthType.shared_private_key.name,
         DeviceAuthApiType.sas.value,
     ]:
+        if any([pk, sk]) and not all([pk, sk]):
+            raise ValueError("When configuring symmetric key auth both primary and secondary keys are required.")
+
         auth = AuthenticationMechanism(
             symmetric_key=SymmetricKey(primary_key=pk, secondary_key=sk),
             type=DeviceAuthApiType.sas.value,
@@ -282,7 +290,7 @@ def _assemble_auth(auth_method, pk, sk):
         DeviceAuthApiType.selfSigned.value,
     ]:
         if not pk:
-            raise ValueError("primary thumbprint required with selfSigned auth")
+            raise ValueError("When configuring selfSigned auth the primary thumbprint is required.")
         auth = AuthenticationMechanism(
             x509_thumbprint=X509Thumbprint(
                 primary_thumbprint=pk, secondary_thumbprint=sk
@@ -788,7 +796,9 @@ def iot_device_module_create(
     device_id,
     module_id,
     hub_name=None,
-    auth_method="shared_private_key",
+    auth_method=DeviceAuthType.shared_private_key.value,
+    primary_key=None,
+    secondary_key=None,
     primary_thumbprint=None,
     secondary_thumbprint=None,
     valid_days=None,
@@ -824,14 +834,16 @@ def iot_device_module_create(
             device_id=device_id,
             module_id=module_id,
             auth_method=auth_method,
-            pk=primary_thumbprint,
-            sk=secondary_thumbprint,
+            pk=primary_thumbprint if auth_method == DeviceAuthType.x509_thumbprint.value else primary_key,
+            sk=secondary_thumbprint if auth_method == DeviceAuthType.x509_thumbprint.value else secondary_key,
         )
         return service_sdk.modules.create_or_update_identity(
             id=device_id, mid=module_id, module=module
         )
     except CloudError as e:
         handle_service_exception(e)
+    except ValueError as ve:
+        raise InvalidArgumentValueError(ve)
 
 
 def _assemble_module(device_id, module_id, auth_method, pk=None, sk=None):
