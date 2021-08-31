@@ -427,6 +427,17 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         assert result["container"] == file_upload["container"]
         self._delete_fileupload()
 
+    def test_central_organization_methods_CRD(self):
+        org = self._create_organization()
+        command = self._appendOptionalArgsToCommand(
+            "iot central organization show -n {} --org-id {}".format(APP_ID, org["id"]),
+            TOKEN,
+            DNS_SUFFIX,
+        )
+        result = self.cmd(command).get_output_in_json()
+        assert result["id"] == org["id"]
+        self._delete_organization(org["id"])
+
     def test_central_device_groups_list(self):
         result = self._list_device_groups()
         # assert object is empty or populated but not null
@@ -782,7 +793,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
             TOKEN,
             DNS_SUFFIX,
         )
-        print("Command: {}".format(command))
+
         return self.cmd(
             command,
             checks=[
@@ -794,6 +805,38 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
     def _delete_fileupload(self):
         command = self._appendOptionalArgsToCommand(
             "iot central file-upload delete --app-id {}".format(APP_ID),
+            TOKEN,
+            DNS_SUFFIX,
+        )
+        self.cmd(
+            command,
+            checks=[
+                self.check("result", "success"),
+            ],
+        )
+
+    def _create_organization(self):
+        org_id = self.create_random_name(prefix="aztest", length=24)
+        command = self._appendOptionalArgsToCommand(
+            "iot central organization create --app-id {} --org-id {}".format(
+                APP_ID, org_id, STORAGE_CSTRING, STORAGE_CONTAINER
+            ),
+            TOKEN,
+            DNS_SUFFIX,
+        )
+
+        return self.cmd(
+            command,
+            checks=[
+                self.check("id", org_id),
+            ],
+        ).get_output_in_json()
+
+    def _delete_organization(self, org_id):
+        command = self._appendOptionalArgsToCommand(
+            "iot central organization delete --app-id {} --org-id {}".format(
+                APP_ID, org_id
+            ),
             TOKEN,
             DNS_SUFFIX,
         )
