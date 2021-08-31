@@ -819,7 +819,7 @@ class TestIotCentral(CaptureOutputLiveScenarioTest):
         org_id = self.create_random_name(prefix="aztest", length=24)
         command = self._appendOptionalArgsToCommand(
             "iot central organization create --app-id {} --org-id {}".format(
-                APP_ID, org_id, STORAGE_CSTRING, STORAGE_CONTAINER
+                APP_ID, org_id
             ),
             TOKEN,
             DNS_SUFFIX,
