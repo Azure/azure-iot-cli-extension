@@ -593,7 +593,34 @@ def _load_central_organizations_help():
         text: >
           az iot central organization show
           --app-id {appid}
-          --organization-id {organizationId}
+          --org-id {organizationId}
+    """
+
+    helps[
+        "iot central organization delete"
+    ] = """
+    type: command
+    short-summary: Delete an organization by ID
+    examples:
+      - name: Delete an organization
+        text: >
+          az iot central organization delete
+          --app-id {appid}
+          --org-id {organizationId}
+    """
+
+    helps[
+        "iot central organization create"
+    ] = """
+    type: command
+    short-summary: Create an organization in the application
+    examples:
+      - name: Create an organization
+        text: >
+          az iot central organization create
+          --app-id {appid}
+          --org-id {organizationId}
+          --parent {parentOrgId}
     """
 
 

@@ -156,6 +156,7 @@ def load_central_commands(self, _):
         cmd_group.show_command("show", "get_org")
         cmd_group.command("list", "list_orgs")
         cmd_group.command("create", "create_org")
+        cmd_group.command("delete", "delete_org")
 
     with self.command_group(
         "iot central job", command_type=central_jobs_ops, is_preview=True

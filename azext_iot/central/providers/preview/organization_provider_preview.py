@@ -74,6 +74,23 @@ class CentralOrganizationProviderPreview:
 
         return org
 
+    def delete_organization(
+        self,
+        org_id,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ) -> central_models.OrganizationPreview:
+        # get or add to cache
+        org = central_services.organization.delete_org(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            org_id=org_id,
+            token=self._token,
+            central_dns_suffix=central_dns_suffix,
+            api_version=ApiVersion.preview.value,
+        )
+
+        return org
+
     def create_organization(
         self, org_id, org_name, parent_org, central_dns_suffix=CENTRAL_ENDPOINT
     ):

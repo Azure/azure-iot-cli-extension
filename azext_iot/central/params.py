@@ -254,6 +254,20 @@ def load_central_arguments(self, _):
             " ISO 8601 duration standard. Default 1h.",
         )
 
+    with self.argument_context("iot central organization") as context:
+        context.argument(
+            "org_id",
+            options_list=["--org-id"],
+            help="Provide a unique identifier for the organization.",
+        )
+
+    with self.argument_context("iot central organization create") as context:
+        context.argument(
+            "parent_id",
+            options_list=["--parent-id"],
+            help="Provide the ID of the parent of the organization.",
+        )
+
     with self.argument_context("iot central job") as context:
         context.argument(
             "job_id",

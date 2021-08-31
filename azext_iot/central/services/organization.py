@@ -23,6 +23,41 @@ logger = get_logger(__name__)
 BASE_PATH = "api/organizations"
 
 
+def _make_call(
+    cmd,
+    app_id: str,
+    method: str,
+    path: str,
+    payload: str,
+    token: str,
+    central_dns_suffix: str,
+    api_version: str,
+    url=None,
+):
+    if url is None:
+        url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
+
+    if path is not None:
+        url = "{}/{}".format(url, path)
+    headers = _utility.get_headers(
+        token, cmd, has_json_payload=True if payload is not None else False
+    )
+
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
+    response = requests.request(
+        url=url,
+        method=method.upper(),
+        headers=headers,
+        params=query_parameters,
+        json=payload,
+        verify=not should_disable_connection_verify(),
+    )
+    return _utility.try_extract_result(response)
+
+
 def get_org(
     cmd,
     app_id: str,
@@ -46,20 +81,16 @@ def get_org(
         role: dict
     """
 
-    url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, org_id)
-    headers = _utility.get_headers(token, cmd)
-
-    # Construct parameters
-    query_parameters = {}
-    query_parameters["api-version"] = api_version
-
-    response = requests.get(
-        url,
-        headers=headers,
-        params=query_parameters,
-        verify=not should_disable_connection_verify(),
+    result = _make_call(
+        cmd,
+        app_id=app_id,
+        method="get",
+        path=org_id,
+        payload=None,
+        token=token,
+        central_dns_suffix=central_dns_suffix,
+        api_version=api_version,
     )
-    result = _utility.try_extract_result(response)
 
     return central_models.OrganizationPreview(result)
 
@@ -89,21 +120,19 @@ def list_orgs(
     orgs = []
 
     url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
-    headers = _utility.get_headers(token, cmd)
-
-    # Construct parameters
-    query_parameters = {}
-    query_parameters["api-version"] = api_version
-
     pages_processed = 0
     while (max_pages == 0 or pages_processed < max_pages) and url:
-        response = requests.get(
-            url,
-            headers=headers,
-            params=query_parameters,
-            verify=not should_disable_connection_verify(),
+        result = _make_call(
+            cmd,
+            app_id=app_id,
+            url=url,
+            method="get",
+            path=None,
+            payload=None,
+            token=token,
+            central_dns_suffix=central_dns_suffix,
+            api_version=api_version,
         )
-        result = _utility.try_extract_result(response)
 
         if "value" not in result:
             raise CLIError("Value is not present in body: {}".format(result))
@@ -149,20 +178,58 @@ def create_org(
     if not org_name:
         org_name = org_id
 
-    url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, org_id)
-    headers = _utility.get_headers(token, cmd, has_json_payload=True)
-
-    # Construct parameters
-    query_parameters = {}
-    query_parameters["api-version"] = api_version
-
     payload = {
         "displayName": org_name,
     }
     if parent_org:
         payload["parent"] = parent_org
 
-    response = requests.put(url, headers=headers, json=payload, params=query_parameters)
-    result = _utility.try_extract_result(response)
+    result = _make_call(
+        cmd,
+        app_id=app_id,
+        method="put",
+        path=org_id,
+        payload=payload,
+        token=token,
+        central_dns_suffix=central_dns_suffix,
+        api_version=api_version,
+    )
 
     return central_models.OrganizationPreview(result)
+
+
+def delete_org(
+    cmd,
+    app_id: str,
+    org_id: str,
+    token: str,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.preview.value,
+) -> central_models.OrganizationPreview:
+    """
+    Delete an organization
+
+    Args:
+        cmd: command passed into az
+        org_id: unique case-sensitive organization id,
+        app_id: name of app (used for forming request URL)
+        token: (OPTIONAL) authorization token to fetch role details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        role: dict
+    """
+
+    result = _make_call(
+        cmd,
+        app_id=app_id,
+        method="delete",
+        path=org_id,
+        payload=None,
+        token=token,
+        central_dns_suffix=central_dns_suffix,
+        api_version=api_version,
+    )
+
+    return result

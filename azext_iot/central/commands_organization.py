@@ -25,6 +25,21 @@ def get_org(
     )
 
 
+def delete_org(
+    cmd,
+    app_id: str,
+    org_id: str,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.preview.value,
+):
+    provider = CentralOrganizationProviderPreview(cmd=cmd, app_id=app_id, token=token)
+
+    return provider.delete_organization(
+        org_id=org_id, central_dns_suffix=central_dns_suffix
+    )
+
+
 def list_orgs(
     cmd,
     app_id: str,
