@@ -27,7 +27,6 @@ def get_headers(token, cmd, has_json_payload=False):
 
     if has_json_payload:
         headers["Content-Type"] = "application/json"
-    
     return headers
 
 
