@@ -3545,7 +3545,7 @@ def iot_hub_device_identity_generate_mqtt_credentials(
     client_id = f"{device_id}/{module_id}" if module_id else device_id
 
     # Version 2
-    if version == MQTTConnectVersionType.v2:
+    if version == MQTTConnectVersionType.v2.value:
         api_version = "2021-06-30-preview"
         # Username
         username = "av={}&h={}&did={}&am={}&se={}&sa={}".format(
