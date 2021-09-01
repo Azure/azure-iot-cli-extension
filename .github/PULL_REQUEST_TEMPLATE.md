@@ -9,6 +9,6 @@ This checklist is used to make sure that common guidelines for a pull request ar
 
 - [ ] If introducing new functionality or modified behavior, are they backed by unit and integration tests?
 - [ ] In the same context as above are command names and their parameter definitions accurate? Do help docs have sufficient content?
-- [ ] Have **all** unit **and** integration tests passed locally? i.e. `pytest <project root> -vv`
+- [ ] Have **all** unit **and** integration tests passed locally? i.e. `pytest <project root> -vv`. Please provide evidence in the form of a screenshot showing a succesful run of integration tests.
 - [ ] Have static checks passed using the .pylintrc and .flake8 rules? Look at the CI scripts for example usage.
-- [ ] Have you made an entry in HISTORY.rst which concisely explains your feature or change?
+- [ ] Have you made an entry in HISTORY.rst which concisely explains your user-facing feature or change?
