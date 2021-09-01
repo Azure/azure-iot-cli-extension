@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from azext_iot.tests import IoTLiveScenarioTest
+from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
 from time import sleep
 

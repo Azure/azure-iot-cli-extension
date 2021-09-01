@@ -7,7 +7,7 @@
 import json
 
 from datetime import datetime, timedelta
-from azext_iot.tests import IoTLiveScenarioTest
+from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
 
 

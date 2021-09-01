@@ -10,14 +10,14 @@ from time import sleep
 from knack.util import CLIError
 from pathlib import Path
 
-from azext_iot.tests import IoTLiveScenarioTest
+from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL, UserTypes
 from azext_iot.common.utility import ensure_iothub_sdk_min_version, ensure_azure_namespace_path
 
 from azext_iot.tests.generators import generate_generic_id
 # TODO: assert DEVICE_DEVICESCOPE_PREFIX format in parent device twin.
 from azext_iot.constants import IOTHUB_TRACK_2_SDK_MIN_VERSION
-from azext_iot.tests import DEFAULT_CONTAINER
+from azext_iot.tests.iothub import DEFAULT_CONTAINER
 from azure.cli.core._profile import Profile
 from azure.cli.core.mock import DummyCli
 

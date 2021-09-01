@@ -6,7 +6,7 @@
 
 import pytest
 
-from azext_iot.tests import IoTLiveScenarioTest
+from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.common.shared import AuthenticationTypeDataplane
 
 # The current implementation of preview distributed tracing commands do not work with a cstring.

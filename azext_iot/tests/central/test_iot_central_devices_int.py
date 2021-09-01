@@ -5,23 +5,12 @@
 # --------------------------------------------------------------------------------------------
 
 
-import os
 import time
 import pytest
 
-from azext_iot.tests.conftest import get_context_path
 from azext_iot.central.models.enum import DeviceStatus
 from azext_iot.tests import helpers
-from azext_iot.tests.central import CentralLiveScenarioTest
-
-APP_ID = os.environ.get("azext_iot_central_app_id")
-APP_PRIMARY_KEY = os.environ.get("azext_iot_central_primarykey")
-APP_SCOPE_ID = os.environ.get("azext_iot_central_scope_id")
-DEVICE_ID = os.environ.get("azext_iot_central_device_id")
-TOKEN = os.environ.get("azext_iot_central_token")
-DNS_SUFFIX = os.environ.get("azext_iot_central_dns_suffix")
-device_template_path = get_context_path(__file__, "json/device_template_int_test.json")
-sync_command_params = get_context_path(__file__, "json/sync_command_args.json")
+from azext_iot.tests.central import CentralLiveScenarioTest, APP_ID, APP_PRIMARY_KEY, APP_SCOPE_ID, DEVICE_ID, TOKEN, DNS_SUFFIX
 
 if not all([APP_ID]):
     raise ValueError("Set azext_iot_central_app_id to run central integration tests.")

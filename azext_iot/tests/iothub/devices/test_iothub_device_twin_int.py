@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 
 from azext_iot.common.utility import read_file_content
-from azext_iot.tests import IoTLiveScenarioTest
+from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
 

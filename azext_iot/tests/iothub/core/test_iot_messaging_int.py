@@ -9,7 +9,7 @@ import json
 
 from time import time
 from uuid import uuid4
-from azext_iot.tests import IoTLiveScenarioTest, PREFIX_DEVICE
+from azext_iot.tests.iothub import IoTLiveScenarioTest, PREFIX_DEVICE
 from azext_iot.common.utility import (
     execute_onthread,
     calculate_millisec_since_unix_epoch_utc,

@@ -8,7 +8,7 @@ from azext_iot.iothub.providers.discovery import (
     IotHubDiscovery,
     PRIVILEDGED_ACCESS_RIGHTS_SET,
 )
-from azext_iot.tests import IoTLiveScenarioTest
+from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.settings import Setting
 
 

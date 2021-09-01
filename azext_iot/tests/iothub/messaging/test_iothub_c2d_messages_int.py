@@ -8,7 +8,7 @@ import json
 
 from time import sleep
 from uuid import uuid4
-from azext_iot.tests import IoTLiveScenarioTest
+from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.common.shared import AuthenticationTypeDataplane
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
 from azext_iot.common.utility import (
