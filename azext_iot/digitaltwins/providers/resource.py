@@ -75,11 +75,13 @@ class ResourceProvider(DigitalTwinsResourceManager):
             )
 
             def check_state(lro):
+                print("Start check state")
                 from time import sleep
                 instance = lro.resource().as_dict()
                 state = instance.get('provisioning_state', None)
                 retries = 0
                 while (state.lower() not in ProvisioningStateType.FINISHED.value) and retries < MAX_ADT_CREATE_RETRIES:
+                    print("trying")
                     retries += 1
                     sleep(ADT_CREATE_RETRY_AFTER)
                     lro.update_status()
@@ -94,6 +96,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
                     )
 
             def rbac_handler(lro):
+                print("Start rbac handler")
                 instance = lro.resource().as_dict()
                 identity = instance.get("identity")
                 if identity:
@@ -120,6 +123,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
 
             create_or_update.add_done_callback(rbac_handler)
             create_or_update.add_done_callback(check_state)
+            print("finish with func")
             return create_or_update
         except CloudError as e:
             raise e
