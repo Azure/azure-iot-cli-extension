@@ -263,9 +263,15 @@ def load_central_arguments(self, _):
 
     with self.argument_context("iot central organization create") as context:
         context.argument(
-            "parent_id",
+            "parent_org",
             options_list=["--parent-id"],
             help="Provide the ID of the parent of the organization.",
+        )
+    with self.argument_context("iot central organization create") as context:
+        context.argument(
+            "org_name",
+            options_list=["--org-name"],
+            help="Display name of the organization.",
         )
 
     with self.argument_context("iot central job") as context:
