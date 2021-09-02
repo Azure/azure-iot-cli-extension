@@ -96,7 +96,6 @@ class TestTwinCreateInstance(object):
         yield mocked_response
 
     def test_create_instance_with_retry(self, fixture_cmd, mocker, service_client_with_retry):
-
         mocker.patch.object(azext_iot.digitaltwins.providers.resource, "ADT_CREATE_RETRY_AFTER", 0.0001)
         subject.create_instance(
             cmd=fixture_cmd,
@@ -110,7 +109,6 @@ class TestTwinCreateInstance(object):
         assert "operationkey" in check_request.url
         assert len(service_client_with_retry.calls) == 2
         assert service_client_with_retry.calls[1].response.content.decode("utf-8") == finished
-
 
     @pytest.fixture
     def service_client_with_failed_retry(self, mocked_response, start_twin_response):
@@ -145,7 +143,7 @@ class TestTwinCreateInstance(object):
 
         yield mocked_response
 
-    def test_create_instance_with_failed_retry( self, fixture_cmd, mocker, service_client_with_failed_retry):
+    def test_create_instance_with_failed_retry(self, fixture_cmd, mocker, service_client_with_failed_retry):
         mocker.patch.object(azext_iot.digitaltwins.providers.resource, "ADT_CREATE_RETRY_AFTER", 0.0001)
         result = subject.create_instance(
             cmd=fixture_cmd,
