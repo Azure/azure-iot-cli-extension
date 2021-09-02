@@ -7,7 +7,7 @@ schedules:
     - dev
 
 variables:
-  pythonVersion: '3.6.x'
+  pythonVersion: '3.7.x'
   architecture: 'x64'
 
 parameters:
@@ -71,6 +71,7 @@ stages:
     - template: templates/nightly-tests.yml
       parameters:
         azureCLIVersion: edge
+        pythonVersion: $(pythonVersion)
   
   - stage: 'test_min'
     displayName: 'Run all tests with min CLI'
@@ -81,6 +82,7 @@ stages:
     - template: templates/nightly-tests.yml
       parameters:
         azureCLIVersion: min
+        pythonVersion: $(pythonVersion)
           
   - stage: 'kpi'
     displayName: 'Build KPIs'
