@@ -10,4 +10,6 @@ wheel==0.30.0
 pre-commit
 pylint
 flake8
-azure-iot-device
+azure-storage-blob
+pytest-xdist
+pytest-rerunfailures
