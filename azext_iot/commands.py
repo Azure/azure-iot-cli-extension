@@ -43,6 +43,11 @@ def load_command_table(self, _):
         cmd_group.command("renew-key", "iot_device_key_regenerate")
         cmd_group.command("import", "iot_device_import")
         cmd_group.command("export", "iot_device_export")
+        cmd_group.command(
+            "generate-mqtt-credentials",
+            "iot_hub_device_identity_generate_mqtt_credentials",
+            is_preview=True
+        )
 
     with self.command_group(
         "iot hub device-identity children", command_type=iothub_ops
@@ -131,6 +136,15 @@ def load_command_table(self, _):
         "iot hub connection-string", command_type=iothub_ops
     ) as cmd_group:
         cmd_group.show_command("show", "iot_hub_connection_string_show")
+
+    with self.command_group(
+        "iot hub topic-space", command_type=iothub_ops, is_preview=True
+    ) as cmd_group:
+        cmd_group.command("create", "iot_hub_topic_space_create")
+        cmd_group.show_command("show", "iot_hub_topic_space_show")
+        cmd_group.command("update", "iot_hub_topic_space_update")
+        cmd_group.command("list", "iot_hub_topic_space_list")
+        cmd_group.command("delete", "iot_hub_topic_space_delete")
 
     with self.command_group("iot edge", command_type=iothub_ops) as cmd_group:
         cmd_group.command("set-modules", "iot_edge_set_modules")

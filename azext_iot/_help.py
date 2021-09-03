@@ -299,6 +299,31 @@ helps[
 """
 
 helps[
+    "iot hub device-identity generate-mqtt-credentials"
+] = """
+    type: command
+    short-summary: Generate MQTT credentials for device or module connections.
+    examples:
+    - name: Generate MQTT credentials using device id.
+      text: >
+        az iot hub device-identity generate-mqtt-credentials -n {iothub_name} -d {device_id}
+    - name: Generate MQTT credentials using device id, DTMI, module id, product information, custom duration.
+      text: >
+        az iot hub device-identity generate-mqtt-credentials -n {iothub_name} -d {device_id} -m {module_id} --dtmi {dtmi}
+        --du {duration} --pi {product_info}
+    - name: Generate MQTT credentials using device id using MQTT Connect Credentials Format Version 1.
+      text: >
+        az iot hub device-identity generate-mqtt-credentials -n {iothub_name} -d {device_id} --fv v1
+    - name: Generate MQTT credentials using a Device connection string.
+      text: >
+        az iot hub device-identity generate-mqtt-credentials -n {iothub_name} --cs {connection_string}
+    - name: Generate MQTT credentials using a Device connection string and custom duration.
+      text: >
+        az iot hub device-identity generate-mqtt-credentials -n {iothub_name} --cs {connection_string} --du
+         {duration}
+"""
+
+helps[
     "iot hub device-identity parent"
 ] = """
     type: group
@@ -767,6 +792,80 @@ helps[
     - name: Update the distributed tracing options for a device
       text: >
         az iot hub distributed-tracing update -d {device_id} --sm on --sr 50 -n {iothub_name}
+"""
+
+helps[
+    "iot hub topic-space"
+] = """
+    type: group
+    short-summary: Manage topic spaces within an IoT Hub.
+"""
+
+helps[
+    "iot hub topic-space show"
+] = """
+    type: command
+    short-summary: Show details of an exisiting topic space within an IoT Hub.
+"""
+
+helps[
+    "iot hub topic-space delete"
+] = """
+    type: command
+    short-summary: Delete an exisiting topic space within an IoT Hub.
+"""
+
+helps[
+    "iot hub topic-space list"
+] = """
+    type: command
+    short-summary: List exisiting topic space within an IoT Hub.
+"""
+
+helps[
+    "iot hub topic-space create"
+] = """
+    type: command
+    short-summary: Create a topic space within an IoT Hub.
+    examples:
+    - name: Create a topic space within an IoT Hub with one template.
+      text: >
+        az iot hub topic-space create -n {hub_name} --tsn {topic_space_name}
+        --tst {topic_type} --template topic/template
+    - name: Create a topic space within an IoT Hub with templates from a json file.
+      text: >
+        az iot hub topic-space create -n {hub_name} --tsn {topic_space_name}
+        --tst {topic_type} --template {topic_template_txt_path}
+    - name: Create a topic space within an IoT Hub with multiple templates.
+      text: >
+        az iot hub topic-space create -n {hub_name} --tsn {topic_space_name}
+        --tst {topic_type} --template topic/template1 topic/template2 topic/template3
+    - name: Create a topic space within an IoT Hub with variables in the template.
+            Ensure you have the single and double quotes. This will only work for Powershell.
+      text: >
+        az iot hub topic-space create -n {hub_name} --tsn {topic_space_name}
+        --tst {topic_type} --template '"device/${serviceId|portalId}/#"'
+    - name: Create a topic space within an IoT Hub with variables in the template.
+            Ensure you use single quotes. This will only work for Bash.
+      text: >
+        az iot hub topic-space create -n {hub_name} --tsn {topic_space_name}
+        --tst {topic_type} --template 'device/${serviceId|portalId}/#'
+"""
+
+helps[
+    "iot hub topic-space update"
+] = """
+    type: command
+    short-summary: Update a topic space within an IoT Hub. Topic Space type cannot be updated.
+    examples:
+    - name: Update a topic space within an IoT Hub with one template.
+      text: >
+        az iot hub topic-space update -n {hub_name} --tsn {topic_space_name}
+        --template {topic_template}
+    - name: Update a topic space within an IoT Hub with multiple templates.
+      text: >
+        az iot hub topic-space update -n {hub_name} --tsn {topic_space_name}
+        --template {topic_template1} {topic_template2} {topic_template3}
 """
 
 helps[

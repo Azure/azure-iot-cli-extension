@@ -272,3 +272,22 @@ class ConnectionStringParser(Enum):
     Module = parse_iot_device_module_connection_string
     Device = parse_iot_device_connection_string
     IotHub = parse_iot_hub_connection_string
+
+
+class TopicSpaceType(Enum):
+    """
+        Type of topic space.
+    """
+
+    LowFanout = "LowFanout"
+    HighFanout = "HighFanout"
+    PublishOnly = "PublishOnly"
+
+
+class MQTTConnectVersionType(Enum):
+    """
+    Type of MQTT connect credentials format version.
+    """
+
+    v1 = "v1"
+    v2 = "v2"

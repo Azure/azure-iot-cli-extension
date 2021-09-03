@@ -17,6 +17,7 @@ from azure.cli.core.commands.parameters import (
 )
 from azext_iot.common.shared import (
     EntityStatusType,
+    MQTTConnectVersionType,
     SettleType,
     DeviceAuthType,
     KeyType,
@@ -33,6 +34,7 @@ from azext_iot.common.shared import (
     AuthenticationType,
     AuthenticationTypeDataplane,
     RenewKeyType,
+    TopicSpaceType,
 )
 from azext_iot._validators import mode2_iot_login_handler
 from azext_iot.assets.user_messages import info_param_properties_device
@@ -534,6 +536,39 @@ def load_arguments(self, _):
             "a percentage. Only values from 0 to 100 (inclusive) are permitted.",
         )
 
+    with self.argument_context("iot hub device-identity generate-mqtt-credentials") as context:
+        context.argument(
+            "connection_string",
+            options_list=["--connection-string", "--cs"],
+            help="Target connection string. This bypasses the IoT Hub registry and generates the user credentials directly "
+                 "from the supplied symmetric key without further validation. All other command parameters aside from "
+                 "duration will be ignored. Supported connection string types: Device, Module."
+        )
+        context.argument(
+            "duration",
+            options_list=["--duration", "--du"],
+            type=int,
+            help="Indicates the duration in seconds, for which the mqtt credentials will remain valid.",
+        )
+        context.argument(
+            "product_info",
+            options_list=["--product-info", "--pi"],
+            help="Description of the product.",
+        )
+        context.argument(
+            "dtmi",
+            options_list=["--dtmi"],
+            help="Digital Twins model Id. Example: dtmi:com:example:Room;2",
+        )
+        context.argument(
+            "version",
+            arg_type=get_enum_type(MQTTConnectVersionType),
+            options_list=["--format-version", "--fv"],
+            help="MQTT connect credentials format version to use when generating the credentials. Use v2 for preview API "
+                 "version 2021-06-30-preview and v1 for current GA API versions."
+            "v2",
+        )
+
     with self.argument_context("iot hub query") as context:
         context.argument(
             "query_command",
@@ -545,6 +580,27 @@ def load_arguments(self, _):
             options_list=["--top"],
             type=int,
             help="Maximum number of elements to return. By default query has no cap.",
+        )
+
+    with self.argument_context("iot hub topic-space") as context:
+        context.argument(
+            "topic_name",
+            options_list=["--topic-space-name", "--tsn"],
+            help="Topic space name.",
+        )
+        context.argument(
+            "topic_templates",
+            nargs="*",
+            options_list=["--topic-space-templates", "--templates"],
+            help="Space separated or json-formatted list of tokens which can be inline topic space "
+            "template values, or paths to json files containing a json-formatted list of topic space"
+            " template values.",
+        )
+        context.argument(
+            "topic_type",
+            options_list=["--topic-space-type", "--tst"],
+            arg_type=get_enum_type(TopicSpaceType),
+            help="Topic space type. Currently, only LowFanout and PublishOnly are supported.",
         )
 
     with self.argument_context("iot device") as context:

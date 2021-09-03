@@ -17,6 +17,10 @@ ENV_SET_TEST_IOTHUB_OPTIONAL = [
     "azext_iot_teststoragecontainer"
 ]
 
+ENV_SET_TEST_IOTHUB_CONNECTION_STRING = [
+    "azext_iot_testhub_connection_string"
+]
+
 
 class UserTypes(Enum):
     user = "user"

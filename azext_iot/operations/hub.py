@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import json
 from os.path import exists, basename
 from time import time, sleep
 from knack.log import get_logger
@@ -28,7 +29,9 @@ from azext_iot.common.shared import (
     IoTHubStateType,
     DeviceAuthApiType,
     ConnectionStringParser,
-    EntityStatusType
+    EntityStatusType,
+    MQTTConnectVersionType,
+    TopicSpaceType,
 )
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
@@ -1404,7 +1407,6 @@ def _process_config_content(content, config_type):
 
 
 def _validate_payload_schema(content):
-    import json
     from os.path import join
     from azext_iot.models.validators import JsonSchemaType, JsonSchemaValidator
     from azext_iot.constants import EDGE_DEPLOYMENT_ROOT_SCHEMAS_PATH as root_schema_path
@@ -2548,7 +2550,6 @@ def iot_simulate_device(
     import sys
     import uuid
     import datetime
-    import json
     from azext_iot.operations._mqtt import mqtt_client
     from threading import Event, Thread
     from tqdm import tqdm
@@ -3284,3 +3285,317 @@ def _customize_device_tracing_output(device_id, desired, reported):
         ):
             output["isSynced"] = True
     return output
+
+
+# Topic Space Preview
+
+
+def iot_hub_topic_space_create(
+    cmd,
+    topic_name,
+    topic_templates,
+    topic_type,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
+):
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
+    resolver = SdkResolver(target=target)
+    service_sdk = resolver.get_sdk(SdkType.service_sdk)
+
+    topic_type = TopicSpaceType(topic_type)
+    if topic_type == TopicSpaceType.HighFanout:
+        raise CLIError("Only LowFanout and PublishOnly topic types are supported right now")
+
+    parsed_templates = []
+    for template in topic_templates:
+        try:
+            parsed_templates.extend(process_json_arg(template, "Topic Space Templates"))
+            logger.info(f"Parsed {template} as file with topic space templates.")
+        except:
+            parsed_templates.append(template)
+            logger.info(f"Parsed {template} as a topic space template.")
+
+    try:
+        return service_sdk.topic_space.put_topic_space(
+            id=topic_name,
+            name=topic_name,
+            properties={
+                "topicspace_type": topic_type,
+                "topic_templates": parsed_templates
+            },
+            raw=True
+        ).response.json()
+    except CloudError as e:
+        raise CLIError(unpack_msrest_error(e))
+
+
+def iot_hub_topic_space_show(
+    cmd,
+    topic_name,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
+):
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
+    resolver = SdkResolver(target=target)
+    service_sdk = resolver.get_sdk(SdkType.service_sdk)
+
+    try:
+        return service_sdk.topic_space.get_topic_space(
+            id=topic_name, raw=True
+        ).response.json()
+    except CloudError as e:
+        raise CLIError(unpack_msrest_error(e))
+
+
+def iot_hub_topic_space_list(
+    cmd,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
+):
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
+    resolver = SdkResolver(target=target)
+    service_sdk = resolver.get_sdk(SdkType.service_sdk)
+
+    try:
+        return service_sdk.topic_space.list_topic_spaces(
+            raw=True
+        ).response.json()
+    except CloudError as e:
+        raise CLIError(unpack_msrest_error(e))
+
+
+def iot_hub_topic_space_update(
+    cmd,
+    topic_name,
+    topic_templates,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
+):
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
+    resolver = SdkResolver(target=target)
+    service_sdk = resolver.get_sdk(SdkType.service_sdk)
+
+    try:
+        topic_instance = service_sdk.topic_space.get_topic_space(
+            id=topic_name, raw=True
+        ).response.json()
+        topic_type = topic_instance["properties"]["topicspaceType"]
+    except CloudError as e:
+        raise CLIError(unpack_msrest_error(e))
+
+    parsed_templates = []
+    for template in topic_templates:
+        try:
+            parsed_templates.extend(process_json_arg(template, "Topic Space Templates"))
+            logger.info(f"Parsed {template} as file with topic space templates.")
+        except:
+            parsed_templates.append(template)
+            logger.info(f"Parsed {template} as a topic space template.")
+
+    try:
+        return service_sdk.topic_space.put_topic_space(
+            id=topic_name,
+            name=topic_name,
+            properties={
+                "topicspace_type": topic_type,
+                "topic_templates": parsed_templates
+            },
+            raw=True
+        ).response.json()
+    except CloudError as e:
+        raise CLIError(unpack_msrest_error(e))
+
+
+def iot_hub_topic_space_delete(
+    cmd,
+    topic_name,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
+):
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        hub_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
+    resolver = SdkResolver(target=target)
+    service_sdk = resolver.get_sdk(SdkType.service_sdk)
+
+    try:
+        service_sdk.topic_space.delete_topic_space(
+            id=topic_name
+        )
+    except CloudError as e:
+        raise CLIError(unpack_msrest_error(e))
+
+
+# TODO: Move when finished to correct section
+
+def iot_hub_device_identity_generate_mqtt_credentials(
+    cmd,
+    device_id=None,
+    connection_string=None,
+    dtmi=None,
+    hub_name=None,
+    module_id=None,
+    duration=3600,
+    policy_name=None,
+    product_info=None,
+    version=None,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
+):
+    import hmac
+    import hashlib
+    import base64
+    from time import time
+
+    if not any([device_id, connection_string]):
+        raise CLIError(
+            "Please provide a Device Id (via the '--device-id' or '-d' parameter)"
+            " or a supported connection string via --connection-string or --cs parameter..."
+        )
+
+    if not connection_string:
+        # Online only if need to get shared access key
+        if module_id:
+            connection_json = iot_get_module_connection_string(
+                cmd=cmd,
+                device_id=device_id,
+                module_id=module_id,
+                hub_name=hub_name,
+                key_type="primary",
+                resource_group_name=resource_group_name,
+                login=login,
+                auth_type_dataplane=auth_type_dataplane,
+            )
+        else:
+            connection_json = iot_get_device_connection_string(
+                cmd=cmd,
+                device_id=device_id,
+                hub_name=hub_name,
+                key_type="primary",
+                resource_group_name=resource_group_name,
+                login=login,
+                auth_type_dataplane=auth_type_dataplane,
+            )
+        connection_string = connection_json["connectionString"]
+
+    try:
+        parsed_cs = ConnectionStringParser.Module(connection_string)
+    except:
+        parsed_cs = ConnectionStringParser.Device(connection_string)
+    device_id = parsed_cs["DeviceId"]
+    hub_name = parsed_cs["HostName"]
+    shared_access_key = parsed_cs["SharedAccessKey"]
+    module_id = parsed_cs.get("ModuleId", None)
+
+    # Time updates
+    password_creation_time = int(time())
+    password_expiry_time = password_creation_time + duration
+
+    client_id = f"{device_id}/{module_id}" if module_id else device_id
+
+    # Version 2
+    if version == MQTTConnectVersionType.v2.value:
+        api_version = "2021-06-30-preview"
+        # Username
+        username = "av={}&h={}&did={}&am={}&se={}&sa={}".format(
+            api_version,
+            hub_name,
+            device_id,
+            "SASb64",
+            int(password_expiry_time) * 1000,
+            int(password_creation_time) * 1000,
+        )
+
+        if module_id:
+            username += f"&mid={module_id}"
+
+        if dtmi:
+            username += f"&dtmi={dtmi}"
+
+        if product_info:
+            username += f"&ca={product_info}"
+
+        if policy_name:
+            username += f"&sp={policy_name}"
+
+        # Password
+        password = "{}\n{}\n{}\n{}\n{}\n".format(
+            hub_name,
+            client_id,
+            policy_name if policy_name else "",
+            password_creation_time * 1000,
+            password_expiry_time * 1000,
+        )
+
+        decoded_key = base64.b64decode(shared_access_key)
+
+        try:
+            payload_to_sign = password.encode("utf-8")  # type: ignore
+        except AttributeError:
+            # If byte string, no need to encode
+            pass
+
+        encoded_key = hmac.HMAC(
+            key=decoded_key,
+            msg=payload_to_sign,  # type: ignore
+            digestmod=hashlib.sha256,
+        ).digest()
+
+        return {
+            "username": username,
+            "password": base64.b64encode(encoded_key)
+        }
+
+    else:
+        api_version = "2019-10-01"
+        username = "{}/{}/?api-version={}".format(
+            hub_name, client_id, api_version
+        )
+
+        return {
+            "username": username,
+            "client_id": client_id,
+            "password": _iot_build_sas_token_from_cs(
+                connection_string,
+                duration
+            ).generate_sas_token()
+        }
