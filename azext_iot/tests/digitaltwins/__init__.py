@@ -178,7 +178,6 @@ class DTLiveScenarioTest(LiveScenarioTest):
                 wait_in_sec * interval
             )
         )
-
         refereshed_instance = self.embedded_cli.invoke(
             "dt show -n {} -g {}".format(
                 instance["name"], instance["resourceGroup"]

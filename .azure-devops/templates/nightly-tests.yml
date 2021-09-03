@@ -12,44 +12,67 @@ parameters:
   - min
   - released
   - edge
+- name: azureSubscription
+  type: string
+  default: 'az_cli_nightly_conn'
 
-steps:
-  - template: setup-dev-test-env.yml
+jobs:
+
+- job: 'testCentral'
+  displayName: 'Test IoT Central'
+  steps:
+  - template: run-tests-parallel.yml
     parameters:
-      architecture: ${{ parameters.architecture }}
+      path: 'azext_iot/tests/central'
+      name: 'iot-central'
+      azureSubscription: ${{ parameters.azureSubscription }}
       pythonVersion: ${{ parameters.pythonVersion }}
-      azureCLIVersion: ${{ parameters.azureCLIVersion }}
 
-  - template: set-testenv-sentinel.yml
+- job: 'testADT'
+  displayName: 'Test Azure DigitalTwins'
+  steps:
+  - template: run-tests-parallel.yml
+    parameters:
+      path: 'azext_iot/tests/digitaltwins'
+      name: 'azure-digitaltwins'
+      azureSubscription: ${{ parameters.azureSubscription }}
+      pythonVersion: ${{ parameters.pythonVersion }}
 
-  - script: |
-      pytest -vv azext_iot/tests -k "_unit" --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-unit.xml
-    displayName: 'All unit tests'
-    env:
-      COVERAGE_FILE: .coverage.all
+- job: 'testDPS'
+  displayName: 'Test DPS'
+  steps:
+  - template: run-tests-parallel.yml
+    parameters:
+      path: 'azext_iot/tests/dps'
+      name: 'device-provisioning-service'
+      azureSubscription: ${{ parameters.azureSubscription }}
+      pythonVersion: ${{ parameters.pythonVersion }}
 
-  - task: AzureCLI@2
-    continueOnError: true
-    displayName: 'All integration tests'
-    inputs:
-      azureSubscription: az-cli-nightly
-      scriptType: bash
-      scriptLocation: inlineScript
-      inlineScript: |
-        export COVERAGE_FILE=.coverage.all
-        pytest -vv azext_iot/tests -k "_int" --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml
+- job: 'testHub_job_1'
+  displayName: 'Test IoT Hub - config, core and jobs'
+  steps:
+  - template: run-tests-parallel.yml
+    parameters:
+      path: 'azext_iot/tests/iothub/configurations azext_iot/tests/iothub/core azext_iot/tests/iothub/jobs'
+      name: 'iot-hub-1'
+      azureSubscription: ${{ parameters.azureSubscription }}
+      pythonVersion: ${{ parameters.pythonVersion }}
 
-  - task: PublishBuildArtifacts@1
-    inputs:
-      pathToPublish: .coverage.all
-      publishLocation: 'Container' 
-      artifactName: 'coverage'
+- job: 'testHub_job_2'
+  displayName: 'Test IoT Hub - devices, messaging and modules'
+  steps:
+  - template: run-tests-parallel.yml
+    parameters:
+      path: 'azext_iot/tests/iothub/devices azext_iot/tests/iothub/messaging azext_iot/tests/iothub/modules'
+      name: 'iot-hub-2'
+      azureSubscription: ${{ parameters.azureSubscription }}
+      pythonVersion: ${{ parameters.pythonVersion }}
 
-  - task: PublishTestResults@2
-    condition: succeededOrFailed()
-    displayName: 'Publish Test Results'
-    inputs:
-      testResultsFormat: 'JUnit'
-      testResultsFiles: '**/test-*.xml'
-      testRunTitle: 'Publish test results for Python ${{ parameters.pythonVersion }} on OS $(Agent.OS)'
-      searchFolder: '$(System.DefaultWorkingDirectory)'
+- job: 'unitTests'
+  displayName: 'Unit tests and code coverage'
+  steps:
+  - template: run-tests-parallel.yml
+    parameters:
+      runIntTests: 'false'
+      runUnitTests: 'true'
+      pythonVersion: ${{ parameters.pythonVersion }}

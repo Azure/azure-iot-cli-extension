@@ -26,6 +26,8 @@ Release History
 
 **IoT Hub updates**
 
+* Device simulation overhaul ("az iot device simulate"). Device simulation is experimental and subject to change.
+  Please take a look at the --help docs for functionality and usage highlights.
 * Device and module identity creation support usage of custom symmetric keys.
 
 0.10.15
