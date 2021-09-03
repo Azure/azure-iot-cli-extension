@@ -51,7 +51,6 @@ def get_fileupload(
     app_id: str,
     token: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.preview.value,
 ) -> central_models.FileUploadPreview:
     """
     Get fileupload info
@@ -77,11 +76,10 @@ def delete_fileupload(
     cmd,
     app_id: str,
     token: str,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.preview.value,
+    central_dns_suffix=CENTRAL_ENDPOINT
 ) -> central_models.FileUploadPreview:
     """
-    Delete fle upload storage configuration
+    Delete file upload storage configuration
 
     Args:
         cmd: command passed into az

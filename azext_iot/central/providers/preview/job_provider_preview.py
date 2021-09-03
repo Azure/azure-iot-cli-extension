@@ -162,7 +162,7 @@ class CentralJobProviderPreview:
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         if job_id in self._jobs:
-            raise CLIError("Organization already exists")
+            raise CLIError("Job already exists")
         job = central_services.job.create_job(
             self._cmd,
             self._app_id,
@@ -181,7 +181,7 @@ class CentralJobProviderPreview:
         )
 
         if not job:
-            raise CLIError("No organization found with id: '{}'.".format(job_id))
+            raise CLIError("No job found with id: '{}'.".format(job_id))
 
         # add to cache
         self._jobs[job.id] = job

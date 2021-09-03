@@ -651,9 +651,9 @@ def _load_central_jobs_help():
     type: command
     short-summary: Create and execute a job via its job definition
     examples:
-      - name: Create a job
+      - name: Create a job with name
         text: >
-          az iot central job create with name
+          az iot central job create
           --app-id {appid}
           --job-id {jobId}
           --group-id {groupId}

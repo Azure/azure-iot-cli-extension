@@ -328,13 +328,13 @@ def load_central_arguments(self, _):
             "threshold_percentage",
             options_list=["--threshold-percentage"],
             default=False,
-            help="Specify if cancellation threshold applies for a number of devices or a percentage of the total. Default: False",
+            help="Specify if cancellation threshold applies for a number of devices or a percentage of the total.",
         )
         context.argument(
             "threshold_batch",
             options_list=["--threshold-batch"],
             default=False,
-            help="Whether the cancellation threshold applies per-batch or to the overall job. Default: False",
+            help="Whether the cancellation threshold applies per-batch or to the overall job.",
         )
         context.argument(
             "description",

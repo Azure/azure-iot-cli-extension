@@ -43,15 +43,15 @@ class CentralFileUploadProviderPreview:
                 cmd=self._cmd,
                 app_id=self._app_id,
                 token=self._token,
-                central_dns_suffix=central_dns_suffix,
-                api_version=ApiVersion.preview.value,
+                central_dns_suffix=central_dns_suffix
             )
+
+            if not fileupload:
+                raise CLIError("No file upload account found")
+
             self._fileupload = fileupload
 
-        if not fileupload:
-            raise CLIError("No file upload account found")
-
-        return fileupload
+        return self._fileupload
 
     def delete_fileupload(
         self,
@@ -62,8 +62,7 @@ class CentralFileUploadProviderPreview:
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
-            central_dns_suffix=central_dns_suffix,
-            api_version=ApiVersion.preview.value,
+            central_dns_suffix=central_dns_suffix
         )
 
         return res

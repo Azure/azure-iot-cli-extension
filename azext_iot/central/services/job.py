@@ -340,7 +340,6 @@ def create_job(
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.preview.value,
 ) -> central_models.JobPreview:
-
     """
     Create a job in IoTC
 
@@ -390,7 +389,7 @@ def create_job(
             "type": "percentage" if threshold_percentage else "number",
             "batch": threshold_batch,
         }
-    print(payload)
+
     response = requests.put(url, headers=headers, json=payload, params=query_parameters)
     result = _utility.try_extract_result(response)
 
