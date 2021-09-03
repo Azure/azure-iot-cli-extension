@@ -231,7 +231,7 @@ def load_central_arguments(self, _):
             help="Provide a unique identifier for the role",
         )
 
-    with self.argument_context("iot central file-upload create") as context:
+    with self.argument_context("iot central file-upload-configuration create") as context:
         context.argument(
             "connection_string",
             options_list=["--connection-string", "-s"],

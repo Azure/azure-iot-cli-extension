@@ -234,7 +234,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
     def _create_fileupload(self):
         command = self._appendOptionalArgsToCommand(
-            'iot central file-upload create --app-id {} -s "{}" -c "{}"'.format(
+            'iot central file-upload-configuration create --app-id {} -s "{}" -c "{}"'.format(
                 APP_ID, STORAGE_CSTRING, STORAGE_CONTAINER
             ),
             TOKEN,
@@ -251,7 +251,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
     def _delete_fileupload(self):
         command = self._appendOptionalArgsToCommand(
-            "iot central file-upload delete --app-id {}".format(APP_ID),
+            "iot central file-upload-configuration delete --app-id {}".format(APP_ID),
             TOKEN,
             DNS_SUFFIX,
         )
@@ -295,7 +295,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         )
 
     def _wait_for_storage_configured(self):
-        command = "iot central file-upload show --app-id {}".format(APP_ID)
+        command = "iot central file-upload-configuration show --app-id {}".format(APP_ID)
         command = self._appendOptionalArgsToCommand(command, TOKEN, DNS_SUFFIX)
 
         while True:

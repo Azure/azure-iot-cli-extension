@@ -287,7 +287,7 @@ class TestIotCentral(CentralLiveScenarioTest):
         file_upload = self._create_fileupload()
         self._wait_for_storage_configured()
         command = self._appendOptionalArgsToCommand(
-            "iot central file-upload show -n {}".format(APP_ID), TOKEN, DNS_SUFFIX
+            "iot central file-upload-configuration show -n {}".format(APP_ID), TOKEN, DNS_SUFFIX
         )
         result = self.cmd(command).get_output_in_json()
         assert result["connectionString"] == file_upload["connectionString"]
