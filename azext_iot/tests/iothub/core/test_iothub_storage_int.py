@@ -322,9 +322,9 @@ class TestIoTStorage(IoTLiveScenarioTest):
         identity_principal = hub_identity["userAssignedIdentities"][identity_id]["principalId"]
         assert identity_principal == user_identity["principalId"]
 
-        attempts = 1
+        attempts = 0
         user_identity_setup_completed = False
-        while attempts <= USER_IDENTITY_SETUP_MAX_ATTEMPTS and not user_identity_setup_completed:
+        while not user_identity_setup_completed:
             try:
                 self.assign_storage_role_if_needed(identity_principal)
 
@@ -371,9 +371,9 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 )
                 user_identity_setup_completed = True
             except Exception as x:
-                if attempts == USER_IDENTITY_SETUP_MAX_ATTEMPTS:
-                    raise x
                 attempts += 1
+                if attempts >= USER_IDENTITY_SETUP_MAX_ATTEMPTS:
+                    raise x
 
         # if we enabled identity for this hub, undo identity and RBAC
         if identity_enabled:
