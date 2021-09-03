@@ -324,7 +324,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
         attempts = 1
         user_identity_setup_completed = False
-        while attempts <= USER_IDENTITY_SETUP_MAX_ATTEMPTS or user_identity_setup_completed:
+        while attempts <= USER_IDENTITY_SETUP_MAX_ATTEMPTS and not user_identity_setup_completed:
             try:
                 self.assign_storage_role_if_needed(identity_principal)
 
@@ -370,7 +370,6 @@ class TestIoTStorage(IoTLiveScenarioTest):
                     expect_failure=True
                 )
                 user_identity_setup_completed = True
-
             except Exception as x:
                 if attempts == USER_IDENTITY_SETUP_MAX_ATTEMPTS:
                     raise x
