@@ -28,6 +28,7 @@ LIVE_STORAGE_ACCOUNT = settings.env.azext_iot_teststorageaccount
 STORAGE_ROLE = "Storage Blob Data Contributor"
 CWD = os.path.dirname(os.path.abspath(__file__))
 user_managed_identity_name = generate_generic_id()
+USER_IDENTITY_SETUP_MAX_ATTEMPTS = 3
 
 
 class TestIoTStorage(IoTLiveScenarioTest):
@@ -321,49 +322,58 @@ class TestIoTStorage(IoTLiveScenarioTest):
         identity_principal = hub_identity["userAssignedIdentities"][identity_id]["principalId"]
         assert identity_principal == user_identity["principalId"]
 
-        self.assign_storage_role_if_needed(identity_principal)
+        attempts = 0
+        user_identity_setup_completed = False
+        while not user_identity_setup_completed:
+            try:
+                self.assign_storage_role_if_needed(identity_principal)
 
-        # user identity assignment takes longer than expected
-        sleep(30)
+                # user identity assignment takes longer than expected
+                sleep(30)
 
-        # identity-based device-identity export
-        self.cmd(
-            'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {} --ik true'.format(
-                self.entity_name, self.live_storage_uri, "identity", identity_id
-            ),
-            checks=[
-                self.check("outputBlobContainerUri", self.live_storage_uri),
-                self.check("failureReason", None),
-                self.check("type", "export"),
-                self.check("excludeKeysInExport", False),
-                self.check("storageAuthenticationType", "identityBased"),
-                self.exists("jobId"),
-            ],
-        )
+                # identity-based device-identity export
+                self.cmd(
+                    'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {} --ik true'.format(
+                        self.entity_name, self.live_storage_uri, "identity", identity_id
+                    ),
+                    checks=[
+                        self.check("outputBlobContainerUri", self.live_storage_uri),
+                        self.check("failureReason", None),
+                        self.check("type", "export"),
+                        self.check("excludeKeysInExport", False),
+                        self.check("storageAuthenticationType", "identityBased"),
+                        self.exists("jobId"),
+                    ],
+                )
 
-        # give time to finish job
-        sleep(30)
+                # give time to finish job
+                sleep(30)
 
-        self.cmd(
-            'iot hub device-identity import -n {} --ibcu "{}" --obcu "{}" --auth-type {} --identity {}'.format(
-                self.entity_name, self.live_storage_uri, self.live_storage_uri, "identity", identity_id
-            ),
-            checks=[
-                self.check("outputBlobContainerUri", self.live_storage_uri),
-                self.check("inputBlobContainerUri", self.live_storage_uri),
-                self.check("failureReason", None),
-                self.check("type", "import"),
-                self.check("storageAuthenticationType", "identityBased"),
-                self.exists("jobId"),
-            ],
-        )
+                self.cmd(
+                    'iot hub device-identity import -n {} --ibcu "{}" --obcu "{}" --auth-type {} --identity {}'.format(
+                        self.entity_name, self.live_storage_uri, self.live_storage_uri, "identity", identity_id
+                    ),
+                    checks=[
+                        self.check("outputBlobContainerUri", self.live_storage_uri),
+                        self.check("inputBlobContainerUri", self.live_storage_uri),
+                        self.check("failureReason", None),
+                        self.check("type", "import"),
+                        self.check("storageAuthenticationType", "identityBased"),
+                        self.exists("jobId"),
+                    ],
+                )
 
-        self.cmd(
-            'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {}'.format(
-                self.entity_name, self.live_storage_uri, "identity", "fake_managed_identity"
-            ),
-            expect_failure=True
-        )
+                self.cmd(
+                    'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {}'.format(
+                        self.entity_name, self.live_storage_uri, "identity", "fake_managed_identity"
+                    ),
+                    expect_failure=True
+                )
+                user_identity_setup_completed = True
+            except Exception as x:
+                attempts += 1
+                if attempts >= USER_IDENTITY_SETUP_MAX_ATTEMPTS:
+                    raise x
 
         # if we enabled identity for this hub, undo identity and RBAC
         if identity_enabled:
