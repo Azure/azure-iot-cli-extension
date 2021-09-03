@@ -4,7 +4,9 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from azext_iot.central.models.enum import ApiVersion
 import datetime
+
 import isodate
 import time
 from azext_iot.monitor.parsers import strings
@@ -18,9 +20,8 @@ from azext_iot.constants import (
 
 from azext_iot.central.models.devicetwin import DeviceTwin, Property
 
-from azext_iot.central.providers import CentralDeviceTwinProvider
+from azext_iot.central.providers import CentralDeviceTwinProvider, CentralDeviceProvider
 from azext_iot.central.providers.v1 import (
-    CentralDeviceProviderV1,
     CentralDeviceTemplateProviderV1,
 )
 from azext_iot.monitor.parsers.issue import IssueHandler
@@ -46,8 +47,8 @@ class PropertyMonitor:
             token=self._token,
             device_id=self._device_id,
         )
-        self._central_device_provider = CentralDeviceProviderV1(
-            cmd=self._cmd, app_id=self._app_id, token=self._token
+        self._central_device_provider = CentralDeviceProvider(
+            cmd=self._cmd, app_id=self._app_id, token=self._token, api_version=ApiVersion.v1.value
         )
         self._central_template_provider = CentralDeviceTemplateProviderV1(
             cmd=self._cmd, app_id=self._app_id, token=self._token

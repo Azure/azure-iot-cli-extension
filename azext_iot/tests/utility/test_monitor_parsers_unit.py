@@ -4,13 +4,14 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from azext_iot.central.models.enum import ApiVersion
 import json
 import pytest
 
 from unittest import mock
 from uamqp.message import Message, MessageProperties
+from azext_iot.central.providers import CentralDeviceProvider
 from azext_iot.central.providers.v1 import (
-    CentralDeviceProviderV1,
     CentralDeviceTemplateProviderV1,
 )
 from azext_iot.central import models as central_models
@@ -614,10 +615,10 @@ class TestCentralParser:
         message: Message,
         args: CommonParserArguments,
     ):
-        device_provider = CentralDeviceProviderV1(cmd=None, app_id=None)
+        device_provider = CentralDeviceProvider(cmd=None, app_id=None, api_version=ApiVersion.v1.value)
         template_provider = CentralDeviceTemplateProviderV1(cmd=None, app_id=None)
         device_provider.get_device = mock.MagicMock(
-            return_value=central_models.DeviceV1({})
+            return_value=central_models.Device({})
         )
         template_provider.get_device_template = mock.MagicMock(
             return_value=device_template

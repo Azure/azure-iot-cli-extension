@@ -12,4 +12,3 @@ class FileUploadPreview:
         self.container = fileupload.get("container")
         self.sasttl = fileupload.get("sasTtl")
         self.state = fileupload.get("state")
-        pass

@@ -8,8 +8,8 @@ import re
 
 from uamqp.message import Message
 
+from azext_iot.central.providers import CentralDeviceProvider
 from azext_iot.central.providers.v1 import (
-    CentralDeviceProviderV1,
     CentralDeviceTemplateProviderV1,
 )
 from azext_iot.central import models as central_models
@@ -26,7 +26,7 @@ class CentralParser(CommonParser):
         self,
         message: Message,
         common_parser_args: CommonParserArguments,
-        central_device_provider: CentralDeviceProviderV1,
+        central_device_provider: CentralDeviceProvider,
         central_template_provider: CentralDeviceTemplateProviderV1,
         central_dns_suffix=CENTRAL_ENDPOINT
     ):

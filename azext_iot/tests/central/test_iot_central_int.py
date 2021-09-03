@@ -6,12 +6,14 @@
 
 
 import json
-
+import pytest
 from azure.iot.device import Message
 from azext_iot.common import utility
 from azext_iot.monitor.parsers import strings
 from azext_iot.tests import helpers
-from azext_iot.tests.central import CentralLiveScenarioTest, APP_ID, TOKEN, DNS_SUFFIX, sync_command_params
+from azext_iot.tests.central import (CentralLiveScenarioTest,
+                                     APP_ID, TOKEN, DNS_SUFFIX, STORAGE_CSTRING, STORAGE_CONTAINER, sync_command_params)
+
 
 if not all([APP_ID]):
     raise ValueError("Set azext_iot_central_app_id to run central integration tests.")
@@ -278,3 +280,32 @@ class TestIotCentral(CentralLiveScenarioTest):
 
         # check that run result and show result indeed match
         assert run_result["response"] == show_result["value"][0]["response"]
+
+    @pytest.mark.skipif(not STORAGE_CSTRING or not STORAGE_CONTAINER,
+                        reason="empty azext_iot_central_storage_cstring or azext_iot_central_storage_container env var",)
+    def test_central_fileupload_methods_CRD(self):
+        file_upload = self._create_fileupload()
+        self._wait_for_storage_configured()
+        command = self._appendOptionalArgsToCommand(
+            "iot central file-upload show -n {}".format(APP_ID), TOKEN, DNS_SUFFIX
+        )
+        result = self.cmd(command).get_output_in_json()
+        assert result["connectionString"] == file_upload["connectionString"]
+        assert result["container"] == file_upload["container"]
+        self._delete_fileupload()
+
+    def test_central_organization_methods_CRD(self):
+        org = self._create_organization()
+        command = self._appendOptionalArgsToCommand(
+            "iot central organization show -n {} --org-id {}".format(APP_ID, org["id"]),
+            TOKEN,
+            DNS_SUFFIX,
+        )
+        result = self.cmd(command).get_output_in_json()
+        assert result["id"] == org["id"]
+        self._delete_organization(org["id"])
+
+    def test_central_device_groups_list(self):
+        result = self._list_device_groups()
+        # assert object is empty or populated but not null
+        assert result is not None and (result == {} or bool(result) is True)

@@ -5,7 +5,9 @@
 # --------------------------------------------------------------------------------------------
 
 from azext_iot.central.providers.devicetwin_provider import CentralDeviceTwinProvider
+from azext_iot.central.providers.device_provider import CentralDeviceProvider
 
 __all__ = [
     "CentralDeviceTwinProvider",
+    "CentralDeviceProvider"
 ]

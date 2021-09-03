@@ -4,9 +4,6 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from azext_iot.central.providers.preview.device_provider_preview import (
-    CentralDeviceProviderPreview,
-)
 from azext_iot.central.providers.preview.device_template_provider_preview import (
     CentralDeviceTemplateProviderPreview,
 )
@@ -33,7 +30,6 @@ from azext_iot.central.providers.preview.fileupload_provider_preview import (
 )
 
 __all__ = [
-    "CentralDeviceProviderPreview",
     "CentralDeviceTemplateProviderPreview",
     "CentralUserProviderPreview",
     "CentralApiTokenProviderPreview",

@@ -8,4 +8,3 @@ class OrganizationPreview:
     def __init__(self, org: dict):
         self.display_name = org.get("displayName")
         self.id = org.get("id")
-        pass

@@ -7,7 +7,7 @@
 from azext_iot.central.models.enum import DeviceStatus
 
 
-class DeviceV1:
+class Device:
     def __init__(self, device: dict):
         self.enabled = device.get("enabled")
         self.display_name = device.get("displayName")
@@ -16,6 +16,7 @@ class DeviceV1:
         self.template = device.get("template")
         self.provisioned = device.get("provisioned")
         self.simulated = device.get("simulated")
+        self.organizations = device.get("organizations")
         self.device_status = self._parse_device_status()
 
     def _parse_device_status(self) -> DeviceStatus:

@@ -196,6 +196,9 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         assert template_id in created_device_template_list.keys()
 
         self._delete_device_template(template_id)
+
+        # template can't be deleted if any device exists for it. Assert accordingly
+
         deleted_device_template_list = self.cmd(
             self._appendOptionalArgsToCommand(
                 "iot central device-template list --app-id {}".format(APP_ID),
@@ -205,8 +208,13 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         ).get_output_in_json()
 
         deleted_dev_temp_count = len(deleted_device_template_list)
+
         assert deleted_dev_temp_count == start_dev_temp_count
-        assert template_id not in deleted_device_template_list.keys()
+
+        if template_id not in start_device_template_list.keys():
+            # template has been created during test so deletion succeeds
+            # otherwise it might fail because existing devices can exist
+            assert template_id not in deleted_device_template_list.keys()
 
     def test_central_device_groups_list(self):
         result = self._list_device_groups()

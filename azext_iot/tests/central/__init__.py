@@ -18,6 +18,8 @@ APP_SCOPE_ID = os.environ.get("azext_iot_central_scope_id")
 DEVICE_ID = os.environ.get("azext_iot_central_device_id")
 TOKEN = os.environ.get("azext_iot_central_token")
 DNS_SUFFIX = os.environ.get("azext_iot_central_dns_suffix")
+STORAGE_CSTRING = os.environ.get("azext_iot_central_storage_cstring")
+STORAGE_CONTAINER = os.environ.get("azext_iot_central_storage_container")
 device_template_path = get_context_path(__file__, "json/device_template_int_test.json")
 sync_command_params = get_context_path(__file__, "json/sync_command_args.json")
 
@@ -170,6 +172,14 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             except:
                 time.sleep(10)
 
+    def _list_device_groups(self):
+        command = self._appendOptionalArgsToCommand(
+            "iot central device-group list --app-id {}".format(APP_ID),
+            TOKEN,
+            DNS_SUFFIX,
+        )
+        return self.cmd(command).get_output_in_json()
+
     def _list_roles(self):
         return self.cmd(
             "iot central role list --app-id {}".format(
@@ -221,6 +231,83 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             output = ""
 
         return output
+
+    def _create_fileupload(self):
+        command = self._appendOptionalArgsToCommand(
+            'iot central file-upload create --app-id {} -s "{}" -c "{}"'.format(
+                APP_ID, STORAGE_CSTRING, STORAGE_CONTAINER
+            ),
+            TOKEN,
+            DNS_SUFFIX,
+        )
+
+        return self.cmd(
+            command,
+            checks=[
+                self.check("connectionString", STORAGE_CSTRING),
+                self.check("container", STORAGE_CONTAINER),
+            ],
+        ).get_output_in_json()
+
+    def _delete_fileupload(self):
+        command = self._appendOptionalArgsToCommand(
+            "iot central file-upload delete --app-id {}".format(APP_ID),
+            TOKEN,
+            DNS_SUFFIX,
+        )
+        self.cmd(
+            command,
+            checks=[
+                self.check("result", "success"),
+            ],
+        )
+
+    def _create_organization(self):
+        org_id = self.create_random_name(prefix="aztest", length=24)
+        command = self._appendOptionalArgsToCommand(
+            "iot central organization create --app-id {} --org-id {}".format(
+                APP_ID, org_id
+            ),
+            TOKEN,
+            DNS_SUFFIX,
+        )
+
+        return self.cmd(
+            command,
+            checks=[
+                self.check("id", org_id),
+            ],
+        ).get_output_in_json()
+
+    def _delete_organization(self, org_id):
+        command = self._appendOptionalArgsToCommand(
+            "iot central organization delete --app-id {} --org-id {}".format(
+                APP_ID, org_id
+            ),
+            TOKEN,
+            DNS_SUFFIX,
+        )
+        self.cmd(
+            command,
+            checks=[
+                self.check("result", "success"),
+            ],
+        )
+
+    def _wait_for_storage_configured(self):
+        command = "iot central file-upload show --app-id {}".format(APP_ID)
+        command = self._appendOptionalArgsToCommand(command, TOKEN, DNS_SUFFIX)
+
+        while True:
+            result = self.cmd(command)
+            file_upload = result.get_output_in_json()
+
+            # return when its provisioned
+            if file_upload.get("state") == "succeeded":
+                return
+
+            # wait 10 seconds for provisioning to complete
+            time.sleep(10)
 
     def _appendOptionalArgsToCommand(self, command: str, token: str, dnsSuffix: str):
         if token:

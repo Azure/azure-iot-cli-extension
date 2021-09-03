@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 # This is largely derived from https://docs.microsoft.com/en-us/rest/api/iotcentral/devices
 
-from typing import List, Union
+from typing import List
 import requests
 
 from knack.util import CLIError
@@ -27,9 +27,9 @@ def get_device(
     app_id: str,
     device_id: str,
     token: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
-) -> Union[central_models.DevicePreview, central_models.DeviceV1]:
+) -> central_models.Device:
     """
     Get device info given a device id
 
@@ -60,20 +60,17 @@ def get_device(
     )
     result = _utility.try_extract_result(response)
 
-    if api_version == ApiVersion.preview.value:
-        return central_models.DevicePreview(result)
-    else:
-        return central_models.DeviceV1(result)
+    return central_models.Device(result)
 
 
 def list_devices(
     cmd,
     app_id: str,
     token: str,
+    api_version: str,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
-) -> List[Union[central_models.DevicePreview, central_models.DeviceV1]]:
+) -> List[central_models.Device]:
     """
     Get a list of all devices in IoTC app
 
@@ -113,14 +110,9 @@ def list_devices(
         if "value" not in result:
             raise CLIError("Value is not present in body: {}".format(result))
 
-        if api_version == ApiVersion.preview.value:
-            devices.extend(
-                [central_models.DevicePreview(device) for device in result["value"]]
-            )
-        else:
-            devices.extend(
-                [central_models.DeviceV1(device) for device in result["value"]]
-            )
+        devices.extend(
+            [central_models.Device(device) for device in result["value"]]
+        )
 
         url = result.get("nextLink", None)
         pages_processed = pages_processed + 1
@@ -132,6 +124,7 @@ def get_device_registration_summary(
     cmd,
     app_id: str,
     token: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> dict:
     """
@@ -151,7 +144,7 @@ def get_device_registration_summary(
     registration_summary = {status.value: 0 for status in DeviceStatus}
 
     url = "https://{}.{}/{}?api-version={}".format(
-        app_id, central_dns_suffix, BASE_PATH, ApiVersion.v1.value
+        app_id, central_dns_suffix, BASE_PATH, api_version
     )
     headers = _utility.get_headers(token, cmd)
 
@@ -170,7 +163,7 @@ def get_device_registration_summary(
 
         for device in result["value"]:
             registration_summary[
-                central_models.DeviceV1(device).device_status.value
+                central_models.Device(device).device_status.value
             ] += 1
 
         print("Processed {} devices...".format(sum(registration_summary.values())))
@@ -188,9 +181,9 @@ def create_device(
     simulated: bool,
     organizations: str,
     token: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
-) -> Union[central_models.DevicePreview, central_models.DeviceV1]:
+) -> central_models.Device:
     """
     Create a device in IoTC
 
@@ -235,10 +228,7 @@ def create_device(
     response = requests.put(url, headers=headers, json=payload, params=query_parameters)
     result = _utility.try_extract_result(response)
 
-    if api_version == ApiVersion.preview.value:
-        return central_models.DevicePreview(result)
-    else:
-        return central_models.DeviceV1(result)
+    return central_models.Device(result)
 
 
 def delete_device(
@@ -246,8 +236,8 @@ def delete_device(
     app_id: str,
     device_id: str,
     token: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
 ) -> dict:
     """
     Delete a device from IoTC
@@ -280,8 +270,8 @@ def get_device_credentials(
     app_id: str,
     device_id: str,
     token: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
 ):
     """
     Get device credentials from IoTC
@@ -317,8 +307,8 @@ def run_command(
     device_id: str,
     command_name: str,
     payload: dict,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
 ):
     """
     Execute a direct method on a device
@@ -365,8 +355,8 @@ def run_component_command(
     interface_id: str,
     command_name: str,
     payload: dict,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
 ):
     """
     Execute a direct method on a device
@@ -412,8 +402,8 @@ def get_command_history(
     token: str,
     device_id: str,
     command_name: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
 ):
     """
     Get command history
@@ -450,8 +440,8 @@ def get_component_command_history(
     device_id: str,
     interface_id: str,
     command_name: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
 ):
     """
     Get component command history

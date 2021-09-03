@@ -9,4 +9,3 @@ class DeviceGroupPreview:
     def __init__(self, group: dict):
         self.display_name = group.get("displayName")
         self.id = group.get("id")
-        pass

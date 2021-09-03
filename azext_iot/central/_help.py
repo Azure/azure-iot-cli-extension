@@ -38,7 +38,7 @@ def load_central_help():
     _load_central_device_templates_help()
     _load_central_device_groups_help()
     _load_central_roles_help()
-    _load_central_file_uploads_help()
+    _load_central_file_upload_configuration_help()
     _load_central_organizations_help()
     _load_central_jobs_help()
     _load_central_monitors_help()
@@ -58,7 +58,7 @@ def _load_central_devices_help():
         "iot central device list"
     ] = """
         type: command
-        short-summary: List devices in IoT Central.
+        short-summary: Get the list of devices for an IoT Central application.
         examples:
         - name: List all devices in an application, sorted by device Id (default)
           text: >
@@ -309,7 +309,7 @@ def _load_central_users_help():
         "iot central user list"
     ] = """
     type: command
-    short-summary: Get list of users in an application
+    short-summary: Get list of users for an IoT Central application
     examples:
       - name: List of users
         text: >
@@ -374,7 +374,7 @@ def _load_central_api_token_help():
         "iot central api-token list"
     ] = """
     type: command
-    short-summary: List all API tokens associated with your IoT Central application.
+    short-summary: Get the list of API tokens associated with your IoT Central application.
     long-summary: Information in the list contains basic information about the tokens in the application and does not include token values.
     examples:
       - name: List of API tokens
@@ -397,7 +397,7 @@ def _load_central_device_templates_help():
         "iot central device-template list"
     ] = """
         type: command
-        short-summary: List device templates in IoT Central.
+        short-summary: Get the list of device templates for an IoT Central application.
         examples:
         - name: List all device templates in an application, sorted by template Id (default)
           text: >
@@ -480,12 +480,12 @@ def _load_central_device_groups_help():
     """
 
 
-def _load_central_file_uploads_help():
+def _load_central_file_upload_configuration_help():
     helps[
         "iot central file-upload"
     ] = """
           type: group
-          short-summary: Manage and configure IoT Central file uploads
+          short-summary: Manage and configure IoT Central file upload
       """
 
     helps[
@@ -494,7 +494,7 @@ def _load_central_file_uploads_help():
     type: command
     short-summary: Get the details of file upload storage account configuration
     examples:
-      - name: Get details of file upload
+      - name: Get details of file upload configuration
         text: >
           az iot central file-upload show
           --app-id {appid}
@@ -532,7 +532,7 @@ def _load_central_roles_help():
         "iot central role"
     ] = """
         type: group
-        short-summary: Manage and configure IoT Central roles
+        short-summary: Manage and configure roles for an IoT Central application.
     """
 
     helps[
@@ -567,7 +567,7 @@ def _load_central_organizations_help():
         "iot central organization"
     ] = """
         type: group
-        short-summary: Manage and configure IoT Central organizations
+        short-summary: Manage and configure organizations for an IoT Central application.
     """
 
     helps[
@@ -629,7 +629,7 @@ def _load_central_jobs_help():
         "iot central job"
     ] = """
         type: group
-        short-summary: Manage and configure IoT Central jobs
+        short-summary: Manage and configure jobs for an IoT Central application.
     """
 
     helps[
@@ -653,12 +653,35 @@ def _load_central_jobs_help():
     examples:
       - name: Create a job
         text: >
+          az iot central job create with name
+          --app-id {appid}
+          --job-id {jobId}
+          --group-id {groupId}
+          --job-name {jobName}
+          --content {creationJSONPath}
+
+      - name: Create a job with name and batch configuration in percentage
+        text: >
           az iot central job create
           --app-id {appid}
           --job-id {jobId}
           --group-id {groupId}
           --job-name {jobName}
           --content {creationJSONPath}
+          --batch {batchValue}
+          --batch-percentage
+
+      - name: Create a job with name and cancellation threshold configuration in percentage with no batch
+        text: >
+          az iot central job create
+          --app-id {appid}
+          --job-id {jobId}
+          --group-id {groupId}
+          --job-name {jobName}
+          --content {creationJSONPath}
+          --threshold {thresholdValue}
+          --threshold-percentage
+          --description {jobDesc}
     """
 
     helps[
