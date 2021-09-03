@@ -155,7 +155,7 @@ def load_central_arguments(self, _):
         context.argument(
             "device_id",
             options_list=["--device-id", "-d"],
-            help="Provide a unique identifier for the device."
+            help="Unique identifier for the device."
             " A case-sensitive string (up to 128 characters long) of ASCII 7-bit alphanumeric characters plus"
             " certain special characters: - . + % _ # * ? ! ( ) , : = @ $ '",
         )
@@ -221,26 +221,26 @@ def load_central_arguments(self, _):
         context.argument(
             "module_id",
             options_list=["--module-id", "-m"],
-            help="Provide IoT Edge Module ID if the device type is IoT Edge.",
+            help="The IoT Edge Module ID if the device type is IoT Edge.",
         )
 
     with self.argument_context("iot central role") as context:
         context.argument(
             "role_id",
             options_list=["--role-id", "-r"],
-            help="Provide a unique identifier for the role",
+            help="Unique identifier for the role",
         )
 
     with self.argument_context("iot central file-upload-configuration create") as context:
         context.argument(
             "connection_string",
             options_list=["--connection-string", "-s"],
-            help="Provide the connection string used to configure the storage account",
+            help="The connection string used to configure the storage account",
         )
         context.argument(
             "container",
             options_list=["--container", "-c"],
-            help="Provide the name of the container inside the storage account",
+            help="The name of the container inside the storage account",
         )
         context.argument(
             "account",
@@ -258,14 +258,14 @@ def load_central_arguments(self, _):
         context.argument(
             "org_id",
             options_list=["--org-id"],
-            help="Provide a unique identifier for the organization.",
+            help="Unique identifier for the organization.",
         )
 
     with self.argument_context("iot central organization create") as context:
         context.argument(
             "parent_org",
             options_list=["--parent-id"],
-            help="Provide the ID of the parent of the organization.",
+            help="The ID of the parent of the organization.",
         )
     with self.argument_context("iot central organization create") as context:
         context.argument(
@@ -278,14 +278,14 @@ def load_central_arguments(self, _):
         context.argument(
             "job_id",
             options_list=["--job-id", "-j"],
-            help="Provide a unique identifier for the job.",
+            help="Unique identifier for the job.",
         )
 
     with self.argument_context("iot central job rerun") as context:
         context.argument(
             "rerun_id",
             options_list=["--rerun-id"],
-            help="Provide a unique identifier for the rerun.",
+            help="Unique identifier for the rerun.",
         )
 
     with self.argument_context("iot central job create") as context:
@@ -297,7 +297,7 @@ def load_central_arguments(self, _):
         context.argument(
             "group_id",
             options_list=["--group-id", "-g"],
-            help="Provide the ID of the device group on which to execute the job",
+            help="The ID of the device group on which to execute the job",
         )
         context.argument(
             "content",
