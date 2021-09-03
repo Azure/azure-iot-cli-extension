@@ -115,8 +115,3 @@ class TemplatePreview:
             for interface, schema in self.schema_names.items()
             if property_name in schema
         ]
-
-    def _get_interface_id(self, interface) -> list:
-        return (
-            interface["schema"]["@id"] if interface.get("@type") else interface["@id"]
-        )
