@@ -25,6 +25,7 @@ jobs:
     parameters:
       path: 'azext_iot/tests/central'
       name: 'iot-central'
+      azureCLIVersion: ${{ parameters.azureCLIVersion }}
       azureSubscription: ${{ parameters.azureSubscription }}
       pythonVersion: ${{ parameters.pythonVersion }}
 
@@ -35,6 +36,7 @@ jobs:
     parameters:
       path: 'azext_iot/tests/digitaltwins'
       name: 'azure-digitaltwins'
+      azureCLIVersion: ${{ parameters.azureCLIVersion }}
       azureSubscription: ${{ parameters.azureSubscription }}
       pythonVersion: ${{ parameters.pythonVersion }}
 
@@ -45,6 +47,7 @@ jobs:
     parameters:
       path: 'azext_iot/tests/dps'
       name: 'device-provisioning-service'
+      azureCLIVersion: ${{ parameters.azureCLIVersion }}
       azureSubscription: ${{ parameters.azureSubscription }}
       pythonVersion: ${{ parameters.pythonVersion }}
 
@@ -55,6 +58,7 @@ jobs:
     parameters:
       path: 'azext_iot/tests/iothub/configurations azext_iot/tests/iothub/core azext_iot/tests/iothub/jobs'
       name: 'iot-hub-1'
+      azureCLIVersion: ${{ parameters.azureCLIVersion }}
       azureSubscription: ${{ parameters.azureSubscription }}
       pythonVersion: ${{ parameters.pythonVersion }}
 
@@ -65,6 +69,7 @@ jobs:
     parameters:
       path: 'azext_iot/tests/iothub/devices azext_iot/tests/iothub/messaging azext_iot/tests/iothub/modules'
       name: 'iot-hub-2'
+      azureCLIVersion: ${{ parameters.azureCLIVersion }}
       azureSubscription: ${{ parameters.azureSubscription }}
       pythonVersion: ${{ parameters.pythonVersion }}
 
@@ -73,6 +78,7 @@ jobs:
   steps:
   - template: run-tests-parallel.yml
     parameters:
+      azureCLIVersion: ${{ parameters.azureCLIVersion }}
       runIntTests: 'false'
       runUnitTests: 'true'
       pythonVersion: ${{ parameters.pythonVersion }}
