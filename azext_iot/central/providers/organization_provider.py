@@ -6,19 +6,18 @@
 
 
 from typing import List
-from azext_iot.central.models.organizationPreview import OrganizationPreview
 from knack.util import CLIError
 from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.enum import ApiVersion
-from azext_iot.central import models as central_models
+from azext_iot.central.models.v2 import OrganizationV2
 
 logger = get_logger(__name__)
 
 
-class CentralOrganizationProviderPreview:
-    def __init__(self, cmd, app_id: str, token=None):
+class CentralOrganizationProvider:
+    def __init__(self, cmd, app_id: str, api_version: str, token=None):
         """
         Provider for organizations APIs
 
@@ -33,11 +32,12 @@ class CentralOrganizationProviderPreview:
         self._cmd = cmd
         self._app_id = app_id
         self._token = token
+        self._api_version = api_version
         self._orgs = {}
 
     def list_organizations(
         self, central_dns_suffix=CENTRAL_ENDPOINT
-    ) -> List[OrganizationPreview]:
+    ) -> List[OrganizationV2]:
         orgs = central_services.organization.list_orgs(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -55,7 +55,7 @@ class CentralOrganizationProviderPreview:
         self,
         org_id,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> central_models.OrganizationPreview:
+    ) -> OrganizationV2:
         # get or add to cache
         org = self._orgs.get(org_id)
         if not org:
@@ -78,7 +78,7 @@ class CentralOrganizationProviderPreview:
         self,
         org_id,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> central_models.OrganizationPreview:
+    ) -> OrganizationV2:
         # get or add to cache
         org = central_services.organization.delete_org(
             cmd=self._cmd,

@@ -9,14 +9,13 @@ from knack.util import CLIError
 from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
-from azext_iot.central.models.enum import ApiVersion
-from azext_iot.central import models as central_models
+from azext_iot.central.models.v2 import FileUploadV2
 
 logger = get_logger(__name__)
 
 
-class CentralFileUploadProviderPreview:
-    def __init__(self, cmd, app_id: str, token=None):
+class CentralFileUploadProvider:
+    def __init__(self, cmd, app_id: str, api_version: str, token=None):
         """
         Provider for fileuploads APIs
 
@@ -31,19 +30,21 @@ class CentralFileUploadProviderPreview:
         self._cmd = cmd
         self._app_id = app_id
         self._token = token
+        self._api_version = api_version
         self._fileupload = {}
 
     def get_fileupload(
         self,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> central_models.FileUploadPreview:
+    ) -> FileUploadV2:
         # get or add to cache
         if not self._fileupload:
             fileupload = central_services.file_upload.get_fileupload(
                 cmd=self._cmd,
                 app_id=self._app_id,
                 token=self._token,
-                central_dns_suffix=central_dns_suffix
+                api_version=self._api_version,
+                central_dns_suffix=central_dns_suffix,
             )
 
             if not fileupload:
@@ -56,13 +57,14 @@ class CentralFileUploadProviderPreview:
     def delete_fileupload(
         self,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> central_models.FileUploadPreview:
+    ) -> FileUploadV2:
         # get or add to cache
         res = central_services.file_upload.delete_fileupload(
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
-            central_dns_suffix=central_dns_suffix
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
         )
 
         return res
@@ -85,7 +87,7 @@ class CentralFileUploadProviderPreview:
             sasTtl=sasTtl,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
-            api_version=ApiVersion.preview.value,
+            api_version=self._api_version,
         )
 
         return res

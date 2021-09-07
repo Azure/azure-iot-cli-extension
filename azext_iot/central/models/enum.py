@@ -23,15 +23,6 @@ class DeviceStatus(Enum):
     unassociated = "unassociated"
 
 
-class JobStatus(Enum):
-    """
-    Type of Job status.
-    """
-
-    running = "running"
-    starting = "starting"
-
-
 class Role(Enum):
     """
     Types of roles a user can have in Central (admin, builder, etc)
@@ -67,5 +58,6 @@ class ApiVersion(Enum):
     API version's supported
     """
 
-    preview = "1.1-preview"
+    preview = "preview"
     v1 = "1.0"
+    v2 = "1.1-preview"

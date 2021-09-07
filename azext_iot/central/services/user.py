@@ -24,8 +24,8 @@ def add_service_principal(
     object_id: str,
     role: Role,
     token: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
 ) -> dict:
     """
     Add a user to a Central app
@@ -73,8 +73,8 @@ def add_email(
     email: str,
     role: Role,
     token: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
 ) -> dict:
     """
     Add a user to a Central app
@@ -92,7 +92,7 @@ def add_email(
     """
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, assignee)
 
-    if api_version == ApiVersion.v1.value:
+    if api_version == ApiVersion.v1.value or api_version == ApiVersion.v2.value:
         user_type = UserTypeV1.email.value
     else:
         user_type = UserTypePreview.email.value
@@ -110,15 +110,17 @@ def add_email(
     query_parameters["api-version"] = api_version
 
     response = requests.put(url, headers=headers, json=payload, params=query_parameters)
-    return _utility.try_extract_result(response)
+    return _utility.get_object(
+        _utility.try_extract_result(response), "User", api_version
+    )
 
 
 def get_user_list(
     cmd,
     app_id: str,
     token: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
 ) -> dict:
     """
     Get the list of users for central app.
@@ -142,7 +144,9 @@ def get_user_list(
     query_parameters["api-version"] = api_version
 
     response = requests.get(url, headers=headers, params=query_parameters)
-    return _utility.try_extract_result(response)
+    return _utility.get_object(
+        _utility.try_extract_result(response), "User", api_version
+    )
 
 
 def get_user(
@@ -150,8 +154,8 @@ def get_user(
     app_id: str,
     token: str,
     assignee: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
 ) -> dict:
     """
     Get information for the specified user.
@@ -184,8 +188,8 @@ def delete_user(
     app_id: str,
     token: str,
     assignee: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
 ) -> dict:
     """
     delete user from theapp.

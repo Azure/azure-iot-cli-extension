@@ -5,13 +5,16 @@
 # --------------------------------------------------------------------------------------------
 # Nothing in this file should be used outside of service/central
 
-from knack.util import CLIError
+from knack.util import CLIError, to_snake_case
 from requests import Response
 from knack.log import logging
 
 from azext_iot import constants
 from azext_iot.common import auth
+
 import uuid
+from importlib import import_module
+from azext_iot.central.models.enum import ApiVersion
 
 
 def get_headers(token, cmd, has_json_payload=False):
@@ -51,3 +54,37 @@ def log_response_debug(response: Response, logger: logging.Logger):
     logger.debug("Response status code: {}".format(response.status_code))
     logger.debug("Response url: {}".format(response.url))
     logger.debug("Response headers: {}".format(response.headers))
+
+
+def get_object(data: dict, model: str, api_version):
+    try:
+        if api_version == ApiVersion.v1.value:
+            module = getattr(
+                import_module(
+                    "azext_iot.central.models.v1.{}".format(to_snake_case(model))
+                ),
+                model,
+            )
+            return module(data)
+
+        elif api_version == ApiVersion.v2.value:
+            module = getattr(
+                import_module(
+                    "azext_iot.central.models.v2.{}".format(to_snake_case(model))
+                ),
+                model,
+            )
+            return module(data)
+        else:
+            module = getattr(
+                import_module(
+                    "azext_iot.central.models.preview.{}".format(to_snake_case(model))
+                ),
+                model,
+            )
+            return module(data)
+    except Exception as e:
+        print(e)
+        raise CLIError(
+            "{} is not available for api version == {}".format(model, api_version)
+        )

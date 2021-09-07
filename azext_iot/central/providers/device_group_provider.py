@@ -5,18 +5,18 @@
 # --------------------------------------------------------------------------------------------
 
 
-from typing import List
-from azext_iot.central.models.deviceGroupPreview import DeviceGroupPreview
+from typing import List, Union
 from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
-from azext_iot.central.models.enum import ApiVersion
+from azext_iot.central.models.v2 import DeviceGroupV2
+from azext_iot.central.models.preview import DeviceGroupPreview
 
 logger = get_logger(__name__)
 
 
-class CentralDeviceGroupProviderPreview:
-    def __init__(self, cmd, app_id: str, token=None):
+class CentralDeviceGroupProvider:
+    def __init__(self, cmd, app_id: str, api_version: str, token=None):
         """
         Provider for device groups APIs
 
@@ -31,17 +31,18 @@ class CentralDeviceGroupProviderPreview:
         self._cmd = cmd
         self._app_id = app_id
         self._token = token
+        self._api_version = api_version
         self._device_groups = {}
 
     def list_device_groups(
         self, central_dns_suffix=CENTRAL_ENDPOINT
-    ) -> List[DeviceGroupPreview]:
+    ) -> List[Union[DeviceGroupPreview, DeviceGroupV2]]:
         device_groups = central_services.device_group.list_device_groups(
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
-            api_version=ApiVersion.preview.value,
+            api_version=self._api_version,
         )
 
         # add to cache

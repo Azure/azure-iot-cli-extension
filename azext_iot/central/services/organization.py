@@ -13,7 +13,7 @@ from knack.log import get_logger
 
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
-from azext_iot.central import models as central_models
+from azext_iot.central.models.v2 import OrganizationV2
 from azext_iot.central.models.enum import ApiVersion
 from azure.cli.core.util import should_disable_connection_verify
 
@@ -21,6 +21,7 @@ from azure.cli.core.util import should_disable_connection_verify
 logger = get_logger(__name__)
 
 BASE_PATH = "api/organizations"
+MODEL = "Organization"
 
 
 def _make_call(
@@ -65,7 +66,7 @@ def get_org(
     token: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.preview.value,
-) -> central_models.OrganizationPreview:
+) -> OrganizationV2:
     """
     Get organization info given an organization id
 
@@ -92,7 +93,7 @@ def get_org(
         api_version=api_version,
     )
 
-    return central_models.OrganizationPreview(result)
+    return _utility.get_object(result, MODEL, api_version)
 
 
 def list_orgs(
@@ -102,7 +103,7 @@ def list_orgs(
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.preview.value,
-) -> List[central_models.OrganizationPreview]:
+) -> List[OrganizationV2]:
     """
     Get a list of all organizations in IoTC app
 
@@ -138,7 +139,7 @@ def list_orgs(
             raise CLIError("Value is not present in body: {}".format(result))
 
         orgs.extend(
-            [central_models.OrganizationPreview(org) for org in result["value"]]
+            [_utility.get_object(org, MODEL, api_version) for org in result["value"]]
         )
 
         url = result.get("nextLink", None)
@@ -156,7 +157,7 @@ def create_org(
     token: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.preview.value,
-) -> central_models.OrganizationPreview:
+) -> OrganizationV2:
 
     """
     Create an organization in IoTC
@@ -195,7 +196,7 @@ def create_org(
         api_version=api_version,
     )
 
-    return central_models.OrganizationPreview(result)
+    return _utility.get_object(result, MODEL, api_version)
 
 
 def delete_org(
@@ -205,7 +206,7 @@ def delete_org(
     token: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.preview.value,
-) -> central_models.OrganizationPreview:
+) -> OrganizationV2:
     """
     Delete an organization
 

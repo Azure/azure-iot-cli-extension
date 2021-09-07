@@ -6,7 +6,7 @@
 # Dev note - think of this as a controller
 
 from azext_iot.constants import CENTRAL_ENDPOINT
-from azext_iot.central.providers.preview import CentralRoleProviderPreview
+from azext_iot.central.providers import CentralRoleProvider
 from azext_iot.central.models.enum import ApiVersion
 
 
@@ -18,7 +18,9 @@ def get_role(
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.preview.value,
 ):
-    provider = CentralRoleProviderPreview(cmd=cmd, app_id=app_id, token=token)
+    provider = CentralRoleProvider(
+        cmd=cmd, app_id=app_id, api_version=api_version, token=token
+    )
 
     return provider.get_role(role_id=role_id, central_dns_suffix=central_dns_suffix)
 
@@ -30,6 +32,8 @@ def list_roles(
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.preview.value,
 ):
-    provider = CentralRoleProviderPreview(cmd=cmd, app_id=app_id, token=token)
+    provider = CentralRoleProvider(
+        cmd=cmd, app_id=app_id, api_version=api_version, token=token
+    )
 
     return provider.list_roles(central_dns_suffix=central_dns_suffix)

@@ -11,7 +11,7 @@ CLI parameter definitions.
 from knack.arguments import CLIArgumentType, CaseInsensitiveList
 from azure.cli.core.commands.parameters import get_three_state_flag
 from azext_iot.monitor.models.enum import Severity
-from azext_iot.central.models.enum import Role, ApiVersion
+from azext_iot.central.models.enum import ApiVersion
 from azext_iot._params import event_msg_prop_type, event_timeout_type
 
 severity_type = CLIArgumentType(
@@ -22,7 +22,6 @@ severity_type = CLIArgumentType(
 
 role_type = CLIArgumentType(
     options_list=["--role", "-r"],
-    choices=CaseInsensitiveList([role.name for role in Role]),
     help="The role that will be associated with this token."
     " You can specify one of the built-in roles, or specify the role ID of a custom role."
     " See more at https://aka.ms/iotcentral-customrolesdocs",
@@ -104,6 +103,12 @@ def load_central_arguments(self, _):
             " Specify an ID that you'll then use when modifying or deleting this token later via the CLI or API.",
         )
         context.argument("role", arg_type=role_type)
+        context.argument(
+            "org_id",
+            options_list=["--organization-id", "--orgid"],
+            help="The ID of the organization for the token role assignment."
+            " Only available for api-version == 1.1-preview",
+        )
 
     with self.argument_context("iot central device compute-device-key") as context:
         context.argument(
@@ -176,6 +181,17 @@ def load_central_arguments(self, _):
             "by visiting https://github.com/iot-for-all/iot-central-high-availability-clients#readme",
         )
 
+    with self.argument_context("iot central device-group") as context:
+        context.argument(
+            "api_version",
+            options_list=["--api-version", "--av"],
+            choices=CaseInsensitiveList(
+                [ApiVersion.preview.value, ApiVersion.v2.value]
+            ),
+            default=ApiVersion.v2.value,
+            help="The API version for the requested operation.",
+        )
+
     with self.argument_context("iot central user") as context:
         context.argument(
             "tenant_id",
@@ -231,7 +247,18 @@ def load_central_arguments(self, _):
             help="Unique identifier for the role",
         )
 
-    with self.argument_context("iot central file-upload-configuration create") as context:
+    with self.argument_context("iot central file-upload-configuration") as context:
+        context.argument(
+            "api_version",
+            options_list=["--api-version", "--av"],
+            choices=CaseInsensitiveList([ApiVersion.v2.value]),
+            default=ApiVersion.v2.value,
+            help="The API version for the requested operation.",
+        )
+
+    with self.argument_context(
+        "iot central file-upload-configuration create"
+    ) as context:
         context.argument(
             "connection_string",
             options_list=["--connection-string", "-s"],

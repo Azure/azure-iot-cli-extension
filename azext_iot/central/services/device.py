@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 # This is largely derived from https://docs.microsoft.com/en-us/rest/api/iotcentral/devices
 
-from typing import List
+from typing import List, Union
 import requests
 
 from knack.util import CLIError
@@ -13,7 +13,9 @@ from knack.log import get_logger
 
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
-from azext_iot.central import models as central_models
+from azext_iot.central.models.preview import DevicePreview
+from azext_iot.central.models.v1 import DeviceV1
+from azext_iot.central.models.v2 import DeviceV2
 from azext_iot.central.models.enum import DeviceStatus, ApiVersion
 from azure.cli.core.util import should_disable_connection_verify
 
@@ -29,7 +31,7 @@ def get_device(
     token: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> central_models.Device:
+) -> Union[DeviceV2, DeviceV1, DevicePreview]:
     """
     Get device info given a device id
 
@@ -60,7 +62,11 @@ def get_device(
     )
     result = _utility.try_extract_result(response)
 
-    return central_models.Device(result)
+    if api_version == ApiVersion.v1.value:
+        return DeviceV1(result)
+    elif api_version == ApiVersion.v2.value:
+        return DeviceV2(result)
+    return DevicePreview(result)
 
 
 def list_devices(
@@ -70,7 +76,7 @@ def list_devices(
     api_version: str,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> List[central_models.Device]:
+) -> List[Union[DeviceV1, DeviceV2, DevicePreview]]:
     """
     Get a list of all devices in IoTC app
 
@@ -110,9 +116,14 @@ def list_devices(
         if "value" not in result:
             raise CLIError("Value is not present in body: {}".format(result))
 
-        devices.extend(
-            [central_models.Device(device) for device in result["value"]]
-        )
+        if api_version == ApiVersion.v1.value:
+            ctor = DeviceV1
+        elif api_version == ApiVersion.v2.value:
+            ctor = DeviceV2
+        else:
+            ctor = DevicePreview
+
+        devices.extend([ctor(device) for device in result["value"]])
 
         url = result.get("nextLink", None)
         pages_processed = pages_processed + 1
@@ -161,10 +172,15 @@ def get_device_registration_summary(
         if "value" not in result:
             raise CLIError("Value is not present in body: {}".format(result))
 
+        if api_version == ApiVersion.v1.value:
+            ctor = DeviceV1
+        elif api_version == ApiVersion.v2.value:
+            ctor = DeviceV2
+        else:
+            ctor = DevicePreview
+
         for device in result["value"]:
-            registration_summary[
-                central_models.Device(device).device_status.value
-            ] += 1
+            registration_summary[ctor(device).device_status.value] += 1
 
         print("Processed {} devices...".format(sum(registration_summary.values())))
         url = result.get("nextLink")
@@ -183,7 +199,7 @@ def create_device(
     token: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> central_models.Device:
+) -> Union[DeviceV1, DeviceV2, DevicePreview]:
     """
     Create a device in IoTC
 
@@ -221,14 +237,20 @@ def create_device(
     if template:
         payload["template"] = template
 
-    if api_version == ApiVersion.preview.value:
+    if api_version == ApiVersion.v2.value:
         if organizations:
             payload["organizations"] = organizations.split(",")
 
     response = requests.put(url, headers=headers, json=payload, params=query_parameters)
     result = _utility.try_extract_result(response)
 
-    return central_models.Device(result)
+    if api_version == ApiVersion.v1.value:
+        ctor = DeviceV1
+    elif api_version == ApiVersion.v2.value:
+        ctor = DeviceV2
+    else:
+        ctor = DevicePreview
+    return ctor(result)
 
 
 def delete_device(

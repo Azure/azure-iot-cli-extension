@@ -6,7 +6,7 @@
 # Dev note - think of this as a controller
 
 from azext_iot.constants import CENTRAL_ENDPOINT
-from azext_iot.central.providers.preview import CentralOrganizationProviderPreview
+from azext_iot.central.providers import CentralOrganizationProvider
 from azext_iot.central.models.enum import ApiVersion
 
 
@@ -16,9 +16,11 @@ def get_org(
     org_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.preview.value,
+    api_version=ApiVersion.v2.value,
 ):
-    provider = CentralOrganizationProviderPreview(cmd=cmd, app_id=app_id, token=token)
+    provider = CentralOrganizationProvider(
+        cmd=cmd, app_id=app_id, api_version=api_version, token=token
+    )
 
     return provider.get_organization(
         org_id=org_id, central_dns_suffix=central_dns_suffix
@@ -31,9 +33,11 @@ def delete_org(
     org_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.preview.value,
+    api_version=ApiVersion.v2.value,
 ):
-    provider = CentralOrganizationProviderPreview(cmd=cmd, app_id=app_id, token=token)
+    provider = CentralOrganizationProvider(
+        cmd=cmd, app_id=app_id, api_version=api_version, token=token
+    )
 
     return provider.delete_organization(
         org_id=org_id, central_dns_suffix=central_dns_suffix
@@ -45,9 +49,11 @@ def list_orgs(
     app_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.preview.value,
+    api_version=ApiVersion.v2.value,
 ):
-    provider = CentralOrganizationProviderPreview(cmd=cmd, app_id=app_id, token=token)
+    provider = CentralOrganizationProvider(
+        cmd=cmd, app_id=app_id, api_version=api_version, token=token
+    )
 
     return provider.list_organizations(central_dns_suffix=central_dns_suffix)
 
@@ -60,9 +66,12 @@ def create_org(
     parent_org=None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.preview.value,
+    api_version=ApiVersion.v2.value,
 ):
-    provider = CentralOrganizationProviderPreview(cmd=cmd, app_id=app_id, token=token)
+    provider = CentralOrganizationProvider(
+        cmd=cmd, app_id=app_id, api_version=api_version, token=token
+    )
+
     return provider.create_organization(
         org_id=org_id,
         org_name=org_name,

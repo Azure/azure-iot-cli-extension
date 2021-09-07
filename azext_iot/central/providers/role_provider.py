@@ -5,20 +5,20 @@
 # --------------------------------------------------------------------------------------------
 
 
-from typing import List
-from azext_iot.central.models.rolePreview import RolePreview
+from typing import List, Union
 from knack.util import CLIError
 from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
-from azext_iot.central.models.enum import ApiVersion
-from azext_iot.central import models as central_models
+from azext_iot.central.models.v1 import RoleV1
+from azext_iot.central.models.v2 import RoleV2
+from azext_iot.central.models.preview import RolePreview
 
 logger = get_logger(__name__)
 
 
-class CentralRoleProviderPreview:
-    def __init__(self, cmd, app_id: str, token=None):
+class CentralRoleProvider:
+    def __init__(self, cmd, app_id: str, api_version: str, token=None):
         """
         Provider for roles APIs
 
@@ -33,15 +33,18 @@ class CentralRoleProviderPreview:
         self._cmd = cmd
         self._app_id = app_id
         self._token = token
+        self._api_version = api_version
         self._roles = {}
 
-    def list_roles(self, central_dns_suffix=CENTRAL_ENDPOINT) -> List[RolePreview]:
+    def list_roles(
+        self, central_dns_suffix=CENTRAL_ENDPOINT
+    ) -> List[Union[RoleV1, RoleV2, RolePreview]]:
         roles = central_services.role.list_roles(
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
-            api_version=ApiVersion.preview.value,
+            api_version=self._api_version,
         )
 
         # add to cache
@@ -53,7 +56,7 @@ class CentralRoleProviderPreview:
         self,
         role_id,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> central_models.RolePreview:
+    ) -> Union[RoleV1, RoleV2, RolePreview]:
         # get or add to cache
         role = self._roles.get(role_id)
         if not role:
@@ -63,7 +66,7 @@ class CentralRoleProviderPreview:
                 role_id=role_id,
                 token=self._token,
                 central_dns_suffix=central_dns_suffix,
-                api_version=ApiVersion.preview.value,
+                api_version=self._api_version,
             )
             self._roles[role_id] = role
 

@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 
-class JobPreview:
+class Job:
     def __init__(self, job: dict):
         self.display_name = job.get("displayName")
         self.id = job.get("id")

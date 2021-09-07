@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 # This is largely derived from https://docs.microsoft.com/en-us/rest/api/iotcentral/roles
 
-from typing import List
+from typing import List, Union
 import requests
 
 from knack.util import CLIError
@@ -13,8 +13,9 @@ from knack.log import get_logger
 
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
-from azext_iot.central import models as central_models
-from azext_iot.central.models.enum import ApiVersion
+from azext_iot.central.models.v1 import RoleV1
+from azext_iot.central.models.v2 import RoleV2
+from azext_iot.central.models.preview import RolePreview
 from azure.cli.core.util import should_disable_connection_verify
 
 
@@ -28,9 +29,9 @@ def get_role(
     app_id: str,
     role_id: str,
     token: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.preview.value,
-) -> central_models.RolePreview:
+) -> Union[RoleV1, RoleV2, RolePreview]:
     """
     Get role info given a role id
 
@@ -61,17 +62,17 @@ def get_role(
     )
     result = _utility.try_extract_result(response)
 
-    return central_models.RolePreview(result)
+    return _utility.get_object(result, "Role", api_version)
 
 
 def list_roles(
     cmd,
     app_id: str,
     token: str,
+    api_version: str,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.preview.value,
-) -> List[central_models.RolePreview]:
+) -> List[Union[RoleV1, RoleV2, RolePreview]]:
     """
     Get a list of all roles in IoTC app
 
@@ -108,7 +109,9 @@ def list_roles(
         if "value" not in result:
             raise CLIError("Value is not present in body: {}".format(result))
 
-        roles.extend([central_models.RolePreview(role) for role in result["value"]])
+        roles.extend(
+            [_utility.get_object(role, "Role", api_version) for role in result["value"]]
+        )
 
         url = result.get("nextLink", None)
         pages_processed = pages_processed + 1

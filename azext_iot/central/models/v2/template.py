@@ -4,11 +4,10 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-
 from knack.util import CLIError
 
 
-class TemplateV1:
+class Template:
     def __init__(self, template: dict):
         self.raw_template = template
         try:
@@ -67,7 +66,7 @@ class TemplateV1:
             )
             raise CLIError(details)
 
-    def _extract_root_interface_contents(self, dcm: dict) -> dict:
+    def _extract_root_interface_contents(self, dcm: dict):
         rootContents = dcm.get("contents", {})
         contents = [
             entity for entity in rootContents if entity.get("@type") != "Component"
@@ -77,6 +76,7 @@ class TemplateV1:
 
     def _extract_interfaces(self, template: dict) -> dict:
         try:
+
             interfaces = []
             dcm = template.get("capabilityModel", {})
 
@@ -90,7 +90,7 @@ class TemplateV1:
                 interface["@id"]: self._extract_schemas(interface)
                 for interface in interfaces
             }
-        except Exception:
+        except:
             details = "Unable to extract device schema from template '{}'.".format(
                 self.id
             )

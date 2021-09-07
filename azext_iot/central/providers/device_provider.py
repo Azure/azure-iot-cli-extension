@@ -4,17 +4,20 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from typing import List
-from azext_iot.central.models.device import Device
+from typing import List, Union
 from knack.util import CLIError
 from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.enum import DeviceStatus
+from azext_iot.central.models.v1 import DeviceV1
+from azext_iot.central.models.v2 import DeviceV2
+from azext_iot.central.models.preview import DevicePreview
 from azext_iot.dps.services import global_service as dps_global_service
 
 
 logger = get_logger(__name__)
+MODEL = "Device"
 
 
 class CentralDeviceProvider:
@@ -32,8 +35,8 @@ class CentralDeviceProvider:
         """
         self._cmd = cmd
         self._app_id = app_id
-        self._token = token
         self._api_version = api_version
+        self._token = token
         self._devices = {}
         self._device_templates = {}
         self._device_credentials = {}
@@ -43,7 +46,7 @@ class CentralDeviceProvider:
         self,
         device_id,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> Device:
+    ) -> Union[DeviceV1, DeviceV2, DevicePreview]:
 
         # get or add to cache
         device = self._devices.get(device_id)
@@ -54,19 +57,19 @@ class CentralDeviceProvider:
                 device_id=device_id,
                 token=self._token,
                 central_dns_suffix=central_dns_suffix,
-                api_version=self._api_version
+                api_version=self._api_version,
             )
             self._devices[device_id] = device
 
         if not device:
             raise CLIError("No device found with id: '{}'.".format(device_id))
 
-        return device
+        return self._devices[device_id]
 
     def list_devices(
         self,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> List[Device]:
+    ) -> List[Union[DeviceV1, DeviceV2, DevicePreview]]:
         devices = central_services.device.list_devices(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -88,7 +91,7 @@ class CentralDeviceProvider:
         simulated=False,
         organizations=None,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> Device:
+    ) -> Union[DeviceV1, DeviceV2, DevicePreview]:
         if not device_id:
             raise CLIError("Device id must be specified.")
 
@@ -102,8 +105,8 @@ class CentralDeviceProvider:
             device_name=device_name,
             template=template,
             simulated=simulated,
+            organizations=organizations,
             token=self._token,
-            organizations=None,
             central_dns_suffix=central_dns_suffix,
             api_version=self._api_version,
         )
@@ -114,7 +117,7 @@ class CentralDeviceProvider:
         # add to cache
         self._devices[device.id] = device
 
-        return device
+        return self._devices[device.id]
 
     def delete_device(
         self,

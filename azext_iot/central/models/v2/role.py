@@ -5,7 +5,8 @@
 # --------------------------------------------------------------------------------------------
 
 
-class RolePreview:
+class Role:
     def __init__(self, device: dict):
         self.display_name = device.get("displayName")
         self.id = device.get("id")
+        pass

@@ -7,8 +7,8 @@
 
 from knack.util import CLIError
 from azext_iot.constants import CENTRAL_ENDPOINT
-from azext_iot.central.providers.preview import CentralJobProviderPreview
 from azext_iot.central.models.enum import ApiVersion
+from azext_iot.central.providers.job_provider import CentralJobProvider
 from azext_iot.common import utility
 
 
@@ -20,7 +20,9 @@ def get_job(
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.preview.value,
 ):
-    provider = CentralJobProviderPreview(cmd=cmd, app_id=app_id, token=token)
+    provider = CentralJobProvider(
+        cmd=cmd, app_id=app_id, api_version=api_version, token=token
+    )
 
     return provider.get_job(job_id=job_id, central_dns_suffix=central_dns_suffix)
 
@@ -33,7 +35,9 @@ def stop_job(
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.preview.value,
 ):
-    provider = CentralJobProviderPreview(cmd=cmd, app_id=app_id, token=token)
+    provider = CentralJobProvider(
+        cmd=cmd, app_id=app_id, api_version=api_version, token=token
+    )
 
     return provider.stop_job(job_id=job_id, central_dns_suffix=central_dns_suffix)
 
@@ -46,7 +50,9 @@ def resume_job(
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.preview.value,
 ):
-    provider = CentralJobProviderPreview(cmd=cmd, app_id=app_id, token=token)
+    provider = CentralJobProvider(
+        cmd=cmd, app_id=app_id, api_version=api_version, token=token
+    )
 
     return provider.resume_job(job_id=job_id, central_dns_suffix=central_dns_suffix)
 
@@ -60,7 +66,9 @@ def rerun_job(
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.preview.value,
 ):
-    provider = CentralJobProviderPreview(cmd=cmd, app_id=app_id, token=token)
+    provider = CentralJobProvider(
+        cmd=cmd, app_id=app_id, api_version=api_version, token=token
+    )
 
     return provider.rerun_job(
         job_id=job_id, rerun_id=rerun_id, central_dns_suffix=central_dns_suffix
@@ -75,7 +83,9 @@ def get_job_devices(
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.preview.value,
 ):
-    provider = CentralJobProviderPreview(cmd=cmd, app_id=app_id, token=token)
+    provider = CentralJobProvider(
+        cmd=cmd, app_id=app_id, api_version=api_version, token=token
+    )
 
     return provider.get_job_devices(
         job_id=job_id, central_dns_suffix=central_dns_suffix
@@ -89,7 +99,9 @@ def list_jobs(
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.preview.value,
 ):
-    provider = CentralJobProviderPreview(cmd=cmd, app_id=app_id, token=token)
+    provider = CentralJobProvider(
+        cmd=cmd, app_id=app_id, api_version=api_version, token=token
+    )
 
     return provider.list_jobs(central_dns_suffix=central_dns_suffix)
 
@@ -117,7 +129,9 @@ def create_job(
 
     payload = utility.process_json_arg(content, argument_name="content")
 
-    provider = CentralJobProviderPreview(cmd=cmd, app_id=app_id, token=token)
+    provider = CentralJobProvider(
+        cmd=cmd, app_id=app_id, api_version=api_version, token=token
+    )
     return provider.create_job(
         job_id=job_id,
         job_name=job_name,

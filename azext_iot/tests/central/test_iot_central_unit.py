@@ -4,6 +4,14 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from azext_iot.central.providers import (
+    CentralFileUploadProvider,
+    CentralOrganizationProvider,
+    CentralRoleProvider,
+    CentralDeviceGroupProvider,
+    CentralDeviceTemplateProvider,
+    CentralJobProvider,
+)
 from azext_iot.central.models.enum import ApiVersion
 import pytest
 import json
@@ -17,23 +25,19 @@ from azext_iot.central import commands_device_twin
 from azext_iot.central import commands_device
 from azext_iot.central import commands_monitor
 from azext_iot.central.providers import CentralDeviceProvider
-from azext_iot.central.providers.v1 import (
-    CentralDeviceTemplateProviderV1,
-)
-from azext_iot.central.providers.preview import (
-    CentralDeviceGroupProviderPreview,
-    CentralRoleProviderPreview,
-    CentralOrganizationProviderPreview,
-    CentralJobProviderPreview,
-    CentralFileUploadProviderPreview,
-)
 from azext_iot.central.models.devicetwin import DeviceTwin
-from azext_iot.central import models as central_models
 from azext_iot.monitor.property import PropertyMonitor
 from azext_iot.monitor.models.enum import Severity
 from azext_iot.tests.helpers import load_json
 from azext_iot.tests.test_constants import FileNames
 from azext_iot.constants import PNP_DTDLV2_COMPONENT_MARKER
+from azext_iot.central.models.v2 import (
+    DeviceGroupV2,
+    OrganizationV2,
+    JobV2,
+    FileUploadV2,
+)
+from azext_iot.central.models.v1 import RoleV1, TemplateV1
 
 device_id = "mydevice"
 app_id = "myapp"
@@ -169,7 +173,9 @@ class TestCentralDeviceProvider:
     @mock.patch("azext_iot.central.services.device")
     def test_should_return_device(self, mock_device_svc, mock_device_template_svc):
         # setup
-        provider = CentralDeviceProvider(cmd=None, app_id=app_id, api_version=ApiVersion.v1.value)
+        provider = CentralDeviceProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1.value
+        )
         mock_device_svc.get_device.return_value = self._device
         mock_device_template_svc.get_device_template.return_value = (
             self._device_template
@@ -192,7 +198,9 @@ class TestCentralDeviceProvider:
         self, mock_device_svc, mock_device_template_svc
     ):
         # setup
-        provider = CentralDeviceTemplateProviderV1(cmd=None, app_id=app_id)
+        provider = CentralDeviceTemplateProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1.value
+        )
         mock_device_svc.get_device.return_value = self._device
         mock_device_template_svc.get_device_template.return_value = (
             self._device_template
@@ -211,15 +219,32 @@ class TestCentralDeviceProvider:
 
 class TestCentralDeviceGroupProvider:
     _device_groups = [
-        central_models.DeviceGroupPreview(group)
-        for group in load_json(FileNames.central_device_group_file)
+        DeviceGroupV2(group) for group in load_json(FileNames.central_device_group_file)
     ]
 
     @mock.patch("azext_iot.central.services.device_group")
     def test_should_return_device_groups(self, mock_device_group_svc):
 
         # setup
-        provider = CentralDeviceGroupProviderPreview(cmd=None, app_id=app_id)
+        provider = CentralDeviceGroupProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v2.value
+        )
+        mock_device_group_svc.list_device_groups.return_value = self._device_groups
+
+        # act
+        device_groups = provider.list_device_groups()
+        # verify
+        # call counts should be at most 1 since the provider has a cache
+        assert mock_device_group_svc.list_device_groups.call_count == 1
+        assert set(device_groups) == set(map(lambda x: x.id, self._device_groups))
+
+    @mock.patch("azext_iot.central.services.device_group")
+    def test_should_fail_device_groups(self, mock_device_group_svc):
+
+        # setup
+        provider = CentralDeviceGroupProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1.value
+        )
         mock_device_group_svc.list_device_groups.return_value = self._device_groups
 
         # act
@@ -231,16 +256,15 @@ class TestCentralDeviceGroupProvider:
 
 
 class TestCentralRoleProvider:
-    _roles = [
-        central_models.RolePreview(role)
-        for role in load_json(FileNames.central_role_file)
-    ]
+    _roles = [RoleV1(role) for role in load_json(FileNames.central_role_file)]
 
     @mock.patch("azext_iot.central.services.role")
     def test_should_return_roles(self, mock_role_svc):
 
         # setup
-        provider = CentralRoleProviderPreview(cmd=None, app_id=app_id)
+        provider = CentralRoleProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1.value
+        )
         mock_role_svc.list_roles.return_value = self._roles
 
         # act
@@ -253,7 +277,9 @@ class TestCentralRoleProvider:
     @mock.patch("azext_iot.central.services.role")
     def test_should_return_role(self, mock_role_svc):
         # setup
-        provider = CentralRoleProviderPreview(cmd=None, app_id=app_id)
+        provider = CentralRoleProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1.value
+        )
         mock_role_svc.get_role.return_value = self._roles[0]
 
         # act
@@ -266,15 +292,16 @@ class TestCentralRoleProvider:
 
 class TestCentralOrganizationProvider:
     _orgs = [
-        central_models.OrganizationPreview(org)
-        for org in load_json(FileNames.central_organization_file)
+        OrganizationV2(org) for org in load_json(FileNames.central_organization_file)
     ]
 
     @mock.patch("azext_iot.central.services.organization")
     def test_should_return_orgs(self, mock_org_svc):
 
         # setup
-        provider = CentralOrganizationProviderPreview(cmd=None, app_id=app_id)
+        provider = CentralOrganizationProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v2.value
+        )
         mock_org_svc.list_orgs.return_value = self._orgs
 
         # act
@@ -287,7 +314,9 @@ class TestCentralOrganizationProvider:
     @mock.patch("azext_iot.central.services.organization")
     def test_should_return_org(self, mock_org_svc):
         # setup
-        provider = CentralOrganizationProviderPreview(cmd=None, app_id=app_id)
+        provider = CentralOrganizationProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v2.value
+        )
         mock_org_svc.get_org.return_value = self._orgs[0]
 
         # act
@@ -299,15 +328,15 @@ class TestCentralOrganizationProvider:
 
 
 class TestCentralJobProvider:
-    _jobs = [
-        central_models.JobPreview(job) for job in load_json(FileNames.central_job_file)
-    ]
+    _jobs = [JobV2(job) for job in load_json(FileNames.central_job_file)]
 
     @mock.patch("azext_iot.central.services.job")
     def test_should_return_jobs(self, mock_job_svc):
 
         # setup
-        provider = CentralJobProviderPreview(cmd=None, app_id=app_id)
+        provider = CentralJobProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v2.value
+        )
         mock_job_svc.list_jobs.return_value = self._jobs
 
         # act
@@ -320,7 +349,9 @@ class TestCentralJobProvider:
     @mock.patch("azext_iot.central.services.job")
     def test_should_return_job(self, mock_job_svc):
         # setup
-        provider = CentralJobProviderPreview(cmd=None, app_id=app_id)
+        provider = CentralJobProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v2.value
+        )
         mock_job_svc.get_job.return_value = self._jobs[0]
 
         # act
@@ -332,14 +363,14 @@ class TestCentralJobProvider:
 
 
 class TestCentralFileuploadProvider:
-    _fileupload = central_models.FileUploadPreview(
-        load_json(FileNames.central_fileupload_file)
-    )
+    _fileupload = FileUploadV2(load_json(FileNames.central_fileupload_file))
 
     @mock.patch("azext_iot.central.services.file_upload")
     def test_should_return_fileupload(self, mock_fileupload_svc):
         # setup
-        provider = CentralFileUploadProviderPreview(cmd=None, app_id=app_id)
+        provider = CentralFileUploadProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v2.value
+        )
         mock_fileupload_svc.get_fileupload.return_value = self._fileupload
 
         # act
@@ -431,8 +462,8 @@ class TestCentralPropertyMonitor:
     ):
 
         # setup
-        mock_device_template_svc.get_device_template.return_value = (
-            central_models.TemplateV1(self._duplicate_property_template)
+        mock_device_template_svc.get_device_template.return_value = TemplateV1(
+            self._duplicate_property_template
         )
 
         monitor = PropertyMonitor(
@@ -476,8 +507,8 @@ class TestCentralPropertyMonitor:
     ):
 
         # setup
-        mock_device_template_svc.get_device_template.return_value = (
-            central_models.TemplateV1(self._duplicate_property_template)
+        mock_device_template_svc.get_device_template.return_value = TemplateV1(
+            self._duplicate_property_template
         )
 
         monitor = PropertyMonitor(
@@ -515,8 +546,8 @@ class TestCentralPropertyMonitor:
     ):
 
         # setup
-        mock_device_template_svc.get_device_template.return_value = (
-            central_models.TemplateV1(self._duplicate_property_template)
+        mock_device_template_svc.get_device_template.return_value = TemplateV1(
+            self._duplicate_property_template
         )
 
         monitor = PropertyMonitor(
@@ -564,8 +595,8 @@ class TestCentralPropertyMonitor:
     ):
 
         # setup
-        mock_device_template_svc.get_device_template.return_value = (
-            central_models.TemplateV1(self._duplicate_property_template)
+        mock_device_template_svc.get_device_template.return_value = TemplateV1(
+            self._duplicate_property_template
         )
 
         monitor = PropertyMonitor(

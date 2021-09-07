@@ -4,16 +4,17 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from typing import List
+from typing import List, Union
 from knack.util import CLIError
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
-from azext_iot.central.models.enum import ApiVersion
-from azext_iot.central import models as central_models
+from azext_iot.central.models.v1 import TemplateV1
+from azext_iot.central.models.v2 import TemplateV2
+from azext_iot.central.models.preview import TemplatePreview
 
 
-class CentralDeviceTemplateProviderPreview:
-    def __init__(self, cmd, app_id, token=None):
+class CentralDeviceTemplateProvider:
+    def __init__(self, cmd, app_id, api_version: str, token=None):
         """
         Provider for device_template APIs
 
@@ -27,6 +28,7 @@ class CentralDeviceTemplateProviderPreview:
         """
         self._cmd = cmd
         self._app_id = app_id
+        self._api_version = api_version
         self._token = token
         self._device_templates = {}
 
@@ -34,7 +36,7 @@ class CentralDeviceTemplateProviderPreview:
         self,
         device_template_id,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> central_models.TemplatePreview:
+    ) -> Union[TemplateV1, TemplateV2, TemplatePreview]:
         # get or add to cache
         device_template = self._device_templates.get(device_template_id)
         if not device_template:
@@ -44,7 +46,7 @@ class CentralDeviceTemplateProviderPreview:
                 device_template_id=device_template_id,
                 token=self._token,
                 central_dns_suffix=central_dns_suffix,
-                api_version=ApiVersion.preview.value,
+                api_version=self._api_version,
             )
             self._device_templates[device_template_id] = device_template
 
@@ -60,25 +62,24 @@ class CentralDeviceTemplateProviderPreview:
     def list_device_templates(
         self,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> List[central_models.TemplatePreview]:
+    ) -> List[Union[TemplateV1, TemplateV2, TemplatePreview]]:
         templates = central_services.device_template.list_device_templates(
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
-            api_version=ApiVersion.preview.value,
+            api_version=self._api_version,
         )
 
         self._device_templates.update(
             {template.id: template.raw_template for template in templates}
         )
-
         return self._device_templates
 
     def map_device_templates(
         self,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> dict:
+    ):
         """
         Maps each template name to the corresponding template id
         """
@@ -86,7 +87,7 @@ class CentralDeviceTemplateProviderPreview:
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
-            api_version=ApiVersion.preview.value,
+            api_version=self._api_version,
         )
         return {template.name: template.id for template in templates}
 
@@ -95,7 +96,7 @@ class CentralDeviceTemplateProviderPreview:
         device_template_id: str,
         payload: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> central_models.TemplatePreview:
+    ):
         template = central_services.device_template.create_device_template(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -103,7 +104,7 @@ class CentralDeviceTemplateProviderPreview:
             payload=payload,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
-            api_version=ApiVersion.preview.value,
+            api_version=self._api_version,
         )
 
         self._device_templates[template.id] = template
@@ -114,7 +115,7 @@ class CentralDeviceTemplateProviderPreview:
         self,
         device_template_id,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> dict:
+    ):
         if not device_template_id:
             raise CLIError("Device template id must be specified.")
 
@@ -124,7 +125,7 @@ class CentralDeviceTemplateProviderPreview:
             app_id=self._app_id,
             device_template_id=device_template_id,
             central_dns_suffix=central_dns_suffix,
-            api_version=ApiVersion.preview.value,
+            api_version=self._api_version,
         )
 
         # remove from cache

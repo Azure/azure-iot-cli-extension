@@ -9,7 +9,7 @@ import requests
 from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
-from azext_iot.central.models.enum import Role, ApiVersion
+from azext_iot.central.models.enum import ApiVersion
 
 logger = get_logger(__name__)
 
@@ -20,9 +20,10 @@ def add_api_token(
     cmd,
     app_id: str,
     token_id: str,
-    role: Role,
+    role: str,
+    org_id: str,
     token: str,
-    api_version=ApiVersion.v1.value,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> dict:
     """
@@ -43,8 +44,11 @@ def add_api_token(
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, token_id)
 
     payload = {
-        "roles": [{"role": role.value}],
+        "roles": [{"role": role}],
     }
+
+    if org_id and api_version == ApiVersion.v2.value:
+        payload["roles"][0]["organization"] = org_id
 
     # Construct parameters
     query_parameters = {}

@@ -9,14 +9,14 @@ from knack.util import CLIError
 
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
-from azext_iot.central.models.enum import Role, ApiVersion
+from azext_iot.central.models.enum import Role
 
 
 logger = get_logger(__name__)
 
 
-class CentralUserProviderV1:
-    def __init__(self, cmd, app_id: str, token=None):
+class CentralUserProvider:
+    def __init__(self, cmd, app_id: str, api_version: str, token=None):
         """
         Provider for device APIs
 
@@ -31,6 +31,7 @@ class CentralUserProviderV1:
         self._cmd = cmd
         self._app_id = app_id
         self._token = token
+        self._api_version = api_version
 
     def add_service_principal(
         self,
@@ -55,7 +56,7 @@ class CentralUserProviderV1:
             role=role,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
-            api_version=ApiVersion.v1.value,
+            api_version=self._api_version,
         )
 
     def get_user_list(
@@ -67,7 +68,7 @@ class CentralUserProviderV1:
             app_id=self._app_id,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
-            api_version=ApiVersion.v1.value,
+            api_version=self._api_version,
         )
 
     def get_user(
@@ -81,7 +82,7 @@ class CentralUserProviderV1:
             assignee=assignee,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
-            api_version=ApiVersion.v1.value,
+            api_version=self._api_version,
         )
 
     def delete_user(
@@ -95,7 +96,7 @@ class CentralUserProviderV1:
             assignee=assignee,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
-            api_version=ApiVersion.v1.value,
+            api_version=self._api_version,
         )
 
     def add_email(
@@ -116,5 +117,5 @@ class CentralUserProviderV1:
             role=role,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
-            api_version=ApiVersion.v1.value,
+            api_version=self._api_version,
         )

@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 # This is largely derived from https://docs.microsoft.com/en-us/rest/api/iotcentral/jobs
 
-from typing import List
+from typing import List, Union
 import requests
 
 from knack.util import CLIError
@@ -13,9 +13,9 @@ from knack.log import get_logger
 
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
-from azext_iot.central import models as central_models
-from azext_iot.central.models.enum import ApiVersion
 from azure.cli.core.util import should_disable_connection_verify
+from azext_iot.central.models.v2 import JobV2
+from azext_iot.central.models.preview import JobPreview
 
 
 logger = get_logger(__name__)
@@ -31,8 +31,8 @@ def _call_job(
     job_id: str,
     body: str,
     token: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.preview.value,
 ):
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, job_id)
     headers = _utility.get_headers(token, cmd)
@@ -65,10 +65,10 @@ def _list_job(
     app_id: str,
     path: str,
     token: str,
+    api_version: str,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.preview.value,
-) -> List:
+) -> List[Union[JobPreview, JobV2]]:
     """
     Get a list of all jobs in IoTC app
 
@@ -121,9 +121,9 @@ def get_job(
     app_id: str,
     job_id: str,
     token: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.preview.value,
-) -> central_models.JobPreview:
+) -> Union[JobPreview, JobV2]:
     """
     Get job info given a job id
 
@@ -150,7 +150,7 @@ def get_job(
         central_dns_suffix=central_dns_suffix,
         api_version=api_version,
     )
-    return central_models.JobPreview(result)
+    return _utility.get_object(result, "Job", api_version)
 
 
 def stop_job(
@@ -158,9 +158,9 @@ def stop_job(
     app_id: str,
     job_id: str,
     token: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.preview.value,
-) -> central_models.JobPreview:
+) -> Union[JobPreview, JobV2]:
     """
     Stop a running job
 
@@ -187,7 +187,7 @@ def stop_job(
         central_dns_suffix=central_dns_suffix,
         api_version=api_version,
     )
-    return central_models.JobPreview(result)
+    return _utility.get_object(result, "Job", api_version)
 
 
 def resume_job(
@@ -195,9 +195,9 @@ def resume_job(
     app_id: str,
     job_id: str,
     token: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.preview.value,
-) -> central_models.JobPreview:
+) -> Union[JobPreview, JobV2]:
     """
     Resume a stopped job
 
@@ -224,7 +224,7 @@ def resume_job(
         central_dns_suffix=central_dns_suffix,
         api_version=api_version,
     )
-    return central_models.JobPreview(result)
+    return _utility.get_object(result, "Job", api_version)
 
 
 def rerun_job(
@@ -233,9 +233,9 @@ def rerun_job(
     job_id: str,
     rerun_id: str,
     token: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.preview.value,
-) -> central_models.JobPreview:
+) -> Union[JobPreview, JobV2]:
     """
     Rerun a job on failed devices
 
@@ -263,7 +263,7 @@ def rerun_job(
         central_dns_suffix=central_dns_suffix,
         api_version=api_version,
     )
-    return central_models.JobPreview(result)
+    return _utility.get_object(result, "Job", api_version)
 
 
 def get_job_devices(
@@ -271,9 +271,9 @@ def get_job_devices(
     app_id: str,
     job_id: str,
     token: str,
+    api_version: str,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.preview.value,
 ):
     """
     Get device statuses
@@ -305,10 +305,10 @@ def list_jobs(
     cmd,
     app_id: str,
     token: str,
+    api_version: str,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.preview.value,
-) -> List[central_models.JobPreview]:
+) -> List[Union[JobPreview, JobV2]]:
 
     values = _list_job(
         cmd=cmd,
@@ -320,7 +320,7 @@ def list_jobs(
         api_version=api_version,
     )
 
-    return [central_models.JobPreview(job) for job in values]
+    return [_utility.get_object(job, "Job", api_version) for job in values]
 
 
 def create_job(
@@ -337,9 +337,9 @@ def create_job(
     batch: int,
     threshold: int,
     token: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.preview.value,
-) -> central_models.JobPreview:
+) -> Union[JobPreview, JobV2]:
     """
     Create a job in IoTC
 
@@ -393,4 +393,4 @@ def create_job(
     response = requests.put(url, headers=headers, json=payload, params=query_parameters)
     result = _utility.try_extract_result(response)
 
-    return central_models.JobPreview(result)
+    return _utility.get_object(result, "Job", api_version)

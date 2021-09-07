@@ -9,9 +9,7 @@ import re
 from uamqp.message import Message
 
 from azext_iot.central.providers import CentralDeviceProvider
-from azext_iot.central.providers.v1 import (
-    CentralDeviceTemplateProviderV1,
-)
+from azext_iot.central.providers import CentralDeviceTemplateProvider
 from azext_iot.central import models as central_models
 from azext_iot.monitor.parsers import strings
 from azext_iot.monitor.central_validator import validate, extract_schema_type
@@ -27,8 +25,8 @@ class CentralParser(CommonParser):
         message: Message,
         common_parser_args: CommonParserArguments,
         central_device_provider: CentralDeviceProvider,
-        central_template_provider: CentralDeviceTemplateProviderV1,
-        central_dns_suffix=CENTRAL_ENDPOINT
+        central_template_provider: CentralDeviceTemplateProvider,
+        central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         super(CentralParser, self).__init__(
             message=message, common_parser_args=common_parser_args
@@ -121,7 +119,9 @@ class CentralParser(CommonParser):
 
     def _get_template(self):
         try:
-            device = self._central_device_provider.get_device(self.device_id, central_dns_suffix=self._central_dns_suffix)
+            device = self._central_device_provider.get_device(
+                self.device_id, central_dns_suffix=self._central_dns_suffix
+            )
             template = self._central_template_provider.get_device_template(
                 device.template, central_dns_suffix=self._central_dns_suffix
             )
@@ -156,7 +156,8 @@ class CentralParser(CommonParser):
                 )
             else:
                 details = strings.invalid_field_name_mismatch_template(
-                    name_miss, template.schema_names,
+                    name_miss,
+                    template.schema_names,
                 )
             self._add_central_issue(severity=Severity.warning, details=details)
 

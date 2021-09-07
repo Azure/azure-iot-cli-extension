@@ -9,21 +9,21 @@ from azext_iot.central.models.enum import DeviceStatus
 
 class Device:
     def __init__(self, device: dict):
-        self.enabled = device.get("enabled")
+        self.approved = device.get("approved")
         self.display_name = device.get("displayName")
         self.etag = device.get("etag")
         self.id = device.get("id")
-        self.template = device.get("template")
+        self.instance_of = device.get("instanceOf")
         self.provisioned = device.get("provisioned")
         self.simulated = device.get("simulated")
-        self.organizations = device.get("organizations")
         self.device_status = self._parse_device_status()
+        pass
 
     def _parse_device_status(self) -> DeviceStatus:
-        if not self.enabled:
+        if not self.approved:
             return DeviceStatus.blocked
 
-        if not self.template:
+        if not self.instance_of:
             return DeviceStatus.unassociated
 
         if not self.provisioned:
@@ -37,7 +37,7 @@ class Device:
             "display_name": self.display_name,
             "id": self.id,
             "simulated": self.simulated,
-            "template": self.template,
+            "instance_of": self.instance_of,
         }
 
         return registration_info

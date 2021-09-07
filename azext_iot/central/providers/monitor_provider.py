@@ -7,9 +7,9 @@
 from azext_iot.central.models.enum import ApiVersion
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azure.cli.core.commands import AzCliCommand
-from azext_iot.central.providers import CentralDeviceProvider
-from azext_iot.central.providers.v1 import (
-    CentralDeviceTemplateProviderV1,
+from azext_iot.central.providers import (
+    CentralDeviceProvider,
+    CentralDeviceTemplateProvider,
 )
 
 from azext_iot.monitor.models.arguments import (
@@ -35,8 +35,8 @@ class MonitorProvider:
         central_device_provider = CentralDeviceProvider(
             cmd=cmd, app_id=app_id, token=token, api_version=ApiVersion.v1.value
         )
-        central_template_provider = CentralDeviceTemplateProviderV1(
-            cmd=cmd, app_id=app_id, token=token
+        central_template_provider = CentralDeviceTemplateProvider(
+            cmd=cmd, app_id=app_id, token=token, api_version=ApiVersion.v1.value
         )
         self._targets = self._build_targets(
             cmd=cmd,
@@ -94,7 +94,7 @@ class MonitorProvider:
     def _build_handler(
         self,
         central_device_provider: CentralDeviceProvider,
-        central_template_provider: CentralDeviceTemplateProviderV1,
+        central_template_provider: CentralDeviceTemplateProvider,
         central_handler_args: CentralHandlerArguments,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):

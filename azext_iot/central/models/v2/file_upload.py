@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 
-class FileUploadPreview:
+class FileUpload:
     def __init__(self, fileupload: dict):
         self.account = fileupload.get("account")
         self.connection_string = fileupload.get("connectionString")

@@ -9,8 +9,7 @@ from knack.util import CLIError
 
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.common import utility
-from azext_iot.central.providers.preview import CentralDeviceTemplateProviderPreview
-from azext_iot.central.providers.v1 import CentralDeviceTemplateProviderV1
+from azext_iot.central.providers import CentralDeviceTemplateProvider
 from azext_iot.central.models.enum import ApiVersion
 
 
@@ -22,12 +21,9 @@ def get_device_template(
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
 ):
-    if api_version == ApiVersion.preview.value:
-        provider = CentralDeviceTemplateProviderPreview(
-            cmd=cmd, app_id=app_id, token=token
-        )
-    else:
-        provider = CentralDeviceTemplateProviderV1(cmd=cmd, app_id=app_id, token=token)
+    provider = CentralDeviceTemplateProvider(
+        cmd=cmd, app_id=app_id, token=token, api_version=api_version
+    )
 
     template = provider.get_device_template(
         device_template_id=device_template_id,
@@ -43,12 +39,9 @@ def list_device_templates(
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
 ):
-    if api_version == ApiVersion.preview.value:
-        provider = CentralDeviceTemplateProviderPreview(
-            cmd=cmd, app_id=app_id, token=token
-        )
-    else:
-        provider = CentralDeviceTemplateProviderV1(cmd=cmd, app_id=app_id, token=token)
+    provider = CentralDeviceTemplateProvider(
+        cmd=cmd, app_id=app_id, token=token, api_version=api_version
+    )
 
     templates = provider.list_device_templates(central_dns_suffix=central_dns_suffix)
     return templates
@@ -61,12 +54,9 @@ def map_device_templates(
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
 ):
-    if api_version == ApiVersion.preview.value:
-        provider = CentralDeviceTemplateProviderPreview(
-            cmd=cmd, app_id=app_id, token=token
-        )
-    else:
-        provider = CentralDeviceTemplateProviderV1(cmd=cmd, app_id=app_id, token=token)
+    provider = CentralDeviceTemplateProvider(
+        cmd=cmd, app_id=app_id, token=token, api_version=api_version
+    )
 
     return provider.map_device_templates(central_dns_suffix=central_dns_suffix)
 
@@ -85,12 +75,9 @@ def create_device_template(
 
     payload = utility.process_json_arg(content, argument_name="content")
 
-    if api_version == ApiVersion.preview.value:
-        provider = CentralDeviceTemplateProviderPreview(
-            cmd=cmd, app_id=app_id, token=token
-        )
-    else:
-        provider = CentralDeviceTemplateProviderV1(cmd=cmd, app_id=app_id, token=token)
+    provider = CentralDeviceTemplateProvider(
+        cmd=cmd, app_id=app_id, token=token, api_version=api_version
+    )
 
     template = provider.create_device_template(
         device_template_id=device_template_id,
@@ -108,12 +95,9 @@ def delete_device_template(
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
 ):
-    if api_version == ApiVersion.preview.value:
-        provider = CentralDeviceTemplateProviderPreview(
-            cmd=cmd, app_id=app_id, token=token
-        )
-    else:
-        provider = CentralDeviceTemplateProviderV1(cmd=cmd, app_id=app_id, token=token)
+    provider = CentralDeviceTemplateProvider(
+        cmd=cmd, app_id=app_id, token=token, api_version=api_version
+    )
 
     return provider.delete_device_template(
         device_template_id=device_template_id,

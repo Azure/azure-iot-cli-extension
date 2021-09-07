@@ -7,11 +7,11 @@
 from knack.util import CLIError
 
 
-class TemplatePreview:
+class Template:
     def __init__(self, template: dict):
         self.raw_template = template
         try:
-            self.id = template.get("@id")
+            self.id = template.get("id")
             self.name = template.get("displayName")
             self.interfaces = self._extract_interfaces(template)
             self.schema_names = self._extract_schema_names(self.interfaces)
@@ -83,11 +83,11 @@ class TemplatePreview:
             if dcm.get("contents"):
                 interfaces.append(self._extract_root_interface_contents(dcm))
 
-            if dcm.get("extends"):
-                interfaces.extend(dcm.get("extends"))
+            if dcm.get("implements"):
+                interfaces.extend(dcm.get("implements"))
 
             return {
-                interface["@id"]: self._extract_schemas(interface)
+                self._get_interface_id(interface): self._extract_schemas(interface)
                 for interface in interfaces
             }
         except:
@@ -115,3 +115,8 @@ class TemplatePreview:
             for interface, schema in self.schema_names.items()
             if property_name in schema
         ]
+
+    def _get_interface_id(self, interface) -> list:
+        return (
+            interface["schema"]["@id"] if interface.get("@type") else interface["@id"]
+        )
