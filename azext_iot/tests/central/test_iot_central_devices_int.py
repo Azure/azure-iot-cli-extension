@@ -10,7 +10,15 @@ import pytest
 
 from azext_iot.central.models.enum import DeviceStatus
 from azext_iot.tests import helpers
-from azext_iot.tests.central import CentralLiveScenarioTest, APP_ID, APP_PRIMARY_KEY, APP_SCOPE_ID, DEVICE_ID, TOKEN, DNS_SUFFIX
+from azext_iot.tests.central import (
+    CentralLiveScenarioTest,
+    APP_ID,
+    APP_PRIMARY_KEY,
+    APP_SCOPE_ID,
+    DEVICE_ID,
+    TOKEN,
+    DNS_SUFFIX,
+)
 
 if not all([APP_ID]):
     raise ValueError("Set azext_iot_central_app_id to run central integration tests.")
@@ -139,7 +147,14 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
 
         created_dev_count = len(created_device_list)
         assert created_dev_count == (start_dev_count + 1)
-        assert device_id in created_device_list.keys()
+        # assert device with id "device_id" is in created list
+        assert (
+            next(
+                (device for device in created_device_list if device["id"] == device_id),
+                None,
+            )
+            is not None
+        )
         self._delete_device(device_id)
 
         deleted_device_list = self.cmd(
@@ -150,7 +165,14 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
 
         deleted_dev_count = len(deleted_device_list)
         assert deleted_dev_count == start_dev_count
-        assert device_id not in deleted_device_list.keys()
+        # assert device with id "device_id" has been removed from list
+        assert (
+            next(
+                (device for device in deleted_device_list if device["id"] == device_id),
+                None,
+            )
+            is None
+        )
 
     def test_central_device_template_methods_CRD(self):
         # currently: create, show, list, delete
@@ -193,7 +215,18 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         assert (created_dev_temp_count == (start_dev_temp_count + 1)) or (
             created_dev_temp_count == start_dev_temp_count
         )
-        assert template_id in created_device_template_list.keys()
+        # assert template with id "template_id" is in created list
+        assert (
+            next(
+                (
+                    template
+                    for template in created_device_template_list
+                    if template["@id"] == template_id
+                ),
+                None,
+            )
+            is not None
+        )
 
         self._delete_device_template(template_id)
 
@@ -211,10 +244,30 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
 
         assert deleted_dev_temp_count == start_dev_temp_count
 
-        if template_id not in start_device_template_list.keys():
+        if (
+            next(
+                (
+                    template
+                    for template in start_device_template_list
+                    if template["@id"] == template_id
+                ),
+                None,
+            )
+            is None
+        ):
             # template has been created during test so deletion succeeds
             # otherwise it might fail because existing devices can exist
-            assert template_id not in deleted_device_template_list.keys()
+            assert (
+                next(
+                    (
+                        template
+                        for template in deleted_device_template_list
+                        if template["id"] == template_id
+                    ),
+                    None,
+                )
+                is None
+            )
 
     def test_central_device_groups_list(self):
         result = self._list_device_groups()
@@ -389,8 +442,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
 
     def _list_device_groups(self):
         return self.cmd(
-            "iot central device-group list --app-id {}".format(
-                APP_ID)
+            "iot central device-group list --app-id {}".format(APP_ID)
         ).get_output_in_json()
 
     def _connect_gettwin_disconnect_wait_tobeprovisioned(self, device_id, credentials):

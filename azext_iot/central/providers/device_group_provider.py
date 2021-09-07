@@ -50,4 +50,4 @@ class CentralDeviceGroupProvider:
             {device_group.id: device_group for device_group in device_groups}
         )
 
-        return self._device_groups
+        return device_groups

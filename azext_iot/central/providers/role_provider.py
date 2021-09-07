@@ -50,7 +50,7 @@ class CentralRoleProvider:
         # add to cache
         self._roles.update({role.id: role for role in roles})
 
-        return self._roles
+        return roles
 
     def get_role(
         self,

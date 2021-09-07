@@ -64,8 +64,8 @@ def get_org(
     app_id: str,
     org_id: str,
     token: str,
+    api_version:str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.preview.value,
 ) -> OrganizationV2:
     """
     Get organization info given an organization id
@@ -100,9 +100,9 @@ def list_orgs(
     cmd,
     app_id: str,
     token: str,
+    api_version:str,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.preview.value,
 ) -> List[OrganizationV2]:
     """
     Get a list of all organizations in IoTC app
@@ -155,8 +155,8 @@ def create_org(
     org_name: str,
     parent_org: str,
     token: str,
+    api_version:str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.preview.value,
 ) -> OrganizationV2:
 
     """
@@ -204,8 +204,8 @@ def delete_org(
     app_id: str,
     org_id: str,
     token: str,
+    api_version:str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.preview.value,
 ) -> OrganizationV2:
     """
     Delete an organization

@@ -10,13 +10,13 @@ from uamqp.message import Message
 
 from azext_iot.central.providers import CentralDeviceProvider
 from azext_iot.central.providers import CentralDeviceTemplateProvider
-from azext_iot.central import models as central_models
 from azext_iot.monitor.parsers import strings
 from azext_iot.monitor.central_validator import validate, extract_schema_type
 from azext_iot.monitor.models.arguments import CommonParserArguments
 from azext_iot.monitor.models.enum import Severity
 from azext_iot.monitor.parsers.common_parser import CommonParser
 from azext_iot.constants import CENTRAL_ENDPOINT
+from azext_iot.central.models.v1 import TemplateV1
 
 
 class CentralParser(CommonParser):
@@ -90,7 +90,7 @@ class CentralParser(CommonParser):
 
         template = self._get_template()
 
-        if not isinstance(template, central_models.TemplateV1):
+        if not isinstance(template, TemplateV1):
             return
 
         # if component name is not defined then data should be mapped to root/inherited interfaces
@@ -135,7 +135,7 @@ class CentralParser(CommonParser):
     # 1) primitive types match (e.g. boolean is indeed bool etc)
     # 2) names match (i.e. Humidity vs humidity etc)
     def _validate_payload(
-        self, payload: dict, template: central_models.TemplateV1, is_component: bool
+        self, payload: dict, template: TemplateV1, is_component: bool
     ):
         name_miss = []
         for telemetry_name, telemetry in payload.items():

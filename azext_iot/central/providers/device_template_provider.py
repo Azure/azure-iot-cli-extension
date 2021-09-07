@@ -74,7 +74,7 @@ class CentralDeviceTemplateProvider:
         self._device_templates.update(
             {template.id: template.raw_template for template in templates}
         )
-        return self._device_templates
+        return list(self._device_templates.values())
 
     def map_device_templates(
         self,

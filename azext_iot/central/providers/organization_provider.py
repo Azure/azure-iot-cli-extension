@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 
+from sys import api_version
 from typing import List
 from knack.util import CLIError
 from knack.log import get_logger
@@ -43,13 +44,13 @@ class CentralOrganizationProvider:
             app_id=self._app_id,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
-            api_version=ApiVersion.preview.value,
+            api_version=self._api_version,
         )
 
         # add to cache
         self._orgs.update({org.id: org for org in orgs})
 
-        return self._orgs
+        return orgs
 
     def get_organization(
         self,
@@ -65,7 +66,7 @@ class CentralOrganizationProvider:
                 org_id=org_id,
                 token=self._token,
                 central_dns_suffix=central_dns_suffix,
-                api_version=ApiVersion.preview.value,
+                api_version=self._api_version,
             )
             self._orgs[org_id] = org
 
@@ -86,7 +87,7 @@ class CentralOrganizationProvider:
             org_id=org_id,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
-            api_version=ApiVersion.preview.value,
+            api_version=self._api_version,
         )
 
         return org
@@ -103,6 +104,7 @@ class CentralOrganizationProvider:
             org_name=org_name,
             parent_org=parent_org,
             token=self._token,
+            api_version=self._api_version,
             central_dns_suffix=central_dns_suffix,
         )
 

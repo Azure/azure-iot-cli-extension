@@ -287,6 +287,13 @@ def load_central_arguments(self, _):
             options_list=["--org-id"],
             help="Unique identifier for the organization.",
         )
+        context.argument(
+            "api_version",
+            options_list=["--api-version", "--av"],
+            choices=CaseInsensitiveList([ApiVersion.v2.value]),
+            default=ApiVersion.v2.value,
+            help="The API version for the requested operation.",
+        )
 
     with self.argument_context("iot central organization create") as context:
         context.argument(

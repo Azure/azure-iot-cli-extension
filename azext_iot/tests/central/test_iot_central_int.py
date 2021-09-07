@@ -11,8 +11,15 @@ from azure.iot.device import Message
 from azext_iot.common import utility
 from azext_iot.monitor.parsers import strings
 from azext_iot.tests import helpers
-from azext_iot.tests.central import (CentralLiveScenarioTest,
-                                     APP_ID, TOKEN, DNS_SUFFIX, STORAGE_CSTRING, STORAGE_CONTAINER, sync_command_params)
+from azext_iot.tests.central import (
+    CentralLiveScenarioTest,
+    APP_ID,
+    TOKEN,
+    DNS_SUFFIX,
+    STORAGE_CSTRING,
+    STORAGE_CONTAINER,
+    sync_command_params,
+)
 
 
 if not all([APP_ID]):
@@ -174,13 +181,11 @@ class TestIotCentral(CentralLiveScenarioTest):
         command = self._appendOptionalArgsToCommand(command, TOKEN, DNS_SUFFIX)
         result = self.cmd(command).get_output_in_json()
 
-        user_list = result.get("value")
-
         for user in users:
             self._delete_user(user.get("id"))
 
         for user in users:
-            assert user in user_list
+            assert user in result
 
     def test_central_api_token_methods_CRD(self):
         tokens = self._create_api_tokens()
@@ -281,13 +286,17 @@ class TestIotCentral(CentralLiveScenarioTest):
         # check that run result and show result indeed match
         assert run_result["response"] == show_result["value"][0]["response"]
 
-    @pytest.mark.skipif(not STORAGE_CSTRING or not STORAGE_CONTAINER,
-                        reason="empty azext_iot_central_storage_cstring or azext_iot_central_storage_container env var",)
+    @pytest.mark.skipif(
+        not STORAGE_CSTRING or not STORAGE_CONTAINER,
+        reason="empty azext_iot_central_storage_cstring or azext_iot_central_storage_container env var",
+    )
     def test_central_fileupload_methods_CRD(self):
         file_upload = self._create_fileupload()
         self._wait_for_storage_configured()
         command = self._appendOptionalArgsToCommand(
-            "iot central file-upload-configuration show -n {}".format(APP_ID), TOKEN, DNS_SUFFIX
+            "iot central file-upload-configuration show -n {}".format(APP_ID),
+            TOKEN,
+            DNS_SUFFIX,
         )
         result = self.cmd(command).get_output_in_json()
         assert result["connectionString"] == file_upload["connectionString"]
@@ -304,8 +313,3 @@ class TestIotCentral(CentralLiveScenarioTest):
         result = self.cmd(command).get_output_in_json()
         assert result["id"] == org["id"]
         self._delete_organization(org["id"])
-
-    def test_central_device_groups_list(self):
-        result = self._list_device_groups()
-        # assert object is empty or populated but not null
-        assert result is not None and (result == {} or bool(result) is True)

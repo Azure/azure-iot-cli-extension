@@ -81,7 +81,7 @@ class CentralDeviceProvider:
         # add to cache
         self._devices.update({device.id: device for device in devices})
 
-        return self._devices
+        return devices
 
     def create_device(
         self,

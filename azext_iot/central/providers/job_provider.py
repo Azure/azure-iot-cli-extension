@@ -49,7 +49,7 @@ class CentralJobProvider:
         # add to cache
         self._jobs.update({job.id: job for job in jobs})
 
-        return self._jobs
+        return jobs
 
     def get_job(
         self,
