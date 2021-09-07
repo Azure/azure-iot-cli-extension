@@ -7,7 +7,7 @@
 import pytest
 import collections
 
-from azext_iot.central import models as central_models
+from azext_iot.central.models.v1 import TemplateV1
 from azext_iot.monitor.central_validator import validate, extract_schema_type
 
 from azext_iot.tests.helpers import load_json
@@ -22,7 +22,7 @@ class TestTemplateValidations:
             "urn:sampleApp:groupThree_bz:myxqftpsr:2",
             "urn:sampleApp:groupOne_bz:2",
         ]
-        template = central_models.TemplateV1(
+        template = TemplateV1(
             load_json(FileNames.central_property_validation_template_file)
         )
 
@@ -35,7 +35,7 @@ class TestTemplateValidations:
             "_rpgcmdpo",
             "RS40OccupancySensorV36fy",
         ]
-        template = central_models.TemplateV1(
+        template = TemplateV1(
             load_json(FileNames.central_property_validation_template_file)
         )
 
@@ -52,7 +52,7 @@ class TestExtractSchemaType:
             "component1PropReadonly": "boolean",
             "component1Prop2": "boolean",
         }
-        template = central_models.TemplateV1(
+        template = TemplateV1(
             load_json(FileNames.central_property_validation_template_file)
         )
         for key, val in expected_mapping.items():
@@ -67,7 +67,7 @@ class TestExtractSchemaType:
             "testComponent": "boolean",
             "component2PropReadonly": "boolean",
         }
-        template = central_models.TemplateV1(
+        template = TemplateV1(
             load_json(FileNames.central_property_validation_template_file)
         )
         for key, val in expected_mapping.items():
@@ -94,9 +94,7 @@ class TestExtractSchemaType:
             "Time": "time",
             "Vector": "vector",
         }
-        template = central_models.TemplateV1(
-            load_json(FileNames.central_device_template_file)
-        )
+        template = TemplateV1(load_json(FileNames.central_device_template_file))
         for key, val in expected_mapping.items():
             schema = template.get_schema(key)
             schema_type = extract_schema_type(schema)
@@ -185,7 +183,8 @@ class TestDateTimeValidations:
 
     # Failure suite
     @pytest.mark.parametrize(
-        "to_validate", ["2020-13-35", *BAD_ARRAY],
+        "to_validate",
+        ["2020-13-35", *BAD_ARRAY],
     )
     def test_is_iso8601_date_fail(self, to_validate):
         assert not validate({"schema": "date"}, to_validate)
@@ -245,9 +244,7 @@ class TestComplexType:
         [(1, True), (2, True), (3, False), ("1", False), ("2", False)],
     )
     def test_int_enum(self, value, expected_result):
-        template = central_models.TemplateV1(
-            load_json(FileNames.central_device_template_file)
-        )
+        template = TemplateV1(load_json(FileNames.central_device_template_file))
         schema = template.get_schema("IntEnum")
         assert validate(schema, value) == expected_result
 
@@ -256,9 +253,7 @@ class TestComplexType:
         [("A", True), ("B", True), ("C", False), (1, False), (2, False)],
     )
     def test_str_enum(self, value, expected_result):
-        template = central_models.TemplateV1(
-            load_json(FileNames.central_device_template_file)
-        )
+        template = TemplateV1(load_json(FileNames.central_device_template_file))
         schema = template.get_schema("StringEnum")
         assert validate(schema, value) == expected_result
 
@@ -272,25 +267,41 @@ class TestComplexType:
         ],
     )
     def test_object_simple(self, value, expected_result):
-        template = central_models.TemplateV1(
-            load_json(FileNames.central_device_template_file)
-        )
+        template = TemplateV1(load_json(FileNames.central_device_template_file))
         schema = template.get_schema("Object")
         assert validate(schema, value) == expected_result
 
     @pytest.mark.parametrize(
         "value, expected_result",
         [
-            ({"LayerC": {"Depth1C": {"SomeTelemetry": 100}}}, True,),
-            ({"LayerC": {"Depth1C": {"SomeTelemetry": 100.001}}}, True,),
-            ({"LayerC": {"Depth1C": {"SomeTelemetry": "100"}}}, False,),
-            ({"LayerC": {"Depth1C": {"sometelemetry": 100.001}}}, False,),
-            ({"LayerC": {"depth1c": {"SomeTelemetry": 100.001}}}, False,),
-            ({"layerc": {"Depth1C": {"SomeTelemetry": 100.001}}}, False,),
+            (
+                {"LayerC": {"Depth1C": {"SomeTelemetry": 100}}},
+                True,
+            ),
+            (
+                {"LayerC": {"Depth1C": {"SomeTelemetry": 100.001}}},
+                True,
+            ),
+            (
+                {"LayerC": {"Depth1C": {"SomeTelemetry": "100"}}},
+                False,
+            ),
+            (
+                {"LayerC": {"Depth1C": {"sometelemetry": 100.001}}},
+                False,
+            ),
+            (
+                {"LayerC": {"depth1c": {"SomeTelemetry": 100.001}}},
+                False,
+            ),
+            (
+                {"layerc": {"Depth1C": {"SomeTelemetry": 100.001}}},
+                False,
+            ),
         ],
     )
     def test_object_medium(self, value, expected_result):
-        template = central_models.TemplateV1(
+        template = TemplateV1(
             load_json(FileNames.central_deeply_nested_device_template_file)
         )
         schema = template.get_schema("RidiculousObject")
@@ -369,7 +380,7 @@ class TestComplexType:
         ],
     )
     def test_object_deep(self, value, expected_result):
-        template = central_models.TemplateV1(
+        template = TemplateV1(
             load_json(FileNames.central_deeply_nested_device_template_file)
         )
         schema = template.get_schema("RidiculousObject")
