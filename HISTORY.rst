@@ -13,8 +13,8 @@ Release History
 
 **Breaking Changes**
 
-* `az iot central device-template show` for preview version now returns DTDLV2 models.
-  This means that some model keys differ from previous deprecated preview version.
+* List commands like `az iot central device list` and others, 
+  now return list of raw templates as dict instead of a main dict with template ids as keys and raw templates as values.
 
 0.10.16
 +++++++++++++++
