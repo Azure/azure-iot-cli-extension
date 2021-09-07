@@ -5,13 +5,11 @@
 # --------------------------------------------------------------------------------------------
 
 
-from sys import api_version
 from typing import List
 from knack.util import CLIError
 from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
-from azext_iot.central.models.enum import ApiVersion
 from azext_iot.central.models.v2 import OrganizationV2
 
 logger = get_logger(__name__)

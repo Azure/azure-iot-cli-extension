@@ -14,7 +14,6 @@ from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
 from azext_iot.central.models.v2 import OrganizationV2
-from azext_iot.central.models.enum import ApiVersion
 from azure.cli.core.util import should_disable_connection_verify
 
 
@@ -64,7 +63,7 @@ def get_org(
     app_id: str,
     org_id: str,
     token: str,
-    api_version:str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> OrganizationV2:
     """
@@ -100,7 +99,7 @@ def list_orgs(
     cmd,
     app_id: str,
     token: str,
-    api_version:str,
+    api_version: str,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> List[OrganizationV2]:
@@ -155,7 +154,7 @@ def create_org(
     org_name: str,
     parent_org: str,
     token: str,
-    api_version:str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> OrganizationV2:
 
@@ -204,7 +203,7 @@ def delete_org(
     app_id: str,
     org_id: str,
     token: str,
-    api_version:str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> OrganizationV2:
     """
