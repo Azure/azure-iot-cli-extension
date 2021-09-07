@@ -38,6 +38,8 @@ try:
     from .job_response_py3 import JobResponse
     from .query_result_py3 import QueryResult
     from .module_py3 import Module
+    from .topic_space_properties_py3 import TopicSpaceProperties
+    from .topic_space_py3 import TopicSpace
     from .cloud_to_device_method_result_py3 import CloudToDeviceMethodResult
 except (SyntaxError, ImportError):
     from .configuration_metrics import ConfigurationMetrics
@@ -68,6 +70,8 @@ except (SyntaxError, ImportError):
     from .job_response import JobResponse
     from .query_result import QueryResult
     from .module import Module
+    from .topic_space_properties import TopicSpaceProperties
+    from .topic_space import TopicSpace
     from .cloud_to_device_method_result import CloudToDeviceMethodResult
 
 __all__ = [
@@ -99,5 +103,7 @@ __all__ = [
     'JobResponse',
     'QueryResult',
     'Module',
+    'TopicSpaceProperties',
+    'TopicSpace',
     'CloudToDeviceMethodResult',
 ]
