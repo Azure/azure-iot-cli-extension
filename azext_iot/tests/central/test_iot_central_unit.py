@@ -236,7 +236,7 @@ class TestCentralDeviceGroupProvider:
         # verify
         # call counts should be at most 1 since the provider has a cache
         assert mock_device_group_svc.list_device_groups.call_count == 1
-        assert set(device_groups) == set(map(lambda x: x.id, self._device_groups))
+        assert set(device_groups) == set(self._device_groups)
 
     @mock.patch("azext_iot.central.services.device_group")
     def test_should_fail_device_groups(self, mock_device_group_svc):
@@ -252,7 +252,7 @@ class TestCentralDeviceGroupProvider:
         # verify
         # call counts should be at most 1 since the provider has a cache
         assert mock_device_group_svc.list_device_groups.call_count == 1
-        assert set(device_groups) == set(map(lambda x: x.id, self._device_groups))
+        assert set(device_groups) == set(self._device_groups)
 
 
 class TestCentralRoleProvider:
@@ -272,7 +272,7 @@ class TestCentralRoleProvider:
         # verify
         # call counts should be at most 1 since the provider has a cache
         assert mock_role_svc.list_roles.call_count == 1
-        assert set(roles) == set(map(lambda x: x.id, self._roles))
+        assert set(roles) == set(self._roles)
 
     @mock.patch("azext_iot.central.services.role")
     def test_should_return_role(self, mock_role_svc):
@@ -309,7 +309,7 @@ class TestCentralOrganizationProvider:
         # verify
         # call counts should be at most 1 since the provider has a cache
         assert mock_org_svc.list_orgs.call_count == 1
-        assert set(orgs) == set(map(lambda x: x.id, self._orgs))
+        assert set(orgs) == set(self._orgs)
 
     @mock.patch("azext_iot.central.services.organization")
     def test_should_return_org(self, mock_org_svc):
@@ -344,7 +344,7 @@ class TestCentralJobProvider:
         # verify
         # call counts should be at most 1 since the provider has a cache
         assert mock_job_svc.list_jobs.call_count == 1
-        assert set(jobs) == set(map(lambda x: x.id, self._jobs))
+        assert set(jobs) == set(self._jobs)
 
     @mock.patch("azext_iot.central.services.job")
     def test_should_return_job(self, mock_job_svc):
