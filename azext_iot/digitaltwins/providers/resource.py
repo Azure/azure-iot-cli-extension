@@ -85,7 +85,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
                     lro.update_status()
                     instance = lro.resource().as_dict()
                     state = instance.get('provisioning_state', None)
-                if state.lower() not in ProvisioningStateType.FINISHED.value:
+                if state and state.lower() not in ProvisioningStateType.FINISHED.value:
                     logger.warning(
                         "The resource has been created and has not finished provisioning. Please monitor the status of "
                         "the Digital Twin instance using az dt show -n {} -g {}".format(
