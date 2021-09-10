@@ -47,7 +47,7 @@ def _validate_issues(
 @pytest.fixture(
     params=[
         common_parser.INTERFACE_NAME_IDENTIFIER_V1,
-        common_parser.INTERFACE_NAME_IDENTIFIER_V1_1_preview,
+        common_parser.INTERFACE_NAME_IDENTIFIER_V2,
     ]
 )
 def interface_identifier_bytes(request):
