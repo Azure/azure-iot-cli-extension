@@ -186,9 +186,9 @@ def load_central_arguments(self, _):
             "api_version",
             options_list=["--api-version", "--av"],
             choices=CaseInsensitiveList(
-                [ApiVersion.preview.value, ApiVersion.v2.value]
+                [ApiVersion.preview.value, ApiVersion.v1_1_preview.value]
             ),
-            default=ApiVersion.v2.value,
+            default=ApiVersion.v1_1_preview.value,
             help="The API version for the requested operation.",
         )
 
@@ -251,8 +251,8 @@ def load_central_arguments(self, _):
         context.argument(
             "api_version",
             options_list=["--api-version", "--av"],
-            choices=CaseInsensitiveList([ApiVersion.v2.value]),
-            default=ApiVersion.v2.value,
+            choices=CaseInsensitiveList([ApiVersion.v1_1_preview.value]),
+            default=ApiVersion.v1_1_preview.value,
             help="The API version for the requested operation.",
         )
 
@@ -290,8 +290,8 @@ def load_central_arguments(self, _):
         context.argument(
             "api_version",
             options_list=["--api-version", "--av"],
-            choices=CaseInsensitiveList([ApiVersion.v2.value]),
-            default=ApiVersion.v2.value,
+            choices=CaseInsensitiveList([ApiVersion.v1_1_preview.value]),
+            default=ApiVersion.v1_1_preview.value,
             help="The API version for the requested operation.",
         )
 

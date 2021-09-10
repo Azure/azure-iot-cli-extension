@@ -60,4 +60,4 @@ class ApiVersion(Enum):
 
     preview = "preview"
     v1 = "1.0"
-    v2 = "1.1-preview"
+    v1_1_preview = "1.1-preview"

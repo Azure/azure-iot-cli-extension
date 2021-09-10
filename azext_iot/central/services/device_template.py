@@ -15,7 +15,7 @@ from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
 from azext_iot.central.models.preview import TemplatePreview
 from azext_iot.central.models.v1 import TemplateV1
-from azext_iot.central.models.v2 import TemplateV2
+from azext_iot.central.models.v1_1_preview import TemplateV1_1_preview
 from azext_iot.central.models.enum import ApiVersion
 
 logger = get_logger(__name__)
@@ -30,7 +30,7 @@ def get_device_template(
     token: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[TemplatePreview, TemplateV1, TemplateV2]:
+) -> Union[TemplatePreview, TemplateV1, TemplateV1_1_preview]:
     """
     Get a specific device template from IoTC
 
@@ -61,7 +61,7 @@ def get_device_template(
     elif api_version == ApiVersion.v1.value:
         return TemplateV1(_utility.try_extract_result(response))
     else:
-        return TemplateV2(_utility.try_extract_result(response))
+        return TemplateV1_1_preview(_utility.try_extract_result(response))
 
 
 def list_device_templates(
@@ -71,7 +71,7 @@ def list_device_templates(
     api_version: str,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> List[Union[TemplatePreview, TemplateV1, TemplateV2]]:
+) -> List[Union[TemplatePreview, TemplateV1, TemplateV1_1_preview]]:
     """
     Get a list of all device templates in IoTC
 
@@ -121,7 +121,7 @@ def list_device_templates(
             ]
         else:
             device_templates = device_templates + [
-                TemplateV2(device_template) for device_template in result["value"]
+                TemplateV1_1_preview(device_template) for device_template in result["value"]
             ]
 
         url = result.get("nextLink", None)
@@ -138,7 +138,7 @@ def create_device_template(
     token: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[TemplatePreview, TemplateV1, TemplateV2]:
+) -> Union[TemplatePreview, TemplateV1, TemplateV1_1_preview]:
     """
     Create a device template in IoTC
 
@@ -173,7 +173,7 @@ def create_device_template(
     elif api_version == ApiVersion.v1.value:
         return TemplateV1(_utility.try_extract_result(response))
     else:
-        return TemplateV2(_utility.try_extract_result(response))
+        return TemplateV1_1_preview(_utility.try_extract_result(response))
 
 
 def delete_device_template(

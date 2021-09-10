@@ -15,7 +15,7 @@ from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
 from azext_iot.central.models.preview import DevicePreview
 from azext_iot.central.models.v1 import DeviceV1
-from azext_iot.central.models.v2 import DeviceV2
+from azext_iot.central.models.v1_1_preview import DeviceV1_1_preview
 from azext_iot.central.models.enum import DeviceStatus, ApiVersion
 from azure.cli.core.util import should_disable_connection_verify
 
@@ -31,7 +31,7 @@ def get_device(
     token: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[DeviceV2, DeviceV1, DevicePreview]:
+) -> Union[DeviceV1_1_preview, DeviceV1, DevicePreview]:
     """
     Get device info given a device id
 
@@ -64,8 +64,8 @@ def get_device(
 
     if api_version == ApiVersion.v1.value:
         return DeviceV1(result)
-    elif api_version == ApiVersion.v2.value:
-        return DeviceV2(result)
+    elif api_version == ApiVersion.v1_1_preview.value:
+        return DeviceV1_1_preview(result)
     return DevicePreview(result)
 
 
@@ -76,7 +76,7 @@ def list_devices(
     api_version: str,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> List[Union[DeviceV1, DeviceV2, DevicePreview]]:
+) -> List[Union[DeviceV1, DeviceV1_1_preview, DevicePreview]]:
     """
     Get a list of all devices in IoTC app
 
@@ -118,8 +118,8 @@ def list_devices(
 
         if api_version == ApiVersion.v1.value:
             ctor = DeviceV1
-        elif api_version == ApiVersion.v2.value:
-            ctor = DeviceV2
+        elif api_version == ApiVersion.v1_1_preview.value:
+            ctor = DeviceV1_1_preview
         else:
             ctor = DevicePreview
 
@@ -174,8 +174,8 @@ def get_device_registration_summary(
 
         if api_version == ApiVersion.v1.value:
             ctor = DeviceV1
-        elif api_version == ApiVersion.v2.value:
-            ctor = DeviceV2
+        elif api_version == ApiVersion.v1_1_preview.value:
+            ctor = DeviceV1_1_preview
         else:
             ctor = DevicePreview
 
@@ -199,7 +199,7 @@ def create_device(
     token: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[DeviceV1, DeviceV2, DevicePreview]:
+) -> Union[DeviceV1, DeviceV1_1_preview, DevicePreview]:
     """
     Create a device in IoTC
 
@@ -237,7 +237,7 @@ def create_device(
     if template:
         payload["template"] = template
 
-    if api_version == ApiVersion.v2.value:
+    if api_version == ApiVersion.v1_1_preview.value:
         if organizations:
             payload["organizations"] = organizations.split(",")
 
@@ -246,8 +246,8 @@ def create_device(
 
     if api_version == ApiVersion.v1.value:
         ctor = DeviceV1
-    elif api_version == ApiVersion.v2.value:
-        ctor = DeviceV2
+    elif api_version == ApiVersion.v1_1_preview.value:
+        ctor = DeviceV1_1_preview
     else:
         ctor = DevicePreview
     return ctor(result)

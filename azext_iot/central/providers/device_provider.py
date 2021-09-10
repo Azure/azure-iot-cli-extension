@@ -11,7 +11,7 @@ from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.enum import DeviceStatus
 from azext_iot.central.models.v1 import DeviceV1
-from azext_iot.central.models.v2 import DeviceV2
+from azext_iot.central.models.v1_1_preview import DeviceV1_1_preview
 from azext_iot.central.models.preview import DevicePreview
 from azext_iot.dps.services import global_service as dps_global_service
 
@@ -46,7 +46,7 @@ class CentralDeviceProvider:
         self,
         device_id,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> Union[DeviceV1, DeviceV2, DevicePreview]:
+    ) -> Union[DeviceV1, DeviceV1_1_preview, DevicePreview]:
 
         # get or add to cache
         device = self._devices.get(device_id)
@@ -69,7 +69,7 @@ class CentralDeviceProvider:
     def list_devices(
         self,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> List[Union[DeviceV1, DeviceV2, DevicePreview]]:
+    ) -> List[Union[DeviceV1, DeviceV1_1_preview, DevicePreview]]:
         devices = central_services.device.list_devices(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -91,7 +91,7 @@ class CentralDeviceProvider:
         simulated=False,
         organizations=None,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> Union[DeviceV1, DeviceV2, DevicePreview]:
+    ) -> Union[DeviceV1, DeviceV1_1_preview, DevicePreview]:
         if not device_id:
             raise CLIError("Device id must be specified.")
 

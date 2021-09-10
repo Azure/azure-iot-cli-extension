@@ -11,7 +11,7 @@ from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.preview import JobPreview
-from azext_iot.central.models.v2 import JobV2
+from azext_iot.central.models.v1_1_preview import JobV1_1_preview
 
 logger = get_logger(__name__)
 
@@ -37,7 +37,7 @@ class CentralJobProvider:
 
     def list_jobs(
         self, central_dns_suffix=CENTRAL_ENDPOINT
-    ) -> List[Union[JobPreview, JobV2]]:
+    ) -> List[Union[JobPreview, JobV1_1_preview]]:
         jobs = central_services.job.list_jobs(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -55,7 +55,7 @@ class CentralJobProvider:
         self,
         job_id,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> Union[JobPreview, JobV2]:
+    ) -> Union[JobPreview, JobV1_1_preview]:
         # get or add to cache
         job = self._jobs.get(job_id)
         if not job:
@@ -78,7 +78,7 @@ class CentralJobProvider:
         self,
         job_id,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> Union[JobPreview, JobV2]:
+    ) -> Union[JobPreview, JobV1_1_preview]:
         # get or add to cache
         job = central_services.job.stop_job(
             cmd=self._cmd,
@@ -97,7 +97,7 @@ class CentralJobProvider:
         self,
         job_id,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> Union[JobPreview, JobV2]:
+    ) -> Union[JobPreview, JobV1_1_preview]:
         # get or add to cache
         job = central_services.job.resume_job(
             cmd=self._cmd,
@@ -118,7 +118,7 @@ class CentralJobProvider:
         job_id,
         rerun_id,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> Union[JobPreview, JobV2]:
+    ) -> Union[JobPreview, JobV1_1_preview]:
         # get or add to cache
         job = central_services.job.rerun_job(
             cmd=self._cmd,

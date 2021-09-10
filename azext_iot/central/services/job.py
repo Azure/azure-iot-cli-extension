@@ -14,7 +14,7 @@ from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
 from azure.cli.core.util import should_disable_connection_verify
-from azext_iot.central.models.v2 import JobV2
+from azext_iot.central.models.v1_1_preview import JobV1_1_preview
 from azext_iot.central.models.preview import JobPreview
 
 
@@ -68,7 +68,7 @@ def _list_job(
     api_version: str,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> List[Union[JobPreview, JobV2]]:
+) -> List[Union[JobPreview, JobV1_1_preview]]:
     """
     Get a list of all jobs in IoTC app
 
@@ -123,7 +123,7 @@ def get_job(
     token: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[JobPreview, JobV2]:
+) -> Union[JobPreview, JobV1_1_preview]:
     """
     Get job info given a job id
 
@@ -160,7 +160,7 @@ def stop_job(
     token: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[JobPreview, JobV2]:
+) -> Union[JobPreview, JobV1_1_preview]:
     """
     Stop a running job
 
@@ -197,7 +197,7 @@ def resume_job(
     token: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[JobPreview, JobV2]:
+) -> Union[JobPreview, JobV1_1_preview]:
     """
     Resume a stopped job
 
@@ -235,7 +235,7 @@ def rerun_job(
     token: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[JobPreview, JobV2]:
+) -> Union[JobPreview, JobV1_1_preview]:
     """
     Rerun a job on failed devices
 
@@ -308,7 +308,7 @@ def list_jobs(
     api_version: str,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> List[Union[JobPreview, JobV2]]:
+) -> List[Union[JobPreview, JobV1_1_preview]]:
 
     values = _list_job(
         cmd=cmd,
@@ -339,7 +339,7 @@ def create_job(
     token: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[JobPreview, JobV2]:
+) -> Union[JobPreview, JobV1_1_preview]:
     """
     Create a job in IoTC
 

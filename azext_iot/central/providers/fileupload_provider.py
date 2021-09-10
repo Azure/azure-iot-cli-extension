@@ -9,7 +9,7 @@ from knack.util import CLIError
 from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
-from azext_iot.central.models.v2 import FileUploadV2
+from azext_iot.central.models.v1_1_preview import FileUploadV1_1_preview
 
 logger = get_logger(__name__)
 
@@ -36,7 +36,7 @@ class CentralFileUploadProvider:
     def get_fileupload(
         self,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> FileUploadV2:
+    ) -> FileUploadV1_1_preview:
         # get or add to cache
         if not self._fileupload:
             fileupload = central_services.file_upload.get_fileupload(
@@ -57,7 +57,7 @@ class CentralFileUploadProvider:
     def delete_fileupload(
         self,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> FileUploadV2:
+    ) -> FileUploadV1_1_preview:
         # get or add to cache
         res = central_services.file_upload.delete_fileupload(
             cmd=self._cmd,

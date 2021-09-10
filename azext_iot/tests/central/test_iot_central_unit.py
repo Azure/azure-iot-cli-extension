@@ -31,11 +31,11 @@ from azext_iot.monitor.models.enum import Severity
 from azext_iot.tests.helpers import load_json
 from azext_iot.tests.test_constants import FileNames
 from azext_iot.constants import PNP_DTDLV2_COMPONENT_MARKER
-from azext_iot.central.models.v2 import (
-    DeviceGroupV2,
-    OrganizationV2,
-    JobV2,
-    FileUploadV2,
+from azext_iot.central.models.v1_1_preview import (
+    DeviceGroupV1_1_preview,
+    OrganizationV1_1_preview,
+    JobV1_1_preview,
+    FileUploadV1_1_preview,
 )
 from azext_iot.central.models.v1 import RoleV1, TemplateV1
 
@@ -219,7 +219,8 @@ class TestCentralDeviceProvider:
 
 class TestCentralDeviceGroupProvider:
     _device_groups = [
-        DeviceGroupV2(group) for group in load_json(FileNames.central_device_group_file)
+        DeviceGroupV1_1_preview(group)
+        for group in load_json(FileNames.central_device_group_file)
     ]
 
     @mock.patch("azext_iot.central.services.device_group")
@@ -227,7 +228,7 @@ class TestCentralDeviceGroupProvider:
 
         # setup
         provider = CentralDeviceGroupProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.v2.value
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
         )
         mock_device_group_svc.list_device_groups.return_value = self._device_groups
 
@@ -292,7 +293,8 @@ class TestCentralRoleProvider:
 
 class TestCentralOrganizationProvider:
     _orgs = [
-        OrganizationV2(org) for org in load_json(FileNames.central_organization_file)
+        OrganizationV1_1_preview(org)
+        for org in load_json(FileNames.central_organization_file)
     ]
 
     @mock.patch("azext_iot.central.services.organization")
@@ -300,7 +302,7 @@ class TestCentralOrganizationProvider:
 
         # setup
         provider = CentralOrganizationProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.v2.value
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
         )
         mock_org_svc.list_orgs.return_value = self._orgs
 
@@ -315,7 +317,7 @@ class TestCentralOrganizationProvider:
     def test_should_return_org(self, mock_org_svc):
         # setup
         provider = CentralOrganizationProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.v2.value
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
         )
         mock_org_svc.get_org.return_value = self._orgs[0]
 
@@ -328,14 +330,14 @@ class TestCentralOrganizationProvider:
 
 
 class TestCentralJobProvider:
-    _jobs = [JobV2(job) for job in load_json(FileNames.central_job_file)]
+    _jobs = [JobV1_1_preview(job) for job in load_json(FileNames.central_job_file)]
 
     @mock.patch("azext_iot.central.services.job")
     def test_should_return_jobs(self, mock_job_svc):
 
         # setup
         provider = CentralJobProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.v2.value
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
         )
         mock_job_svc.list_jobs.return_value = self._jobs
 
@@ -350,7 +352,7 @@ class TestCentralJobProvider:
     def test_should_return_job(self, mock_job_svc):
         # setup
         provider = CentralJobProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.v2.value
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
         )
         mock_job_svc.get_job.return_value = self._jobs[0]
 
@@ -363,13 +365,13 @@ class TestCentralJobProvider:
 
 
 class TestCentralFileuploadProvider:
-    _fileupload = FileUploadV2(load_json(FileNames.central_fileupload_file))
+    _fileupload = FileUploadV1_1_preview(load_json(FileNames.central_fileupload_file))
 
     @mock.patch("azext_iot.central.services.file_upload")
     def test_should_return_fileupload(self, mock_fileupload_svc):
         # setup
         provider = CentralFileUploadProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.v2.value
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
         )
         mock_fileupload_svc.get_fileupload.return_value = self._fileupload
 

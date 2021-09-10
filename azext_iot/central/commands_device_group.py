@@ -15,7 +15,7 @@ def list_device_groups(
     app_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v2.value,
+    api_version=ApiVersion.v1_1_preview.value,
 ):
     provider = CentralDeviceGroupProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version

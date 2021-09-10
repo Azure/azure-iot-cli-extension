@@ -9,7 +9,7 @@ from knack.util import CLIError
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.v1 import TemplateV1
-from azext_iot.central.models.v2 import TemplateV2
+from azext_iot.central.models.v1_1_preview import TemplateV1_1_preview
 from azext_iot.central.models.preview import TemplatePreview
 
 
@@ -36,7 +36,7 @@ class CentralDeviceTemplateProvider:
         self,
         device_template_id,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> Union[TemplateV1, TemplateV2, TemplatePreview]:
+    ) -> Union[TemplateV1, TemplateV1_1_preview, TemplatePreview]:
         # get or add to cache
         device_template = self._device_templates.get(device_template_id)
         if not device_template:
@@ -62,7 +62,7 @@ class CentralDeviceTemplateProvider:
     def list_device_templates(
         self,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> List[Union[TemplateV1, TemplateV2, TemplatePreview]]:
+    ) -> List[Union[TemplateV1, TemplateV1_1_preview, TemplatePreview]]:
         templates = central_services.device_template.list_device_templates(
             cmd=self._cmd,
             app_id=self._app_id,

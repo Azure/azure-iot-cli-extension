@@ -9,7 +9,7 @@ from typing import List, Union
 from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
-from azext_iot.central.models.v2 import DeviceGroupV2
+from azext_iot.central.models.v1_1_preview import DeviceGroupV1_1_preview
 from azext_iot.central.models.preview import DeviceGroupPreview
 
 logger = get_logger(__name__)
@@ -36,7 +36,7 @@ class CentralDeviceGroupProvider:
 
     def list_device_groups(
         self, central_dns_suffix=CENTRAL_ENDPOINT
-    ) -> List[Union[DeviceGroupPreview, DeviceGroupV2]]:
+    ) -> List[Union[DeviceGroupPreview, DeviceGroupV1_1_preview]]:
         device_groups = central_services.device_group.list_device_groups(
             cmd=self._cmd,
             app_id=self._app_id,

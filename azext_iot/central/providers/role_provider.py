@@ -11,7 +11,7 @@ from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.v1 import RoleV1
-from azext_iot.central.models.v2 import RoleV2
+from azext_iot.central.models.v1_1_preview import RoleV1_1_preview
 from azext_iot.central.models.preview import RolePreview
 
 logger = get_logger(__name__)
@@ -38,7 +38,7 @@ class CentralRoleProvider:
 
     def list_roles(
         self, central_dns_suffix=CENTRAL_ENDPOINT
-    ) -> List[Union[RoleV1, RoleV2, RolePreview]]:
+    ) -> List[Union[RoleV1, RoleV1_1_preview, RolePreview]]:
         roles = central_services.role.list_roles(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -56,7 +56,7 @@ class CentralRoleProvider:
         self,
         role_id,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> Union[RoleV1, RoleV2, RolePreview]:
+    ) -> Union[RoleV1, RoleV1_1_preview, RolePreview]:
         # get or add to cache
         role = self._roles.get(role_id)
         if not role:

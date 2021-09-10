@@ -14,7 +14,7 @@ from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
 from azext_iot.central.models.v1 import RoleV1
-from azext_iot.central.models.v2 import RoleV2
+from azext_iot.central.models.v1_1_preview import RoleV1_1_preview
 from azext_iot.central.models.preview import RolePreview
 from azure.cli.core.util import should_disable_connection_verify
 
@@ -31,7 +31,7 @@ def get_role(
     token: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[RoleV1, RoleV2, RolePreview]:
+) -> Union[RoleV1, RoleV1_1_preview, RolePreview]:
     """
     Get role info given a role id
 
@@ -72,7 +72,7 @@ def list_roles(
     api_version: str,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> List[Union[RoleV1, RoleV2, RolePreview]]:
+) -> List[Union[RoleV1, RoleV1_1_preview, RolePreview]]:
     """
     Get a list of all roles in IoTC app
 

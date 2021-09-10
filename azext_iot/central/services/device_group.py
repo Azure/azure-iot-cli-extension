@@ -14,7 +14,7 @@ from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
 from azext_iot.central.models.preview import DeviceGroupPreview
-from azext_iot.central.models.v2 import DeviceGroupV2
+from azext_iot.central.models.v1_1_preview import DeviceGroupV1_1_preview
 from azext_iot.central.models.enum import ApiVersion
 
 logger = get_logger(__name__)
@@ -29,7 +29,7 @@ def list_device_groups(
     api_version: str,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> List[Union[DeviceGroupPreview, DeviceGroupV2]]:
+) -> List[Union[DeviceGroupPreview, DeviceGroupV1_1_preview]]:
     """
     Get a list of all device groups in IoTC app
 
@@ -65,7 +65,7 @@ def list_device_groups(
             [
                 DeviceGroupPreview(device_group)
                 if api_version == ApiVersion.preview.value
-                else DeviceGroupV2(device_group)
+                else DeviceGroupV1_1_preview(device_group)
                 for device_group in result["value"]
             ]
         )

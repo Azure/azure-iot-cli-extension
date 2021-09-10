@@ -67,10 +67,10 @@ def get_object(data: dict, model: str, api_version):
             )
             return module(data)
 
-        elif api_version == ApiVersion.v2.value:
+        elif api_version == ApiVersion.v1_1_preview.value:
             module = getattr(
                 import_module(
-                    "azext_iot.central.models.v2.{}".format(to_snake_case(model))
+                    "azext_iot.central.models.v1_1_preview.{}".format(to_snake_case(model))
                 ),
                 model,
             )

@@ -10,7 +10,7 @@ from knack.util import CLIError
 from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
-from azext_iot.central.models.v2 import OrganizationV2
+from azext_iot.central.models.v1_1_preview import OrganizationV1_1_preview
 
 logger = get_logger(__name__)
 
@@ -36,7 +36,7 @@ class CentralOrganizationProvider:
 
     def list_organizations(
         self, central_dns_suffix=CENTRAL_ENDPOINT
-    ) -> List[OrganizationV2]:
+    ) -> List[OrganizationV1_1_preview]:
         orgs = central_services.organization.list_orgs(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -54,7 +54,7 @@ class CentralOrganizationProvider:
         self,
         org_id,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> OrganizationV2:
+    ) -> OrganizationV1_1_preview:
         # get or add to cache
         org = self._orgs.get(org_id)
         if not org:
@@ -77,7 +77,7 @@ class CentralOrganizationProvider:
         self,
         org_id,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> OrganizationV2:
+    ) -> OrganizationV1_1_preview:
         # get or add to cache
         org = central_services.organization.delete_org(
             cmd=self._cmd,

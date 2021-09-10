@@ -47,7 +47,7 @@ def add_api_token(
         "roles": [{"role": role}],
     }
 
-    if org_id and api_version == ApiVersion.v2.value:
+    if org_id and api_version == ApiVersion.v1_1_preview.value:
         payload["roles"][0]["organization"] = org_id
 
     # Construct parameters

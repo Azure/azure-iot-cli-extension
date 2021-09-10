@@ -11,7 +11,7 @@ from knack.log import get_logger
 
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
-from azext_iot.central.models.v2 import FileUploadV2
+from azext_iot.central.models.v1_1_preview import FileUploadV1_1_preview
 from azure.cli.core.util import should_disable_connection_verify
 
 
@@ -52,7 +52,7 @@ def get_fileupload(
     token: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> FileUploadV2:
+) -> FileUploadV1_1_preview:
     """
     Get fileupload info
     Args:
@@ -79,7 +79,7 @@ def get_fileupload(
 
 def delete_fileupload(
     cmd, app_id: str, token: str, api_version: str, central_dns_suffix=CENTRAL_ENDPOINT
-) -> FileUploadV2:
+) -> FileUploadV1_1_preview:
     """
     Delete file upload storage configuration
 
@@ -116,7 +116,7 @@ def create_fileupload(
     token: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> FileUploadV2:
+) -> FileUploadV1_1_preview:
     """
     Create the file upload storage account configuration.
 

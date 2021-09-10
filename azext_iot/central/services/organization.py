@@ -13,7 +13,7 @@ from knack.log import get_logger
 
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
-from azext_iot.central.models.v2 import OrganizationV2
+from azext_iot.central.models.v1_1_preview import OrganizationV1_1_preview
 from azure.cli.core.util import should_disable_connection_verify
 
 
@@ -65,7 +65,7 @@ def get_org(
     token: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> OrganizationV2:
+) -> OrganizationV1_1_preview:
     """
     Get organization info given an organization id
 
@@ -102,7 +102,7 @@ def list_orgs(
     api_version: str,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> List[OrganizationV2]:
+) -> List[OrganizationV1_1_preview]:
     """
     Get a list of all organizations in IoTC app
 
@@ -156,7 +156,7 @@ def create_org(
     token: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> OrganizationV2:
+) -> OrganizationV1_1_preview:
 
     """
     Create an organization in IoTC
@@ -205,7 +205,7 @@ def delete_org(
     token: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> OrganizationV2:
+) -> OrganizationV1_1_preview:
     """
     Delete an organization
 
