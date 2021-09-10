@@ -18,7 +18,7 @@ def get_job(
     job_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.preview.value,
+    api_version=ApiVersion.v1_1_preview.value,
 ):
     provider = CentralJobProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
@@ -33,7 +33,7 @@ def stop_job(
     job_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.preview.value,
+    api_version=ApiVersion.v1_1_preview.value,
 ):
     provider = CentralJobProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
@@ -48,7 +48,7 @@ def resume_job(
     job_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.preview.value,
+    api_version=ApiVersion.v1_1_preview.value,
 ):
     provider = CentralJobProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
@@ -64,7 +64,7 @@ def rerun_job(
     rerun_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.preview.value,
+    api_version=ApiVersion.v1_1_preview.value,
 ):
     provider = CentralJobProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
@@ -81,7 +81,7 @@ def get_job_devices(
     job_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.preview.value,
+    api_version=ApiVersion.v1_1_preview.value,
 ):
     provider = CentralJobProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
@@ -97,7 +97,7 @@ def list_jobs(
     app_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.preview.value,
+    api_version=ApiVersion.v1_1_preview.value,
 ):
     provider = CentralJobProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
@@ -121,7 +121,7 @@ def create_job(
     threshold=None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.preview.value,
+    api_version=ApiVersion.v1_1_preview.value,
 ):
 
     if not isinstance(content, str):
