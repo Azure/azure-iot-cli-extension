@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 # This is largely derived from https://docs.microsoft.com/en-us/rest/api/iotcentral/roles
 
-from typing import List
+from typing import List, Union
 import requests
 
 from knack.util import CLIError
@@ -33,7 +33,7 @@ def _make_call(
     central_dns_suffix: str,
     api_version: str,
     url=None,
-):
+) -> Union[dict, OrganizationV1_1_preview]:
     if url is None:
         url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
 

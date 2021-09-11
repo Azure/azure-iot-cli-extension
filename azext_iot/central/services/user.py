@@ -7,11 +7,14 @@
 from azure.cli.core.util import should_disable_connection_verify
 from knack.util import CLIError
 import requests
-
+from typing import Union, List
 from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
 from azext_iot.central.models.enum import Role, ApiVersion, UserTypePreview, UserTypeV1
+from azext_iot.central.models.v1 import UserV1
+from azext_iot.central.models.v1_1_preview import UserV1_1_preview
+from azext_iot.central.models.preview import UserPreview
 
 logger = get_logger(__name__)
 
@@ -29,7 +32,7 @@ def _make_call(
     central_dns_suffix: str,
     api_version: str,
     url=None,
-):
+) -> Union[dict, UserV1, UserPreview, UserV1_1_preview]:
     if url is None:
         url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
 
@@ -164,7 +167,7 @@ def get_user_list(
     api_version: str,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> dict:
+) -> List[Union[UserV1, UserV1_1_preview, UserPreview]]:
     """
     Get the list of users for central app.
 
@@ -215,7 +218,7 @@ def get_user(
     assignee: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> dict:
+) -> Union[UserV1, UserV1_1_preview, UserPreview]:
     """
     Get information for the specified user.
 

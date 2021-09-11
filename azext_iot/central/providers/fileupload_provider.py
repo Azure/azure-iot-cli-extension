@@ -22,6 +22,7 @@ class CentralFileUploadProvider:
         Args:
             cmd: command passed into az
             app_id: name of app (used for forming request URL)
+            api_version: API version (appendend to request URL)
             token: (OPTIONAL) authorization token to fetch device details from IoTC.
                 MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
                 Useful in scenarios where user doesn't own the app

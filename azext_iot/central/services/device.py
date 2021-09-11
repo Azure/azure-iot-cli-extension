@@ -229,13 +229,16 @@ def create_device(
     query_parameters = {}
     query_parameters["api-version"] = api_version
 
-    payload = {
-        "displayName": device_name,
-        "simulated": simulated,
-        "enabled": True,
-    }
-    if template:
-        payload["template"] = template
+    payload = {"displayName": device_name, "simulated": simulated}
+
+    if api_version == ApiVersion.preview.value:
+        payload["approved"] = True
+        if template:
+            payload["instanceOf"] = template
+    else:
+        payload["enabled"] = True
+        if template:
+            payload["template"] = template
 
     if api_version == ApiVersion.v1_1_preview.value:
         if organizations:

@@ -114,9 +114,9 @@ def create_job(
     content: str,
     job_name=None,
     description=None,
-    batch_percentage=False,
-    threshold_percentage=False,
-    threshold_batch=False,
+    batch_type=None,
+    threshold_type=None,
+    threshold_batch=None,
     batch=None,
     threshold=None,
     token=None,
@@ -132,14 +132,19 @@ def create_job(
     provider = CentralJobProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
+
     return provider.create_job(
         job_id=job_id,
         job_name=job_name,
         group_id=group_id,
         content=payload,
         description=description,
-        batch_percentage=batch_percentage,
-        threshold_percentage=threshold_percentage,
+        batch_percentage=True
+        if batch_type is not None and batch_type.lower() == "percentage"
+        else False,
+        threshold_percentage=True
+        if threshold_type is not None and threshold_type.lower() == "percentage"
+        else False,
         threshold_batch=threshold_batch,
         batch=batch,
         threshold=threshold,

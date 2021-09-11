@@ -56,7 +56,7 @@ def log_response_debug(response: Response, logger: logging.Logger):
     logger.debug("Response headers: {}".format(response.headers))
 
 
-def get_object(data: dict, model: str, api_version):
+def get_object(data: dict, model: str, api_version) -> object:
     try:
         if api_version == ApiVersion.v1.value:
             module = getattr(
@@ -70,7 +70,9 @@ def get_object(data: dict, model: str, api_version):
         elif api_version == ApiVersion.v1_1_preview.value:
             module = getattr(
                 import_module(
-                    "azext_iot.central.models.v1_1_preview.{}".format(to_snake_case(model))
+                    "azext_iot.central.models.v1_1_preview.{}".format(
+                        to_snake_case(model)
+                    )
                 ),
                 model,
             )
@@ -84,7 +86,6 @@ def get_object(data: dict, model: str, api_version):
             )
             return module(data)
     except Exception as e:
-        print(e)
         raise CLIError(
             "{} is not available for api version == {}".format(model, api_version)
         )

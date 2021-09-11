@@ -6,7 +6,7 @@
 # This is largely derived from https://docs.microsoft.com/en-us/rest/api/iotcentral/fileuploads
 
 import requests
-
+from typing import Union
 from knack.log import get_logger
 
 from azext_iot.constants import CENTRAL_ENDPOINT
@@ -28,7 +28,7 @@ def _make_call(
     token: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-):
+) -> Union[dict, FileUploadV1_1_preview]:
     url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
     headers = _utility.get_headers(token, cmd)
 
@@ -126,7 +126,7 @@ def create_fileupload(
         connection_string: The connection string used to configure the storage account
         container: The name of the container inside the storage account
         account: (optional) The storage account name where to upload the file to
-        sasTtl: ISO 8601 duration standard, The amount of time the device’s request to upload a file is valid before it expires.
+        sasTtl: (optional) ISO 8601 duration standard, The amount of time the device’s request to upload a file is valid before it expires.
         token: (OPTIONAL) authorization token to fetch file upload details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
         central_dns_suffix: {centralDnsSuffixInPath} as found in docs

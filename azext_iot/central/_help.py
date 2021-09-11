@@ -552,7 +552,7 @@ def _load_central_roles_help():
         "iot central role show"
     ] = """
     type: command
-    short-summary: Get the details of a role by ID
+    short-summary: Get the details of a role by ID.
     examples:
       - name: Get details of role
         text: >
@@ -587,7 +587,7 @@ def _load_central_organizations_help():
         "iot central organization show"
     ] = """
     type: command
-    short-summary: Get the details of a organization by ID
+    short-summary: Get the details of a organization by ID.
     examples:
       - name: Get details of organization
         text: >
@@ -600,7 +600,7 @@ def _load_central_organizations_help():
         "iot central organization delete"
     ] = """
     type: command
-    short-summary: Delete an organization by ID
+    short-summary: Delete an organization by ID.
     examples:
       - name: Delete an organization
         text: >
@@ -613,15 +613,21 @@ def _load_central_organizations_help():
         "iot central organization create"
     ] = """
     type: command
-    short-summary: Create an organization in the application
+    short-summary: Create an organization in the application.
     examples:
       - name: Create an organization
         text: >
           az iot central organization create
           --app-id {appid}
           --org-id {organizationId}
-          --parent {parentOrgId}
-    """
+
+      - name: Create an organization, child of a parent one in the application.
+        text: >
+          az iot central organization create
+          --app-id {appid}
+          --org-id {organizationId}
+          --parent-id {parentId}
+        """
 
 
 def _load_central_jobs_help():
@@ -649,7 +655,7 @@ def _load_central_jobs_help():
         "iot central job create"
     ] = """
     type: command
-    short-summary: Create and execute a job via its job definition
+    short-summary: Create and execute a job via its job definition.
     examples:
       - name: Create a job with name
         text: >
@@ -660,7 +666,7 @@ def _load_central_jobs_help():
           --job-name {jobName}
           --content {creationJSONPath}
 
-      - name: Create a job with name and batch configuration in percentage
+      - name: Create a job with name and batch configuration.
         text: >
           az iot central job create
           --app-id {appid}
@@ -668,10 +674,10 @@ def _load_central_jobs_help():
           --group-id {groupId}
           --job-name {jobName}
           --content {creationJSONPath}
-          --batch {batchValue}
-          --batch-percentage
+          --batch {jobBatchValue}
+          --batch-type {jobBatchType}
 
-      - name: Create a job with name and cancellation threshold configuration in percentage with no batch
+      - name: Create a job with name and cancellation threshold configuration with no batch.
         text: >
           az iot central job create
           --app-id {appid}
@@ -679,8 +685,8 @@ def _load_central_jobs_help():
           --group-id {groupId}
           --job-name {jobName}
           --content {creationJSONPath}
-          --threshold {thresholdValue}
-          --threshold-percentage
+          --cancellation-threshold {jobCancellationThresholdValue}
+          --cancellation-threshold-type {jobCancellationThresholdType}
           --description {jobDesc}
     """
 
@@ -688,7 +694,7 @@ def _load_central_jobs_help():
         "iot central job show"
     ] = """
     type: command
-    short-summary: Get the details of a job by ID
+    short-summary: Get the details of a job by ID.
     examples:
       - name: Get details of job
         text: >
@@ -701,7 +707,7 @@ def _load_central_jobs_help():
         "iot central job stop"
     ] = """
     type: command
-    short-summary: Stop a running job
+    short-summary: Stop a running job.
     examples:
       - name: Stop a job
         text: >
@@ -714,7 +720,7 @@ def _load_central_jobs_help():
         "iot central job resume"
     ] = """
     type: command
-    short-summary: Resume a stopped job
+    short-summary: Resume a stopped job.
     examples:
       - name: Resume a job
         text: >
@@ -727,7 +733,7 @@ def _load_central_jobs_help():
         "iot central job rerun"
     ] = """
     type: command
-    short-summary: Rerun a job on failed devices
+    short-summary: Re-run a job on all failed devices.
     examples:
       - name: Rerun a job
         text: >
@@ -741,7 +747,7 @@ def _load_central_jobs_help():
         "iot central job get-devices"
     ] = """
     type: command
-    short-summary: Get job device statuses
+    short-summary: Get job device statuses.
     examples:
       - name: Get the list of individual device statuses by job ID
         text: >

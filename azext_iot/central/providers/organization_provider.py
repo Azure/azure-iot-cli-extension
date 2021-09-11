@@ -23,6 +23,7 @@ class CentralOrganizationProvider:
         Args:
             cmd: command passed into az
             app_id: name of app (used for forming request URL)
+            api_version: API version (appendend to request URL)
             token: (OPTIONAL) authorization token to fetch device details from IoTC.
                 MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
                 Useful in scenarios where user doesn't own the app
@@ -107,7 +108,9 @@ class CentralOrganizationProvider:
         )
 
         if not org:
-            raise CLIError("No organization found with id: '{}'.".format(org_id))
+            raise CLIError(
+                "Failed to create organization with id: '{}'.".format(org_id)
+            )
 
         # add to cache
         self._orgs[org.id] = org

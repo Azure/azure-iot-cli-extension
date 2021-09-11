@@ -33,7 +33,7 @@ def _call_job(
     token: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-):
+) -> Union[dict, JobV1_1_preview, JobPreview]:
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, job_id)
     headers = _utility.get_headers(token, cmd)
 

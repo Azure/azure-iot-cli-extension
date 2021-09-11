@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 # Dev note - think of this as a controller
 
-
+from typing import List
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.providers import CentralApiTokenProvider
 from azext_iot.central.models.enum import Role, ApiVersion
@@ -20,7 +20,7 @@ def add_api_token(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
-):
+) -> dict:
     provider = CentralApiTokenProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
@@ -44,7 +44,7 @@ def list_api_tokens(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
-):
+) -> List[dict]:
 
     provider = CentralApiTokenProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
@@ -79,7 +79,7 @@ def delete_api_token(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
-):
+) -> dict:
     provider = CentralApiTokenProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )

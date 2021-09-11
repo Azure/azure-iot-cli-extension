@@ -24,6 +24,7 @@ class CentralJobProvider:
         Args:
             cmd: command passed into az
             app_id: name of app (used for forming request URL)
+            api_version: API version (appendend to request URL)
             token: (OPTIONAL) authorization token to fetch device details from IoTC.
                 MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
                 Useful in scenarios where user doesn't own the app
@@ -89,7 +90,7 @@ class CentralJobProvider:
             api_version=self._api_version,
         )
         if not job:
-            raise CLIError("No job found with id: '{}'.".format(job_id))
+            raise CLIError("Failed to stop job with id: '{}'.".format(job_id))
 
         return job
 
@@ -109,7 +110,7 @@ class CentralJobProvider:
         )
 
         if not job:
-            raise CLIError("No job found with id: '{}'.".format(job_id))
+            raise CLIError("Failed to resume job with id: '{}'.".format(job_id))
 
         return job
 
@@ -131,7 +132,7 @@ class CentralJobProvider:
         )
 
         if not job:
-            raise CLIError("No job found with id: '{}'.".format(job_id))
+            raise CLIError("Failed to re-run job with id: '{}'.".format(job_id))
 
         return job
 
@@ -183,7 +184,7 @@ class CentralJobProvider:
         )
 
         if not job:
-            raise CLIError("No job found with id: '{}'.".format(job_id))
+            raise CLIError("Failed to create job with id: '{}'.".format(job_id))
 
         # add to cache
         self._jobs[job.id] = job
