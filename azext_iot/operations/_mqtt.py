@@ -10,6 +10,7 @@ from azext_iot.common.utility import ensure_azure_namespace_path
 
 printer = pprint.PrettyPrinter(indent=2)
 
+
 class mqtt_client(object):
     def __init__(
         self, target, device_conn_string, device_id,
