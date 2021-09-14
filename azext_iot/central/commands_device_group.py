@@ -5,7 +5,10 @@
 # --------------------------------------------------------------------------------------------
 # Dev note - think of this as a controller
 
+from typing import List, Union
 from azext_iot.constants import CENTRAL_ENDPOINT
+from azext_iot.central.models.preview import DeviceGroupPreview
+from azext_iot.central.models.v1_1_preview import DeviceGroupV1_1_preview
 from azext_iot.central.providers import CentralDeviceGroupProvider
 from azext_iot.central.models.enum import ApiVersion
 
@@ -16,7 +19,7 @@ def list_device_groups(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1_1_preview.value,
-):
+) -> List[Union[DeviceGroupPreview, DeviceGroupV1_1_preview]]:
     provider = CentralDeviceGroupProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )

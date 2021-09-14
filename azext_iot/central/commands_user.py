@@ -5,10 +5,15 @@
 # --------------------------------------------------------------------------------------------
 # Dev note - think of this as a controller
 
-
+from typing import List, Union
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.providers import CentralUserProvider
 from azext_iot.central.models.enum import Role, ApiVersion
+from azext_iot.central.models.v1 import UserV1
+from azext_iot.central.models.preview import UserPreview
+from azext_iot.central.models.v1_1_preview import UserV1_1_preview
+
+UserType = Union[UserV1, UserPreview, UserV1_1_preview]
 
 
 def add_user(
@@ -22,7 +27,7 @@ def add_user(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
-):
+) -> UserType:
     provider = CentralUserProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
@@ -50,7 +55,7 @@ def list_users(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
-):
+) -> List[UserType]:
     provider = CentralUserProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
@@ -67,7 +72,7 @@ def get_user(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
-):
+) -> UserType:
     provider = CentralUserProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
@@ -85,7 +90,7 @@ def delete_user(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
-):
+) -> dict:
     provider = CentralUserProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )

@@ -6,10 +6,15 @@
 # Dev note - think of this as a controller
 
 from knack.util import CLIError
+from typing import Union, List, Any
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.models.enum import ApiVersion
 from azext_iot.central.providers.job_provider import CentralJobProvider
+from azext_iot.central.models.preview import JobPreview
+from azext_iot.central.models.v1_1_preview import JobV1_1_preview
 from azext_iot.common import utility
+
+JobType = Union[JobPreview, JobV1_1_preview]
 
 
 def get_job(
@@ -19,7 +24,7 @@ def get_job(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1_1_preview.value,
-):
+) -> JobType:
     provider = CentralJobProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
@@ -34,7 +39,7 @@ def stop_job(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1_1_preview.value,
-):
+) -> JobType:
     provider = CentralJobProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
@@ -49,7 +54,7 @@ def resume_job(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1_1_preview.value,
-):
+) -> JobType:
     provider = CentralJobProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
@@ -65,7 +70,7 @@ def rerun_job(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1_1_preview.value,
-):
+) -> JobType:
     provider = CentralJobProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
@@ -82,7 +87,7 @@ def get_job_devices(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1_1_preview.value,
-):
+) -> List[Any]:
     provider = CentralJobProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
@@ -98,7 +103,7 @@ def list_jobs(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1_1_preview.value,
-):
+) -> List[JobType]:
     provider = CentralJobProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
@@ -122,7 +127,7 @@ def create_job(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1_1_preview.value,
-):
+) -> JobType:
 
     if not isinstance(content, str):
         raise CLIError("content must be a string: {}".format(content))

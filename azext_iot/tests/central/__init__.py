@@ -37,7 +37,10 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         self._api_version = request.config.getoption("--api-version")
 
         global IS_1_1_PREVIEW
-        IS_1_1_PREVIEW = self._api_version == ApiVersion.v1_1_preview.value
+        IS_1_1_PREVIEW = (
+            self._api_version == ApiVersion.v1_1_preview.value
+            or self._api_version == None
+        )  # either explicitely selected or omitted
         yield
 
     def __init__(self, test_scenario):
@@ -327,8 +330,8 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         ).get_output_in_json()
 
     def _delete_fileupload(self, api_version):
-        command = (
-            "iot central file-upload-configuration delete --app-id {}".format(APP_ID),
+        command = "iot central file-upload-configuration delete --app-id {}".format(
+            APP_ID
         )
         self.cmd(
             command,

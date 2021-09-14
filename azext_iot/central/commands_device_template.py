@@ -6,7 +6,10 @@
 # Dev note - think of this as a controller
 
 from knack.util import CLIError
-
+from typing import Union
+from azext_iot.central.models.preview import TemplatePreview
+from azext_iot.central.models.v1 import TemplateV1
+from azext_iot.central.models.v1_1_preview import TemplateV1_1_preview
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.common import utility
 from azext_iot.central.providers import CentralDeviceTemplateProvider
@@ -20,7 +23,7 @@ def get_device_template(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
-):
+) -> Union[TemplatePreview, TemplateV1, TemplateV1_1_preview]:
     provider = CentralDeviceTemplateProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )

@@ -5,9 +5,15 @@
 # --------------------------------------------------------------------------------------------
 # Dev note - think of this as a controller
 
+from typing import Union, List
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.providers import CentralRoleProvider
 from azext_iot.central.models.enum import ApiVersion
+from azext_iot.central.models.preview import RolePreview
+from azext_iot.central.models.v1_1_preview import RoleV1_1_preview
+from azext_iot.central.models.v1 import RoleV1
+
+RoleType = Union[RoleV1, RoleV1_1_preview, RolePreview]
 
 
 def get_role(
@@ -17,7 +23,7 @@ def get_role(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
-):
+) -> RoleType:
     provider = CentralRoleProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
@@ -31,7 +37,7 @@ def list_roles(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
-):
+) -> List[RoleType]:
     provider = CentralRoleProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
