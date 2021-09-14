@@ -126,7 +126,8 @@ def create_fileupload(
         connection_string: The connection string used to configure the storage account
         container: The name of the container inside the storage account
         account: (optional) The storage account name where to upload the file to
-        sasTtl: (optional) ISO 8601 duration standard, The amount of time the device’s request to upload a file is valid before it expires.
+        sasTtl: (optional) ISO 8601 duration standard,
+                The amount of time the device’s request to upload a file is valid before it expires.
         token: (OPTIONAL) authorization token to fetch file upload details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
         central_dns_suffix: {centralDnsSuffixInPath} as found in docs

@@ -85,7 +85,7 @@ def get_object(data: dict, model: str, api_version) -> object:
                 model,
             )
             return module(data)
-    except Exception as e:
+    except:
         raise CLIError(
             "{} is not available for api version == {}".format(model, api_version)
         )

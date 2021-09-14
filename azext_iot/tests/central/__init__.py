@@ -6,11 +6,11 @@
 
 import os
 import time
-
+import pytest
 from azext_iot.tests import CaptureOutputLiveScenarioTest
 from azext_iot.tests.conftest import get_context_path
 from azext_iot.common import utility
-from azext_iot.central.models.enum import Role
+from azext_iot.central.models.enum import Role, UserTypePreview, UserTypeV1, ApiVersion
 
 APP_ID = os.environ.get("azext_iot_central_app_id")
 APP_PRIMARY_KEY = os.environ.get("azext_iot_central_primarykey")
@@ -22,13 +22,30 @@ STORAGE_CSTRING = os.environ.get("azext_iot_central_storage_cstring")
 STORAGE_CONTAINER = os.environ.get("azext_iot_central_storage_container")
 device_template_path = get_context_path(__file__, "json/device_template_int_test.json")
 sync_command_params = get_context_path(__file__, "json/sync_command_args.json")
+DEFAULT_FILE_UPLOAD_TTL = "PT1H"
+
+IS_1_1_PREVIEW = False
 
 
 class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
+    @pytest.fixture(autouse=True)
+    def fixture_api_version(self, request):
+        self._api_version = request.config.getoption("--api-version")
+
+        global IS_1_1_PREVIEW
+        IS_1_1_PREVIEW = self._api_version == ApiVersion.v1_1_preview.value
+        yield
+
     def __init__(self, test_scenario):
         super(CentralLiveScenarioTest, self).__init__(test_scenario)
 
-    def _create_device(self, **kwargs) -> (str, str):
+    def cmd(self, command, api_version, checks=None, expect_failure=False):
+        command = self._appendOptionalArgsToCommand(
+            command, token=TOKEN, dns_suffix=DNS_SUFFIX, api_version=api_version
+        )
+        return super().cmd(command, checks=checks, expect_failure=expect_failure)
+
+    def _create_device(self, api_version, **kwargs) -> (str, str):
         """
         kwargs:
             instance_of: template_id (str)
@@ -40,8 +57,6 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         command = "iot central device create --app-id {} -d {} --device-name {}".format(
             APP_ID, device_id, device_name
         )
-
-        command = self._appendOptionalArgsToCommand(command, TOKEN, DNS_SUFFIX)
 
         checks = [
             self.check("enabled", True),
@@ -60,42 +75,59 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
         checks.append(self.check("simulated", simulated))
 
-        self.cmd(command, checks=checks)
+        self.cmd(command, api_version=api_version, checks=checks)
         return (device_id, device_name)
 
-    def _create_users(self,):
+    def _create_users(self, api_version):
 
         users = []
         for role in Role:
             user_id = self.create_random_name(prefix="aztest", length=24)
             email = user_id + "@microsoft.com"
             command = "iot central user create --app-id {} --user-id {} -r {} --email {}".format(
-                APP_ID, user_id, role.name, email,
+                APP_ID,
+                user_id,
+                role.name,
+                email,
             )
 
             checks = [
                 self.check("id", user_id),
                 self.check("email", email),
-                self.check("type", "email"),
+                self.check(
+                    "type",
+                    UserTypePreview.email.value
+                    if api_version == ApiVersion.preview.value
+                    else UserTypeV1.email.value,
+                ),
                 self.check("roles[0].role", role.value),
             ]
-            users.append(self.cmd(command, checks=checks).get_output_in_json())
+            users.append(
+                self.cmd(
+                    command, api_version=api_version, checks=checks
+                ).get_output_in_json()
+            )
 
         return users
 
-    def _delete_user(self, user_id) -> None:
+    def _delete_user(self, api_version, user_id) -> None:
         self.cmd(
             "iot central user delete --app-id {} --user-id {}".format(APP_ID, user_id),
+            api_version=api_version,
             checks=[self.check("result", "success")],
         )
 
-    def _create_api_tokens(self,):
+    def _create_api_tokens(self, api_version):
 
         tokens = []
         for role in Role:
             token_id = self.create_random_name(prefix="aztest", length=24)
-            command = "iot central api-token create --app-id {} --token-id {} -r {}".format(
-                APP_ID, token_id, role.name,
+            command = (
+                "iot central api-token create --app-id {} --token-id {} -r {}".format(
+                    APP_ID,
+                    token_id,
+                    role.name,
+                )
             )
 
             checks = [
@@ -103,23 +135,27 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 self.check("roles[0].role", role.value),
             ]
 
-            tokens.append(self.cmd(command, checks=checks).get_output_in_json())
+            tokens.append(
+                self.cmd(
+                    command, api_version=api_version, checks=checks
+                ).get_output_in_json()
+            )
         return tokens
 
-    def _delete_api_token(self, token_id) -> None:
+    def _delete_api_token(self, api_version, token_id) -> None:
         self.cmd(
             "iot central api-token delete --app-id {} --token-id {}".format(
                 APP_ID, token_id
             ),
+            api_version=api_version,
             checks=[self.check("result", "success")],
         )
 
-    def _wait_for_provisioned(self, device_id):
+    def _wait_for_provisioned(self, api_version, device_id):
         command = "iot central device show --app-id {} -d {}".format(APP_ID, device_id)
-        command = self._appendOptionalArgsToCommand(command, TOKEN, DNS_SUFFIX)
 
         while True:
-            result = self.cmd(command)
+            result = self.cmd(command, api_version=api_version)
             device = result.get_output_in_json()
 
             # return when its provisioned
@@ -129,16 +165,17 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             # wait 10 seconds for provisioning to complete
             time.sleep(10)
 
-    def _delete_device(self, device_id) -> None:
+    def _delete_device(self, api_version, device_id) -> None:
 
         command = "iot central device delete --app-id {} -d {} ".format(
             APP_ID, device_id
         )
-        command = self._appendOptionalArgsToCommand(command, TOKEN, DNS_SUFFIX)
 
-        self.cmd(command, checks=[self.check("result", "success")])
+        self.cmd(
+            command, api_version=api_version, checks=[self.check("result", "success")]
+        )
 
-    def _create_device_template(self):
+    def _create_device_template(self, api_version):
         template = utility.process_json_arg(
             device_template_path, argument_name="device_template_path"
         )
@@ -148,49 +185,52 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         command = "iot central device-template create --app-id {} --device-template-id {} -k '{}'".format(
             APP_ID, template_id, device_template_path
         )
-        command = self._appendOptionalArgsToCommand(command, TOKEN, DNS_SUFFIX)
 
-        result = self.cmd(command, checks=[self.check("displayName", template_name), ],)
+        result = self.cmd(
+            command,
+            api_version=api_version,
+            checks=[
+                self.check("displayName", template_name),
+            ],
+        )
         json_result = result.get_output_in_json()
 
         assert json_result["@id"] == template_id
         return (template_id, template_name)
 
-    def _delete_device_template(self, template_id):
+    def _delete_device_template(self, api_version, template_id):
         attempts = range(0, 10)
         command = "iot central device-template delete --app-id {} --device-template-id {}".format(
             APP_ID, template_id
         )
 
-        command = self._appendOptionalArgsToCommand(command, TOKEN, DNS_SUFFIX)
-
         # retry logic to delete the template
         for _ in attempts:
             try:
-                self.cmd(command, checks=[self.check("result", "success")])
+                self.cmd(
+                    command,
+                    api_version=api_version,
+                    checks=[self.check("result", "success")],
+                )
                 return
             except:
                 time.sleep(10)
 
-    def _list_device_groups(self):
-        command = self._appendOptionalArgsToCommand(
-            "iot central device-group list --app-id {}".format(APP_ID),
-            TOKEN,
-            DNS_SUFFIX,
-        )
-        return self.cmd(command).get_output_in_json()
+    def _list_device_groups(self, api_version):
+        command = "iot central device-group list --app-id {}".format(APP_ID)
+        return self.cmd(command, api_version=api_version).get_output_in_json()
 
-    def _list_roles(self):
+    def _list_roles(self, api_version):
         return self.cmd(
-            "iot central role list --app-id {}".format(
-                APP_ID)
+            "iot central role list --app-id {}".format(APP_ID), api_version=api_version
         ).get_output_in_json()
 
-    def _get_credentials(self, device_id):
+    def _get_credentials(self, api_version, device_id):
         return self.cmd(
             "iot central device show-credentials --app-id {} -d {}".format(
                 APP_ID, device_id
-            )
+            ),
+            api_version=api_version,
         ).get_output_in_json()
 
     def _get_validate_messages_output(
@@ -216,7 +256,9 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
         return output
 
-    def _get_monitor_events_output(self, device_id, enqueued_time, asserts=None):
+    def _get_monitor_events_output(
+        self, api_version, device_id, enqueued_time, asserts=None
+    ):
         if not asserts:
             asserts = []
 
@@ -232,74 +274,75 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
         return output
 
-    def _create_fileupload(self):
-        command = self._appendOptionalArgsToCommand(
-            'iot central file-upload-configuration create --app-id {} -s "{}" -c "{}"'.format(
-                APP_ID, STORAGE_CSTRING, STORAGE_CONTAINER
-            ),
-            TOKEN,
-            DNS_SUFFIX,
+    def _create_fileupload(self, api_version, account_name=None, sasttl=None):
+        command = 'iot central file-upload-configuration create --app-id {} -s "{}" -c "{}"'.format(
+            APP_ID, STORAGE_CSTRING, STORAGE_CONTAINER
         )
+
+        if account_name is not None:
+            command += " --account {}".format(account_name)
+        if sasttl is not None:
+            command += " --sas-ttl {}".format(sasttl)
 
         return self.cmd(
             command,
+            api_version=api_version,
             checks=[
                 self.check("connectionString", STORAGE_CSTRING),
                 self.check("container", STORAGE_CONTAINER),
+                self.check("account", None if account_name is None else account_name),
+                self.check("state", "pending"),
+                self.check(
+                    "sasttl", DEFAULT_FILE_UPLOAD_TTL if sasttl is None else sasttl
+                ),
             ],
         ).get_output_in_json()
 
-    def _delete_fileupload(self):
-        command = self._appendOptionalArgsToCommand(
+    def _delete_fileupload(self, api_version):
+        command = (
             "iot central file-upload-configuration delete --app-id {}".format(APP_ID),
-            TOKEN,
-            DNS_SUFFIX,
         )
         self.cmd(
             command,
+            api_version=api_version,
             checks=[
                 self.check("result", "success"),
             ],
         )
 
-    def _create_organization(self):
+    def _create_organization(self, api_version):
         org_id = self.create_random_name(prefix="aztest", length=24)
-        command = self._appendOptionalArgsToCommand(
-            "iot central organization create --app-id {} --org-id {}".format(
-                APP_ID, org_id
-            ),
-            TOKEN,
-            DNS_SUFFIX,
+        command = "iot central organization create --app-id {} --org-id {}".format(
+            APP_ID, org_id
         )
 
         return self.cmd(
             command,
+            api_version=api_version,
             checks=[
                 self.check("id", org_id),
             ],
         ).get_output_in_json()
 
-    def _delete_organization(self, org_id):
-        command = self._appendOptionalArgsToCommand(
-            "iot central organization delete --app-id {} --org-id {}".format(
-                APP_ID, org_id
-            ),
-            TOKEN,
-            DNS_SUFFIX,
+    def _delete_organization(self, api_version, org_id):
+        command = "iot central organization delete --app-id {} --org-id {}".format(
+            APP_ID, org_id
         )
         self.cmd(
             command,
+            api_version=api_version,
             checks=[
                 self.check("result", "success"),
             ],
         )
 
-    def _wait_for_storage_configured(self):
-        command = "iot central file-upload-configuration show --app-id {}".format(APP_ID)
-        command = self._appendOptionalArgsToCommand(command, TOKEN, DNS_SUFFIX)
+    def _wait_for_storage_configured(self, api_version):
+        command = "iot central file-upload-configuration show --app-id {}".format(
+            APP_ID
+        )
 
         while True:
-            result = self.cmd(command)
+            result = self.cmd(command, api_version=api_version)
             file_upload = result.get_output_in_json()
 
             # return when its provisioned
@@ -309,10 +352,14 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             # wait 10 seconds for provisioning to complete
             time.sleep(10)
 
-    def _appendOptionalArgsToCommand(self, command: str, token: str, dnsSuffix: str):
+    def _appendOptionalArgsToCommand(
+        self, command: str, token: str, dns_suffix: str, api_version: str
+    ):
         if token:
-            command = command + ' --token "{}"'.format(token)
-        if dnsSuffix:
-            command = command + ' --central-dns-suffix "{}"'.format(dnsSuffix)
+            command += ' --token "{}"'.format(token)
+        if dns_suffix:
+            command += ' --central-dns-suffix "{}"'.format(dns_suffix)
+        if api_version:
+            command += " --api-version {}".format(api_version)
 
         return command
