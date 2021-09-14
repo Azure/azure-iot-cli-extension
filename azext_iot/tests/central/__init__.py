@@ -7,6 +7,7 @@
 import os
 import time
 import pytest
+from typing import Tuple
 from azext_iot.tests import CaptureOutputLiveScenarioTest
 from azext_iot.tests.conftest import get_context_path
 from azext_iot.common import utility
@@ -21,6 +22,9 @@ DNS_SUFFIX = os.environ.get("azext_iot_central_dns_suffix")
 STORAGE_CSTRING = os.environ.get("azext_iot_central_storage_cstring")
 STORAGE_CONTAINER = os.environ.get("azext_iot_central_storage_container")
 device_template_path = get_context_path(__file__, "json/device_template_int_test.json")
+device_template_path_preview = get_context_path(
+    __file__, "json/device_template_int_test_preview.json"
+)
 sync_command_params = get_context_path(__file__, "json/sync_command_args.json")
 DEFAULT_FILE_UPLOAD_TTL = "PT1H"
 
@@ -39,13 +43,13 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def __init__(self, test_scenario):
         super(CentralLiveScenarioTest, self).__init__(test_scenario)
 
-    def cmd(self, command, api_version, checks=None, expect_failure=False):
+    def cmd(self, command, api_version=None, checks=None, expect_failure=False):
         command = self._appendOptionalArgsToCommand(
             command, token=TOKEN, dns_suffix=DNS_SUFFIX, api_version=api_version
         )
         return super().cmd(command, checks=checks, expect_failure=expect_failure)
 
-    def _create_device(self, api_version, **kwargs) -> (str, str):
+    def _create_device(self, api_version, **kwargs) -> Tuple[str, str]:
         """
         kwargs:
             instance_of: template_id (str)
@@ -59,15 +63,26 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         )
 
         checks = [
-            self.check("enabled", True),
             self.check("displayName", device_name),
             self.check("id", device_id),
         ]
 
+        if api_version == ApiVersion.preview.value:
+            checks.append(self.check("approved", True))
+        else:
+            checks.append(self.check("enabled", True))
+
         template = kwargs.get("template")
         if template:
             command = command + " --template {}".format(template)
-            checks.append(self.check("template", template))
+            checks.append(
+                self.check(
+                    "instanceOf"
+                    if api_version == ApiVersion.preview.value
+                    else "template",
+                    template,
+                )
+            )
 
         simulated = bool(kwargs.get("simulated"))
         if simulated:
@@ -176,14 +191,24 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         )
 
     def _create_device_template(self, api_version):
-        template = utility.process_json_arg(
-            device_template_path, argument_name="device_template_path"
-        )
+        if api_version == ApiVersion.preview.value:
+            template = utility.process_json_arg(
+                device_template_path_preview,
+                argument_name="device_template_path_preview",
+            )
+        else:
+            template = utility.process_json_arg(
+                device_template_path, argument_name="device_template_path"
+            )
         template_name = template["displayName"]
         template_id = template_name + "id"
 
         command = "iot central device-template create --app-id {} --device-template-id {} -k '{}'".format(
-            APP_ID, template_id, device_template_path
+            APP_ID,
+            template_id,
+            device_template_path_preview
+            if api_version == ApiVersion.preview.value
+            else device_template_path,
         )
 
         result = self.cmd(
@@ -195,7 +220,10 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         )
         json_result = result.get_output_in_json()
 
-        assert json_result["@id"] == template_id
+        if api_version == ApiVersion.preview.value:
+            assert json_result["id"] == template_id
+        else:
+            assert json_result["@id"] == template_id
         return (template_id, template_name)
 
     def _delete_device_template(self, api_version, template_id):

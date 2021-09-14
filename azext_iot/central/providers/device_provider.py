@@ -9,7 +9,7 @@ from knack.util import CLIError
 from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
-from azext_iot.central.models.enum import DeviceStatus
+from azext_iot.central.models.enum import DeviceStatus, ApiVersion
 from azext_iot.central.models.v1 import DeviceV1
 from azext_iot.central.models.v1_1_preview import DeviceV1_1_preview
 from azext_iot.central.models.preview import DevicePreview
@@ -340,7 +340,9 @@ class CentralDeviceProvider:
         template = central_services.device_template.get_device_template(
             cmd=self._cmd,
             app_id=self._app_id,
-            device_template_id=current_device.template,
+            device_template_id=current_device.instance_of
+            if self._api_version == ApiVersion.preview.value
+            else current_device.template,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
             api_version=self._api_version,

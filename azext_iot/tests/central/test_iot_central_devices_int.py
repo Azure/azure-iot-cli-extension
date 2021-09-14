@@ -8,7 +8,7 @@
 import time
 import pytest
 
-from azext_iot.central.models.enum import DeviceStatus
+from azext_iot.central.models.enum import DeviceStatus, ApiVersion
 from azext_iot.tests import helpers
 from azext_iot.tests.central import (
     CentralLiveScenarioTest,
@@ -36,14 +36,14 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
             )
         )
 
-        self.cmd(command, api_version=self._api_version, expect_failure=True)
+        self.cmd(command, expect_failure=True)
 
         # Verify incorrect device-id throws error
         command = "iot central device twin show --app-id {} --device-id incorrect-device".format(
             APP_ID
         )
 
-        self.cmd(command, api_version=self._api_version, expect_failure=True)
+        self.cmd(command, expect_failure=True)
 
         # Verify incorrect app-id throws error
         command = (
@@ -52,13 +52,13 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
             )
         )
 
-        self.cmd(command, api_version=self._api_version, expect_failure=True)
+        self.cmd(command, expect_failure=True)
         # Verify incorrect device-id throws error
         command = "iot central device twin show --app-id {} --device-id incorrect-device".format(
             APP_ID
         )
 
-        self.cmd(command, api_version=self._api_version, expect_failure=True)
+        self.cmd(command, expect_failure=True)
         self._delete_device(device_id=device_id, api_version=self._api_version)
 
     def test_central_device_twin_show_success(self):
@@ -76,7 +76,6 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
 
         self.cmd(
             command,
-            api_version=self._api_version,
             checks=[self.check("deviceId", device_id)],
         )
 
@@ -86,7 +85,6 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
 
         self.cmd(
             command,
-            api_version=self._api_version,
             checks=[self.check("deviceId", device_id)],
         )
         self._delete_device(device_id=device_id, api_version=self._api_version)
@@ -140,17 +138,17 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         (device_id, device_name) = self._create_device(api_version=self._api_version)
 
         command = "iot central device show --app-id {} -d {}".format(APP_ID, device_id)
+        checks = [
+            self.check("displayName", device_name),
+            self.check("id", device_id),
+            self.check("simulated", False),
+        ]
+        if self._api_version == ApiVersion.preview.value:
+            checks.append(self.check("approved", True))
+        else:
+            checks.append(self.check("enabled", True))
 
-        self.cmd(
-            command,
-            api_version=self._api_version,
-            checks=[
-                self.check("enabled", True),
-                self.check("displayName", device_name),
-                self.check("id", device_id),
-                self.check("simulated", False),
-            ],
-        )
+        self.cmd(command, api_version=self._api_version, checks=checks)
 
         created_device_list = self.cmd(
             "iot central device list --app-id {}".format(APP_ID),
@@ -211,7 +209,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
 
         json_result = result.get_output_in_json()
 
-        assert json_result["@id"] == template_id
+        assert self._get_template_id(json_result) == template_id
 
         created_device_template_list = self.cmd(
             "iot central device-template list --app-id {}".format(APP_ID),
@@ -229,7 +227,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
                 (
                     template
                     for template in created_device_template_list
-                    if template["@id"] == template_id
+                    if self._get_template_id(template) == template_id
                 ),
                 None,
             )
@@ -256,7 +254,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
                 (
                     template
                     for template in start_device_template_list
-                    if template["@id"] == template_id
+                    if self._get_template_id(template) == template_id
                 ),
                 None,
             )
@@ -313,7 +311,14 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         assert device_registration_info.get("device_status") == "registered"
         assert device_registration_info.get("id") == device_id
         assert device_registration_info.get("display_name") == device_name
-        assert device_registration_info.get("template") == template_id
+        assert (
+            device_registration_info.get(
+                "instance_of"
+                if self._api_version == ApiVersion.preview.value
+                else "template"
+            )
+            == template_id
+        )
         assert not device_registration_info.get("simulated")
 
         # Validation - dps state
@@ -349,7 +354,14 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         assert device_registration_info.get("device_status") == "unassociated"
         assert device_registration_info.get("id") == device_id
         assert device_registration_info.get("display_name") == device_name
-        assert device_registration_info.get("template") is None
+        assert (
+            device_registration_info.get(
+                "instance_of"
+                if self._api_version == ApiVersion.preview.value
+                else "template"
+            )
+            is None
+        )
         assert not device_registration_info.get("simulated")
 
         # Validation - dps state
@@ -462,3 +474,8 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         device_client.disconnect()
         device_client.shutdown()
         self._wait_for_provisioned(device_id=device_id, api_version=self._api_version)
+
+    def _get_template_id(self, template):
+        if self._api_version == ApiVersion.preview.value:
+            return template["id"]
+        return template["@id"]
