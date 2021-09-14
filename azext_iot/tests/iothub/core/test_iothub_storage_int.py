@@ -28,7 +28,7 @@ LIVE_STORAGE_ACCOUNT = settings.env.azext_iot_teststorageaccount
 STORAGE_ROLE = "Storage Blob Data Contributor"
 CWD = os.path.dirname(os.path.abspath(__file__))
 user_managed_identity_name = generate_generic_id()
-USER_IDENTITY_SETUP_MAX_ATTEMPTS = 3
+USER_IDENTITY_SETUP_MAX_ATTEMPTS = 5
 
 
 class TestIoTStorage(IoTLiveScenarioTest):
