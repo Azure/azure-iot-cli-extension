@@ -12,7 +12,7 @@ shared: Define shared data types(enums)
 from enum import Enum
 
 MAX_ADT_CREATE_RETRIES = 5
-ADT_CREATE_RETRY_AFTER = 10
+ADT_CREATE_RETRY_AFTER = 60
 
 
 class ADTEndpointType(Enum):

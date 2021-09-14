@@ -81,7 +81,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
                 retries = 0
                 while (state.lower() not in ProvisioningStateType.FINISHED.value) and retries < MAX_ADT_CREATE_RETRIES:
                     retries += 1
-                    sleep(ADT_CREATE_RETRY_AFTER)
+                    sleep(int(lro._response.headers.get('retry-after', ADT_CREATE_RETRY_AFTER)))
                     lro.update_status()
                     instance = lro.resource().as_dict()
                     state = instance.get('provisioning_state', None)
