@@ -39,7 +39,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         global IS_1_1_PREVIEW
         IS_1_1_PREVIEW = (
             self._api_version == ApiVersion.v1_1_preview.value
-            or self._api_version == None
+            or self._api_version is None
         )  # either explicitely selected or omitted
         yield
 
