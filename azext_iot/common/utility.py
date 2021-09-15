@@ -23,7 +23,6 @@ from threading import Event, Thread
 from datetime import datetime
 from knack.log import get_logger
 from knack.util import CLIError
-from azext_iot.constants import IOTHUB_MGMT_SDK_PACKAGE_NAME
 
 logger = get_logger(__name__)
 
