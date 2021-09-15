@@ -118,8 +118,8 @@ class ResourceProvider(DigitalTwinsResourceManager):
                                 role_type=role_type,
                             )
 
-            create_or_update.add_done_callback(rbac_handler)
             create_or_update.add_done_callback(check_state)
+            create_or_update.add_done_callback(rbac_handler)
             return create_or_update
         except CloudError as e:
             raise e
