@@ -8,6 +8,8 @@ import pprint
 from time import sleep
 from azext_iot.common.utility import ensure_azure_namespace_path
 
+printer = pprint.PrettyPrinter(indent=2)
+
 
 class mqtt_client(object):
     def __init__(
@@ -26,7 +28,6 @@ class mqtt_client(object):
         self.method_response_code = method_response_code
         self.method_response_payload = method_response_payload
         self.device_client.on_twin_desired_properties_patch_received = self.twin_patch_handler
-        self.printer = pprint.PrettyPrinter(indent=2)
         self.default_data_encoding = 'utf-8'
         self.init_reported_properties = init_reported_properties
 
@@ -70,7 +71,7 @@ class mqtt_client(object):
             "Message Properties": message_properties
         }
         print("\nC2D Message Handler [Received C2D message]:")
-        self.printer.pprint(output)
+        printer.pprint(output)
 
     def method_request_handler(
         self, method_request
@@ -85,7 +86,7 @@ class mqtt_client(object):
         }
 
         print("\nMethod Request Handler [Received direct method invocation request]:")
-        self.printer.pprint(output)
+        printer.pprint(output)
 
         # set response payload
         if self.method_response_payload:
@@ -116,7 +117,7 @@ class mqtt_client(object):
 
         if modified_properties:
             print("\nTwin patch handler [Updating device twin reported properties]:")
-            self.printer.pprint(modified_properties)
+            printer.pprint(modified_properties)
             self.device_client.patch_twin_reported_properties(modified_properties)
 
     def execute(

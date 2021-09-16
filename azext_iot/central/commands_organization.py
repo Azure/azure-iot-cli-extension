@@ -5,9 +5,11 @@
 # --------------------------------------------------------------------------------------------
 # Dev note - think of this as a controller
 
+from typing import List
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.providers import CentralOrganizationProvider
 from azext_iot.central.models.enum import ApiVersion
+from azext_iot.central.models.v1_1_preview import OrganizationV1_1_preview
 
 
 def get_org(
@@ -17,7 +19,7 @@ def get_org(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1_1_preview.value,
-):
+) -> OrganizationV1_1_preview:
     provider = CentralOrganizationProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
@@ -34,7 +36,7 @@ def delete_org(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1_1_preview.value,
-):
+) -> OrganizationV1_1_preview:
     provider = CentralOrganizationProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
@@ -50,7 +52,7 @@ def list_orgs(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1_1_preview.value,
-):
+) -> List[OrganizationV1_1_preview]:
     provider = CentralOrganizationProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
@@ -67,7 +69,7 @@ def create_org(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1_1_preview.value,
-):
+) -> OrganizationV1_1_preview:
     provider = CentralOrganizationProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )

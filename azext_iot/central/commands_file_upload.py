@@ -8,6 +8,7 @@
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.providers import CentralFileUploadProvider
 from azext_iot.central.models.enum import ApiVersion
+from azext_iot.central.models.v1_1_preview import FileUploadV1_1_preview
 
 
 def get_fileupload(
@@ -16,7 +17,7 @@ def get_fileupload(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1_1_preview.value,
-):
+) -> FileUploadV1_1_preview:
     provider = CentralFileUploadProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
@@ -30,7 +31,7 @@ def delete_fileupload(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1_1_preview.value,
-):
+) -> FileUploadV1_1_preview:
     provider = CentralFileUploadProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
@@ -48,7 +49,7 @@ def create_fileupload(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1_1_preview.value,
-):
+) -> FileUploadV1_1_preview:
     provider = CentralFileUploadProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
