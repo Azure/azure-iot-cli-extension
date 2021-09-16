@@ -75,7 +75,7 @@ class TestDTPrivateLinksLifecycle(DTLiveScenarioTest):
             "network nsg create -n {} -g {}".format(
                 nsg_name, self.rg
             ),
-            checks=self.check("newNsg.name", nsg_name),
+            checks=self.check("NewNSG.name", nsg_name),
         )
         self.cmd(
             "network vnet create -n {} -g {} --subnet-name {} --nsg {}".format(
@@ -83,7 +83,7 @@ class TestDTPrivateLinksLifecycle(DTLiveScenarioTest):
             ),
             checks=[
                 self.check("length(newVNet.subnets)", 1),
-                self.check("length(newVNet.subnets[0].networkSecurityGroup)", 1)
+                self.check("newVNet.subnets[0].networkSecurityGroup != null", "True")
             ],
         )
         self.cmd(
