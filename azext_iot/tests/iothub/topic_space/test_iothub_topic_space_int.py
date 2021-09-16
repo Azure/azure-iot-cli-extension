@@ -19,7 +19,7 @@ class TestIoTHubTopicSpace(IoTLiveScenarioTest):
         super(TestIoTHubTopicSpace, self).__init__(test_case)
 
     def test_overall_topic_space(self):
-        file_name = "./example_json.json"
+        file_name = "./example_topic.json"
         topic_types = ["LowFanout", "PublishOnly"]
         topic_templates = [
             f"t{generate_generic_id()}",
@@ -185,8 +185,8 @@ class TestIoTHubTopicSpace(IoTLiveScenarioTest):
             for topic in topics:
                 self.cmd(
                     "iot hub topic-space delete -n {} -g {} --tsn {}".format(
-                    self.entity_name,
-                    self.entity_rg,
+                        self.entity_name,
+                        self.entity_rg,
                         topic["name"],
                     )
                 )
@@ -264,7 +264,7 @@ class TestIoTHubTopicSpace(IoTLiveScenarioTest):
                 )
             )
             self.cmd(
-                "iot hub topic-space create -l {} --tsn {} --tst {} --template {}".format(
+                "iot hub topic-space create -n {} -g {} --tsn {} --tst {} --template {}".format(
                     self.entity_name,
                     self.entity_rg,
                     topic_name,
@@ -273,7 +273,7 @@ class TestIoTHubTopicSpace(IoTLiveScenarioTest):
                 )
             )
             self.cmd(
-                "iot hub topic-space create -l {} --tsn {} --tst {} --template {}".format(
+                "iot hub topic-space create -n {} -g {} --tsn {} --tst {} --template {}".format(
                     self.entity_name,
                     self.entity_rg,
                     topic_name2,
@@ -284,7 +284,7 @@ class TestIoTHubTopicSpace(IoTLiveScenarioTest):
             )
 
         self.cmd(
-            "iot hub topic-space delete -l {} --tsn {}".format(
+            "iot hub topic-space delete -n {} -g {} --tsn {}".format(
                 self.entity_name,
                 self.entity_rg,
                 topic_name,
