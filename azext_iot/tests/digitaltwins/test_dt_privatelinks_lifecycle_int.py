@@ -28,7 +28,6 @@ class TestDTPrivateLinksLifecycle(DTLiveScenarioTest):
             )
         ).get_output_in_json()
         self.track_instance(create_output)
-        create_output = self.wait_for_hostname(create_output)
 
         # Fail test if hostName missing
         assert create_output.get(

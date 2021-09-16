@@ -35,7 +35,6 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
             "dt create -n {} -g {} -l {}".format(instance_name, self.rg, self.region)
         ).get_output_in_json()
         self.track_instance(create_output)
-        self.wait_for_hostname(create_output)
 
         self.cmd(
             "dt role-assignment create -n {} -g {} --assignee {} --role '{}'".format(
