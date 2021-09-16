@@ -24,6 +24,13 @@ Release History
    - az iot central device-template list
    - az iot central api-token list
    - az iot central user list
+   
+0.10.17
++++++++++++++++
+
+**IoT Hub updates**
+
+* Fixed an issue in 0.10.16 causing IoT Hub command failure in Windows MSI environment.
 
 0.10.16
 +++++++++++++++
