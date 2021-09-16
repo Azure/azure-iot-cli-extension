@@ -322,7 +322,7 @@ class TestIotCentral(CentralLiveScenarioTest):
         file_upload = self._create_fileupload(api_version=self._api_version)
 
         self._wait_for_storage_configured(api_version=self._api_version)
-        command = "iot central file-upload-configuration show -n {}".format(APP_ID)
+        command = "iot central file-upload-config show -n {}".format(APP_ID)
 
         result = self.cmd(command, api_version=self._api_version).get_output_in_json()
         assert result["state"] == "succeeded"
@@ -349,7 +349,7 @@ class TestIotCentral(CentralLiveScenarioTest):
         )
 
         self._wait_for_storage_configured(api_version=self._api_version)
-        command = "iot central file-upload-configuration show -n {}".format(APP_ID)
+        command = "iot central file-upload-config show -n {}".format(APP_ID)
 
         result = self.cmd(command, api_version=self._api_version).get_output_in_json()
         assert result["state"] == "succeeded"

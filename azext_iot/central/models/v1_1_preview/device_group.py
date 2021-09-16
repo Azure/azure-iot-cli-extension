@@ -10,4 +10,3 @@ class DeviceGroup:
         self.display_name = group.get("displayName")
         self.id = group.get("id")
         self.organizations = group.get("organizations")
-        pass

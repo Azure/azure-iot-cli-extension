@@ -303,7 +303,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         return output
 
     def _create_fileupload(self, api_version, account_name=None, sasttl=None):
-        command = 'iot central file-upload-configuration create --app-id {} -s "{}" -c "{}"'.format(
+        command = 'iot central file-upload-config create --app-id {} -s "{}" -c "{}"'.format(
             APP_ID, STORAGE_CSTRING, STORAGE_CONTAINER
         )
 
@@ -328,7 +328,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
     def _delete_fileupload(self, api_version):
         command = (
-            "iot central file-upload-configuration delete --app-id {}".format(APP_ID),
+            "iot central file-upload-config delete --app-id {}".format(APP_ID),
         )
         self.cmd(
             command,
@@ -365,7 +365,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         )
 
     def _wait_for_storage_configured(self, api_version):
-        command = "iot central file-upload-configuration show --app-id {}".format(
+        command = "iot central file-upload-config show --app-id {}".format(
             APP_ID
         )
 

@@ -105,7 +105,7 @@ def load_central_arguments(self, _):
         context.argument("role", arg_type=role_type)
         context.argument(
             "org_id",
-            options_list=["--organization-id", "--orgid"],
+            options_list=["--organization-id", "--org-id"],
             help="The ID of the organization for the token role assignment."
             " Only available for api-version == 1.1-preview",
         )
@@ -166,7 +166,7 @@ def load_central_arguments(self, _):
         )
         context.argument(
             "organizations",
-            options_list=["--organizations", "--org"],
+            options_list=["--organizations", "--orgs"],
             help="Assign the device to the specified organizations."
             " Comma separated list of organization ids."
             " Minimum supported version: 1.1-preview.",
@@ -247,7 +247,7 @@ def load_central_arguments(self, _):
             help="Unique identifier for the role",
         )
 
-    with self.argument_context("iot central file-upload-configuration") as context:
+    with self.argument_context("iot central file-upload-config") as context:
         context.argument(
             "api_version",
             options_list=["--api-version", "--av"],
@@ -257,7 +257,7 @@ def load_central_arguments(self, _):
         )
 
     with self.argument_context(
-        "iot central file-upload-configuration create"
+        "iot central file-upload-config create"
     ) as context:
         context.argument(
             "connection_string",

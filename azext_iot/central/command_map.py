@@ -142,7 +142,7 @@ def load_central_commands(self, _):
         cmd_group.command("list", "list_roles")
 
     with self.command_group(
-        "iot central file-upload-configuration",
+        "iot central file-upload-config",
         command_type=central_file_uploads_ops,
         is_preview=True,
     ) as cmd_group:
