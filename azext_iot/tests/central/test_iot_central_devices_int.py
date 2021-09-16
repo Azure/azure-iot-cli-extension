@@ -23,6 +23,17 @@ if not all([APP_ID]):
 
 
 class TestIotCentralDevices(CentralLiveScenarioTest):
+    @pytest.fixture(autouse=True)
+    def fixture_api_version(self, request):
+        self._api_version = request.config.getoption("--api-version")
+        IS_1_1_PREVIEW = (
+            self._api_version == ApiVersion.v1_1_preview.value
+            or self._api_version is None
+        )  # either explicitely selected or omitted
+        if IS_1_1_PREVIEW:
+            print("Testing 1.1-preview")
+        yield
+
     def __init__(self, test_scenario):
         super(TestIotCentralDevices, self).__init__(test_scenario=test_scenario)
 

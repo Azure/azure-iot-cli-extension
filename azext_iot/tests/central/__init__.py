@@ -8,10 +8,12 @@ import os
 import time
 import pytest
 from typing import Tuple
+from knack.util import CLIError
 from azext_iot.tests import CaptureOutputLiveScenarioTest
 from azext_iot.tests.conftest import get_context_path
 from azext_iot.common import utility
 from azext_iot.central.models.enum import Role, UserTypePreview, UserTypeV1, ApiVersion
+from json import loads
 
 APP_ID = os.environ.get("azext_iot_central_app_id")
 APP_PRIMARY_KEY = os.environ.get("azext_iot_central_primarykey")
@@ -28,21 +30,8 @@ device_template_path_preview = get_context_path(
 sync_command_params = get_context_path(__file__, "json/sync_command_args.json")
 DEFAULT_FILE_UPLOAD_TTL = "PT1H"
 
-IS_1_1_PREVIEW = False
-
 
 class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
-    @pytest.fixture(autouse=True)
-    def fixture_api_version(self, request):
-        self._api_version = request.config.getoption("--api-version")
-
-        global IS_1_1_PREVIEW
-        IS_1_1_PREVIEW = (
-            self._api_version == ApiVersion.v1_1_preview.value
-            or self._api_version is None
-        )  # either explicitely selected or omitted
-        yield
-
     def __init__(self, test_scenario):
         super(CentralLiveScenarioTest, self).__init__(test_scenario)
 
@@ -332,7 +321,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         ).get_output_in_json()
 
     def _delete_fileupload(self, api_version):
-        command = ("iot central file-upload-config delete --app-id {}".format(APP_ID),)
+        command = "iot central file-upload-config delete --app-id {}".format(APP_ID)
         self.cmd(
             command,
             api_version=api_version,
@@ -371,12 +360,20 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         command = "iot central file-upload-config show --app-id {}".format(APP_ID)
 
         while True:
-            result = self.cmd(command, api_version=api_version)
+            try:
+                result = self.cmd(command, api_version=api_version)
+            except CLIError as e:
+                if e.args[0] and "code" in e.args[0]:
+                    err = dict(e.args[0])
+                    if err["code"] == "NotFound":
+                        # storage has been deleted
+                        return
+                    raise e
             file_upload = result.get_output_in_json()
 
             # return when its provisioned
             if file_upload.get("state") == "succeeded":
-                return
+                return file_upload
 
             # wait 10 seconds for provisioning to complete
             time.sleep(10)

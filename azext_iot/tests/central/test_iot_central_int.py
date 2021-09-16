@@ -6,6 +6,7 @@
 
 
 import json
+from azext_iot.central.models.enum import ApiVersion
 from azure.iot.device import Message
 from azext_iot.common import utility
 from azext_iot.monitor.parsers import strings
@@ -17,7 +18,6 @@ from azext_iot.tests.central import (
     STORAGE_CONTAINER,
     DEFAULT_FILE_UPLOAD_TTL,
     sync_command_params,
-    IS_1_1_PREVIEW,
 )
 import pytest
 
@@ -25,8 +25,21 @@ import pytest
 if not all([APP_ID]):
     raise ValueError("Set azext_iot_central_app_id to run central integration tests.")
 
+IS_1_1_PREVIEW = True
+
 
 class TestIotCentral(CentralLiveScenarioTest):
+    @pytest.fixture(autouse=True)
+    def fixture_api_version(self, request):
+        self._api_version = request.config.getoption("--api-version")
+        IS_1_1_PREVIEW = (
+            self._api_version == ApiVersion.v1_1_preview.value
+            or self._api_version is None
+        )  # either explicitely selected or omitted
+        if IS_1_1_PREVIEW:
+            print("Testing 1.1-preview")
+        yield
+
     def __init__(self, test_scenario):
         super(TestIotCentral, self).__init__(test_scenario=test_scenario)
 
@@ -321,10 +334,8 @@ class TestIotCentral(CentralLiveScenarioTest):
     def test_central_fileupload_methods_CRD_required(self):
         file_upload = self._create_fileupload(api_version=self._api_version)
 
-        self._wait_for_storage_configured(api_version=self._api_version)
-        command = "iot central file-upload-config show -n {}".format(APP_ID)
+        result = self._wait_for_storage_configured(api_version=self._api_version)
 
-        result = self.cmd(command, api_version=self._api_version).get_output_in_json()
         assert result["state"] == "succeeded"
         assert result["connectionString"] == file_upload["connectionString"]
         assert result["container"] == file_upload["container"]
@@ -334,8 +345,10 @@ class TestIotCentral(CentralLiveScenarioTest):
         )  # sasTTL not passed in params
         self._delete_fileupload(api_version=self._api_version)
         # check deleting state
+        command = "iot central file-upload-config show -n {}".format(APP_ID)
         result = self.cmd(command, api_version=self._api_version).get_output_in_json()
         assert result["state"] == "deleting"
+        self._wait_for_storage_configured(api_version=self._api_version)
 
     @pytest.mark.skipif(
         not STORAGE_CSTRING or not STORAGE_CONTAINER,
@@ -348,10 +361,7 @@ class TestIotCentral(CentralLiveScenarioTest):
             api_version=self._api_version, account_name=ACCOUNT_NAME, sasttl=SAS_TTL
         )
 
-        self._wait_for_storage_configured(api_version=self._api_version)
-        command = "iot central file-upload-config show -n {}".format(APP_ID)
-
-        result = self.cmd(command, api_version=self._api_version).get_output_in_json()
+        result = self._wait_for_storage_configured(api_version=self._api_version)
         assert result["state"] == "succeeded"
         assert result["connectionString"] == file_upload["connectionString"]
         assert result["container"] == file_upload["container"]
@@ -360,8 +370,10 @@ class TestIotCentral(CentralLiveScenarioTest):
         self._delete_fileupload(api_version=self._api_version)
 
         # check deleting state
+        command = "iot central file-upload-config show -n {}".format(APP_ID)
         result = self.cmd(command, api_version=self._api_version).get_output_in_json()
         assert result["state"] == "deleting"
+        self._wait_for_storage_configured(api_version=self._api_version)
 
     @pytest.mark.xfail(
         condition=not IS_1_1_PREVIEW,
