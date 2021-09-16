@@ -8,13 +8,22 @@ Release History
 
 **IoT Central updates**
 
-* Adds preview commands (v1.1-preview).
+* Adds preview commands (v1.1-preview):
+  - Organizations (az iot central organization)
+  - File Upload Configuration (az iot central file-upload-config)
+  - Jobs (az iot central job)
 * Adds x-ms-client-request-id header for each request
 
 **Breaking Changes**
 
 * List commands like `az iot central device list` and others, 
-  now return list of raw templates as dict instead of a main dict with template ids as keys and raw templates as values.
+  now return list of items instead of a main dict with item ids as keys and items as values.
+
+  Involved commands:
+   - az iot central device list
+   - az iot central device-template list
+   - az iot central api-token list
+   - az iot central user list
 
 0.10.16
 +++++++++++++++
