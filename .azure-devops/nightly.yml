@@ -127,7 +127,7 @@ stages:
     displayName: 'Run all tests against Windows MSI install'
     pool:
       vmImage: 'vs2017-win2016'
-    dependsOn: build # change to test_min after testing
+    dependsOn: test_min
     jobs:
     - template: templates/nightly-tests.yml
       parameters:
@@ -140,7 +140,7 @@ stages:
           
   - stage: 'kpi'
     displayName: 'Build KPIs'
-    dependsOn: [build, test_edge, test_min]
+    dependsOn: [build, test_edge, test_min, test_msi]
     jobs:
     - job: 'calculateCodeCoverage'
       displayName: 'Calculate distributed code coverage'

@@ -32,11 +32,10 @@ steps:
   - ${{ if eq(parameters.azureCLIVersion, 'msi') }}:
     - template: install-azure-cli-msi.yml
 
-  - template: download-install-local-azure-test-sdk.yml
-
   - template: setup-ci-machine.yml
+
+  - template: download-install-local-azure-test-sdk.yml
 
   - template: download-install-local-azure-iot-cli-extension.yml
 
-  - ${{ if ne(parameters.azureCLIVersion, 'msi') }}:
-    - template: set-pythonpath.yml
+  - template: set-pythonpath.yml

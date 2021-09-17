@@ -1,3 +1,10 @@
 steps:
   - script: choco install azure-cli
     displayName: 'Install released azure-cli from MSI'
+  - task: PowerShell@2
+    displayName: 'Set Windows MSI Python Executable PATH'
+    inputs:
+      targetType: 'inline'
+      script: |
+        echo "##vso[task.prependPath]C:\Program Files (x86)\Microsoft SDKs\Azure\CLI2"
+        echo "##vso[task.prependPath]C:\Program Files (x86)\Microsoft SDKs\Azure\CLI2\Scripts"
