@@ -6,10 +6,6 @@ schedules:
     include:
     - dev
 
-variables:
-  pythonVersion: '3.6.x'
-  architecture: 'x64'
-
 parameters:
 - name: vmImage
   type: string
@@ -17,6 +13,41 @@ parameters:
   values:
   - 'ubuntu-18.04'
   - 'ubuntu-latest'
+- name: pythonVersion
+  type: string
+  default: '3.8.x'
+  values:
+  - '3.6.x'
+  - '3.8.x'
+  - '3.9.x'
+- name: architecture
+  type: string
+  default: 'x64'
+- name: 'testCentral'
+  type: boolean
+  default: true
+- name: 'testADT'
+  type: boolean
+  default: true
+- name: 'testDPS'
+  type: boolean
+  default: true
+- name: 'testHub'
+  type: boolean
+  default: true
+- name: azureSubscription
+  type: string
+  default: 'az_cli_nightly_conn'
+  values:
+  - 'az_cli_nightly_conn'
+  - 'AzIoTCLIService'
+
+variables:
+  - group: aziotcli_test_primary
+  - name: pythonVersion
+    value: ${{ parameters.pythonVersion }}
+  - name: architecture
+    value: ${{ parameters.architecture }}
 
 stages:
   - stage: 'build'
@@ -72,6 +103,10 @@ stages:
       parameters:
         azureCLIVersion: edge
         pythonVersion: $(pythonVersion)
+        testADT: ${{ parameters.testADT }}
+        testCentral: ${{ parameters.testCentral }}
+        testDPS: ${{ parameters.testDPS }}
+        testHub: ${{ parameters.testHub }}
   
   - stage: 'test_min'
     displayName: 'Run all tests with min CLI'
@@ -83,6 +118,25 @@ stages:
       parameters:
         azureCLIVersion: min
         pythonVersion: $(pythonVersion)
+        testADT: ${{ parameters.testADT }}
+        testCentral: ${{ parameters.testCentral }}
+        testDPS: ${{ parameters.testDPS }}
+        testHub: ${{ parameters.testHub }}
+
+  - stage: 'test_msi'
+    displayName: 'Run all tests against Windows MSI install'
+    pool:
+      vmImage: 'vs2017-win2016'
+    dependsOn: build # change to test_min after testing
+    jobs:
+    - template: templates/nightly-tests.yml
+      parameters:
+        azureCLIVersion: msi
+        pythonVersion: $(pythonVersion)
+        testADT: ${{ parameters.testADT }}
+        testCentral: ${{ parameters.testCentral }}
+        testDPS: ${{ parameters.testDPS }}
+        testHub: ${{ parameters.testHub }}
           
   - stage: 'kpi'
     displayName: 'Build KPIs'
@@ -95,4 +149,3 @@ stages:
         parameters:
           pythonVersion: $(pythonVersion)
           architecture: $(architecture)
-

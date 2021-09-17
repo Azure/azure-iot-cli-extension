@@ -18,6 +18,7 @@ parameters:
   - min
   - released
   - edge
+  - msi
 - name: path
   type: string
   default: 'azext_iot/tests'
