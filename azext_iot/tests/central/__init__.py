@@ -6,14 +6,12 @@
 
 import os
 import time
-import pytest
 from typing import Tuple
 from knack.util import CLIError
 from azext_iot.tests import CaptureOutputLiveScenarioTest
 from azext_iot.tests.conftest import get_context_path
 from azext_iot.common import utility
 from azext_iot.central.models.enum import Role, UserTypePreview, UserTypeV1, ApiVersion
-from json import loads
 
 APP_ID = os.environ.get("azext_iot_central_app_id")
 APP_PRIMARY_KEY = os.environ.get("azext_iot_central_primarykey")
