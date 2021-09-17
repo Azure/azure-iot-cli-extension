@@ -9,6 +9,7 @@ Release History
 **IoT Central updates**
 
 * Adds preview commands (v1.1-preview):
+
   - Organizations (az iot central organization)
   - File Upload Configuration (az iot central file-upload-config)
   - Jobs (az iot central job)
@@ -24,7 +25,7 @@ Release History
    - az iot central device-template list
    - az iot central api-token list
    - az iot central user list
-   
+
 0.10.17
 +++++++++++++++
 
