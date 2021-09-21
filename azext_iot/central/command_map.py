@@ -23,6 +23,16 @@ central_device_groups_ops = CliCommandType(
 
 central_roles_ops = CliCommandType(operations_tmpl="azext_iot.central.commands_role#{}")
 
+central_file_uploads_ops = CliCommandType(
+    operations_tmpl="azext_iot.central.commands_file_upload#{}"
+)
+
+central_orgs_ops = CliCommandType(
+    operations_tmpl="azext_iot.central.commands_organization#{}"
+)
+
+central_jobs_ops = CliCommandType(operations_tmpl="azext_iot.central.commands_job#{}")
+
 central_device_twin_ops = CliCommandType(
     operations_tmpl="azext_iot.central.commands_device_twin#{}"
 )
@@ -130,6 +140,34 @@ def load_central_commands(self, _):
     ) as cmd_group:
         cmd_group.show_command("show", "get_role")
         cmd_group.command("list", "list_roles")
+
+    with self.command_group(
+        "iot central file-upload-config",
+        command_type=central_file_uploads_ops,
+        is_preview=True,
+    ) as cmd_group:
+        cmd_group.show_command("show", "get_fileupload")
+        cmd_group.show_command("delete", "delete_fileupload")
+        cmd_group.show_command("create", "create_fileupload")
+
+    with self.command_group(
+        "iot central organization", command_type=central_orgs_ops, is_preview=True
+    ) as cmd_group:
+        cmd_group.show_command("show", "get_org")
+        cmd_group.command("list", "list_orgs")
+        cmd_group.command("create", "create_org")
+        cmd_group.command("delete", "delete_org")
+
+    with self.command_group(
+        "iot central job", command_type=central_jobs_ops, is_preview=True
+    ) as cmd_group:
+        cmd_group.show_command("show", "get_job")
+        cmd_group.command("list", "list_jobs")
+        cmd_group.command("create", "create_job")
+        cmd_group.command("stop", "stop_job")
+        cmd_group.command("resume", "resume_job")
+        cmd_group.command("get-devices", "get_job_devices")
+        cmd_group.command("rerun", "rerun_job")
 
     with self.command_group(
         "iot central device twin",

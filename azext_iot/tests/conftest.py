@@ -24,7 +24,9 @@ path_discovery_init = (
     "azext_iot.iothub.providers.discovery.IotHubDiscovery._initialize_client"
 )
 path_sas = "azext_iot._factory.SasTokenAuthentication"
-path_mqtt_device_client = "azure.iot.device.IoTHubDeviceClient.create_from_connection_string"
+path_mqtt_device_client = (
+    "azure.iot.device.IoTHubDeviceClient.create_from_connection_string"
+)
 path_iot_hub_monitor_events_entrypoint = (
     "azext_iot.operations.hub._iot_hub_monitor_events"
 )
@@ -81,31 +83,23 @@ def fixture_cmd(mocker):
 def fixture_device(mocker):
     get_device = mocker.patch(path_get_device)
     get_device.return_value = {
-        'deviceId': 'Test_Device_1',
-        'generationId': '637534345627501371',
-        'etag': 'ODgxNTgwOA==',
-        'connectionState': 'Connected',
-        'status': 'enabled',
-        'statusReason': None,
-        'connectionStateUpdatedTime': '2021-05-12T08:48:08.7205939Z',
-        'statusUpdatedTime': '0001-01-01T00:00:00Z',
-        'lastActivityTime': '2021-05-12T08:48:07.6903807Z',
-        'cloudToDeviceMessageCount': 0,
-        'authentication': {
-            'symmetricKey': {
-                'primaryKey': 'TestKey1',
-                'secondaryKey': 'TestKey2'
-            },
-            'x509Thumbprint': {
-                'primaryThumbprint': None,
-                'secondaryThumbprint': None
-            },
-            'type': 'sas'
+        "deviceId": "Test_Device_1",
+        "generationId": "637534345627501371",
+        "etag": "ODgxNTgwOA==",
+        "connectionState": "Connected",
+        "status": "enabled",
+        "statusReason": None,
+        "connectionStateUpdatedTime": "2021-05-12T08:48:08.7205939Z",
+        "statusUpdatedTime": "0001-01-01T00:00:00Z",
+        "lastActivityTime": "2021-05-12T08:48:07.6903807Z",
+        "cloudToDeviceMessageCount": 0,
+        "authentication": {
+            "symmetricKey": {"primaryKey": "TestKey1", "secondaryKey": "TestKey2"},
+            "x509Thumbprint": {"primaryThumbprint": None, "secondaryThumbprint": None},
+            "type": "sas",
         },
-        'capabilities': {
-            'iotEdge': False
-        },
-        'hub': 'test-iot-hub.azure-devices.net'
+        "capabilities": {"iotEdge": False},
+        "hub": "test-iot-hub.azure-devices.net",
     }
     return get_device
 
@@ -182,19 +176,11 @@ def fixture_iot_device_show_sas(mocker):
     device = mocker.patch(path_iot_device_show)
     device.return_value = {
         "authentication": {
-            "symmetricKey": {
-                "primaryKey": "test_pk",
-                "secondaryKey": "test_sk"
-            },
+            "symmetricKey": {"primaryKey": "test_pk", "secondaryKey": "test_sk"},
             "type": DeviceAuthApiType.sas.value,
-            "x509Thumbprint": {
-                "primaryThumbprint": None,
-                "secondaryThumbprint": None
-            }
+            "x509Thumbprint": {"primaryThumbprint": None, "secondaryThumbprint": None},
         },
-        "capabilities": {
-            "iotEdge": False
-        },
+        "capabilities": {"iotEdge": False},
         "cloudToDeviceMessageCount": 0,
         "connectionState": "Disconnected",
         "connectionStateUpdatedTime": "2021-05-27T00:36:11.2861732Z",
@@ -205,7 +191,7 @@ def fixture_iot_device_show_sas(mocker):
         "lastActivityTime": "2021-05-27T00:18:16.3154299Z",
         "status": "enabled",
         "statusReason": None,
-        "statusUpdatedTime": "0001-01-01T00:00:00Z"
+        "statusUpdatedTime": "0001-01-01T00:00:00Z",
     }
     return device
 
@@ -215,19 +201,11 @@ def fixture_self_signed_device_show_self_signed(mocker):
     device = mocker.patch(path_iot_device_show)
     device.return_value = {
         "authentication": {
-            "symmetricKey": {
-                "primaryKey": "test_pk",
-                "secondaryKey": "test_sk"
-            },
+            "symmetricKey": {"primaryKey": "test_pk", "secondaryKey": "test_sk"},
             "type": DeviceAuthApiType.selfSigned.value,
-            "x509Thumbprint": {
-                "primaryThumbprint": None,
-                "secondaryThumbprint": None
-            }
+            "x509Thumbprint": {"primaryThumbprint": None, "secondaryThumbprint": None},
         },
-        "capabilities": {
-            "iotEdge": False
-        },
+        "capabilities": {"iotEdge": False},
         "cloudToDeviceMessageCount": 0,
         "connectionState": "Disconnected",
         "connectionStateUpdatedTime": "2021-05-27T00:36:11.2861732Z",
@@ -238,7 +216,7 @@ def fixture_self_signed_device_show_self_signed(mocker):
         "lastActivityTime": "2021-05-27T00:18:16.3154299Z",
         "status": "enabled",
         "statusReason": None,
-        "statusUpdatedTime": "0001-01-01T00:00:00Z"
+        "statusUpdatedTime": "0001-01-01T00:00:00Z",
     }
     return device
 
@@ -289,7 +267,7 @@ def get_context_path(base_path, *paths):
     return base_path
 
 
-''' TODO: Possibly expand for future use
+""" TODO: Possibly expand for future use
 fake_oauth_response = responses.Response(
     method=responses.POST,
     url=re.compile("https://login.microsoftonline.com/(.+)/oauth2/token"),
@@ -308,7 +286,7 @@ fake_oauth_response = responses.Response(
     status=200,
     content_type="application/json",
 )
-'''
+"""
 
 
 @pytest.fixture
@@ -361,7 +339,9 @@ def fixture_mock_aics_token(mocker):
 
 @pytest.fixture
 def fixture_dt_client(mocker, fixture_cmd):
-    from azext_iot.sdk.digitaltwins.controlplane import AzureDigitalTwinsManagementClient
+    from azext_iot.sdk.digitaltwins.controlplane import (
+        AzureDigitalTwinsManagementClient,
+    )
     from azext_iot.sdk.digitaltwins.dataplane import AzureDigitalTwinsAPI
     from azext_iot.digitaltwins.providers.auth import DigitalTwinAuthentication
 
@@ -392,7 +372,11 @@ def fixture_dt_client(mocker, fixture_cmd):
         credentials=DigitalTwinAuthentication(
             fixture_cmd, "00000000-0000-0000-0000-000000000000"
         ),
-        base_url="https://{}/".format(hostname)
+        base_url="https://{}/".format(hostname),
     )
 
     return control_plane_patch, data_plane_patch
+
+
+def pytest_addoption(parser):
+    parser.addoption("--api-version", action="store", default=None)
