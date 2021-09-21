@@ -223,16 +223,24 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         )
 
         # retry logic to delete the template
+        error = None
         for _ in attempts:
             try:
+                error = None
                 self.cmd(
                     command,
                     api_version=api_version,
                     checks=[self.check("result", "success")],
                 )
                 return
-            except:
+            except Exception as e:
+                error = e
                 time.sleep(10)
+
+        raise CLIError(
+            f"Device template {template_id} cannot be deleted."
+            + (f" Error: {error}" if error is not None else "")
+        )
 
     def _list_device_groups(self, api_version):
         command = "iot central device-group list --app-id {}".format(APP_ID)
