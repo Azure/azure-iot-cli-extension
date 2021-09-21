@@ -8,12 +8,18 @@ from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.common.utility import generate_key
 from azext_iot.tests.iothub import (
-    DATAPLANE_AUTH_TYPES,
+    AuthenticationTypeDataplane,
     PRIMARY_THUMBPRINT,
     SECONDARY_THUMBPRINT,
     DEVICE_TYPES,
 )
 import re
+
+# Topic spaces do not work with login.
+
+custom_auth_types = [
+    AuthenticationTypeDataplane.key.value,
+]
 
 
 class TestIoTHubDevices(IoTLiveScenarioTest):
@@ -22,7 +28,7 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
 
     def test_iothub_device_identity(self):
         to_remove_device_ids = []
-        for auth_phase in DATAPLANE_AUTH_TYPES:
+        for auth_phase in custom_auth_types:
             for device_type in DEVICE_TYPES:
                 device_count = 4
                 device_ids = self.generate_device_names(
@@ -301,7 +307,7 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
             f"--am x509_thumbprint --ptp {PRIMARY_THUMBPRINT} --stp {SECONDARY_THUMBPRINT}"
         )
 
-        for auth_phase in DATAPLANE_AUTH_TYPES:
+        for auth_phase in custom_auth_types:
             renew_primary_key_device = self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub device-identity renew-key "
@@ -360,7 +366,7 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
             f"HostName={self.entity_name}.azure-devices.net;DeviceId={device_ids[1]};x509=true"
         )
 
-        for auth_phase in DATAPLANE_AUTH_TYPES:
+        for auth_phase in custom_auth_types:
             primary_key_cstring = self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub device-identity connection-string show "
@@ -416,7 +422,7 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
             f"iot hub device-identity create -d {device_ids[1]} -n {self.entity_name} -g {self.entity_rg} --auth-method X509_ca"
         )
 
-        for auth_phase in DATAPLANE_AUTH_TYPES:
+        for auth_phase in custom_auth_types:
             self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub generate-sas-token -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg}",
@@ -462,6 +468,7 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
             "device_id": f"d_{generate_generic_id()}",
             "hub_name": self.entity_name,
             "duration": 3600,
+            "format_version": "v2"
         }
 
         self.cmd(
@@ -470,10 +477,11 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
 
         # Device ID + Hub name
         credentials = self.cmd(
-            "iot hub device-identity generate-mqtt-credentials -n {} -d {} -g {}".format(
+            "iot hub device-identity generate-mqtt-credentials -n {} -d {} -g {} --fv {}".format(
                 props["hub_name"],
                 props["device_id"],
-                self.entity_rg
+                self.entity_rg,
+                props["format_version"],
             )
         ).get_output_in_json()
 
@@ -495,6 +503,25 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
         # All Optional Params
         credentials = self.cmd(
             "iot hub device-identity generate-mqtt-credentials -n {} -d {} -m {} --dtmi {} -g {} "
+            "--du {} --pi {} --pn {} --fv {}".format(
+                props["hub_name"],
+                props["device_id"],
+                props["module_id"],
+                props["dtmi"],
+                self.entity_rg,
+                props["duration"],
+                props["product_info"],
+                props["shared_access_key_name"],
+                props["format_version"],
+            )
+        ).get_output_in_json()
+
+        assert_username_password(credentials, props)
+
+        # All Optional Params; format version 1
+        props.update({"format_version": "v1"})
+        credentials = self.cmd(
+            "iot hub device-identity generate-mqtt-credentials -n {} -d {} -m {} --dtmi {} -g {} "
             "--du {} --pi {} --pn {}".format(
                 props["hub_name"],
                 props["device_id"],
@@ -509,13 +536,13 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
 
         assert_username_password(credentials, props)
 
-        # Connection String
+        # Connection String; recreate props with v2
         props = {
             "device_id": props["device_id"],
             "hub_name": self.entity_name,
             "module_id": props["module_id"],
-            "password_creation_time": 0,
-            "password_expiry_time": 3600,
+            "duration": 3600,
+            "format_version": "v2"
         }
         device_cs = "HostName={}.azure-devices.net;DeviceId={};SharedAccessKey={}".format(
             props["hub_name"],
@@ -524,8 +551,9 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
         )
         module_cs = device_cs + ";ModuleId={}".format(props["module_id"])
         credentials = self.cmd(
-            "iot hub device-identity generate-mqtt-credentials --cs {}".format(
+            "iot hub device-identity generate-mqtt-credentials --cs {} --fv {}".format(
                 module_cs,
+                props["format_version"],
             )
         ).get_output_in_json()
         assert_username_password(credentials, props)
@@ -538,20 +566,31 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
         props = {
             "device_id": props["device_id"],
             "hub_name": self.entity_name,
-            "password_creation_time": 0,
-            "password_expiry_time": 3600,
+            "duration": 3600,
+            "format_version": "v2"
         }
         credentials = self.cmd(
-            "iot hub device-identity generate-mqtt-credentials --cs {}".format(
-                device_cs
+            "iot hub device-identity generate-mqtt-credentials --cs {} --fv {}".format(
+                device_cs,
+                props["format_version"],
             )
         ).get_output_in_json()
         assert_username_password(credentials, props)
 
         props.update({
-            "password_creation_time": 100,
-            "password_expiry_time": 1000,
+            "duration": 100,
         })
+        credentials = self.cmd(
+            "iot hub device-identity generate-mqtt-credentials --cs {} --du {} --fv {}".format(
+                device_cs,
+                props["duration"],
+                props["format_version"],
+            )
+        ).get_output_in_json()
+        assert_username_password(credentials, props)
+
+        # Connection string; Format version 1
+        props.update({"format_version": "v1"})
         credentials = self.cmd(
             "iot hub device-identity generate-mqtt-credentials --cs {} --du {}".format(
                 device_cs,
@@ -565,10 +604,11 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
         )
 
 
-def assert_username_password(result, expected_props, version=2):
+def assert_username_password(result, expected_props):
+    print(result)
     username = result["username"]
     password = result["password"]
-    if version == 1:
+    if expected_props["format_version"] == "v1":
         client_id = result["client_id"]
         assert "api-version=2019-10-01" in username
         assert expected_props['hub_name'] in username
@@ -594,7 +634,7 @@ def assert_username_password(result, expected_props, version=2):
             int(re.search(r"se\=(.*?)(\&|$)", username).group(1)) -
             int(re.search(r"sa\=(.*?)(\&|$)", username).group(1))
         )
-        assert result_diff == expected_props["duration"]
+        assert result_diff == expected_props["duration"] * 1000
 
         if expected_props.get("module_id", None):
             assert f"mid={expected_props['module_id']}" in username

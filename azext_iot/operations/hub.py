@@ -3476,7 +3476,7 @@ def iot_hub_device_identity_generate_mqtt_credentials(
     duration=3600,
     policy_name=None,
     product_info=None,
-    version=None,
+    version=MQTTConnectVersionType.v1.value,
     resource_group_name=None,
     login=None,
     auth_type_dataplane=None,
@@ -3582,6 +3582,7 @@ def iot_hub_device_identity_generate_mqtt_credentials(
 
         return {
             "username": username,
+            "client_id": client_id,
             "password": base64.b64encode(encoded_key)
         }
 

@@ -10,10 +10,10 @@ from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.common.shared import AuthenticationTypeDataplane
 
 # The current implementation of preview distributed tracing commands do not work with a cstring.
+# Topic spaces do not work with login.
 
 custom_auth_types = [
     AuthenticationTypeDataplane.key.value,
-    AuthenticationTypeDataplane.login.value,
 ]
 
 

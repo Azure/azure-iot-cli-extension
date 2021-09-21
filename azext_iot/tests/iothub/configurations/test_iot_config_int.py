@@ -8,8 +8,8 @@ import random
 import json
 
 from azext_iot.tests.iothub import IoTLiveScenarioTest
+from azext_iot.common.shared import AuthenticationTypeDataplane
 from azext_iot.tests.conftest import get_context_path
-from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
 from azext_iot.common.utility import read_file_content
 
 edge_content_path = get_context_path(__file__, "test_edge_deployment.json")
@@ -26,6 +26,13 @@ adm_content_module_path = get_context_path(__file__, "test_adm_module_content.js
 adm_content_device_path = get_context_path(__file__, "test_adm_device_content.json")
 
 
+# Topic spaces do not work with login.
+
+custom_auth_types = [
+    AuthenticationTypeDataplane.key.value,
+]
+
+
 class TestIoTConfigurations(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTConfigurations, self).__init__(
@@ -33,7 +40,7 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
         )
 
     def test_edge_set_modules(self):
-        for auth_phase in DATAPLANE_AUTH_TYPES:
+        for auth_phase in custom_auth_types:
             edge_device_count = 1
             edge_device_ids = self.generate_device_names(edge_device_count, True)
 
@@ -82,7 +89,7 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
             )
 
     def test_edge_deployments(self):
-        for auth_phase in DATAPLANE_AUTH_TYPES:
+        for auth_phase in custom_auth_types:
             config_count = 5
             config_ids = self.generate_config_names(config_count)
 
@@ -446,7 +453,7 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
         priority = random.randint(1, 10)
         condition = "tags.building=9 and tags.environment='test'"
 
-        for auth_phase in DATAPLANE_AUTH_TYPES:
+        for auth_phase in custom_auth_types:
             # Device content inline
             # Note: $schema is included as a nested property in the sample content.
             self.cmd(

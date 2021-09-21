@@ -8,7 +8,13 @@ import json
 
 from datetime import datetime, timedelta
 from azext_iot.tests.iothub import IoTLiveScenarioTest
-from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
+from azext_iot.common.shared import AuthenticationTypeDataplane
+
+# Topic spaces do not work with login.
+
+custom_auth_types = [
+    AuthenticationTypeDataplane.key.value,
+]
 
 
 class TestIoTHubJobs(IoTLiveScenarioTest):
@@ -16,7 +22,7 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
         super(TestIoTHubJobs, self).__init__(test_case)
 
     def test_jobs(self):
-        for auth_phase in DATAPLANE_AUTH_TYPES:
+        for auth_phase in custom_auth_types:
             device_count = 2
             device_ids_twin_tags = self.generate_device_names(device_count)
             device_ids_twin_props = self.generate_device_names(device_count)

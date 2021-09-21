@@ -8,11 +8,16 @@ from azext_iot.tests.iothub import IoTLiveScenarioTest
 from time import sleep
 from azext_iot.common.utility import generate_key
 from azext_iot.tests.iothub import (
-    DATAPLANE_AUTH_TYPES,
+    AuthenticationTypeDataplane,
     PRIMARY_THUMBPRINT,
     SECONDARY_THUMBPRINT,
     DEVICE_TYPES,
 )
+# Topic spaces do not work with login.
+
+custom_auth_types = [
+    AuthenticationTypeDataplane.key.value,
+]
 
 
 class TestIoTHubModules(IoTLiveScenarioTest):
@@ -20,7 +25,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
         super(TestIoTHubModules, self).__init__(test_case)
 
     def test_iothub_module_identity(self):
-        for auth_phase in DATAPLANE_AUTH_TYPES:
+        for auth_phase in custom_auth_types:
             for device_type in DEVICE_TYPES:
                 device_count = 1
                 module_count = 4
@@ -256,7 +261,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
             f"-m {module_ids[1]} -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg} --am x509_ca"
         )
 
-        for auth_phase in DATAPLANE_AUTH_TYPES:
+        for auth_phase in custom_auth_types:
             renew_primary_key_module = self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub module-identity renew-key -m {module_ids[0]} "
@@ -328,7 +333,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
             f"DeviceId={device_ids[0]};ModuleId={module_ids[1]};x509=true"
         )
 
-        for auth_phase in DATAPLANE_AUTH_TYPES:
+        for auth_phase in custom_auth_types:
             primary_key_cstring = self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub module-identity connection-string show -m {module_ids[0]} -d {device_ids[0]} "
@@ -389,7 +394,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
             "--auth-method x509_ca"
         )
 
-        for auth_phase in DATAPLANE_AUTH_TYPES:
+        for auth_phase in custom_auth_types:
             self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub generate-sas-token -m {module_ids[0]} -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg}",

@@ -5,11 +5,16 @@
 # --------------------------------------------------------------------------------------------
 
 from azext_iot.tests.iothub import IoTLiveScenarioTest
-from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
+from azext_iot.common.shared import AuthenticationTypeDataplane
 from time import sleep
 
 # TODO: assert device scope format in device twin.
 # from azext_iot.constants import DEVICE_DEVICESCOPE_PREFIX
+# Topic spaces do not work with login.
+
+custom_auth_types = [
+    AuthenticationTypeDataplane.key.value,
+]
 
 
 class TestIoTHubNestedEdge(IoTLiveScenarioTest):
@@ -17,7 +22,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
         super(TestIoTHubNestedEdge, self).__init__(test_case)
 
     def test_iothub_nested_edge(self):
-        for auth_phase in DATAPLANE_AUTH_TYPES:
+        for auth_phase in custom_auth_types:
             device_count = 3
             device_ids = self.generate_device_names(device_count)
             edge_device_count = 2

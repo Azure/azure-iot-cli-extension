@@ -5,7 +5,13 @@
 # --------------------------------------------------------------------------------------------
 
 from azext_iot.tests.iothub import IoTLiveScenarioTest
-from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
+from azext_iot.common.shared import AuthenticationTypeDataplane
+
+# Topic spaces do not work with login.
+
+custom_auth_types = [
+    AuthenticationTypeDataplane.key.value,
+]
 
 
 class TestIoTHubUtilities(IoTLiveScenarioTest):
@@ -13,7 +19,7 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
         super(TestIoTHubUtilities, self).__init__(test_case)
 
     def test_iothub_generate_sas_token(self):
-        for auth_phase in DATAPLANE_AUTH_TYPES:
+        for auth_phase in custom_auth_types:
             self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub generate-sas-token -n {self.entity_name} -g {self.entity_rg}",
@@ -136,7 +142,7 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
         )
 
     def test_iothub_init(self):
-        for auth_phase in DATAPLANE_AUTH_TYPES:
+        for auth_phase in custom_auth_types:
             self.cmd(
                 self.set_cmd_auth_type(
                     f'iot hub query --hub-name {self.entity_name} -q "select * from devices"',

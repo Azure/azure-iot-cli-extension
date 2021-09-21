@@ -11,9 +11,15 @@ from pathlib import Path
 from azext_iot.common.utility import read_file_content
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.generators import generate_generic_id
-from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
+from azext_iot.common.shared import AuthenticationTypeDataplane
 
 CWD = os.path.dirname(os.path.abspath(__file__))
+
+# Topic spaces do not work with login.
+
+custom_auth_types = [
+    AuthenticationTypeDataplane.key.value,
+]
 
 
 class TestIoTHubModuleTwin(IoTLiveScenarioTest):
@@ -21,7 +27,7 @@ class TestIoTHubModuleTwin(IoTLiveScenarioTest):
         super(TestIoTHubModuleTwin, self).__init__(test_case)
 
     def test_iothub_module_twin(self):
-        for auth_phase in DATAPLANE_AUTH_TYPES:
+        for auth_phase in custom_auth_types:
             device_count = 1
             device_ids = self.generate_device_names(device_count)
             module_count = 1
@@ -162,7 +168,7 @@ class TestIoTHubModuleTwin(IoTLiveScenarioTest):
             )
 
     def test_iothub_module_twin_replace(self):
-        for auth_phase in DATAPLANE_AUTH_TYPES:
+        for auth_phase in custom_auth_types:
             device_count = 1
             device_ids = self.generate_device_names(device_count)
             module_count = 1
