@@ -35,15 +35,9 @@ parameters:
 - name: 'testHub'
   type: boolean
   default: true
-- name: azureSubscription
-  type: string
-  default: 'az_cli_nightly_conn'
-  values:
-  - 'az_cli_nightly_conn'
-  - 'AzIoTCLIService'
 
 variables:
-  - group: aziotcli_test_primary
+  - group: aziotcli_test_nightly
   - name: pythonVersion
     value: ${{ parameters.pythonVersion }}
   - name: architecture

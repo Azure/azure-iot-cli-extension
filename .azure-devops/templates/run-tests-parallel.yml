@@ -77,7 +77,7 @@ steps:
       continueOnError: true
       displayName: '${{ parameters.name }} integration tests'
       inputs:
-        azureSubscription: ${{ parameters.azureSubscription }}
+        azureSubscription: $(AzureServiceConnection)
         scriptType: bash
         scriptLocation: inlineScript
         ${{ if containsValue(parameters.serial_execution_dirs, parameters.path) }}:
