@@ -32,6 +32,9 @@ parameters:
   type: boolean
   default: true
 
+variables:
+  - group: aziotcli_test_primary
+
 stages:
   - stage: 'build'
     displayName: 'Build and Publish Artifacts'
