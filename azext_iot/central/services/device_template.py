@@ -13,7 +13,9 @@ from knack.util import CLIError
 from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
-from azext_iot.central import models as central_models
+from azext_iot.central.models.preview import TemplatePreview
+from azext_iot.central.models.v1 import TemplateV1
+from azext_iot.central.models.v1_1_preview import TemplateV1_1_preview
 from azext_iot.central.models.enum import ApiVersion
 
 logger = get_logger(__name__)
@@ -26,9 +28,9 @@ def get_device_template(
     app_id: str,
     device_template_id: str,
     token: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
-) -> Union[central_models.TemplatePreview, central_models.TemplateV1]:
+) -> Union[TemplatePreview, TemplateV1, TemplateV1_1_preview]:
     """
     Get a specific device template from IoTC
 
@@ -55,19 +57,21 @@ def get_device_template(
     response = requests.get(url, headers=headers, params=query_parameters)
 
     if api_version == ApiVersion.preview.value:
-        return central_models.TemplatePreview(_utility.try_extract_result(response))
+        return TemplatePreview(_utility.try_extract_result(response))
+    elif api_version == ApiVersion.v1.value:
+        return TemplateV1(_utility.try_extract_result(response))
     else:
-        return central_models.TemplateV1(_utility.try_extract_result(response))
+        return TemplateV1_1_preview(_utility.try_extract_result(response))
 
 
 def list_device_templates(
     cmd,
     app_id: str,
     token: str,
+    api_version: str,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
-) -> List[Union[central_models.TemplatePreview, central_models.TemplateV1]]:
+) -> List[Union[TemplatePreview, TemplateV1, TemplateV1_1_preview]]:
     """
     Get a list of all device templates in IoTC
 
@@ -109,13 +113,15 @@ def list_device_templates(
 
         if api_version == ApiVersion.preview.value:
             device_templates = device_templates + [
-                central_models.TemplatePreview(device_template)
-                for device_template in result["value"]
+                TemplatePreview(device_template) for device_template in result["value"]
+            ]
+        elif api_version == ApiVersion.v1.value:
+            device_templates = device_templates + [
+                TemplateV1(device_template) for device_template in result["value"]
             ]
         else:
             device_templates = device_templates + [
-                central_models.TemplateV1(device_template)
-                for device_template in result["value"]
+                TemplateV1_1_preview(device_template) for device_template in result["value"]
             ]
 
         url = result.get("nextLink", None)
@@ -130,9 +136,9 @@ def create_device_template(
     device_template_id: str,
     payload: dict,
     token: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
-) -> Union[central_models.TemplatePreview, central_models.TemplateV1]:
+) -> Union[TemplatePreview, TemplateV1, TemplateV1_1_preview]:
     """
     Create a device template in IoTC
 
@@ -163,9 +169,11 @@ def create_device_template(
 
     response = requests.put(url, headers=headers, json=payload, params=query_parameters)
     if api_version == ApiVersion.preview.value:
-        return central_models.TemplatePreview(_utility.try_extract_result(response))
+        return TemplatePreview(_utility.try_extract_result(response))
+    elif api_version == ApiVersion.v1.value:
+        return TemplateV1(_utility.try_extract_result(response))
     else:
-        return central_models.TemplateV1(_utility.try_extract_result(response))
+        return TemplateV1_1_preview(_utility.try_extract_result(response))
 
 
 def delete_device_template(
@@ -173,8 +181,8 @@ def delete_device_template(
     app_id: str,
     device_template_id: str,
     token: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
 ) -> dict:
     """
     Delete a device template from IoTC

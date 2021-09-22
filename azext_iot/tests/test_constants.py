@@ -12,7 +12,10 @@ class FileNames:
     )
     central_device_file = "central/json/device.json"
     central_device_group_file = "central/json/device_group.json"
+    central_organization_file = "central/json/organization.json"
     central_role_file = "central/json/role.json"
+    central_job_file = "central/json/job.json"
+    central_fileupload_file = "central/json/fileupload.json"
     central_device_twin_file = "central/json/device_twin.json"
     central_property_validation_template_file = (
         "central/json/property_validation_template.json"
