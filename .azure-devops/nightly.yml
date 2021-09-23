@@ -86,27 +86,12 @@ stages:
           architecture: $(architecture)
 
       - template: templates/install-and-record-version.yml
-
-  - stage: 'test_edge'
-    displayName: 'Run all tests with edge CLI'
-    pool:
-      vmImage: ${{ parameters.vmImage }}
-    dependsOn: build
-    jobs:
-    - template: templates/nightly-tests.yml
-      parameters:
-        azureCLIVersion: edge
-        pythonVersion: $(pythonVersion)
-        testADT: ${{ parameters.testADT }}
-        testCentral: ${{ parameters.testCentral }}
-        testDPS: ${{ parameters.testDPS }}
-        testHub: ${{ parameters.testHub }}
   
   - stage: 'test_min'
     displayName: 'Run all tests with min CLI'
     pool:
       vmImage: ${{ parameters.vmImage }}
-    dependsOn: test_edge
+    dependsOn: build
     jobs:
     - template: templates/nightly-tests.yml
       parameters:
@@ -134,7 +119,7 @@ stages:
           
   - stage: 'kpi'
     displayName: 'Build KPIs'
-    dependsOn: [build, test_edge, test_min, test_msi]
+    dependsOn: [build, test_min, test_msi]
     jobs:
     - job: 'calculateCodeCoverage'
       displayName: 'Calculate distributed code coverage'

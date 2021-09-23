@@ -17,7 +17,6 @@ parameters:
   values:
   - min
   - released
-  - edge
   - msi
 - name: path
   type: string
