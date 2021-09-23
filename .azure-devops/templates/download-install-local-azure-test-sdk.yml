@@ -16,14 +16,7 @@ steps:
         Foreach ($wheel in $wheels)
         {
             Write-Host "installing" $wheel.FullName
-            Try
-            {
-              pip install $wheel.FullName
-            }
-            Catch [system.exception]
-            {
-              Write-Host $error
-            }
+            pip install $wheel.FullName
         }
         Write-Host "done"
       workingDirectory: '$(System.ArtifactsDirectory)/wheels'
