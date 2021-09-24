@@ -2242,6 +2242,7 @@ def iot_device_send_message(
     )
     for _ in range(msg_count):
         client_mqtt.send_d2c_message(message_text=data, properties=properties)
+    client_mqtt.shutdown()
 
 
 def iot_device_send_message_http(
@@ -2634,6 +2635,7 @@ def iot_simulate_device(
                 init_reported_properties=init_reported_properties
             )
             client_mqtt.execute(data=generator(), properties=properties_to_send, publish_delay=msg_interval, msg_count=msg_count)
+            client_mqtt.shutdown()
         else:
             op = Thread(target=http_wrap, args=(target, device_id, generator(), msg_interval, msg_count))
             op.start()
