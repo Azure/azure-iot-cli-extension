@@ -86,7 +86,7 @@ stages:
           architecture: $(architecture)
 
       - template: templates/install-and-record-version.yml
-  
+
   - stage: 'test_min'
     displayName: 'Run all tests with min CLI'
     pool:
