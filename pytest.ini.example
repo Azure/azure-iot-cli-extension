@@ -1,5 +1,7 @@
 [pytest]
-junit_family = xunit1
+log_cli = 1
+log_cli_level = WARNING
+
 addopts =
     -v
 
