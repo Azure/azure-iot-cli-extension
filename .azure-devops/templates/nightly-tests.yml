@@ -11,58 +11,71 @@ parameters:
   values:
   - min
   - released
-  - edge
+  - msi
 - name: azureSubscription
   type: string
   default: 'az_cli_nightly_conn'
+- name: 'testCentral'
+  type: boolean
+  default: true
+- name: 'testADT'
+  type: boolean
+  default: true
+- name: 'testDPS'
+  type: boolean
+  default: true
+- name: 'testHub'
+  type: boolean
+  default: true
 
 jobs:
 
 - job: 'testCentral'
   displayName: 'Test IoT Central'
+  condition: eq('${{ parameters.testCentral }}', true)
   steps:
   - template: run-tests-parallel.yml
     parameters:
       path: 'azext_iot/tests/central'
       name: 'iot-central'
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
-      azureSubscription: ${{ parameters.azureSubscription }}
       pythonVersion: ${{ parameters.pythonVersion }}
 
 - job: 'testADT'
   displayName: 'Test Azure DigitalTwins'
+  condition: eq('${{ parameters.testADT }}', true)
   steps:
   - template: run-tests-parallel.yml
     parameters:
       path: 'azext_iot/tests/digitaltwins'
       name: 'azure-digitaltwins'
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
-      azureSubscription: ${{ parameters.azureSubscription }}
       pythonVersion: ${{ parameters.pythonVersion }}
 
 - job: 'testDPS'
   displayName: 'Test DPS'
+  condition: eq('${{ parameters.testDPS }}', true)
   steps:
   - template: run-tests-parallel.yml
     parameters:
       path: 'azext_iot/tests/dps'
       name: 'device-provisioning-service'
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
-      azureSubscription: ${{ parameters.azureSubscription }}
       pythonVersion: ${{ parameters.pythonVersion }}
 
 - job: 'testHub_job_1'
   displayName: 'Test IoT Hub - config, core and jobs'
+  condition: eq('${{ parameters.testHub }}', true)
   steps:
   - template: run-tests-parallel.yml
     parameters:
       path: 'azext_iot/tests/iothub/configurations azext_iot/tests/iothub/core azext_iot/tests/iothub/jobs'
       name: 'iot-hub-1'
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
-      azureSubscription: ${{ parameters.azureSubscription }}
       pythonVersion: ${{ parameters.pythonVersion }}
 
 - job: 'testHub_job_2'
+  condition: eq('${{ parameters.testHub }}', true)
   displayName: 'Test IoT Hub - devices, messaging and modules'
   steps:
   - template: run-tests-parallel.yml
@@ -70,7 +83,6 @@ jobs:
       path: 'azext_iot/tests/iothub/devices azext_iot/tests/iothub/messaging azext_iot/tests/iothub/modules'
       name: 'iot-hub-2'
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
-      azureSubscription: ${{ parameters.azureSubscription }}
       pythonVersion: ${{ parameters.pythonVersion }}
 
 - job: 'unitTests'

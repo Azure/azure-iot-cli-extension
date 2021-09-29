@@ -3,6 +3,9 @@ pr: none
 trigger: none
 
 parameters:
+- name: variableGroup
+  type: string
+  default: 'aziotcli_test_primary'
 - name: vmImage
   type: string
   default: 'ubuntu-18.04'
@@ -31,9 +34,9 @@ parameters:
 - name: 'testHub'
   type: boolean
   default: true
-- name: azureSubscription
-  type: string
-  default: 'AzIoTCLIService'
+
+variables:
+  - group: ${{ parameters.variableGroup }}
 
 stages:
   - stage: 'build'
@@ -93,7 +96,6 @@ stages:
         parameters:
           path: 'azext_iot/tests/central'
           name: 'iot-central'
-          azureSubscription: ${{ parameters.azureSubscription }}
           pythonVersion: ${{ parameters.pythonVersion }}
     
     - job: 'testADT'
@@ -104,7 +106,6 @@ stages:
         parameters:
           path: 'azext_iot/tests/digitaltwins'
           name: 'azure-digitaltwins'
-          azureSubscription: ${{ parameters.azureSubscription }}
           pythonVersion: ${{ parameters.pythonVersion }}
 
     - job: 'testDPS'
@@ -115,7 +116,6 @@ stages:
         parameters:
           path: 'azext_iot/tests/dps'
           name: 'device-provisioning-service'
-          azureSubscription: ${{ parameters.azureSubscription }}
           pythonVersion: ${{ parameters.pythonVersion }}
     
     - job: 'testHub_job_1'
@@ -126,7 +126,6 @@ stages:
         parameters:
           path: 'azext_iot/tests/iothub/configurations azext_iot/tests/iothub/core azext_iot/tests/iothub/jobs'
           name: 'iot-hub-1'
-          azureSubscription: ${{ parameters.azureSubscription }}
           pythonVersion: ${{ parameters.pythonVersion }}
     
     - job: 'testHub_job_2'
@@ -137,7 +136,6 @@ stages:
         parameters:
           path: 'azext_iot/tests/iothub/devices azext_iot/tests/iothub/messaging azext_iot/tests/iothub/modules'
           name: 'iot-hub-2'
-          azureSubscription: ${{ parameters.azureSubscription }}
           pythonVersion: ${{ parameters.pythonVersion }}
 
     - job: 'unitTests'
