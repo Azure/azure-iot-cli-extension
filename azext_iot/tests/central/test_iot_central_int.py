@@ -78,12 +78,11 @@ class TestIotCentral(CentralLiveScenarioTest):
         )
 
         self._delete_device(device_id=device_id, api_version=self._api_version)
-        try:
-            self._delete_device_template(
-                template_id=template_id, api_version=self._api_version
-            )
-        except:
-            pass
+
+        self._delete_device_template(
+            template_id=template_id, api_version=self._api_version
+        )
+
         assert '"Bool": true' in output
         assert device_id in output
 
@@ -112,12 +111,10 @@ class TestIotCentral(CentralLiveScenarioTest):
         output = self._get_validate_messages_output(device_id, enqueued_time)
 
         self._delete_device(device_id=device_id, api_version=self._api_version)
-        try:
-            self._delete_device_template(
-                template_id=template_id, api_version=self._api_version
-            )
-        except:
-            pass
+
+        self._delete_device_template(
+            template_id=template_id, api_version=self._api_version
+        )
 
         assert output
         assert "Successfully parsed 1 message(s)" in output
@@ -190,12 +187,10 @@ class TestIotCentral(CentralLiveScenarioTest):
         )
 
         self._delete_device(device_id=device_id, api_version=self._api_version)
-        try:
-            self._delete_device_template(
-                template_id=template_id, api_version=self._api_version
-            )
-        except:
-            pass
+
+        self._delete_device_template(
+            template_id=template_id, api_version=self._api_version
+        )
 
         assert output
 
@@ -282,12 +277,10 @@ class TestIotCentral(CentralLiveScenarioTest):
         show_command_result = self.cmd(command, api_version=self._api_version)
 
         self._delete_device(device_id=device_id, api_version=self._api_version)
-        try:
-            self._delete_device_template(
-                template_id=template_id, api_version=self._api_version
-            )
-        except:
-            pass
+
+        self._delete_device_template(
+            template_id=template_id, api_version=self._api_version
+        )
 
         run_result = run_command_result.get_output_in_json()
         show_result = show_command_result.get_output_in_json()
@@ -321,13 +314,11 @@ class TestIotCentral(CentralLiveScenarioTest):
         show_command_result = self.cmd(command, api_version=self._api_version)
 
         self._delete_device(device_id=device_id, api_version=self._api_version)
-        try:
-            self._delete_device_template(
-                template_id=template_id,
-                api_version=self._api_version,
-            )
-        except:
-            pass
+
+        self._delete_device_template(
+            template_id=template_id,
+            api_version=self._api_version,
+        )
 
         run_result = run_command_result.get_output_in_json()
         show_result = show_command_result.get_output_in_json()

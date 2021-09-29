@@ -99,12 +99,9 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
             checks=[self.check("deviceId", device_id)],
         )
         self._delete_device(device_id=device_id, api_version=self._api_version)
-        try:
-            self._delete_device_template(
-                template_id=template_id, api_version=self._api_version
-            )
-        except:
-            pass
+        self._delete_device_template(
+            template_id=template_id, api_version=self._api_version
+        )
 
     @pytest.mark.skipif(
         not APP_SCOPE_ID, reason="empty azext_iot_central_scope_id env var"
@@ -248,14 +245,10 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
             )
             is not None
         )
-        try:
-            self._delete_device_template(
-                template_id=template_id, api_version=self._api_version
-            )
-        except:
-            pass
 
-        # template can't be deleted if any device exists for it. Assert accordingly
+        self._delete_device_template(
+            template_id=template_id, api_version=self._api_version
+        )
 
         deleted_device_template_list = self.cmd(
             "iot central device-template list --app-id {}".format(APP_ID),
@@ -264,7 +257,11 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
 
         deleted_dev_temp_count = len(deleted_device_template_list)
 
-        assert deleted_dev_temp_count == start_dev_temp_count
+        # if template existed before this run then a successfull deletion reduces the number of templates
+        assert (
+            deleted_dev_temp_count == start_dev_temp_count
+            or deleted_dev_temp_count == (start_dev_temp_count - 1)
+        )
 
         if (
             next(
@@ -309,12 +306,10 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         result = self.cmd(command, api_version=self._api_version)
 
         self._delete_device(device_id=device_id, api_version=self._api_version)
-        try:
-            self._delete_device_template(
-                template_id=template_id, api_version=self._api_version
-            )
-        except:
-            pass
+
+        self._delete_device_template(
+            template_id=template_id, api_version=self._api_version
+        )
 
         json_result = result.get_output_in_json()
 
@@ -472,12 +467,10 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
 
         # Cleanup
         self._delete_device(device_id=device_id, api_version=self._api_version)
-        try:
-            self._delete_device_template(
-                template_id=template_id, api_version=self._api_version
-            )
-        except:
-            pass
+
+        self._delete_device_template(
+            template_id=template_id, api_version=self._api_version
+        )
 
         assert len(hubIdentifierOriginal) > 0
         assert len(hubIdentifierFailOver) > 0
