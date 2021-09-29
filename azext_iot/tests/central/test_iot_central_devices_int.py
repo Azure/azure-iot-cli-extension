@@ -204,6 +204,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         ).get_output_in_json()
 
         start_dev_temp_count = len(start_device_template_list)
+
         (template_id, template_name) = self._create_device_template(
             api_version=self._api_version
         )
@@ -249,8 +250,6 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
             template_id=template_id, api_version=self._api_version
         )
 
-        # template can't be deleted if any device exists for it. Assert accordingly
-
         deleted_device_template_list = self.cmd(
             "iot central device-template list --app-id {}".format(APP_ID),
             api_version=self._api_version,
@@ -258,7 +257,11 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
 
         deleted_dev_temp_count = len(deleted_device_template_list)
 
-        assert deleted_dev_temp_count == start_dev_temp_count
+        # if template existed before this run then a successfull deletion reduces the number of templates
+        assert (
+            deleted_dev_temp_count == start_dev_temp_count
+            or deleted_dev_temp_count == (start_dev_temp_count - 1)
+        )
 
         if (
             next(
@@ -288,7 +291,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
     def test_central_device_groups_list(self):
         result = self._list_device_groups()
         # assert object is empty or populated but not null
-        assert result is not None and (result == {} or bool(result) is True)
+        assert result is not None and (result == [] or bool(result) is True)
 
     def test_central_device_registration_info_registered(self):
         (template_id, _) = self._create_device_template(api_version=self._api_version)
@@ -303,6 +306,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         result = self.cmd(command, api_version=self._api_version)
 
         self._delete_device(device_id=device_id, api_version=self._api_version)
+
         self._delete_device_template(
             template_id=template_id, api_version=self._api_version
         )
@@ -463,6 +467,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
 
         # Cleanup
         self._delete_device(device_id=device_id, api_version=self._api_version)
+
         self._delete_device_template(
             template_id=template_id, api_version=self._api_version
         )

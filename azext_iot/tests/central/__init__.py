@@ -235,6 +235,26 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 return
             except Exception as e:
                 error = e
+                # delete associated devices if any.
+                command = "iot central device list --app-id {}".format(APP_ID)
+                devices = self.cmd(
+                    command, api_version=api_version
+                ).get_output_in_json()
+
+                if devices:
+                    for device in devices:
+                        device_template = device[
+                            "instanceOf"
+                            if api_version == ApiVersion.preview.value
+                            else "template"
+                        ]
+                        if device_template == template_id:
+                            self.cmd(
+                                "iot central device delete --app-id {} --device-id {}".format(
+                                    APP_ID, device["id"]
+                                ),
+                                api_version=api_version,
+                            )
                 time.sleep(10)
 
         raise CLIError(
