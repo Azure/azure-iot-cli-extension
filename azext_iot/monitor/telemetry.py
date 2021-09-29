@@ -65,9 +65,8 @@ def start_multiple_monitors(
     loop = get_loop()
 
     # TODO: Remove direct usage of loop arguments by Python 3.10
-    future = asyncio.gather(
-        *coroutines, loop=loop, return_exceptions=True
-    )  # pylint: disable=deprecated-argument
+    # pylint: disable=deprecated-argument
+    future = asyncio.gather(*coroutines, loop=loop, return_exceptions=True)
     result = None
 
     try:
@@ -77,9 +76,11 @@ def start_multiple_monitors(
     except KeyboardInterrupt:
         print("Stopping event monitor...", flush=True)
         try:
+            # TODO: remove when deprecating
+            # pylint: disable=no-member
             tasks = (
                 asyncio.Task.all_tasks()
-                if sys.version_info < (3, 9)  # TODO: remove when deprecating
+                if sys.version_info < (3, 9)
                 else asyncio.all_tasks()
             )
             for t in tasks:  # pylint: disable=no-member
