@@ -3,6 +3,9 @@ pr: none
 trigger: none
 
 parameters:
+- name: variableGroup
+  type: string
+  default: 'aziotcli_test_primary'
 - name: vmImage
   type: string
   default: 'ubuntu-18.04'
@@ -33,7 +36,7 @@ parameters:
   default: true
 
 variables:
-  - group: aziotcli_test_primary
+  - group: ${{ parameters.variableGroup }}
 
 stages:
   - stage: 'build'
