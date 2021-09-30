@@ -96,7 +96,6 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
                 MOCK_RESOURCE_TAGS,
             )
         ).get_output_in_json()
-        self.track_instance(create_output)
 
         assert_common_resource_attributes(
             create_output,
@@ -130,12 +129,11 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         )
 
         # No location specified. Use the resource group location.
-        create_msi_output = self.cmd(
+        self.cmd(
             "dt create -n {} -g {} --assign-identity --scopes {}".format(
                 instance_names[1], self.rg, " ".join(scope_ids)
             )
         ).get_output_in_json()
-        self.track_instance(create_msi_output)
 
         # wait for identity assignment
         sleep(60)
