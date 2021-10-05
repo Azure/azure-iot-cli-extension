@@ -7,7 +7,7 @@
             "_justification": "Client device simulation requires a SAS key extracted from IoT Hub to be passed in MQTT lib."
         },
         {
-            "file": "azext_iot\\tests\\iothub\\test_iothub_discovery_unit.py",
+            "file": "azext_iot\\tests\\iothub\\core\\test_iothub_discovery_unit.py",
             "placeholder": "SharedAccessKey=AB+c/+5nm2XpDXcffhnGhnxz/TVF4m5ag7AuVIGwchj=",
             "_justification": "Completely made up IoT Hub policy key for unit test."
         },
@@ -29,7 +29,7 @@
             "_justification": "Completely made up keys for unit tests."
         },
         {
-            "file": "azext_iot\\tests\\iothub\\test_iot_ext_unit.py",
+            "file": "azext_iot\\tests\\iothub\\core\\test_iot_ext_unit.py",
             "placeholder": "+XLy+MVZ+aTeOnVzN2kLeB16O+kSxmz6g3rS6fAf6rw=",
             "_justification": "Ensure made up policy key generates the proper SAS token."
         }

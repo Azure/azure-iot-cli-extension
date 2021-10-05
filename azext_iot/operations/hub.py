@@ -10,7 +10,6 @@ from knack.log import get_logger
 from knack.util import CLIError
 from enum import Enum, EnumMeta
 from azext_iot.constants import (
-    EXTENSION_ROOT,
     DEVICE_DEVICESCOPE_PREFIX,
     TRACING_PROPERTY,
     TRACING_ALLOWED_FOR_LOCATION,
@@ -29,12 +28,12 @@ from azext_iot.common.shared import (
     IoTHubStateType,
     DeviceAuthApiType,
     ConnectionStringParser,
+    EntityStatusType
 )
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
     read_file_content,
     validate_key_value_pairs,
-    url_encode_dict,
     unpack_msrest_error,
     init_monitoring,
     process_json_arg,
@@ -43,13 +42,13 @@ from azext_iot.common.utility import (
 )
 from azext_iot._factory import SdkResolver, CloudError
 from azext_iot.operations.generic import _execute_query, _process_top
-
+import pprint
 
 logger = get_logger(__name__)
+printer = pprint.PrettyPrinter(indent=2)
 
 
 # Query
-
 
 def iot_query(
     cmd,
@@ -149,10 +148,12 @@ def iot_device_create(
     device_id,
     hub_name=None,
     edge_enabled=False,
-    auth_method="shared_private_key",
+    auth_method=DeviceAuthType.shared_private_key.value,
+    primary_key=None,
+    secondary_key=None,
     primary_thumbprint=None,
     secondary_thumbprint=None,
-    status="enabled",
+    status=EntityStatusType.enabled.value,
     status_reason=None,
     valid_days=None,
     output_dir=None,
@@ -187,8 +188,8 @@ def iot_device_create(
             device_id,
             auth_method,
             edge_enabled,
-            primary_thumbprint,
-            secondary_thumbprint,
+            primary_thumbprint if auth_method == DeviceAuthType.x509_thumbprint.value else primary_key,
+            secondary_thumbprint if auth_method == DeviceAuthType.x509_thumbprint.value else secondary_key,
             status,
             status_reason,
         )
@@ -197,6 +198,8 @@ def iot_device_create(
         )
     except CloudError as e:
         raise CLIError(unpack_msrest_error(e))
+    except ValueError as ve:
+        raise CLIError(ve)
 
     return output
 
@@ -208,7 +211,7 @@ def _assemble_device(
     edge_enabled,
     pk=None,
     sk=None,
-    status="enabled",
+    status=EntityStatusType.enabled.value,
     status_reason=None,
     device_scope=None,
 ):
@@ -263,6 +266,9 @@ def _assemble_auth(auth_method, pk, sk):
         DeviceAuthType.shared_private_key.name,
         DeviceAuthApiType.sas.value,
     ]:
+        if any([pk, sk]) and not all([pk, sk]):
+            raise ValueError("When configuring symmetric key auth both primary and secondary keys are required.")
+
         auth = AuthenticationMechanism(
             symmetric_key=SymmetricKey(primary_key=pk, secondary_key=sk),
             type=DeviceAuthApiType.sas.value,
@@ -272,7 +278,7 @@ def _assemble_auth(auth_method, pk, sk):
         DeviceAuthApiType.selfSigned.value,
     ]:
         if not pk:
-            raise ValueError("primary thumbprint required with selfSigned auth")
+            raise ValueError("When configuring selfSigned auth the primary thumbprint is required.")
         auth = AuthenticationMechanism(
             x509_thumbprint=X509Thumbprint(
                 primary_thumbprint=pk, secondary_thumbprint=sk
@@ -778,7 +784,9 @@ def iot_device_module_create(
     device_id,
     module_id,
     hub_name=None,
-    auth_method="shared_private_key",
+    auth_method=DeviceAuthType.shared_private_key.value,
+    primary_key=None,
+    secondary_key=None,
     primary_thumbprint=None,
     secondary_thumbprint=None,
     valid_days=None,
@@ -814,14 +822,16 @@ def iot_device_module_create(
             device_id=device_id,
             module_id=module_id,
             auth_method=auth_method,
-            pk=primary_thumbprint,
-            sk=secondary_thumbprint,
+            pk=primary_thumbprint if auth_method == DeviceAuthType.x509_thumbprint.value else primary_key,
+            sk=secondary_thumbprint if auth_method == DeviceAuthType.x509_thumbprint.value else secondary_key,
         )
         return service_sdk.modules.create_or_update_identity(
             id=device_id, mid=module_id, module=module
         )
     except CloudError as e:
         raise CLIError(unpack_msrest_error(e))
+    except ValueError as ve:
+        raise CLIError(ve)
 
 
 def _assemble_module(device_id, module_id, auth_method, pk=None, sk=None):
@@ -1759,8 +1769,6 @@ def iot_device_twin_update(
     etag=None,
     auth_type_dataplane=None,
 ):
-    from azext_iot.common.utility import verify_transform
-
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         hub_name=hub_name,
@@ -1768,6 +1776,17 @@ def iot_device_twin_update(
         login=login,
         auth_type=auth_type_dataplane,
     )
+    return _iot_device_twin_update(target, device_id, parameters, etag)
+
+
+def _iot_device_twin_update(
+    target,
+    device_id,
+    parameters,
+    etag=None,
+):
+    from azext_iot.common.utility import verify_transform
+
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
@@ -2205,75 +2224,25 @@ def iot_device_send_message(
     properties=None,
     msg_count=1,
     resource_group_name=None,
-    login=None,
-    qos=1,
+    login=None
 ):
+    from azext_iot.operations._mqtt import mqtt_client
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
-    return _iot_device_send_message(
-        target=target,
-        device_id=device_id,
-        data=data,
-        properties=properties,
-        msg_count=msg_count,
-        qos=qos,
-    )
-
-
-def _iot_device_send_message(
-    target, device_id, data, properties=None, msg_count=1, qos=1
-):
-    from azext_iot.operations._mqtt import build_mqtt_device_username
-    from paho.mqtt import publish
-    from paho.mqtt import client as mqtt
-    import ssl
-    import os
-
-    device = _iot_device_show(target, device_id)
-    if (
-        device
-        and device.get("authentication", {}).get("type", "")
-        != DeviceAuthApiType.sas.value
-    ):
-        raise CLIError(
-            "D2C send message command only supports symmetric key auth (SAS) based devices"
-        )
-
-    msgs = []
     if properties:
         properties = validate_key_value_pairs(properties)
-
-    sas = SasTokenAuthentication(
-        target["entity"], target["policy"], target["primarykey"], 360
-    ).generate_sas_token()
-    cwd = EXTENSION_ROOT
-    cert_path = os.path.join(cwd, "digicert.pem")
-    auth = {
-        "username": build_mqtt_device_username(target["entity"], device_id),
-        "password": sas,
-    }
-
-    tls = {"ca_certs": cert_path, "tls_version": ssl.PROTOCOL_SSLv23}
-    topic = "devices/{}/messages/events/{}".format(
-        device_id, url_encode_dict(properties) if properties else ""
+    device = _iot_device_show(target, device_id)
+    device_connection_string = _build_device_or_module_connection_string(device, KeyType.primary.value)
+    client_mqtt = mqtt_client(
+        target=target,
+        device_conn_string=device_connection_string,
+        device_id=device_id
     )
     for _ in range(msg_count):
-        msgs.append({"topic": topic, "payload": data, "qos": int(qos)})
-    try:
-        publish.multiple(
-            msgs,
-            client_id=device_id,
-            hostname=target["entity"],
-            auth=auth,
-            port=8883,
-            protocol=mqtt.MQTTv311,
-            tls=tls,
-        )
-        return
-    except Exception as x:
-        raise CLIError(x)
+        client_mqtt.send_d2c_message(message_text=data, properties=properties)
+    client_mqtt.shutdown()
 
 
 def iot_device_send_message_http(
@@ -2573,13 +2542,17 @@ def iot_simulate_device(
     properties=None,
     resource_group_name=None,
     login=None,
+    method_response_code=None,
+    method_response_payload=None,
+    init_reported_properties=None
 ):
     import sys
     import uuid
     import datetime
     import json
-    from azext_iot.operations._mqtt import mqtt_client_wrap
-    from azext_iot.common.utility import execute_onthread
+    from azext_iot.operations._mqtt import mqtt_client
+    from threading import Event, Thread
+    from tqdm import tqdm
     from azext_iot.constants import (
         MIN_SIM_MSG_INTERVAL,
         MIN_SIM_MSG_COUNT,
@@ -2597,6 +2570,14 @@ def iot_simulate_device(
     if msg_count < MIN_SIM_MSG_COUNT:
         raise CLIError("msg count must be at least {}".format(MIN_SIM_MSG_COUNT))
 
+    if protocol_type != ProtocolType.mqtt.name:
+        if method_response_code:
+            raise CLIError("'method-response-code' not supported, {} doesn't allow direct methods.".format(protocol_type))
+        if method_response_payload:
+            raise CLIError("'method-response-payload' not supported, {} doesn't allow direct methods.".format(protocol_type))
+        if init_reported_properties:
+            raise CLIError("'init-reported-properties' not supported, {} doesn't allow setting twin props".format(protocol_type))
+
     properties_to_send = _iot_simulate_get_default_properties(protocol_type)
     user_properties = validate_key_value_pairs(properties) or {}
     properties_to_send.update(user_properties)
@@ -2605,7 +2586,16 @@ def iot_simulate_device(
     target = discovery.get_target(
         hub_name=hub_name, resource_group_name=resource_group_name, login=login
     )
-    token = None
+
+    if method_response_payload:
+        method_response_payload = process_json_arg(
+            method_response_payload, argument_name="method-response-payload"
+        )
+
+    if init_reported_properties:
+        init_reported_properties = process_json_arg(
+            init_reported_properties, argument_name="init-reported-properties"
+        )
 
     class generator(object):
         def __init__(self):
@@ -2620,41 +2610,36 @@ def iot_simulate_device(
             }
             return json.dumps(payload) if jsonify else payload
 
-    def http_wrap(target, device_id, generator):
-        d = generator.generate(False)
-        _iot_device_send_message_http(target, device_id, d, headers=properties_to_send)
-        print(".", end="", flush=True)
+    cancellation_token = Event()
 
+    def http_wrap(target, device_id, generator, msg_interval, msg_count):
+        for _ in tqdm(range(0, msg_count), desc='Sending and receiving events via https', ascii=' #'):
+            d = generator.generate(False)
+            _iot_device_send_message_http(target, device_id, d, headers=properties_to_send)
+            if cancellation_token.wait(msg_interval):
+                break
     try:
         if protocol_type == ProtocolType.mqtt.name:
-
             device = _iot_device_show(target, device_id)
-            if (
-                device
-                and device.get("authentication", {}).get("type", "")
-                != DeviceAuthApiType.sas.value
-            ):
-                raise CLIError(
-                    "MQTT simulation is only supported for symmetric key auth (SAS) based devices"
-                )
+            device_connection_string = _build_device_or_module_connection_string(device, KeyType.primary.value)
 
-            wrap = mqtt_client_wrap(
+            if device and device.get("authentication", {}).get("type", "") != DeviceAuthApiType.sas.value:
+                raise CLIError('MQTT simulation is only supported for symmetric key auth (SAS) based devices')
+
+            client_mqtt = mqtt_client(
                 target=target,
+                device_conn_string=device_connection_string,
                 device_id=device_id,
-                properties=properties_to_send,
-                sas_duration=(msg_count * msg_interval)
-                + 60,  # int type is enforced for msg_count and msg_interval
+                method_response_code=method_response_code,
+                method_response_payload=method_response_payload,
+                init_reported_properties=init_reported_properties
             )
-            wrap.execute(generator(), publish_delay=msg_interval, msg_count=msg_count)
+            client_mqtt.execute(data=generator(), properties=properties_to_send, publish_delay=msg_interval, msg_count=msg_count)
+            client_mqtt.shutdown()
         else:
-            print("Sending and receiving events via https")
-            token, op = execute_onthread(
-                method=http_wrap,
-                args=[target, device_id, generator()],
-                interval=msg_interval,
-                max_runs=msg_count,
-                return_handle=True,
-            )
+            op = Thread(target=http_wrap, args=(target, device_id, generator(), msg_interval, msg_count))
+            op.start()
+
             while op.is_alive():
                 _handle_c2d_msg(target, device_id, receive_settle)
                 sleep(SIM_RECEIVE_SLEEP_SEC)
@@ -2664,8 +2649,8 @@ def iot_simulate_device(
     except Exception as x:
         raise CLIError(x)
     finally:
-        if token:
-            token.set()
+        if cancellation_token:
+            cancellation_token.set()
 
 
 def iot_c2d_message_purge(
@@ -2703,16 +2688,16 @@ def _handle_c2d_msg(target, device_id, receive_settle, lock_timeout=60):
     result = _iot_c2d_message_receive(target, device_id, lock_timeout)
     if result:
         print()
-        print("__Received C2D Message__")
-        print(result)
+        print("C2D Message Handler [Received C2D message]:")
+        printer.pprint(result)
         if receive_settle == "reject":
-            print("__Rejecting message__")
+            print("C2D Message Handler [Rejecting message]")
             _iot_c2d_message_reject(target, device_id, result["etag"])
         elif receive_settle == "abandon":
-            print("__Abandoning message__")
+            print("C2D Message Handler [Abandoning message]")
             _iot_c2d_message_abandon(target, device_id, result["etag"])
         else:
-            print("__Completing message__")
+            print("C2D Message Handler [Completing message]")
             _iot_c2d_message_complete(target, device_id, result["etag"])
         return True
     return False

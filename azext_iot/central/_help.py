@@ -36,6 +36,11 @@ def load_central_help():
     _load_central_users_help()
     _load_central_api_token_help()
     _load_central_device_templates_help()
+    _load_central_device_groups_help()
+    _load_central_roles_help()
+    _load_central_file_upload_configuration_help()
+    _load_central_organizations_help()
+    _load_central_jobs_help()
     _load_central_monitors_help()
     _load_central_command_help()
     _load_central_compute_device_key()
@@ -47,6 +52,18 @@ def _load_central_devices_help():
     ] = """
         type: group
         short-summary: Manage and configure IoT Central devices
+    """
+
+    helps[
+        "iot central device list"
+    ] = """
+        type: command
+        short-summary: Get the list of devices for an IoT Central application.
+        examples:
+        - name: List all devices in an application, sorted by device Id (default)
+          text: >
+            az iot central device list
+            --app-id {appid}
     """
 
     helps[
@@ -292,7 +309,7 @@ def _load_central_users_help():
         "iot central user list"
     ] = """
     type: command
-    short-summary: Get list of users in an application
+    short-summary: Get list of users for an IoT Central application
     examples:
       - name: List of users
         text: >
@@ -357,7 +374,7 @@ def _load_central_api_token_help():
         "iot central api-token list"
     ] = """
     type: command
-    short-summary: List all API tokens associated with your IoT Central application.
+    short-summary: Get the list of API tokens associated with your IoT Central application.
     long-summary: Information in the list contains basic information about the tokens in the application and does not include token values.
     examples:
       - name: List of API tokens
@@ -374,6 +391,18 @@ def _load_central_device_templates_help():
     ] = """
         type: group
         short-summary: Manage and configure IoT Central device templates
+    """
+
+    helps[
+        "iot central device-template list"
+    ] = """
+        type: command
+        short-summary: Get the list of device templates for an IoT Central application.
+        examples:
+        - name: List all device templates in an application, sorted by template Id (default)
+          text: >
+            az iot central device-template list
+            --app-id {appid}
     """
 
     helps[
@@ -426,6 +455,305 @@ def _load_central_device_templates_help():
             az iot central device-template delete
             --app-id {appid}
             --device-template-id {devicetemplateid}
+    """
+
+
+def _load_central_device_groups_help():
+    helps[
+        "iot central device-group"
+    ] = """
+        type: group
+        short-summary: Manage and configure IoT Central device groups
+    """
+
+    helps[
+        "iot central device-group list"
+    ] = """
+        type: command
+        short-summary: Get the list of device groups for an IoT Central application.
+
+        examples:
+        - name: List device groups in an application
+          text: >
+            az iot central device-group list
+            --app-id {appid}
+    """
+
+
+def _load_central_file_upload_configuration_help():
+    helps[
+        "iot central file-upload-config"
+    ] = """
+          type: group
+          short-summary: Manage and configure IoT Central file upload
+      """
+
+    helps[
+        "iot central file-upload-config show"
+    ] = """
+    type: command
+    short-summary: Get the details of file upload storage account configuration
+    examples:
+      - name: Get details of file upload configuration
+        text: >
+          az iot central file-upload-config show
+          --app-id {appid}
+    """
+
+    helps[
+        "iot central file-upload-config delete"
+    ] = """
+    type: command
+    short-summary: Delete file upload storage account configuration
+    examples:
+      - name: Delete file upload
+        text: >
+          az iot central file-upload-config delete
+          --app-id {appid}
+    """
+
+    helps[
+        "iot central file-upload-config create"
+    ] = """
+    type: command
+    short-summary: Create file upload storage account configuration
+    examples:
+      - name: Create file upload
+        text: >
+          az iot central file-upload-config create
+          --app-id {appid}
+          --connection-string {conn_string}
+          --container {container}
+    """
+
+
+def _load_central_roles_help():
+    helps[
+        "iot central role"
+    ] = """
+        type: group
+        short-summary: Manage and configure roles for an IoT Central application.
+    """
+
+    helps[
+        "iot central role list"
+    ] = """
+        type: command
+        short-summary: Get the list of roles for an IoT Central application.
+
+        examples:
+        - name: List roles in an application
+          text: >
+            az iot central role list
+            --app-id {appid}
+    """
+
+    helps[
+        "iot central role show"
+    ] = """
+    type: command
+    short-summary: Get the details of a role by ID.
+    examples:
+      - name: Get details of role
+        text: >
+          az iot central role show
+          --app-id {appid}
+          --role-id {roleId}
+    """
+
+
+def _load_central_organizations_help():
+    helps[
+        "iot central organization"
+    ] = """
+        type: group
+        short-summary: Manage and configure organizations for an IoT Central application.
+    """
+
+    helps[
+        "iot central organization list"
+    ] = """
+        type: command
+        short-summary: Get the list of organizations for an IoT Central application.
+
+        examples:
+        - name: List organizations in an application
+          text: >
+            az iot central organization list
+            --app-id {appid}
+    """
+
+    helps[
+        "iot central organization show"
+    ] = """
+    type: command
+    short-summary: Get the details of a organization by ID.
+    examples:
+      - name: Get details of organization
+        text: >
+          az iot central organization show
+          --app-id {appid}
+          --org-id {organizationId}
+    """
+
+    helps[
+        "iot central organization delete"
+    ] = """
+    type: command
+    short-summary: Delete an organization by ID.
+    examples:
+      - name: Delete an organization
+        text: >
+          az iot central organization delete
+          --app-id {appid}
+          --org-id {organizationId}
+    """
+
+    helps[
+        "iot central organization create"
+    ] = """
+    type: command
+    short-summary: Create an organization in the application.
+    examples:
+      - name: Create an organization
+        text: >
+          az iot central organization create
+          --app-id {appid}
+          --org-id {organizationId}
+
+      - name: Create an organization, child of a parent one in the application.
+        text: >
+          az iot central organization create
+          --app-id {appid}
+          --org-id {organizationId}
+          --parent-id {parentId}
+        """
+
+
+def _load_central_jobs_help():
+    helps[
+        "iot central job"
+    ] = """
+        type: group
+        short-summary: Manage and configure jobs for an IoT Central application.
+    """
+
+    helps[
+        "iot central job list"
+    ] = """
+        type: command
+        short-summary: Get the list of jobs for an IoT Central application.
+
+        examples:
+        - name: List jobs in an application
+          text: >
+            az iot central job list
+            --app-id {appid}
+    """
+
+    helps[
+        "iot central job create"
+    ] = """
+    type: command
+    short-summary: Create and execute a job via its job definition.
+    examples:
+      - name: Create a job with name
+        text: >
+          az iot central job create
+          --app-id {appid}
+          --job-id {jobId}
+          --group-id {groupId}
+          --job-name {jobName}
+          --content {creationJSONPath}
+
+      - name: Create a job with name and batch configuration.
+        text: >
+          az iot central job create
+          --app-id {appid}
+          --job-id {jobId}
+          --group-id {groupId}
+          --job-name {jobName}
+          --content {creationJSONPath}
+          --batch {jobBatchValue}
+          --batch-type {jobBatchType}
+
+      - name: Create a job with name and cancellation threshold configuration with no batch.
+        text: >
+          az iot central job create
+          --app-id {appid}
+          --job-id {jobId}
+          --group-id {groupId}
+          --job-name {jobName}
+          --content {creationJSONPath}
+          --cancellation-threshold {jobCancellationThresholdValue}
+          --cancellation-threshold-type {jobCancellationThresholdType}
+          --description {jobDesc}
+    """
+
+    helps[
+        "iot central job show"
+    ] = """
+    type: command
+    short-summary: Get the details of a job by ID.
+    examples:
+      - name: Get details of job
+        text: >
+          az iot central job show
+          --app-id {appid}
+          --job-id {jobId}
+    """
+
+    helps[
+        "iot central job stop"
+    ] = """
+    type: command
+    short-summary: Stop a running job.
+    examples:
+      - name: Stop a job
+        text: >
+          az iot central job stop
+          --app-id {appid}
+          --job-id {jobId}
+    """
+
+    helps[
+        "iot central job resume"
+    ] = """
+    type: command
+    short-summary: Resume a stopped job.
+    examples:
+      - name: Resume a job
+        text: >
+          az iot central job resume
+          --app-id {appid}
+          --job-id {jobId}
+    """
+
+    helps[
+        "iot central job rerun"
+    ] = """
+    type: command
+    short-summary: Re-run a job on all failed devices.
+    examples:
+      - name: Rerun a job
+        text: >
+          az iot central job rerun
+          --app-id {appid}
+          --job-id {jobId}
+          --rerun-id {rerunId}
+    """
+
+    helps[
+        "iot central job get-devices"
+    ] = """
+    type: command
+    short-summary: Get job device statuses.
+    examples:
+      - name: Get the list of individual device statuses by job ID
+        text: >
+          az iot central job get-devices
+          --app-id {appid}
+          --job-id {jobId}
     """
 
 

@@ -74,18 +74,6 @@ children_list_prop_type = CLIArgumentType(
     help="Child device list (space separated).",
 )
 
-# There is a bug in CLI core preventing treating --qos as an integer.
-# Until its resolved, ensure casting of value to integer
-# TODO: azure.cli.core.parser line 180 difflib.get_close_matches
-qos_type = CLIArgumentType(
-    options_list=["--qos"],
-    type=str,
-    nargs="?",
-    choices=["0", "1"],
-    help="Quality of Service. 0 = At most once, 1 = At least once. 2 (Exactly once) is not supported."
-    "This command parameter has been deprecated and will be removed in the next release."
-)
-
 event_timeout_type = CLIArgumentType(
     options_list=["--timeout", "--to", "-t"],
     type=int,
@@ -181,7 +169,7 @@ def load_arguments(self, _):
             "auth_method",
             options_list=["--auth-method", "--am"],
             arg_type=get_enum_type(DeviceAuthType),
-            help="The authorization type an entity is to be created with.",
+            help="The authorization method an entity is to be created with.",
         )
         context.argument(
             "metric_type",
@@ -259,14 +247,25 @@ def load_arguments(self, _):
             "primary_thumbprint",
             arg_group="X.509",
             options_list=["--primary-thumbprint", "--ptp"],
-            help="Explicit self-signed certificate thumbprint to use for primary key.",
+            help="Self-signed certificate thumbprint to use for the primary thumbprint.",
         )
         context.argument(
             "secondary_thumbprint",
             arg_group="X.509",
             options_list=["--secondary-thumbprint", "--stp"],
-            help="Explicit self-signed certificate thumbprint to "
-            "use for secondary key.",
+            help="Self-signed certificate thumbprint to use for the secondary thumbprint.",
+        )
+        context.argument(
+            "primary_key",
+            options_list=["--primary-key", "--pk"],
+            help="The primary symmetric shared access key stored in base64 format.",
+            arg_group="Symmetric Key",
+        )
+        context.argument(
+            "secondary_key",
+            options_list=["--secondary-key", "--sk"],
+            help="The secondary symmetric shared access key stored in base64 format.",
+            arg_group="Symmetric Key",
         )
         context.argument(
             "valid_days",
@@ -405,18 +404,6 @@ def load_arguments(self, _):
             "status_reason",
             options_list=["--status-reason", "--star"],
             help="Description for device status.",
-        )
-
-    with self.argument_context("iot hub device-identity update") as context:
-        context.argument(
-            "primary_key",
-            options_list=["--primary-key", "--pk"],
-            help="The primary symmetric shared access key stored in base64 format.",
-        )
-        context.argument(
-            "secondary_key",
-            options_list=["--secondary-key", "--sk"],
-            help="The secondary symmetric shared access key stored in base64 format.",
         )
 
     with self.argument_context("iot hub device-identity renew-key") as context:
@@ -597,13 +584,30 @@ def load_arguments(self, _):
             arg_type=get_enum_type(ProtocolType),
             help="Indicates device-to-cloud message protocol",
         )
-        context.argument("qos", arg_type=qos_type, deprecate_info=context.deprecate())
 
     with self.argument_context("iot device simulate") as context:
         context.argument(
             "properties",
             options_list=["--properties", "--props", "-p"],
             help=info_param_properties_device(include_http=True),
+        )
+        context.argument(
+            "method_response_code",
+            type=int,
+            options_list=["--method-response-code", "--mrc"],
+            help="Status code to be returned when direct method is executed on device. Optional param, only supported for mqtt.",
+        )
+        context.argument(
+            "method_response_payload",
+            options_list=["--method-response-payload", "--mrp"],
+            help="Payload to be returned when direct method is executed on device. Provide file path or raw json. "
+            "Optional param, only supported for mqtt.",
+        )
+        context.argument(
+            "init_reported_properties",
+            options_list=["--init-reported-properties", "--irp"],
+            help="Initial state of twin reported properties for the target device when the simulator is run. "
+            "Optional param, only supported for mqtt.",
         )
 
     with self.argument_context("iot device c2d-message") as context:

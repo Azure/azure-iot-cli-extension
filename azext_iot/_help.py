@@ -141,6 +141,9 @@ helps[
 ] = """
     type: command
     short-summary: Create a device in an IoT Hub.
+    long-summary: |
+                  When using the auth method of shared_private_key (also known as symmetric keys),
+                  if no custom keys are provided the service will generate them for the device.
     examples:
     - name: Create an edge enabled IoT device with default authorization (shared private key).
       text: >
@@ -441,6 +444,9 @@ helps[
 ] = """
     type: command
     short-summary: Create a module on a target IoT device in an IoT Hub.
+    long-summary: |
+                  When using the auth method of shared_private_key (also known as symmetric keys),
+                  if no custom keys are provided the service will generate them for the module.
 """
 
 helps[
@@ -878,19 +884,29 @@ helps[
                    While the device simulation is running, the device will automatically receive
                    and acknowledge cloud-to-device (c2d) messages. For mqtt simulation, all c2d messages will
                    be acknowledged with completion. For http simulation c2d acknowledgement is based on user
-                   selection which can be complete, reject or abandon. Additionally, mqtt simulation is only
-                   supported for symmetric key auth (SAS) based devices
+                   selection which can be complete, reject or abandon. The mqtt simulation also supports direct
+                   method invocation which can be acknowledged by a response status code and response payload.
+
+                   Note: MQTT simulation is only supported for symmetric key auth (SAS) based devices.
 
                    Note: The command by default will set content-type to application/json and content-encoding
                    to utf-8. This can be overriden.
     examples:
     - name: Basic usage (mqtt)
       text: az iot device simulate -n {iothub_name} -d {device_id}
-    - name: Basic usage (mqtt) with sending mixed properties
+    - name: Send mixed properties (mqtt)
       text: az iot device simulate -n {iothub_name} -d {device_id} --properties "myprop=myvalue;$.ct=application/json"
+    - name: Send direct method response status code and direct method response payload as raw json (mqtt only)
+      text: az iot device simulate -n {iothub_name} -d {device_id} --method-response-code 201 --method-response-payload '{"result":"Direct method successful"}'
+    - name: Send direct method response status code and direct method response payload as path to local file (mqtt only)
+      text: az iot device simulate -n {iothub_name} -d {device_id} --method-response-code 201 --method-response-payload '../my_direct_method_payload.json'
+    - name: Send the initial state of device twin reported properties as raw json for the target device (mqtt only)
+      text: az iot device simulate -n {iothub_name} -d {device_id} --init-reported-properties '{"reported_prop_1":"val_1", "reported_prop_2":val_2}'
+    - name: Send the initial state of device twin reported properties as path to local file for the target device (mqtt only)
+      text: az iot device simulate -n {iothub_name} -d {device_id} --init-reported-properties '../my_device_twin_reported_properties.json'
     - name: Basic usage (http)
       text: az iot device simulate -n {iothub_name} -d {device_id} --protocol http
-    - name: Basic usage (http) with sending mixed properties
+    - name: Send mixed properties (http)
       text: az iot device simulate -n {iothub_name} -d {device_id} --protocol http --properties
             "iothub-app-myprop=myvalue;content-type=application/json;iothub-correlationid=12345"
     - name: Choose total message count and interval between messages

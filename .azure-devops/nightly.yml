@@ -1,14 +1,47 @@
-# Run nightly at midnight.
+# Run nightly at midnight (Pacific).
 schedules:
-- cron: "0 0 * * *"
+- cron: "0 7 * * *"
   displayName: Nightly Integration Build
   branches:
     include:
     - dev
 
+parameters:
+- name: vmImage
+  type: string
+  default: 'ubuntu-18.04'
+  values:
+  - 'ubuntu-18.04'
+  - 'ubuntu-latest'
+- name: pythonVersion
+  type: string
+  default: '3.8.x'
+  values:
+  - '3.6.x'
+  - '3.8.x'
+  - '3.9.x'
+- name: architecture
+  type: string
+  default: 'x64'
+- name: 'testCentral'
+  type: boolean
+  default: true
+- name: 'testADT'
+  type: boolean
+  default: true
+- name: 'testDPS'
+  type: boolean
+  default: true
+- name: 'testHub'
+  type: boolean
+  default: true
+
 variables:
-  pythonVersion: '3.6.x'
-  architecture: 'x64'
+  - group: aziotcli_test_nightly
+  - name: pythonVersion
+    value: ${{ parameters.pythonVersion }}
+  - name: architecture
+    value: ${{ parameters.architecture }}
 
 stages:
   - stage: 'build'
@@ -17,7 +50,7 @@ stages:
 
     - job: 'Build_Publish_Azure_IoT_CLI_Extension'
       pool:
-        vmImage: 'Ubuntu-16.04'
+        vmImage: ${{ parameters.vmImage }}
 
       steps:
       - task: UsePythonVersion@0
@@ -31,7 +64,7 @@ stages:
 
     - job: 'Build_Publish_Azure_CLI_Test_SDK'
       pool:
-        vmImage: 'Ubuntu-16.04'
+        vmImage: ${{ parameters.vmImage }}
 
       steps:
       - task: UsePythonVersion@0
@@ -54,29 +87,39 @@ stages:
 
       - template: templates/install-and-record-version.yml
 
-  - stage: 'test'
-    displayName: 'Run all tests'
+  - stage: 'test_min'
+    displayName: 'Run all tests with min CLI'
     pool:
-      vmImage: 'Ubuntu-16.04'
+      vmImage: ${{ parameters.vmImage }}
     dependsOn: build
     jobs:
-    - job: 'azEdge'
-      displayName: 'Test against edge AZ CLI'
-      steps:
-      - template: templates/nightly-tests.yml
-        parameters:
-          azureCLIVersion: 'edge'
-    - job: 'azMin'
-      dependsOn: 'azEdge'
-      displayName: 'Test against minimum supported AZ CLI'
-      steps:
-      - template: templates/nightly-tests.yml
-        parameters:
-          azureCLIVersion: 'min'
+    - template: templates/nightly-tests.yml
+      parameters:
+        azureCLIVersion: min
+        pythonVersion: $(pythonVersion)
+        testADT: ${{ parameters.testADT }}
+        testCentral: ${{ parameters.testCentral }}
+        testDPS: ${{ parameters.testDPS }}
+        testHub: ${{ parameters.testHub }}
+
+  - stage: 'test_msi'
+    displayName: 'Run all tests against Windows MSI install'
+    pool:
+      vmImage: 'vs2017-win2016'
+    dependsOn: test_min
+    jobs:
+    - template: templates/nightly-tests.yml
+      parameters:
+        azureCLIVersion: msi
+        pythonVersion: $(pythonVersion)
+        testADT: ${{ parameters.testADT }}
+        testCentral: ${{ parameters.testCentral }}
+        testDPS: ${{ parameters.testDPS }}
+        testHub: ${{ parameters.testHub }}
           
   - stage: 'kpi'
     displayName: 'Build KPIs'
-    dependsOn: [build, test]
+    dependsOn: [build, test_min, test_msi]
     jobs:
     - job: 'calculateCodeCoverage'
       displayName: 'Calculate distributed code coverage'
@@ -85,4 +128,3 @@ stages:
         parameters:
           pythonVersion: $(pythonVersion)
           architecture: $(architecture)
-

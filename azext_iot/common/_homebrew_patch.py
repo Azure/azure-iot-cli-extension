@@ -39,7 +39,7 @@ class HomebrewPipPatch(object):
         else:
             logger.debug("Homebrew patch: Temporarily creating %s to support extension installation on Homebrew.",
                          HomebrewPipPatch.CFG_FILE)
-            with open(HomebrewPipPatch.CFG_FILE, "w") as f:
+            with open(HomebrewPipPatch.CFG_FILE, "w", encoding="utf-8") as f:
                 f.write("[install]\nprefix=")
             self.our_cfg_file = True
 

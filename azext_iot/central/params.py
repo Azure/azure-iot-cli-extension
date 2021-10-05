@@ -11,7 +11,7 @@ CLI parameter definitions.
 from knack.arguments import CLIArgumentType, CaseInsensitiveList
 from azure.cli.core.commands.parameters import get_three_state_flag
 from azext_iot.monitor.models.enum import Severity
-from azext_iot.central.models.enum import Role, ApiVersion
+from azext_iot.central.models.enum import ApiVersion
 from azext_iot._params import event_msg_prop_type, event_timeout_type
 
 severity_type = CLIArgumentType(
@@ -22,7 +22,6 @@ severity_type = CLIArgumentType(
 
 role_type = CLIArgumentType(
     options_list=["--role", "-r"],
-    choices=CaseInsensitiveList([role.name for role in Role]),
     help="The role that will be associated with this token."
     " You can specify one of the built-in roles, or specify the role ID of a custom role."
     " See more at https://aka.ms/iotcentral-customrolesdocs",
@@ -92,7 +91,8 @@ def load_central_arguments(self, _):
         context.argument(
             "device_template_id",
             options_list=["--device-template-id", "--dtid"],
-            help="Unique ID for the Device template.",
+            help="Digital Twin Model Identifier of the device template."
+            " Learn more at https://aka.ms/iotcentraldtmi.",
         )
 
     with self.argument_context("iot central api-token") as context:
@@ -103,6 +103,12 @@ def load_central_arguments(self, _):
             " Specify an ID that you'll then use when modifying or deleting this token later via the CLI or API.",
         )
         context.argument("role", arg_type=role_type)
+        context.argument(
+            "org_id",
+            options_list=["--organization-id", "--org-id"],
+            help="The ID of the organization for the token role assignment."
+            " Only available for api-version == 1.1-preview",
+        )
 
     with self.argument_context("iot central device compute-device-key") as context:
         context.argument(
@@ -154,9 +160,16 @@ def load_central_arguments(self, _):
         context.argument(
             "device_id",
             options_list=["--device-id", "-d"],
-            help="Provide a unique identifier for the device."
+            help="Unique identifier for the device."
             " A case-sensitive string (up to 128 characters long) of ASCII 7-bit alphanumeric characters plus"
             " certain special characters: - . + % _ # * ? ! ( ) , : = @ $ '",
+        )
+        context.argument(
+            "organizations",
+            options_list=["--organizations", "--orgs"],
+            help="Assign the device to the specified organizations."
+            " Comma separated list of organization ids."
+            " Minimum supported version: 1.1-preview.",
         )
     with self.argument_context("iot central device manual-failover") as context:
         context.argument(
@@ -166,6 +179,17 @@ def load_central_arguments(self, _):
             help="A positive integer. TTL in minutes to move device back to the original hub."
             "Has default value in backend. See documentation on what the latest backend default time to live value"
             "by visiting https://github.com/iot-for-all/iot-central-high-availability-clients#readme",
+        )
+
+    with self.argument_context("iot central device-group") as context:
+        context.argument(
+            "api_version",
+            options_list=["--api-version", "--av"],
+            choices=CaseInsensitiveList(
+                [ApiVersion.preview.value, ApiVersion.v1_1_preview.value]
+            ),
+            default=ApiVersion.v1_1_preview.value,
+            help="The API version for the requested operation.",
         )
 
     with self.argument_context("iot central user") as context:
@@ -213,5 +237,152 @@ def load_central_arguments(self, _):
         context.argument(
             "module_id",
             options_list=["--module-id", "-m"],
-            help="Provide IoT Edge Module ID if the device type is IoT Edge.",
+            help="The IoT Edge Module ID if the device type is IoT Edge.",
+        )
+
+    with self.argument_context("iot central role") as context:
+        context.argument(
+            "role_id",
+            options_list=["--role-id", "-r"],
+            help="Unique identifier for the role",
+        )
+
+    with self.argument_context("iot central file-upload-config") as context:
+        context.argument(
+            "api_version",
+            options_list=["--api-version", "--av"],
+            choices=CaseInsensitiveList([ApiVersion.v1_1_preview.value]),
+            default=ApiVersion.v1_1_preview.value,
+            help="The API version for the requested operation.",
+        )
+
+    with self.argument_context(
+        "iot central file-upload-config create"
+    ) as context:
+        context.argument(
+            "connection_string",
+            options_list=["--connection-string", "-s"],
+            help="The connection string used to configure the storage account",
+        )
+        context.argument(
+            "container",
+            options_list=["--container", "-c"],
+            help="The name of the container inside the storage account",
+        )
+        context.argument(
+            "account",
+            options_list=["--account", "-a"],
+            help="The storage account name where to upload the file to",
+        )
+        context.argument(
+            "sasTtl",
+            options_list=["--sas-ttl"],
+            help="The amount of time the device’s request to upload a file is valid before it expires."
+            " ISO 8601 duration standard. Default 1h.",
+        )
+
+    with self.argument_context("iot central organization") as context:
+        context.argument(
+            "org_id",
+            options_list=["--org-id"],
+            help="Unique identifier for the organization.",
+        )
+        context.argument(
+            "api_version",
+            options_list=["--api-version", "--av"],
+            choices=CaseInsensitiveList([ApiVersion.v1_1_preview.value]),
+            default=ApiVersion.v1_1_preview.value,
+            help="The API version for the requested operation.",
+        )
+
+    with self.argument_context("iot central organization create") as context:
+        context.argument(
+            "parent_org",
+            options_list=["--parent-id"],
+            help="The ID of the parent of the organization.",
+        )
+    with self.argument_context("iot central organization create") as context:
+        context.argument(
+            "org_name",
+            options_list=["--org-name"],
+            help="Display name of the organization.",
+        )
+
+    with self.argument_context("iot central job") as context:
+        context.argument(
+            "job_id",
+            options_list=["--job-id", "-j"],
+            help="Unique identifier for the job.",
+        )
+        context.argument(
+            "api_version",
+            options_list=["--api-version", "--av"],
+            choices=CaseInsensitiveList(
+                [ApiVersion.v1_1_preview.value, ApiVersion.preview.value]
+            ),
+            default=ApiVersion.v1_1_preview.value,
+            help="The API version for the requested operation.",
+        )
+
+    with self.argument_context("iot central job rerun") as context:
+        context.argument(
+            "rerun_id",
+            options_list=["--rerun-id"],
+            help="Unique identifier for the rerun.",
+        )
+
+    with self.argument_context("iot central job create") as context:
+        context.argument(
+            "job_name",
+            options_list=["--job-name"],
+            help="Display name of the job.",
+        )
+        context.argument(
+            "group_id",
+            options_list=["--group-id", "-g"],
+            help="The ID of the device group on which to execute the job",
+        )
+        context.argument(
+            "content",
+            options_list=["--content", "-k"],
+            help="The job data definition. Provide path to JSON file or raw stringified JSON."
+            " [File Path Example:./path/to/file.json]"
+            " [Example of stringified JSON:[{<Job Data JSON>}]. The request body must contain array of JobData.",
+        )
+        context.argument(
+            "batch_type",
+            options_list=["--batch-type", "--bt"],
+            default=False,
+            help="Specify if batching is done on a number of devices or a percentage of the total. Default: False",
+        )
+        context.argument(
+            "batch",
+            type=int,
+            options_list=["--batch", "-b"],
+            help="The number or percentage of devices on which batching is done.",
+        )
+        context.argument(
+            "threshold",
+            type=int,
+            options_list=["--cancellation-threshold", "--cth"],
+            help="The number or percentage of devices on which the cancellation threshold is applied.",
+        )
+        context.argument(
+            "threshold_type",
+            options_list=["--cancellation-threshold-type", "--ctt"],
+            choices=CaseInsensitiveList(["number", "percentage"]),
+            default="number",
+            help="Specify if cancellation threshold applies for a number of devices or a percentage of the total.",
+        )
+        context.argument(
+            "threshold_batch",
+            options_list=["--cancellation-threshold-batch", "--ctb"],
+            default="number",
+            help="Whether the cancellation threshold applies per-batch or to the overall job.",
+        )
+        context.argument(
+            "description",
+            type=str,
+            options_list=["--description", "--desc"],
+            help="Detailed description of the job.",
         )

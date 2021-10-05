@@ -48,11 +48,11 @@ def create_self_signed_certificate(subject, valid_days, cert_output_dir, cert_on
         cert_file = subject + '-cert.pem'
         key_file = subject + '-key.pem'
 
-        with open(join(cert_output_dir, cert_file), "wt") as f:
+        with open(join(cert_output_dir, cert_file), "wt", encoding="utf-8") as f:
             f.write(cert_dump)
 
         if not cert_only:
-            with open(join(cert_output_dir, key_file), "wt") as f:
+            with open(join(cert_output_dir, key_file), "wt", encoding="utf-8") as f:
                 f.write(key_dump)
 
     result = {

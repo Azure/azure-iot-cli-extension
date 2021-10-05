@@ -13,7 +13,9 @@ from knack.log import get_logger
 
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
-from azext_iot.central import models as central_models
+from azext_iot.central.models.preview import DevicePreview
+from azext_iot.central.models.v1 import DeviceV1
+from azext_iot.central.models.v1_1_preview import DeviceV1_1_preview
 from azext_iot.central.models.enum import DeviceStatus, ApiVersion
 from azure.cli.core.util import should_disable_connection_verify
 
@@ -27,9 +29,9 @@ def get_device(
     app_id: str,
     device_id: str,
     token: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
-) -> Union[central_models.DevicePreview, central_models.DeviceV1]:
+) -> Union[DeviceV1_1_preview, DeviceV1, DevicePreview]:
     """
     Get device info given a device id
 
@@ -60,20 +62,21 @@ def get_device(
     )
     result = _utility.try_extract_result(response)
 
-    if api_version == ApiVersion.preview.value:
-        return central_models.DevicePreview(result)
-    else:
-        return central_models.DeviceV1(result)
+    if api_version == ApiVersion.v1.value:
+        return DeviceV1(result)
+    elif api_version == ApiVersion.v1_1_preview.value:
+        return DeviceV1_1_preview(result)
+    return DevicePreview(result)
 
 
 def list_devices(
     cmd,
     app_id: str,
     token: str,
-    max_pages=1,
+    api_version: str,
+    max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
-) -> List[Union[central_models.DevicePreview, central_models.DeviceV1]]:
+) -> List[Union[DeviceV1, DeviceV1_1_preview, DevicePreview]]:
     """
     Get a list of all devices in IoTC app
 
@@ -97,31 +100,43 @@ def list_devices(
     query_parameters = {}
     query_parameters["api-version"] = api_version
 
+    logger.warning(
+        "This command may take a long time to complete if your app contains a lot of devices"
+    )
+
     pages_processed = 0
-    while (pages_processed <= max_pages) and url:
-        response = requests.get(url, headers=headers, params=query_parameters)
+    while (max_pages == 0 or pages_processed < max_pages) and url:
+        response = requests.get(
+            url,
+            headers=headers,
+            params=query_parameters if pages_processed == 0 else None,
+        )
         result = _utility.try_extract_result(response)
 
         if "value" not in result:
             raise CLIError("Value is not present in body: {}".format(result))
 
-        if api_version == ApiVersion.preview.value:
-            devices = devices + [
-                central_models.DevicePreview(device) for device in result["value"]
-            ]
+        if api_version == ApiVersion.v1.value:
+            ctor = DeviceV1
+        elif api_version == ApiVersion.v1_1_preview.value:
+            ctor = DeviceV1_1_preview
         else:
-            devices = devices + [
-                central_models.DeviceV1(device) for device in result["value"]
-            ]
+            ctor = DevicePreview
 
-        url = result.get("nextLink", params=query_parameters)
+        devices.extend([ctor(device) for device in result["value"]])
+
+        url = result.get("nextLink", None)
         pages_processed = pages_processed + 1
 
     return devices
 
 
 def get_device_registration_summary(
-    cmd, app_id: str, token: str, central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd,
+    app_id: str,
+    token: str,
+    api_version: str,
+    central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> dict:
     """
     Get device registration summary for a given app
@@ -140,7 +155,7 @@ def get_device_registration_summary(
     registration_summary = {status.value: 0 for status in DeviceStatus}
 
     url = "https://{}.{}/{}?api-version={}".format(
-        app_id, central_dns_suffix, BASE_PATH, ApiVersion.v1.value
+        app_id, central_dns_suffix, BASE_PATH, api_version
     )
     headers = _utility.get_headers(token, cmd)
 
@@ -157,10 +172,15 @@ def get_device_registration_summary(
         if "value" not in result:
             raise CLIError("Value is not present in body: {}".format(result))
 
+        if api_version == ApiVersion.v1.value:
+            ctor = DeviceV1
+        elif api_version == ApiVersion.v1_1_preview.value:
+            ctor = DeviceV1_1_preview
+        else:
+            ctor = DevicePreview
+
         for device in result["value"]:
-            registration_summary[
-                central_models.DeviceV1(device).device_status.value
-            ] += 1
+            registration_summary[ctor(device).device_status.value] += 1
 
         print("Processed {} devices...".format(sum(registration_summary.values())))
         url = result.get("nextLink")
@@ -175,10 +195,11 @@ def create_device(
     device_name: str,
     template: str,
     simulated: bool,
+    organizations: str,
     token: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
-) -> Union[central_models.DevicePreview, central_models.DeviceV1]:
+) -> Union[DeviceV1, DeviceV1_1_preview, DevicePreview]:
     """
     Create a device in IoTC
 
@@ -208,30 +229,31 @@ def create_device(
     query_parameters = {}
     query_parameters["api-version"] = api_version
 
+    payload = {"displayName": device_name, "simulated": simulated}
+
     if api_version == ApiVersion.preview.value:
-        payload = {
-            "displayName": device_name,
-            "simulated": simulated,
-            "approved": True,
-        }
+        payload["approved"] = True
         if template:
             payload["instanceOf"] = template
     else:
-        payload = {
-            "displayName": device_name,
-            "simulated": simulated,
-            "enabled": True,
-        }
+        payload["enabled"] = True
         if template:
             payload["template"] = template
+
+    if api_version == ApiVersion.v1_1_preview.value:
+        if organizations:
+            payload["organizations"] = organizations.split(",")
 
     response = requests.put(url, headers=headers, json=payload, params=query_parameters)
     result = _utility.try_extract_result(response)
 
-    if api_version == ApiVersion.preview.value:
-        return central_models.DevicePreview(result)
+    if api_version == ApiVersion.v1.value:
+        ctor = DeviceV1
+    elif api_version == ApiVersion.v1_1_preview.value:
+        ctor = DeviceV1_1_preview
     else:
-        return central_models.DeviceV1(result)
+        ctor = DevicePreview
+    return ctor(result)
 
 
 def delete_device(
@@ -239,8 +261,8 @@ def delete_device(
     app_id: str,
     device_id: str,
     token: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
 ) -> dict:
     """
     Delete a device from IoTC
@@ -273,8 +295,8 @@ def get_device_credentials(
     app_id: str,
     device_id: str,
     token: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
 ):
     """
     Get device credentials from IoTC
@@ -310,8 +332,8 @@ def run_command(
     device_id: str,
     command_name: str,
     payload: dict,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
 ):
     """
     Execute a direct method on a device
@@ -358,8 +380,8 @@ def run_component_command(
     interface_id: str,
     command_name: str,
     payload: dict,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
 ):
     """
     Execute a direct method on a device
@@ -405,8 +427,8 @@ def get_command_history(
     token: str,
     device_id: str,
     command_name: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
 ):
     """
     Get command history
@@ -443,8 +465,8 @@ def get_component_command_history(
     device_id: str,
     interface_id: str,
     command_name: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
 ):
     """
     Get component command history
@@ -521,7 +543,11 @@ def run_manual_failover(
 
 
 def run_manual_failback(
-    cmd, app_id: str, device_id: str, token: str, central_dns_suffix=CENTRAL_ENDPOINT,
+    cmd,
+    app_id: str,
+    device_id: str,
+    token: str,
+    central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     """
     Execute a manual failback for device. Reverts the previously executed failover

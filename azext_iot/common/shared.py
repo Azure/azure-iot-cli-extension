@@ -48,7 +48,7 @@ class SettleType(Enum):
 
 class DeviceAuthType(Enum):
     """
-    Device Authorization type.
+    Client based Device Authorization type.
     """
 
     shared_private_key = "shared_private_key"
@@ -58,7 +58,7 @@ class DeviceAuthType(Enum):
 
 class DeviceAuthApiType(Enum):
     """
-    Hub Device Authorization type.
+    API based Device Authorization type.
     """
 
     sas = "sas"
@@ -150,16 +150,6 @@ class DistributedTracingSamplingModeType(Enum):
 
     off = "off"
     on = "on"
-
-
-class PnPModelType(Enum):
-    """
-    Type of PnP Model.
-    """
-
-    any = "any"
-    interface = "Interface"
-    capabilityModel = "capabilityModel"
 
 
 class ConfigType(Enum):

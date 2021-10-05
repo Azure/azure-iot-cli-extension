@@ -34,22 +34,25 @@ if not PACKAGE_NAME:
     raise RuntimeError("Cannot find package information")
 
 
-# The following dependencies are needed by the IoT extension.
-# Most of these are leveraged from Az CLI Core.
+# The following dependencies are needed by the IoT extension but used from Az CLI Core.
 # 'msrestazure>=0.4.29,<2.0.0',
 # 'paho-mqtt==1.5.0',
-# 'jmespath==0.9.3',
-# 'pyyaml==3.13'
-# 'knack>=0.3.1'
-# 'jsonschema==3.2.0'
-# 'enum34' (when python_version < 3.4)
+# 'jmespath',
+# 'pyyaml'
+# 'knack'
 
 # There is also a dependency for uamqp for amqp based commands
 # though that is installed out of band (managed by the extension)
 # for compatibility reasons.
 
-DEPENDENCIES = ["paho-mqtt==1.5.0", "jsonschema==3.2.0", "packaging"]
-
+DEPENDENCIES = [
+    "jsonschema~=3.2.0",
+    "importlib_metadata;python_version<'3.8'",
+    "azure-iot-device~=2.5",
+    "tqdm~=4.62",
+    "packaging"
+]
+EXTRAS = {"uamqp": ["uamqp~=1.2"]}
 
 CLASSIFIERS = [
     "Development Status :: 4 - Beta",
@@ -70,7 +73,9 @@ setup(
     version=VERSION,
     python_requires=">=3.6,<4",
     description=short_description,
-    long_description="{} Intended for power users and/or automation of IoT solutions at scale.".format(short_description),
+    long_description="{} Intended for power users and/or automation of IoT solutions at scale.".format(
+        short_description
+    ),
     license="MIT",
     author="Microsoft",
     author_email="iotupx@microsoft.com",  # +@digimaun
@@ -80,10 +85,10 @@ setup(
     package_data={
         EXTENSION_REF_NAME: [
             "azext_metadata.json",
-            "digicert.pem",
             "assets/*",
         ]
     },
     install_requires=DEPENDENCIES,
-    zip_safe=False
+    extras_require=EXTRAS,
+    zip_safe=False,
 )

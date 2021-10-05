@@ -3,6 +3,58 @@
 Release History
 ===============
 
+0.11.0
++++++++++++++++
+
+**IoT Central updates**
+
+* Adds preview commands (v1.1-preview):
+
+  - Organizations (az iot central organization)
+  - File Upload Configuration (az iot central file-upload-config)
+  - Jobs (az iot central job)
+* Adds x-ms-client-request-id header for each request
+
+**Breaking Changes**
+
+* List commands like `az iot central device list` and others, 
+  now return list of items instead of a main dict with item ids as keys and items as values.
+
+  Involved commands:
+   - az iot central device list
+   - az iot central device-template list
+   - az iot central api-token list
+   - az iot central user list
+
+0.10.17
++++++++++++++++
+
+**IoT Hub updates**
+
+* Fixed an issue in 0.10.16 causing IoT Hub command failure in Windows MSI environment.
+
+0.10.16
++++++++++++++++
+
+**IoT Central updates**
+
+* Adds support for listing devices.
+* Adds support for listing device templates.
+
+**IoT Hub updates**
+
+* Device simulation overhaul ("az iot device simulate"). Device simulation is experimental and subject to change.
+  Please take a look at the --help docs for functionality and usage highlights.
+* Device and module identity creation support usage of custom symmetric keys.
+
+0.10.15
++++++++++++++++
+
+**IoT Central updates**
+
+* Adds support for listing device groups
+* Adds support for listing roles and get role by id
+
 0.10.14
 +++++++++++++++
 

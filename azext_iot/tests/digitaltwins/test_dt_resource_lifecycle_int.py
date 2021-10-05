@@ -96,10 +96,9 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
                 MOCK_RESOURCE_TAGS,
             )
         ).get_output_in_json()
-        self.track_instance(create_output)
 
         assert_common_resource_attributes(
-            self.wait_for_hostname(create_output),
+            create_output,
             instance_names[0],
             self.rg,
             self.region,
@@ -130,20 +129,23 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         )
 
         # No location specified. Use the resource group location.
-        create_msi_output = self.cmd(
+        self.cmd(
             "dt create -n {} -g {} --assign-identity --scopes {}".format(
                 instance_names[1], self.rg, " ".join(scope_ids)
             )
         ).get_output_in_json()
-        self.track_instance(create_msi_output)
 
-        assert_common_resource_attributes(
-            self.wait_for_hostname(create_msi_output),
-            instance_names[1],
-            self.rg,
-            self.rg_region,
-            tags=None,
-            assign_identity=True,
+        # wait for identity assignment
+        sleep(60)
+
+        self.cmd(
+            "dt wait -n {} -g {} --custom \"{}\" --interval {} --timeout {}".format(
+                instance_names[1],
+                self.rg,
+                "identity!='None'",
+                15,
+                15 * 20
+            )
         )
 
         show_msi_output = self.cmd(
@@ -176,14 +178,30 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         # Update tags and disable MSI
         updated_tags = "env=test tier=premium"
         updated_tags_dict = {"env": "test", "tier": "premium"}
-        remove_msi_output = self.cmd(
+        self.cmd(
             "dt create -n {} -g {} --assign-identity false --tags {}".format(
                 instance_names[1], self.rg, updated_tags
             )
         ).get_output_in_json()
 
+        self.cmd(
+            "dt wait -n {} -g {} --custom \"{}\" --interval {} --timeout {}".format(
+                instance_names[1],
+                self.rg,
+                "identity=='None'",
+                15,
+                15 * 20
+            )
+        )
+
+        remove_msi_output = self.cmd(
+            "dt show -n {} -g {}".format(
+                instance_names[1], self.rg
+            )
+        ).get_output_in_json()
+
         assert_common_resource_attributes(
-            self.wait_for_hostname(remove_msi_output),
+            remove_msi_output,
             instance_names[1],
             self.rg,
             self.rg_region,
