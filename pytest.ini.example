@@ -1,5 +1,7 @@
 [pytest]
-junit_family = xunit1
+log_cli = 1
+log_cli_level = WARNING
+
 addopts =
     -v
 
@@ -20,6 +22,8 @@ env =
     azext_iot_central_app_id=
     azext_iot_central_scope_id=
     azext_iot_central_primarykey=
+    azext_iot_central_storage_cstring=
+    azext_iot_central_storage_container=
     azext_dt_region=
     azext_dt_ep_eventgrid_topic=
     azext_dt_ep_servicebus_namespace=

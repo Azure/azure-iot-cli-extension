@@ -4,16 +4,17 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from azext_iot.central.models.enum import ApiVersion
 import json
 import pytest
 
 from unittest import mock
 from uamqp.message import Message, MessageProperties
-from azext_iot.central.providers.v1 import (
-    CentralDeviceProviderV1,
-    CentralDeviceTemplateProviderV1,
+from azext_iot.central.providers import (
+    CentralDeviceProvider,
+    CentralDeviceTemplateProvider,
 )
-from azext_iot.central import models as central_models
+from azext_iot.central.models.v1 import TemplateV1, DeviceV1
 from azext_iot.monitor.parsers import common_parser, central_parser
 from azext_iot.monitor.parsers import strings
 from azext_iot.monitor.models.arguments import CommonParserArguments
@@ -227,7 +228,11 @@ class TestCommonParser:
             self.bad_content_type, "application/json"
         )
         _validate_issues(
-            parser, Severity.warning, 2, 2, [expected_details_1, expected_details_2],
+            parser,
+            Severity.warning,
+            2,
+            2,
+            [expected_details_1, expected_details_2],
         )
 
     def test_parse_bad_type_and_bad_payload_should_error(self):
@@ -439,7 +444,7 @@ class TestCentralParser:
 
     def test_validate_against_invalid_component_template_should_fail(self):
         # setup
-        device_template = central_models.TemplateV1(
+        device_template = TemplateV1(
             load_json(FileNames.central_property_validation_template_file)
         )
 
@@ -486,7 +491,7 @@ class TestCentralParser:
 
     def test_validate_invalid_telmetry_component_template_should_fail(self):
         # setup
-        device_template = central_models.TemplateV1(
+        device_template = TemplateV1(
             load_json(FileNames.central_property_validation_template_file)
         )
 
@@ -528,7 +533,8 @@ class TestCentralParser:
         assert properties["application"] == self.app_properties
 
         expected_details = strings.invalid_field_name_component_mismatch_template(
-            list(self.bad_dcm_payload.keys()), device_template.component_schema_names,
+            list(self.bad_dcm_payload.keys()),
+            device_template.component_schema_names,
         )
 
         _validate_issues(parser, Severity.warning, 1, 1, [expected_details])
@@ -552,8 +558,8 @@ class TestCentralParser:
         )
 
         # haven't found a better way to force the error to occur within parser
-        parser._central_template_provider.get_device_template = lambda x, central_dns_suffix: central_models.TemplateV1(
-            device_template
+        parser._central_template_provider.get_device_template = (
+            lambda x, central_dns_suffix: TemplateV1(device_template)
         )
 
         # act
@@ -604,21 +610,21 @@ class TestCentralParser:
         _validate_issues(parser, Severity.error, 1, 1, [expected_details])
 
     def _get_template(self):
-        return central_models.TemplateV1(
-            load_json(FileNames.central_device_template_file)
-        )
+        return TemplateV1(load_json(FileNames.central_device_template_file))
 
     def _create_parser(
         self,
-        device_template: central_models.TemplateV1,
+        device_template: TemplateV1,
         message: Message,
         args: CommonParserArguments,
     ):
-        device_provider = CentralDeviceProviderV1(cmd=None, app_id=None)
-        template_provider = CentralDeviceTemplateProviderV1(cmd=None, app_id=None)
-        device_provider.get_device = mock.MagicMock(
-            return_value=central_models.DeviceV1({})
+        device_provider = CentralDeviceProvider(
+            cmd=None, app_id=None, api_version=ApiVersion.v1.value
         )
+        template_provider = CentralDeviceTemplateProvider(
+            cmd=None, app_id=None, api_version=ApiVersion.v1.value
+        )
+        device_provider.get_device = mock.MagicMock(return_value=DeviceV1({}))
         template_provider.get_device_template = mock.MagicMock(
             return_value=device_template
         )

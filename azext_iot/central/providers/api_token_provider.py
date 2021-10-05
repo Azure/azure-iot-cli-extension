@@ -8,20 +8,20 @@ from knack.log import get_logger
 
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
-from azext_iot.central.models.enum import Role, ApiVersion
 
 
 logger = get_logger(__name__)
 
 
-class CentralApiTokenProviderPreview:
-    def __init__(self, cmd, app_id: str, token=None):
+class CentralApiTokenProvider:
+    def __init__(self, cmd, app_id: str, api_version: str, token=None):
         """
         Provider for API token APIs
 
         Args:
             cmd: command passed into az
             app_id: name of app (used for forming request URL)
+            api_version: API version (appendend to request URL)
             token: (OPTIONAL) authorization token to fetch API token details from IoTC.
                 MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
                 Useful in scenarios where user doesn't own the app
@@ -30,11 +30,13 @@ class CentralApiTokenProviderPreview:
         self._cmd = cmd
         self._app_id = app_id
         self._token = token
+        self._api_version = api_version
 
     def add_api_token(
         self,
         token_id: str,
-        role: Role,
+        role: str,
+        org_id: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> dict:
 
@@ -44,7 +46,8 @@ class CentralApiTokenProviderPreview:
             token_id=token_id,
             role=role,
             token=self._token,
-            api_version=ApiVersion.preview.value,
+            org_id=org_id,
+            api_version=self._api_version,
             central_dns_suffix=central_dns_suffix,
         )
 
@@ -54,7 +57,7 @@ class CentralApiTokenProviderPreview:
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
-            api_version=ApiVersion.preview.value,
+            api_version=self._api_version,
             central_dns_suffix=central_dns_suffix,
         )
 
@@ -68,14 +71,13 @@ class CentralApiTokenProviderPreview:
             app_id=self._app_id,
             token_id=token_id,
             token=self._token,
-            api_version=ApiVersion.preview.value,
+            api_version=self._api_version,
             central_dns_suffix=central_dns_suffix,
         )
 
     def delete_api_token(
         self,
         token_id,
-        api_version=ApiVersion.v1.value,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> dict:
         return central_services.api_token.delete_api_token(
@@ -83,6 +85,6 @@ class CentralApiTokenProviderPreview:
             app_id=self._app_id,
             token_id=token_id,
             token=self._token,
-            api_version=ApiVersion.preview.value,
+            api_version=self._api_version,
             central_dns_suffix=central_dns_suffix,
         )

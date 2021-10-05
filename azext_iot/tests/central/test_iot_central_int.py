@@ -6,25 +6,51 @@
 
 
 import json
-
+from azext_iot.central.models.enum import ApiVersion
 from azure.iot.device import Message
 from azext_iot.common import utility
 from azext_iot.monitor.parsers import strings
 from azext_iot.tests import helpers
-from azext_iot.tests.central import CentralLiveScenarioTest, APP_ID, TOKEN, DNS_SUFFIX, sync_command_params
+from azext_iot.tests.central import (
+    CentralLiveScenarioTest,
+    APP_ID,
+    STORAGE_CSTRING,
+    STORAGE_CONTAINER,
+    DEFAULT_FILE_UPLOAD_TTL,
+    sync_command_params,
+)
+import pytest
+
 
 if not all([APP_ID]):
     raise ValueError("Set azext_iot_central_app_id to run central integration tests.")
 
+IS_1_1_PREVIEW = True
+
 
 class TestIotCentral(CentralLiveScenarioTest):
+    @pytest.fixture(autouse=True)
+    def fixture_api_version(self, request):
+        self._api_version = request.config.getoption("--api-version")
+        IS_1_1_PREVIEW = (
+            self._api_version == ApiVersion.v1_1_preview.value
+            or self._api_version is None
+        )  # either explicitely selected or omitted
+        if IS_1_1_PREVIEW:
+            print("Testing 1.1-preview")
+        yield
+
     def __init__(self, test_scenario):
         super(TestIotCentral, self).__init__(test_scenario=test_scenario)
 
     def test_central_monitor_events(self):
-        (template_id, _) = self._create_device_template()
-        (device_id, _) = self._create_device(template=template_id)
-        credentials = self._get_credentials(device_id)
+        (template_id, _) = self._create_device_template(api_version=self._api_version)
+        (device_id, _) = self._create_device(
+            template=template_id, api_version=self._api_version
+        )
+        credentials = self._get_credentials(
+            device_id=device_id, api_version=self._api_version
+        )
 
         device_client = helpers.dps_connect_device(device_id, credentials)
 
@@ -42,21 +68,32 @@ class TestIotCentral(CentralLiveScenarioTest):
         command = "iot central diagnostics monitor-events --app-id {} -y".format(
             APP_ID + "zzz"
         )
-        command = self._appendOptionalArgsToCommand(command, TOKEN, DNS_SUFFIX)
-        self.cmd(command, expect_failure=True)
+        self.cmd(command, api_version=self._api_version, expect_failure=True)
 
         # Ensure no failure
-        output = self._get_monitor_events_output(device_id, enqueued_time)
+        output = self._get_monitor_events_output(
+            device_id=device_id,
+            enqueued_time=enqueued_time,
+            api_version=self._api_version,
+        )
 
-        self._delete_device(device_id)
-        self._delete_device_template(template_id)
+        self._delete_device(device_id=device_id, api_version=self._api_version)
+
+        self._delete_device_template(
+            template_id=template_id, api_version=self._api_version
+        )
+
         assert '"Bool": true' in output
         assert device_id in output
 
     def test_central_validate_messages_success(self):
-        (template_id, _) = self._create_device_template()
-        (device_id, _) = self._create_device(template=template_id)
-        credentials = self._get_credentials(device_id)
+        (template_id, _) = self._create_device_template(api_version=self._api_version)
+        (device_id, _) = self._create_device(
+            template=template_id, api_version=self._api_version
+        )
+        credentials = self._get_credentials(
+            device_id=device_id, api_version=self._api_version
+        )
 
         device_client = helpers.dps_connect_device(device_id, credentials)
 
@@ -73,8 +110,11 @@ class TestIotCentral(CentralLiveScenarioTest):
         # Validate the messages
         output = self._get_validate_messages_output(device_id, enqueued_time)
 
-        self._delete_device(device_id)
-        self._delete_device_template(template_id)
+        self._delete_device(device_id=device_id, api_version=self._api_version)
+
+        self._delete_device_template(
+            template_id=template_id, api_version=self._api_version
+        )
 
         assert output
         assert "Successfully parsed 1 message(s)" in output
@@ -82,9 +122,13 @@ class TestIotCentral(CentralLiveScenarioTest):
 
     def test_central_validate_messages_issues_detected(self):
         expected_messages = []
-        (template_id, _) = self._create_device_template()
-        (device_id, _) = self._create_device(template=template_id)
-        credentials = self._get_credentials(device_id)
+        (template_id, _) = self._create_device_template(api_version=self._api_version)
+        (device_id, _) = self._create_device(
+            template=template_id, api_version=self._api_version
+        )
+        credentials = self._get_credentials(
+            device_id=device_id, api_version=self._api_version
+        )
 
         device_client = helpers.dps_connect_device(device_id, credentials)
 
@@ -142,8 +186,11 @@ class TestIotCentral(CentralLiveScenarioTest):
             device_id, enqueued_time, max_messages=len(expected_messages)
         )
 
-        self._delete_device(device_id)
-        self._delete_device_template(template_id)
+        self._delete_device(device_id=device_id, api_version=self._api_version)
+
+        self._delete_device_template(
+            template_id=template_id, api_version=self._api_version
+        )
 
         assert output
 
@@ -160,44 +207,40 @@ class TestIotCentral(CentralLiveScenarioTest):
             assert issue in output
 
     def test_central_user_methods_CRD(self):
-        users = self._create_users()
+        users = self._create_users(api_version=self._api_version)
 
         command = "iot central user show --app-id {} --user-id {}".format(
             APP_ID, users[0].get("id")
         )
-        command = self._appendOptionalArgsToCommand(command, TOKEN, DNS_SUFFIX)
-        self.cmd(command)
+        self.cmd(command, api_version=self._api_version)
 
         command = "iot central user list --app-id {}".format(APP_ID)
-        command = self._appendOptionalArgsToCommand(command, TOKEN, DNS_SUFFIX)
-        result = self.cmd(command).get_output_in_json()
-
-        user_list = result.get("value")
+        result = self.cmd(command, api_version=self._api_version).get_output_in_json()
 
         for user in users:
-            self._delete_user(user.get("id"))
+            self._delete_user(user_id=user.get("id"), api_version=self._api_version)
 
         for user in users:
-            assert user in user_list
+            assert user in result
 
     def test_central_api_token_methods_CRD(self):
-        tokens = self._create_api_tokens()
+        tokens = self._create_api_tokens(api_version=self._api_version)
         command = "iot central api-token show --app-id {} --token-id {}".format(
             APP_ID, tokens[0].get("id")
         )
-        command = self._appendOptionalArgsToCommand(command, TOKEN, DNS_SUFFIX)
-        self.cmd(command)
+        self.cmd(command, api_version=self._api_version)
 
         command = "iot central api-token list --app-id {}".format(
             APP_ID,
         )
-        command = self._appendOptionalArgsToCommand(command, TOKEN, DNS_SUFFIX)
-        result = self.cmd(command).get_output_in_json()
+        result = self.cmd(command, api_version=self._api_version).get_output_in_json()
 
         token_list = result.get("value")
 
         for token in tokens:
-            self._delete_api_token(token.get("id"))
+            self._delete_api_token(
+                token_id=token.get("id"), api_version=self._api_version
+            )
 
         for token in tokens:
             token_info_basic = {
@@ -208,33 +251,36 @@ class TestIotCentral(CentralLiveScenarioTest):
             assert token_info_basic in token_list
 
     def test_central_roles_list(self):
-        result = self._list_roles()
+        result = self._list_roles(api_version=self._api_version)
         # assert object is empty or populated but not null
         assert result is not None and (result == {} or bool(result) is True)
 
     def test_central_run_command_root_level(self):
         command_name = "testRootCommand"
-        (template_id, _) = self._create_device_template()
-        (device_id, _) = self._create_device(template=template_id, simulated=True)
+        (template_id, _) = self._create_device_template(api_version=self._api_version)
+        (device_id, _) = self._create_device(
+            template=template_id, api_version=self._api_version, simulated=True
+        )
 
-        self._wait_for_provisioned(device_id)
+        self._wait_for_provisioned(device_id=device_id, api_version=self._api_version)
 
         command = "iot central device command run -n {} -d {} --cn {} -k '{}'".format(
             APP_ID, device_id, command_name, sync_command_params
         )
 
-        command = self._appendOptionalArgsToCommand(command, TOKEN, DNS_SUFFIX)
-        run_command_result = self.cmd(command)
+        run_command_result = self.cmd(command, api_version=self._api_version)
 
         command = "iot central device command history -n {} -d {} --cn {}".format(
             APP_ID, device_id, command_name
         )
 
-        command = self._appendOptionalArgsToCommand(command, TOKEN, DNS_SUFFIX)
-        show_command_result = self.cmd(command)
+        show_command_result = self.cmd(command, api_version=self._api_version)
 
-        self._delete_device(device_id)
-        self._delete_device_template(template_id)
+        self._delete_device(device_id=device_id, api_version=self._api_version)
+
+        self._delete_device_template(
+            template_id=template_id, api_version=self._api_version
+        )
 
         run_result = run_command_result.get_output_in_json()
         show_result = show_command_result.get_output_in_json()
@@ -248,27 +294,31 @@ class TestIotCentral(CentralLiveScenarioTest):
     def test_central_run_command_component(self):
         interface_id = "dtmiIntTestDeviceTemplateV33jl"
         command_name = "testCommand"
-        (template_id, _) = self._create_device_template()
-        (device_id, _) = self._create_device(template=template_id, simulated=True)
+        (template_id, _) = self._create_device_template(api_version=self._api_version)
+        (device_id, _) = self._create_device(
+            template=template_id, api_version=self._api_version, simulated=True
+        )
 
-        self._wait_for_provisioned(device_id)
+        self._wait_for_provisioned(device_id=device_id, api_version=self._api_version)
 
         command = (
             "iot central device command run -n {} -d {} -i {} --cn {} -k '{}'".format(
                 APP_ID, device_id, interface_id, command_name, sync_command_params
             )
         )
-        command = self._appendOptionalArgsToCommand(command, TOKEN, DNS_SUFFIX)
-        run_command_result = self.cmd(command)
+        run_command_result = self.cmd(command, api_version=self._api_version)
 
         command = "iot central device command history -n {} -d {} -i {} --cn {}".format(
             APP_ID, device_id, interface_id, command_name
         )
-        command = self._appendOptionalArgsToCommand(command, TOKEN, DNS_SUFFIX)
-        show_command_result = self.cmd(command)
+        show_command_result = self.cmd(command, api_version=self._api_version)
 
-        self._delete_device(device_id)
-        self._delete_device_template(template_id)
+        self._delete_device(device_id=device_id, api_version=self._api_version)
+
+        self._delete_device_template(
+            template_id=template_id,
+            api_version=self._api_version,
+        )
 
         run_result = run_command_result.get_output_in_json()
         show_result = show_command_result.get_output_in_json()
@@ -278,3 +328,68 @@ class TestIotCentral(CentralLiveScenarioTest):
 
         # check that run result and show result indeed match
         assert run_result["response"] == show_result["value"][0]["response"]
+
+    @pytest.mark.skipif(
+        not STORAGE_CSTRING or not STORAGE_CONTAINER,
+        reason="empty azext_iot_central_storage_cstring or azext_iot_central_storage_container env var",
+    )
+    @pytest.mark.xfail(
+        condition=not IS_1_1_PREVIEW,
+        reason="Api version not supported",
+    )
+    def test_central_fileupload_methods_CRD_required(self):
+        file_upload = self._create_fileupload(api_version=self._api_version)
+
+        result = self._wait_for_storage_configured(api_version=self._api_version)
+
+        assert result["state"] == "succeeded"
+        assert result["connectionString"] == file_upload["connectionString"]
+        assert result["container"] == file_upload["container"]
+        assert result["account"] is None  # account was not passed in params
+        assert (
+            result["sasttl"] == DEFAULT_FILE_UPLOAD_TTL
+        )  # sasTTL not passed in params
+        self._delete_fileupload(api_version=self._api_version)
+        # check deleting state
+        command = "iot central file-upload-config show -n {}".format(APP_ID)
+        result = self.cmd(command, api_version=self._api_version).get_output_in_json()
+        assert result["state"] == "deleting"
+        self._wait_for_storage_configured(api_version=self._api_version)
+
+    @pytest.mark.skipif(
+        not STORAGE_CSTRING or not STORAGE_CONTAINER,
+        reason="empty azext_iot_central_storage_cstring or azext_iot_central_storage_container env var",
+    )
+    def test_central_fileupload_methods_CRD_optional(self):
+        ACCOUNT_NAME = "account"
+        SAS_TTL = "PT2H"
+        file_upload = self._create_fileupload(
+            api_version=self._api_version, account_name=ACCOUNT_NAME, sasttl=SAS_TTL
+        )
+
+        result = self._wait_for_storage_configured(api_version=self._api_version)
+        assert result["state"] == "succeeded"
+        assert result["connectionString"] == file_upload["connectionString"]
+        assert result["container"] == file_upload["container"]
+        assert result["account"] == ACCOUNT_NAME
+        assert result["sasttl"] == SAS_TTL
+        self._delete_fileupload(api_version=self._api_version)
+
+        # check deleting state
+        command = "iot central file-upload-config show -n {}".format(APP_ID)
+        result = self.cmd(command, api_version=self._api_version).get_output_in_json()
+        assert result["state"] == "deleting"
+        self._wait_for_storage_configured(api_version=self._api_version)
+
+    @pytest.mark.xfail(
+        condition=not IS_1_1_PREVIEW,
+        reason="Api version not supported",
+    )
+    def test_central_organization_methods_CRD(self):
+        org = self._create_organization(api_version=self._api_version)
+        command = "iot central organization show -n {} --org-id {}".format(
+            APP_ID, org["id"]
+        )
+        result = self.cmd(command, api_version=self._api_version).get_output_in_json()
+        assert result["id"] == org["id"]
+        self._delete_organization(org_id=org["id"], api_version=self._api_version)

@@ -19,6 +19,8 @@ steps:
             "azext_iot_central_app_id": os.environ.get("AZEXT_IOT_CENTRAL_APP_ID", sentinel_value),
             "azext_iot_central_scope_id": os.environ.get("AZEXT_IOT_CENTRAL_SCOPE_ID", sentinel_value),
             "azext_iot_central_primarykey": os.environ.get("AZEXT_IOT_CENTRAL_PRIMARYKEY", sentinel_value),
+            "azext_iot_central_storage_cstring": os.environ.get("AZEXT_IOT_CENTRAL_STORAGE_CSTRING", sentinel_value),
+            "azext_iot_central_storage_container": os.environ.get("AZEXT_IOT_CENTRAL_STORAGE_CONTAINER", sentinel_value),
             "azext_dt_ep_eventgrid_topic": os.environ.get("AZEXT_DT_EP_EVENTGRID_TOPIC", sentinel_value),
             "azext_dt_ep_servicebus_namespace": os.environ.get("AZEXT_DT_EP_SERVICEBUS_NAMESPACE", sentinel_value),
             "azext_dt_ep_servicebus_policy": os.environ.get("AZEXT_DT_EP_SERVICEBUS_POLICY", sentinel_value),
@@ -46,6 +48,8 @@ steps:
       AZEXT_IOT_CENTRAL_APP_ID: $(azext_iot_central_app_id)
       AZEXT_IOT_CENTRAL_SCOPE_ID: $(azext_iot_central_scope_id)
       AZEXT_IOT_CENTRAL_PRIMARYKEY: $(azext_iot_central_primarykey)
+      AZEXT_IOT_CENTRAL_STORAGE_CSTRING: $(azext_iot_central_storage_cstring)
+      AZEXT_IOT_CENTRAL_STORAGE_CONTAINER: $(azext_iot_central_storage_container)
       AZEXT_DT_EP_EVENTGRID_TOPIC: $(azext_dt_ep_eventgrid_topic)
       AZEXT_DT_EP_SERVICEBUS_NAMESPACE: $(azext_dt_ep_servicebus_namespace)
       AZEXT_DT_EP_SERVICEBUS_POLICY: $(azext_dt_ep_servicebus_policy)

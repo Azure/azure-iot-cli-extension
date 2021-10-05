@@ -7,7 +7,7 @@
 from knack.util import CLIError
 
 
-class TemplatePreview:
+class Template:
     def __init__(self, template: dict):
         self.raw_template = template
         try:

@@ -2133,6 +2133,7 @@ class TestDeviceSimulate:
             # mqtt msg body - which is a json string
             assert json.loads(mqttclient().send_message.call_args[0][0].data)
             assert serviceclient.call_count == 0
+            assert mqttclient().shutdown.call_count == 1
 
     @pytest.mark.parametrize(
         "rs, mc, mi, protocol, exception, mrc, mrp, irp",

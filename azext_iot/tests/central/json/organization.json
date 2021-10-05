@@ -1,0 +1,20 @@
+[
+    {
+        "id": "washington",
+        "displayName": "Washington"
+    },
+    {
+        "id": "oregon",
+        "displayName": "Oregon"
+    },
+    {
+        "id": "seattle",
+        "displayName": "Seattle",
+        "parent": "washington"
+    },
+    {
+        "id": "portland",
+        "displayName": "Portland",
+        "parent": "oregon"
+    }
+]

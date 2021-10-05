@@ -135,3 +135,9 @@ class mqtt_client(object):
 
         except Exception as x:
             raise x
+
+    def shutdown(self):
+        try:
+            self.device_client.shutdown()
+        except:
+            pass

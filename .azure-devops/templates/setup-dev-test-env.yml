@@ -11,7 +11,7 @@ parameters:
   values:
   - min
   - released
-  - edge
+  - msi
 
 steps:
   - task: UsePythonVersion@0
@@ -25,12 +25,12 @@ steps:
   - ${{ if eq(parameters.azureCLIVersion, 'released') }}:
     - template: install-azure-cli-released.yml
 
-  - ${{ if eq(parameters.azureCLIVersion, 'edge') }}:
-    - template: install-azure-cli-edge.yml
-
-  - template: download-install-local-azure-test-sdk.yml
+  - ${{ if eq(parameters.azureCLIVersion, 'msi') }}:
+    - template: install-azure-cli-msi.yml
 
   - template: setup-ci-machine.yml
+
+  - template: download-install-local-azure-test-sdk.yml
 
   - template: download-install-local-azure-iot-cli-extension.yml
 

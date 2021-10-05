@@ -85,7 +85,6 @@ setup(
     package_data={
         EXTENSION_REF_NAME: [
             "azext_metadata.json",
-            "digicert.pem",
             "assets/*",
         ]
     },
