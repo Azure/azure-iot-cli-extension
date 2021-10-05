@@ -183,7 +183,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 device_ids[0], "full", self.connection_string
             )
         )
-        
+
         # invoke device method without response status and payload
         res = self.cmd(
             """iot hub invoke-device-method -d {} --method-name {} --login {} --method-payload '{}'""".format(
