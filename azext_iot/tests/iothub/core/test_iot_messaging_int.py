@@ -183,8 +183,6 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 device_ids[0], "full", self.connection_string
             )
         )
-        token.set()
-        thread.join()
 
         # invoke device method without response status and payload
         res = self.cmd(
