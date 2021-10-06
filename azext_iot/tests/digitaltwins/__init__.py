@@ -154,33 +154,9 @@ class DTLiveScenarioTest(LiveScenarioTest):
 
     def tearDown(self):
         for instance in self.tracked_instances:
-            self.embedded_cli.invoke(
-                "dt delete -n {} -g {} -y --no-wait".format(instance[0], instance[1])
-            )
-
-    # Needed because the DT service will indicate provisioning is finished before it actually is.
-    def wait_for_hostname(
-        self, instance: dict, wait_in_sec: int = 10, interval: int = 7, extra_condition: str = None
-    ):
-        from time import sleep
-        sleep(wait_in_sec)
-
-        jmes = "hostName && provisioningState=='Succeeded'"
-        if extra_condition:
-            jmes += "&& {}".format(extra_condition)
-
-        self.embedded_cli.invoke(
-            "dt wait -n {} -g {} --custom \"{}\" --interval {} --timeout {}".format(
-                instance["name"],
-                instance["resourceGroup"],
-                jmes,
-                wait_in_sec,
-                wait_in_sec * interval
-            )
-        )
-        refereshed_instance = self.embedded_cli.invoke(
-            "dt show -n {} -g {}".format(
-                instance["name"], instance["resourceGroup"]
-            )
-        ).as_json()
-        return refereshed_instance if refereshed_instance else instance
+            try:
+                self.embedded_cli.invoke(
+                    "dt delete -n {} -g {} -y --no-wait".format(instance[0], instance[1])
+                )
+            except:
+                logger.info("The DT instance {} has already been deleted.".format(instance))
