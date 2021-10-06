@@ -170,7 +170,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 self.entity_name,
                 "complete",
                 "Testing mqtt c2d and direct method invocations",
-                2,
+                4,
                 5,
                 "mqtt",
             ],
