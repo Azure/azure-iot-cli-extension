@@ -18,6 +18,13 @@ parameters:
   - '3.6.x'
   - '3.8.x'
   - '3.9.x'
+- name: pythonVersionTestRun
+  type: string
+  default: '3.8.x'
+  values:
+  - '3.6.x'
+  - '3.8.x'
+  - '3.9.x'
 - name: architecture
   type: string
   default: 'x64'
@@ -95,7 +102,7 @@ stages:
         parameters:
           path: 'azext_iot/tests/central'
           name: 'iot-central'
-          pythonVersion: ${{ parameters.pythonVersion }}
+          pythonVersion: ${{ parameters.pythonVersionTestRun }}
     
     - job: 'testADT'
       displayName: 'Test Azure DigitalTwins'
@@ -105,7 +112,7 @@ stages:
         parameters:
           path: 'azext_iot/tests/digitaltwins'
           name: 'azure-digitaltwins'
-          pythonVersion: ${{ parameters.pythonVersion }}
+          pythonVersion: ${{ parameters.pythonVersionTestRun }}
 
     - job: 'testDPS'
       displayName: 'Test DPS'
@@ -115,7 +122,7 @@ stages:
         parameters:
           path: 'azext_iot/tests/dps'
           name: 'device-provisioning-service'
-          pythonVersion: ${{ parameters.pythonVersion }}
+          pythonVersion: ${{ parameters.pythonVersionTestRun }}
     
     - job: 'testHub_job_1'
       displayName: 'Test IoT Hub - config, core and jobs'
@@ -125,7 +132,7 @@ stages:
         parameters:
           path: 'azext_iot/tests/iothub/configurations azext_iot/tests/iothub/core azext_iot/tests/iothub/jobs'
           name: 'iot-hub-1'
-          pythonVersion: ${{ parameters.pythonVersion }}
+          pythonVersion: ${{ parameters.pythonVersionTestRun }}
     
     - job: 'testHub_job_2'
       displayName: 'Test IoT Hub - devices, messaging and modules'
@@ -135,7 +142,7 @@ stages:
         parameters:
           path: 'azext_iot/tests/iothub/devices azext_iot/tests/iothub/messaging azext_iot/tests/iothub/modules'
           name: 'iot-hub-2'
-          pythonVersion: ${{ parameters.pythonVersion }}
+          pythonVersion: ${{ parameters.pythonVersionTestRun }}
 
     - job: 'unitTests'
       displayName: 'Unit tests and code coverage'
@@ -144,7 +151,7 @@ stages:
         parameters:
           runIntTests: 'false'
           runUnitTests: 'true'
-          pythonVersion: ${{ parameters.pythonVersion }}
+          pythonVersion: ${{ parameters.pythonVersionTestRun }}
 
   - stage: 'kpi'
     displayName: 'Build KPIs'
@@ -155,7 +162,7 @@ stages:
       steps:
       - template: templates/calculate-code-coverage.yml
         parameters:
-          pythonVersion: ${{ parameters.pythonVersion }}
+          pythonVersion: ${{ parameters.pythonVersionTestRun }}
           architecture: ${{ parameters.architecture }}
 
   - stage: 'release'
