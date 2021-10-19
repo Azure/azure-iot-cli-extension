@@ -93,7 +93,7 @@ jobs:
   steps:
   - template: templates/run-tests-parallel.yml
     parameters:
-      pythonVersion: '$(python.version)'
+      pythonVersion: '3.8.x'
       runUnitTests: true
       runIntTests: false
 
@@ -112,7 +112,7 @@ jobs:
 
   - template: templates/run-tests-parallel.yml
     parameters:
-      pythonVersion: '$(python.version)'
+      pythonVersion: '3.8.x'
       runUnitTests: true
       runIntTests: false
 
