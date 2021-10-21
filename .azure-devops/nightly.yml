@@ -31,7 +31,6 @@ parameters:
   - '3.6.x'
   - '3.8.x'
   - '3.9.x'
-
 - name: architecture
   type: string
   default: 'x64'
@@ -52,6 +51,8 @@ variables:
   - group: aziotcli_test_nightly
   - name: pythonVersion
     value: ${{ parameters.pythonVersion }}
+  - name: pythonVersionTestRun
+    value: ${{ parameters.pythonVersionTestRun }}
   - name: architecture
     value: ${{ parameters.architecture }}
 
