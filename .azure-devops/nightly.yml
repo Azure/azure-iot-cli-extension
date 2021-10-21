@@ -24,6 +24,13 @@ parameters:
   - '3.6.x'
   - '3.8.x'
   - '3.9.x'
+- name: pythonVersionTestRun
+  type: string
+  default: '3.8.x'
+  values:
+  - '3.6.x'
+  - '3.8.x'
+  - '3.9.x'
 - name: architecture
   type: string
   default: 'x64'
@@ -44,6 +51,8 @@ variables:
   - group: aziotcli_test_nightly
   - name: pythonVersion
     value: ${{ parameters.pythonVersion }}
+  - name: pythonVersionTestRun
+    value: ${{ parameters.pythonVersionTestRun }}
   - name: architecture
     value: ${{ parameters.architecture }}
 
@@ -100,7 +109,7 @@ stages:
     - template: templates/nightly-tests.yml
       parameters:
         azureCLIVersion: min
-        pythonVersion: $(pythonVersion)
+        pythonVersion: $(pythonVersionTestRun)
         testADT: ${{ parameters.testADT }}
         testCentral: ${{ parameters.testCentral }}
         testDPS: ${{ parameters.testDPS }}
@@ -115,7 +124,7 @@ stages:
     - template: templates/nightly-tests.yml
       parameters:
         azureCLIVersion: msi
-        pythonVersion: $(pythonVersion)
+        pythonVersion: $(pythonVersionTestRun)
         testADT: ${{ parameters.testADT }}
         testCentral: ${{ parameters.testCentral }}
         testDPS: ${{ parameters.testDPS }}
@@ -130,5 +139,5 @@ stages:
       steps:
       - template: templates/calculate-code-coverage.yml
         parameters:
-          pythonVersion: $(pythonVersion)
+          pythonVersion: $(pythonVersionTestRun)
           architecture: $(architecture)
