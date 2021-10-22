@@ -118,7 +118,7 @@ stages:
   - stage: 'test_msi'
     displayName: 'Run all tests against Windows MSI install'
     pool:
-      vmImage: 'vs2017-win2016'
+      vmImage: 'windows-2019'
     dependsOn: test_min
     jobs:
     - template: templates/nightly-tests.yml
