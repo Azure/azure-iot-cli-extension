@@ -32,7 +32,7 @@ jobs:
 
 - job: 'testCentral'
   displayName: 'Test IoT Central'
-  condition: eq('${{ parameters.testCentral }}', true)
+  condition: and(succeeded(), eq('${{ parameters.testCentral }}', true))
   steps:
   - template: run-tests-parallel.yml
     parameters:
@@ -43,7 +43,7 @@ jobs:
 
 - job: 'testADT'
   displayName: 'Test Azure DigitalTwins'
-  condition: eq('${{ parameters.testADT }}', true)
+  condition: and(succeeded(), eq('${{ parameters.testADT }}', true))
   steps:
   - template: run-tests-parallel.yml
     parameters:
@@ -54,7 +54,7 @@ jobs:
 
 - job: 'testDPS'
   displayName: 'Test DPS'
-  condition: eq('${{ parameters.testDPS }}', true)
+  condition: and(succeeded(), eq('${{ parameters.testDPS }}', true))
   steps:
   - template: run-tests-parallel.yml
     parameters:
@@ -65,7 +65,7 @@ jobs:
 
 - job: 'testHub_job_1'
   displayName: 'Test IoT Hub - config, core and jobs'
-  condition: eq('${{ parameters.testHub }}', true)
+  condition: and(succeeded(), eq('${{ parameters.testHub }}', true))
   steps:
   - template: run-tests-parallel.yml
     parameters:
@@ -75,7 +75,7 @@ jobs:
       pythonVersion: ${{ parameters.pythonVersion }}
 
 - job: 'testHub_job_2'
-  condition: eq('${{ parameters.testHub }}', true)
+  condition: and(succeeded(), eq('${{ parameters.testHub }}', true))
   displayName: 'Test IoT Hub - devices, messaging and modules'
   steps:
   - template: run-tests-parallel.yml
