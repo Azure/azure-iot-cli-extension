@@ -1,5 +1,5 @@
 steps:
-  - script: choco install azure-cli
+  - script: choco upgrade azure-cli --debug --verbose
     displayName: 'Install released azure-cli from MSI'
   - task: PowerShell@2
     displayName: 'Set Windows MSI Python Executable PATH'
