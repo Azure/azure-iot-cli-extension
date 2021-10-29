@@ -569,7 +569,7 @@ def iot_dps_compute_device_key(
     if symmetric_key is None:
         if not all([client, dps_name, resource_group_name, enrollment_id]):
             raise CLIError(
-                "Please provide DPS enrollment group idenfitiers (Device Provisioning Service name via "
+                "Please provide DPS enrollment group identifiers (Device Provisioning Service name via "
                 "--dps-name, Enrollment ID via --enrollment-id, and resource group via --resource-group "
                 "or -g) or the enrollment group symmetric key via --symmetric-key or --key."
             )
@@ -581,10 +581,12 @@ def iot_dps_compute_device_key(
             attestation = sdk.get_enrollment_group_attestation_mechanism(
                 enrollment_id, raw=True
             ).response.json()
-            if attestation.get("symmetricKey") is None:
+            if attestation.get("type") != AttestationType.symmetricKey.value:
                 raise CLIError(
-                    "Requested enrollment group has an attestation type of 'x509'. Currently, compute-device-key "
-                    "is only supported for symmetric key enrollment groups"
+                    "Requested enrollment group has an attestation type of '{}'. Currently, compute-device-key "
+                    "is only supported for enrollment groups with symmetric key attestation type.".format(
+                        attestation.get("type")
+                    )
                 )
             symmetric_key = attestation["symmetricKey"]["primaryKey"]
         except ProvisioningServiceErrorDetailsException as e:

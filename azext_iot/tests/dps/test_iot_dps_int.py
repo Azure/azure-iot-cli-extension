@@ -464,7 +464,7 @@ class TestDPSEnrollments(LiveScenarioTest):
             )
         )
 
-    def test_dps_enrollment_group_lifecycle(self):
+    def test_dps_enrollment_group_x509_lifecycle(self):
         enrollment_id = self.create_random_name("enrollment-for-test", length=48)
         reprovisionPolicy_never = "never"
         hub_host_name = "{}.azure-devices.net".format(hub)
@@ -518,6 +518,15 @@ class TestDPSEnrollments(LiveScenarioTest):
                 self.check("enrollmentGroupId", enrollment_id),
                 self.exists("attestation.x509"),
             ],
+        )
+
+        # Compute Device Key only works for symmetric key enrollment groups
+        self.cmd(
+            'az iot dps compute-device-key -g {} --dps-name {} --enrollment-id {} '
+            "--registration-id myarbitrarydeviceId".format(
+                rg, dps, enrollment_id
+            ),
+            expect_failure=True
         )
 
         etag = self.cmd(
