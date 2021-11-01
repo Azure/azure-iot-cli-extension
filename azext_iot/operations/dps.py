@@ -559,15 +559,15 @@ def iot_dps_device_enrollment_group_delete(
 
 def iot_dps_compute_device_key(
     cmd,
+    client,
     registration_id,
-    client=None,
     enrollment_id=None,
     dps_name=None,
     resource_group_name=None,
     symmetric_key=None,
 ):
     if symmetric_key is None:
-        if not all([client, dps_name, resource_group_name, enrollment_id]):
+        if not all([dps_name, resource_group_name, enrollment_id]):
             raise CLIError(
                 "Please provide DPS enrollment group identifiers (Device Provisioning Service name via "
                 "--dps-name, Enrollment ID via --enrollment-id, and resource group via --resource-group "
