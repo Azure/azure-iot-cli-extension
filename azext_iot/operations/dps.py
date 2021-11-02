@@ -558,8 +558,40 @@ def iot_dps_device_enrollment_group_delete(
 
 
 def iot_dps_compute_device_key(
-    cmd, symmetric_key, registration_id,
+    cmd,
+    client,
+    registration_id,
+    enrollment_id=None,
+    dps_name=None,
+    resource_group_name=None,
+    symmetric_key=None,
 ):
+    if symmetric_key is None:
+        if not all([dps_name, resource_group_name, enrollment_id]):
+            raise CLIError(
+                "Please provide DPS enrollment group identifiers (Device Provisioning Service name via "
+                "--dps-name, Enrollment ID via --enrollment-id, and resource group via --resource-group "
+                "or -g) or the enrollment group symmetric key via --symmetric-key or --key."
+            )
+
+        target = get_iot_dps_connection_string(cmd, client, dps_name, resource_group_name)
+        try:
+            resolver = SdkResolver(target=target)
+            sdk = resolver.get_sdk(SdkType.dps_sdk)
+            attestation = sdk.get_enrollment_group_attestation_mechanism(
+                enrollment_id, raw=True
+            ).response.json()
+            if attestation.get("type") != AttestationType.symmetricKey.value:
+                raise CLIError(
+                    "Requested enrollment group has an attestation type of '{}'. Currently, compute-device-key "
+                    "is only supported for enrollment groups with symmetric key attestation type.".format(
+                        attestation.get("type")
+                    )
+                )
+            symmetric_key = attestation["symmetricKey"]["primaryKey"]
+        except ProvisioningServiceErrorDetailsException as e:
+            raise CLIError(e)
+
     return compute_device_key(
         primary_key=symmetric_key, registration_id=registration_id
     )

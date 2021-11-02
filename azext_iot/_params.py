@@ -884,10 +884,14 @@ def load_arguments(self, _):
         )
 
     with self.argument_context("iot dps compute-device-key") as context:
+        context.argument("enrollment_id", help="ID of enrollment group")
         context.argument(
             "symmetric_key",
             options_list=["--symmetric-key", "--key"],
-            help="The symmetric shared access key for the enrollment group. ",
+            help="The symmetric shared access key for the enrollment group. This bypasses the "
+            "Device Provisioning Service registry and generates the SAS token directly "
+            "from the supplied symmetric key without further validation. All other command "
+            "parameters aside from registration ID will be ignored.",
         )
         context.argument("registration_id", help="ID of device registration. ")
 
