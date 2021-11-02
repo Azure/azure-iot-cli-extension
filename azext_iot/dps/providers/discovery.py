@@ -29,8 +29,14 @@ class DPSDiscovery(BaseDiscovery):
             if getattr(self.cmd, "cli_ctx", None):
                 self.client = iot_service_provisioning_factory(self.cmd.cli_ctx).iot_dps_resource
                 self.sub_id = get_subscription_id(self.cmd.cli_ctx)
+                # Weirdness thanks to client discrepencies
+                self.client.get_keys_for_key_name = self.client.list_keys_for_key_name
             else:
                 self.client = self.cmd
+
+    def _make_kwargs(self, **kwargs):
+        kwargs["provisioning_service_name"] = kwargs.get("resource_name")
+        return kwargs
 
     def _policy_error(self, policy_name, resource_name):
         return (

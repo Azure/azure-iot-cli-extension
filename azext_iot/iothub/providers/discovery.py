@@ -44,6 +44,9 @@ class IotHubDiscovery(BaseDiscovery):
             else:
                 self.client = self.cmd
 
+    def _make_kwargs(self, **kwargs):
+        return kwargs
+
     def _policy_error(self, policy_name, resource_name):
         return (
             "Unable to discover a priviledged policy for IoT Hub: {}, in subscription {}. "

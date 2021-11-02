@@ -51,6 +51,11 @@ class BaseDiscovery(object):
         """Creates the client if not created already."""
         pass
 
+    @abstractmethod
+    def _make_kwargs(self, **kwargs):
+        """Returns the correct kwargs for the client operations."""
+        pass
+
     def get_resources(self, rg: str = None) -> List:
         """
         Returns a list of all raw resources that are present within the subscription (and
@@ -100,14 +105,9 @@ class BaseDiscovery(object):
         """
         self._initialize_client()
 
-        if self.resource_type == "IoT Hub":
-            policy_pager = self.client.list_keys(
-                resource_group_name=rg, resource_name=resource_name
-            )
-        else:
-            policy_pager = self.client.list_keys(
-                resource_group_name=rg, provisioning_service_name=resource_name
-            )
+        policy_pager = self.client.list_keys(
+            **self._make_kwargs(resource_name=resource_name, resource_group_name=rg)
+        )
         policy_list = []
 
         if self.track2:
@@ -144,14 +144,11 @@ class BaseDiscovery(object):
 
         if rg:
             try:
-                if self.resource_type == "IoT Hub":
-                    return self.client.get(
-                        resource_group_name=rg, resource_name=resource_name
+                return self.client.get(
+                    **self._make_kwargs(
+                        resource_name=resource_name, resource_group_name=rg
                     )
-                else:
-                    return self.client.get(
-                        resource_group_name=rg, provisioning_service_name=resource_name
-                    )
+                )
             except:  # pylint: disable=broad-except
                 raise CLIError(
                     "Unable to find {}: {} in resource group: {}".format(
@@ -208,14 +205,13 @@ class BaseDiscovery(object):
         self._initialize_client()
 
         if policy_name.lower() != "auto":
-            if self.resource_type == "IoT Hub":
-                return self.client.get_keys_for_key_name(
-                    resource_group_name=rg, resource_name=resource_name, key_name=policy_name
+            return self.client.get_keys_for_key_name(
+                **self._make_kwargs(
+                    resource_name=resource_name,
+                    resource_group_name=rg,
+                    key_name=policy_name
                 )
-            else:
-                return self.client.list_keys_for_key_name(
-                    resource_group_name=rg, provisioning_service_name=resource_name, key_name=policy_name
-                )
+            )
 
         policy_list = self.get_policies(resource_name=resource_name, rg=rg)
 
