@@ -1364,9 +1364,13 @@ helps[
 ] = """
     type: command
     short-summary: Generate a derived device SAS key.
-    long-summary: Generate a derived device key from a DPS enrollment group symmetric key.
+    long-summary: Generate a derived device key from a DPS enrollment group.
     examples:
-    - name: Basic usage
+    - name: Compute the device key with the given symmetric key.
       text: >
         az iot dps compute-device-key --key {enrollement_group_symmetric_key} --registration-id {registration_id}
+    - name: Compute the device key with the given enrollment group.
+      text: >
+        az iot dps compute-device-key -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id} --registration-id {registration_id}
 """

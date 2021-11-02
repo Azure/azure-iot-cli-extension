@@ -161,12 +161,12 @@ class TestDPSEnrollments(LiveScenarioTest):
             )
 
     def test_dps_compute_device_key(self):
-        device_key = self.cmd(
+        offline_device_key = self.cmd(
             'az iot dps compute-device-key --key "{}" '
             "--registration-id myarbitrarydeviceId".format(test_endorsement_key)
         ).output
-        device_key = device_key.strip("\"'\n")
-        assert device_key == "cT/EXZvsplPEpT//p98Pc6sKh8mY3kYgSxavHwMkl7w="
+        offline_device_key = offline_device_key.strip("\"'\n")
+        assert offline_device_key == "cT/EXZvsplPEpT//p98Pc6sKh8mY3kYgSxavHwMkl7w="
 
     def test_dps_enrollment_tpm_lifecycle(self):
         enrollment_id = self.create_random_name("enrollment-for-test", length=48)
@@ -464,7 +464,7 @@ class TestDPSEnrollments(LiveScenarioTest):
             )
         )
 
-    def test_dps_enrollment_group_lifecycle(self):
+    def test_dps_enrollment_group_x509_lifecycle(self):
         enrollment_id = self.create_random_name("enrollment-for-test", length=48)
         reprovisionPolicy_never = "never"
         hub_host_name = "{}.azure-devices.net".format(hub)
@@ -518,6 +518,15 @@ class TestDPSEnrollments(LiveScenarioTest):
                 self.check("enrollmentGroupId", enrollment_id),
                 self.exists("attestation.x509"),
             ],
+        )
+
+        # Compute Device Key only works for symmetric key enrollment groups
+        self.cmd(
+            'az iot dps compute-device-key -g {} --dps-name {} --enrollment-id {} '
+            "--registration-id myarbitrarydeviceId".format(
+                rg, dps, enrollment_id
+            ),
+            expect_failure=True
         )
 
         etag = self.cmd(
@@ -593,6 +602,95 @@ class TestDPSEnrollments(LiveScenarioTest):
         self.cmd(
             "iot dps certificate delete -g {} --dps-name {} --name {} --etag {}".format(
                 rg, dps, cert_name, cert_etag
+            )
+        )
+
+    def test_dps_enrollment_group_symmetrickey_lifecycle(self):
+        enrollment_id = self.create_random_name("enrollment-for-test", length=48)
+        attestation_type = AttestationType.symmetricKey.value
+        etag = self.cmd(
+            "iot dps enrollment-group create -g {} --dps-name {} --enrollment-id {}".format(
+                rg, dps, enrollment_id
+            ),
+            checks=[
+                self.check("enrollmentGroupId", enrollment_id),
+                self.check("attestation.type", attestation_type),
+            ],
+        ).get_output_in_json()["etag"]
+
+        self.cmd(
+            "iot dps enrollment-group list -g {} --dps-name {}".format(rg, dps),
+            checks=[
+                self.check("length(@)", 1),
+                self.check("[0].enrollmentGroupId", enrollment_id),
+            ],
+        )
+
+        self.cmd(
+            "iot dps enrollment-group show -g {} --dps-name {} --enrollment-id {}".format(
+                rg, dps, enrollment_id
+            ),
+            checks=[self.check("enrollmentGroupId", enrollment_id)],
+        )
+
+        keys = self.cmd(
+            "iot dps enrollment-group show -g {} --dps-name {} --enrollment-id {} --show-keys".format(
+                rg, dps, enrollment_id
+            ),
+            checks=[
+                self.check("enrollmentGroupId", enrollment_id),
+                self.exists("attestation.symmetricKey"),
+            ],
+        ).get_output_in_json()["attestation"]["symmetricKey"]
+
+        # Compute Device Key tests
+        online_device_key = self.cmd(
+            'az iot dps compute-device-key -g {} --dps-name {} --enrollment-id {} '
+            "--registration-id myarbitrarydeviceId".format(
+                rg, dps, enrollment_id
+            )
+        ).output
+
+        offline_device_key = self.cmd(
+            'az iot dps compute-device-key --key "{}" '
+            "--registration-id myarbitrarydeviceId".format(keys["primaryKey"])
+        ).output
+        assert offline_device_key == online_device_key
+
+        # Compute Device Key uses primary key
+        offline_device_key = self.cmd(
+            'az iot dps compute-device-key --key "{}" '
+            "--registration-id myarbitrarydeviceId".format(keys["secondaryKey"])
+        ).output
+        assert offline_device_key != online_device_key
+
+        etag = self.cmd(
+            "iot dps enrollment-group update -g {} --dps-name {} --enrollment-id {}"
+            " --pk {} --sk {} --etag {}".format(
+                rg,
+                dps,
+                enrollment_id,
+                keys["secondaryKey"],
+                keys["primaryKey"],
+                etag
+            ),
+            checks=[
+                self.check("enrollmentGroupId", enrollment_id),
+                self.check("attestation.type", attestation_type),
+            ],
+        ).get_output_in_json()["etag"]
+
+        online_device_key = self.cmd(
+            'az iot dps compute-device-key -g {} --dps-name {} --enrollment-id {} '
+            "--registration-id myarbitrarydeviceId".format(
+                rg, dps, enrollment_id
+            )
+        ).output
+        assert offline_device_key == online_device_key
+
+        self.cmd(
+            "iot dps enrollment-group delete -g {} --dps-name {} --enrollment-id {}".format(
+                rg, dps, enrollment_id
             )
         )
 
