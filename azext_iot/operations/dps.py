@@ -581,7 +581,8 @@ def iot_dps_compute_device_key(
                 "or -g) or the enrollment group symmetric key via --symmetric-key or --key."
             )
 
-        target = get_iot_dps_connection_string(cmd, client, dps_name, resource_group_name)
+        discovery = DPSDiscovery(cmd)
+        target = discovery.get_target(dps_name, resource_group_name)
         try:
             resolver = SdkResolver(target=target)
             sdk = resolver.get_sdk(SdkType.dps_sdk)

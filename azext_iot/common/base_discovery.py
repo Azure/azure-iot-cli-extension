@@ -171,11 +171,13 @@ class BaseDiscovery(object):
             )
         )
 
-    @abstractclassmethod
+    @classmethod
+    @abstractmethod
     def _usable_policy(cls, policy):
         """Returns a boolean representing if the given policy can be used."""
         pass
 
+    @classmethod
     @abstractmethod
     def _policy_error(self, policy_name, resource_name):
         """Returns a str for the policy error message."""
