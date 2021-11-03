@@ -5,13 +5,12 @@
 # --------------------------------------------------------------------------------------------
 
 from abc import abstractmethod, abstractclassmethod
+from azure.core.exceptions import HttpResponseError
 from knack.util import CLIError
 from knack.log import get_logger
 from azext_iot.common.shared import AuthenticationTypeDataplane
 from typing import Dict, List
 from types import SimpleNamespace
-
-CONN_STR_TEMPLATE = "HostName={};SharedAccessKeyName={};SharedAccessKey={}"
 
 logger = get_logger(__name__)
 
@@ -37,13 +36,13 @@ class BaseDiscovery(object):
 
     :ivar resource_type: Type of the resources the client fetches. Used to abstract
                          error messages.
-    :vartype resource_type: str
+    :vartype resource_type: DiscoveryResourceType
     """
-    def __init__(self, cmd, track2=False, resource_type=None):
+    def __init__(self, cmd, resource_type=None):
         self.cmd = cmd
         self.client = None
         self.sub_id = "unknown"
-        self.track2 = track2
+        self.track2 = False
         self.resource_type = resource_type
 
     @abstractmethod
@@ -323,13 +322,16 @@ class BaseDiscovery(object):
         if resources:
             print()
             for resource in resources:
-                targets.append(
-                    self.get_target(
-                        resource_name=resource.name,
-                        resource_group_name=resource.additional_properties.get("resourcegroup"),
-                        **kwargs
+                try:
+                    targets.append(
+                        self.get_target(
+                            resource_name=resource.name,
+                            resource_group_name=resource.additional_properties.get("resourcegroup"),
+                            **kwargs
+                        )
                     )
-                )
+                except HttpResponseError as e:
+                    logger.warning("Could not access %s. %s", resource, e)
 
         return targets
 

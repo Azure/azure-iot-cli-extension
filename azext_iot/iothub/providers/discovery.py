@@ -6,7 +6,9 @@
 
 from knack.log import get_logger
 from azure.cli.core.commands.client_factory import get_subscription_id
+from azext_iot.common._azure import CONN_STR_TEMPLATE
 from azext_iot.common.base_discovery import BaseDiscovery
+from azext_iot.common.shared import DiscoveryResourceType
 from azext_iot.common.utility import trim_from_start, ensure_iothub_sdk_min_version
 from azext_iot.iothub.models.iothub_target import IotHubTarget
 from azext_iot._factory import iot_hub_service_factory
@@ -17,7 +19,6 @@ from enum import Enum, EnumMeta
 PRIVILEDGED_ACCESS_RIGHTS_SET = set(
     ["RegistryWrite", "ServiceConnect", "DeviceConnect"]
 )
-CONN_STR_TEMPLATE = "HostName={};SharedAccessKeyName={};SharedAccessKey={}"
 POLICY_ERROR_TEMPLATE = (
     "Unable to discover a priviledged policy for IoT Hub: {}, in subscription {}. "
     "When interfacing with an IoT Hub, the IoT extension requires any single policy with "
@@ -27,17 +28,19 @@ POLICY_ERROR_TEMPLATE = (
 logger = get_logger(__name__)
 
 
-# TODO: Consider abstract base class
 class IotHubDiscovery(BaseDiscovery):
     def __init__(self, cmd):
         super().__init__(
             cmd,
-            ensure_iothub_sdk_min_version(IOTHUB_TRACK_2_SDK_MIN_VERSION),
-            "IoT Hub"
+            DiscoveryResourceType.IoTHub.value
         )
 
     def _initialize_client(self):
+        """Initialize the client and set the track2 value if not done already."""
         if not self.client:
+            # Track 2 could be supported
+            self.track2 = ensure_iothub_sdk_min_version(IOTHUB_TRACK_2_SDK_MIN_VERSION)
+
             if getattr(self.cmd, "cli_ctx", None):
                 self.client = iot_hub_service_factory(self.cmd.cli_ctx)
                 self.sub_id = get_subscription_id(self.cmd.cli_ctx)
@@ -47,17 +50,12 @@ class IotHubDiscovery(BaseDiscovery):
     def _make_kwargs(self, **kwargs):
         return kwargs
 
-    def _policy_error(self, policy_name, resource_name):
-        return (
-            "Unable to discover a priviledged policy for IoT Hub: {}, in subscription {}. "
-            "When interfacing with an IoT Hub, the IoT extension requires any single policy with "
-            "'RegistryWrite', 'ServiceConnect' and 'DeviceConnect' rights.".format(
-                resource_name, self.sub_id
-            )
-        )
+    def _policy_error(self, policy_name: str, resource_name: str) -> str:
+        return POLICY_ERROR_TEMPLATE.format(resource_name, self.sub_id)
 
     @classmethod
-    def _usable_policy(cls, policy):
+    def _usable_policy(cls, policy) -> bool:
+        """Ensure that the policy has the correct rights."""
         rights_set = set(policy.rights.split(", "))
         return PRIVILEDGED_ACCESS_RIGHTS_SET == rights_set
 
