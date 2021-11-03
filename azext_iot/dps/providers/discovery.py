@@ -6,7 +6,7 @@
 
 from knack.log import get_logger
 from azure.cli.core.commands.client_factory import get_subscription_id
-from azext_iot.common._azure import CONN_STR_TEMPLATE, parse_dps_connection_string
+from azext_iot.common._azure import CONN_STR_TEMPLATE
 from azext_iot.common.base_discovery import BaseDiscovery
 from azext_iot.common.shared import DiscoveryResourceType
 from azext_iot._factory import iot_service_provisioning_factory
