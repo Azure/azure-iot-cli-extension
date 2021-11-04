@@ -20,16 +20,16 @@ class TestDPSDiscovery(LiveScenarioTest):
         setattr(self.cmd_shell, "cli_ctx", self.cli_ctx)
         self.desired_policy_name = "provisioningserviceowner"
 
-    def test_iothub_discovery(self):
+    def test_dps_discovery(self):
         discovery = DPSDiscovery(self.cmd_shell)
 
-        iothub = discovery.find_resource(resource_name=dps)
-        assert iothub.name == dps
+        resource = discovery.find_resource(resource_name=dps)
+        assert resource.name == dps
 
         auto_policy = discovery.find_policy(resource_name=dps, rg=dps_rg).as_dict()
         assert auto_policy
 
-        # Assumption - Test Iothub includes the vanilla iothubowner policy
+        # Assumption - Test DPS includes the vanilla provisioningserviceowner policy
         desired_policy = discovery.find_policy(
             resource_name=dps, rg=dps_rg, policy_name=self.desired_policy_name
         ).as_dict()
@@ -39,7 +39,7 @@ class TestDPSDiscovery(LiveScenarioTest):
         assert len(policies)
 
         # Example for leveraging discovery to build cstring for every policy on target IotHub
-        cstrings = [discovery._build_target(resource=iothub, policy=p)["cs"] for p in policies]
+        cstrings = [discovery._build_target(resource=resource, policy=p)["cs"] for p in policies]
         assert len(cstrings)
 
         sub_hubs = discovery.get_resources()
@@ -58,7 +58,7 @@ class TestDPSDiscovery(LiveScenarioTest):
 
         assert len(rg_hubs) <= len(sub_hubs)
 
-    def test_iothub_targets(self):
+    def test_dps_targets(self):
         discovery = DPSDiscovery(self.cmd_shell)
 
         # cs_target1 = discovery.get_target_by_cstring(self.connection_string)

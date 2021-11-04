@@ -65,7 +65,6 @@ def iot_dps_device_enrollment_get(
 ):
     discovery = DPSDiscovery(cmd)
     target = discovery.get_target(dps_name, resource_group_name)
-    print(target)
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
@@ -624,7 +623,6 @@ def iot_dps_registration_list(cmd, dps_name, enrollment_id, resource_group_name=
 def iot_dps_registration_get(cmd, dps_name, registration_id, resource_group_name=None):
     discovery = DPSDiscovery(cmd)
     target = discovery.get_target(dps_name, resource_group_name)
-    print(dps_name, resource_group_name, target)
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)

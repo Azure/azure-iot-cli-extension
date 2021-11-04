@@ -53,8 +53,7 @@ class IotHubDiscovery(BaseDiscovery):
     def _policy_error(self, policy_name: str, resource_name: str) -> str:
         return POLICY_ERROR_TEMPLATE.format(resource_name, self.sub_id)
 
-    @classmethod
-    def _usable_policy(cls, policy) -> bool:
+    def _usable_policy(self, policy) -> bool:
         """Ensure that the policy has the correct rights."""
         rights_set = set(policy.rights.split(", "))
         return PRIVILEDGED_ACCESS_RIGHTS_SET == rights_set

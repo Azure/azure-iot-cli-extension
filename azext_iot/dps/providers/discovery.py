@@ -44,8 +44,7 @@ class DPSDiscovery(BaseDiscovery):
             "IoT Provisioning Service {}.".format(policy_name, resource_name)
         )
 
-    @classmethod
-    def _usable_policy(cls, policy):
+    def _usable_policy(self, policy):
         return bool(policy)
 
     @classmethod

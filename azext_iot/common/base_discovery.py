@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from azure.core.exceptions import HttpResponseError
 from knack.util import CLIError
 from knack.log import get_logger
@@ -16,7 +16,7 @@ logger = get_logger(__name__)
 
 
 # Abstract base class
-class BaseDiscovery(object):
+class BaseDiscovery(ABC):
     """BaseDiscovery to support resource and policy auto discovery.
 
     Eliminates the need to provide the resource group and policy name to
@@ -171,13 +171,11 @@ class BaseDiscovery(object):
             )
         )
 
-    @classmethod
     @abstractmethod
-    def _usable_policy(cls, policy):
+    def _usable_policy(self, policy):
         """Returns a boolean representing if the given policy can be used."""
         pass
 
-    @classmethod
     @abstractmethod
     def _policy_error(self, policy_name, resource_name):
         """Returns a str for the policy error message."""
@@ -323,7 +321,6 @@ class BaseDiscovery(object):
         targets = []
         resources = self.get_resources(rg=resource_group_name)
         if resources:
-            print()
             for resource in resources:
                 try:
                     targets.append(
