@@ -227,7 +227,8 @@ class BaseDiscovery(object):
             self._policy_error(policy_name, resource_name)
         )
 
-    @abstractclassmethod
+    @classmethod
+    @abstractmethod
     def get_target_by_cstring(cls, connection_string):
         """Returns target inforation needed from a connection string."""
         pass
