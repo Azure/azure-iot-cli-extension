@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from abc import abstractmethod, abstractclassmethod
+from abc import abstractmethod
 from azure.core.exceptions import HttpResponseError
 from knack.util import CLIError
 from knack.log import get_logger
