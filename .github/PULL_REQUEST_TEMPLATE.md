@@ -14,8 +14,9 @@ Basic expectations
 - [ ] If introducing new functionality or modified behavior, are they backed by unit and integration tests?
 - [ ] In the same context as above are command names and their parameter definitions accurate? Do help docs have sufficient content?
 - [ ] Have **all** unit **and** integration tests passed locally? i.e. `pytest <project root> -vv`. Please provide evidence in the form of a screenshot showing a succesful run of integration tests.
-- [ ] Have static checks passed using the .pylintrc and .flake8 rules? Look at the CI scripts for example usage.
+- [ ] Have static checks passed using the `.pylintrc` and `.flake8` rules? Look at the CI scripts for example usage.
 - [ ] Have extraneous print or debug statements (if any) been removed from the surface area of changes?
+- [ ] Commented out code-blocks or statements have not been introduced.
 - [ ] Have you made an entry in HISTORY.rst which concisely explains your user-facing feature or change?
 
 Azure IoT CLI maintainers reserve the right to enforce any of the outlined expectations.
