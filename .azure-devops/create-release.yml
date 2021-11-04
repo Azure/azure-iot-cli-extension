@@ -175,7 +175,7 @@ stages:
 
     - job: 'Calculate_Sha_And_Create_Release'
       pool:
-        vmImage: 'vs2017-win2016'
+        vmImage: 'windows-2019'
       variables:
         CLIVersion: $[ stageDependencies.build.recordVersion.outputs['setupVersion.CLIVersion'] ]
         ReleaseTitle: $[ stageDependencies.build.recordVersion.outputs['setupVersion.ReleaseTitle'] ]
