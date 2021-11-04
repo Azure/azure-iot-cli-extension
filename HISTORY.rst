@@ -7,6 +7,8 @@ Release History
 +++++++++++++++
 
 **IoT DPS changes**
+* DPS now supports auto resource and policy discovery. Resource group is no longer a
+  required parameter for az iot dps commands.
 * az iot dps compute-device-key now supports enrollment group identifiers in addition to
   enrollment group symmetric key. Please take a look at the --help docs for functionality
   and usage highlights.

@@ -50,14 +50,6 @@ class DPSDiscovery(BaseDiscovery):
     @classmethod
     def get_target_by_cstring(cls, connection_string: str):
         # TODO: future iteration
-        # """Parse from dps connection string and return the parts needed. See IotHubTarget."""
-        # decomposed = parse_dps_connection_string(connection_string)
-        # return {
-        #     "cs": connection_string,
-        #     "policy": decomposed.get("SharedAccessKeyName"),
-        #     "primarykey": decomposed.get("SharedAccessKey"),
-        #     "entity": decomposed.get("HostName"),
-        # }
         pass
 
     def _build_target(self, resource, policy, key_type: str = None, **kwargs) -> Dict[str, str]:
