@@ -19,3 +19,5 @@ Basic expectations
 - [ ] Have you made an entry in HISTORY.rst which concisely explains your user-facing feature or change?
 
 Azure IoT CLI maintainers reserve the right to enforce any of the outlined expectations.
+
+A PR is considered **ready for review** when all basic expectations have been met (or do not apply).
