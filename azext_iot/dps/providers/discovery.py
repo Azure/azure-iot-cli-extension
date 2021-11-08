@@ -55,9 +55,9 @@ class DPSDiscovery(BaseDiscovery):
         self, resource, policy, key_type: str = None, **kwargs
     ) -> Dict[str, str]:
         # This is more or less a compatibility function which produces the
-        # same result as _azure.get_iot_hub_connection_string()
+        # same result as _azure.get_iot_dps_connection_string()
         # In future iteration we will return a 'Target' object rather than dict
-        # but that will be better served aligning with vNext pattern for Iot Hub
+        # but that will be better served aligning with vNext pattern for DPS
         result = {}
         result["cs"] = IOT_SERVICE_CS_TEMPLATE.format(
             resource.properties.service_operations_host_name,
