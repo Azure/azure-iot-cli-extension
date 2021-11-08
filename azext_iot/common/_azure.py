@@ -39,7 +39,7 @@ def parse_iot_device_module_connection_string(cs):
     return _parse_connection_string(cs, validate, "Module")
 
 
-CONN_STR_TEMPLATE = "HostName={};SharedAccessKeyName={};SharedAccessKey={}"
+IOT_SERVICE_CS_TEMPLATE = "HostName={};SharedAccessKeyName={};SharedAccessKey={}"
 
 
 def get_iot_dps_connection_string(
@@ -102,7 +102,7 @@ def get_iot_dps_connection_string(
         )
 
     result = {}
-    result["cs"] = CONN_STR_TEMPLATE.format(
+    result["cs"] = IOT_SERVICE_CS_TEMPLATE.format(
         target_dps.properties.service_operations_host_name,
         policy.key_name,
         policy.primary_key if key_type == "primary" else policy.secondary_key,

@@ -6,55 +6,60 @@
 
 from knack.log import get_logger
 from azure.cli.core.commands.client_factory import get_subscription_id
-from azext_iot.common._azure import CONN_STR_TEMPLATE
+from azext_iot.common._azure import IOT_SERVICE_CS_TEMPLATE
 from azext_iot.common.base_discovery import BaseDiscovery
 from azext_iot.common.shared import DiscoveryResourceType
 from azext_iot._factory import iot_service_provisioning_factory
-from typing import Dict
+from typing import Any, Dict
 
 logger = get_logger(__name__)
+PRIVILEDGED_ACCESS_RIGHTS_SET = set(
+    ["ServiceConfig", "EnrollmentWrite"]
+)
 
 
 class DPSDiscovery(BaseDiscovery):
     def __init__(self, cmd):
         super().__init__(
-            cmd,
-            DiscoveryResourceType.DPS.value
+            cmd=cmd,
+            necessary_rights_set=PRIVILEDGED_ACCESS_RIGHTS_SET,
+            resource_type=DiscoveryResourceType.DPS.value
         )
 
     def _initialize_client(self):
         if not self.client:
             if getattr(self.cmd, "cli_ctx", None):
+                # The client we want to use is an attribute of the client returned
+                # from the factory. This will have to be revisted if the DPS sdk changes.
                 self.client = iot_service_provisioning_factory(self.cmd.cli_ctx).iot_dps_resource
                 self.sub_id = get_subscription_id(self.cmd.cli_ctx)
             else:
                 self.client = self.cmd
 
-            # Weirdness thanks to client discrepencies
+            # Method get_keys_for_key_name needed for policy discovery (see
+            # BaseDiscovery.find_policy for usage) and is defined as
+            # list)keys_for_key_name in the DPS Sdk.
             self.client.get_keys_for_key_name = self.client.list_keys_for_key_name
 
-    def _make_kwargs(self, **kwargs):
-        """Adds kwarg for the DPS client."""
+    def _make_kwargs(self, **kwargs) -> Dict[str, Any]:
+        # The DPS client needs the provisioning_service_name argument
         kwargs["provisioning_service_name"] = kwargs.get("resource_name")
         return kwargs
-
-    def _policy_error(self, policy_name: str, resource_name: str) -> str:
-        return (
-            "No keys found for policy {} of "
-            "IoT Provisioning Service {}.".format(policy_name, resource_name)
-        )
-
-    def _usable_policy(self, policy):
-        return bool(policy)
 
     @classmethod
     def get_target_by_cstring(cls, connection_string: str):
         # TODO: future iteration
         pass
 
-    def _build_target(self, resource, policy, key_type: str = None, **kwargs) -> Dict[str, str]:
+    def _build_target(
+        self, resource, policy, key_type: str = None, **kwargs
+    ) -> Dict[str, str]:
+        # This is more or less a compatibility function which produces the
+        # same result as _azure.get_iot_hub_connection_string()
+        # In future iteration we will return a 'Target' object rather than dict
+        # but that will be better served aligning with vNext pattern for Iot Hub
         result = {}
-        result["cs"] = CONN_STR_TEMPLATE.format(
+        result["cs"] = IOT_SERVICE_CS_TEMPLATE.format(
             resource.properties.service_operations_host_name,
             policy.key_name,
             policy.primary_key if key_type == "primary" else policy.secondary_key,

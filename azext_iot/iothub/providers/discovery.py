@@ -6,33 +6,28 @@
 
 from knack.log import get_logger
 from azure.cli.core.commands.client_factory import get_subscription_id
-from azext_iot.common._azure import CONN_STR_TEMPLATE
+from azext_iot.common._azure import IOT_SERVICE_CS_TEMPLATE
 from azext_iot.common.base_discovery import BaseDiscovery
 from azext_iot.common.shared import DiscoveryResourceType
 from azext_iot.common.utility import trim_from_start, ensure_iothub_sdk_min_version
 from azext_iot.iothub.models.iothub_target import IotHubTarget
 from azext_iot._factory import iot_hub_service_factory
 from azext_iot.constants import IOTHUB_TRACK_2_SDK_MIN_VERSION
-from typing import Dict
+from typing import Any, Dict
 from enum import Enum, EnumMeta
 
+logger = get_logger(__name__)
 PRIVILEDGED_ACCESS_RIGHTS_SET = set(
     ["RegistryWrite", "ServiceConnect", "DeviceConnect"]
 )
-POLICY_ERROR_TEMPLATE = (
-    "Unable to discover a priviledged policy for IoT Hub: {}, in subscription {}. "
-    "When interfacing with an IoT Hub, the IoT extension requires any single policy with "
-    "'RegistryWrite', 'ServiceConnect' and 'DeviceConnect' rights."
-)
-
-logger = get_logger(__name__)
 
 
 class IotHubDiscovery(BaseDiscovery):
     def __init__(self, cmd):
         super().__init__(
-            cmd,
-            DiscoveryResourceType.IoTHub.value
+            cmd=cmd,
+            necessary_rights_set=PRIVILEDGED_ACCESS_RIGHTS_SET,
+            resource_type=DiscoveryResourceType.IoTHub.value
         )
 
     def _initialize_client(self):
@@ -47,16 +42,8 @@ class IotHubDiscovery(BaseDiscovery):
             else:
                 self.client = self.cmd
 
-    def _make_kwargs(self, **kwargs):
+    def _make_kwargs(self, **kwargs) -> Dict[str, Any]:
         return kwargs
-
-    def _policy_error(self, policy_name: str, resource_name: str) -> str:
-        return POLICY_ERROR_TEMPLATE.format(resource_name, self.sub_id)
-
-    def _usable_policy(self, policy) -> bool:
-        """Ensure that the policy has the correct rights."""
-        rights_set = set(policy.rights.split(", "))
-        return PRIVILEDGED_ACCESS_RIGHTS_SET == rights_set
 
     @classmethod
     def get_target_by_cstring(cls, connection_string: str) -> IotHubTarget:
@@ -72,7 +59,7 @@ class IotHubDiscovery(BaseDiscovery):
         include_events = kwargs.get("include_events", False)
 
         target = {}
-        target["cs"] = CONN_STR_TEMPLATE.format(
+        target["cs"] = IOT_SERVICE_CS_TEMPLATE.format(
             resource.properties.host_name,
             policy.key_name,
             policy.primary_key if key_type == "primary" else policy.secondary_key,

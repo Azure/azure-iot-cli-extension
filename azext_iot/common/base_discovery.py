@@ -9,10 +9,26 @@ from azure.core.exceptions import HttpResponseError
 from knack.util import CLIError
 from knack.log import get_logger
 from azext_iot.common.shared import AuthenticationTypeDataplane
-from typing import Dict, List
+from typing import Any, Dict, List
 from types import SimpleNamespace
 
 logger = get_logger(__name__)
+POLICY_ERROR_TEMPLATE = (
+    "Unable to discover a priviledged policy for {0}: {1}, in subscription {2}. "
+    "When interfacing with an {0}, the IoT extension requires any single policy with "
+    "{3} rights."
+)
+
+
+def _format_policy_set(inputs: set) -> str:
+    inputs = list(f"'{x}'" for x in inputs)
+    if len(inputs) == 1:
+        return inputs[0]
+    elif len(inputs) == 2:
+        return inputs[0] + " and " + inputs[1]
+
+    inputs[-1] = "and " + inputs[-1]
+    return ", ".join(inputs)
 
 
 # Abstract base class
@@ -37,13 +53,18 @@ class BaseDiscovery(ABC):
     :ivar resource_type: Type of the resources the client fetches. Used to abstract
                          error messages.
     :vartype resource_type: DiscoveryResourceType
+
+    :ivar necessary_rights_set: Set of policy names needed for the Iot Extension to run
+                                commands against the DPS instance.
+    :vartype necessary_rights_set: Set[str]
     """
-    def __init__(self, cmd, resource_type=None):
+    def __init__(self, cmd, necessary_rights_set: set = None, resource_type: str = None):
         self.cmd = cmd
         self.client = None
         self.sub_id = "unknown"
-        self.track2 = False
         self.resource_type = resource_type
+        self.track2 = False
+        self.necessary_rights_set = necessary_rights_set
 
     @abstractmethod
     def _initialize_client(self):
@@ -51,7 +72,7 @@ class BaseDiscovery(ABC):
         pass
 
     @abstractmethod
-    def _make_kwargs(self, **kwargs):
+    def _make_kwargs(self, **kwargs) -> Dict[str, Any]:
         """Returns the correct kwargs for the client operations."""
         pass
 
@@ -171,16 +192,6 @@ class BaseDiscovery(ABC):
             )
         )
 
-    @abstractmethod
-    def _usable_policy(self, policy):
-        """Returns a boolean representing if the given policy can be used."""
-        pass
-
-    @abstractmethod
-    def _policy_error(self, policy_name, resource_name):
-        """Returns a str for the policy error message."""
-        pass
-
     def find_policy(self, resource_name: str, rg: str, policy_name: str = "auto"):
         """
         Returns the policy with the policy_name for the given resource.
@@ -215,14 +226,20 @@ class BaseDiscovery(ABC):
         policy_list = self.get_policies(resource_name=resource_name, rg=rg)
 
         for policy in policy_list:
-            if self._usable_policy(policy):
+            rights_set = set(policy.rights.split(", "))
+            if self.necessary_rights_set.issubset(rights_set):
                 logger.info(
                     "Using policy '%s' for %s interaction.", policy.key_name, self.resource_type
                 )
                 return policy
 
         raise CLIError(
-            self._policy_error(policy_name, resource_name)
+            POLICY_ERROR_TEMPLATE.format(
+                self.resource_type,
+                resource_name,
+                self.sub_id,
+                _format_policy_set(self.necessary_rights_set)
+            )
         )
 
     @classmethod
