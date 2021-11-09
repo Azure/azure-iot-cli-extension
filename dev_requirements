@@ -13,3 +13,4 @@ flake8
 azure-storage-blob
 pytest-xdist
 pytest-rerunfailures
+tox
