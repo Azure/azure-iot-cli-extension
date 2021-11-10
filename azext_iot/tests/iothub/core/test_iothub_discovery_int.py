@@ -22,27 +22,27 @@ class TestIoTHubDiscovery(IoTLiveScenarioTest):
     def test_iothub_discovery(self):
         discovery = IotHubDiscovery(self.cmd_shell)
 
-        iothub = discovery.find_iothub(hub_name=self.entity_name)
+        iothub = discovery.find_resource(resource_name=self.entity_name)
         assert iothub.name == self.entity_name
 
-        auto_policy = discovery.find_policy(hub_name=self.entity_name, rg=self.entity_rg).as_dict()
+        auto_policy = discovery.find_policy(resource_name=self.entity_name, rg=self.entity_rg).as_dict()
         rights_set = set(auto_policy["rights"].split(", "))
         assert rights_set == PRIVILEDGED_ACCESS_RIGHTS_SET
 
         # Assumption - Test Iothub includes the vanilla iothubowner policy
         desired_policy = discovery.find_policy(
-            hub_name=self.entity_name, rg=self.entity_rg, policy_name=self.desired_policy_name
+            resource_name=self.entity_name, rg=self.entity_rg, policy_name=self.desired_policy_name
         ).as_dict()
         assert desired_policy["key_name"] == self.desired_policy_name
 
-        policies = discovery.get_policies(hub_name=self.entity_name, rg=self.entity_rg)
+        policies = discovery.get_policies(resource_name=self.entity_name, rg=self.entity_rg)
         assert len(policies)
 
         # Example for leveraging discovery to build cstring for every policy on target IotHub
-        cstrings = [discovery._build_target(iothub=iothub, policy=p)["cs"] for p in policies]
+        cstrings = [discovery._build_target(resource=iothub, policy=p)["cs"] for p in policies]
         assert len(cstrings)
 
-        sub_hubs = discovery.get_iothubs()
+        sub_hubs = discovery.get_resources()
         assert sub_hubs
 
         filtered_sub_hubs = [
@@ -50,7 +50,7 @@ class TestIoTHubDiscovery(IoTLiveScenarioTest):
         ]
         assert filtered_sub_hubs
 
-        rg_hubs = discovery.get_iothubs(rg=self.entity_rg)
+        rg_hubs = discovery.get_resources(rg=self.entity_rg)
         assert rg_hubs
 
         filtered_rg_hubs = [hub for hub in rg_hubs if hub.as_dict()["name"] == self.entity_name]
@@ -64,17 +64,17 @@ class TestIoTHubDiscovery(IoTLiveScenarioTest):
         cs_target1 = discovery.get_target_by_cstring(self.connection_string)
         assert_target(cs_target1, True)
 
-        cs_target2 = discovery.get_target(hub_name=None, login=self.connection_string)
+        cs_target2 = discovery.get_target(resource_name=None, login=self.connection_string)
         assert_target(cs_target2, True)
 
-        auto_target = discovery.get_target(hub_name=self.entity_name)
+        auto_target = discovery.get_target(resource_name=self.entity_name)
         assert_target(auto_target, rg=self.entity_rg)
 
-        auto_target = discovery.get_target(hub_name=self.entity_name, resource_group_name=self.entity_rg)
+        auto_target = discovery.get_target(resource_name=self.entity_name, resource_group_name=self.entity_rg)
         assert_target(auto_target, rg=self.entity_rg)
 
         desired_target = discovery.get_target(
-            hub_name=self.entity_name, policy_name=self.desired_policy_name, include_events=True
+            resource_name=self.entity_name, policy_name=self.desired_policy_name, include_events=True
         )
         assert_target(desired_target, rg=self.entity_rg, include_events=True)
 
