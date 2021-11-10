@@ -58,8 +58,8 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
         super(IoTLiveScenarioTest, self).__init__(test_scenario)
 
         if not settings.env.azext_iot_testhub:
-            profile = Profile(cli_ctx=DummyCli())
-            profile.refresh_accounts()
+            # profile = Profile(cli_ctx=DummyCli())
+            # profile.refresh_accounts()
             hubs_list = self.cmd(
                 '''iot hub list -g "{}"'''.format(self.entity_rg)
             ).get_output_in_json()
@@ -94,7 +94,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 new_hub = self.cmd(
                     "iot hub show -n {} -g {}".format(self.entity_name, self.entity_rg)
                 ).get_output_in_json()
-
+                exit()
                 account = self.cmd("account show").get_output_in_json()
                 user = account["user"]
 
