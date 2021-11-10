@@ -58,6 +58,8 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
         super(IoTLiveScenarioTest, self).__init__(test_scenario)
 
         if not settings.env.azext_iot_testhub:
+            profile = Profile(cli_ctx=DummyCli())
+            profile.refresh_accounts()
             hubs_list = self.cmd(
                 '''iot hub list -g "{}"'''.format(self.entity_rg)
             ).get_output_in_json()
@@ -110,7 +112,6 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
                     sleep(10)
 
-                profile = Profile(cli_ctx=DummyCli())
                 profile.refresh_accounts()
                 sleep(ROLE_ASSIGNMENT_REFRESH_TIME)
 
