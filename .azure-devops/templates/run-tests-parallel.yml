@@ -26,7 +26,7 @@ parameters:
   default: 'all'
 - name: azureSubscription
   type: string
-  default: 'AzIoTCLIService'
+  default: 'az_cli_nightly_conn'
 - name: num_threads
   type: number
   default: 6
