@@ -68,7 +68,9 @@ jobs:
         python.version: '3.7.x'
       Python38:
         python.version: '3.8.x'
-    maxParallel: 3
+      Python39:
+        python.version: '3.9.x'
+    maxParallel: 4
 
   steps:
   - bash: sudo rm -R -f /usr/local/lib/azureExtensionDir
