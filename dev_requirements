@@ -4,7 +4,6 @@ pytest-cov
 pytest-env
 uamqp~=1.2
 responses
-urllib3[secure]>=1.26.5
 black
 wheel==0.30.0
 pre-commit
