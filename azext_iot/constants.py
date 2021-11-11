@@ -48,6 +48,10 @@ PNP_DTDLV2_COMPONENT_MARKER = "__t"
 # Config Key's
 CONFIG_KEY_UAMQP_EXT_VERSION = "uamqp_ext_version"
 
-# Initial Track 2 SDK version
+# Initial Track 2 SDK version for IoT Hub
 IOTHUB_MGMT_SDK_PACKAGE_NAME = "azure-mgmt-iothub"
 IOTHUB_TRACK_2_SDK_MIN_VERSION = "2.0.0"
+
+# Initial Track 2 SDK version for DPS
+IOTDPS_MGMT_SDK_PACKAGE_NAME = "azure-mgmt-iothubprovisioningservice"
+IOTDPS_TRACK_2_SDK_MIN_VERSION = "1.0.0"

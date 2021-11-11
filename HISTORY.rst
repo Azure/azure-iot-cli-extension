@@ -7,6 +7,8 @@ Release History
 +++++++++++++++
 
 **IoT DPS changes**
+* DPS support DPS connection string as a resource identifier with the --login or -l
+  parameter, similar to IoT Hub Identifier Arguments
 * DPS now supports auto resource and policy discovery. Resource group is no longer a
   required parameter for az iot dps commands. Auto policy discovery ensures that a policy
   with all the correct permissions is available and is used by the IoT extension for all
