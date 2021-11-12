@@ -10,8 +10,6 @@ from time import sleep
 from typing import List
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
 from azext_iot.tests.generators import generate_generic_id
-from azure.cli.core._profile import Profile
-from azure.cli.core.mock import DummyCli
 from azext_iot.tests import CaptureOutputLiveScenarioTest
 
 from azext_iot.common.certops import create_self_signed_certificate
