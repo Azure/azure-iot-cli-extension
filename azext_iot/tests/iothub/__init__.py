@@ -93,18 +93,20 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     "iot hub show -n {} -g {}".format(self.entity_name, self.entity_rg)
                 ).get_output_in_json()
 
-                account = self.cmd("account show").get_output_in_json()
-                user = account["user"]
+                sleep(40)
 
-                try:
-                    # assign IoT Hub Data Contributor role to current user
-                    self.cmd(
-                        '''role assignment create --assignee "{}" --role "{}" --scope "{}"'''.format(
-                            'cd22f07c-7c98-4587-85f8-4b16984ef9c8', USER_ROLE, new_hub["id"]
-                        )
-                    )
-                except:
-                    sleep(5)
+                # account = self.cmd("account show").get_output_in_json()
+                # user = account["user"]
+
+                # try:
+                #     # assign IoT Hub Data Contributor role to current user
+                #     self.cmd(
+                #         '''role assignment create --assignee "{}" --role "{}" --scope "{}"'''.format(
+                #             'cd22f07c-7c98-4587-85f8-4b16984ef9c8', USER_ROLE, new_hub["id"]
+                #         )
+                #     )
+                # except:
+                #     sleep(5)
 
                 # ensure role assignment is complete
                 # role_assignment_principal_names = []
