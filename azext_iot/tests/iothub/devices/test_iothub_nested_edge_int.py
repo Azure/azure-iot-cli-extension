@@ -269,3 +269,63 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
                 )
             )
             assert output.get_output_in_json() == []
+
+    def test_iothub_device_scope_on_create(self):
+        for auth_phase in DATAPLANE_AUTH_TYPES:
+            device_count = 1
+            device_ids = self.generate_device_names(device_count)
+            edge_device_count = 1
+            edge_device_ids = self.generate_device_names(edge_device_count)
+
+            edge_device = self.cmd(
+                self.set_cmd_auth_type(
+                    f"iot hub device-identity create -d {edge_device_ids[0]} -n {self.entity_name} -g {self.entity_rg} --ee",
+                    auth_type=auth_phase,
+                ),
+                checks=[
+                    self.check("capabilities.iotEdge", True),
+                    self.exists("deviceScope"),
+                    self.check("parentScopes", []),
+                ],
+            ).get_output_in_json()
+
+            self.cmd(
+                self.set_cmd_auth_type(
+                    f"iot hub device-identity create -d {device_ids[0]} -n {self.entity_name} "
+                    f"-g {self.entity_rg} --device-scope {edge_device['deviceScope']}",
+                    auth_type=auth_phase,
+                ),
+                checks=[
+                    self.check("deviceScope", edge_device["deviceScope"]),
+                ],
+            )
+
+    def test_iothub_edge_device_parent_scope_on_create(self):
+        for auth_phase in DATAPLANE_AUTH_TYPES:
+            edge_device_count = 2
+            edge_device_ids = self.generate_device_names(edge_device_count)
+
+            edge_device = self.cmd(
+                self.set_cmd_auth_type(
+                    f"iot hub device-identity create -d {edge_device_ids[0]} -n {self.entity_name} -g {self.entity_rg} --ee",
+                    auth_type=auth_phase,
+                ),
+                checks=[
+                    self.check("capabilities.iotEdge", True),
+                    self.exists("deviceScope"),
+                    self.check("parentScopes", []),
+                ],
+            ).get_output_in_json()
+
+            self.cmd(
+                self.set_cmd_auth_type(
+                    f"iot hub device-identity create -d {edge_device_ids[1]} -n {self.entity_name} --ee "
+                    f"-g {self.entity_rg} --device-scope {edge_device['deviceScope']}",
+                    auth_type=auth_phase,
+                ),
+                checks=[
+                    self.check("capabilities.iotEdge", True),
+                    self.exists("deviceScope"),
+                    self.check("parentScopes", [edge_device["deviceScope"]]),
+                ],
+            )
