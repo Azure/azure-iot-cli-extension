@@ -100,7 +100,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     # assign IoT Hub Data Contributor role to current user
                     self.cmd(
                         '''role assignment create --assignee "{}" --role "{}" --scope "{}"'''.format(
-                            '028b95c5-7eac-437d-a3ad-1905962dac9b', USER_ROLE, new_hub["id"]
+                            'cd22f07c-7c98-4587-85f8-4b16984ef9c8', USER_ROLE, new_hub["id"]
                         )
                     )
                 except:
