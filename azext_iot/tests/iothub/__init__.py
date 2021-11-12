@@ -47,7 +47,7 @@ ENTITY_NAME = settings.env.azext_iot_testhub if settings.env.azext_iot_testhub e
 STORAGE_CONTAINER = (
     settings.env.azext_iot_teststoragecontainer if settings.env.azext_iot_teststoragecontainer else DEFAULT_CONTAINER
 )
-ROLE_ASSIGNMENT_REFRESH_TIME = 60
+ROLE_ASSIGNMENT_REFRESH_TIME = 120
 
 
 class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
@@ -89,34 +89,6 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                         )
                     )
 
-                new_hub = self.cmd(
-                    "iot hub show -n {} -g {}".format(self.entity_name, self.entity_rg)
-                ).get_output_in_json()
-
-                sleep(40)
-
-                # account = self.cmd("account show").get_output_in_json()
-                # user = account["user"]
-
-                # try:
-                #     # assign IoT Hub Data Contributor role to current user
-                #     self.cmd(
-                #         '''role assignment create --assignee "{}" --role "{}" --scope "{}"'''.format(
-                #             'cd22f07c-7c98-4587-85f8-4b16984ef9c8', USER_ROLE, new_hub["id"]
-                #         )
-                #     )
-                # except:
-                #     sleep(5)
-
-                # ensure role assignment is complete
-                # role_assignment_principal_names = []
-                # while user["name"] not in role_assignment_principal_names:
-                #     role_assignments = self.get_role_assignments(new_hub["id"], USER_ROLE)
-                #     role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
-                #     sleep(10)
-
-                # profile = Profile(cli_ctx=DummyCli())
-                # profile.refresh_accounts()
                 sleep(ROLE_ASSIGNMENT_REFRESH_TIME)
 
         self.region = self.get_region()
