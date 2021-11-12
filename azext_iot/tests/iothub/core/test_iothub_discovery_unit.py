@@ -36,7 +36,7 @@ class TestIoTHubDiscovery:
         parsed_fake_login = parse_iot_hub_connection_string(fake_login)
 
         target = discovery.get_target(
-            hub_name=None, resource_group_name=None, login=fake_login
+            resource_name=None, resource_group_name=None, login=fake_login
         )
 
         # Ensure no ARM calls are made

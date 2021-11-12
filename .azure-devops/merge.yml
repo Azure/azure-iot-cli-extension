@@ -2,25 +2,19 @@ trigger:
   branches:
     include:
       - dev
-      - master
+      - main
   paths:
     exclude:
-    - README.md
-    - docs/alt-install-methods.md
-    - docs/install-help.md
-    - docs/scenario-automation.md
+    - '**/*.md'
 
 pr:
   branches:
     include:
       - dev
-      - master
+      - main
   paths:
     exclude:
-    - README.md
-    - docs/alt-install-methods.md
-    - docs/install-help.md
-    - docs/scenario-automation.md
+    - '**/*.md'
 
 variables:
   iot_ext_package: azure-iot
@@ -74,7 +68,9 @@ jobs:
         python.version: '3.7.x'
       Python38:
         python.version: '3.8.x'
-    maxParallel: 3
+      Python39:
+        python.version: '3.9.x'
+    maxParallel: 4
 
   steps:
   - bash: sudo rm -R -f /usr/local/lib/azureExtensionDir
@@ -88,7 +84,7 @@ jobs:
 - job: 'run_unit_tests_macOs'
   dependsOn: ['build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']
   pool:
-    vmImage: 'macOS-10.14'
+    vmImage: 'macOS-10.15'
 
   steps:
   - template: templates/run-tests-parallel.yml
@@ -102,7 +98,7 @@ jobs:
 - job: 'run_unit_tests_windows'
   dependsOn : [ 'build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']
   pool:
-    vmImage: 'vs2017-win2016'
+    vmImage: 'windows-2019'
 
   steps:
   - task: PowerShell@2
@@ -157,7 +153,7 @@ jobs:
 - job: CredScan
   displayName: 'Credential Scan'
   pool:
-    vmImage: 'vs2017-win2016'
+    vmImage: 'windows-2019'
 
   steps:
   - task: CredScan@3
