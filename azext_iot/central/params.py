@@ -386,3 +386,79 @@ def load_central_arguments(self, _):
             options_list=["--description", "--desc"],
             help="Detailed description of the job.",
         )
+
+    with self.argument_context("iot central query") as context:
+        context.argument(
+            "query_string",
+            options_list=["--query-string", "--qs"],
+            help="Query clause to retrieve telemetry or property data.",
+        )
+        context.argument(
+            "api_version",
+            options_list=["--api-version", "--av"],
+            choices=CaseInsensitiveList([ApiVersion.v1_1_preview.value]),
+            default=ApiVersion.v1_1_preview.value,
+            help="The API version for the requested operation.",
+        )
+
+    with self.argument_context("iot central destination") as context:
+        context.argument(
+            "destination_id",
+            options_list=["--dest-id"],
+            help="Unique identifier for the destination.",
+        )
+        context.argument(
+            "api_version",
+            options_list=["--api-version", "--av"],
+            choices=CaseInsensitiveList([ApiVersion.v1_1_preview.value]),
+            default=ApiVersion.v1_1_preview.value,
+            help="The API version for the requested operation.",
+        )
+
+    with self.argument_context("iot central destination create") as context:
+        context.argument(
+            "content",
+            options_list=["--content", "-k"],
+            help="The destination definition. Provide path to JSON file or raw stringified JSON."
+            " [File Path Example:./path/to/file.json]"
+            " [Example of stringified JSON:[{<Job Data JSON>}]. The request body must contain array of JobData.",
+        )
+    with self.argument_context("iot central destination update") as context:
+        context.argument(
+            "content",
+            options_list=["--content", "-k"],
+            help="The partial destination definition. Provide path to JSON file or raw stringified JSON."
+            " [File Path Example:./path/to/file.json]"
+            " [Example of stringified JSON:[{<Job Data JSON>}]. The request body must contain array of JobData.",
+        )
+
+    with self.argument_context("iot central export") as context:
+        context.argument(
+            "export_id",
+            options_list=["--export-id"],
+            help="Unique identifier for the export.",
+        )
+        context.argument(
+            "api_version",
+            options_list=["--api-version", "--av"],
+            choices=CaseInsensitiveList([ApiVersion.v1_1_preview.value]),
+            default=ApiVersion.v1_1_preview.value,
+            help="The API version for the requested operation.",
+        )
+
+    with self.argument_context("iot central export create") as context:
+        context.argument(
+            "content",
+            options_list=["--content", "-k"],
+            help="The export definition. Provide path to JSON file or raw stringified JSON."
+            " [File Path Example:./path/to/file.json]"
+            " [Example of stringified JSON:[{<Job Data JSON>}]. The request body must contain array of JobData.",
+        )
+    with self.argument_context("iot central export update") as context:
+        context.argument(
+            "content",
+            options_list=["--content", "-k"],
+            help="The partial export definition. Provide path to JSON file or raw stringified JSON."
+            " [File Path Example:./path/to/file.json]"
+            " [Example of stringified JSON:[{<Job Data JSON>}]. The request body must contain array of JobData.",
+        )

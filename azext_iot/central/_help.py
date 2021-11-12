@@ -31,6 +31,18 @@ def load_central_help():
         short-summary: Manage IoT Central applications.
         long-summary: Create, delete, view, and update your IoT Central apps.
         """
+    helps[
+        "iot central query"
+    ] = """
+        type: command
+        short-summary: Query device telemetry or property data with IoT Central Query Language.
+        examples:
+          - name: Query device telemetry
+            text: >
+              az iot central query
+              --app-id {appid}
+              --query-string {query_string}
+        """
 
     _load_central_devices_help()
     _load_central_users_help()
@@ -44,7 +56,156 @@ def load_central_help():
     _load_central_monitors_help()
     _load_central_command_help()
     _load_central_compute_device_key()
+    _load_central_destination_help()
+    _load_central_export_help()
 
+def _load_central_export_help():
+    helps[
+      "iot central export"
+    ] = """
+        type: group
+        short-summary: Manage and configure IoT Central data exports.
+    """
+
+    helps[
+      "iot central export list"
+    ] = """
+        type: command
+        short-summary: Get the list of exports for an IoT Central application.
+        examples:
+        - name: List all exports in an application
+          text: >
+            az iot central export list
+            --app-id {appid}
+    """
+
+    helps[
+      "iot central export show"
+    ] = """
+        type: command
+        short-summary: Get a export details
+        examples:
+        - name: Get a export details
+          text: >
+            az iot central export show
+            --app-id {appid}
+            --export-id {exportid}
+    """
+
+    helps[
+      "iot central export create"
+    ] = """
+        type: command
+        short-summary: Create a export for an application.
+        examples:
+        - name: Create a export
+          text: >
+            az iot central export create
+            --app-id {appid}
+            --export-id {exportid}
+            --content {content}
+    """
+
+    helps[
+      "iot central export update"
+    ] = """
+        type: command
+        short-summary: Update a export for an application.
+        examples:
+        - name: Update a export
+          text: >
+            az iot central export update
+            --app-id {appid}
+            --export-id {exportid}
+            --content {content}
+    """
+
+    helps[
+      "iot central export delete"
+    ] = """
+        type: command
+        short-summary: Delete a export for an application.
+        examples:
+        - name: Delete a export
+          text: >
+            az iot central export delete
+            --app-id {appid}
+            --export-id {exportid}
+    """
+
+def _load_central_destination_help():
+    helps[
+      "iot central destination"
+    ] = """
+        type: group
+        short-summary: Manage and configure IoT Central data export destinations.
+    """
+
+    helps[
+      "iot central destination list"
+    ] = """
+        type: command
+        short-summary: Get the list of destinations for an IoT Central application.
+        examples:
+        - name: List all destinations in an application
+          text: >
+            az iot central destination list
+            --app-id {appid}
+    """
+
+    helps[
+      "iot central destination show"
+    ] = """
+        type: command
+        short-summary: Get a destination details
+        examples:
+        - name: Get a destination details
+          text: >
+            az iot central destination show
+            --app-id {appid}
+            --destination-id {destinationid}
+    """
+
+    helps[
+      "iot central destination create"
+    ] = """
+        type: command
+        short-summary: Create a destination for an application.
+        examples:
+        - name: Create a destination
+          text: >
+            az iot central destination create
+            --app-id {appid}
+            --destination-id {destinationid}
+            --content {content}
+    """
+
+    helps[
+      "iot central destination update"
+    ] = """
+        type: command
+        short-summary: Update a destination for an application.
+        examples:
+        - name: Update a destination
+          text: >
+            az iot central destination update
+            --app-id {appid}
+            --destination-id {destinationid}
+            --content {content}
+    """
+
+    helps[
+      "iot central destination delete"
+    ] = """
+        type: command
+        short-summary: Delete a destination for an application.
+        examples:
+        - name: Delete a destination
+          text: >
+            az iot central destination delete
+            --app-id {appid}
+            --destination-id {destinationid}
+    """
 
 def _load_central_devices_help():
     helps[

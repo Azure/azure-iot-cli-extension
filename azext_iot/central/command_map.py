@@ -7,6 +7,7 @@
 """
 Load CLI commands
 """
+from knack.arguments import CLIArgumentType
 from azure.cli.core.commands import CliCommandType
 
 central_device_ops = CliCommandType(
@@ -47,12 +48,47 @@ central_api_token_ops = CliCommandType(
     operations_tmpl="azext_iot.central.commands_api_token#{}"
 )
 
+central_query_ops = CliCommandType(
+    operations_tmpl = "azext_iot.central.commands_query#{}"
+)
+
+central_destination_ops = CliCommandType(
+    operations_tmpl="azext_iot.central.commands_destination#{}"
+)
+
+central_export_ops = CliCommandType(
+    operations_tmpl="azext_iot.central.commands_export#{}"
+)
+
 
 # Dev note - think of this as the "router" and all self.command_group as the controllers
 def load_central_commands(self, _):
     """
     Load CLI commands
     """
+    
+    with self.command_group(
+        "iot central", command_type=central_query_ops, is_preview=True
+    ) as cmd_group:
+        cmd_group.command("query", "query_run")
+    
+    with self.command_group(
+        "iot central destination", command_type=central_destination_ops, is_preview=True
+    ) as cmd_group:
+        cmd_group.command("list", "list_dataExport_destinations")
+        cmd_group.command("show", "get_dataExport_destination")
+        cmd_group.command("delete", "delete_dataExport_destination")
+        cmd_group.command("create", "add_dataExport_destination")
+        cmd_group.command("update", "update_dataExport_destination")
+
+    with self.command_group(
+        "iot central export", command_type=central_export_ops, is_preview=True
+    ) as cmd_group:
+        cmd_group.command("list", "list_dataExport_exports")
+        cmd_group.command("show", "get_dataExport_export")
+        cmd_group.command("delete", "delete_dataExport_export")
+        cmd_group.command("create", "add_dataExport_export")
+        cmd_group.command("update", "update_dataExport_export")
 
     with self.command_group(
         "iot central diagnostics", command_type=central_monitor_ops, is_preview=True
