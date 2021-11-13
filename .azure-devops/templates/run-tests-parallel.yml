@@ -35,7 +35,7 @@ parameters:
   default: 6
 - name: num_reruns
   type: number
-  default: 0
+  default: 2
 - name: reruns_delay
   type: number
   default: 60
