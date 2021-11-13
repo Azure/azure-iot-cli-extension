@@ -95,7 +95,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
                 account = self.cmd("account show").get_output_in_json()
                 user = account["user"]
-                if user["name"] == None:
+                if user["name"] is None:
                     raise Exception("User not found") 
                 role_assignments = self.get_role_assignments(new_hub["id"], USER_ROLE)
                 role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
