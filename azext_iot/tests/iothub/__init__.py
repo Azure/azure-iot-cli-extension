@@ -93,14 +93,15 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     "iot hub show -n {} -g {}".format(self.entity_name, self.entity_rg)
                 ).get_output_in_json()
 
-                account = self.cmd("account show").get_output_in_json()
-                user = account["user"]
-                if user["name"] is None:
-                    raise Exception("User not found") 
                 role_assignments = self.get_role_assignments(new_hub["id"], USER_ROLE)
                 role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
-                
-                if user["name"] not in role_assignment_principal_names:
+
+                account = self.cmd("account show").get_output_in_json()
+                user = account["user"]
+
+                if user["name"] is None:
+                    raise Exception("User not found")
+                elif user["name"] not in role_assignment_principal_names:
                     # assign IoT Hub Data Contributor role to current user
                     self.cmd(
                         '''role assignment create --assignee "{}" --role "{}" --scope "{}"'''.format(
