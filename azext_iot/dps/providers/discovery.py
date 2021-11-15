@@ -49,7 +49,7 @@ class DPSDiscovery(BaseDiscovery):
 
     def _make_kwargs(self, **kwargs) -> Dict[str, Any]:
         # The DPS client needs the provisioning_service_name argument
-        kwargs["provisioning_service_name"] = kwargs.get("resource_name")
+        kwargs["provisioning_service_name"] = kwargs.pop("resource_name")
         return kwargs
 
     @classmethod
