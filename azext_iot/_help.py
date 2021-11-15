@@ -144,6 +144,9 @@ helps[
     long-summary: |
                   When using the auth method of shared_private_key (also known as symmetric keys),
                   if no custom keys are provided the service will generate them for the device.
+
+                  If a device scope is provided for an edge device, the value will automatically be
+                  converted to a parent scope.
     examples:
     - name: Create an edge enabled IoT device with default authorization (shared private key).
       text: >
@@ -163,10 +166,13 @@ helps[
       text: >
         az iot hub device-identity create -n {iothub_name} -d {device_id} --am x509_thumbprint
         --ptp {thumbprint_1} --stp {thumbprint_2}
-    - name: Create an IoT device with root CA authorization with disabled status and reason
+    - name: Create an IoT device with root CA authorization with disabled status and reason.
       text: >
         az iot hub device-identity create -n {iothub_name} -d {device_id} --am x509_ca
         --status disabled --status-reason 'for reasons'
+    - name: Create an IoT device with a device scope.
+      text: >
+        az iot hub device-identity create -n {iothub_name} -d {device_id} --device-scope 'ms-azure-iot-edge://edge0-123456789123456789'
 """
 
 helps[
@@ -302,16 +308,16 @@ helps[
     "iot hub device-identity parent"
 ] = """
     type: group
-    short-summary: Manage IoT device\'s parent device.
+    short-summary: Manage parent device relationships for IoT devices.
 """
 
 helps[
     "iot hub device-identity parent show"
 ] = """
     type: command
-    short-summary: Get the parent device of the specified device.
+    short-summary: Get the parent device of a target device.
     examples:
-    - name: Get the parent device of the specified device.
+    - name: Get the parent device of a target device.
       text: >
         az iot hub device-identity parent show -d {device_id} -n {iothub_name}
 """
@@ -320,37 +326,36 @@ helps[
     "iot hub device-identity parent set"
 ] = """
     type: command
-    short-summary: Set the parent device of the specified device.
+    short-summary: Set the parent device of a target device.
     examples:
-    - name: Set the parent device of the specified device.
+    - name: Set the parent device of a target device.
       text: >
         az iot hub device-identity parent set -d {device_id} --pd {edge_device_id} -n {iothub_name}
-    - name: Set the parent device of the specified device and overwrites its original parent.
+    - name: Set the parent device of a target device and overwrite the existing parent.
       text: >
-        az iot hub device-identity parent set -d {device_id} --pd {edge_device_id} --force -n {iothub_name}
+        az iot hub device-identity parent set -d {device_id} --pd {edge_device_id} -n {iothub_name} --force
 """
 
 helps[
     "iot hub device-identity children"
 ] = """
     type: group
-    short-summary: Manage IoT device\'s children device.
+    short-summary: Manage children device relationships for IoT edge devices.
 """
 
 helps[
     "iot hub device-identity children add"
 ] = """
     type: command
-    short-summary: Add specified space-separated list of device ids as children of specified edge device.
+    short-summary: Add devices as children to a target edge device.
     examples:
-    - name: Add devices as a children to the edge device.
+    - name: Add a space-separated list of device Ids as children to the target edge device.
       text: >
-        az iot hub device-identity children add -d {edge_device_id} --child-list {space_separated_device_id}
+        az iot hub device-identity children add -d {edge_device_id} --child-list {child_device_id_1} {child_device_id_2}
         -n {iothub_name}
-    - name: Add devices as children to the edge device and overwrites children devices'
-            original parent.
+    - name: Add devices as children to the edge device and overwrite the children devices' existing parent.
       text: >
-        az iot hub device-identity children add -d {edge_device_id} --child-list {space_separated_device_id}
+        az iot hub device-identity children add -d {edge_device_id} --child-list {child_device_id_1} {child_device_id_2}
         -n {iothub_name} -f
 """
 
@@ -358,12 +363,12 @@ helps[
     "iot hub device-identity children list"
 ] = """
     type: command
-    short-summary: Outputs list of assigned child devices.
+    short-summary: Outputs the collection of assigned child devices.
     examples:
-    - name: Show all assigned children devices as list.
+    - name: List all assigned children devices.
       text: >
         az iot hub device-identity children list -d {edge_device_id} -n {iothub_name}
-    - name: Show all assigned children devices as list whose device ID contains substring of 'test'.
+    - name: List all assigned children devices whose device Id contains a substring of 'test'.
       text: >
         az iot hub device-identity children list -d {edge_device_id} -n {iothub_name} --query "[?contains(@,'test')]"
 """
@@ -372,13 +377,13 @@ helps[
     "iot hub device-identity children remove"
 ] = """
     type: command
-    short-summary: Remove devices as children from specified edge device.
+    short-summary: Remove child devices from a target edge device.
     examples:
-    - name: Remove all mentioned devices as children of specified device.
+    - name: Remove a space-seperated list of child devices from a target parent device.
       text: >
         az iot hub device-identity children remove -d {edge_device_id} --child-list {space_separated_device_id}
         -n {iothub_name}
-    - name: Remove all devices as children specified edge device.
+    - name: Remove all child devices from a target parent device.
       text: >
         az iot hub device-identity children remove -d {edge_device_id} --remove-all
 """

@@ -35,8 +35,6 @@ if not PACKAGE_NAME:
 
 
 # The following dependencies are needed by the IoT extension but used from Az CLI Core.
-# 'msrestazure>=0.4.29,<2.0.0',
-# 'paho-mqtt==1.5.0',
 # 'jmespath',
 # 'pyyaml'
 # 'knack'
@@ -46,6 +44,7 @@ if not PACKAGE_NAME:
 # for compatibility reasons.
 
 DEPENDENCIES = [
+    "msrestazure>=0.6.3,<2.0.0",
     "jsonschema~=3.2.0",
     "importlib_metadata;python_version<'3.8'",
     "azure-iot-device~=2.5",
@@ -63,6 +62,7 @@ CLASSIFIERS = [
     "Programming Language :: Python :: 3.6",
     "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
     "License :: OSI Approved :: MIT License",
 ]
 

@@ -62,6 +62,7 @@ def generate_device_create_req(
     status_reason=None,
     valid_days=None,
     output_dir=None,
+    device_scope=None,
 ):
     return {
         "client": None,
@@ -76,7 +77,8 @@ def generate_device_create_req(
         "status": status,
         "status_reason": status_reason,
         "valid_days": valid_days,
-        "output_dir": output_dir
+        "output_dir": output_dir,
+        "device_scope": device_scope
     }
 
 
@@ -105,6 +107,7 @@ class TestDeviceCreate:
                 )
             ),
             (generate_device_create_req(status="disabled", status_reason="reasons")),
+            (generate_device_create_req(device_scope=generate_generic_id()))
         ],
     )
     def test_device_create(self, serviceclient, req):
@@ -122,6 +125,7 @@ class TestDeviceCreate:
             req["status_reason"],
             req["valid_days"],
             req["output_dir"],
+            req["device_scope"]
         )
 
         args = serviceclient.call_args
@@ -135,6 +139,9 @@ class TestDeviceCreate:
         if req.get("status_reason"):
             assert body["statusReason"] == req["status_reason"]
         assert body["capabilities"]["iotEdge"] == req["ee"]
+
+        if req.get("device_scope"):
+            assert body["deviceScope"] == req["device_scope"]
 
         if req["auth"] == "shared_private_key":
             assert body["authentication"]["type"] == DeviceAuthApiType.sas.value
