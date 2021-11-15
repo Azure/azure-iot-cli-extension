@@ -157,6 +157,7 @@ def iot_device_create(
     status_reason=None,
     valid_days=None,
     output_dir=None,
+    device_scope=None,
     resource_group_name=None,
     login=None,
     auth_type_dataplane=None,
@@ -184,14 +185,15 @@ def iot_device_create(
 
     try:
         device = _assemble_device(
-            False,
-            device_id,
-            auth_method,
-            edge_enabled,
-            primary_thumbprint if auth_method == DeviceAuthType.x509_thumbprint.value else primary_key,
-            secondary_thumbprint if auth_method == DeviceAuthType.x509_thumbprint.value else secondary_key,
-            status,
-            status_reason,
+            is_update=False,
+            device_id=device_id,
+            auth_method=auth_method,
+            edge_enabled=edge_enabled,
+            pk=primary_thumbprint if auth_method == DeviceAuthType.x509_thumbprint.value else primary_key,
+            sk=secondary_thumbprint if auth_method == DeviceAuthType.x509_thumbprint.value else secondary_key,
+            status=status,
+            status_reason=status_reason,
+            device_scope=device_scope,
         )
         output = service_sdk.devices.create_or_update_identity(
             id=device_id, device=device
@@ -230,16 +232,16 @@ def _assemble_device(
         )
         return device
     if edge_enabled:
-        parent_scope = []
+        parent_scopes = []
         if device_scope:
-            parent_scope = [device_scope]
+            parent_scopes = [device_scope]
         device = Device(
             device_id=device_id,
             authentication=auth,
             capabilities=cap,
             status=status,
             status_reason=status_reason,
-            parent_scopes=parent_scope,
+            parent_scopes=parent_scopes,
         )
         return device
     else:

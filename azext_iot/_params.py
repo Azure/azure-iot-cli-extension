@@ -405,6 +405,14 @@ def load_arguments(self, _):
             options_list=["--status-reason", "--star"],
             help="Description for device status.",
         )
+        context.argument(
+            "device_scope",
+            options_list=["--device-scope"],
+            help="The scope of the device. "
+            "For edge devices, this is auto-generated and immutable. "
+            "For leaf devices, set this to create child/parent relationship.",
+            arg_group="Device Scope"
+        )
 
     with self.argument_context("iot hub device-identity renew-key") as context:
         context.argument(
