@@ -7,12 +7,11 @@
 
 import os
 
-VERSION = "0.11.0"
+VERSION = "0.11.1"
 EXTENSION_NAME = "azure-iot"
 EXTENSION_ROOT = os.path.dirname(os.path.abspath(__file__))
 EXTENSION_CONFIG_ROOT_KEY = "iotext"
 EDGE_DEPLOYMENT_ROOT_SCHEMAS_PATH = os.path.join(EXTENSION_ROOT, "assets")
-BASE_MQTT_API_VERSION = "2018-06-30"
 MESSAGING_HTTP_C2D_SYSTEM_PROPERTIES = [
     "iothub-messageid",
     "iothub-correlationid",
@@ -44,9 +43,6 @@ DEVICETWIN_MONITOR_TIME_SEC = 15
 # (Lib name, minimum version (including), maximum version (excluding))
 EVENT_LIB = ("uamqp", "1.2", "1.3")
 PNP_DTDLV2_COMPONENT_MARKER = "__t"
-
-# Config Key's
-CONFIG_KEY_UAMQP_EXT_VERSION = "uamqp_ext_version"
 
 # Initial Track 2 SDK version for IoT Hub
 IOTHUB_MGMT_SDK_PACKAGE_NAME = "azure-mgmt-iothub"
