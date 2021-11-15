@@ -272,3 +272,11 @@ class ConnectionStringParser(Enum):
     Module = parse_iot_device_module_connection_string
     Device = parse_iot_device_connection_string
     IotHub = parse_iot_hub_connection_string
+
+
+class DiscoveryResourceType(Enum):
+    """
+    Resource types supported by discovery.
+    """
+    IoTHub = "IoT Hub"
+    DPS = "IoT Device Provisioning Service"
