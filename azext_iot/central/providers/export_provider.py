@@ -60,7 +60,7 @@ class CentralExportProvider(CentralProvider):
             )
         
         # add to cache
-        self._exports[export.id] = export
+        self._exports[export["id"]] = export
 
         return export
 
