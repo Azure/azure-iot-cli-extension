@@ -279,4 +279,4 @@ class DiscoveryResourceType(Enum):
     Resource types supported by discovery.
     """
     IoTHub = "IoT Hub"
-    DPS = "IoT Device Provisioning Service"
+    DPS = "IoT Hub Device Provisioning Service"

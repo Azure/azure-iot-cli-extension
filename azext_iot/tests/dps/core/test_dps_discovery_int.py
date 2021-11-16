@@ -61,14 +61,15 @@ class TestDPSDiscovery(LiveScenarioTest):
     def test_dps_targets(self):
         discovery = DPSDiscovery(self.cmd_shell)
 
-        # cs_target1 = discovery.get_target_by_cstring(self.connection_string)
-        # assert_target(cs_target1, True)
-
-        # cs_target2 = discovery.get_target(resource_name=None, login=self.connection_string)
-        # assert_target(cs_target2, True)
-
         auto_target = discovery.get_target(resource_name=dps)
         assert_target(auto_target, rg=dps_rg)
+        connection_string = auto_target["cs"]
+
+        cs_target1 = discovery.get_target_by_cstring(connection_string)
+        assert_target(cs_target1, True)
+
+        cs_target2 = discovery.get_target(resource_name=None, login=connection_string)
+        assert_target(cs_target2, True)
 
         auto_target = discovery.get_target(resource_name=dps, resource_group_name=dps_rg)
         assert_target(auto_target, rg=dps_rg)

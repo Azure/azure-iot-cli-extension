@@ -43,11 +43,13 @@ logger = get_logger(__name__)
 # DPS Enrollments
 
 
-def iot_dps_device_enrollment_list(cmd, dps_name, resource_group_name=None, top=None):
+def iot_dps_device_enrollment_list(
+    cmd, dps_name=None, resource_group_name=None, top=None, login=None,
+):
     from azext_iot.sdk.dps.service.models.query_specification import QuerySpecification
 
     discovery = DPSDiscovery(cmd)
-    target = discovery.get_target(dps_name, resource_group_name)
+    target = discovery.get_target(dps_name, resource_group_name, login=login)
 
     try:
         resolver = SdkResolver(target=target)
@@ -61,10 +63,10 @@ def iot_dps_device_enrollment_list(cmd, dps_name, resource_group_name=None, top=
 
 
 def iot_dps_device_enrollment_get(
-    cmd, enrollment_id, dps_name, resource_group_name=None, show_keys=None
+    cmd, enrollment_id, dps_name=None, resource_group_name=None, show_keys=None, login=None,
 ):
     discovery = DPSDiscovery(cmd)
-    target = discovery.get_target(dps_name, resource_group_name)
+    target = discovery.get_target(dps_name, resource_group_name, login=login)
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
@@ -95,7 +97,7 @@ def iot_dps_device_enrollment_create(
     cmd,
     enrollment_id,
     attestation_type,
-    dps_name,
+    dps_name=None,
     resource_group_name=None,
     endorsement_key=None,
     certificate_path=None,
@@ -112,10 +114,11 @@ def iot_dps_device_enrollment_create(
     iot_hubs=None,
     edge_enabled=False,
     webhook_url=None,
-    api_version=None
+    api_version=None,
+    login=None,
 ):
     discovery = DPSDiscovery(cmd)
-    target = discovery.get_target(dps_name, resource_group_name)
+    target = discovery.get_target(dps_name, resource_group_name, login=login)
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
@@ -174,7 +177,7 @@ def iot_dps_device_enrollment_create(
 def iot_dps_device_enrollment_update(
     cmd,
     enrollment_id,
-    dps_name,
+    dps_name=None,
     resource_group_name=None,
     etag=None,
     endorsement_key=None,
@@ -195,9 +198,10 @@ def iot_dps_device_enrollment_update(
     edge_enabled=None,
     webhook_url=None,
     api_version=None,
+    login=None,
 ):
     discovery = DPSDiscovery(cmd)
-    target = discovery.get_target(dps_name, resource_group_name)
+    target = discovery.get_target(dps_name, resource_group_name, login=login)
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
@@ -276,10 +280,10 @@ def iot_dps_device_enrollment_update(
 
 
 def iot_dps_device_enrollment_delete(
-    cmd, enrollment_id, dps_name, resource_group_name=None, etag=None
+    cmd, enrollment_id, dps_name=None, resource_group_name=None, etag=None, login=None,
 ):
     discovery = DPSDiscovery(cmd)
-    target = discovery.get_target(dps_name, resource_group_name)
+    target = discovery.get_target(dps_name, resource_group_name, login=login)
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
@@ -293,12 +297,12 @@ def iot_dps_device_enrollment_delete(
 
 
 def iot_dps_device_enrollment_group_list(
-    cmd, dps_name, resource_group_name=None, top=None
+    cmd, dps_name=None, resource_group_name=None, top=None, login=None,
 ):
     from azext_iot.sdk.dps.service.models.query_specification import QuerySpecification
 
     discovery = DPSDiscovery(cmd)
-    target = discovery.get_target(dps_name, resource_group_name)
+    target = discovery.get_target(dps_name, resource_group_name, login=login)
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
@@ -311,10 +315,10 @@ def iot_dps_device_enrollment_group_list(
 
 
 def iot_dps_device_enrollment_group_get(
-    cmd, enrollment_id, dps_name, resource_group_name=None, show_keys=None
+    cmd, enrollment_id, dps_name=None, resource_group_name=None, show_keys=None, login=None,
 ):
     discovery = DPSDiscovery(cmd)
-    target = discovery.get_target(dps_name, resource_group_name)
+    target = discovery.get_target(dps_name, resource_group_name, login=login)
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
@@ -344,7 +348,7 @@ def iot_dps_device_enrollment_group_get(
 def iot_dps_device_enrollment_group_create(
     cmd,
     enrollment_id,
-    dps_name,
+    dps_name=None,
     resource_group_name=None,
     certificate_path=None,
     secondary_certificate_path=None,
@@ -362,9 +366,10 @@ def iot_dps_device_enrollment_group_create(
     edge_enabled=False,
     webhook_url=None,
     api_version=None,
+    login=None,
 ):
     discovery = DPSDiscovery(cmd)
-    target = discovery.get_target(dps_name, resource_group_name)
+    target = discovery.get_target(dps_name, resource_group_name, login=login)
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
@@ -429,7 +434,7 @@ def iot_dps_device_enrollment_group_create(
 def iot_dps_device_enrollment_group_update(
     cmd,
     enrollment_id,
-    dps_name,
+    dps_name=None,
     resource_group_name=None,
     etag=None,
     certificate_path=None,
@@ -450,9 +455,10 @@ def iot_dps_device_enrollment_group_update(
     edge_enabled=None,
     webhook_url=None,
     api_version=None,
+    login=None,
 ):
     discovery = DPSDiscovery(cmd)
-    target = discovery.get_target(dps_name, resource_group_name)
+    target = discovery.get_target(dps_name, resource_group_name, login=login)
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
@@ -550,10 +556,10 @@ def iot_dps_device_enrollment_group_update(
 
 
 def iot_dps_device_enrollment_group_delete(
-    cmd, enrollment_id, dps_name, resource_group_name=None, etag=None
+    cmd, enrollment_id, dps_name=None, resource_group_name=None, etag=None, login=None,
 ):
     discovery = DPSDiscovery(cmd)
-    target = discovery.get_target(dps_name, resource_group_name)
+    target = discovery.get_target(dps_name, resource_group_name, login=login)
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
@@ -570,6 +576,7 @@ def iot_dps_compute_device_key(
     dps_name=None,
     resource_group_name=None,
     symmetric_key=None,
+    login=None,
 ):
     if symmetric_key is None:
         if not all([dps_name, resource_group_name, enrollment_id]):
@@ -580,7 +587,7 @@ def iot_dps_compute_device_key(
             )
 
         discovery = DPSDiscovery(cmd)
-        target = discovery.get_target(dps_name, resource_group_name)
+        target = discovery.get_target(dps_name, resource_group_name, login=login)
         try:
             resolver = SdkResolver(target=target)
             sdk = resolver.get_sdk(SdkType.dps_sdk)
@@ -606,9 +613,9 @@ def iot_dps_compute_device_key(
 # DPS Registration
 
 
-def iot_dps_registration_list(cmd, dps_name, enrollment_id, resource_group_name=None):
+def iot_dps_registration_list(cmd, enrollment_id, dps_name=None, resource_group_name=None, login=None):
     discovery = DPSDiscovery(cmd)
-    target = discovery.get_target(dps_name, resource_group_name)
+    target = discovery.get_target(dps_name, resource_group_name, login=login)
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
@@ -620,9 +627,9 @@ def iot_dps_registration_list(cmd, dps_name, enrollment_id, resource_group_name=
         raise CLIError(e)
 
 
-def iot_dps_registration_get(cmd, dps_name, registration_id, resource_group_name=None):
+def iot_dps_registration_get(cmd, registration_id, dps_name=None, resource_group_name=None, login=None):
     discovery = DPSDiscovery(cmd)
-    target = discovery.get_target(dps_name, resource_group_name)
+    target = discovery.get_target(dps_name, resource_group_name, login=login)
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
@@ -634,9 +641,11 @@ def iot_dps_registration_get(cmd, dps_name, registration_id, resource_group_name
         raise CLIError(e)
 
 
-def iot_dps_registration_delete(cmd, dps_name, registration_id, resource_group_name=None, etag=None):
+def iot_dps_registration_delete(
+    cmd, registration_id, dps_name=None, resource_group_name=None, etag=None, login=None
+):
     discovery = DPSDiscovery(cmd)
-    target = discovery.get_target(dps_name, resource_group_name)
+    target = discovery.get_target(dps_name, resource_group_name, login=login)
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
