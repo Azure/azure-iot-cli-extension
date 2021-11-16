@@ -152,7 +152,7 @@ class TestDeviceTwinShow:
 
         yield mocked_response
 
-    def test_device_twin_show_calls_get_twin(self):
+    def test_device_twin_show_calls_get_twin(self,service_client):
         result = commands_device.get_device_twin(fixture_cmd, device_id, app_id)
         assert result == device_twin_result
 
