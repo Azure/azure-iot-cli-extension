@@ -20,7 +20,7 @@ class IoTHubProvider(object):
         self.rg = rg
         self.discovery = IotHubDiscovery(cmd)
         self.target = self.discovery.get_target(
-            hub_name=self.hub_name,
+            resource_name=self.hub_name,
             resource_group_name=self.rg,
             login=login,
             auth_type=auth_type_dataplane,
