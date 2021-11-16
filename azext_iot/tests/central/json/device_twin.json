@@ -1,186 +1,76 @@
 {
-    "deviceId": "testDpsSetup",
-    "etag": "AAAAAAAAAIA=",
-    "deviceEtag": "NTMwMzM3ODQ4",
-    "status": "enabled",
-    "statusUpdateTime": "0001-01-01T00: 00: 00Z",
-    "connectionState": "Connected",
-    "lastActivityTime": "2020-06-25T06: 36: 07.5744727Z",
-    "cloudToDeviceMessageCount": 0,
-    "authenticationType": "sas",
-    "x509Thumbprint": {
-        "primaryThumbprint": "None",
-        "secondaryThumbprint": "None"
-    },
-    "version": 2856,
+    "deviceId": "2a5znfmy36q",
+    "etag": "AAAAAAAAAAI=",
     "properties": {
         "desired": {
-            "$iotin:settings": {
-                "fanSpeed": {
-                    "value": 120
-                }
-            },
             "$metadata": {
                 "$lastUpdated": "current_time",
-                "$lastUpdatedVersion": 128,
-                "$iotin:settings": {
+                "$lastUpdatedVersion": 2,
+                "writeableProp": {
                     "$lastUpdated": "current_time",
-                    "$lastUpdatedVersion": 128,
-                    "fanSpeed": {
+                    "$lastUpdatedVersion": 2,
+                    "value": {
                         "$lastUpdated": "current_time",
-                        "$lastUpdatedVersion": 128,
-                        "value": {
-                            "$lastUpdated": "current_time",
-                            "$lastUpdatedVersion": 128
-                        }
+                        "$lastUpdatedVersion": 2
                     }
                 }
             },
-            "$version": 128
+            "$version": 2,
+            "writeableProp": {
+                "value": "12"
+            }
         },
         "reported": {
-            "$iotin:urn_azureiot_Client_SDKInformation": {
-                "language": {
-                    "value": "C"
-                },
-                "version": {
-                    "value": "0.9.0"
-                },
-                "vendor": {
-                    "value": "Microsoft"
-                }
-            },
-            "$iotin:deviceinfo": {
-                "manufacturer": {
-                    "value": "MXChip"
-                },
-                "model": {
-                    "value": "AZ3166"
-                },
-                "osName": {
-                    "value": "Arm Mbed OS v5.2"
-                },
-                "processorArchitecture": {
-                    "value": "Arm Cortex M4"
-                },
-                "swVersion": {
-                    "value": "1.0.0"
-                },
-                "processorManufacturer": {
-                    "value": "STMicro"
-                },
-                "totalStorage": {
-                    "value": 2048
-                },
-                "totalMemory": {
-                    "value": 256
-                }
-            },
-            "$iotin:settings": {
-                "fanSpeed": {
-                    "value": 120,
-                    "sc": 200,
-                    "sd": "fanSpeed property is updated successfully",
-                    "sv": 128
-                }
-            },
             "$metadata": {
                 "$lastUpdated": "current_time",
-                "$iotin:urn_azureiot_Client_SDKInformation": {
+                "device_info": {
                     "$lastUpdated": "current_time",
-                    "language": {
-                        "$lastUpdated": "current_time",
-                        "value": {
-                            "$lastUpdated": "current_time"
-                        }
+                    "__t": {
+                        "$lastUpdated": "current_time"
                     },
-                    "version": {
-                        "$lastUpdated": "current_time",
-                        "value": {
-                            "$lastUpdated": "current_time"
-                        }
-                    },
-                    "vendor": {
-                        "$lastUpdated": "current_time",
-                        "value": {
-                            "$lastUpdated": "current_time"
-                        }
-                    }
-                },
-                "$iotin:deviceinfo": {
-                    "$lastUpdated": "current_time",
                     "manufacturer": {
-                        "$lastUpdated": "current_time",
-                        "value": {
-                            "$lastUpdated": "current_time"
-                        }
+                        "$lastUpdated": "current_time"
                     },
                     "model": {
-                        "$lastUpdated": "current_time",
-                        "value": {
-                            "$lastUpdated": "current_time"
-                        }
+                        "$lastUpdated": "current_time"
                     },
                     "osName": {
-                        "$lastUpdated": "current_time",
-                        "value": {
-                            "$lastUpdated": "current_time"
-                        }
+                        "$lastUpdated": "current_time"
                     },
                     "processorArchitecture": {
-                        "$lastUpdated": "current_time",
-                        "value": {
-                            "$lastUpdated": "current_time"
-                        }
-                    },
-                    "swVersion": {
-                        "$lastUpdated": "current_time",
-                        "value": {
-                            "$lastUpdated": "current_time"
-                        }
+                        "$lastUpdated": "current_time"
                     },
                     "processorManufacturer": {
-                        "$lastUpdated": "current_time",
-                        "value": {
-                            "$lastUpdated": "current_time"
-                        }
+                        "$lastUpdated": "current_time"
                     },
-                    "totalStorage": {
-                        "$lastUpdated": "current_time",
-                        "value": {
-                            "$lastUpdated": "current_time"
-                        }
+                    "readOnlyProp": {
+                        "$lastUpdated": "current_time"
+                    },
+                    "swVersion": {
+                        "$lastUpdated": "current_time"
                     },
                     "totalMemory": {
-                        "$lastUpdated": "current_time",
-                        "value": {
-                            "$lastUpdated": "current_time"
-                        }
-                    }
-                },
-                "$iotin:settings": {
-                    "$lastUpdated": "current_time",
-                    "fanSpeed": {
-                        "$lastUpdated": "current_time",
-                        "value": {
-                            "$lastUpdated": "current_time"
-                        },
-                        "sc": {
-                            "$lastUpdated": "current_time"
-                        },
-                        "sd": {
-                            "$lastUpdated": "current_time"
-                        },
-                        "sv": {
-                            "$lastUpdated": "current_time"
-                        }
+                        "$lastUpdated": "current_time"
+                    },
+                    "totalStorage": {
+                        "$lastUpdated": "current_time"
                     }
                 }
             },
-            "$version": 2728
+            "$version": 2,
+            "device_info": {
+                "__t": "c",
+                "manufacturer": "Apple",
+                "model": "iPhone 12",
+                "osName": "iOS",
+                "processorArchitecture": "Intel x86-64h Haswell",
+                "processorManufacturer": "unknown",
+                "readOnlyProp": "editable",
+                "swVersion": "14.5",
+                "totalMemory": 8589934592,
+                "totalStorage": 250685575168
+            }
         }
     },
-    "capabilities": {
-        "iotEdge": "False"
-    }
+    "tags": {}
 }

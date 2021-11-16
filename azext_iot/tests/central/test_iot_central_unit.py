@@ -136,27 +136,6 @@ class TestCentralHelpers:
         }
 
 
-class TestDeviceTwinShow:
-    @pytest.fixture
-    def service_client(
-        self, mocked_response, fixture_cmd, fixture_get_iot_central_tokens
-    ):
-        mocked_response.add(
-            method=responses.GET,
-            url="https://{}/twins/{}".format(resource, device_id),
-            body=json.dumps(device_twin_result),
-            status=200,
-            content_type="application/json",
-            match_querystring=False,
-        )
-
-        yield mocked_response
-
-    def test_device_twin_show_calls_get_twin(self,service_client):
-        result = commands_device.get_device_twin(fixture_cmd, device_id, app_id)
-        assert result == device_twin_result
-
-
 class TestMonitorEvents:
     @pytest.mark.parametrize("timeout, exception", [(-1, CLIError)])
     def test_monitor_events_invalid_args(self, timeout, exception, fixture_cmd):
@@ -167,6 +146,7 @@ class TestMonitorEvents:
 class TestCentralDeviceProvider:
     _device = load_json(FileNames.central_device_file)
     _device_template = load_json(FileNames.central_device_template_file)
+    _device_twin = load_json(FileNames.central_device_twin_file)
 
     @mock.patch("azext_iot.central.services.device_template")
     @mock.patch("azext_iot.central.services.device")
@@ -214,6 +194,16 @@ class TestCentralDeviceProvider:
         # call counts should be at most 1 since the provider has a cache
         assert mock_device_template_svc.get_device_template.call_count == 1
         assert template == self._device_template
+
+    @mock.patch("azext_iot.central.services.device")
+    def test_device_twin_show_calls_get_twin(self, mock_device_svc):
+        provider = CentralDeviceProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1.value
+        )
+        mock_device_svc.get_device_twin.return_value = self._device_twin
+
+        twin = provider.get_device_twin("someDeviceId")
+        assert twin == self._device_twin
 
 
 class TestCentralDeviceGroupProvider:
@@ -412,24 +402,17 @@ class TestCentralPropertyMonitor:
         result = monitor._compare_properties(
             twin_next.reported_property, twin.reported_property
         )
-        assert len(result) == 3
-        assert len(result["$iotin:urn_azureiot_Client_SDKInformation"]) == 3
-        assert result["$iotin:urn_azureiot_Client_SDKInformation"]["language"]
-        assert result["$iotin:urn_azureiot_Client_SDKInformation"]["version"]
-        assert result["$iotin:urn_azureiot_Client_SDKInformation"]["vendor"]
+        assert len(result) == 1
 
-        assert len(result["$iotin:deviceinfo"]) == 8
-        assert result["$iotin:deviceinfo"]["manufacturer"]
-        assert result["$iotin:deviceinfo"]["model"]
-        assert result["$iotin:deviceinfo"]["osName"]
-        assert result["$iotin:deviceinfo"]["processorArchitecture"]
-        assert result["$iotin:deviceinfo"]["swVersion"]
-        assert result["$iotin:deviceinfo"]["processorManufacturer"]
-        assert result["$iotin:deviceinfo"]["totalStorage"]
-        assert result["$iotin:deviceinfo"]["totalMemory"]
-
-        assert len(result["$iotin:settings"]) == 1
-        assert result["$iotin:settings"]["fanSpeed"]
+        assert len(result["device_info"]) == 10
+        assert result["device_info"]["manufacturer"]
+        assert result["device_info"]["model"]
+        assert result["device_info"]["osName"]
+        assert result["device_info"]["processorArchitecture"]
+        assert result["device_info"]["swVersion"]
+        assert result["device_info"]["processorManufacturer"]
+        assert result["device_info"]["totalStorage"]
+        assert result["device_info"]["totalMemory"]
 
     @mock.patch("azext_iot.central.services.device_template")
     @mock.patch("azext_iot.central.services.device")
