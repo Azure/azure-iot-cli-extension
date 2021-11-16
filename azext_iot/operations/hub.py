@@ -2621,8 +2621,8 @@ def iot_simulate_device(
             if cancellation_token.wait(msg_interval):
                 break
     try:
+        device = _iot_device_show(target, device_id)
         if protocol_type == ProtocolType.mqtt.name:
-            device = _iot_device_show(target, device_id)
             device_connection_string = _build_device_or_module_connection_string(device, KeyType.primary.value)
 
             if device and device.get("authentication", {}).get("type", "") != DeviceAuthApiType.sas.value:
