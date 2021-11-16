@@ -111,7 +111,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                         )
                     )
                     sleep(10)
-                    
+
         self.region = self.get_region()
         self.connection_string = self.get_hub_cstring()
 
