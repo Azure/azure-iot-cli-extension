@@ -128,6 +128,7 @@ def get_iot_central_tokens(cmd, app_id, token, central_dns_suffix):
     url = "https://{}.{}/system/iothubs/generateSasTokens".format(
         app_id, central_dns_suffix
     )
+
     response = requests.post(url, headers={"Authorization": token})
     tokens = response.json()
 

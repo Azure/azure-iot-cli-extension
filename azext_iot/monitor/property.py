@@ -21,7 +21,6 @@ from azext_iot.constants import (
 from azext_iot.central.models.devicetwin import DeviceTwin, Property
 
 from azext_iot.central.providers import (
-    CentralDeviceTwinProvider,
     CentralDeviceProvider,
     CentralDeviceTemplateProvider,
 )
@@ -42,12 +41,6 @@ class PropertyMonitor:
         self._device_id = device_id
         self._token = token
         self._central_dns_suffix = central_dns_suffix
-        self._device_twin_provider = CentralDeviceTwinProvider(
-            cmd=self._cmd,
-            app_id=self._app_id,
-            token=self._token,
-            device_id=self._device_id,
-        )
         self._central_device_provider = CentralDeviceProvider(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -188,7 +181,8 @@ class PropertyMonitor:
         prev_twin = None
 
         while True:
-            raw_twin = self._device_twin_provider.get_device_twin(
+            raw_twin = self._central_device_provider.get_device_twin(
+                device_id=self._device_id,
                 central_dns_suffix=self._central_dns_suffix
             )
 
@@ -221,7 +215,8 @@ class PropertyMonitor:
 
         while True:
 
-            raw_twin = self._device_twin_provider.get_device_twin(
+            raw_twin = self._central_device_provider.get_device_twin(
+                device_id=self._device_id,
                 central_dns_suffix=self._central_dns_suffix
             )
 

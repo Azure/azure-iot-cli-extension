@@ -4,7 +4,6 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from azext_iot.central.providers.devicetwin_provider import CentralDeviceTwinProvider
 from azext_iot.central.providers.api_token_provider import CentralApiTokenProvider
 from azext_iot.central.providers.device_provider import CentralDeviceProvider
 from azext_iot.central.providers.device_group_provider import CentralDeviceGroupProvider
@@ -21,7 +20,6 @@ from azext_iot.central.providers.organization_provider import (
 
 
 __all__ = [
-    "CentralDeviceTwinProvider",
     "CentralDeviceProvider",
     "CentralApiTokenProvider",
     "CentralDeviceGroupProvider",

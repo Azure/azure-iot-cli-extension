@@ -46,6 +46,20 @@ def get_device(
     return provider.get_device(device_id, central_dns_suffix=central_dns_suffix)
 
 
+def get_device_twin(
+    cmd,
+    app_id: str,
+    device_id: str,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+) -> DeviceType:
+    provider = CentralDeviceProvider(
+        cmd=cmd, app_id=app_id, token=token, api_version=ApiVersion.v1.value
+    )
+
+    return provider.get_device_twin(device_id, central_dns_suffix=central_dns_suffix)
+
+
 def create_device(
     cmd,
     app_id: str,

@@ -285,6 +285,28 @@ class CentralDeviceProvider:
             api_version=self._api_version,
         )
 
+    def get_device_twin(
+        self,
+        device_id,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ) -> dict:
+
+        twin = central_services.device.get_device_twin(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            token=self._token,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+        if not twin:
+            raise CLIError("No twin found for device with id: '{}'.".format(device_id))
+
+        if '_links' in twin:
+            twin.pop('_links')
+
+        return twin
+
     def run_manual_failover(
         self,
         device_id: str,

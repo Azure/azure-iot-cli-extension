@@ -21,7 +21,6 @@ from unittest import mock
 from datetime import datetime
 from knack.util import CLIError
 from azure.cli.core.mock import DummyCli
-from azext_iot.central import commands_device_twin
 from azext_iot.central import commands_device
 from azext_iot.central import commands_monitor
 from azext_iot.central.providers import CentralDeviceProvider
@@ -153,8 +152,8 @@ class TestDeviceTwinShow:
 
         yield mocked_response
 
-    def test_device_twin_show_calls_get_twin(self, service_client):
-        result = commands_device_twin.device_twin_show(fixture_cmd, device_id, app_id)
+    def test_device_twin_show_calls_get_twin(self):
+        result = commands_device.get_device_twin(fixture_cmd, device_id, app_id)
         assert result == device_twin_result
 
 
