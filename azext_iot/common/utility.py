@@ -456,6 +456,17 @@ def ensure_iothub_sdk_min_version(min_ver):
     return version.parse(iot_sdk_version) >= version.parse(min_ver)
 
 
+def ensure_iotdps_sdk_min_version(min_ver):
+    from packaging import version
+
+    try:
+        from azure.mgmt.iothubprovisioningservices import __version__ as iot_sdk_version
+    except ImportError:
+        from azure.mgmt.iothubprovisioningservices._version import VERSION as iot_sdk_version
+
+    return version.parse(iot_sdk_version) >= version.parse(min_ver)
+
+
 def scantree(path):
     for entry in os.scandir(path):
         if entry.is_dir(follow_symlinks=False):

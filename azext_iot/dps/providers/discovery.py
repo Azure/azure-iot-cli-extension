@@ -9,8 +9,12 @@ from azure.cli.core.commands.client_factory import get_subscription_id
 from azext_iot.common._azure import IOT_SERVICE_CS_TEMPLATE
 from azext_iot.common.base_discovery import BaseDiscovery
 from azext_iot.common.shared import DiscoveryResourceType
+from azext_iot.common.utility import ensure_iotdps_sdk_min_version
+from azext_iot.constants import IOTDPS_TRACK_2_SDK_MIN_VERSION
+from azext_iot.dps.models.dps_target import DPSTarget
 from azext_iot._factory import iot_service_provisioning_factory
 from typing import Any, Dict
+
 
 logger = get_logger(__name__)
 PRIVILEDGED_ACCESS_RIGHTS_SET = set(
@@ -28,6 +32,8 @@ class DPSDiscovery(BaseDiscovery):
 
     def _initialize_client(self):
         if not self.client:
+            # Track 2 could be supported
+            self.track2 = ensure_iotdps_sdk_min_version(IOTDPS_TRACK_2_SDK_MIN_VERSION)
             if getattr(self.cmd, "cli_ctx", None):
                 # The client we want to use is an attribute of the client returned
                 # from the factory. This will have to be revisted if the DPS sdk changes.
@@ -43,13 +49,12 @@ class DPSDiscovery(BaseDiscovery):
 
     def _make_kwargs(self, **kwargs) -> Dict[str, Any]:
         # The DPS client needs the provisioning_service_name argument
-        kwargs["provisioning_service_name"] = kwargs.get("resource_name")
+        kwargs["provisioning_service_name"] = kwargs.pop("resource_name")
         return kwargs
 
     @classmethod
-    def get_target_by_cstring(cls, connection_string: str):
-        # TODO: future iteration
-        pass
+    def get_target_by_cstring(cls, connection_string: str) -> DPSTarget:
+        return DPSTarget.from_connection_string(cstring=connection_string).as_dict()
 
     def _build_target(
         self, resource, policy, key_type: str = None, **kwargs

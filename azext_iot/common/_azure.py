@@ -31,6 +31,11 @@ def parse_iot_hub_connection_string(cs):
     return _parse_connection_string(cs, validate, "IoT Hub")
 
 
+def parse_iot_dps_connection_string(cs):
+    validate = ["HostName", "SharedAccessKeyName", "SharedAccessKey"]
+    return _parse_connection_string(cs, validate, "IoT DPS")
+
+
 def parse_iot_device_connection_string(cs):
     validate = ["HostName", "DeviceId", "SharedAccessKey"]
     return _parse_connection_string(cs, validate, "Device")
