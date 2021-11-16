@@ -3,6 +3,17 @@
 Release History
 ===============
 
+0.11.2
++++++++++++++++
+
+**IoT Central updates**
+
+* Adds new preview commands (v1.1-preview)
+
+  - Query (az iot central query)
+  - Destination (az iot central destination)
+  - Export (az iot central export)
+
 0.11.1
 +++++++++++++++
 
