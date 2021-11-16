@@ -89,6 +89,29 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
                 sleep(ROLE_ASSIGNMENT_REFRESH_TIME)
 
+                new_hub = self.cmd(
+                    "iot hub show -n {} -g {}".format(self.entity_name, self.entity_rg)
+                ).get_output_in_json()
+
+                account = self.cmd("account show").get_output_in_json()
+                user = account["user"]
+
+                if user["name"] is None:
+                    raise Exception("User not found")
+
+                while True:
+                    role_assignments = self.get_role_assignments(new_hub["id"], USER_ROLE)
+                    role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
+                    if user["name"] in role_assignment_principal_names:
+                        break
+                    # else assign IoT Hub Data Contributor role to current user and check again
+                    self.cmd(
+                        '''role assignment create --assignee "{}" --role "{}" --scope "{}"'''.format(
+                            user["name"], USER_ROLE, new_hub["id"]
+                        )
+                    )
+                    sleep(10)
+
         self.region = self.get_region()
         self.connection_string = self.get_hub_cstring()
 
