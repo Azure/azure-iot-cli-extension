@@ -289,7 +289,7 @@ class BaseDiscovery(ABC):
             return self.get_target_by_cstring(connection_string=cstring)
 
         resource_group_name = resource_group_name or kwargs.get("rg")
-        target = self.find_resource(resource_name=resource_name, rg=resource_group_name)
+        resource = self.find_resource(resource_name=resource_name, rg=resource_group_name)
 
         key_type = kwargs.get("key_type", "primary")
 
@@ -303,22 +303,22 @@ class BaseDiscovery(ABC):
             policy.secondary_key = AuthenticationTypeDataplane.login.value
 
             return self._build_target(
-                resource=target,
+                resource=resource,
                 policy=policy,
                 key_type="primary",
                 **kwargs
             )
 
         policy_name = kwargs.get("policy_name", "auto")
-        rg = target.additional_properties.get("resourcegroup")
+        rg = resource.additional_properties.get("resourcegroup")
 
-        target_policy = self.find_policy(
-            resource_name=target.name, rg=rg, policy_name=policy_name,
+        resource_policy = self.find_policy(
+            resource_name=resource.name, rg=rg, policy_name=policy_name,
         )
 
         return self._build_target(
-            resource=target,
-            policy=target_policy,
+            resource=resource,
+            policy=resource_policy,
             key_type=key_type,
             **kwargs
         )

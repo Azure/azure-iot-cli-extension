@@ -12,6 +12,11 @@
             "_justification": "Completely made up IoT Hub policy key for unit test."
         },
         {
+            "file": "azext_iot\\tests\\dps\\core\\test_dps_discovery_unit.py",
+            "placeholder": "SharedAccessKey=AB+c/+5nm2XpDXcffhnGhnxz/TVF4m5ag7AuVIGwchj=",
+            "_justification": "Completely made up DPS policy key for unit test."
+        },
+        {
             "file": "azext_iot\\tests\\iothub\\configurations\\test_edge_deployment.json",
             "_justification": "Completely made up deployment with fake container registry creds."
         },
