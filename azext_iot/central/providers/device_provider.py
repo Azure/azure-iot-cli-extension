@@ -7,6 +7,7 @@
 from typing import List, Union
 from knack.util import CLIError
 from knack.log import get_logger
+from azext_iot.central.models.devicetwin import DeviceTwin
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.enum import DeviceStatus, ApiVersion
@@ -289,7 +290,7 @@ class CentralDeviceProvider:
         self,
         device_id,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> dict:
+    ) -> DeviceTwin:
 
         twin = central_services.device.get_device_twin(
             cmd=self._cmd,
@@ -301,9 +302,6 @@ class CentralDeviceProvider:
 
         if not twin:
             raise CLIError("No twin found for device with id: '{}'.".format(device_id))
-
-        if '_links' in twin:
-            twin.pop('_links')
 
         return twin
 

@@ -14,6 +14,7 @@ from knack.log import get_logger
 
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
+from azext_iot.central.models.devicetwin import DeviceTwin
 from azext_iot.central.models.preview import DevicePreview
 from azext_iot.central.models.v1 import DeviceV1
 from azext_iot.central.models.v1_1_preview import DeviceV1_1_preview
@@ -504,7 +505,7 @@ def get_device_twin(
     device_id: str,
     token: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[DeviceV1_1_preview, DeviceV1, DevicePreview]:
+) -> DeviceTwin:
     """
     Get device twin given a device id
 
@@ -536,7 +537,7 @@ def get_device_twin(
         headers=headers,
         verify=not should_disable_connection_verify(),
     )
-    return _utility.try_extract_result(response)
+    return DeviceTwin(_utility.try_extract_result(response))
 
 
 def run_manual_failover(

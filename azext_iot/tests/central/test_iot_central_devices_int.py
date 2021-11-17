@@ -281,7 +281,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
                     (
                         template
                         for template in deleted_device_template_list
-                        if template["id"] == template_id
+                        if self._get_template_id(template) == template_id
                     ),
                     None,
                 )
