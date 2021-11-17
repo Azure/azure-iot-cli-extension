@@ -3,6 +3,12 @@
 Release History
 ===============
 
+0.11.2
++++++++++++++++
+
+**IoT Central updates**
+* Fixed hub token leak for device twin show
+
 0.11.1
 +++++++++++++++
 
