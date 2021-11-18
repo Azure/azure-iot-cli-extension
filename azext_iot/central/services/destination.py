@@ -32,6 +32,15 @@ def add_dataExport_destination(
 
     Args:
         cmd: command passed into az
+        app_id: name of app (used for forming request URL)
+        destination_id: unique identifier of destination
+        payload: destination JSON definition
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.        
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs  
+
+    Returns:
+        Destination        
     """
 
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, destination_id)
@@ -61,6 +70,15 @@ def update_dataExport_destination(
 
     Args:
         cmd: command passed into az
+        app_id: name of app (used for forming request URL)
+        destination_id: unique identifier for destination
+        payload: destination JSON definition
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.        
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs  
+
+    Returns:
+        Destination        
     """
 
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, destination_id)
@@ -89,7 +107,14 @@ def list_dataExport_destinations(
 
     Args:
         cmd: command passed into az
-
+        app_id: name of app (used for forming request URL)
+        max_pages: max return result pages
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.        
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs    
+    
+    Returns:
+        List of destinations
     """
     destinations = []
 
@@ -132,6 +157,14 @@ def get_dataExport_destination(
 
     Args:
         cmd: command passed into az
+        app_id: name of app (used for forming request URL)
+        destination_id: unique identifier of destination
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.        
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        Destination      
     """
 
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, destination_id)
@@ -160,6 +193,14 @@ def delete_dataExport_destination(
 
     Args:
         cmd: command passed into az
+        app_id: name of app (used for forming request URL)
+        destination_id: unique identifier of destination
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.        
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        response dict     
     """
 
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, destination_id)
