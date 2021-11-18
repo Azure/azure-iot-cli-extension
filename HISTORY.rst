@@ -3,12 +3,6 @@
 Release History
 ===============
 
-0.11.2
-+++++++++++++++
-
-**IoT Central updates**
-* Fixed hub token leak for device twin show
-
 0.11.1
 +++++++++++++++
 
@@ -28,6 +22,9 @@ Release History
 **IoT Hub updates**
 
 * `az iot hub device-identity create` supports a device scope argument via `--device-scope` parameter.
+
+**IoT Central updates**
+  * Fixed hub token leak for device twin show
 
 0.11.0
 +++++++++++++++
