@@ -1,0 +1,10 @@
+{
+    "displayName": "Test Export 1",
+    "enabled": false,
+    "source": "telemetry",
+    "destinations": [
+      {
+        "id": "aztestdest0001"
+      }
+    ]
+  }

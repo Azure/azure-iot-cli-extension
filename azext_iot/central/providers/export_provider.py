@@ -6,7 +6,6 @@
 
 from typing import List, Union
 
-from knack.util import CLIError
 from knack.log import get_logger
 
 from azext_iot.central.providers.central_provider import CentralProvider
@@ -121,4 +120,4 @@ class CentralExportProvider(CentralProvider):
             central_dns_suffix=central_dnx_suffix
         )
 
-        del self._exports[export_id]
+        self._exports.pop(export_id, None)
