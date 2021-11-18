@@ -163,7 +163,7 @@ def _load_central_destination_help():
           text: >
             az iot central destination show
             --app-id {appid}
-            --destination-id {destinationid}
+            --dest-id {destinationid}
     """
 
     helps[
@@ -176,7 +176,7 @@ def _load_central_destination_help():
           text: >
             az iot central destination create
             --app-id {appid}
-            --destination-id {destinationid}
+            --dest-id {destinationid}
             --content {content}
     """
 
@@ -190,7 +190,7 @@ def _load_central_destination_help():
           text: >
             az iot central destination update
             --app-id {appid}
-            --destination-id {destinationid}
+            --dest-id {destinationid}
             --content {content}
     """
 
@@ -204,7 +204,7 @@ def _load_central_destination_help():
           text: >
             az iot central destination delete
             --app-id {appid}
-            --destination-id {destinationid}
+            --dest-id {destinationid}
     """
 
 def _load_central_devices_help():
