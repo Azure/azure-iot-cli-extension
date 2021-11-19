@@ -86,6 +86,12 @@ def load_arguments(self, _):
     Load CLI Args for Knack parser
     """
     with self.argument_context("iot") as context:
+        context.argument("resource_group_name", arg_type=resource_group_name_type)
+        context.argument(
+            "hub_name", options_list=["--hub-name", "-n"], arg_type=hub_name_type,
+            help="IoT Hub name. Required if --login is not provided.",
+            arg_group="IoT Hub Identifier"
+        )
         context.argument(
             "login",
             options_list=["--login", "-l"],
@@ -94,12 +100,6 @@ def load_arguments(self, _):
             'Use to avoid session login via "az login". '
             "If both an entity connection string and name are provided the connection string takes priority. "
             "Required if --hub-name is not provided.",
-            arg_group="IoT Hub Identifier"
-        )
-        context.argument("resource_group_name", arg_type=resource_group_name_type)
-        context.argument(
-            "hub_name", options_list=["--hub-name", "-n"], arg_type=hub_name_type,
-            help="IoT Hub name. Required if --login is not provided.",
             arg_group="IoT Hub Identifier"
         )
         context.argument(
@@ -404,6 +404,14 @@ def load_arguments(self, _):
             "status_reason",
             options_list=["--status-reason", "--star"],
             help="Description for device status.",
+        )
+        context.argument(
+            "device_scope",
+            options_list=["--device-scope"],
+            help="The scope of the device. "
+            "For edge devices, this is auto-generated and immutable. "
+            "For leaf devices, set this to create child/parent relationship.",
+            arg_group="Device Scope"
         )
 
     with self.argument_context("iot hub device-identity renew-key") as context:
@@ -809,7 +817,20 @@ def load_arguments(self, _):
 
     with self.argument_context("iot dps") as context:
         context.argument(
-            "dps_name", help="Name of the Azure IoT Hub device provisioning service"
+            "login",
+            options_list=["--login", "-l"],
+            validator=mode2_iot_login_handler,
+            help="This command supports an entity connection string with rights to perform action. "
+            'Use to avoid session login via "az login". '
+            "If both an entity connection string and name are provided the connection string takes priority. "
+            "Required if --dps-name is not provided.",
+            arg_group="Device Provisioning Service Identifier"
+        )
+        context.argument(
+            "dps_name",
+            options_list=["--dps-name", "-n"],
+            help="Name of the Azure IoT Hub Device Provisioning Service. Required if --login is not provided.",
+            arg_group="Device Provisioning Service Identifier"
         )
         context.argument(
             "initial_twin_properties",

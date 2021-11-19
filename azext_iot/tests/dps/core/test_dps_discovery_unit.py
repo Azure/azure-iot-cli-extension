@@ -5,8 +5,8 @@
 # --------------------------------------------------------------------------------------------
 
 import pytest
-from azext_iot.iothub.providers.discovery import IotHubDiscovery
-from azext_iot.common._azure import parse_iot_hub_connection_string
+from azext_iot.dps.providers.discovery import DPSDiscovery
+from azext_iot.common._azure import parse_iot_dps_connection_string
 
 
 @pytest.fixture
@@ -19,21 +19,22 @@ def get_mgmt_client(mocker, fixture_cmd):
         mocker.MagicMock(name="subscription"),
         mocker.MagicMock(name="tenant"),
     )
-    patch = mocker.patch("azext_iot._factory.iot_hub_service_factory")
+    patch = mocker.patch("azext_iot._factory.iot_service_provisioning_factory")
     patch.return_value = None
 
     return patch
 
 
-class TestIoTHubDiscovery:
+class TestDPSDiscovery:
     def test_get_target_by_cstring(self, fixture_cmd, get_mgmt_client):
-        discovery = IotHubDiscovery(cmd=fixture_cmd)
+        discovery = DPSDiscovery(cmd=fixture_cmd)
 
         fake_login = (
-            "HostName=CoolIoTHub.azure-devices.net;SharedAccessKeyName=iothubowner;"
+            "HostName=COOLDPS.azure-devices-provisioning.net;"
+            "SharedAccessKeyName=provisioningserviceowner;"
             "SharedAccessKey=AB+c/+5nm2XpDXcffhnGhnxz/TVF4m5ag7AuVIGwchj="
         )
-        parsed_fake_login = parse_iot_hub_connection_string(fake_login)
+        parsed_fake_login = parse_iot_dps_connection_string(fake_login)
 
         target = discovery.get_target(
             resource_name=None, resource_group_name=None, login=fake_login

@@ -1,6 +1,12 @@
 steps:
-  - script: choco upgrade azure-cli --debug --verbose
-    displayName: 'Install released azure-cli from MSI'
+  # Ensure azure CLI is already installed (and where) and check version information.
+  - task: PowerShell@2
+    inputs:
+      targetType: inline
+      script: |
+        (Get-Command az).source
+        az -v
+    displayName: 'Show AZ CLI version info'
   - task: PowerShell@2
     displayName: 'Set Windows MSI Python Executable PATH'
     inputs:
