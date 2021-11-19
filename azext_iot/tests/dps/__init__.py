@@ -232,9 +232,9 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
         if auth_type == "cstring":
             return f"{command} --login {self.dps_cstring}"
 
-        # return command
+        return command
         # Future iterations would support multiple auth-types
-        return f"{command} --auth-type {auth_type}"
+        # return f"{command} --auth-type {auth_type}"
 
     @pytest.fixture(scope='class', autouse=True)
     def tearDownSuite(self):
