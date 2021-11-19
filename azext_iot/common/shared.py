@@ -259,6 +259,24 @@ class IoTHubStateType(Enum):
     ReActivating = "ReActivating"
 
 
+class IoTDPSStateType(Enum):
+    """
+    IoT Hub Device Provisioning Service State Property
+    """
+    Activating = "Activating"
+    ActivationFailed = "ActivationFailed"
+    Active = "Active"
+    Deleted = "Deleted"
+    Deleting = "Deleting"
+    DeletionFailed = "DeletionFailed"
+    FailingOver = "FailingOver"
+    FailoverFailed = "FailoverFailed"
+    Resuming = "Resuming"
+    Suspended = "Suspended"
+    Suspending = "Suspending"
+    Transitioning = "Transitioning"
+
+
 class ConnectionStringParser(Enum):
     """
         All connection string parser with respective functions

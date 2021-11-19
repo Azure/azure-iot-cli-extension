@@ -191,3 +191,8 @@ def load_command_table(self, _):
         cmd_group.command("list", "iot_dps_registration_list")
         cmd_group.show_command("show", "iot_dps_registration_get")
         cmd_group.command("delete", "iot_dps_registration_delete")
+
+    with self.command_group(
+        "iot dps connection-string", command_type=iotdps_ops
+    ) as cmd_group:
+        cmd_group.show_command("show", "iot_dps_connection_string_show", is_preview=True)

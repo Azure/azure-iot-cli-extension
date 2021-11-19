@@ -916,6 +916,13 @@ def load_arguments(self, _):
         )
         context.argument("registration_id", help="ID of device registration. ")
 
+    with self.argument_context("iot dps connection-string") as context:
+        context.argument(
+            "show_all",
+            options_list=["--show-all", "--all"],
+            help="Show all shared access policies for the respective DPS.",
+        )
+
     with self.argument_context("iot dps enrollment") as context:
         context.argument("enrollment_id", help="ID of device enrollment record")
         context.argument("device_id", help="IoT Hub Device ID")

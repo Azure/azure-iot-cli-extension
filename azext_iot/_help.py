@@ -1379,3 +1379,36 @@ helps[
         az iot dps compute-device-key -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --registration-id {registration_id}
 """
+
+helps[
+    "iot dps connection-string"
+] = """
+    type: group
+    short-summary: Manage IoT Hub Device Provisioning Service connection strings.
+"""
+
+helps[
+    "iot dps connection-string show"
+] = """
+    type: command
+    short-summary: Show the connection strings for the specified Device Provisioning Services using the given
+                   policy name and key.
+    examples:
+    - name: Show the connection strings for all active state DPS's in a subscription
+            using the default policy and primary key.
+      text: >
+          az iot dps connection-string show
+    - name: Show the connection strings for all active state DPS's in a resource group
+            using the default policy and primary key.
+      text: >
+          az iot dps connection-string show --resource-group MyResourceGroup
+    - name: Show all connection strings of the given DPS using primary key.
+      text: >
+          az iot dps connection-string show -n MyDPS --all
+    - name: Show the connection string of the given DPS using the default policy and primary key.
+      text: >
+          az iot dps connection-string show -n MyDPS
+    - name: Show the connection string of the given DPS using policy 'service' and secondary key.
+      text: >
+          az iot dps connection-string show -n MyDPS --policy-name service --key-type secondary
+"""
