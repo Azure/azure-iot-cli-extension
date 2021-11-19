@@ -256,9 +256,7 @@ def load_central_arguments(self, _):
             help="The API version for the requested operation.",
         )
 
-    with self.argument_context(
-        "iot central file-upload-config create"
-    ) as context:
+    with self.argument_context("iot central file-upload-config create") as context:
         context.argument(
             "connection_string",
             options_list=["--connection-string", "-s"],

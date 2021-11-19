@@ -12,6 +12,7 @@ from azext_iot.central.providers import CentralExportProvider
 from azext_iot.central.models.enum import ApiVersion
 from azext_iot.central.models.v1_1_preview import ExportV1_1_preview
 
+
 def get_dataExport_export(
     cmd,
     app_id: str,
@@ -28,13 +29,14 @@ def get_dataExport_export(
         export_id=export_id, central_dnx_suffix=central_dns_suffix
     )
 
+
 def delete_dataExport_export(
     cmd,
     app_id: str,
     export_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1_1_preview.value,    
+    api_version=ApiVersion.v1_1_preview.value,
 ):
     provider = CentralExportProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
@@ -44,18 +46,20 @@ def delete_dataExport_export(
         export_id=export_id, central_dnx_suffix=central_dns_suffix
     )
 
+
 def list_dataExport_exports(
     cmd,
     app_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1_1_preview.value,    
+    api_version=ApiVersion.v1_1_preview.value,
 ) -> List[Union[dict, ExportV1_1_preview]]:
     provider = CentralExportProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
 
     return provider.list_dataExport_exports(central_dns_suffix=central_dns_suffix)
+
 
 def add_dataExport_export(
     cmd,
@@ -64,7 +68,7 @@ def add_dataExport_export(
     content: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1_1_preview.value,    
+    api_version=ApiVersion.v1_1_preview.value,
 ) -> Union[dict, ExportV1_1_preview]:
     payload = utility.process_json_arg(content, argument_name="content")
 
@@ -78,6 +82,7 @@ def add_dataExport_export(
         central_dnx_suffix=central_dns_suffix,
     )
 
+
 def update_dataExport_export(
     cmd,
     app_id: str,
@@ -85,7 +90,7 @@ def update_dataExport_export(
     content: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1_1_preview.value,    
+    api_version=ApiVersion.v1_1_preview.value,
 ) -> Union[dict, ExportV1_1_preview]:
     payload = utility.process_json_arg(content, argument_name="content")
 

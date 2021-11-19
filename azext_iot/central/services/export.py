@@ -18,6 +18,7 @@ logger = get_logger(__name__)
 
 BASE_PATH = "api/dataExport/exports"
 
+
 def add_dataExport_export(
     cmd,
     app_id: str,
@@ -35,12 +36,12 @@ def add_dataExport_export(
         app_id: name of app (used for forming request URL)
         export_id: unique identifier for export
         payload: export definition in JSON
-        token: (OPTIONAL) authorization token to fetch device details from IoTC.        
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
         central_dns_suffix: {centralDnsSuffixInPath} as found in docs
 
     Returns:
-        Export    
+        Export
     """
 
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, export_id)
@@ -53,8 +54,9 @@ def add_dataExport_export(
         payload=payload,
         token=token,
         api_version=api_version,
-        central_dnx_suffix=central_dns_suffix
+        central_dnx_suffix=central_dns_suffix,
     )
+
 
 def update_dataExport_export(
     cmd,
@@ -73,10 +75,10 @@ def update_dataExport_export(
         app_id: name of app (used for forming request URL)
         export_id: unique identifier for export
         payload: export definition in JSON
-        token: (OPTIONAL) authorization token to fetch device details from IoTC.        
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
         central_dns_suffix: {centralDnsSuffixInPath} as found in docs
-    
+
     Returns:
         Export
     """
@@ -91,8 +93,9 @@ def update_dataExport_export(
         payload=payload,
         token=token,
         api_version=api_version,
-        central_dnx_suffix=central_dns_suffix
+        central_dnx_suffix=central_dns_suffix,
     )
+
 
 def list_dataExport_exports(
     cmd,
@@ -109,19 +112,19 @@ def list_dataExport_exports(
         cmd: command passed into az
         app_id: name of app (used for forming request URL)
         max_pages: max return result pages
-        token: (OPTIONAL) authorization token to fetch device details from IoTC.        
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
         central_dns_suffix: {centralDnsSuffixInPath} as found in docs
 
     Returns:
-        List of Export     
+        List of Export
     """
     exports = []
 
     url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
     pages_processed = 0
     while (max_pages == 0 or pages_processed < max_pages) and url:
-        result =  _utility.make_api_call(
+        result = _utility.make_api_call(
             cmd,
             app_id,
             method="GET",
@@ -129,20 +132,19 @@ def list_dataExport_exports(
             payload=None,
             token=token,
             api_version=api_version,
-            central_dnx_suffix=central_dns_suffix
+            central_dnx_suffix=central_dns_suffix,
         )
 
         if "value" not in result:
             raise CLIError("Value is not present in body: {}".format(result))
 
-        exports.extend(
-            result.get("value", [])
-        )
+        exports.extend(result.get("value", []))
 
         url = result.get("nextLink", None)
         pages_processed = pages_processed + 1
-    
+
     return exports
+
 
 def get_dataExport_export(
     cmd,
@@ -150,7 +152,7 @@ def get_dataExport_export(
     export_id: str,
     token: str,
     api_version=ApiVersion.v1_1_preview.value,
-    central_dns_suffix=CENTRAL_ENDPOINT
+    central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> Union[dict, ExportV1_1_preview]:
     """
     Get information about a specified export.
@@ -159,12 +161,12 @@ def get_dataExport_export(
         cmd: command passed into az
         app_id: name of app (used for forming request URL)
         export_id: unique identifier for export
-        token: (OPTIONAL) authorization token to fetch device details from IoTC.        
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
-        central_dns_suffix: {centralDnsSuffixInPath} as found in docs     
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
 
     Returns:
-        Export     
+        Export
     """
 
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, export_id)
@@ -177,8 +179,9 @@ def get_dataExport_export(
         payload=None,
         token=token,
         api_version=api_version,
-        central_dnx_suffix=central_dns_suffix
+        central_dnx_suffix=central_dns_suffix,
     )
+
 
 def delete_dataExport_export(
     cmd,
@@ -195,10 +198,10 @@ def delete_dataExport_export(
         cmd: command passed into az
         app_id: name of app (used for forming request URL)
         export_id: unique identifier for export
-        token: (OPTIONAL) authorization token to fetch device details from IoTC.        
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
-        central_dns_suffix: {centralDnsSuffixInPath} as found in docs          
-    
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
     Returns:
         Response dict
     """
@@ -213,5 +216,5 @@ def delete_dataExport_export(
         payload=None,
         token=token,
         api_version=api_version,
-        central_dnx_suffix=central_dns_suffix
+        central_dnx_suffix=central_dns_suffix,
     )

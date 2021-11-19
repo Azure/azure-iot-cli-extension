@@ -383,7 +383,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 self.check("result", "success"),
             ],
         )
-    
+
     def _create_destination(self, api_version, dest_id):
         command = "iot central destination create --app-id {} --dest-id {} --content '{}'".format(
             APP_ID,
@@ -391,21 +391,14 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             destination_webhook_path,
         )
         return self.cmd(
-            command,
-            api_version=api_version,
-            checks=[
-                self.check("id", dest_id)
-            ]
+            command, api_version=api_version, checks=[self.check("id", dest_id)]
         ).get_output_in_json()
-    
+
     def _delete_destination(self, api_version, dest_id):
         command = "iot central destination delete --app-id {} --dest-id {}".format(
             APP_ID, dest_id
         )
-        self.cmd(
-            command,
-            api_version=api_version
-        )
+        self.cmd(command, api_version=api_version)
 
     def _create_export(self, api_version, export_id):
         command = "iot central export create --app-id {} --export-id {} --content '{}'".format(
@@ -414,21 +407,14 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             export_webhook_path,
         )
         return self.cmd(
-            command,
-            api_version=api_version,
-            checks=[
-                self.check("id", export_id)
-            ]
+            command, api_version=api_version, checks=[self.check("id", export_id)]
         ).get_output_in_json()
 
     def _delete_export(self, api_version, export_id):
         command = "iot central export delete --app-id {} --export-id {}".format(
             APP_ID, export_id
         )
-        self.cmd(
-            command,
-            api_version=api_version
-        )
+        self.cmd(command, api_version=api_version)
 
     def _wait_for_storage_configured(self, api_version):
         command = "iot central file-upload-config show --app-id {}".format(APP_ID)

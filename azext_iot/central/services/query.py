@@ -3,7 +3,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-# 
+#
 
 from typing import Union
 import requests
@@ -21,13 +21,14 @@ logger = get_logger(__name__)
 
 BASE_PATH = "api/query"
 
+
 def query_run(
     cmd,
     app_id: str,
     query: str,
     token: str,
     api_version: str,
-    central_dns_suffix=CENTRAL_ENDPOINT
+    central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> Union[dict, QueryReponseV1_1_preview]:
     """
     Execute query to get the telemetry or property data
@@ -59,4 +60,3 @@ def query_run(
         verify=not should_disable_connection_verify(),
     )
     return _utility.try_extract_result(response)
-

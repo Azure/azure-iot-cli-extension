@@ -15,11 +15,12 @@ from azext_iot.central.models.v1_1_preview import ExportV1_1_preview
 
 logger = get_logger(__name__)
 
+
 class CentralExportProvider(CentralProvider):
     def __init__(self, cmd, app_id: str, api_version: str, token=None):
         super().__init__(cmd, app_id, api_version, token=token)
         self._exports = {}
-    
+
     def list_dataExport_exports(
         self, central_dns_suffix=CENTRAL_ENDPOINT
     ) -> List[Union[dict, ExportV1_1_preview]]:
@@ -28,7 +29,7 @@ class CentralExportProvider(CentralProvider):
             app_id=self._app_id,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
-            api_version=self._api_version
+            api_version=self._api_version,
         )
 
         # add to cache
@@ -36,7 +37,7 @@ class CentralExportProvider(CentralProvider):
             self._exports.update({export["id"]: export})
 
         return exports
-    
+
     def add_dataExport_export(
         self, export_id, payload, central_dnx_suffix=CENTRAL_ENDPOINT
     ) -> Union[dict, ExportV1_1_preview]:
@@ -50,14 +51,12 @@ class CentralExportProvider(CentralProvider):
             payload=payload,
             token=self._token,
             api_version=self._api_version,
-            central_dns_suffix=central_dnx_suffix
+            central_dns_suffix=central_dnx_suffix,
         )
 
         if not export:
-            raise CLIError(
-                "Failed to create export with id: '{}'.".format(export_id)
-            )
-        
+            raise CLIError("Failed to create export with id: '{}'.".format(export_id))
+
         # add to cache
         self._exports[export["id"]] = export
 
@@ -73,19 +72,17 @@ class CentralExportProvider(CentralProvider):
             payload=payload,
             token=self._token,
             api_version=self._api_version,
-            central_dns_suffix=central_dnx_suffix
+            central_dns_suffix=central_dnx_suffix,
         )
 
         if not export:
-            raise CLIError(
-                "Failed to create export with id: '{}'.".format(export_id)
-            )
-        
+            raise CLIError("Failed to create export with id: '{}'.".format(export_id))
+
         # add to cache
         self._exports[export_id] = export
 
         return export
-    
+
     def get_dataExport_export(
         self, export_id, central_dnx_suffix=CENTRAL_ENDPOINT
     ) -> Union[dict, ExportV1_1_preview]:
@@ -100,24 +97,22 @@ class CentralExportProvider(CentralProvider):
                 export_id=export_id,
                 central_dns_suffix=central_dnx_suffix,
             )
-        
+
         if not export:
             raise CLIError("No export found with id: '{}'.".format(export_id))
         else:
             self._exports[export_id] = export
-        
+
         return export
-    
-    def delete_dataExport_export(
-        self, export_id, central_dnx_suffix=CENTRAL_ENDPOINT
-    ):
+
+    def delete_dataExport_export(self, export_id, central_dnx_suffix=CENTRAL_ENDPOINT):
         central_services.export.delete_dataExport_export(
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
             api_version=self._api_version,
             export_id=export_id,
-            central_dns_suffix=central_dnx_suffix
+            central_dns_suffix=central_dnx_suffix,
         )
 
         self._exports.pop(export_id, None)

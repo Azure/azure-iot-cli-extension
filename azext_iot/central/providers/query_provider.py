@@ -14,6 +14,7 @@ from azext_iot.central import services as central_services
 
 logger = get_logger(__name__)
 
+
 class CentralQueryProvider:
     def __init__(self, cmd, app_id: str, query: str, api_version: str, token=None):
         """
@@ -41,7 +42,7 @@ class CentralQueryProvider:
         response = central_services.query.query_run(
             cmd=self._cmd,
             app_id=self._app_id,
-            query = self._query,
+            query=self._query,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
             api_version=self._api_version,

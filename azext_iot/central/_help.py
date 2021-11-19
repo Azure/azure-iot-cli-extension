@@ -59,16 +59,17 @@ def load_central_help():
     _load_central_destination_help()
     _load_central_export_help()
 
+
 def _load_central_export_help():
     helps[
-      "iot central export"
+        "iot central export"
     ] = """
         type: group
         short-summary: Manage and configure IoT Central data exports.
     """
 
     helps[
-      "iot central export list"
+        "iot central export list"
     ] = """
         type: command
         short-summary: Get the list of exports for an IoT Central application.
@@ -80,7 +81,7 @@ def _load_central_export_help():
     """
 
     helps[
-      "iot central export show"
+        "iot central export show"
     ] = """
         type: command
         short-summary: Get a export details
@@ -93,7 +94,7 @@ def _load_central_export_help():
     """
 
     helps[
-      "iot central export create"
+        "iot central export create"
     ] = """
         type: command
         short-summary: Create a export for an application.
@@ -107,7 +108,7 @@ def _load_central_export_help():
     """
 
     helps[
-      "iot central export update"
+        "iot central export update"
     ] = """
         type: command
         short-summary: Update a export for an application.
@@ -121,7 +122,7 @@ def _load_central_export_help():
     """
 
     helps[
-      "iot central export delete"
+        "iot central export delete"
     ] = """
         type: command
         short-summary: Delete a export for an application.
@@ -133,16 +134,17 @@ def _load_central_export_help():
             --export-id {exportid}
     """
 
+
 def _load_central_destination_help():
     helps[
-      "iot central destination"
+        "iot central destination"
     ] = """
         type: group
         short-summary: Manage and configure IoT Central data export destinations.
     """
 
     helps[
-      "iot central destination list"
+        "iot central destination list"
     ] = """
         type: command
         short-summary: Get the list of destinations for an IoT Central application.
@@ -154,7 +156,7 @@ def _load_central_destination_help():
     """
 
     helps[
-      "iot central destination show"
+        "iot central destination show"
     ] = """
         type: command
         short-summary: Get a destination details
@@ -167,7 +169,7 @@ def _load_central_destination_help():
     """
 
     helps[
-      "iot central destination create"
+        "iot central destination create"
     ] = """
         type: command
         short-summary: Create a destination for an application.
@@ -181,7 +183,7 @@ def _load_central_destination_help():
     """
 
     helps[
-      "iot central destination update"
+        "iot central destination update"
     ] = """
         type: command
         short-summary: Update a destination for an application.
@@ -195,7 +197,7 @@ def _load_central_destination_help():
     """
 
     helps[
-      "iot central destination delete"
+        "iot central destination delete"
     ] = """
         type: command
         short-summary: Delete a destination for an application.
@@ -206,6 +208,7 @@ def _load_central_destination_help():
             --app-id {appid}
             --dest-id {destinationid}
     """
+
 
 def _load_central_devices_help():
     helps[

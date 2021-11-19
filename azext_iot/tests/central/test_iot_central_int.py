@@ -413,7 +413,9 @@ class TestIotCentral(CentralLiveScenarioTest):
         command = "iot central export show -n {} --export-id {}".format(
             APP_ID, export["id"]
         )
-        export_result = self.cmd(command, api_version=self._api_version).get_output_in_json()
+        export_result = self.cmd(
+            command, api_version=self._api_version
+        ).get_output_in_json()
         assert export_result["id"] == export["id"]
 
         self._delete_export(export_id=export["id"], api_version=self._api_version)
@@ -429,20 +431,14 @@ class TestIotCentral(CentralLiveScenarioTest):
             template=template_id, api_version=self._api_version, simulated=True
         )
 
-        command = "iot central query -n {} --query-string \"{}\"".format(
+        command = 'iot central query -n {} --query-string "{}"'.format(
             APP_ID,
-            "SELECT TOP 1 testDefaultCapability FROM dtmi:intTestDeviceTemplateid WHERE WITHIN_WINDOW(PT1H)"
+            "SELECT TOP 1 testDefaultCapability FROM dtmi:intTestDeviceTemplateid WHERE WITHIN_WINDOW(PT1H)",
         )
-        response = self.cmd(
-            command,
-            api_version=self._api_version
-        ).get_output_in_json()
+        response = self.cmd(command, api_version=self._api_version).get_output_in_json()
 
         assert response["results"] != None
-        self._delete_device(
-            api_version=self._api_version, device_id=device_id
-        )
+        self._delete_device(api_version=self._api_version, device_id=device_id)
         self._delete_device_template(
             api_version=self._api_version, template_id=template_id
         )
-

@@ -11,6 +11,7 @@ from azext_iot.central.providers import CentralQueryProvider
 from azext_iot.central.models.enum import ApiVersion
 from azext_iot.central.models.v1_1_preview import QueryReponseV1_1_preview
 
+
 def query_run(
     cmd,
     app_id: str,

@@ -49,7 +49,7 @@ central_api_token_ops = CliCommandType(
 )
 
 central_query_ops = CliCommandType(
-    operations_tmpl = "azext_iot.central.commands_query#{}"
+    operations_tmpl="azext_iot.central.commands_query#{}"
 )
 
 central_destination_ops = CliCommandType(
@@ -66,12 +66,12 @@ def load_central_commands(self, _):
     """
     Load CLI commands
     """
-    
+
     with self.command_group(
         "iot central", command_type=central_query_ops, is_preview=True
     ) as cmd_group:
         cmd_group.command("query", "query_run")
-    
+
     with self.command_group(
         "iot central destination", command_type=central_destination_ops, is_preview=True
     ) as cmd_group:

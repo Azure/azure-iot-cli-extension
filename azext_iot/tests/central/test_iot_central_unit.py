@@ -392,14 +392,20 @@ class TestCentralFileuploadProvider:
         assert mock_fileupload_svc.get_fileupload.call_count == 1
         assert fileupload.connection_string == self._fileupload.connection_string
 
+
 class TestCentralQueryProvider:
-    _query_response = QueryReponseV1_1_preview(load_json(FileNames.central_query_response_file))
+    _query_response = QueryReponseV1_1_preview(
+        load_json(FileNames.central_query_response_file)
+    )
 
     @mock.patch("azext_iot.central.services.query")
     def test_should_return_query_response(self, mock_query_svc):
         # setup
         provider = CentralQueryProvider(
-            cmd=None, query=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+            cmd=None,
+            query=None,
+            app_id=app_id,
+            api_version=ApiVersion.v1_1_preview.value,
         )
         mock_query_svc.query_run.return_value = self._query_response
 
@@ -409,11 +415,9 @@ class TestCentralQueryProvider:
         assert mock_query_svc.query_run.call_count == 1
         assert query_response.results == self._query_response.results
 
+
 class TestCentralDestinationProvider:
-    _destinations = [
-        dest
-        for dest in load_json(FileNames.central_destination_file)
-    ]
+    _destinations = [dest for dest in load_json(FileNames.central_destination_file)]
 
     @mock.patch("azext_iot.central.services.destination")
     def test_should_return_destinations(self, mock_destination_svc):
@@ -421,38 +425,46 @@ class TestCentralDestinationProvider:
         provider = CentralDestinationProvider(
             cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
         )
-        mock_destination_svc.list_dataExport_destinations.return_value = self._destinations
+        mock_destination_svc.list_dataExport_destinations.return_value = (
+            self._destinations
+        )
 
         # act
         destinations = provider.list_dataExport_destinations()
         # verify
         assert mock_destination_svc.list_dataExport_destinations.call_count == 1
         assert destinations == self._destinations
-    
+
     @mock.patch("azext_iot.central.services.destination")
     def test_should_return_destination(self, mock_destination_svc):
         # setup
         provider = CentralDestinationProvider(
             cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
         )
-        mock_destination_svc.get_dataExport_destination.return_value = self._destinations[0]
+        mock_destination_svc.get_dataExport_destination.return_value = (
+            self._destinations[0]
+        )
 
         # act
         destination = provider.get_dataExport_destination(self._destinations[0]["id"])
         # verify
         assert mock_destination_svc.get_dataExport_destination.call_count == 1
         assert destination == self._destinations[0]
-    
+
     @mock.patch("azext_iot.central.services.destination")
     def test_should_add_destination(self, mock_destination_svc):
         # setup
         provider = CentralDestinationProvider(
             cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
         )
-        mock_destination_svc.add_dataExport_destination.return_value = self._destinations[0]
+        mock_destination_svc.add_dataExport_destination.return_value = (
+            self._destinations[0]
+        )
 
         # act
-        destination = provider.add_dataExport_destination(self._destinations[0]["id"], self._destinations[0])
+        destination = provider.add_dataExport_destination(
+            self._destinations[0]["id"], self._destinations[0]
+        )
         # verify
         assert mock_destination_svc.add_dataExport_destination.call_count == 1
         assert provider._destinations[destination["id"]] == self._destinations[0]
@@ -463,11 +475,17 @@ class TestCentralDestinationProvider:
         provider = CentralDestinationProvider(
             cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
         )
-        mock_destination_svc.update_dataExport_destination.return_value = self._destinations[0]
+        mock_destination_svc.update_dataExport_destination.return_value = (
+            self._destinations[0]
+        )
 
         # act
-        provider.add_dataExport_destination(self._destinations[0]["id"], self._destinations[0])
-        destination = provider.update_dataExport_destination(self._destinations[0]["id"], None)
+        provider.add_dataExport_destination(
+            self._destinations[0]["id"], self._destinations[0]
+        )
+        destination = provider.update_dataExport_destination(
+            self._destinations[0]["id"], None
+        )
         # verify
         assert mock_destination_svc.add_dataExport_destination.call_count == 1
         assert mock_destination_svc.update_dataExport_destination.call_count == 1
@@ -479,22 +497,23 @@ class TestCentralDestinationProvider:
         provider = CentralDestinationProvider(
             cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
         )
-        mock_destination_svc.add_dataExport_destination.return_value = self._destinations[0]
-
+        mock_destination_svc.add_dataExport_destination.return_value = (
+            self._destinations[0]
+        )
 
         # act
-        provider.add_dataExport_destination(self._destinations[0]["id"], self._destinations[0])
+        provider.add_dataExport_destination(
+            self._destinations[0]["id"], self._destinations[0]
+        )
         provider.delete_dataExport_destination(self._destinations[0]["id"])
         # verify
         assert mock_destination_svc.add_dataExport_destination.call_count == 1
         assert mock_destination_svc.delete_dataExport_destination.call_count == 1
         assert provider._destinations.__len__() == 0
 
+
 class TestCentralExportProvider:
-    _exports = [
-        exp
-        for exp in load_json(FileNames.central_export_file)
-    ]
+    _exports = [exp for exp in load_json(FileNames.central_export_file)]
 
     @mock.patch("azext_iot.central.services.export")
     def test_should_return_exports(self, mock_export_svc):
@@ -509,7 +528,7 @@ class TestCentralExportProvider:
         # verify
         assert mock_export_svc.list_dataExport_exports.call_count == 1
         assert exports == self._exports
-    
+
     @mock.patch("azext_iot.central.services.export")
     def test_should_return_export(self, mock_export_svc):
         # setup
@@ -523,7 +542,7 @@ class TestCentralExportProvider:
         # verify
         assert mock_export_svc.get_dataExport_export.call_count == 1
         assert export == self._exports[0]
-    
+
     @mock.patch("azext_iot.central.services.export")
     def test_should_add_export(self, mock_export_svc):
         # setup
@@ -533,7 +552,9 @@ class TestCentralExportProvider:
         mock_export_svc.add_dataExport_export.return_value = self._exports[0]
 
         # act
-        export = provider.add_dataExport_export(self._exports[0]["id"], self._exports[0])
+        export = provider.add_dataExport_export(
+            self._exports[0]["id"], self._exports[0]
+        )
         # verify
         assert mock_export_svc.add_dataExport_export.call_count == 1
         assert export == self._exports[0]
@@ -564,12 +585,15 @@ class TestCentralExportProvider:
         mock_export_svc.add_dataExport_export.return_value = self._exports[0]
 
         # act
-        export = provider.add_dataExport_export(self._exports[0]["id"], self._exports[0])
+        export = provider.add_dataExport_export(
+            self._exports[0]["id"], self._exports[0]
+        )
         provider.delete_dataExport_export(export["id"])
         # verify
         assert mock_export_svc.add_dataExport_export.call_count == 1
         assert mock_export_svc.delete_dataExport_export.call_count == 1
         assert provider._exports.__len__() == 0
+
 
 class TestCentralPropertyMonitor:
     _device_twin = load_json(FileNames.central_device_twin_file)
