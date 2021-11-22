@@ -7,6 +7,7 @@
 from typing import List, Union
 
 from knack.log import get_logger
+from knack.util import CLIError
 
 from azext_iot.central.providers.central_provider import CentralProvider
 from azext_iot.constants import CENTRAL_ENDPOINT

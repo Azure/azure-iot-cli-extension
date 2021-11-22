@@ -417,7 +417,7 @@ class TestCentralQueryProvider:
 
 
 class TestCentralDestinationProvider:
-    _destinations = [dest for dest in load_json(FileNames.central_destination_file)]
+    _destinations = list(load_json(FileNames.central_destination_file))
 
     @mock.patch("azext_iot.central.services.destination")
     def test_should_return_destinations(self, mock_destination_svc):
