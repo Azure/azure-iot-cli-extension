@@ -53,7 +53,7 @@ iot central destination update:
     api_version:
       rule_exclusions:
       - no_parameter_defaults_for_update_commands
-    central_dnx_suffix:
+    central_dns_suffix:
       rule_exclusions:
       - no_parameter_defaults_for_update_commands
 iot central export update:
@@ -61,6 +61,6 @@ iot central export update:
     api_version:
       rule_exclusions:
       - no_parameter_defaults_for_update_commands
-    central_dnx_suffix:
+    central_dns_suffix:
       rule_exclusions:
       - no_parameter_defaults_for_update_commands

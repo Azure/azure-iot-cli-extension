@@ -513,7 +513,7 @@ class TestCentralDestinationProvider:
 
 
 class TestCentralExportProvider:
-    _exports = [exp for exp in load_json(FileNames.central_export_file)]
+    _exports = list(load_json(FileNames.central_export_file))
 
     @mock.patch("azext_iot.central.services.export")
     def test_should_return_exports(self, mock_export_svc):
