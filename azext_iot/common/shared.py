@@ -138,7 +138,7 @@ class AllocationType(Enum):
     """
 
     hashed = "hashed"
-    geolatency = "geolatency"
+    geolatency = "geoLatency"
     static = "static"
     custom = "custom"
 

@@ -195,4 +195,4 @@ def load_command_table(self, _):
     with self.command_group(
         "iot dps connection-string", command_type=iotdps_ops
     ) as cmd_group:
-        cmd_group.show_command("show", "iot_dps_connection_string_show", is_preview=True)
+        cmd_group.show_command("show", "iot_dps_connection_string_show")

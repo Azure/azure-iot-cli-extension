@@ -4,7 +4,6 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import os
 from azext_iot.common.shared import EntityStatusType, AttestationType, AllocationType, ReprovisionType
 from azext_iot.common.utility import generate_key
 from azext_iot.tests.dps import (
@@ -27,10 +26,6 @@ test_endorsement_key = (
 class TestDPSEnrollments(IoTDPSLiveScenarioTest):
     def __init__(self, test_method):
         super(TestDPSEnrollments, self).__init__(test_method)
-
-    def __del__(self):
-        if os.path.exists(CERT_PATH):
-            os.remove(CERT_PATH)
 
     def test_dps_compute_device_key(self):
         offline_device_key = self.cmd(
@@ -254,6 +249,7 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
             secondary_key = generate_key()
             device_id = self.generate_enrollment_names()[0]
 
+            # Use provided keys
             etag = self.cmd(
                 self.set_cmd_auth_type(
                     "iot dps enrollment create --enrollment-id {} --attestation-type {}"
@@ -271,7 +267,7 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                         device_id,
                         '"{generic_dict}"',
                         '"{generic_dict}"',
-                        AllocationType.geolatency.value,
+                        AllocationType.geolatency.value.lower(),
                         ReprovisionType.reprovisionandresetdata.value,
                         self.hub_host_name,
                     ),
@@ -282,7 +278,7 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                     self.check("registrationId", enrollment_id),
                     self.check("provisioningStatus", EntityStatusType.enabled.value),
                     self.check("deviceId", device_id),
-                    self.check("allocationPolicy", "geoLatency"),
+                    self.check("allocationPolicy", AllocationType.geolatency.value),
                     # self.check("iotHubs", self.hub_host_name.split()),
                     self.check("initialTwin.tags", self.kwargs["generic_dict"]),
                     self.check(
@@ -348,6 +344,7 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                 ],
             )
 
+            # Use service generated keys
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot dps enrollment create --enrollment-id {} --attestation-type {}"
@@ -402,7 +399,7 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                         CERT_PATH,
                         CERT_PATH,
                         EntityStatusType.enabled.value,
-                        "geoLatency",
+                        AllocationType.geolatency.value,
                         self.hub_host_name,
                     ),
                     auth_type=auth_phase
@@ -411,7 +408,7 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                     self.check("enrollmentGroupId", enrollment_id),
                     self.check("provisioningStatus", EntityStatusType.enabled.value),
                     self.exists("reprovisionPolicy"),
-                    self.check("allocationPolicy", "geoLatency"),
+                    self.check("allocationPolicy", AllocationType.geolatency.value),
                     self.check("iotHubs", self.hub_host_name.split()),
                     self.check("reprovisionPolicy.migrateDeviceData", True),
                     self.check("reprovisionPolicy.updateHubAssignment", True),
@@ -556,17 +553,43 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
     def test_dps_enrollment_group_symmetrickey_lifecycle(self):
         attestation_type = AttestationType.symmetricKey.value
         for auth_phase in DATAPLANE_AUTH_TYPES:
-            enrollment_id = self.generate_enrollment_names(group=True)[0]
+            enrollment_id, enrollment_id2 = self.generate_enrollment_names(count=2, group=True)
+            primary_key = generate_key()
+            secondary_key = generate_key()
+
             etag = self.cmd(
                 self.set_cmd_auth_type(
-                    "iot dps enrollment-group create -g {} --dps-name {} --enrollment-id {}".format(
-                        self.entity_rg, self.entity_dps_name, enrollment_id
+                    "iot dps enrollment-group create --enrollment-id {}"
+                    " -g {} --dps-name {} --pk {} --sk {} --provisioning-status {}"
+                    " --initial-twin-tags {} --initial-twin-properties {}"
+                    " --allocation-policy {} --rp {} --iot-hubs {} --edge-enabled".format(
+                        enrollment_id,
+                        self.entity_rg,
+                        self.entity_dps_name,
+                        primary_key,
+                        secondary_key,
+                        EntityStatusType.enabled.value,
+                        '"{generic_dict}"',
+                        '"{generic_dict}"',
+                        AllocationType.geolatency.value,
+                        ReprovisionType.reprovisionandresetdata.value,
+                        self.hub_host_name,
                     ),
                     auth_type=auth_phase
                 ),
                 checks=[
                     self.check("enrollmentGroupId", enrollment_id),
-                    self.check("attestation.type", attestation_type),
+                    self.check("provisioningStatus", EntityStatusType.enabled.value),
+                    self.check("allocationPolicy", AllocationType.geolatency.value),
+                    # self.check("iotHubs", self.hub_host_name.split()),
+                    self.check("initialTwin.tags", self.kwargs["generic_dict"]),
+                    self.check(
+                        "initialTwin.properties.desired", self.kwargs["generic_dict"]
+                    ),
+                    self.exists("reprovisionPolicy"),
+                    self.check("reprovisionPolicy.migrateDeviceData", False),
+                    self.check("reprovisionPolicy.updateHubAssignment", True),
+                    self.check("capabilities.iotEdge", True),
                 ],
             ).get_output_in_json()["etag"]
 
@@ -591,15 +614,79 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                 checks=[self.check("enrollmentGroupId", enrollment_id)],
             )
 
-            keys = self.cmd(
+            self.cmd(
                 self.set_cmd_auth_type(
-                    "iot dps enrollment-group show -g {} --dps-name {} --enrollment-id {} --show-keys".format(
-                        self.entity_rg, self.entity_dps_name, enrollment_id
+                    "iot dps enrollment-group update -g {} --dps-name {} --enrollment-id {}"
+                    " --provisioning-status {} --etag {} --edge-enabled False"
+                    " --allocation-policy {} --webhook-url {} --api-version {}".format(
+                        self.entity_rg,
+                        self.entity_dps_name,
+                        enrollment_id,
+                        EntityStatusType.disabled.value,
+                        etag,
+                        AllocationType.custom.value,
+                        WEBHOOK_URL,
+                        API_VERSION,
                     ),
                     auth_type=auth_phase
                 ),
                 checks=[
                     self.check("enrollmentGroupId", enrollment_id),
+                    self.check("provisioningStatus", EntityStatusType.disabled.value),
+                    self.check("allocationPolicy", "custom"),
+                    self.check("customAllocationDefinition.webhookUrl", WEBHOOK_URL),
+                    self.check("customAllocationDefinition.apiVersion", API_VERSION),
+                    # self.check("iotHubs", self.hub_host_name.split()),
+                    self.exists("initialTwin.tags"),
+                    self.exists("initialTwin.properties.desired"),
+                    self.check("attestation.symmetricKey.primaryKey", primary_key),
+                    self.check("capabilities.iotEdge", False),
+                ],
+            )
+
+            # Use service generated keys
+            etag = self.cmd(
+                self.set_cmd_auth_type(
+                    "iot dps enrollment-group create -g {} --dps-name {} --enrollment-id {}".format(
+                        self.entity_rg, self.entity_dps_name, enrollment_id2
+                    ),
+                    auth_type=auth_phase
+                ),
+                checks=[
+                    self.check("enrollmentGroupId", enrollment_id2),
+                    self.check("attestation.type", attestation_type),
+                ],
+            ).get_output_in_json()["etag"]
+
+            self.cmd(
+                self.set_cmd_auth_type(
+                    "iot dps enrollment-group list -g {} --dps-name {}".format(self.entity_rg, self.entity_dps_name),
+                    auth_type=auth_phase
+                ),
+                checks=[
+                    self.check("length(@)", 2)
+                ],
+            )
+
+            self.cmd(
+                self.set_cmd_auth_type(
+                    "iot dps enrollment-group show -g {} --dps-name {} --enrollment-id {}".format(
+                        self.entity_rg, self.entity_dps_name, enrollment_id2
+                    ),
+                    auth_type=auth_phase
+                ),
+                checks=[self.check("enrollmentGroupId", enrollment_id2)],
+            )
+
+            keys = self.cmd(
+                self.set_cmd_auth_type(
+                    "iot dps enrollment-group show -g {} --dps-name {} --enrollment-id {} --show-keys".format(
+                        self.entity_rg, self.entity_dps_name, enrollment_id2
+                    ),
+                    auth_type=auth_phase
+                ),
+                checks=[
+                    self.check("enrollmentGroupId", enrollment_id2),
                     self.exists("attestation.symmetricKey"),
                 ],
             ).get_output_in_json()["attestation"]["symmetricKey"]
@@ -609,7 +696,7 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                 self.set_cmd_auth_type(
                     'az iot dps compute-device-key -g {} --dps-name {} --enrollment-id {} '
                     "--registration-id myarbitrarydeviceId".format(
-                        self.entity_rg, self.entity_dps_name, enrollment_id
+                        self.entity_rg, self.entity_dps_name, enrollment_id2
                     ),
                     auth_type=auth_phase
                 ),
@@ -634,7 +721,7 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                     " --pk {} --sk {} --etag {}".format(
                         self.entity_rg,
                         self.entity_dps_name,
-                        enrollment_id,
+                        enrollment_id2,
                         keys["secondaryKey"],
                         keys["primaryKey"],
                         etag
@@ -642,7 +729,7 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                     auth_type=auth_phase
                 ),
                 checks=[
-                    self.check("enrollmentGroupId", enrollment_id),
+                    self.check("enrollmentGroupId", enrollment_id2),
                     self.check("attestation.type", attestation_type),
                 ],
             ).get_output_in_json()["etag"]
@@ -651,12 +738,21 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                 self.set_cmd_auth_type(
                     'az iot dps compute-device-key -g {} --dps-name {} --enrollment-id {} '
                     "--registration-id myarbitrarydeviceId".format(
-                        self.entity_rg, self.entity_dps_name, enrollment_id
+                        self.entity_rg, self.entity_dps_name, enrollment_id2
                     ),
                     auth_type=auth_phase
                 ),
             ).output
             assert offline_device_key == online_device_key
+
+            self.cmd(
+                self.set_cmd_auth_type(
+                    "iot dps enrollment-group delete -g {} --dps-name {} --enrollment-id {}".format(
+                        self.entity_rg, self.entity_dps_name, enrollment_id2
+                    ),
+                    auth_type=auth_phase
+                ),
+            )
 
             self.cmd(
                 self.set_cmd_auth_type(
@@ -736,7 +832,7 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                         CERT_PATH,
                         CERT_PATH,
                         EntityStatusType.enabled.value,
-                        "geoLatency",
+                        AllocationType.geolatency.value,
                         self.hub_host_name,
                         '"{twin_array_dict}"',
                     ),
@@ -746,7 +842,7 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                     self.check("enrollmentGroupId", enrollment_group_id),
                     self.check("provisioningStatus", EntityStatusType.enabled.value),
                     self.exists("reprovisionPolicy"),
-                    self.check("allocationPolicy", "geoLatency"),
+                    self.check("allocationPolicy", AllocationType.geolatency.value),
                     self.check("iotHubs", self.hub_host_name.split()),
                     self.check(
                         "initialTwin.properties.desired", self.kwargs["twin_array_dict"]

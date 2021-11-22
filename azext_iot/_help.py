@@ -1394,11 +1394,11 @@ helps[
     short-summary: Show the connection strings for the specified Device Provisioning Services using the given
                    policy name and key.
     examples:
-    - name: Show the connection strings for all active state DPS's in a subscription
+    - name: Show the connection strings for all active state DPS instances in a subscription
             using the default policy and primary key.
       text: >
           az iot dps connection-string show
-    - name: Show the connection strings for all active state DPS's in a resource group
+    - name: Show the connection strings for all active state DPS instances in a resource group
             using the default policy and primary key.
       text: >
           az iot dps connection-string show --resource-group MyResourceGroup

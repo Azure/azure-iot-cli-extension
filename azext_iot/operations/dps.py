@@ -1018,8 +1018,9 @@ def _validate_allocation_policy_for_enrollment(
             raise CLIError(
                 "'iot_hub_host_name' is not required when allocation-policy is defined."
             )
+        # Code to ensure geolatency still works after the enum fix.
         if not any(
-            allocation_policy == allocation.value for allocation in AllocationType
+            allocation_policy.lower() == allocation.value.lower() for allocation in AllocationType
         ):
             raise CLIError("Please provide valid allocation policy.")
         if allocation_policy == AllocationType.static.value:

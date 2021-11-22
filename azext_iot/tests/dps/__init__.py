@@ -133,13 +133,11 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
         hubs = self.cmd(
             "iot dps linked-hub list --dps-name {} -g {}".format(self.entity_dps_name, self.entity_rg)
         ).get_output_in_json()
-        if not len(hubs) or not len(
-            list(
-                filter(
-                    lambda linked_hub: linked_hub["name"]
-                    == "{}.azure-devices.net".format(self.entity_hub_name),
-                    hubs,
-                )
+        if not hubs or not list(
+            filter(
+                lambda linked_hub: linked_hub["name"]
+                == "{}.azure-devices.net".format(self.entity_hub_name),
+                hubs,
             )
         ):
             self.cmd(
@@ -153,7 +151,7 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
         enrollments = self.cmd(
             "iot dps enrollment list --dps-name {} -g  {}".format(self.entity_dps_name, self.entity_rg)
         ).get_output_in_json()
-        if len(enrollments) > 0:
+        if enrollments:
             enrollment_ids = list(map(lambda x: x["registrationId"], enrollments))
             for id in enrollment_ids:
                 self.cmd(
@@ -165,7 +163,7 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
         enrollment_groups = self.cmd(
             "iot dps enrollment-group list --dps-name {} -g  {}".format(self.entity_dps_name, self.entity_rg)
         ).get_output_in_json()
-        if len(enrollment_groups) > 0:
+        if enrollment_groups:
             enrollment_ids = list(map(lambda x: x["enrollmentGroupId"], enrollment_groups))
             for id in enrollment_ids:
                 self.cmd(
@@ -201,10 +199,6 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
         ]
         return names
 
-    def tearDown(self):
-        if os.path.exists(CERT_PATH):
-            os.remove(CERT_PATH)
-
     def get_hub_region(self):
         return self.cmd(
             "iot hub show -n {}".format(self.entity_hub_name)
@@ -239,6 +233,8 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
     @pytest.fixture(scope='class', autouse=True)
     def tearDownSuite(self):
         yield None
+        if os.path.exists(CERT_PATH):
+            os.remove(CERT_PATH)
         self.cmd(
             "iot dps linked-hub delete --dps-name {} --linked-hub {} --resource-group {}".format(
                 ENTITY_DPS_NAME, self.hub_host_name, ENTITY_RG
@@ -250,7 +246,7 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     ENTITY_HUB_NAME, ENTITY_RG
                 )
             )
-        if not settings.env.azext_iot_testhub:
+        if not settings.env.azext_iot_testdps:
             self.cmd(
                 "iot dps delete --name {} --resource-group {}".format(
                     ENTITY_DPS_NAME, ENTITY_RG
