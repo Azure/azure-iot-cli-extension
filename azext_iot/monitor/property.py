@@ -18,7 +18,7 @@ from azext_iot.constants import (
     PNP_DTDLV2_COMPONENT_MARKER,
 )
 
-from azext_iot.central.models.devicetwin import DeviceTwin, Property
+from azext_iot.central.models.devicetwin import Property
 
 from azext_iot.central.providers import (
     CentralDeviceProvider,
