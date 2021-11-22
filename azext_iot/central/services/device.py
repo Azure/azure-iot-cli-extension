@@ -527,7 +527,7 @@ def get_device_twin(
         ]
         token = "Bearer {}".format(aad_token)
 
-    url = f"https://{app_id}.{central_dns_suffix}/system/iothub/devices/{device_id}/get-twin"
+    url = f"https://{app_id}.{central_dns_suffix}/system/iothub/devices/{device_id}/get-twin?extendedInfo=true"
     headers = _utility.get_headers(token, cmd)
 
     # Construct parameters

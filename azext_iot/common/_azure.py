@@ -55,7 +55,7 @@ def get_iot_central_tokens(cmd, app_id, token, central_dns_suffix):
         ]
         token = "Bearer {}".format(aad_token)
 
-    url = "https://{}.{}/system/iothubs/generateSasTokens".format(
+    url = "https://{}.{}/system/iothubs/generateEventSasTokens".format(
         app_id, central_dns_suffix
     )
 
