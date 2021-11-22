@@ -1081,7 +1081,7 @@ helps[
     "iot dps"
 ] = """
     type: group
-    short-summary: Manage entities in an Azure IoT Hub Device Provisioning Service.
+    short-summary: Manage entities in an Azure IoT Hub Device Provisioning Service (DPS).
                    Augmented with the IoT extension.
 """
 
@@ -1089,21 +1089,21 @@ helps[
     "iot dps enrollment"
 ] = """
     type: group
-    short-summary: Manage enrollments in an Azure IoT Hub Device Provisioning Service.
+    short-summary: Manage individual device enrollments in an Azure IoT Hub Device Provisioning Service.
 """
 
 helps[
     "iot dps enrollment list"
 ] = """
     type: command
-    short-summary: List device enrollments in an Azure IoT Hub Device Provisioning Service.
+    short-summary: List individual device enrollments in an Azure IoT Hub Device Provisioning Service.
 """
 
 helps[
     "iot dps enrollment show"
 ] = """
     type: command
-    short-summary: Get device enrollment details in an Azure IoT Hub Device Provisioning Service.
+    short-summary: Get individual device enrollment details in an Azure IoT Hub Device Provisioning Service.
     examples:
     - name: Basic usage
       text: >
@@ -1117,7 +1117,7 @@ helps[
     "iot dps enrollment create"
 ] = """
     type: command
-    short-summary: Create a device enrollment in an Azure IoT Hub Device Provisioning Service.
+    short-summary: Create an individual device enrollment in an Azure IoT Hub Device Provisioning Service.
     examples:
     - name: Create an enrollment '{enrollment_id}' with attestation type 'x509' in the Azure
             IoT provisioning service '{dps_name}' in the resource group '{resource_group_name}'
@@ -1178,7 +1178,7 @@ helps[
     "iot dps enrollment update"
 ] = """
     type: command
-    short-summary: Update a device enrollment in an Azure IoT Hub Device Provisioning Service.
+    short-summary: Update an individual device enrollment in an Azure IoT Hub Device Provisioning Service.
     examples:
     - name: Update enrollment '{enrollment_id}' with a new x509 certificate in the Azure IoT
             Device Provisioning Service '{dps_name}' in the resource group '{resource_group_name}'.
@@ -1223,14 +1223,14 @@ helps[
     "iot dps enrollment delete"
 ] = """
     type: command
-    short-summary: Delete a device enrollment in an Azure IoT Hub Device Provisioning Service.
+    short-summary: Delete an individual device enrollment in an Azure IoT Hub Device Provisioning Service.
 """
 
 helps[
     "iot dps enrollment-group"
 ] = """
     type: group
-    short-summary: Manage Azure IoT Hub Device Provisioning Service.
+    short-summary: Manage enrollment groups in an Azure IoT Hub Device Provisioning Service.
 """
 
 helps[
@@ -1244,7 +1244,7 @@ helps[
     "iot dps enrollment-group show"
 ] = """
     type: command
-    short-summary: Get the details of an enrollment group in an Azure IoT Hub Device Provisioning Service.
+    short-summary: Get an enrollment group's details in an Azure IoT Hub Device Provisioning Service.
     examples:
     - name: Basic usage
       text: >
@@ -1339,22 +1339,24 @@ helps[
     "iot dps registration"
 ] = """
     type: group
-    short-summary: Manage Azure IoT Hub Device Provisioning Service registrations.
+    short-summary: Manage device registrations for an enrollment group in an Azure IoT Hub Device
+        Provisioning Service.
 """
 
 helps[
     "iot dps registration list"
 ] = """
     type: command
-    short-summary: List device registration state in an Azure IoT Hub Device Provisioning
-        Service enrollment group.
+    short-summary: List device registrations for an enrollment group in an Azure IoT Hub Device
+        Provisioning Service.
 """
 
 helps[
     "iot dps registration show"
 ] = """
     type: command
-    short-summary: Get the device registration state in an Azure IoT Hub Device Provisioning Service.
+    short-summary: Get a device registration for an enrollment group in an Azure IoT Hub Device
+        Provisioning Service.
 """
 
 helps[
@@ -1369,7 +1371,7 @@ helps[
 ] = """
     type: command
     short-summary: Generate a derived device SAS key.
-    long-summary: Generate a derived device key from a DPS enrollment group.
+    long-summary: Generate a derived device key for a DPS enrollment group.
     examples:
     - name: Compute the device key with the given symmetric key.
       text: >

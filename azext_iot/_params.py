@@ -835,77 +835,90 @@ def load_arguments(self, _):
         context.argument(
             "initial_twin_properties",
             options_list=["--initial-twin-properties", "--props"],
-            help="Initial twin properties",
+            help="Initial twin properties.",
         )
         context.argument(
             "initial_twin_tags",
             options_list=["--initial-twin-tags", "--tags"],
-            help="Initial twin tags",
+            help="Initial twin tags.",
         )
         context.argument(
             "iot_hub_host_name",
             options_list=["--iot-hub-host-name", "--hn"],
-            help="Host name of target IoT Hub",
+            help="Host name of target IoT Hub. Allocation policy defaults to static if this parameter is provided.",
         )
         context.argument(
             "provisioning_status",
             options_list=["--provisioning-status", "--ps"],
             arg_type=get_enum_type(EntityStatusType),
-            help="Enable or disable enrollment entry",
+            help="Enable or disable enrollment entry.",
         )
         context.argument(
             "certificate_path",
             options_list=["--certificate-path", "--cp"],
             help="The path to the file containing the primary certificate.",
+            arg_group="Authentication"
         )
         context.argument(
             "secondary_certificate_path",
             options_list=["--secondary-certificate-path", "--scp"],
-            help="The path to the file containing the secondary certificate",
+            help="The path to the file containing the secondary certificate.",
+            arg_group="Authentication"
         )
         context.argument(
             "remove_certificate",
             options_list=["--remove-certificate", "--rc"],
-            help="Remove current primary certificate",
+            help="Flag to remove current primary certificate.",
             arg_type=get_three_state_flag(),
+            arg_group="Authentication"
         )
         context.argument(
             "remove_secondary_certificate",
             options_list=["--remove-secondary-certificate", "--rsc"],
-            help="Remove current secondary certificate",
+            help="Flag to remove current secondary certificate.",
             arg_type=get_three_state_flag(),
+            arg_group="Authentication"
         )
         context.argument(
             "reprovision_policy",
             options_list=["--reprovision-policy", "--rp"],
             arg_type=get_enum_type(ReprovisionType),
-            help="Device data to be handled on re-provision to different Iot Hub.",
+            help="Policy to determine how device data should be handled on re-provision to a different IoT Hub.",
         )
         context.argument(
             "allocation_policy",
             options_list=["--allocation-policy", "--ap"],
             arg_type=get_enum_type(AllocationType),
-            help="Type of allocation for device assigned to the Hub.",
+            help="Type of allocation policy to determine how a device is assigned to an IoT Hub.",
+            arg_group="Allocation Policy Arguments"
         )
         context.argument(
             "iot_hubs",
             options_list=["--iot-hubs", "--ih"],
-            help="Host name of target IoT Hub. Use space-separated list for multiple IoT Hubs.",
+            help="Host name of target IoT Hub associated with the allocation policy. Use space-separated "
+            "list for multiple IoT Hubs.",
+            arg_group="Allocation Policy Arguments"
         )
         context.argument(
             "webhook_url",
             options_list=["--webhook-url", "--wh"],
-            help="The webhook URL used for custom allocation requests.",
+            help="The Azure Function webhook URL used for custom allocation requests.",
+            arg_group="Allocation Policy Arguments"
         )
         context.argument(
             "api_version",
             options_list=["--api-version", "--av"],
             help="The API version of the provisioning service types sent in the custom allocation"
             " request. Minimum supported version: 2018-09-01-preview.",
+            arg_group="Allocation Policy Arguments"
         )
 
     with self.argument_context("iot dps compute-device-key") as context:
-        context.argument("enrollment_id", help="ID of enrollment group")
+        context.argument(
+            "enrollment_id",
+            options_list=["--enrollment-id", "--group-id"],
+            help="Enrollment group ID."
+        )
         context.argument(
             "symmetric_key",
             options_list=["--symmetric-key", "--key"],
@@ -917,17 +930,23 @@ def load_arguments(self, _):
         context.argument("registration_id", help="ID of device registration. ")
 
     with self.argument_context("iot dps enrollment") as context:
-        context.argument("enrollment_id", help="ID of device enrollment record")
-        context.argument("device_id", help="IoT Hub Device ID")
+        context.argument(
+            "enrollment_id",
+            options_list=["--enrollment-id"],
+            help="Individual device enrollment ID."
+        )
+        context.argument("device_id", help="Device ID registered in the IoT Hub.")
         context.argument(
             "primary_key",
             options_list=["--primary-key", "--pk"],
             help="The primary symmetric shared access key stored in base64 format. ",
+            arg_group="Authentication"
         )
         context.argument(
             "secondary_key",
             options_list=["--secondary-key", "--sk"],
             help="The secondary symmetric shared access key stored in base64 format. ",
+            arg_group="Authentication"
         )
 
     with self.argument_context("iot dps enrollment create") as context:
@@ -935,27 +954,31 @@ def load_arguments(self, _):
             "attestation_type",
             options_list=["--attestation-type", "--at"],
             arg_type=get_enum_type(AttestationType),
-            help="Attestation Mechanism",
+            help="Attestation Mechanism used for authentication to the DPS.",
+            arg_group="Authentication"
         )
         context.argument(
             "certificate_path",
             options_list=["--certificate-path", "--cp"],
             help="The path to the file containing the primary certificate. "
-            "When choosing x509 as attestation type, "
-            "one of the certificate path is required.",
+            "Required when choosing x509 as attestation type and the secondary"
+            " certificate path is not provided.",
+            arg_group="Authentication"
         )
         context.argument(
             "secondary_certificate_path",
             options_list=["--secondary-certificate-path", "--scp"],
             help="The path to the file containing the secondary certificate. "
-            "When choosing x509 as attestation type, "
-            "one of the certificate path is required.",
+            "Required when choosing x509 as attestation type and the primary"
+            " certificate path is not provided.",
+            arg_group="Authentication"
         )
         context.argument(
             "endorsement_key",
             options_list=["--endorsement-key", "--ek"],
             help="TPM endorsement key for a TPM device. "
             "When choosing tpm as attestation type, endorsement key is required.",
+            arg_group="Authentication"
         )
 
     with self.argument_context("iot dps enrollment show") as context:
@@ -963,7 +986,7 @@ def load_arguments(self, _):
             "show_keys",
             options_list=["--show-keys", "--keys"],
             arg_type=get_three_state_flag(),
-            help="Include attestation keys and information in enrollment results",
+            help="Include attestation keys and information in enrollment results.",
         )
 
     with self.argument_context("iot dps enrollment update") as context:
@@ -974,40 +997,46 @@ def load_arguments(self, _):
         )
 
     with self.argument_context("iot dps enrollment-group") as context:
-        context.argument("enrollment_id", help="ID of enrollment group")
+        context.argument("enrollment_id", help="ID of enrollment group.")
         context.argument(
             "primary_key",
             options_list=["--primary-key", "--pk"],
             help="The primary symmetric shared access key stored in base64 format. ",
+            arg_group="Authentication"
         )
         context.argument(
             "secondary_key",
             options_list=["--secondary-key", "--sk"],
             help="The secondary symmetric shared access key stored in base64 format. ",
+            arg_group="Authentication"
         )
         context.argument(
             "certificate_path",
             options_list=["--certificate-path", "--cp"],
             help="The path to the file containing the primary certificate. "
             "If attestation with an intermediate certificate is desired then a certificate path must be provided.",
+            arg_group="Authentication"
         )
         context.argument(
             "secondary_certificate_path",
             options_list=["--secondary-certificate-path", "--scp"],
             help="The path to the file containing the secondary certificate. "
             "If attestation with an intermediate certificate is desired then a certificate path must be provided.",
+            arg_group="Authentication"
         )
         context.argument(
             "root_ca_name",
             options_list=["--root-ca-name", "--ca-name", "--cn"],
             help="The name of the primary root CA certificate. "
             "If attestation with a root CA certificate is desired then a root ca name must be provided.",
+            arg_group="Authentication"
         )
         context.argument(
             "secondary_root_ca_name",
             options_list=["--secondary-root-ca-name", "--secondary-ca-name", "--scn"],
             help="The name of the secondary root CA certificate. "
             "If attestation with a root CA certificate is desired then a root ca name must be provided.",
+            arg_group="Authentication"
         )
 
     with self.argument_context("iot dps enrollment-group show") as context:
@@ -1015,11 +1044,15 @@ def load_arguments(self, _):
             "show_keys",
             options_list=["--show-keys", "--keys"],
             arg_type=get_three_state_flag(),
-            help="Include attestation keys and information in enrollment group results",
+            help="Include attestation keys and information in enrollment group results.",
         )
 
     with self.argument_context("iot dps registration") as context:
-        context.argument("registration_id", help="ID of device registration")
+        context.argument("registration_id", help="ID of device registration.")
 
     with self.argument_context("iot dps registration list") as context:
-        context.argument("enrollment_id", help="ID of enrollment group")
+        context.argument(
+            "enrollment_id",
+            options_list=["--enrollment-id", "--group-id"],
+            help="Enrollment group ID."
+        )
