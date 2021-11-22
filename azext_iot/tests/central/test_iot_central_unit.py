@@ -16,7 +16,6 @@ from azext_iot.central.models.enum import ApiVersion
 import pytest
 import json
 import responses
-import ast
 from unittest import mock
 from datetime import datetime
 from knack.util import CLIError
