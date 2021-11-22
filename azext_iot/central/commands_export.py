@@ -13,7 +13,7 @@ from azext_iot.central.models.enum import ApiVersion
 from azext_iot.central.models.v1_1_preview import ExportV1_1_preview
 
 
-def show_dataExport_export(
+def get_dataExport_export(
     cmd,
     app_id: str,
     export_id: str,

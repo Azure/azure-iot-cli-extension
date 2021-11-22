@@ -75,7 +75,7 @@ def load_central_commands(self, _):
         "iot central destination", command_type=central_destination_ops, is_preview=True
     ) as cmd_group:
         cmd_group.command("list", "list_dataExport_destinations")
-        cmd_group.command("show", "show_dataExport_destination")
+        cmd_group.show_command("show", "get_dataExport_destination")
         cmd_group.command("delete", "delete_dataExport_destination")
         cmd_group.command("create", "add_dataExport_destination")
         cmd_group.command("update", "update_dataExport_destination")
@@ -84,7 +84,7 @@ def load_central_commands(self, _):
         "iot central export", command_type=central_export_ops, is_preview=True
     ) as cmd_group:
         cmd_group.command("list", "list_dataExport_exports")
-        cmd_group.command("show", "show_dataExport_export")
+        cmd_group.show_command("show", "get_dataExport_export")
         cmd_group.command("delete", "delete_dataExport_export")
         cmd_group.command("create", "add_dataExport_export")
         cmd_group.command("update", "update_dataExport_export")

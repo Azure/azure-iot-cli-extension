@@ -17,7 +17,7 @@ from azext_iot.central.models.v1_1_preview import (
 )
 
 
-def show_dataExport_destination(
+def get_dataExport_destination(
     cmd,
     app_id: str,
     destination_id: str,
