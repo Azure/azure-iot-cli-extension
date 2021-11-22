@@ -18,6 +18,7 @@ from importlib import import_module
 from azext_iot.central.models.enum import ApiVersion
 from azure.cli.core.util import should_disable_connection_verify
 
+
 def make_api_call(
     cmd,
     app_id: str,
@@ -26,7 +27,7 @@ def make_api_call(
     payload: str,
     token: str,
     api_version: str,
-    central_dnx_suffix: str
+    central_dnx_suffix: str,
 ) -> dict:
 
     headers = get_headers(
@@ -46,6 +47,7 @@ def make_api_call(
         verify=not should_disable_connection_verify(),
     )
     return try_extract_result(response)
+
 
 def get_headers(token, cmd, has_json_payload=False):
     if not token:

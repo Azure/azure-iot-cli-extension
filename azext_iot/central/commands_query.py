@@ -5,7 +5,6 @@
 # --------------------------------------------------------------------------------------------
 # Command handling for query device telemetry or property data
 
-from azext_iot.central import providers
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.providers import CentralQueryProvider
 from azext_iot.central.models.enum import ApiVersion

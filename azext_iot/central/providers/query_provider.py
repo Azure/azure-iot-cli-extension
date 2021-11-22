@@ -4,8 +4,6 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from typing import List, Union
-from knack.util import CLIError
 from knack.log import get_logger
 
 from azext_iot.central.models.v1_1_preview import QueryReponseV1_1_preview

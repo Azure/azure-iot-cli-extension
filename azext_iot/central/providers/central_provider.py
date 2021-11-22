@@ -8,6 +8,7 @@ from knack.log import get_logger
 
 logger = get_logger(__name__)
 
+
 class CentralProvider:
     def __init__(self, cmd, app_id: str, api_version: str, token=None):
         """

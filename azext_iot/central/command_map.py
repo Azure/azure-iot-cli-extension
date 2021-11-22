@@ -7,7 +7,6 @@
 """
 Load CLI commands
 """
-from knack.arguments import CLIArgumentType
 from azure.cli.core.commands import CliCommandType
 
 central_device_ops = CliCommandType(

@@ -8,9 +8,7 @@
 from typing import Union
 import requests
 
-from knack.util import CLIError
 from knack.log import get_logger
-from azext_iot.central.services.role import BASE_PATH
 
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility

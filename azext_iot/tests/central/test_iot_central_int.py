@@ -6,7 +6,6 @@
 
 
 import json
-import time
 from azext_iot.central.models.enum import ApiVersion
 from azure.iot.device import Message
 from azext_iot.common import utility
@@ -437,7 +436,7 @@ class TestIotCentral(CentralLiveScenarioTest):
         )
         response = self.cmd(command, api_version=self._api_version).get_output_in_json()
 
-        assert response["results"] != None
+        assert response["results"] is not None
         self._delete_device(api_version=self._api_version, device_id=device_id)
         self._delete_device_template(
             api_version=self._api_version, template_id=template_id

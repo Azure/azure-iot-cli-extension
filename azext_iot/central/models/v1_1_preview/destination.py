@@ -14,11 +14,13 @@ class Destination:
         self.status = destination.get("status")
         self.error = destination.get("errors")
 
+
 class WebhookDestination(Destination):
     def __init__(self, destination: dict):
         super().__init__(destination)
         self.url = destination.get("url")
         self.headerCustomizations = destination.get("headerCustomizations")
+
 
 class AdxDestination(Destination):
     def __init__(self, destination: dict):
