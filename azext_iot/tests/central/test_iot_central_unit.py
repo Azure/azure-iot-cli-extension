@@ -100,9 +100,6 @@ def fixture_get_iot_central_tokens(mocker):
                 "sasToken": "sasToken",
             },
             "expiry": "0000",
-            "iothubTenantSasToken": {
-                "sasToken": "SharedAccessSignature sr=shared_resource&sig="
-            },
         }
     }
 
@@ -385,7 +382,7 @@ class TestCentralPropertyMonitor:
     ):
         # setup
         device_twin_data = json.dumps(self._device_twin)
-        raw_twin = ast.literal_eval(
+        raw_twin = json.loads(
             device_twin_data.replace("current_time", datetime.now().isoformat())
         )
 
@@ -404,7 +401,7 @@ class TestCentralPropertyMonitor:
         )
         assert len(result) == 1
 
-        assert len(result["device_info"]) == 10
+        assert len(result["device_info"]) == 9
         assert result["device_info"]["manufacturer"]
         assert result["device_info"]["model"]
         assert result["device_info"]["osName"]
@@ -422,9 +419,10 @@ class TestCentralPropertyMonitor:
         # test to check that no property updates are reported when version is not upadted
         # setup
         device_twin_data = json.dumps(self._device_twin)
-        raw_twin = ast.literal_eval(
+        raw_twin = json.loads(
             device_twin_data.replace("current_time", datetime.now().isoformat())
         )
+
         twin = DeviceTwin(raw_twin)
         twin_next = DeviceTwin(raw_twin)
         monitor = PropertyMonitor(

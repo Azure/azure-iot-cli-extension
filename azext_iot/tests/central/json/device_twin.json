@@ -1,24 +1,21 @@
 {
-    "deviceId": "2a5znfmy36q",
-    "etag": "AAAAAAAAAAI=",
+    "authenticationType": "sas",
+    "capabilities": {
+        "iotEdge": false
+    },
+    "cloudToDeviceMessageCount": 0,
+    "connectionState": "Disconnected",
+    "deviceEtag": "NzQxMTYyNTA3",
+    "deviceId": "ciikv8orhq",
+    "etag": "AAAAAAAAAAE=",
+    "lastActivityTime": "current_time",
+    "modelId": "dtmi:azure:PhoneAsIoTDevice:Application;2",
     "properties": {
         "desired": {
             "$metadata": {
-                "$lastUpdated": "current_time",
-                "$lastUpdatedVersion": 2,
-                "writeableProp": {
-                    "$lastUpdated": "current_time",
-                    "$lastUpdatedVersion": 2,
-                    "value": {
-                        "$lastUpdated": "current_time",
-                        "$lastUpdatedVersion": 2
-                    }
-                }
+                "$lastUpdated": "current_time"
             },
-            "$version": 2,
-            "writeableProp": {
-                "value": "12"
-            }
+            "$version": 1
         },
         "reported": {
             "$metadata": {
@@ -43,9 +40,6 @@
                     "processorManufacturer": {
                         "$lastUpdated": "current_time"
                     },
-                    "readOnlyProp": {
-                        "$lastUpdated": "current_time"
-                    },
                     "swVersion": {
                         "$lastUpdated": "current_time"
                     },
@@ -60,17 +54,23 @@
             "$version": 2,
             "device_info": {
                 "__t": "c",
-                "manufacturer": "Apple",
-                "model": "iPhone 12",
-                "osName": "iOS",
-                "processorArchitecture": "Intel x86-64h Haswell",
-                "processorManufacturer": "unknown",
-                "readOnlyProp": "editable",
-                "swVersion": "14.5",
-                "totalMemory": 8589934592,
-                "totalStorage": 250685575168
+                "manufacturer": "Xiaomi",
+                "model": "Redmi Note 5",
+                "osName": "Android",
+                "processorArchitecture": "I386",
+                "processorManufacturer": "ILOnly",
+                "swVersion": "9",
+                "totalMemory": 3741,
+                "totalStorage": 54621
             }
         }
     },
-    "tags": {}
+    "status": "enabled",
+    "statusUpdateTime": "0001-01-01T00:00:00Z",
+    "tags": {},
+    "version": 3,
+    "x509Thumbprint": {
+        "primaryThumbprint": null,
+        "secondaryThumbprint": null
+    }
 }
