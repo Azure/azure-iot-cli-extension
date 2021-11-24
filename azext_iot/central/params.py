@@ -419,7 +419,7 @@ def load_central_arguments(self, _):
             options_list=["--content", "-k"],
             help="The destination definition. Provide path to JSON file or raw stringified JSON."
             " [File Path Example:./path/to/file.json]"
-            " [Example of stringified JSON:[{<Job Data JSON>}]. The request body must contain array of JobData.",
+            " [Example of stringified JSON:{<Destination Data JSON>}]. The request body must contain content of Destination.",
         )
     with self.argument_context("iot central destination update") as context:
         context.argument(
@@ -427,7 +427,7 @@ def load_central_arguments(self, _):
             options_list=["--content", "-k"],
             help="The partial destination definition. Provide path to JSON file or raw stringified JSON."
             " [File Path Example:./path/to/file.json]"
-            " [Example of stringified JSON:[{<Job Data JSON>}]. The request body must contain array of JobData.",
+            " [Example of stringified JSON:{<Destination Data JSON>}. The request body must contain partial content of Destination.",
         )
 
     with self.argument_context("iot central export") as context:
@@ -450,7 +450,7 @@ def load_central_arguments(self, _):
             options_list=["--content", "-k"],
             help="The export definition. Provide path to JSON file or raw stringified JSON."
             " [File Path Example:./path/to/file.json]"
-            " [Example of stringified JSON:[{<Job Data JSON>}]. The request body must contain array of JobData.",
+            " [Example of stringified JSON:{<Export Data JSON>}. The request body must contain content of Export.",
         )
     with self.argument_context("iot central export update") as context:
         context.argument(
@@ -458,5 +458,5 @@ def load_central_arguments(self, _):
             options_list=["--content", "-k"],
             help="The partial export definition. Provide path to JSON file or raw stringified JSON."
             " [File Path Example:./path/to/file.json]"
-            " [Example of stringified JSON:[{<Job Data JSON>}]. The request body must contain array of JobData.",
+            " [Example of stringified JSON:{<Export Data JSON>}. The request body must contain partial content of Export.",
         )

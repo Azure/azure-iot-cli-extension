@@ -19,12 +19,12 @@ class WebhookDestination(Destination):
     def __init__(self, destination: dict):
         super().__init__(destination)
         self.url = destination.get("url")
-        self.headerCustomizations = destination.get("headerCustomizations")
+        self.header_customizations = destination.get("headerCustomizations")
 
 
 class AdxDestination(Destination):
     def __init__(self, destination: dict):
         super().__init__(destination)
-        self.clusterUrl = destination.get("clusterUrl")
+        self.cluster_url = destination.get("clusterUrl")
         self.database = destination.get("database")
         self.table = destination.get("table")

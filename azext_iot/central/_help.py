@@ -84,9 +84,9 @@ def _load_central_export_help():
         "iot central export show"
     ] = """
         type: command
-        short-summary: Get a export details
+        short-summary: Get an export details
         examples:
-        - name: Get a export details
+        - name: Get an export details
           text: >
             az iot central export show
             --app-id {appid}
@@ -97,9 +97,9 @@ def _load_central_export_help():
         "iot central export create"
     ] = """
         type: command
-        short-summary: Create a export for an application.
+        short-summary: Create an export for an application.
         examples:
-        - name: Create a export
+        - name: Create an export
           text: >
             az iot central export create
             --app-id {appid}
@@ -111,9 +111,9 @@ def _load_central_export_help():
         "iot central export update"
     ] = """
         type: command
-        short-summary: Update a export for an application.
+        short-summary: Update an export for an application.
         examples:
-        - name: Update a export
+        - name: Update an export
           text: >
             az iot central export update
             --app-id {appid}
@@ -125,9 +125,9 @@ def _load_central_export_help():
         "iot central export delete"
     ] = """
         type: command
-        short-summary: Delete a export for an application.
+        short-summary: Delete an export for an application.
         examples:
-        - name: Delete a export
+        - name: Delete an export
           text: >
             az iot central export delete
             --app-id {appid}
