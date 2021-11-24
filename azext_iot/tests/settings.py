@@ -17,6 +17,10 @@ ENV_SET_TEST_IOTHUB_OPTIONAL = [
     "azext_iot_teststoragecontainer"
 ]
 
+ENV_SET_TEST_IOTDPS_OPTIONAL = [
+    "azext_iot_testdps",
+]
+
 
 class UserTypes(Enum):
     user = "user"
