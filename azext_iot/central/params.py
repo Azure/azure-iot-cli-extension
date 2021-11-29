@@ -427,7 +427,8 @@ def load_central_arguments(self, _):
             options_list=["--content", "-k"],
             help="The partial destination definition. Provide path to JSON file or raw stringified JSON."
             " [File Path Example:./path/to/file.json]"
-            " [Example of stringified JSON:{<Destination Data JSON>}. The request body must contain partial content of Destination.",
+            " [Example of stringified JSON:{<Destination Data JSON>}."
+            " The request body must contain partial content of Destination.",
         )
 
     with self.argument_context("iot central export") as context:
