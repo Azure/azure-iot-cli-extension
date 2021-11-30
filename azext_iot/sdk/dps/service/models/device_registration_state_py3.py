@@ -18,8 +18,11 @@ class DeviceRegistrationState(Model):
     Variables are only populated by the server, and will be ignored when
     sending a request.
 
-    :ivar registration_id: The registration ID is alphanumeric, lowercase, and
-     may contain hyphens.
+    :ivar registration_id: This id is used to uniquely identify a device
+     registration of an enrollment.
+     A case-insensitive string (up to 128 characters long) of alphanumeric
+     characters plus certain special characters : . _ -. No special characters
+     allowed at start or end.
     :vartype registration_id: str
     :ivar created_date_time_utc: Registration create date time (in UTC).
     :vartype created_date_time_utc: datetime
@@ -29,7 +32,7 @@ class DeviceRegistrationState(Model):
     :vartype device_id: str
     :ivar status: Enrollment status. Possible values include: 'unassigned',
      'assigning', 'assigned', 'failed', 'disabled'
-    :vartype status: str or ~dps.models.enum
+    :vartype status: str or ~service.models.enum
     :ivar substatus: Substatus for 'Assigned' devices. Possible values include
      - 'initialAssignment': Device has been assigned to an IoT hub for the
      first time, 'deviceDataMigrated': Device has been assigned to a different
@@ -37,10 +40,12 @@ class DeviceRegistrationState(Model):
      hub. Device data was removed from the previously assigned IoT hub,
      'deviceDataReset':  Device has been assigned to a different IoT hub and
      its device data was populated from the initial state stored in the
-     enrollment. Device data was removed from the previously assigned IoT hub.
-     Possible values include: 'initialAssignment', 'deviceDataMigrated',
-     'deviceDataReset'
-    :vartype substatus: str or ~dps.models.enum
+     enrollment. Device data was removed from the previously assigned IoT hub,
+     'reprovisionedToInitialAssignment': Device has been re-provisioned to a
+     previously assigned IoT hub. Possible values include: 'initialAssignment',
+     'deviceDataMigrated', 'deviceDataReset',
+     'reprovisionedToInitialAssignment'
+    :vartype substatus: str or ~service.models.enum
     :ivar error_code: Error code.
     :vartype error_code: int
     :ivar error_message: Error message.

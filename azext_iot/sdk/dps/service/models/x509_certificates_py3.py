@@ -16,9 +16,9 @@ class X509Certificates(Model):
     """Primary and secondary certificates.
 
     :param primary:
-    :type primary: ~dps.models.X509CertificateWithInfo
+    :type primary: ~service.models.X509CertificateWithInfo
     :param secondary:
-    :type secondary: ~dps.models.X509CertificateWithInfo
+    :type secondary: ~service.models.X509CertificateWithInfo
     """
 
     _attribute_map = {

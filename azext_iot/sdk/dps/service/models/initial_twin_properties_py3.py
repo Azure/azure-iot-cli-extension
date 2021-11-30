@@ -16,7 +16,7 @@ class InitialTwinProperties(Model):
     """Represents the initial properties that will be set on the device twin.
 
     :param desired: Gets and sets the InitialTwin desired properties.
-    :type desired: ~dps.models.TwinCollection
+    :type desired: ~service.models.TwinCollection
     """
 
     _attribute_map = {

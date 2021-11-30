@@ -18,10 +18,10 @@ class BulkEnrollmentGroupOperation(Model):
     All required parameters must be populated in order to send to Azure.
 
     :param enrollment_groups: Required. Enrollment items
-    :type enrollment_groups: list[~dps.models.EnrollmentGroup]
+    :type enrollment_groups: list[~service.models.EnrollmentGroup]
     :param mode: Required. Operation mode. Possible values include: 'create',
      'update', 'updateIfMatchETag', 'delete'
-    :type mode: str or ~dps.models.enum
+    :type mode: str or ~service.models.enum
     """
 
     _validation = {

@@ -18,7 +18,7 @@ class X509CertificateWithInfo(Model):
     :param certificate:
     :type certificate: str
     :param info:
-    :type info: ~dps.models.X509CertificateInfo
+    :type info: ~service.models.X509CertificateInfo
     """
 
     _attribute_map = {

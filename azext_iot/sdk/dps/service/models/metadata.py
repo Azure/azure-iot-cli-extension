@@ -17,8 +17,8 @@ class Metadata(Model):
 
     :param last_updated: Last time the TwinCollection was updated
     :type last_updated: datetime
-    :param last_updated_version: This SHOULD be null for Reported properties
-     metadata and MUST not be null for Desired properties metadata.
+    :param last_updated_version: This is null for reported properties metadata
+     and is not null for desired properties metadata.
     :type last_updated_version: long
     """
 

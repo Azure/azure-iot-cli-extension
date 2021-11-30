@@ -18,7 +18,7 @@ class BulkEnrollmentGroupOperationResult(Model):
     All required parameters must be populated in order to send to Azure.
 
     :param errors: Registration errors
-    :type errors: list[~dps.models.BulkEnrollmentGroupOperationError]
+    :type errors: list[~service.models.BulkEnrollmentGroupOperationError]
     :param is_successful: Required. Indicates if the operation was successful
      in its entirety.
     :type is_successful: bool

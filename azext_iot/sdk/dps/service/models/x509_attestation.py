@@ -16,11 +16,11 @@ class X509Attestation(Model):
     """Attestation via X509.
 
     :param client_certificates:
-    :type client_certificates: ~dps.models.X509Certificates
+    :type client_certificates: ~service.models.X509Certificates
     :param signing_certificates:
-    :type signing_certificates: ~dps.models.X509Certificates
+    :type signing_certificates: ~service.models.X509Certificates
     :param ca_references:
-    :type ca_references: ~dps.models.X509CAReferences
+    :type ca_references: ~service.models.X509CAReferences
     """
 
     _attribute_map = {
