@@ -48,7 +48,7 @@ iot edge deployment update:
     auth_type_dataplane:
       rule_exclusions:
       - no_parameter_defaults_for_update_commands
-iot central destination update:
+iot central export destination update:
   parameters:
     api_version:
       rule_exclusions:
