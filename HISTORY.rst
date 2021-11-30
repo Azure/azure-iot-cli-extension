@@ -3,7 +3,7 @@
 Release History
 ===============
 
-0.11.2
+0.11.1
 +++++++++++++++
 
 **IoT Central updates**
@@ -11,11 +11,8 @@ Release History
 * Adds new preview commands (v1.1-preview)
 
   - Query (az iot central query)
-  - Destination (az iot central destination)
+  - Destination (az iot central export destination)
   - Export (az iot central export)
-
-0.11.1
-+++++++++++++++
 
 **IoT DPS updates**
 * Added `az iot dps connection-string show` to show the DPS connection string with
