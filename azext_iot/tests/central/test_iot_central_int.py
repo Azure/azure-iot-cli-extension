@@ -402,7 +402,7 @@ class TestIotCentral(CentralLiveScenarioTest):
         dest_id = "aztestdest0001"
         export_id = "aztestexport001"
         dest = self._create_destination(api_version=self._api_version, dest_id=dest_id)
-        command = "iot central destination show -n {} --dest-id {}".format(
+        command = "iot central export destination show -n {} --dest-id {}".format(
             APP_ID, dest["id"]
         )
         result = self.cmd(command, api_version=self._api_version).get_output_in_json()

@@ -152,7 +152,7 @@ def _load_central_destination_help():
         examples:
         - name: List all destinations in an application
           text: >
-            az iot central destination list
+            az iot central export destination list
             --app-id {appid}
     """
 
@@ -164,7 +164,7 @@ def _load_central_destination_help():
         examples:
         - name: Get a destination details
           text: >
-            az iot central destination show
+            az iot central export destination show
             --app-id {appid}
             --dest-id {destinationid}
     """
@@ -177,7 +177,7 @@ def _load_central_destination_help():
         examples:
         - name: Create a destination
           text: >
-            az iot central destination create
+            az iot central export destination create
             --app-id {appid}
             --dest-id {destinationid}
             --content {content}
@@ -191,7 +191,7 @@ def _load_central_destination_help():
         examples:
         - name: Update a destination
           text: >
-            az iot central destination update
+            az iot central export destination update
             --app-id {appid}
             --dest-id {destinationid}
             --content {content}
@@ -205,7 +205,7 @@ def _load_central_destination_help():
         examples:
         - name: Delete a destination
           text: >
-            az iot central destination delete
+            az iot central export destination delete
             --app-id {appid}
             --dest-id {destinationid}
     """

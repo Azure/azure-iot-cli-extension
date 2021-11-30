@@ -385,7 +385,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         )
 
     def _create_destination(self, api_version, dest_id):
-        command = "iot central destination create --app-id {} --dest-id {} --content '{}'".format(
+        command = "iot central export destination create --app-id {} --dest-id {} --content '{}'".format(
             APP_ID,
             dest_id,
             destination_webhook_path,
@@ -395,8 +395,10 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         ).get_output_in_json()
 
     def _delete_destination(self, api_version, dest_id):
-        command = "iot central destination delete --app-id {} --dest-id {}".format(
-            APP_ID, dest_id
+        command = (
+            "iot central export destination delete --app-id {} --dest-id {}".format(
+                APP_ID, dest_id
+            )
         )
         self.cmd(command, api_version=api_version)
 
