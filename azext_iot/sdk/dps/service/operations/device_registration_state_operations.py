@@ -48,10 +48,10 @@ class DeviceRegistrationStateOperations(object):
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
         :return: DeviceRegistrationState or ClientRawResponse if raw=true
-        :rtype: ~service.models.DeviceRegistrationState or
+        :rtype: ~dps.models.DeviceRegistrationState or
          ~msrest.pipeline.ClientRawResponse
         :raises:
-         :class:`ProvisioningServiceErrorDetailsException<service.models.ProvisioningServiceErrorDetailsException>`
+         :class:`ProvisioningServiceErrorDetailsException<dps.models.ProvisioningServiceErrorDetailsException>`
         """
         # Construct URL
         url = self.get.metadata['url']
@@ -114,7 +114,7 @@ class DeviceRegistrationStateOperations(object):
         :return: None or ClientRawResponse if raw=true
         :rtype: None or ~msrest.pipeline.ClientRawResponse
         :raises:
-         :class:`ProvisioningServiceErrorDetailsException<service.models.ProvisioningServiceErrorDetailsException>`
+         :class:`ProvisioningServiceErrorDetailsException<dps.models.ProvisioningServiceErrorDetailsException>`
         """
         # Construct URL
         url = self.delete.metadata['url']
@@ -170,10 +170,10 @@ class DeviceRegistrationStateOperations(object):
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
         :return: list or ClientRawResponse if raw=true
-        :rtype: list[~service.models.DeviceRegistrationState] or
+        :rtype: list[~dps.models.DeviceRegistrationState] or
          ~msrest.pipeline.ClientRawResponse
         :raises:
-         :class:`ProvisioningServiceErrorDetailsException<service.models.ProvisioningServiceErrorDetailsException>`
+         :class:`ProvisioningServiceErrorDetailsException<dps.models.ProvisioningServiceErrorDetailsException>`
         """
         # Construct URL
         url = self.query.metadata['url']

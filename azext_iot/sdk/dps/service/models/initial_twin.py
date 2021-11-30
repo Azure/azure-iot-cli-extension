@@ -16,9 +16,9 @@ class InitialTwin(Model):
     """Initial device twin. Contains a subset of the properties of Twin.
 
     :param tags: Twin tags.
-    :type tags: ~service.models.TwinCollection
+    :type tags: ~dps.models.TwinCollection
     :param properties: Twin desired properties.
-    :type properties: ~service.models.InitialTwinProperties
+    :type properties: ~dps.models.InitialTwinProperties
     """
 
     _attribute_map = {

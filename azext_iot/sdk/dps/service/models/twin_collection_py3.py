@@ -23,7 +23,7 @@ class TwinCollection(Model):
     :param count: Number of properties in the TwinCollection
     :type count: int
     :param metadata: Metadata for the TwinCollection
-    :type metadata: ~service.models.Metadata
+    :type metadata: ~dps.models.Metadata
     """
 
     _attribute_map = {

@@ -53,11 +53,11 @@ class ProvisioningServiceClient(SDKClient):
     :vartype config: ProvisioningServiceClientConfiguration
 
     :ivar individual_enrollment: IndividualEnrollment operations
-    :vartype individual_enrollment: service.operations.IndividualEnrollmentOperations
+    :vartype individual_enrollment: dps.operations.IndividualEnrollmentOperations
     :ivar enrollment_group: EnrollmentGroup operations
-    :vartype enrollment_group: service.operations.EnrollmentGroupOperations
+    :vartype enrollment_group: dps.operations.EnrollmentGroupOperations
     :ivar device_registration_state: DeviceRegistrationState operations
-    :vartype device_registration_state: service.operations.DeviceRegistrationStateOperations
+    :vartype device_registration_state: dps.operations.DeviceRegistrationStateOperations
 
     :param credentials: Credentials needed for the client to connect to Azure.
     :type credentials: :mod:`A msrestazure Credentials

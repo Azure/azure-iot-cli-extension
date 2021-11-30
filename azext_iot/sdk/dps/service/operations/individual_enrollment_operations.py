@@ -51,10 +51,10 @@ class IndividualEnrollmentOperations(object):
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
         :return: IndividualEnrollment or ClientRawResponse if raw=true
-        :rtype: ~service.models.IndividualEnrollment or
+        :rtype: ~dps.models.IndividualEnrollment or
          ~msrest.pipeline.ClientRawResponse
         :raises:
-         :class:`ProvisioningServiceErrorDetailsException<service.models.ProvisioningServiceErrorDetailsException>`
+         :class:`ProvisioningServiceErrorDetailsException<dps.models.ProvisioningServiceErrorDetailsException>`
         """
         # Construct URL
         url = self.get.metadata['url']
@@ -111,7 +111,7 @@ class IndividualEnrollmentOperations(object):
          -. No special characters allowed at start or end.
         :type id: str
         :param enrollment: The device enrollment record.
-        :type enrollment: ~service.models.IndividualEnrollment
+        :type enrollment: ~dps.models.IndividualEnrollment
         :param if_match: The ETag of the enrollment record.
         :type if_match: str
         :param dict custom_headers: headers that will be added to the request
@@ -120,10 +120,10 @@ class IndividualEnrollmentOperations(object):
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
         :return: IndividualEnrollment or ClientRawResponse if raw=true
-        :rtype: ~service.models.IndividualEnrollment or
+        :rtype: ~dps.models.IndividualEnrollment or
          ~msrest.pipeline.ClientRawResponse
         :raises:
-         :class:`ProvisioningServiceErrorDetailsException<service.models.ProvisioningServiceErrorDetailsException>`
+         :class:`ProvisioningServiceErrorDetailsException<dps.models.ProvisioningServiceErrorDetailsException>`
         """
         # Construct URL
         url = self.create_or_update.metadata['url']
@@ -195,7 +195,7 @@ class IndividualEnrollmentOperations(object):
         :return: None or ClientRawResponse if raw=true
         :rtype: None or ~msrest.pipeline.ClientRawResponse
         :raises:
-         :class:`ProvisioningServiceErrorDetailsException<service.models.ProvisioningServiceErrorDetailsException>`
+         :class:`ProvisioningServiceErrorDetailsException<dps.models.ProvisioningServiceErrorDetailsException>`
         """
         # Construct URL
         url = self.delete.metadata['url']
@@ -251,10 +251,10 @@ class IndividualEnrollmentOperations(object):
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
         :return: list or ClientRawResponse if raw=true
-        :rtype: list[~service.models.IndividualEnrollment] or
+        :rtype: list[~dps.models.IndividualEnrollment] or
          ~msrest.pipeline.ClientRawResponse
         :raises:
-         :class:`ProvisioningServiceErrorDetailsException<service.models.ProvisioningServiceErrorDetailsException>`
+         :class:`ProvisioningServiceErrorDetailsException<dps.models.ProvisioningServiceErrorDetailsException>`
         """
         query_specification = models.QuerySpecification(query=query)
 
@@ -325,10 +325,10 @@ class IndividualEnrollmentOperations(object):
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
         :return: AttestationMechanism or ClientRawResponse if raw=true
-        :rtype: ~service.models.AttestationMechanism or
+        :rtype: ~dps.models.AttestationMechanism or
          ~msrest.pipeline.ClientRawResponse
         :raises:
-         :class:`ProvisioningServiceErrorDetailsException<service.models.ProvisioningServiceErrorDetailsException>`
+         :class:`ProvisioningServiceErrorDetailsException<dps.models.ProvisioningServiceErrorDetailsException>`
         """
         # Construct URL
         url = self.get_attestation_mechanism.metadata['url']
@@ -380,10 +380,10 @@ class IndividualEnrollmentOperations(object):
         """Bulk device enrollment operation with maximum of 10 enrollments.
 
         :param enrollments: Enrollment items
-        :type enrollments: list[~service.models.IndividualEnrollment]
+        :type enrollments: list[~dps.models.IndividualEnrollment]
         :param mode: Operation mode. Possible values include: 'create',
          'update', 'updateIfMatchETag', 'delete'
-        :type mode: str or ~service.models.enum
+        :type mode: str or ~dps.models.enum
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
          deserialized response
@@ -391,10 +391,10 @@ class IndividualEnrollmentOperations(object):
          overrides<msrest:optionsforoperations>`.
         :return: BulkEnrollmentOperationResult or ClientRawResponse if
          raw=true
-        :rtype: ~service.models.BulkEnrollmentOperationResult or
+        :rtype: ~dps.models.BulkEnrollmentOperationResult or
          ~msrest.pipeline.ClientRawResponse
         :raises:
-         :class:`ProvisioningServiceErrorDetailsException<service.models.ProvisioningServiceErrorDetailsException>`
+         :class:`ProvisioningServiceErrorDetailsException<dps.models.ProvisioningServiceErrorDetailsException>`
         """
         bulk_operation = models.BulkEnrollmentOperation(enrollments=enrollments, mode=mode)
 

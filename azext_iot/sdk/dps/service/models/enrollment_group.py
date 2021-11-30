@@ -23,21 +23,21 @@ class EnrollmentGroup(Model):
     :param enrollment_group_id: Required. Enrollment Group ID.
     :type enrollment_group_id: str
     :param attestation: Required. Attestation method used by the device.
-    :type attestation: ~service.models.AttestationMechanism
+    :type attestation: ~dps.models.AttestationMechanism
     :param capabilities: Capabilities of the device.
-    :type capabilities: ~service.models.DeviceCapabilities
+    :type capabilities: ~dps.models.DeviceCapabilities
     :param iot_hub_host_name: The Iot Hub host name.
     :type iot_hub_host_name: str
     :param initial_twin: Initial device twin.
-    :type initial_twin: ~service.models.InitialTwin
+    :type initial_twin: ~dps.models.InitialTwin
     :param etag: The entity tag associated with the resource.
     :type etag: str
     :param provisioning_status: The provisioning status. Possible values
      include: 'enabled', 'disabled'. Default value: "enabled" .
-    :type provisioning_status: str or ~service.models.enum
+    :type provisioning_status: str or ~dps.models.enum
     :param reprovision_policy: The behavior when a device is re-provisioned to
      an IoT hub.
-    :type reprovision_policy: ~service.models.ReprovisionPolicy
+    :type reprovision_policy: ~dps.models.ReprovisionPolicy
     :ivar created_date_time_utc: The DateTime this resource was created.
     :vartype created_date_time_utc: datetime
     :ivar last_updated_date_time_utc: The DateTime this resource was last
@@ -57,15 +57,14 @@ class EnrollmentGroup(Model):
      the logic returns the desired IoT hub as well as the desired initial
      configuration. We recommend using Azure Functions to host your logic.
      Possible values include: 'hashed', 'geoLatency', 'static', 'custom'
-    :type allocation_policy: str or ~service.models.enum
+    :type allocation_policy: str or ~dps.models.enum
     :param iot_hubs: The list of IoT Hub hostnames the device(s) in this
      resource can be allocated to. Must be a subset of tenant level list of IoT
      hubs.
     :type iot_hubs: list[str]
     :param custom_allocation_definition: This tells DPS which webhook to call
      when using custom allocation.
-    :type custom_allocation_definition:
-     ~service.models.CustomAllocationDefinition
+    :type custom_allocation_definition: ~dps.models.CustomAllocationDefinition
     """
 
     _validation = {
