@@ -1120,21 +1120,14 @@ helps[
     short-summary: Create an individual device enrollment in an Azure IoT Hub Device Provisioning Service.
     examples:
     - name: Create an enrollment '{enrollment_id}' with attestation type 'x509' in the Azure
-            IoT provisioning service '{dps_name}' in the resource group '{resource_group_name}'
-      text: >
-        az iot dps enrollment create -g {resource_group_name} --dps-name {dps_name}
-        --enrollment-id {enrollment_id} --attestation-type x509
-        --certificate-path /certificates/Certificate.pem
-    - name: Create an enrollment '{enrollment_id}' with attestation type 'x509' in the Azure
             IoT Device Provisioning Service '{dps_name}' in the resource group
-            '{resource_group_name}' with provisioning status 'disabled', target IoT Hub
-            '{iothub_host_name}', device id '{device_id}', initial twin properties
-            '{"location":{"region":"US"}}' and initial twin tags '{"version":"1"}'.
+            '{resource_group_name}' with provisioning status 'disabled',
+            device id '{device_id}', initial twin properties '{"location":{"region":"US"}}'
+            and initial twin tags '{"version":"1"}'.
       text: >
         az iot dps enrollment create -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --attestation-type x509
         --certificate-path /certificates/Certificate.pem --provisioning-status disabled
-        --iot-hub-host-name {iothub_host_name}
         --initial-twin-properties "{'location':{'region':'US'}}"
         --initial-twin-tags "{'version':'1'}" --device-id {device_id}
     - name: Create an enrollment 'MyEnrollment' with attestation type 'tpm' in the Azure IoT
@@ -1273,14 +1266,13 @@ helps[
         --enrollment-id {enrollment_id} --secondary-ca-name {certificate_name}
     - name: Create an enrollment group '{enrollment_id}' in the Azure IoT provisioning service
             'MyDps' in the resource group '{resource_group_name}' with provisioning status
-            'enabled', target IoT Hub '{iothub_host_name}', initial twin properties
+            'enabled', initial twin properties
             '{"location":{"region":"US"}}' and initial twin tags '{"version_dps":"1"}'
             using an intermediate certificate as primary certificate'.
       text: >
         az iot dps enrollment-group create -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --certificate-path /certificates/Certificate.pem
-        --provisioning-status enabled --iot-hub-host-name {iothub_host_name}
-        --initial-twin-properties "{'location':{'region':'US'}}"
+        --provisioning-status enabled --initial-twin-properties "{'location':{'region':'US'}}"
         --initial-twin-tags "{'version_dps':'1'}"
     - name: Create an enrollment group '{enrollment_id}' in the Azure IoT provisioning service
             '{dps_name}' in the resource group '{resource_group_name} with attestation type 'symmetrickey'.
@@ -1386,7 +1378,7 @@ helps[
     "iot dps connection-string"
 ] = """
     type: group
-    short-summary: Manage IoT Hub Device Provisioning Service connection strings.
+    short-summary: Manage Azure IoT Hub Device Provisioning Service connection strings.
 """
 
 helps[

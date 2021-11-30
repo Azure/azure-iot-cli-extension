@@ -835,16 +835,17 @@ def load_arguments(self, _):
         context.argument(
             "initial_twin_properties",
             options_list=["--initial-twin-properties", "--props"],
-            help="Initial twin properties.",
+            help="Initial device twin properties.",
         )
         context.argument(
             "initial_twin_tags",
             options_list=["--initial-twin-tags", "--tags"],
-            help="Initial twin tags.",
+            help="Initial device twin tags.",
         )
         context.argument(
             "iot_hub_host_name",
             options_list=["--iot-hub-host-name", "--hn"],
+            deprecate_info=context.deprecate(redirect="--iot-hubs", hide=True),
             help="Host name of target IoT Hub. Allocation policy defaults to static if this parameter is provided.",
         )
         context.argument(
@@ -889,28 +890,30 @@ def load_arguments(self, _):
             "allocation_policy",
             options_list=["--allocation-policy", "--ap"],
             arg_type=get_enum_type(AllocationType),
-            help="Type of allocation policy to determine how a device is assigned to an IoT Hub.",
-            arg_group="Allocation Policy Arguments"
+            help="Type of allocation policy to determine how a device is assigned to an IoT Hub. If not "
+            "provided, the allocation policy will be the current allocation policy default set for the "
+            "Device Provisioning Service instance.",
+            arg_group="Allocation Policy"
         )
         context.argument(
             "iot_hubs",
             options_list=["--iot-hubs", "--ih"],
             help="Host name of target IoT Hub associated with the allocation policy. Use space-separated "
             "list for multiple IoT Hubs.",
-            arg_group="Allocation Policy Arguments"
+            arg_group="Allocation Policy"
         )
         context.argument(
             "webhook_url",
             options_list=["--webhook-url", "--wh"],
             help="The Azure Function webhook URL used for custom allocation requests.",
-            arg_group="Allocation Policy Arguments"
+            arg_group="Allocation Policy"
         )
         context.argument(
             "api_version",
             options_list=["--api-version", "--av"],
             help="The API version of the provisioning service types sent in the custom allocation"
             " request. Minimum supported version: 2018-09-01-preview.",
-            arg_group="Allocation Policy Arguments"
+            arg_group="Allocation Policy"
         )
 
     with self.argument_context("iot dps compute-device-key") as context:
@@ -1004,7 +1007,11 @@ def load_arguments(self, _):
         )
 
     with self.argument_context("iot dps enrollment-group") as context:
-        context.argument("enrollment_id", help="ID of enrollment group.")
+        context.argument(
+            "enrollment_id",
+            options_list=["--enrollment-id", "--group-id"],
+            help="Enrollment group ID."
+        )
         context.argument(
             "primary_key",
             options_list=["--primary-key", "--pk"],
