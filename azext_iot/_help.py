@@ -1378,7 +1378,7 @@ helps[
     "iot dps connection-string"
 ] = """
     type: group
-    short-summary: Manage Azure IoT Hub Device Provisioning Service connection strings.
+    short-summary: Manage connection strings for an Azure IoT Hub Device Provisioning Service instance.
 """
 
 helps[
