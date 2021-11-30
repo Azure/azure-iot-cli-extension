@@ -36,6 +36,7 @@ def load_central_help():
     ] = """
         type: command
         short-summary: Query device telemetry or property data with IoT Central Query Language.
+        long-summary: For query syntax details, visit https://docs.microsoft.com/en-us/azure/iot-central/core/howto-query-with-rest-api.
         examples:
           - name: Query device telemetry
             text: >
@@ -56,7 +57,6 @@ def load_central_help():
     _load_central_monitors_help()
     _load_central_command_help()
     _load_central_compute_device_key()
-    _load_central_destination_help()
     _load_central_export_help()
 
 
@@ -65,7 +65,7 @@ def _load_central_export_help():
         "iot central export"
     ] = """
         type: group
-        short-summary: Manage and configure IoT Central data exports.
+        short-summary: Manage and configure IoT Central exports.
     """
 
     helps[
@@ -97,7 +97,7 @@ def _load_central_export_help():
         "iot central export create"
     ] = """
         type: command
-        short-summary: Create an export for an application.
+        short-summary: Create an export for an IoT Central application.
         examples:
         - name: Create an export
           text: >
@@ -111,7 +111,7 @@ def _load_central_export_help():
         "iot central export update"
     ] = """
         type: command
-        short-summary: Update an export for an application.
+        short-summary: Update an export for an IoT Central application.
         examples:
         - name: Update an export
           text: >
@@ -125,7 +125,7 @@ def _load_central_export_help():
         "iot central export delete"
     ] = """
         type: command
-        short-summary: Delete an export for an application.
+        short-summary: Delete an export for an IoT Central application.
         examples:
         - name: Delete an export
           text: >
@@ -133,18 +133,19 @@ def _load_central_export_help():
             --app-id {appid}
             --export-id {exportid}
     """
+    _load_central_destination_help()
 
 
 def _load_central_destination_help():
     helps[
-        "iot central destination"
+        "iot central export destination"
     ] = """
         type: group
-        short-summary: Manage and configure IoT Central data export destinations.
+        short-summary: Manage and configure IoT Central destinations.
     """
 
     helps[
-        "iot central destination list"
+        "iot central export destination list"
     ] = """
         type: command
         short-summary: Get the list of destinations for an IoT Central application.
@@ -156,7 +157,7 @@ def _load_central_destination_help():
     """
 
     helps[
-        "iot central destination show"
+        "iot central export destination show"
     ] = """
         type: command
         short-summary: Get a destination details
@@ -169,10 +170,10 @@ def _load_central_destination_help():
     """
 
     helps[
-        "iot central destination create"
+        "iot central export destination create"
     ] = """
         type: command
-        short-summary: Create a destination for an application.
+        short-summary: Create a destination for an IoT Central application.
         examples:
         - name: Create a destination
           text: >
@@ -183,10 +184,10 @@ def _load_central_destination_help():
     """
 
     helps[
-        "iot central destination update"
+        "iot central export destination update"
     ] = """
         type: command
-        short-summary: Update a destination for an application.
+        short-summary: Update a destination for an IoT Central application.
         examples:
         - name: Update a destination
           text: >
@@ -197,10 +198,10 @@ def _load_central_destination_help():
     """
 
     helps[
-        "iot central destination delete"
+        "iot central export destination delete"
     ] = """
         type: command
-        short-summary: Delete a destination for an application.
+        short-summary: Delete a destination for an IoT Central application.
         examples:
         - name: Delete a destination
           text: >

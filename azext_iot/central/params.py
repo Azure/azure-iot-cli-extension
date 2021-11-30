@@ -399,7 +399,7 @@ def load_central_arguments(self, _):
             help="The API version for the requested operation.",
         )
 
-    with self.argument_context("iot central destination") as context:
+    with self.argument_context("iot central export destination") as context:
         context.argument(
             "destination_id",
             options_list=["--dest-id"],
@@ -413,7 +413,7 @@ def load_central_arguments(self, _):
             help="The API version for the requested operation.",
         )
 
-    with self.argument_context("iot central destination create") as context:
+    with self.argument_context("iot central export destination create") as context:
         context.argument(
             "content",
             options_list=["--content", "-k"],
@@ -421,7 +421,7 @@ def load_central_arguments(self, _):
             " [File Path Example:./path/to/file.json]"
             " [Example of stringified JSON:{<Destination Data JSON>}]. The request body must contain content of Destination.",
         )
-    with self.argument_context("iot central destination update") as context:
+    with self.argument_context("iot central export destination update") as context:
         context.argument(
             "content",
             options_list=["--content", "-k"],

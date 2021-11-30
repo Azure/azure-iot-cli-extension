@@ -72,7 +72,9 @@ def load_central_commands(self, _):
         cmd_group.command("query", "query_run")
 
     with self.command_group(
-        "iot central destination", command_type=central_destination_ops, is_preview=True
+        "iot central export destination",
+        command_type=central_destination_ops,
+        is_preview=True,
     ) as cmd_group:
         cmd_group.command("list", "list_dataExport_destinations")
         cmd_group.show_command("show", "get_dataExport_destination")
