@@ -1,5 +1,5 @@
 {
     "displayName": "test webhook",
     "type": "webhook@v1",
-    "url": "[webhook url]"
+    "url": "https://bing.com"
 }
