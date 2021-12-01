@@ -66,10 +66,8 @@ def load_central_commands(self, _):
     Load CLI commands
     """
 
-    with self.command_group(
-        "iot central", command_type=central_query_ops, is_preview=True
-    ) as cmd_group:
-        cmd_group.command("query", "query_run")
+    with self.command_group("iot central", command_type=central_query_ops) as cmd_group:
+        cmd_group.command("query", "query_run", is_preview=True)
 
     with self.command_group(
         "iot central export destination",
