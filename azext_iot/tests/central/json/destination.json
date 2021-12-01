@@ -3,7 +3,7 @@
         "id": "1021f12a-6969-4eff-8518-57cac5f128ab",
         "displayName": "Webhook No Auth",
         "type": "webhook@v1",
-        "url": "[web hook url]",
+        "url": "[webhook url]",
         "headerCustomizations": {
             "x-custom-region": {
                 "value": "westcentralus",

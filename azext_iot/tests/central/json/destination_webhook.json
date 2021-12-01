@@ -1,5 +1,5 @@
 {
     "displayName": "test webhook",
     "type": "webhook@v1",
-    "url": "https://webhook.site/bf7d2d42-b2f5-426c-b8fa-b6b56c0152ac"
+    "url": "[webhook url]"
 }
