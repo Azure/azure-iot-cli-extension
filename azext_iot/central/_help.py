@@ -111,23 +111,23 @@ def _load_central_export_help():
             az iot central export create
             --app-id {appid}
             --export-id {exportid}
-            --content '{
-              "displayName": "Test Export 1",
-              "enabled": false,
-              "source": "telemetry",
-              "filter": "SELECT * FROM devices WHERE $displayName != \"abc\" AND $id = \"a\"",
-              "enrichments": {
-                "abc": {
-                  "path": "$templateDisplayName"
+            --content "{
+              'displayName': 'Test Export 1',
+              'enabled': false,
+              'source': 'telemetry',
+              'filter': 'SELECT * FROM devices WHERE $displayName != \'abc\' AND $id = \'a\'',
+              'enrichments': {
+                'abc': {
+                  'path': '$templateDisplayName'
                 }
               },
-              "destinations": [
+              'destinations': [
                 {
-                  "id": "fa5792a4-ead3-41dc-a972-fbeed33d46ae",
-                  "transform": "{ ApplicationId: .applicationId, Component: .component, DeviceName: .device.name }"
+                  'id': 'fa5792a4-ead3-41dc-a972-fbeed33d46ae',
+                  'transform': '{ ApplicationId: .applicationId, Component: .component, DeviceName: .device.name }'
                 }
               ]
-            }'
+            }"
     """
 
     helps[
@@ -148,7 +148,7 @@ def _load_central_export_help():
             az iot central export update
             --app-id {appid}
             --export-id {exportid}
-            --content '{"displayName": "Updated Export Name", "enabled": true}'
+            --content "{'displayName': 'Updated Export Name', 'enabled': true}"
     """
 
     helps[
@@ -217,93 +217,93 @@ def _load_central_destination_help():
             az iot central export destination create
             --app-id {appid}
             --dest-id {destinationid}
-            --content '{
-              "displayName": "Webhook",
-              "url": "[webhook url]",
-              "type": "webhook@v1",
-              "headerCustomizations": {
-                "x-custom-region": {
-                  "value": "westcentralus",
-                  "secret": false
+            --content "{
+              'displayName': 'Webhook',
+              'url': '[webhook url]',
+              'type': 'webhook@v1',
+              'headerCustomizations': {
+                'x-custom-region': {
+                  'value': 'westcentralus',
+                  'secret': false
                 }
               }
-            }'
+            }"
 
         - name: Creat a blob stoarge export destination with json payload
           text: >
             az iot central export destination create
             --app-id {appid}
             --dest-id {destintionid}
-            --content '{
-              "displayName": "Blob Storage",
-              "type": "blobstorage@v1",
-              "authorization": {
-                "type": "connectionString",
-                "connectionString": "DefaultEndpointsProtocol=https;AccountName=[accountName];AccountKey=[key];EndpointSuffix=core.windows.net",
-                "container": "test"
+            --content "{
+              'displayName': 'Blob Storage',
+              'type': 'blobstorage@v1',
+              'authorization': {
+                'type': 'connectionString',
+                'connectionString': 'DefaultEndpointsProtocol=https;AccountName=[accountName];AccountKey=[key];EndpointSuffix=core.windows.net',
+                'container': 'test'
               }
-            }'
+            }"
 
         - name: create a Azure Data Explorer export destination with json payload
           text: >
             az iot central export destination create
             --app-id {appid}
             --dest-id {destintionid}
-            --content '{
-              "displayName": "Azure Data Explorer",
-              "type": "dataexplorer@v1",
-              "clusterUrl": "https://[clusterName].westus2.kusto.windows.net",
-              "database": "database1",
-              "table": "table1",
-              "authorization": {
-                "type": "servicePrincipal",
-                "clientId": "3b420743-2020-44c6-9b70-cc42f945db0x",
-                "tenantId": "72f988bf-86f1-41af-91ab-2d7cd011db47",
-                "clientSecret": "[Secret]"
+            --content "{
+              'displayName': 'Azure Data Explorer',
+              'type': 'dataexplorer@v1',
+              'clusterUrl': 'https://[clusterName].westus2.kusto.windows.net',
+              'database': 'database1',
+              'table': 'table1',
+              'authorization': {
+                'type': 'servicePrincipal',
+                'clientId': '3b420743-2020-44c6-9b70-cc42f945db0x',
+                'tenantId': '72f988bf-86f1-41af-91ab-2d7cd011db47',
+                'clientSecret': '[Secret]'
               }
-            }'
+            }"
 
         - name: create an Event Hub export destination with json payload
           text: >
             az iot central export destination create
             --app-id {appid}
             --dest-id {destintionid}
-            --content '{
-              "displayName": "Event Hub",
-              "type": "eventhubs@v1",
-              "authorization": {
-                "type": "connectionString",
-                "connectionString": "Endpoint=sb://[hubName].servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=*****;EntityPath=entityPath1"
+            --content "{
+              'displayName': 'Event Hub',
+              'type': 'eventhubs@v1',
+              'authorization': {
+                'type': 'connectionString',
+                'connectionString': 'Endpoint=sb://[hubName].servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=*****;EntityPath=entityPath1'
               }
-            }'
+            }"
 
         - name: create an Service Bus Queue destination with json payload
           text: >
             az iot central export destination create
             --app-id {appid}
             --dest-id {destintionid}
-            --content '{
-              "displayName": "Service Bus Queue",
-              "type": "servicebusqueue@v1",
-              "authorization": {
-                "type": "connectionString",
-                "connectionString": "Endpoint=sb://[namespance].servicebus.windows.net/;SharedAccessKeyName=xxx;SharedAccessKey=[key];EntityPath=[name]"
+            --content "{
+              'displayName': 'Service Bus Queue',
+              'type': 'servicebusqueue@v1',
+              'authorization': {
+                'type': 'connectionString',
+                'connectionString': 'Endpoint=sb://[namespance].servicebus.windows.net/;SharedAccessKeyName=xxx;SharedAccessKey=[key];EntityPath=[name]'
               }
-            }'
+            }"
 
         - name: create an Service Bus Topic destination with json payload
           text: >
             az iot central export destination create
             --app-id {appid}
             --dest-id {destintionid}
-            --content '{
-              "displayName": "Service Bus Topic",
-              "type": "servicebustopic@v1",
-              "authorization": {
-                "type": "connectionString",
-                "connectionString": "Endpoint=sb://[namespace].servicebus.windows.net/;SharedAccessKeyName=xxx;SharedAccessKey=[key];EntityPath=[name]"
+            --content "{
+              'displayName': 'Service Bus Topic',
+              'type': 'servicebustopic@v1',
+              'authorization': {
+                'type': 'connectionString',
+                'connectionString': 'Endpoint=sb://[namespace].servicebus.windows.net/;SharedAccessKeyName=xxx;SharedAccessKey=[key];EntityPath=[name]'
               }
-            }'
+            }"
     """
 
     helps[
@@ -324,7 +324,7 @@ def _load_central_destination_help():
             az iot central export destination update
             --app-id {appid}
             --dest-id {destinationid}
-            --content '{"displayName": "Web Hook Updated"}'
+            --content "{'displayName': 'Web Hook Updated'}"
     """
 
     helps[

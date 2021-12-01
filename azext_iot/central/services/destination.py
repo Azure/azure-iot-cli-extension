@@ -27,7 +27,7 @@ def add_dataExport_destination(
     cmd,
     app_id: str,
     destination_id: str,
-    payload: str,
+    payload,
     token: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,

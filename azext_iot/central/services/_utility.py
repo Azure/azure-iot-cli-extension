@@ -24,7 +24,7 @@ def make_api_call(
     app_id: str,
     method: str,
     url: str,
-    payload: str,
+    payload,
     token: str,
     api_version: str,
     central_dnx_suffix: str,

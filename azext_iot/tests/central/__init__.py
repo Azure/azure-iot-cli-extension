@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import json
 import os
 import time
 from typing import Tuple
@@ -25,7 +26,6 @@ device_template_path = get_context_path(__file__, "json/device_template_int_test
 device_template_path_preview = get_context_path(
     __file__, "json/device_template_int_test_preview.json"
 )
-destination_webhook_path = get_context_path(__file__, "json/destination_webhook.json")
 export_webhook_path = get_context_path(__file__, "json/export_webhook.json")
 sync_command_params = get_context_path(__file__, "json/sync_command_args.json")
 DEFAULT_FILE_UPLOAD_TTL = "PT1H"
@@ -385,10 +385,22 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         )
 
     def _create_destination(self, api_version, dest_id):
+        self.kwargs["payload"] = json.dumps(
+            {
+                "displayName": "Blob Storage",
+                "type": "blobstorage@v1",
+                "authorization": {
+                    "type": "connectionString",
+                    "connectionString": STORAGE_CSTRING,
+                    "containerName": STORAGE_CONTAINER,
+                },
+            }
+        )
+
         command = "iot central export destination create --app-id {} --dest-id {} --content '{}'".format(
             APP_ID,
             dest_id,
-            destination_webhook_path,
+            "{payload}",
         )
         return self.cmd(
             command, api_version=api_version, checks=[self.check("id", dest_id)]

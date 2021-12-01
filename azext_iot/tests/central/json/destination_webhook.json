@@ -1,5 +1,0 @@
-{
-    "displayName": "test webhook",
-    "type": "webhook@v1",
-    "url": "https://bing.com"
-}
