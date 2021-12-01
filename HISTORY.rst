@@ -22,6 +22,8 @@ Release History
   enrollment group symmetric key. Please take a look at the `--help` docs for functionality
   and usage highlights.
 
+* Improvement to help documentation for DPS functions.
+
 **IoT Hub updates**
 
 * `az iot hub device-identity create` supports a device scope argument via `--device-scope` parameter.
