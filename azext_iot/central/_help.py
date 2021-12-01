@@ -105,7 +105,7 @@ def _load_central_export_help():
             --app-id {appid}
             --export-id {exportid}
             --content './filepath/payload.json'
-      
+
         - name: Create an export from json payload
           text: >
             az iot central export create
@@ -142,7 +142,7 @@ def _load_central_export_help():
             --app-id {appid}
             --export-id {exportid}
             --content './filepath/payload.json'
-        
+
         - name: Update an export's display name and enable export from json payload
           text: >
             az iot central export update
@@ -211,7 +211,7 @@ def _load_central_destination_help():
             --app-id {appid}
             --dest-id {destinationid}
             --content './filepath/payload.json'
-        
+
         - name: Create a webhook export destination with json payload
           text: >
             az iot central export destination create
@@ -225,10 +225,10 @@ def _load_central_destination_help():
                 "x-custom-region": {
                   "value": "westcentralus",
                   "secret": false
-                }  
+                }
               }
             }'
-        
+
         - name: Creat a blob stoarge export destination with json payload
           text: >
             az iot central export destination create
@@ -262,7 +262,7 @@ def _load_central_destination_help():
                 "clientSecret": "[Secret]"
               }
             }'
-        
+
         - name: create an Event Hub export destination with json payload
           text: >
             az iot central export destination create
@@ -276,7 +276,7 @@ def _load_central_destination_help():
                 "connectionString": "Endpoint=sb://[hubName].servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=*****;EntityPath=entityPath1"
               }
             }'
-        
+
         - name: create an Service Bus Queue destination with json payload
           text: >
             az iot central export destination create
@@ -303,7 +303,7 @@ def _load_central_destination_help():
                 "type": "connectionString",
                 "connectionString": "Endpoint=sb://[namespace].servicebus.windows.net/;SharedAccessKeyName=xxx;SharedAccessKey=[key];EntityPath=[name]"
               }
-            }' 
+            }'
     """
 
     helps[
@@ -318,7 +318,7 @@ def _load_central_destination_help():
             --app-id {appid}
             --dest-id {destinationid}
             --content './filepath/payload.json'
-        
+
         - name: Update an export destination with json-patch payload
           text: >
             az iot central export destination update
