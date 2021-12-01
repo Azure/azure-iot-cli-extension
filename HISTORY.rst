@@ -15,6 +15,7 @@ Release History
   - Export (az iot central export)
 
 **IoT DPS updates**
+
 * Added `az iot dps connection-string show` to show the DPS connection string with
   similar support as the IoT Hub connection string show.
 
@@ -29,6 +30,8 @@ Release History
 * `az iot dps compute-device-key` now supports enrollment group identifiers in addition to
   enrollment group symmetric key. Please take a look at the `--help` docs for functionality
   and usage highlights.
+
+* Improvement to help documentation for DPS functions.
 
 **IoT Hub updates**
 
