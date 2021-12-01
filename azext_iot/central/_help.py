@@ -219,7 +219,7 @@ def _load_central_destination_help():
             --dest-id {destinationid}
             --content '{
               "displayName": "Web hook",
-              "url": "https://webhook.examples/hook1",
+              "url": "[your web hook url]",
               "type": "webhook@v1",
               "headerCustomizations": {
                 "x-custom-region": {
