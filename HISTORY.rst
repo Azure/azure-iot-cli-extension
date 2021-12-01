@@ -7,6 +7,7 @@ Release History
 +++++++++++++++
 
 **IoT DPS updates**
+
 * Added `az iot dps connection-string show` to show the DPS connection string with
   similar support as the IoT Hub connection string show.
 
