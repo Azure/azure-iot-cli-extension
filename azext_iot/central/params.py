@@ -8,8 +8,10 @@
 CLI parameter definitions.
 """
 
-from knack.arguments import CLIArgumentType, CaseInsensitiveList
-from azure.cli.core.commands.parameters import get_three_state_flag
+from typing import List
+from knack.arguments import CLIArgumentType, CaseInsensitiveList, enum_choice_list
+from azext_iot.central.common import DestinationType, ExportSource
+from azure.cli.core.commands.parameters import get_three_state_flag, get_enum_type
 from azext_iot.monitor.models.enum import Severity
 from azext_iot.central.models.enum import ApiVersion
 from azext_iot._params import event_msg_prop_type, event_timeout_type
@@ -399,36 +401,10 @@ def load_central_arguments(self, _):
             help="The API version for the requested operation.",
         )
 
-    with self.argument_context("iot central export destination") as context:
-        context.argument(
-            "destination_id",
-            options_list=["--dest-id"],
-            help="Unique identifier for the export destination.",
-        )
-
-    with self.argument_context("iot central export destination create") as context:
-        context.argument(
-            "content",
-            options_list=["--content", "-k"],
-            help="The destination definition. Provide path to JSON file or raw stringified JSON."
-            " [File Path Example:./path/to/file.json]"
-            " [Example of stringified JSON:{<Destination Data JSON>}]. The request body must contain content of Destination.",
-        )
-
-    with self.argument_context("iot central export destination update") as context:
-        context.argument(
-            "content",
-            options_list=["--content", "-k"],
-            help="The partial destination definition. Provide path to JSON file or raw stringified JSON."
-            " [File Path Example:./path/to/file.json]"
-            " [Example of stringified JSON:{<Destination Data JSON>}]."
-            " The request body must contain partial content of Destination.",
-        )
-
     with self.argument_context("iot central export") as context:
         context.argument(
             "export_id",
-            options_list=["--export-id"],
+            options_list=["--export-id", "--id"],
             help="Unique identifier for the export.",
         )
         context.argument(
@@ -441,11 +417,38 @@ def load_central_arguments(self, _):
 
     with self.argument_context("iot central export create") as context:
         context.argument(
-            "content",
-            options_list=["--content", "-k"],
-            help="The export definition. Provide path to JSON file or raw stringified JSON."
-            " [File Path Example:./path/to/file.json]"
-            " [Example of stringified JSON:{<Export Data JSON>}]. The request body must contain content of Export.",
+            "display_name",
+            options_list=["--display-name", "--name"],
+            help="The data export display name",
+        )
+        context.argument(
+            "enabled",
+            options_list=["--enabled", "-e"],
+            arg_type=get_three_state_flag(),
+            help="The enabled status for data export, True or False.",
+        )
+        context.argument(
+            "filter",
+            options_list=["--filter", "-f"],
+            default=None,
+            help="IoT Central Query Language based filter, more details from: ",
+        )
+        context.argument(
+            "source",
+            options_list=["--source", "-s"],
+            help="The data export source.",
+            arg_type=get_enum_type(ExportSource),
+        )
+        context.argument(
+            "enrichments",
+            options_list=["--enrichments", "--en"],
+            help="The data export enrichment",
+            default=None,
+        )
+        context.argument(
+            "destinations",
+            options_list=["--destinations", "--dests"],
+            help="The list of destinations with transform.",
         )
 
     with self.argument_context("iot central export update") as context:
@@ -455,4 +458,64 @@ def load_central_arguments(self, _):
             help="The partial export definition. Provide path to JSON file or raw stringified JSON."
             " [File Path Example:./path/to/file.json]"
             " [Example of stringified JSON:{<Export Data JSON>}]. The request body must contain partial content of Export.",
+        )
+
+    with self.argument_context("iot central export destination") as context:
+        context.argument(
+            "destination_id",
+            options_list=["--dest-id"],
+            help="Unique identifier for the export destination.",
+        )
+
+    with self.argument_context("iot central export destination create") as context:
+        context.argument(
+            "display_name",
+            options_list=["--display-name", "--name"],
+            help="The destination display name.",
+        )
+        context.argument(
+            "type",
+            options_list=["--type", "-t"],
+            help="The destination type.",
+            arg_type=get_enum_type(DestinationType),
+        )
+        context.argument(
+            "url",
+            options_list=["--url"],
+            help="The webhook url.",
+        )
+        context.argument(
+            "cluster_url",
+            options_list=["--cluster-url", "--cu"],
+            help="The azure data explorer cluster url.",
+        )
+        context.argument(
+            "database",
+            options_list=["--database"],
+            help="The azure data explorer database.",
+        )
+        context.argument(
+            "table",
+            options_list=["--table"],
+            help="the azure data explorer table.",
+        )
+        context.argument(
+            "header_customizations",
+            options_list=["--header"],
+            help="The webhook destination custimized header collection in json.",
+        )
+        context.argument(
+            "authorization",
+            options_list=["--authorization", "--au"],
+            help="The authorization config in json.",
+        )
+
+    with self.argument_context("iot central export destination update") as context:
+        context.argument(
+            "content",
+            options_list=["--content", "-k"],
+            help="The partial destination definition. Provide path to JSON file or raw stringified JSON."
+            " [File Path Example:./path/to/file.json]"
+            " [Example of stringified JSON:{<Destination Data JSON>}]."
+            " The request body must contain partial content of Destination.",
         )

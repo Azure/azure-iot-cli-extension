@@ -418,7 +418,7 @@ class TestIotCentral(CentralLiveScenarioTest):
         assert export_result["id"] == export["id"]
 
         self._delete_export(export_id=export["id"], api_version=self._api_version)
-        self._delete_destination(dest_id=dest["id"], api_version=self._api_version)
+        self._delete_destination(dest_id=dest_id, api_version=self._api_version)
 
     @pytest.mark.xfail(
         condition=not IS_1_1_PREVIEW,

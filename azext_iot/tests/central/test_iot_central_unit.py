@@ -414,7 +414,7 @@ class TestCentralDestinationProvider:
     _destinations = list(load_json(FileNames.central_destination_file))
 
     @mock.patch("azext_iot.central.services.destination")
-    def test_should_return_destinations(self, mock_destination_svc):
+    def test_should_return_list_dataExport_destinations(self, mock_destination_svc):
         # setup
         provider = CentralDestinationProvider(
             cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
@@ -430,7 +430,7 @@ class TestCentralDestinationProvider:
         assert destinations == self._destinations
 
     @mock.patch("azext_iot.central.services.destination")
-    def test_should_return_destination(self, mock_destination_svc):
+    def test_should_return_get_dataExport_destination(self, mock_destination_svc):
         # setup
         provider = CentralDestinationProvider(
             cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
@@ -446,7 +446,7 @@ class TestCentralDestinationProvider:
         assert destination == self._destinations[0]
 
     @mock.patch("azext_iot.central.services.destination")
-    def test_should_add_destination(self, mock_destination_svc):
+    def test_should_success_add_dataExport_destinatio(self, mock_destination_svc):
         # setup
         provider = CentralDestinationProvider(
             cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
@@ -464,7 +464,7 @@ class TestCentralDestinationProvider:
         assert provider._destinations[destination["id"]] == self._destinations[0]
 
     @mock.patch("azext_iot.central.services.destination")
-    def test_should_update_destination(self, mock_destination_svc):
+    def test_should_success_update_dataExport_destination(self, mock_destination_svc):
         # setup
         provider = CentralDestinationProvider(
             cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
@@ -486,7 +486,7 @@ class TestCentralDestinationProvider:
         assert provider._destinations[destination["id"]] == self._destinations[0]
 
     @mock.patch("azext_iot.central.services.destination")
-    def test_should_delete_destination(self, mock_destination_svc):
+    def test_should_success_delete_dataExport_destination(self, mock_destination_svc):
         # setup
         provider = CentralDestinationProvider(
             cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
@@ -510,7 +510,7 @@ class TestCentralExportProvider:
     _exports = list(load_json(FileNames.central_export_file))
 
     @mock.patch("azext_iot.central.services.export")
-    def test_should_return_exports(self, mock_export_svc):
+    def test_should_return_list_dataExport_exports(self, mock_export_svc):
         # setup
         provider = CentralExportProvider(
             cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
@@ -524,7 +524,7 @@ class TestCentralExportProvider:
         assert exports == self._exports
 
     @mock.patch("azext_iot.central.services.export")
-    def test_should_return_export(self, mock_export_svc):
+    def test_should_return_get_dataExport_export(self, mock_export_svc):
         # setup
         provider = CentralExportProvider(
             cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
@@ -538,7 +538,7 @@ class TestCentralExportProvider:
         assert export == self._exports[0]
 
     @mock.patch("azext_iot.central.services.export")
-    def test_should_add_export(self, mock_export_svc):
+    def test_should_success_add_dataExport_export(self, mock_export_svc):
         # setup
         provider = CentralExportProvider(
             cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
@@ -555,7 +555,7 @@ class TestCentralExportProvider:
         assert provider._exports[export["id"]] == export
 
     @mock.patch("azext_iot.central.services.export")
-    def test_should_update_export(self, mock_export_svc):
+    def test_should_success_update_dataExport_export(self, mock_export_svc):
         # setup
         provider = CentralExportProvider(
             cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
@@ -571,7 +571,7 @@ class TestCentralExportProvider:
         assert provider._exports[export["id"]] == self._exports[0]
 
     @mock.patch("azext_iot.central.services.export")
-    def test_should_delete_export(self, mock_export_svc):
+    def test_should_success_delete_dataExport_export(self, mock_export_svc):
         # setup
         provider = CentralExportProvider(
             cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value

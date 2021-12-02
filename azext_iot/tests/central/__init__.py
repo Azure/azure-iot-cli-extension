@@ -26,7 +26,6 @@ device_template_path = get_context_path(__file__, "json/device_template_int_test
 device_template_path_preview = get_context_path(
     __file__, "json/device_template_int_test_preview.json"
 )
-export_webhook_path = get_context_path(__file__, "json/export_webhook.json")
 sync_command_params = get_context_path(__file__, "json/sync_command_args.json")
 DEFAULT_FILE_UPLOAD_TTL = "PT1H"
 
@@ -385,22 +384,19 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         )
 
     def _create_destination(self, api_version, dest_id):
-        self.kwargs["payload"] = json.dumps(
+        self.kwargs["authorization"] = json.dumps(
             {
-                "displayName": "Blob Storage",
-                "type": "blobstorage@v1",
-                "authorization": {
-                    "type": "connectionString",
-                    "connectionString": STORAGE_CSTRING,
-                    "containerName": STORAGE_CONTAINER,
-                },
+                "type": "connectionString",
+                "connectionString": STORAGE_CSTRING,
+                "containerName": STORAGE_CONTAINER,
             }
         )
-
-        command = "iot central export destination create --app-id {} --dest-id {} --content '{}'".format(
+        command = "iot central export destination create --app-id {} --dest-id {} --type {} --name '{}' --authorization '{}'".format(
             APP_ID,
             dest_id,
-            "{payload}",
+            "blobstorage@v1",
+            "Blob Storage",
+            "{authorization}",
         )
         return self.cmd(
             command, api_version=api_version, checks=[self.check("id", dest_id)]
@@ -415,10 +411,19 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         self.cmd(command, api_version=api_version)
 
     def _create_export(self, api_version, export_id):
-        command = "iot central export create --app-id {} --export-id {} --content '{}'".format(
+
+        self.kwargs["enrichments"] = json.dumps({"Simulated": {"path": "$simulated"}})
+        self.kwargs["destinations"] = json.dumps([{"id": "aztestdest0001"}])
+
+        command = "iot central export create --app-id {} --export-id {} --name {} --filter {} --source {} --enabled {} --enrichments '{}' --destinations '{}'".format(
             APP_ID,
             export_id,
-            export_webhook_path,
+            '"Test Export"',
+            '"SELECT * FROM devices WHERE $simulated = true"',
+            "Telemetry",
+            "True",
+            "{enrichments}",
+            "{destinations}",
         )
         return self.cmd(
             command, api_version=api_version, checks=[self.check("id", export_id)]

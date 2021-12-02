@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 # Dev note - think of this as a controller
 
+import json
 from typing import List, Union
 from azext_iot.common import utility
 from azext_iot.constants import CENTRAL_ENDPOINT
@@ -65,12 +66,43 @@ def add_dataExport_export(
     cmd,
     app_id: str,
     export_id: str,
-    content: str,
+    source,
+    destinations,
+    display_name,
+    enabled=True,
+    filter=None,
+    enrichments=None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1_1_preview.value,
 ) -> Union[dict, ExportV1_1_preview]:
-    payload = utility.process_json_arg(content, argument_name="content")
+    export = {
+        "id": export_id,
+        "source": source,
+        "displayName": display_name,
+        "enabled": bool(enabled),
+    }
+
+    if filter is not None:
+        export.update({"filter": filter})
+
+    if enrichments is not None:
+        export.update(
+            {
+                "enrichments": utility.process_json_arg(
+                    content=enrichments, argument_name="enrichments"
+                )
+            }
+        )
+
+    if destinations is not None:
+        export.update(
+            {
+                "destinations": utility.process_json_arg(
+                    content=destinations, argument_name="destinations"
+                )
+            }
+        )
 
     provider = CentralExportProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
@@ -78,7 +110,7 @@ def add_dataExport_export(
 
     return provider.add_dataExport_export(
         export_id=export_id,
-        payload=payload,
+        payload=export,
         central_dnx_suffix=central_dns_suffix,
     )
 

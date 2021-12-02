@@ -72,7 +72,7 @@ def _load_central_export_help():
         "iot central export list"
     ] = """
         type: command
-        short-summary: Get the list of exports for an IoT Central application.
+        short-summary: Get the full list of exports for an IoT Central application.
         examples:
         - name: List all exports in an application
           text: >
@@ -99,35 +99,26 @@ def _load_central_export_help():
         type: command
         short-summary: Create an export for an IoT Central application.
         examples:
-        - name: Create an export from file
+        - name: Create an export with filter, enrichments, destinations
           text: >
             az iot central export create
             --app-id {appid}
             --export-id {exportid}
-            --content './filepath/payload.json'
-
-        - name: Create an export from json payload
-          text: >
-            az iot central export create
-            --app-id {appid}
-            --export-id {exportid}
-            --content "{
-              'displayName': 'Test Export 1',
-              'enabled': false,
-              'source': 'telemetry',
-              'filter': 'SELECT * FROM devices WHERE $displayName != \'abc\' AND $id = \'a\'',
-              'enrichments': {
-                'abc': {
-                  'path': '$templateDisplayName'
-                }
-              },
-              'destinations': [
-                {
-                  'id': 'fa5792a4-ead3-41dc-a972-fbeed33d46ae',
-                  'transform': '{ ApplicationId: .applicationId, Component: .component, DeviceName: .device.name }'
-                }
-              ]
+            --enabled {enabled}
+            --display-name {displayname}
+            --source {source}
+            --filter "SELECT * FROM devices WHERE $displayName != \"abc\" AND $id = \"a\""
+            --enrichments "{
+              'simulated': {
+                'path': '$simulated'
+              }
             }"
+            --destinations "[
+              {
+                'id': '{destinationid}',
+                'transform': '{ ApplicationId: .applicationId, Component: .component, DeviceName: .device.name }'
+              }
+            ]"
     """
 
     helps[
@@ -135,6 +126,7 @@ def _load_central_export_help():
     ] = """
         type: command
         short-summary: Update an export for an IoT Central application.
+        long-summary: Source is not allowed to update once export was created.
         examples:
         - name: Update an export from file
           text: >
@@ -178,7 +170,7 @@ def _load_central_destination_help():
         "iot central export destination list"
     ] = """
         type: command
-        short-summary: Get the list of export destinations for an IoT Central application.
+        short-summary: Get the full list of export destinations for an IoT Central application.
         examples:
         - name: List all export destinations in an application
           text: >
@@ -205,43 +197,27 @@ def _load_central_destination_help():
         type: command
         short-summary: Create an export destination for an IoT Central application.
         examples:
-        - name: Create an export destination with file path
-          text: >
-            az iot central export destination create
-            --app-id {appid}
-            --dest-id {destinationid}
-            --content './filepath/payload.json'
-
         - name: Create a webhook export destination with json payload
           text: >
             az iot central export destination create
             --app-id {appid}
             --dest-id {destinationid}
-            --content "{
-              'displayName': 'Webhook',
-              'url': '[webhook url]',
-              'type': 'webhook@v1',
-              'headerCustomizations': {
-                'x-custom-region': {
-                  'value': 'westcentralus',
-                  'secret': false
-                }
-              }
-            }"
+            --name {displayname}
+            --url {url}
+            --type webhook@v1
+            --header "{\"x-custom-region\":{\"value\":\"westus\", \"secret\": false}}"
 
-        - name: Creat a blob stoarge export destination with json payload
+        - name: Create a blob stoarge export destination with json payload
           text: >
             az iot central export destination create
             --app-id {appid}
             --dest-id {destintionid}
-            --content "{
-              'displayName': 'Blob Storage',
-              'type': 'blobstorage@v1',
-              'authorization': {
-                'type': 'connectionString',
-                'connectionString': 'DefaultEndpointsProtocol=https;AccountName=[accountName];AccountKey=[key];EndpointSuffix=core.windows.net',
-                'container': 'test'
-              }
+            --type blobstorage@v1
+            --name {displayname}
+            --authorization "{
+              'type': 'connectionString',
+              'connectionString':'DefaultEndpointsProtocol=https;AccountName=[accountName];AccountKey=[key];EndpointSuffix=core.windows.net',
+              'containerName': 'test'
             }"
 
         - name: create a Azure Data Explorer export destination with json payload
@@ -249,18 +225,16 @@ def _load_central_destination_help():
             az iot central export destination create
             --app-id {appid}
             --dest-id {destintionid}
-            --content "{
-              'displayName': 'Azure Data Explorer',
-              'type': 'dataexplorer@v1',
-              'clusterUrl': 'https://[clusterName].westus2.kusto.windows.net',
-              'database': 'database1',
-              'table': 'table1',
-              'authorization': {
-                'type': 'servicePrincipal',
-                'clientId': '3b420743-2020-44c6-9b70-cc42f945db0x',
-                'tenantId': '72f988bf-86f1-41af-91ab-2d7cd011db47',
-                'clientSecret': '[Secret]'
-              }
+            --type dataexplorer@v1
+            --name {displayname}
+            --cluster-url {clusterurl}
+            --database {database}
+            --table {table}
+            --authorization "{
+              'type': 'servicePrincipal',
+              'clientId': '3b420743-2020-44c6-9b70-cc42f945db0x',
+              'tenantId': '72f988bf-86f1-41af-91ab-2d7cd011db47',
+              'clientSecret': '[Secret]'
             }"
 
         - name: create an Event Hub export destination with json payload
@@ -268,13 +242,11 @@ def _load_central_destination_help():
             az iot central export destination create
             --app-id {appid}
             --dest-id {destintionid}
-            --content "{
-              'displayName': 'Event Hub',
-              'type': 'eventhubs@v1',
-              'authorization': {
-                'type': 'connectionString',
-                'connectionString': 'Endpoint=sb://[hubName].servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=*****;EntityPath=entityPath1'
-              }
+            --type eventhubs@v1
+            --name {displayname}
+            --authorization "{
+              'type': 'connectionString',
+              'connectionString': 'Endpoint=sb://[hubName].servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=*****;EntityPath=entityPath1'
             }"
 
         - name: create an Service Bus Queue destination with json payload
@@ -282,13 +254,11 @@ def _load_central_destination_help():
             az iot central export destination create
             --app-id {appid}
             --dest-id {destintionid}
-            --content "{
-              'displayName': 'Service Bus Queue',
-              'type': 'servicebusqueue@v1',
-              'authorization': {
-                'type': 'connectionString',
-                'connectionString': 'Endpoint=sb://[namespance].servicebus.windows.net/;SharedAccessKeyName=xxx;SharedAccessKey=[key];EntityPath=[name]'
-              }
+            --type servicebusqueue@v1
+            --name {displayname}
+            --authorization "{
+              'type': 'connectionString',
+              'connectionString': 'Endpoint=sb://[namespance].servicebus.windows.net/;SharedAccessKeyName=xxx;SharedAccessKey=[key];EntityPath=[name]'
             }"
 
         - name: create an Service Bus Topic destination with json payload
@@ -296,13 +266,11 @@ def _load_central_destination_help():
             az iot central export destination create
             --app-id {appid}
             --dest-id {destintionid}
-            --content "{
-              'displayName': 'Service Bus Topic',
-              'type': 'servicebustopic@v1',
-              'authorization': {
-                'type': 'connectionString',
-                'connectionString': 'Endpoint=sb://[namespace].servicebus.windows.net/;SharedAccessKeyName=xxx;SharedAccessKey=[key];EntityPath=[name]'
-              }
+            --type servicebustopic@v1
+            --name {displayname}
+            --authorization "{
+              'type': 'connectionString',
+              'connectionString': 'Endpoint=sb://[namespace].servicebus.windows.net/;SharedAccessKeyName=xxx;SharedAccessKey=[key];EntityPath=[name]'
             }"
     """
 
@@ -311,6 +279,7 @@ def _load_central_destination_help():
     ] = """
         type: command
         short-summary: Update an export destination for an IoT Central application.
+        long-summary: Destination type is not changable once it created, you need to create a new destintaion with new type.
         examples:
         - name: Update an export destination from file
           text: >
