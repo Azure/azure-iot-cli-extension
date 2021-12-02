@@ -8,8 +8,7 @@
 CLI parameter definitions.
 """
 
-from typing import List
-from knack.arguments import CLIArgumentType, CaseInsensitiveList, enum_choice_list
+from knack.arguments import CLIArgumentType, CaseInsensitiveList
 from azext_iot.central.common import DestinationType, ExportSource
 from azure.cli.core.commands.parameters import get_three_state_flag, get_enum_type
 from azext_iot.monitor.models.enum import Severity

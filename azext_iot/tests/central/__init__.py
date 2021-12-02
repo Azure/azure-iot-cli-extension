@@ -391,7 +391,8 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 "containerName": STORAGE_CONTAINER,
             }
         )
-        command = "iot central export destination create --app-id {} --dest-id {} --type {} --name '{}' --authorization '{}'".format(
+        command = "iot central export destination create --app-id {} \
+            --dest-id {} --type {} --name '{}' --authorization '{}'".format(
             APP_ID,
             dest_id,
             "blobstorage@v1",
@@ -415,7 +416,8 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         self.kwargs["enrichments"] = json.dumps({"Simulated": {"path": "$simulated"}})
         self.kwargs["destinations"] = json.dumps([{"id": "aztestdest0001"}])
 
-        command = "iot central export create --app-id {} --export-id {} --name {} --filter {} --source {} --enabled {} --enrichments '{}' --destinations '{}'".format(
+        command = "iot central export create --app-id {} --export-id {} --name {} \
+            --filter {} --source {} --enabled {} --enrichments '{}' --destinations '{}'".format(
             APP_ID,
             export_id,
             '"Test Export"',

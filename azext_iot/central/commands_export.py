@@ -5,7 +5,6 @@
 # --------------------------------------------------------------------------------------------
 # Dev note - think of this as a controller
 
-import json
 from typing import List, Union
 from azext_iot.common import utility
 from azext_iot.constants import CENTRAL_ENDPOINT
