@@ -30,7 +30,7 @@ parameters:
 - name: minCLIPythonVersion
   displayName: 'Python version for min CLI tests'
   type: string
-  default: '3.6.x'
+  default: '3.8.x'
   values:
   - '3.6.x'
   - '3.7.x'

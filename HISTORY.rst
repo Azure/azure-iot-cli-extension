@@ -6,6 +6,10 @@ Release History
 0.12.0
 +++++++++++++++
 
+** General Updates **
+
+* The IoT extension officially supports Python 3.10.
+
 **IoT DPS updates**
 
 * Added `az iot dps connection-string show` to show the DPS connection string with
