@@ -102,7 +102,7 @@ def add_dataExport_destination(
     if type == DestinationType.Webhook.value:
         if not url:
             raise CLIError(
-                "url parameter is required when creating webhook destination."
+                "Parameter url is required when creating webhook destination."
             )
         destination.update({"url": url})
         if header_customizations is not None:
@@ -117,15 +117,15 @@ def add_dataExport_destination(
     if type == DestinationType.AzureDataExplorer.value:
         if not cluster_url:
             raise CLIError(
-                "cluster-url is required when creating azure data explorer destination."
+                "Parameter cluster-url is required when creating an azure data explorer destination."
             )
         if not database:
             raise CLIError(
-                "database is required when creating azure data explorer destination."
+                "Parameter database is required when creating an azure data explorer destination."
             )
         if not table:
             raise CLIError(
-                "table is required when creating azure data explorer destination."
+                "Parameter table is required when creating an azure data explorer destination."
             )
         destination.update(
             {"clusterUrl": cluster_url, "database": database, "table": table}
@@ -142,7 +142,7 @@ def add_dataExport_destination(
     else:
         if type != DestinationType.Webhook.value:
             raise CLIError(
-                "authorization is required when creating non webhook destination."
+                "Parameter authorization is required when creating a non-webhook destination."
             )
 
     provider = CentralDestinationProvider(
