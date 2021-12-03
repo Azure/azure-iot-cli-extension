@@ -126,7 +126,7 @@ def _load_central_export_help():
     ] = """
         type: command
         short-summary: Update an export for an IoT Central application.
-        long-summary: Source is not allowed to update once export was created.
+        long-summary: Source is immutable once an export is created.
         examples:
         - name: Update an export from file
           text: >
@@ -279,7 +279,7 @@ def _load_central_destination_help():
     ] = """
         type: command
         short-summary: Update an export destination for an IoT Central application.
-        long-summary: Destination type is not changable once it created, you need to create a new destintaion with new type.
+        long-summary: The destination type is immutable once it is created. A new destination must be created with the new type.
         examples:
         - name: Update an export destination from file
           text: >
