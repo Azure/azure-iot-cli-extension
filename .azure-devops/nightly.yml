@@ -1,11 +1,13 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+
 # Required for schedule only trigger
 trigger: none
 pr: none
 
 # Run nightly at midnight (Pacific).
 schedules:
-- cron: "0 7 * * *"
-  displayName: Nightly Integration Build
+- cron: "0 8 * * *"
+  displayName: 'Nightly Integration Build'
   branches:
     include:
     - dev
@@ -28,7 +30,7 @@ parameters:
 - name: minCLIPythonVersion
   displayName: 'Python version for min CLI tests'
   type: string
-  default: '3.8.x'
+  default: '3.6.x'
   values:
   - '3.6.x'
   - '3.7.x'
@@ -68,8 +70,8 @@ stages:
       steps:
       - task: UsePythonVersion@0
         inputs:
-          versionSpec: $(pythonVersion)
-          architecture: $(architecture)
+          versionSpec: ${{ parameters.pythonVersion }}
+          architecture: ${{ parameters.architecture }}
 
       - template: templates/setup-ci-machine.yml
 
@@ -80,8 +82,8 @@ stages:
       steps:
       - task: UsePythonVersion@0
         inputs:
-          versionSpec: $(pythonVersion)
-          architecture: $(architecture)
+          versionSpec: ${{ parameters.pythonVersion }}
+          architecture: ${{ parameters.architecture }}
 
       - template: templates/setup-ci-machine.yml
 
@@ -93,8 +95,8 @@ stages:
       steps:
       - template: templates/setup-dev-test-env.yml
         parameters:
-          pythonVersion: $(pythonVersion)
-          architecture: $(architecture)
+          pythonVersion: ${{ parameters.pythonVersion }}
+          architecture: ${{ parameters.architecture }}
 
       - template: templates/install-and-record-version.yml
 
@@ -136,5 +138,5 @@ stages:
       steps:
       - template: templates/calculate-code-coverage.yml
         parameters:
-          pythonVersion: $(pythonVersion)
-          architecture: $(architecture)
+          pythonVersion: ${{ parameters.pythonVersion }}
+          architecture: ${{ parameters.architecture }}

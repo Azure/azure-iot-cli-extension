@@ -27,7 +27,7 @@ def add_api_token(
 
     try:
         role = Role[role].value
-    except:
+    except Exception:
         pass
 
     return provider.add_api_token(

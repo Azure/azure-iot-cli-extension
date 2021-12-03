@@ -3,7 +3,7 @@
 Release History
 ===============
 
-0.11.1
+0.12.0
 +++++++++++++++
 
 **IoT DPS updates**

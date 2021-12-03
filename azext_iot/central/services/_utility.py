@@ -41,7 +41,7 @@ def try_extract_result(response: Response):
 
     try:
         body = response.json()
-    except:
+    except Exception:
         raise CLIError("Error parsing response body")
 
     if "error" in body:
@@ -85,7 +85,7 @@ def get_object(data: dict, model: str, api_version) -> object:
                 model,
             )
             return module(data)
-    except:
+    except Exception:
         raise CLIError(
             "{} is not available for api version == {}".format(model, api_version)
         )
