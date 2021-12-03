@@ -108,17 +108,17 @@ def _load_central_export_help():
             --display-name {displayname}
             --source {source}
             --filter "SELECT * FROM devices WHERE $displayName != \"abc\" AND $id = \"a\""
-            --enrichments "{
-              'simulated': {
-                'path': '$simulated'
+            --enrichments '{
+              "simulated": {
+                "path": "$simulated"
               }
-            }"
-            --destinations "[
+            }'
+            --destinations '[
               {
-                'id': '{destinationid}',
-                'transform': '{ ApplicationId: .applicationId, Component: .component, DeviceName: .device.name }'
+                "id": "{destinationid}",
+                "transform": "{ ApplicationId: .applicationId, Component: .component, DeviceName: .device.name }"
               }
-            ]"
+            ]'
     """
 
     helps[
@@ -205,7 +205,7 @@ def _load_central_destination_help():
             --name {displayname}
             --url {url}
             --type webhook@v1
-            --header "{\"x-custom-region\":{\"value\":\"westus\", \"secret\": false}}"
+            --header '{"x-custom-region":{"value":"westus", "secret": false}}'
 
         - name: Create a blob stoarge export destination with json payload
           text: >
@@ -214,11 +214,11 @@ def _load_central_destination_help():
             --dest-id {destintionid}
             --type blobstorage@v1
             --name {displayname}
-            --authorization "{
-              'type': 'connectionString',
-              'connectionString':'DefaultEndpointsProtocol=https;AccountName=[accountName];AccountKey=[key];EndpointSuffix=core.windows.net',
-              'containerName': 'test'
-            }"
+            --authorization '{
+              "type": "connectionString",
+              "connectionString":"DefaultEndpointsProtocol=https;AccountName=[accountName];AccountKey=[key];EndpointSuffix=core.windows.net",
+              "containerName": "test"
+            }'
 
         - name: create a Azure Data Explorer export destination with json payload
           text: >
@@ -230,12 +230,12 @@ def _load_central_destination_help():
             --cluster-url {clusterurl}
             --database {database}
             --table {table}
-            --authorization "{
-              'type': 'servicePrincipal',
-              'clientId': '3b420743-2020-44c6-9b70-cc42f945db0x',
-              'tenantId': '72f988bf-86f1-41af-91ab-2d7cd011db47',
-              'clientSecret': '[Secret]'
-            }"
+            --authorization '{
+              "type": "servicePrincipal",
+              "clientId": "3b420743-2020-44c6-9b70-cc42f945db0x",
+              "tenantId": "72f988bf-86f1-41af-91ab-2d7cd011db47",
+              "clientSecret": "[Secret]"
+            }'
 
         - name: create an Event Hub export destination with json payload
           text: >
@@ -244,10 +244,10 @@ def _load_central_destination_help():
             --dest-id {destintionid}
             --type eventhubs@v1
             --name {displayname}
-            --authorization "{
-              'type': 'connectionString',
-              'connectionString': 'Endpoint=sb://[hubName].servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=*****;EntityPath=entityPath1'
-            }"
+            --authorization '{
+              "type": "connectionString",
+              "connectionString": "Endpoint=sb://[hubName].servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=*****;EntityPath=entityPath1"
+            }'
 
         - name: create an Service Bus Queue destination with json payload
           text: >
@@ -256,10 +256,10 @@ def _load_central_destination_help():
             --dest-id {destintionid}
             --type servicebusqueue@v1
             --name {displayname}
-            --authorization "{
-              'type': 'connectionString',
-              'connectionString': 'Endpoint=sb://[namespance].servicebus.windows.net/;SharedAccessKeyName=xxx;SharedAccessKey=[key];EntityPath=[name]'
-            }"
+            --authorization '{
+              "type": "connectionString",
+              "connectionString": "Endpoint=sb://[namespance].servicebus.windows.net/;SharedAccessKeyName=xxx;SharedAccessKey=[key];EntityPath=[name]"
+            }'
 
         - name: create an Service Bus Topic destination with json payload
           text: >
@@ -268,10 +268,10 @@ def _load_central_destination_help():
             --dest-id {destintionid}
             --type servicebustopic@v1
             --name {displayname}
-            --authorization "{
-              'type': 'connectionString',
-              'connectionString': 'Endpoint=sb://[namespace].servicebus.windows.net/;SharedAccessKeyName=xxx;SharedAccessKey=[key];EntityPath=[name]'
-            }"
+            --authorization '{
+              "type": "connectionString",
+              "connectionString": "Endpoint=sb://[namespace].servicebus.windows.net/;SharedAccessKeyName=xxx;SharedAccessKey=[key];EntityPath=[name]"
+            }'
     """
 
     helps[
@@ -293,7 +293,7 @@ def _load_central_destination_help():
             az iot central export destination update
             --app-id {appid}
             --dest-id {destinationid}
-            --content "{'displayName': 'Web Hook Updated'}"
+            --content '{"displayName": "Web Hook Updated"}'
     """
 
     helps[
