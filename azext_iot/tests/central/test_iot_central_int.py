@@ -408,7 +408,9 @@ class TestIotCentral(CentralLiveScenarioTest):
         result = self.cmd(command, api_version=self._api_version).get_output_in_json()
         assert result["id"] == dest["id"]
 
-        export = self._create_export(api_version=self._api_version, export_id=export_id)
+        export = self._create_export(
+            api_version=self._api_version, export_id=export_id, dest_id=dest_id
+        )
         command = "iot central export show -n {} --export-id {}".format(
             APP_ID, export["id"]
         )

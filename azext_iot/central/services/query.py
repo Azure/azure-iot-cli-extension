@@ -6,14 +6,12 @@
 #
 
 from typing import Union
-import requests
 
 from knack.log import get_logger
 
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
 from azext_iot.central.models.v1_1_preview import QueryReponseV1_1_preview
-from azure.cli.core.util import should_disable_connection_verify
 
 logger = get_logger(__name__)
 
@@ -44,17 +42,16 @@ def query_run(
     """
 
     url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
-    headers = _utility.get_headers(token, cmd)
 
     # Construct parameters
-    query_parameters = {}
-    query_parameters["api-version"] = api_version
     payload = {"query": query}
-    response = requests.post(
-        url,
-        headers=headers,
-        json=payload,
-        params=query_parameters,
-        verify=not should_disable_connection_verify(),
+    return _utility.make_api_call(
+        cmd,
+        method="POST",
+        app_id=app_id,
+        url=url,
+        payload=payload,
+        token=token,
+        api_version=api_version,
+        central_dnx_suffix=central_dns_suffix,
     )
-    return _utility.try_extract_result(response)

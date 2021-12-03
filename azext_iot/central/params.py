@@ -496,7 +496,7 @@ def load_central_arguments(self, _):
         context.argument(
             "table",
             options_list=["--table"],
-            help="the azure data explorer table.",
+            help="The azure data explorer table.",
         )
         context.argument(
             "header_customizations",

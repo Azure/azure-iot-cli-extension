@@ -99,8 +99,8 @@ def add_dataExport_destination(
         "displayName": display_name,
     }
 
-    if type is DestinationType.Webhook.value:
-        if url is None:
+    if type == DestinationType.Webhook.value:
+        if not url:
             raise CLIError(
                 "url parameter is required when creating webhook destination."
             )
@@ -114,16 +114,16 @@ def add_dataExport_destination(
                 }
             )
 
-    if type is DestinationType.AzureDataExplorer:
-        if cluster_url is None:
+    if type == DestinationType.AzureDataExplorer.value:
+        if not cluster_url:
             raise CLIError(
                 "cluster-url is required when creating azure data explorer destination."
             )
-        if database is None:
+        if not database:
             raise CLIError(
                 "database is required when creating azure data explorer destination."
             )
-        if table is None:
+        if not table:
             raise CLIError(
                 "table is required when creating azure data explorer destination."
             )
@@ -131,7 +131,7 @@ def add_dataExport_destination(
             {"clusterUrl": cluster_url, "database": database, "table": table}
         )
 
-    if authorization is not None:
+    if authorization:
         destination.update(
             {
                 "authorization": utility.process_json_arg(
@@ -140,7 +140,7 @@ def add_dataExport_destination(
             }
         )
     else:
-        if type is not DestinationType.Webhook.value:
+        if type != DestinationType.Webhook.value:
             raise CLIError(
                 "authorization is required when creating non webhook destination."
             )

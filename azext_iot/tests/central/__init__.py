@@ -411,10 +411,10 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         )
         self.cmd(command, api_version=api_version)
 
-    def _create_export(self, api_version, export_id):
+    def _create_export(self, api_version, export_id, dest_id):
 
         self.kwargs["enrichments"] = json.dumps({"Simulated": {"path": "$simulated"}})
-        self.kwargs["destinations"] = json.dumps([{"id": "aztestdest0001"}])
+        self.kwargs["destinations"] = json.dumps([{"id": dest_id}])
 
         command = "iot central export create --app-id {} --export-id {} --name {} \
             --filter {} --source {} --enabled {} --enrichments '{}' --destinations '{}'".format(
