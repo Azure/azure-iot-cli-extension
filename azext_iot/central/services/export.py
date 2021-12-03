@@ -19,7 +19,7 @@ logger = get_logger(__name__)
 BASE_PATH = "api/dataExport/exports"
 
 
-def add_dataExport_export(
+def add_export(
     cmd,
     app_id: str,
     export_id: str,
@@ -58,7 +58,7 @@ def add_dataExport_export(
     )
 
 
-def update_dataExport_export(
+def update_export(
     cmd,
     app_id: str,
     export_id: str,
@@ -97,7 +97,7 @@ def update_dataExport_export(
     )
 
 
-def list_dataExport_exports(
+def list_exports(
     cmd,
     app_id: str,
     token: str,
@@ -146,7 +146,7 @@ def list_dataExport_exports(
     return exports
 
 
-def get_dataExport_export(
+def get_export(
     cmd,
     app_id: str,
     export_id: str,
@@ -183,7 +183,7 @@ def get_dataExport_export(
     )
 
 
-def delete_dataExport_export(
+def delete_export(
     cmd,
     app_id: str,
     export_id: str,

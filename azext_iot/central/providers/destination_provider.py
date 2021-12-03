@@ -26,7 +26,7 @@ class CentralDestinationProvider(CentralProvider):
         super().__init__(cmd, app_id, api_version, token=token)
         self._destinations = {}
 
-    def list_dataExport_destinations(
+    def list_destinations(
         self, central_dns_suffix=CENTRAL_ENDPOINT
     ) -> List[
         Union[
@@ -35,7 +35,7 @@ class CentralDestinationProvider(CentralProvider):
             AdxDestinationV1_1_preview,
         ]
     ]:
-        destinations = central_services.destination.list_dataExport_destinations(
+        destinations = central_services.destination.list_destinations(
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
@@ -49,7 +49,7 @@ class CentralDestinationProvider(CentralProvider):
 
         return destinations
 
-    def add_dataExport_destination(
+    def add_destination(
         self, destination_id, payload, central_dnx_suffix=CENTRAL_ENDPOINT
     ) -> Union[
         DestinationV1_1_preview,
@@ -59,7 +59,7 @@ class CentralDestinationProvider(CentralProvider):
         if destination_id in self._destinations:
             raise CLIError("Destination already exists")
 
-        destination = central_services.destination.add_dataExport_destination(
+        destination = central_services.destination.add_destination(
             self._cmd,
             self._app_id,
             destination_id=destination_id,
@@ -79,14 +79,14 @@ class CentralDestinationProvider(CentralProvider):
 
         return destination
 
-    def update_dataExport_destination(
+    def update_destination(
         self, destination_id, payload, central_dnx_suffix=CENTRAL_ENDPOINT
     ) -> Union[
         DestinationV1_1_preview,
         WebhookDestinationV1_1_preview,
         AdxDestinationV1_1_preview,
     ]:
-        destination = central_services.destination.update_dataExport_destination(
+        destination = central_services.destination.update_destination(
             self._cmd,
             self._app_id,
             destination_id=destination_id,
@@ -106,7 +106,7 @@ class CentralDestinationProvider(CentralProvider):
 
         return destination
 
-    def get_dataExport_destination(
+    def get_destination(
         self, destination_id, central_dnx_suffix=CENTRAL_ENDPOINT
     ) -> Union[
         DestinationV1_1_preview,
@@ -116,7 +116,7 @@ class CentralDestinationProvider(CentralProvider):
         # get or add to cache
         destination = self._destinations.get(destination_id)
         if not destination:
-            destination = central_services.destination.get_dataExport_destination(
+            destination = central_services.destination.get_destination(
                 cmd=self._cmd,
                 app_id=self._app_id,
                 token=self._token,
@@ -132,10 +132,8 @@ class CentralDestinationProvider(CentralProvider):
 
         return destination
 
-    def delete_dataExport_destination(
-        self, destination_id, central_dnx_suffix=CENTRAL_ENDPOINT
-    ):
-        central_services.destination.delete_dataExport_destination(
+    def delete_destination(self, destination_id, central_dnx_suffix=CENTRAL_ENDPOINT):
+        central_services.destination.delete_destination(
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,

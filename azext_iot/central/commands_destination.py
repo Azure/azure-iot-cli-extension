@@ -19,7 +19,7 @@ from azext_iot.central.models.v1_1_preview import (
 )
 
 
-def get_dataExport_destination(
+def get_destination(
     cmd,
     app_id: str,
     destination_id: str,
@@ -33,12 +33,12 @@ def get_dataExport_destination(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
 
-    return provider.get_dataExport_destination(
+    return provider.get_destination(
         destination_id=destination_id, central_dnx_suffix=central_dns_suffix
     )
 
 
-def delete_dataExport_destination(
+def delete_destination(
     cmd,
     app_id: str,
     destination_id: str,
@@ -50,12 +50,12 @@ def delete_dataExport_destination(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
 
-    provider.delete_dataExport_destination(
+    provider.delete_destination(
         destination_id=destination_id, central_dnx_suffix=central_dns_suffix
     )
 
 
-def list_dataExport_destinations(
+def list_destinations(
     cmd,
     app_id: str,
     token=None,
@@ -72,10 +72,10 @@ def list_dataExport_destinations(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
 
-    return provider.list_dataExport_destinations(central_dns_suffix=central_dns_suffix)
+    return provider.list_destinations(central_dns_suffix=central_dns_suffix)
 
 
-def add_dataExport_destination(
+def add_destination(
     cmd,
     app_id: str,
     destination_id: str,
@@ -149,14 +149,14 @@ def add_dataExport_destination(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
 
-    return provider.add_dataExport_destination(
+    return provider.add_destination(
         destination_id=destination_id,
         payload=destination,
         central_dnx_suffix=central_dns_suffix,
     )
 
 
-def update_dataExport_destination(
+def update_destination(
     cmd,
     app_id: str,
     destination_id: str,
@@ -173,7 +173,7 @@ def update_dataExport_destination(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
 
-    return provider.update_dataExport_destination(
+    return provider.update_destination(
         destination_id=destination_id,
         payload=payload,
         central_dnx_suffix=central_dns_suffix,

@@ -13,7 +13,7 @@ from azext_iot.central.models.enum import ApiVersion
 from azext_iot.central.models.v1_1_preview import ExportV1_1_preview
 
 
-def get_dataExport_export(
+def get_export(
     cmd,
     app_id: str,
     export_id: str,
@@ -25,12 +25,12 @@ def get_dataExport_export(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
 
-    return provider.get_dataExport_export(
+    return provider.get_export(
         export_id=export_id, central_dnx_suffix=central_dns_suffix
     )
 
 
-def delete_dataExport_export(
+def delete_export(
     cmd,
     app_id: str,
     export_id: str,
@@ -42,12 +42,10 @@ def delete_dataExport_export(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
 
-    provider.delete_dataExport_export(
-        export_id=export_id, central_dnx_suffix=central_dns_suffix
-    )
+    provider.delete_export(export_id=export_id, central_dnx_suffix=central_dns_suffix)
 
 
-def list_dataExport_exports(
+def list_exports(
     cmd,
     app_id: str,
     token=None,
@@ -58,10 +56,10 @@ def list_dataExport_exports(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
 
-    return provider.list_dataExport_exports(central_dns_suffix=central_dns_suffix)
+    return provider.list_exports(central_dns_suffix=central_dns_suffix)
 
 
-def add_dataExport_export(
+def add_export(
     cmd,
     app_id: str,
     export_id: str,
@@ -107,14 +105,14 @@ def add_dataExport_export(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
 
-    return provider.add_dataExport_export(
+    return provider.add_export(
         export_id=export_id,
         payload=export,
         central_dnx_suffix=central_dns_suffix,
     )
 
 
-def update_dataExport_export(
+def update_export(
     cmd,
     app_id: str,
     export_id: str,
@@ -129,7 +127,7 @@ def update_dataExport_export(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
 
-    return provider.update_dataExport_export(
+    return provider.update_export(
         export_id=export_id,
         payload=payload,
         central_dnx_suffix=central_dns_suffix,

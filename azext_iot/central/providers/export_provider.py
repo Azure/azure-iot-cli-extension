@@ -22,10 +22,10 @@ class CentralExportProvider(CentralProvider):
         super().__init__(cmd, app_id, api_version, token=token)
         self._exports = {}
 
-    def list_dataExport_exports(
+    def list_exports(
         self, central_dns_suffix=CENTRAL_ENDPOINT
     ) -> List[Union[dict, ExportV1_1_preview]]:
-        exports = central_services.export.list_dataExport_exports(
+        exports = central_services.export.list_exports(
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
@@ -39,13 +39,13 @@ class CentralExportProvider(CentralProvider):
 
         return exports
 
-    def add_dataExport_export(
+    def add_export(
         self, export_id, payload, central_dnx_suffix=CENTRAL_ENDPOINT
     ) -> Union[dict, ExportV1_1_preview]:
         if export_id in self._exports:
             raise CLIError("Destination already exists")
 
-        export = central_services.export.add_dataExport_export(
+        export = central_services.export.add_export(
             self._cmd,
             self._app_id,
             export_id=export_id,
@@ -63,10 +63,10 @@ class CentralExportProvider(CentralProvider):
 
         return export
 
-    def update_dataExport_export(
+    def update_export(
         self, export_id, payload, central_dnx_suffix=CENTRAL_ENDPOINT
     ) -> Union[dict, ExportV1_1_preview]:
-        export = central_services.export.update_dataExport_export(
+        export = central_services.export.update_export(
             self._cmd,
             self._app_id,
             export_id=export_id,
@@ -84,13 +84,13 @@ class CentralExportProvider(CentralProvider):
 
         return export
 
-    def get_dataExport_export(
+    def get_export(
         self, export_id, central_dnx_suffix=CENTRAL_ENDPOINT
     ) -> Union[dict, ExportV1_1_preview]:
         # get or add to cache
         export = self._exports.get(export_id)
         if not export:
-            export = central_services.export.get_dataExport_export(
+            export = central_services.export.get_export(
                 cmd=self._cmd,
                 app_id=self._app_id,
                 token=self._token,
@@ -106,8 +106,8 @@ class CentralExportProvider(CentralProvider):
 
         return export
 
-    def delete_dataExport_export(self, export_id, central_dnx_suffix=CENTRAL_ENDPOINT):
-        central_services.export.delete_dataExport_export(
+    def delete_export(self, export_id, central_dnx_suffix=CENTRAL_ENDPOINT):
+        central_services.export.delete_export(
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
