@@ -13,6 +13,6 @@ class Export:
         self.source = export.get("source")
         self.filter = export.get("filter")
         self.destinations = export.get("destinations")
-        self.errors = export.get("erros")
+        self.errors = export.get("errors")
         self.status = export.get("status")
-        self.enrichment = export.get("enrichment")
+        self.enrichment = export.get("enrichments")
