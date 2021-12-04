@@ -1,3 +1,5 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+
 pr: none
 trigger: none
 
@@ -12,6 +14,7 @@ parameters:
   - 'ubuntu-18.04'
   - 'ubuntu-latest'
 - name: pythonVersion
+  displayName: 'Python version for building wheel, KPIs'
   type: string
   default: '3.8.x'
   values:
@@ -25,6 +28,7 @@ parameters:
   - '3.6.x'
   - '3.8.x'
   - '3.9.x'
+  - '3.10.x'
 - name: architecture
   type: string
   default: 'x64'
@@ -168,6 +172,7 @@ stages:
   - stage: 'release'
     displayName: 'Stage GitHub release'
     dependsOn: [build, test]
+    condition: and(succeeded(), eq(variables.OfficialBuild, 'true'))
     jobs:
     - deployment: 'StageGitHub'
       displayName: 'Stage CLI extension on GitHub'

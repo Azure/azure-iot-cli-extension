@@ -3162,7 +3162,7 @@ def iot_hub_connection_string_show(
                             else conn_str_getter(hub)[0],
                         }
                     )
-                except:
+                except Exception:
                     logger.warning(
                         f"Warning: The IoT Hub {hub.name} in resource group "
                         + f"{hub.additional_properties['resourcegroup']} does "
