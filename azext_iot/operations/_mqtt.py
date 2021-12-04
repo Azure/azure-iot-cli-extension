@@ -139,5 +139,5 @@ class mqtt_client(object):
     def shutdown(self):
         try:
             self.device_client.shutdown()
-        except:
+        except Exception:
             pass

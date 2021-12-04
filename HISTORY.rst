@@ -3,7 +3,7 @@
 Release History
 ===============
 
-0.11.1
+0.12.0
 +++++++++++++++
 
 **IoT Central updates**
@@ -13,6 +13,10 @@ Release History
   - Query (az iot central query)
   - Destination (az iot central export destination)
   - Export (az iot central export)
+
+** General Updates **
+
+* The IoT extension officially supports Python 3.10.
 
 **IoT DPS updates**
 
