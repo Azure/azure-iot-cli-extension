@@ -227,7 +227,7 @@ def build_mock_response(
 ):
     try:
         from unittest.mock import MagicMock
-    except:
+    except ImportError:
         from mock import MagicMock
 
     response = (

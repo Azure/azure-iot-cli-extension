@@ -3,6 +3,11 @@ steps:
     displayName: 'Build wheel for Azure IoT CLI extension'
     workingDirectory: '.'
 
+  - task: AzureArtifacts.manifest-generator-task.manifest-generator-task.ManifestGeneratorTask@0
+    displayName: 'Generate Software Manifest'
+    inputs:
+      BuildDropPath: 'dist'
+
   - task: PublishBuildArtifacts@1
     displayName: 'Publish Azure IoT CLI extension as build artifact'
     inputs:

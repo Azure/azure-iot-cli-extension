@@ -213,8 +213,6 @@ class ResourceProvider(DigitalTwinsResourceManager):
         target_instance = self.find_instance(
             name=name, resource_group_name=resource_group_name
         )
-        if not resource_group_name:
-            resource_group_name = self.get_rg(target_instance)
 
         return self.rbac.list_assignments(
             dt_scope=target_instance.id,
@@ -226,8 +224,6 @@ class ResourceProvider(DigitalTwinsResourceManager):
         target_instance = self.find_instance(
             name=name, resource_group_name=resource_group_name
         )
-        if not resource_group_name:
-            resource_group_name = self.get_rg(target_instance)
 
         return self.rbac.assign_role(
             dt_scope=target_instance.id, assignee=assignee, role_type=role_type
@@ -237,8 +233,6 @@ class ResourceProvider(DigitalTwinsResourceManager):
         target_instance = self.find_instance(
             name=name, resource_group_name=resource_group_name
         )
-        if not resource_group_name:
-            resource_group_name = self.get_rg(target_instance)
 
         return self.rbac.remove_role(
             dt_scope=target_instance.id, assignee=assignee, role_type=role_type
