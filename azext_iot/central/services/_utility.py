@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 # Nothing in this file should be used outside of service/central
 
-from knack.util import CLIError, to_snake_case
+from knack.util import CLIError, to_snake_case, to_camel_case
 from requests import Response
 from knack.log import logging
 
@@ -89,3 +89,11 @@ def get_object(data: dict, model: str, api_version) -> object:
         raise CLIError(
             "{} is not available for api version == {}".format(model, api_version)
         )
+
+
+def to_camel_dict(data: dict) -> dict:
+    keys = list(data.keys())
+    for key in keys:
+        data[to_camel_case(key)] = data.pop(key)
+
+    return data

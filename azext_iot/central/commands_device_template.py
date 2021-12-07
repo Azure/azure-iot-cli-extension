@@ -38,6 +38,7 @@ def get_device_template(
 def list_device_templates(
     cmd,
     app_id: str,
+    compact=False,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
@@ -46,7 +47,9 @@ def list_device_templates(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
 
-    templates = provider.list_device_templates(central_dns_suffix=central_dns_suffix)
+    templates = provider.list_device_templates(
+        compact=compact, central_dns_suffix=central_dns_suffix
+    )
     return templates
 
 
@@ -83,6 +86,32 @@ def create_device_template(
     )
 
     template = provider.create_device_template(
+        device_template_id=device_template_id,
+        payload=payload,
+        central_dns_suffix=central_dns_suffix,
+    )
+    return template.raw_template
+
+
+def update_device_template(
+    cmd,
+    app_id: str,
+    device_template_id: str,
+    content: str,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
+):
+    if not isinstance(content, str):
+        raise CLIError("content must be a string: {}".format(content))
+
+    payload = utility.process_json_arg(content, argument_name="content")
+
+    provider = CentralDeviceTemplateProvider(
+        cmd=cmd, app_id=app_id, token=token, api_version=api_version
+    )
+
+    template = provider.update_device_template(
         device_template_id=device_template_id,
         payload=payload,
         central_dns_suffix=central_dns_suffix,

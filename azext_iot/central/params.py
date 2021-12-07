@@ -22,7 +22,7 @@ severity_type = CLIArgumentType(
 
 role_type = CLIArgumentType(
     options_list=["--role", "-r"],
-    help="The role that will be associated with this token."
+    help="The role that will be associated with this token or user."
     " You can specify one of the built-in roles, or specify the role ID of a custom role."
     " See more at https://aka.ms/iotcentral-customrolesdocs",
 )
@@ -93,6 +93,13 @@ def load_central_arguments(self, _):
             options_list=["--device-template-id", "--dtid"],
             help="Digital Twin Model Identifier of the device template."
             " Learn more at https://aka.ms/iotcentraldtmi.",
+        )
+
+    with self.argument_context("iot central device-template list") as context:
+        context.argument(
+            "compact",
+            options_list=["--compact", "-c"],
+            help="Shot templates in compact mode",
         )
 
     with self.argument_context("iot central api-token") as context:
@@ -214,6 +221,12 @@ def load_central_arguments(self, _):
             help="ID associated with the user. ",
         )
         context.argument("role", arg_type=role_type)
+        context.argument(
+            "org_id",
+            options_list=["--organization-id", "--org-id"],
+            help="The ID of the organization for the user role assignment."
+            " Only available for api-version == 1.1-preview",
+        )
 
     with self.argument_context("iot central diagnostics") as context:
         context.argument("timeout", arg_type=event_timeout_type)
@@ -256,9 +269,7 @@ def load_central_arguments(self, _):
             help="The API version for the requested operation.",
         )
 
-    with self.argument_context(
-        "iot central file-upload-config create"
-    ) as context:
+    with self.argument_context("iot central file-upload-config create") as context:
         context.argument(
             "connection_string",
             options_list=["--connection-string", "-s"],
@@ -302,6 +313,19 @@ def load_central_arguments(self, _):
             help="The ID of the parent of the organization.",
         )
     with self.argument_context("iot central organization create") as context:
+        context.argument(
+            "org_name",
+            options_list=["--org-name"],
+            help="Display name of the organization.",
+        )
+
+    with self.argument_context("iot central organization update") as context:
+        context.argument(
+            "parent_org",
+            options_list=["--parent-id"],
+            help="The ID of the parent of the organization.",
+        )
+    with self.argument_context("iot central organization update") as context:
         context.argument(
             "org_name",
             options_list=["--org-name"],

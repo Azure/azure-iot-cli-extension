@@ -6,6 +6,7 @@
 
 from typing import List, Union
 from knack.util import CLIError
+from azext_iot.common import utility
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.v1 import TemplateV1
@@ -62,6 +63,7 @@ class CentralDeviceTemplateProvider:
 
     def list_device_templates(
         self,
+        compact=False,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> List[Union[TemplateV1, TemplateV1_1_preview, TemplatePreview]]:
         templates = central_services.device_template.list_device_templates(
@@ -71,6 +73,17 @@ class CentralDeviceTemplateProvider:
             central_dns_suffix=central_dns_suffix,
             api_version=self._api_version,
         )
+
+        if compact:  # if asked for compact, just keep reduced info
+            for template in templates:
+                template.raw_template.pop("capabilityModel", None)
+                template.raw_template.pop("solutionModel", None)
+                template.raw_template.pop("deploymentManifest", None)
+                template.raw_template.pop("@context", None)
+                template.raw_template.pop("etag", None)
+                self._device_templates.update(
+                    {template.id: utility.dict_clean(template.raw_template)}
+                )
 
         self._device_templates.update(
             {template.id: template.raw_template for template in templates}
@@ -99,6 +112,26 @@ class CentralDeviceTemplateProvider:
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         template = central_services.device_template.create_device_template(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_template_id=device_template_id,
+            payload=payload,
+            token=self._token,
+            central_dns_suffix=central_dns_suffix,
+            api_version=self._api_version,
+        )
+
+        self._device_templates[template.id] = template
+
+        return template
+
+    def update_device_template(
+        self,
+        device_template_id: str,
+        payload: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        template = central_services.device_template.update_device_template(
             cmd=self._cmd,
             app_id=self._app_id,
             device_template_id=device_template_id,

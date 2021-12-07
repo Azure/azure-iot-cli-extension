@@ -137,7 +137,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
 
         assert device_client.connected
 
-    def test_central_device_methods_CRD(self):
+    def test_central_device_methods_CRUD(self):
 
         # list devices and get count
         start_device_list = self.cmd(
@@ -176,6 +176,19 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
             )
             is not None
         )
+
+        # UPDATE
+        new_device_name = f"{device_name}_new"
+        command = "iot central device update --app-id {} -d {} --device-name {}".format(
+            APP_ID, device_id, new_device_name
+        )
+        checks = [
+            self.check("displayName", new_device_name),
+            self.check("id", device_id),
+        ]
+        self.cmd(command, api_version=self._api_version, checks=checks)
+
+        # DELETE
         self._delete_device(device_id=device_id, api_version=self._api_version)
 
         deleted_device_list = self.cmd(
@@ -194,7 +207,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
             is None
         )
 
-    def test_central_device_template_methods_CRD(self):
+    def test_central_device_template_methods_CRUD(self):
         # currently: create, show, list, delete
 
         # list device templates and get count
@@ -246,6 +259,19 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
             is not None
         )
 
+        # UPDATE
+        new_template_name = f"{template_name}_new"
+        json_result["displayName"]
+        del json_result[self._get_template_id(json_result)]  # remove id
+        command = (
+            "iot central device-template update --app-id {} --dtid {} -c {}".format(
+                APP_ID, template_id, json_result
+            )
+        )
+        checks = [self.check("displayName", new_template_name)]
+        self.cmd(command, api_version=self._api_version, checks=checks)
+
+        # DELETE
         self._delete_device_template(
             template_id=template_id, api_version=self._api_version
         )

@@ -6,7 +6,7 @@
 
 
 import json
-from azext_iot.central.models.enum import ApiVersion
+from azext_iot.central.models.enum import ApiVersion, Role, get_enum_values
 from azure.iot.device import Message
 from azext_iot.common import utility
 from azext_iot.monitor.parsers import strings
@@ -206,7 +206,7 @@ class TestIotCentral(CentralLiveScenarioTest):
         for issue in expected_issues:
             assert issue in output
 
-    def test_central_user_methods_CRD(self):
+    def test_central_user_methods_CRUD(self):
         users = self._create_users(api_version=self._api_version)
 
         command = "iot central user show --app-id {} --user-id {}".format(
@@ -218,10 +218,20 @@ class TestIotCentral(CentralLiveScenarioTest):
         result = self.cmd(command, api_version=self._api_version).get_output_in_json()
 
         for user in users:
-            self._delete_user(user_id=user.get("id"), api_version=self._api_version)
-
-        for user in users:
             assert user in result
+        # UPDATE
+        for user in users:
+            current_role = user["roles"][0]["role"]
+            new_role = [x for x in get_enum_values(Role) if x != current_role][0]
+            command = "iot central user update --app-id {} --email {} --role {} --user-id {}".format(
+                APP_ID, user["email"], new_role, user["id"]
+            )
+            checks = [self.check("roles[0].role", new_role)]
+            self.cmd(command, api_version=self._api_version, checks=checks)
+
+        # DELETE
+        for user in users:
+            self._delete_user(user_id=user.get("id"), api_version=self._api_version)
 
     def test_central_api_token_methods_CRD(self):
         tokens = self._create_api_tokens(api_version=self._api_version)
@@ -337,7 +347,7 @@ class TestIotCentral(CentralLiveScenarioTest):
         condition=not IS_1_1_PREVIEW,
         reason="Api version not supported",
     )
-    def test_central_fileupload_methods_CRD_required(self):
+    def test_central_fileupload_methods_CRUD_required(self):
         file_upload = self._create_fileupload(api_version=self._api_version)
 
         result = self._wait_for_storage_configured(api_version=self._api_version)
@@ -347,8 +357,19 @@ class TestIotCentral(CentralLiveScenarioTest):
         assert result["container"] == file_upload["container"]
         assert result["account"] is None  # account was not passed in params
         assert (
-            result["sasttl"] == DEFAULT_FILE_UPLOAD_TTL
+            result["sasTtl"] == DEFAULT_FILE_UPLOAD_TTL
         )  # sasTTL not passed in params
+
+        # UPDATE
+        command = (
+            "iot central file-upload-config update --app-id {} --sasTtl {}".format(
+                APP_ID, "PT4H"
+            )
+        )
+        checks = [self.check("sasTtl", "PT4H")]
+        self.cmd(command, api_version=self._api_version, checks=checks)
+
+        # DELETE
         self._delete_fileupload(api_version=self._api_version)
         # check deleting state
         command = "iot central file-upload-config show -n {}".format(APP_ID)
@@ -360,7 +381,7 @@ class TestIotCentral(CentralLiveScenarioTest):
         not STORAGE_CSTRING or not STORAGE_CONTAINER,
         reason="empty azext_iot_central_storage_cstring or azext_iot_central_storage_container env var",
     )
-    def test_central_fileupload_methods_CRD_optional(self):
+    def test_central_fileupload_methods_CRUD_optional(self):
         ACCOUNT_NAME = "account"
         SAS_TTL = "PT2H"
         file_upload = self._create_fileupload(
@@ -372,7 +393,17 @@ class TestIotCentral(CentralLiveScenarioTest):
         assert result["connectionString"] == file_upload["connectionString"]
         assert result["container"] == file_upload["container"]
         assert result["account"] == ACCOUNT_NAME
-        assert result["sasttl"] == SAS_TTL
+        assert result["sasTtl"] == SAS_TTL
+
+        # UPDATE
+        command = (
+            "iot central file-upload-config update --app-id {} --sasTtl {}".format(
+                APP_ID, "PT4H"
+            )
+        )
+        checks = [self.check("sasTtl", "PT4H")]
+        self.cmd(command, api_version=self._api_version, checks=checks)
+
         self._delete_fileupload(api_version=self._api_version)
 
         # check deleting state
@@ -385,11 +416,19 @@ class TestIotCentral(CentralLiveScenarioTest):
         condition=not IS_1_1_PREVIEW,
         reason="Api version not supported",
     )
-    def test_central_organization_methods_CRD(self):
+    def test_central_organization_methods_CRUD(self):
         org = self._create_organization(api_version=self._api_version)
         command = "iot central organization show -n {} --org-id {}".format(
             APP_ID, org["id"]
         )
         result = self.cmd(command, api_version=self._api_version).get_output_in_json()
         assert result["id"] == org["id"]
+
+        # UPDATE
+        command = "iot central organization update --app-id {} --org-id {} --org-name {}".format(
+            APP_ID, org["id"], "new_name"
+        )
+        checks = [self.check("displayName", "new_name")]
+        self.cmd(command, api_version=self._api_version, checks=checks)
+        # DELETE
         self._delete_organization(org_id=org["id"], api_version=self._api_version)

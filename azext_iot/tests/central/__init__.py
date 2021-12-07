@@ -330,7 +330,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         if account_name is not None:
             command += " --account {}".format(account_name)
         if sasttl is not None:
-            command += " --sas-ttl {}".format(sasttl)
+            command += " --sasTtl {}".format(sasttl)
 
         return self.cmd(
             command,
@@ -341,7 +341,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 self.check("account", None if account_name is None else account_name),
                 self.check("state", "pending"),
                 self.check(
-                    "sasttl", DEFAULT_FILE_UPLOAD_TTL if sasttl is None else sasttl
+                    "sasTtl", DEFAULT_FILE_UPLOAD_TTL if sasttl is None else sasttl
                 ),
             ],
         ).get_output_in_json()

@@ -120,6 +120,44 @@ class CentralDeviceProvider:
 
         return self._devices[device.id]
 
+    def update_device(
+        self,
+        device_id,
+        device_name=None,
+        template=None,
+        simulated=None,
+        enabled=None,
+        organizations=None,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ) -> Union[DeviceV1, DeviceV1_1_preview, DevicePreview]:
+        if not device_id:
+            raise CLIError("Device id must be specified.")
+
+        if device_id in self._devices:
+            raise CLIError("Device already exists.")
+
+        device = central_services.device.update_device(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            device_name=device_name,
+            template=template,
+            simulated=simulated,
+            enabled=enabled,
+            organizations=organizations,
+            token=self._token,
+            central_dns_suffix=central_dns_suffix,
+            api_version=self._api_version,
+        )
+
+        if not device:
+            raise CLIError("No device found with id: '{}'.".format(device_id))
+
+        # add to cache
+        self._devices[device.id] = device
+
+        return self._devices[device.id]
+
     def delete_device(
         self,
         device_id,

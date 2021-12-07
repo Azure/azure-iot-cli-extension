@@ -16,8 +16,9 @@ from azext_iot.central.services import _utility
 from azext_iot.central.models.preview import DevicePreview
 from azext_iot.central.models.v1 import DeviceV1
 from azext_iot.central.models.v1_1_preview import DeviceV1_1_preview
-from azext_iot.central.models.enum import DeviceStatus, ApiVersion
+from azext_iot.central.models.enum import DeviceStatus
 from azure.cli.core.util import should_disable_connection_verify
+from azext_iot.common.utility import dict_clean, parse_entity
 
 logger = get_logger(__name__)
 
@@ -62,11 +63,7 @@ def get_device(
     )
     result = _utility.try_extract_result(response)
 
-    if api_version == ApiVersion.v1.value:
-        return DeviceV1(result)
-    elif api_version == ApiVersion.v1_1_preview.value:
-        return DeviceV1_1_preview(result)
-    return DevicePreview(result)
+    return _utility.get_object(result, "Device", api_version)
 
 
 def list_devices(
@@ -116,14 +113,12 @@ def list_devices(
         if "value" not in result:
             raise CLIError("Value is not present in body: {}".format(result))
 
-        if api_version == ApiVersion.v1.value:
-            ctor = DeviceV1
-        elif api_version == ApiVersion.v1_1_preview.value:
-            ctor = DeviceV1_1_preview
-        else:
-            ctor = DevicePreview
-
-        devices.extend([ctor(device) for device in result["value"]])
+        devices.extend(
+            [
+                _utility.get_object(device, "Device", api_version)
+                for device in result["value"]
+            ]
+        )
 
         url = result.get("nextLink", None)
         pages_processed = pages_processed + 1
@@ -172,15 +167,10 @@ def get_device_registration_summary(
         if "value" not in result:
             raise CLIError("Value is not present in body: {}".format(result))
 
-        if api_version == ApiVersion.v1.value:
-            ctor = DeviceV1
-        elif api_version == ApiVersion.v1_1_preview.value:
-            ctor = DeviceV1_1_preview
-        else:
-            ctor = DevicePreview
-
         for device in result["value"]:
-            registration_summary[ctor(device).device_status.value] += 1
+            registration_summary[
+                (_utility.get_object(device, "Device", api_version)).device_status.value
+            ] += 1
 
         print("Processed {} devices...".format(sum(registration_summary.values())))
         url = result.get("nextLink")
@@ -229,31 +219,102 @@ def create_device(
     query_parameters = {}
     query_parameters["api-version"] = api_version
 
-    payload = {"displayName": device_name, "simulated": simulated}
+    payload = {"displayName": device_name, "simulated": simulated, "enabled": True}
 
-    if api_version == ApiVersion.preview.value:
-        payload["approved"] = True
-        if template:
-            payload["instanceOf"] = template
-    else:
-        payload["enabled"] = True
-        if template:
-            payload["template"] = template
+    if template:
+        payload["template"] = template
 
-    if api_version == ApiVersion.v1_1_preview.value:
-        if organizations:
-            payload["organizations"] = organizations.split(",")
+    if organizations:
+        payload["organizations"] = organizations.split(",")
 
-    response = requests.put(url, headers=headers, json=payload, params=query_parameters)
+    data = _utility.get_object(payload, "Device", api_version)
+    json = _utility.to_camel_dict(dict_clean(parse_entity(data)))
+    response = requests.put(url, headers=headers, json=json, params=query_parameters)
     result = _utility.try_extract_result(response)
 
-    if api_version == ApiVersion.v1.value:
-        ctor = DeviceV1
-    elif api_version == ApiVersion.v1_1_preview.value:
-        ctor = DeviceV1_1_preview
-    else:
-        ctor = DevicePreview
-    return ctor(result)
+    return _utility.get_object(result, "Device", api_version)
+
+
+def update_device(
+    cmd,
+    app_id: str,
+    device_id: str,
+    device_name: str,
+    template: str,
+    simulated: bool,
+    enabled: bool,
+    organizations: str,
+    token: str,
+    api_version: str,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+) -> Union[DeviceV1, DeviceV1_1_preview, DevicePreview]:
+    """
+    Update a device in IoTC
+
+    Args:
+        cmd: command passed into az
+        app_id: name of app (used for forming request URL)
+        device_id: unique case-sensitive device id
+        device_name: (non-unique) human readable name for the device
+        template: (optional) string that maps to the device_template_id
+            of the device template that this device is to be an instance of
+        simulated: if IoTC is to simulate data for this device
+        enabled: if device is enabled
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        device: dict
+    """
+
+    url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, device_id)
+    headers = _utility.get_headers(token, cmd, has_json_payload=True)
+
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
+    current_device = get_device(
+        cmd=cmd,
+        app_id=app_id,
+        device_id=device_id,
+        token=token,
+        api_version=api_version,
+        central_dns_suffix=central_dns_suffix,
+    )
+
+    payload = dict_clean(parse_entity(current_device))
+
+    if device_name is not None:
+        payload["displayName"] = device_name
+
+    if template is not None:
+        payload["template"] = template
+
+    if enabled is not None:
+        payload["enabled"] = enabled
+
+    if simulated is not None:
+        payload["simulated"] = simulated
+
+    if organizations is not None:
+        payload["organizations"] = organizations.split(",")
+
+    # sanitize device payload based on apiversion
+
+    data = _utility.get_object(payload, "Device", api_version)
+    json = _utility.to_camel_dict(dict_clean(parse_entity(data)))
+
+    response = requests.patch(
+        url,
+        headers=headers,
+        json=json,
+        params=query_parameters,
+    )
+    result = _utility.try_extract_result(response)
+
+    return _utility.get_object(result, "Device", api_version)
 
 
 def delete_device(

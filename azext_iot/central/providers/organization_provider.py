@@ -92,7 +92,12 @@ class CentralOrganizationProvider:
         return org
 
     def create_organization(
-        self, org_id, org_name, parent_org, central_dns_suffix=CENTRAL_ENDPOINT
+        self,
+        org_id,
+        org_name,
+        parent_org,
+        update=False,
+        central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         if org_id in self._orgs:
             raise CLIError("Organization already exists")
@@ -103,6 +108,7 @@ class CentralOrganizationProvider:
             org_name=org_name,
             parent_org=parent_org,
             token=self._token,
+            update=update,
             api_version=self._api_version,
             central_dns_suffix=central_dns_suffix,
         )

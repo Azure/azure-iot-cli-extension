@@ -121,7 +121,8 @@ def list_device_templates(
             ]
         else:
             device_templates = device_templates + [
-                TemplateV1_1_preview(device_template) for device_template in result["value"]
+                TemplateV1_1_preview(device_template)
+                for device_template in result["value"]
             ]
 
         url = result.get("nextLink", None)
@@ -174,6 +175,51 @@ def create_device_template(
         return TemplateV1(_utility.try_extract_result(response))
     else:
         return TemplateV1_1_preview(_utility.try_extract_result(response))
+
+
+def update_device_template(
+    cmd,
+    app_id: str,
+    device_template_id: str,
+    payload: dict,
+    token: str,
+    api_version: str,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+) -> Union[TemplatePreview, TemplateV1, TemplateV1_1_preview]:
+    """
+    Updates a device template in IoTC
+
+    Args:
+        cmd: command passed into az
+        app_id: name of app (used for forming request URL)
+        device_template_id: case sensitive device template id,
+        payload: see example payload available in
+            <repo-root>/azext_iot/tests/central/json/device_template_int_test.json
+            or check here for more information
+            https://docs.microsoft.com/en-us/rest/api/iotcentral/devicetemplates
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        device: dict
+    """
+
+    url = "https://{}.{}/{}/{}".format(
+        app_id, central_dns_suffix, BASE_PATH, device_template_id
+    )
+    headers = _utility.get_headers(token, cmd, has_json_payload=True)
+
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
+    print(payload)
+    response = requests.patch(
+        url, headers=headers, json=payload, params=query_parameters
+    )
+    result = _utility.try_extract_result(response)
+    return _utility.get_object(result, "Template", api_version)
 
 
 def delete_device_template(

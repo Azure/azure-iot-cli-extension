@@ -154,6 +154,7 @@ def create_org(
     org_name: str,
     parent_org: str,
     token: str,
+    update: bool,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> OrganizationV1_1_preview:
@@ -187,7 +188,7 @@ def create_org(
     result = _make_call(
         cmd,
         app_id=app_id,
-        method="put",
+        method="patch" if update else "put",
         path=org_id,
         payload=payload,
         token=token,

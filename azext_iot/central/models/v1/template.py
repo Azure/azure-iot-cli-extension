@@ -7,13 +7,14 @@
 
 from knack.util import CLIError
 
+from azext_iot.central.models import BaseTemplate
 
-class Template:
+
+class Template(BaseTemplate):
     def __init__(self, template: dict):
-        self.raw_template = template
+        super().__init__(template)
         try:
             self.id = template.get("@id")
-            self.name = template.get("displayName")
             self.interfaces = self._extract_interfaces(template)
             self.schema_names = self._extract_schema_names(self.interfaces)
             self.components = self._extract_components(template)
@@ -22,8 +23,8 @@ class Template:
                     self.components
                 )
 
-        except:
-            raise CLIError("Could not parse iot central device template.")
+        except Exception as ex:
+            raise CLIError("Could not parse iot central device template." + ex)
 
     def get_schema(self, name, is_component=False, identifier="") -> dict:
         entities = self.components if is_component else self.interfaces
@@ -40,32 +41,6 @@ class Template:
 
         # not found
         return None
-
-    def _extract_components(self, template: dict) -> dict:
-        try:
-            dcm = template.get("capabilityModel", {})
-            if dcm.get("contents"):
-                rootContents = dcm.get("contents", {})
-                components = [
-                    entity
-                    for entity in rootContents
-                    if entity.get("@type") == "Component"
-                ]
-
-                if components:
-                    return {
-                        component["name"]: self._extract_schemas(component)
-                        for component in components
-                    }
-                return {}
-            return {}
-        except Exception:
-            details = (
-                "Unable to extract schema for component from template '{}'.".format(
-                    self.id
-                )
-            )
-            raise CLIError(details)
 
     def _extract_root_interface_contents(self, dcm: dict) -> dict:
         rootContents = dcm.get("contents", {})
@@ -95,23 +70,3 @@ class Template:
                 self.id
             )
             raise CLIError(details)
-
-    def _extract_schemas(self, entity: dict) -> dict:
-        if entity.get("schema"):
-            return {schema["name"]: schema for schema in entity["schema"]["contents"]}
-        else:
-            return {schema["name"]: schema for schema in entity["contents"]}
-
-    def _extract_schema_names(self, entity: dict) -> dict:
-        return {
-            entity_name: list(entity_schemas.keys())
-            for entity_name, entity_schemas in entity.items()
-        }
-
-    def _get_interface_list_property(self, property_name) -> list:
-        # returns the list of interfaces where property with property_name is defined
-        return [
-            interface
-            for interface, schema in self.schema_names.items()
-            if property_name in schema
-        ]

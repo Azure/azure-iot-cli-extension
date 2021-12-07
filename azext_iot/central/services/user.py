@@ -11,10 +11,18 @@ from typing import Union, List
 from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
-from azext_iot.central.models.enum import Role, ApiVersion, UserTypePreview, UserTypeV1
+from azext_iot.central.models.enum import (
+    Role,
+    ApiVersion,
+    UserTypePreview,
+    UserTypeV1,
+    get_enum_keys,
+)
 from azext_iot.central.models.v1 import UserV1
 from azext_iot.central.models.v1_1_preview import UserV1_1_preview
 from azext_iot.central.models.preview import UserPreview
+
+User = Union[UserV1, UserV1_1_preview, UserPreview]
 
 logger = get_logger(__name__)
 
@@ -32,7 +40,7 @@ def _make_call(
     central_dns_suffix: str,
     api_version: str,
     url=None,
-) -> Union[dict, UserV1, UserPreview, UserV1_1_preview]:
+) -> dict:
     if url is None:
         url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
 
@@ -57,19 +65,21 @@ def _make_call(
     return _utility.try_extract_result(response)
 
 
-def add_service_principal(
+def addorupdate_service_principal(
     cmd,
     app_id: str,
     assignee: str,
     tenant_id: str,
     object_id: str,
-    role: Role,
+    role: str,
+    org_id: str,
     token: str,
     api_version: str,
+    update=False,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> dict:
+) -> User:
     """
-    Add a user to a Central app
+    Add or update a user to a Central app
 
     Args:
         cmd: command passed into az
@@ -90,16 +100,26 @@ def add_service_principal(
         user_type = UserTypeV1.service_principal.value
 
     payload = {
-        "tenantId": tenant_id,
-        "objectId": object_id,
         "type": user_type,
-        "roles": [{"role": role.value}],
     }
+
+    if role:
+        role_id = Role[role].value if role in get_enum_keys(Role) else role
+        if org_id and api_version == ApiVersion.v1_1_preview.value:
+            payload["roles"] = [{"role": role_id, "organization": org_id}]
+        else:
+            payload["roles"] = [{"role": role_id}]
+
+    if tenant_id:
+        payload["tenantId"] = tenant_id
+
+    if object_id:
+        payload["objectId"] = object_id
 
     result = _make_call(
         cmd,
         app_id=app_id,
-        method="put",
+        method="patch" if update else "put",
         path=assignee,
         payload=payload,
         token=token,
@@ -110,18 +130,20 @@ def add_service_principal(
     return _utility.get_object(result, MODEL, api_version)
 
 
-def add_email(
+def addorupdate_email(
     cmd,
     app_id: str,
     assignee: str,
     email: str,
     role: Role,
+    org_id: str,
     token: str,
     api_version: str,
+    update=False,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> dict:
+) -> User:
     """
-    Add a user to a Central app
+    Add or update a user to a Central app
 
     Args:
         cmd: command passed into az
@@ -141,15 +163,23 @@ def add_email(
         user_type = UserTypeV1.email.value
 
     payload = {
-        "email": email,
         "type": user_type,
-        "roles": [{"role": role.value}],
     }
+
+    if role:
+        role_id = Role[role].value if role in get_enum_keys(Role) else role
+        if org_id and api_version == ApiVersion.v1_1_preview.value:
+            payload["roles"] = [{"role": role_id, "organization": org_id}]
+        else:
+            payload["roles"] = [{"role": role_id}]
+
+    if email:
+        payload["email"] = email
 
     result = _make_call(
         cmd,
         app_id=app_id,
-        method="put",
+        method="patch" if update else "put",
         path=assignee,
         payload=payload,
         token=token,
@@ -167,7 +197,7 @@ def get_user_list(
     api_version: str,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> List[Union[UserV1, UserV1_1_preview, UserPreview]]:
+) -> List[User]:
     """
     Get the list of users for central app.
 
@@ -218,7 +248,7 @@ def get_user(
     assignee: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[UserV1, UserV1_1_preview, UserPreview]:
+) -> User:
     """
     Get information for the specified user.
 
