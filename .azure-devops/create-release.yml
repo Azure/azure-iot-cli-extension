@@ -100,7 +100,7 @@ stages:
       jobs:
       - template: templates/trigger-tests.yml
         parameters:
-          pythonVersion: replace(${{ python_version }}, '_', '.')
+          pythonVersion: ${{replace(python_version, '_', '.')}}
           testADT: ${{ parameters.testADT }}
           testCentral: ${{ parameters.testCentral }}
           testDPS: ${{ parameters.testDPS }}
