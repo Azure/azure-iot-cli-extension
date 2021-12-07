@@ -919,7 +919,7 @@ def load_arguments(self, _):
     with self.argument_context("iot dps compute-device-key") as context:
         context.argument(
             "enrollment_id",
-            options_list=["--enrollment-id", "--group-id"],
+            options_list=["--enrollment-id", "--eid", "--group-id", "--gid"],
             help="Enrollment group ID."
         )
         context.argument(
@@ -942,7 +942,7 @@ def load_arguments(self, _):
     with self.argument_context("iot dps enrollment") as context:
         context.argument(
             "enrollment_id",
-            options_list=["--enrollment-id"],
+            options_list=["--enrollment-id", "--eid"],
             help="Individual device enrollment ID."
         )
         context.argument("device_id", help="Device ID registered in the IoT Hub.")
@@ -1014,7 +1014,7 @@ def load_arguments(self, _):
     with self.argument_context("iot dps enrollment-group") as context:
         context.argument(
             "enrollment_id",
-            options_list=["--enrollment-id", "--group-id"],
+            options_list=["--enrollment-id", "--eid", "--group-id", "--gid"],
             help="Enrollment group ID."
         )
         context.argument(
@@ -1072,6 +1072,6 @@ def load_arguments(self, _):
     with self.argument_context("iot dps registration list") as context:
         context.argument(
             "enrollment_id",
-            options_list=["--enrollment-id", "--group-id"],
+            options_list=["--enrollment-id", "--eid", "--group-id", "--gid"],
             help="Enrollment group ID."
         )
