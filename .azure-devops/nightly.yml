@@ -118,7 +118,7 @@ stages:
       - template: templates/trigger-tests.yml
         parameters:
           azureCLIVersion: min
-          pythonVersion: replace(${{ python_version }}, '_', '.')
+          pythonVersion: ${{replace(python_version, '_', '.')}}
           testADT: ${{ parameters.testADT }}
           testCentral: ${{ parameters.testCentral }}
           testDPS: ${{ parameters.testDPS }}
@@ -134,7 +134,7 @@ stages:
       - template: templates/trigger-tests.yml
         parameters:
           azureCLIVersion: msi
-          pythonVersion: replace(${{ python_version }}, '_', '.')
+          pythonVersion: ${{replace(python_version, '_', '.')}}
           testADT: ${{ parameters.testADT }}
           testCentral: ${{ parameters.testCentral }}
           testDPS: ${{ parameters.testDPS }}
