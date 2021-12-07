@@ -118,8 +118,6 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
         account = self.cmd("account show").get_output_in_json()
         user = account["user"]
-        print(new_dps["id"])
-        print(user)
 
         if user["name"] is None:
             raise Exception("User not found")
