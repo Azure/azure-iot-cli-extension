@@ -100,8 +100,8 @@ class BaseDiscovery(ABC):
             resource_pager = self.client.list_by_resource_group(resource_group_name=rg)
 
         if self.track2:
-            for resource in resource_pager.by_page():
-                resource_list.extend(resource)
+            for resources in resource_pager.by_page():
+                resource_list.extend(resources)
         else:
             try:
                 while True:
@@ -131,8 +131,8 @@ class BaseDiscovery(ABC):
         policy_list = []
 
         if self.track2:
-            for policy in policy_pager.by_page():
-                policy_list.extend(policy)
+            for policies in policy_pager.by_page():
+                policy_list.extend(policies)
         else:
             try:
                 while True:
@@ -169,7 +169,7 @@ class BaseDiscovery(ABC):
                         resource_name=resource_name, resource_group_name=rg
                     )
                 )
-            except:  # pylint: disable=broad-except
+            except Exception:
                 raise CLIError(
                     "Unable to find {}: {} in resource group: {}".format(
                         self.resource_type, resource_name, rg

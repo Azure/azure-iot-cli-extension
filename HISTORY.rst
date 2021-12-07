@@ -3,21 +3,39 @@
 Release History
 ===============
 
-0.11.1
+0.12.0
 +++++++++++++++
 
+**IoT Central updates**
+
+* Adds new preview commands (v1.1-preview)
+
+  - Query (az iot central query)
+  - Destination (az iot central export destination)
+  - Export (az iot central export)
+
+** General Updates **
+
+* The IoT extension officially supports Python 3.10.
+
 **IoT DPS updates**
+
+* Added `az iot dps connection-string show` to show the DPS connection string with
+  similar support as the IoT Hub connection string show.
+
 * DPS support DPS connection string as a resource identifier with the --login or -l
-  parameter, similar to IoT Hub Identifier Arguments
+  parameter, similar to IoT Hub Identifier Arguments.
 
 * DPS now supports auto resource and policy discovery. Resource group is no longer a
-  required parameter for az iot dps commands. Auto policy discovery ensures that a policy
-  with all the correct permissions is available and is used by the IoT extension for all
-  DPS operations.
+  required parameter for az iot dps dataplane commands. Auto policy discovery ensures
+  that a policy with all the correct permissions is available and is used by the IoT
+  extension for all DPS operations.
 
 * `az iot dps compute-device-key` now supports enrollment group identifiers in addition to
   enrollment group symmetric key. Please take a look at the `--help` docs for functionality
   and usage highlights.
+
+* Improvement to help documentation for DPS functions.
 
 **IoT Hub updates**
 

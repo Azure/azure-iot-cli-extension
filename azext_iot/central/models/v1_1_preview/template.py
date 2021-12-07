@@ -21,7 +21,7 @@ class Template:
                     self.components
                 )
 
-        except:
+        except Exception:
             raise CLIError("Could not parse iot central device template.")
 
     def get_schema(self, name, is_component=False, identifier="") -> dict:
@@ -90,7 +90,7 @@ class Template:
                 interface["@id"]: self._extract_schemas(interface)
                 for interface in interfaces
             }
-        except:
+        except Exception:
             details = "Unable to extract device schema from template '{}'.".format(
                 self.id
             )

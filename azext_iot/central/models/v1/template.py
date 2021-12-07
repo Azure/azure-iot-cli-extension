@@ -22,7 +22,7 @@ class Template:
                     self.components
                 )
 
-        except:
+        except Exception:
             raise CLIError("Could not parse iot central device template.")
 
     def get_schema(self, name, is_component=False, identifier="") -> dict:

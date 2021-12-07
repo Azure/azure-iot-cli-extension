@@ -43,12 +43,47 @@ central_api_token_ops = CliCommandType(
     operations_tmpl="azext_iot.central.commands_api_token#{}"
 )
 
+central_query_ops = CliCommandType(
+    operations_tmpl="azext_iot.central.commands_query#{}"
+)
+
+central_destination_ops = CliCommandType(
+    operations_tmpl="azext_iot.central.commands_destination#{}"
+)
+
+central_export_ops = CliCommandType(
+    operations_tmpl="azext_iot.central.commands_export#{}"
+)
+
 
 # Dev note - think of this as the "router" and all self.command_group as the controllers
 def load_central_commands(self, _):
     """
     Load CLI commands
     """
+
+    with self.command_group("iot central", command_type=central_query_ops) as cmd_group:
+        cmd_group.command("query", "query_run", is_preview=True)
+
+    with self.command_group(
+        "iot central export destination",
+        command_type=central_destination_ops,
+        is_preview=True,
+    ) as cmd_group:
+        cmd_group.command("list", "list_destinations")
+        cmd_group.show_command("show", "get_destination")
+        cmd_group.command("delete", "delete_destination")
+        cmd_group.command("create", "add_destination")
+        cmd_group.command("update", "update_destination")
+
+    with self.command_group(
+        "iot central export", command_type=central_export_ops, is_preview=True
+    ) as cmd_group:
+        cmd_group.command("list", "list_exports")
+        cmd_group.show_command("show", "get_export")
+        cmd_group.command("delete", "delete_export")
+        cmd_group.command("create", "add_export")
+        cmd_group.command("update", "update_export")
 
     with self.command_group(
         "iot central diagnostics", command_type=central_monitor_ops, is_preview=True

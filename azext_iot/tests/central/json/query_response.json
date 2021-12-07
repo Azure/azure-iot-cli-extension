@@ -1,0 +1,49 @@
+{
+    "results": [
+        {
+            "$ts": "2021-07-13T15:00:00Z",
+            "avg_RootTelemetry": 50.694243369718016,
+            "max_RootTelemetry": 94.840652761498745
+        },
+        {
+            "$ts": "2021-07-13T18:00:00Z",
+            "avg_RootTelemetry": 50.182172450361513,
+            "max_RootTelemetry": 94.069593916092927
+        },
+        {
+            "$ts": "2021-07-13T21:00:00Z",
+            "avg_RootTelemetry": 49.146167597153536,
+            "max_RootTelemetry": 92.239863696863452
+        },
+        {
+            "$ts": "2021-07-14T00:00:00Z",
+            "avg_RootTelemetry": 50.175258720781486,
+            "max_RootTelemetry": 93.635346493204
+        },
+        {
+            "$ts": "2021-07-14T03:00:00Z",
+            "avg_RootTelemetry": 49.896153299360229,
+            "max_RootTelemetry": 97.061167277047133
+        },
+        {
+            "$ts": "2021-07-14T06:00:00Z",
+            "avg_RootTelemetry": 50.451040170850973,
+            "max_RootTelemetry": 97.623888636224621
+        },
+        {
+            "$ts": "2021-07-14T09:00:00Z",
+            "avg_RootTelemetry": 50.256835113864774,
+            "max_RootTelemetry": 97.920784666869
+        },
+        {
+            "$ts": "2021-07-14T12:00:00Z",
+            "avg_RootTelemetry": 49.683892893951928,
+            "max_RootTelemetry": 97.333619056462823
+        },
+        {
+            "$ts": "2021-07-14T15:00:00Z",
+            "avg_RootTelemetry": 50.270841621540683,
+            "max_RootTelemetry": 94.651144107487553
+        }
+    ]
+}

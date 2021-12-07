@@ -17,6 +17,9 @@ from azext_iot.central.providers.fileupload_provider import CentralFileUploadPro
 from azext_iot.central.providers.organization_provider import (
     CentralOrganizationProvider,
 )
+from azext_iot.central.providers.query_provider import CentralQueryProvider
+from azext_iot.central.providers.destination_provider import CentralDestinationProvider
+from azext_iot.central.providers.export_provider import CentralExportProvider
 
 
 __all__ = [
@@ -29,4 +32,7 @@ __all__ = [
     "CentralFileUploadProvider",
     "CentralOrganizationProvider",
     "CentralJobProvider",
+    "CentralQueryProvider",
+    "CentralDestinationProvider",
+    "CentralExportProvider",
 ]

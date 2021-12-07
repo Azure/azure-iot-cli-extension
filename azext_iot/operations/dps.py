@@ -6,11 +6,14 @@
 
 from knack.log import get_logger
 from knack.util import CLIError
+from azext_iot.common._azure import IOT_SERVICE_CS_TEMPLATE
 from azext_iot.common.shared import (
     SdkType,
     AttestationType,
     ReprovisionType,
     AllocationType,
+    KeyType,
+    IoTDPSStateType
 )
 from azext_iot.common.utility import shell_safe_json_parse
 from azext_iot.common.certops import open_certificate
@@ -610,6 +613,89 @@ def iot_dps_compute_device_key(
     )
 
 
+# DPS Connection strings
+
+
+def iot_dps_connection_string_show(
+    cmd,
+    dps_name=None,
+    resource_group_name=None,
+    policy_name="provisioningserviceowner",
+    key_type=KeyType.primary.value,
+    show_all=False,
+):
+    discovery = DPSDiscovery(cmd)
+
+    if dps_name is None:
+        dps = discovery.get_resources(resource_group_name)
+        if dps is None:
+            raise CLIError("No Device Provisioning Service found.")
+
+        def conn_str_getter(dps):
+            return _get_dps_connection_string(
+                discovery, dps, policy_name, key_type, show_all
+            )
+
+        connection_strings = []
+        for dps in dps:
+            if dps.properties.state == IoTDPSStateType.Active.value:
+                try:
+                    connection_strings.append(
+                        {
+                            "name": dps.name,
+                            "connectionString": conn_str_getter(dps)
+                            if show_all
+                            else conn_str_getter(dps)[0],
+                        }
+                    )
+                except Exception:
+                    logger.warning(
+                        f"Warning: The DPS {dps.name} in resource group "
+                        + f"{dps.additional_properties['resourcegroup']} does "
+                        + f"not have the target policy {policy_name}."
+                    )
+            else:
+                logger.warning(
+                    f"Warning: The DPS {dps.name} in resource group "
+                    + f"{dps.additional_properties['resourcegroup']} is skipped "
+                    + "because the DPS is not active."
+                )
+        return connection_strings
+
+    dps = discovery.find_resource(dps_name, resource_group_name)
+    if dps:
+        conn_str = _get_dps_connection_string(
+            discovery, dps, policy_name, key_type, show_all
+        )
+        return {"connectionString": conn_str if show_all else conn_str[0]}
+
+
+def _get_dps_connection_string(
+    discovery, dps, policy_name, key_type, show_all
+):
+    policies = []
+    if show_all:
+        policies.extend(
+            discovery.get_policies(dps.name, dps.additional_properties["resourcegroup"])
+        )
+    else:
+        policies.append(
+            discovery.find_policy(
+                dps.name, dps.additional_properties["resourcegroup"], policy_name
+            )
+        )
+
+    hostname = dps.properties.service_operations_host_name
+    return [
+        IOT_SERVICE_CS_TEMPLATE.format(
+            hostname,
+            p.key_name,
+            p.secondary_key if key_type == KeyType.secondary.value else p.primary_key,
+        )
+        for p in policies
+    ]
+
+
 # DPS Registration
 
 
@@ -933,6 +1019,7 @@ def _validate_allocation_policy_for_enrollment(
             raise CLIError(
                 "'iot_hub_host_name' is not required when allocation-policy is defined."
             )
+        # Code to ensure geolatency still works after the enum fix.
         if not any(
             allocation_policy == allocation.value for allocation in AllocationType
         ):

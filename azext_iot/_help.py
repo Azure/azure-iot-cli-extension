@@ -1081,7 +1081,7 @@ helps[
     "iot dps"
 ] = """
     type: group
-    short-summary: Manage entities in an Azure IoT Hub Device Provisioning Service.
+    short-summary: Manage entities in an Azure IoT Hub Device Provisioning Service (DPS).
                    Augmented with the IoT extension.
 """
 
@@ -1089,21 +1089,21 @@ helps[
     "iot dps enrollment"
 ] = """
     type: group
-    short-summary: Manage enrollments in an Azure IoT Hub Device Provisioning Service.
+    short-summary: Manage individual device enrollments in an Azure IoT Hub Device Provisioning Service.
 """
 
 helps[
     "iot dps enrollment list"
 ] = """
     type: command
-    short-summary: List device enrollments in an Azure IoT Hub Device Provisioning Service.
+    short-summary: List individual device enrollments in an Azure IoT Hub Device Provisioning Service.
 """
 
 helps[
     "iot dps enrollment show"
 ] = """
     type: command
-    short-summary: Get device enrollment details in an Azure IoT Hub Device Provisioning Service.
+    short-summary: Get individual device enrollment details in an Azure IoT Hub Device Provisioning Service.
     examples:
     - name: Basic usage
       text: >
@@ -1117,24 +1117,17 @@ helps[
     "iot dps enrollment create"
 ] = """
     type: command
-    short-summary: Create a device enrollment in an Azure IoT Hub Device Provisioning Service.
+    short-summary: Create an individual device enrollment in an Azure IoT Hub Device Provisioning Service.
     examples:
     - name: Create an enrollment '{enrollment_id}' with attestation type 'x509' in the Azure
-            IoT provisioning service '{dps_name}' in the resource group '{resource_group_name}'
-      text: >
-        az iot dps enrollment create -g {resource_group_name} --dps-name {dps_name}
-        --enrollment-id {enrollment_id} --attestation-type x509
-        --certificate-path /certificates/Certificate.pem
-    - name: Create an enrollment '{enrollment_id}' with attestation type 'x509' in the Azure
             IoT Device Provisioning Service '{dps_name}' in the resource group
-            '{resource_group_name}' with provisioning status 'disabled', target IoT Hub
-            '{iothub_host_name}', device id '{device_id}', initial twin properties
-            '{"location":{"region":"US"}}' and initial twin tags '{"version":"1"}'.
+            '{resource_group_name}' with provisioning status 'disabled',
+            device id '{device_id}', initial twin properties '{"location":{"region":"US"}}'
+            and initial twin tags '{"version":"1"}'.
       text: >
         az iot dps enrollment create -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --attestation-type x509
         --certificate-path /certificates/Certificate.pem --provisioning-status disabled
-        --iot-hub-host-name {iothub_host_name}
         --initial-twin-properties "{'location':{'region':'US'}}"
         --initial-twin-tags "{'version':'1'}" --device-id {device_id}
     - name: Create an enrollment 'MyEnrollment' with attestation type 'tpm' in the Azure IoT
@@ -1178,7 +1171,7 @@ helps[
     "iot dps enrollment update"
 ] = """
     type: command
-    short-summary: Update a device enrollment in an Azure IoT Hub Device Provisioning Service.
+    short-summary: Update an individual device enrollment in an Azure IoT Hub Device Provisioning Service.
     examples:
     - name: Update enrollment '{enrollment_id}' with a new x509 certificate in the Azure IoT
             Device Provisioning Service '{dps_name}' in the resource group '{resource_group_name}'.
@@ -1223,14 +1216,14 @@ helps[
     "iot dps enrollment delete"
 ] = """
     type: command
-    short-summary: Delete a device enrollment in an Azure IoT Hub Device Provisioning Service.
+    short-summary: Delete an individual device enrollment in an Azure IoT Hub Device Provisioning Service.
 """
 
 helps[
     "iot dps enrollment-group"
 ] = """
     type: group
-    short-summary: Manage Azure IoT Hub Device Provisioning Service.
+    short-summary: Manage enrollment groups in an Azure IoT Hub Device Provisioning Service.
 """
 
 helps[
@@ -1244,7 +1237,7 @@ helps[
     "iot dps enrollment-group show"
 ] = """
     type: command
-    short-summary: Get the details of an enrollment group in an Azure IoT Hub Device Provisioning Service.
+    short-summary: Get an enrollment group's details in an Azure IoT Hub Device Provisioning Service.
     examples:
     - name: Basic usage
       text: >
@@ -1273,14 +1266,13 @@ helps[
         --enrollment-id {enrollment_id} --secondary-ca-name {certificate_name}
     - name: Create an enrollment group '{enrollment_id}' in the Azure IoT provisioning service
             'MyDps' in the resource group '{resource_group_name}' with provisioning status
-            'enabled', target IoT Hub '{iothub_host_name}', initial twin properties
+            'enabled', initial twin properties
             '{"location":{"region":"US"}}' and initial twin tags '{"version_dps":"1"}'
             using an intermediate certificate as primary certificate'.
       text: >
         az iot dps enrollment-group create -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --certificate-path /certificates/Certificate.pem
-        --provisioning-status enabled --iot-hub-host-name {iothub_host_name}
-        --initial-twin-properties "{'location':{'region':'US'}}"
+        --provisioning-status enabled --initial-twin-properties "{'location':{'region':'US'}}"
         --initial-twin-tags "{'version_dps':'1'}"
     - name: Create an enrollment group '{enrollment_id}' in the Azure IoT provisioning service
             '{dps_name}' in the resource group '{resource_group_name} with attestation type 'symmetrickey'.
@@ -1339,22 +1331,24 @@ helps[
     "iot dps registration"
 ] = """
     type: group
-    short-summary: Manage Azure IoT Hub Device Provisioning Service registrations.
+    short-summary: Manage device registrations for an enrollment group in an Azure IoT Hub Device
+        Provisioning Service.
 """
 
 helps[
     "iot dps registration list"
 ] = """
     type: command
-    short-summary: List device registration state in an Azure IoT Hub Device Provisioning
-        Service enrollment group.
+    short-summary: List device registrations for an enrollment group in an Azure IoT Hub Device
+        Provisioning Service.
 """
 
 helps[
     "iot dps registration show"
 ] = """
     type: command
-    short-summary: Get the device registration state in an Azure IoT Hub Device Provisioning Service.
+    short-summary: Get a device registration for an enrollment group in an Azure IoT Hub Device
+        Provisioning Service.
 """
 
 helps[
@@ -1369,7 +1363,7 @@ helps[
 ] = """
     type: command
     short-summary: Generate a derived device SAS key.
-    long-summary: Generate a derived device key from a DPS enrollment group.
+    long-summary: Generate a derived device key for a DPS enrollment group.
     examples:
     - name: Compute the device key with the given symmetric key.
       text: >
@@ -1378,4 +1372,37 @@ helps[
       text: >
         az iot dps compute-device-key -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --registration-id {registration_id}
+"""
+
+helps[
+    "iot dps connection-string"
+] = """
+    type: group
+    short-summary: Manage connection strings for an Azure IoT Hub Device Provisioning Service instance.
+"""
+
+helps[
+    "iot dps connection-string show"
+] = """
+    type: command
+    short-summary: Show the connection strings for the specified Device Provisioning Services using the given
+                   policy name and key.
+    examples:
+    - name: Show the connection strings for all active state DPS instances in a subscription
+            using the default policy and primary key.
+      text: >
+          az iot dps connection-string show
+    - name: Show the connection strings for all active state DPS instances in a resource group
+            using the default policy and primary key.
+      text: >
+          az iot dps connection-string show --resource-group MyResourceGroup
+    - name: Show all connection strings of the given DPS using primary key.
+      text: >
+          az iot dps connection-string show -n MyDPS --all
+    - name: Show the connection string of the given DPS using the default policy and primary key.
+      text: >
+          az iot dps connection-string show -n MyDPS
+    - name: Show the connection string of the given DPS using policy 'service' and secondary key.
+      text: >
+          az iot dps connection-string show -n MyDPS --policy-name service --key-type secondary
 """
