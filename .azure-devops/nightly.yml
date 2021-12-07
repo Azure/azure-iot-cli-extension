@@ -27,14 +27,22 @@ parameters:
   - '3.6.x'
   - '3.8.x'
   - '3.9.x'
-- name: minCLIPythonVersion
-  displayName: 'Python version for min CLI tests'
-  type: string
-  default: '3.8.x'
-  values:
-  - '3.6.x'
-  - '3.7.x'
-  - '3.8.x'
+- name: minCLIPythonVersions
+  displayName: 'Python versions for min CLI tests'
+  type: object
+  default:
+  - '3_6_x'
+  - '3_8_x'
+  - '3_9_x'
+  - '3_10_x'
+- name: msiPythonVersions
+  displayName: 'Python versions for msi CLI tests'
+  type: object
+  default:
+  - '3_6_x'
+  - '3_8_x'
+  - '3_9_x'
+  - '3_10_x'
 - name: architecture
   type: string
   default: 'x64'
@@ -100,38 +108,41 @@ stages:
 
       - template: templates/install-and-record-version.yml
 
-  - stage: 'test_min'
-    displayName: 'Run all tests with min CLI'
-    pool:
-      vmImage: ${{ parameters.vmImage }}
-    dependsOn: build
-    jobs:
-    - template: templates/nightly-tests.yml
-      parameters:
-        azureCLIVersion: min
-        pythonVersion: ${{ parameters.minCLIPythonVersion }}
-        testADT: ${{ parameters.testADT }}
-        testCentral: ${{ parameters.testCentral }}
-        testDPS: ${{ parameters.testDPS }}
-        testHub: ${{ parameters.testHub }}
+  - ${{ each python_version in parameters.minCLIPythonVersions }}:
+    - stage: 'test_min_${{python_version}}'
+      displayName: 'Run all tests with min CLI on python ${{python_version}}'
+      pool:
+        vmImage: ${{ parameters.vmImage }}
+      dependsOn: build
+      jobs:
+      - template: templates/trigger-tests.yml
+        parameters:
+          azureCLIVersion: min
+          pythonVersion: replace(${{ python_version }}, '_', '.')
+          testADT: ${{ parameters.testADT }}
+          testCentral: ${{ parameters.testCentral }}
+          testDPS: ${{ parameters.testDPS }}
+          testHub: ${{ parameters.testHub }}
 
-  - stage: 'test_msi'
-    displayName: 'Run all tests against Windows MSI install'
-    pool:
-      vmImage: 'windows-2019'
-    dependsOn: test_min
-    jobs:
-    - template: templates/nightly-tests.yml
-      parameters:
-        azureCLIVersion: msi
-        testADT: ${{ parameters.testADT }}
-        testCentral: ${{ parameters.testCentral }}
-        testDPS: ${{ parameters.testDPS }}
-        testHub: ${{ parameters.testHub }}
+  - ${{ each python_version in parameters.msiPythonVersions }}:
+    - stage: 'test_msi_${{python_version}}'
+      displayName: 'Run all tests against Windows MSI install on python ${{python_version}}'
+      pool:
+        vmImage: 'windows-2019'
+      dependsOn: test_min
+      jobs:
+      - template: templates/trigger-tests.yml
+        parameters:
+          azureCLIVersion: msi
+          pythonVersion: replace(${{ python_version }}, '_', '.')
+          testADT: ${{ parameters.testADT }}
+          testCentral: ${{ parameters.testCentral }}
+          testDPS: ${{ parameters.testDPS }}
+          testHub: ${{ parameters.testHub }}
           
   - stage: 'kpi'
     displayName: 'Build KPIs'
-    dependsOn: [build, test_min, test_msi]
+    dependsOn: [build, test_min_3_6_x, test_min_3_8_x, test_min_3_9_x, test_min_3_10_x, test_msi_3_6_x, test_min_3_8_x, test_min_3_9_x, test_min_3_10_x]
     jobs:
     - job: 'calculateCodeCoverage'
       displayName: 'Calculate distributed code coverage'
