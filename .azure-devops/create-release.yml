@@ -92,7 +92,7 @@ stages:
       - template: templates/install-and-record-version.yml
 
   - ${{ each python_version in parameters.pythonVersionsForTesting }}:
-    - stage: 'test_python_version_${{replace(python_version,.,_)}}'
+    - stage: 'test_python_version_${{replace(python_version,".","_")}}'
       displayName: 'Run tests on python ${{python_version}}'
       pool:
         vmImage: ${{ parameters.vmImage }}
