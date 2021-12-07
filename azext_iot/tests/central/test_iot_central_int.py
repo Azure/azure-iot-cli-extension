@@ -393,3 +393,53 @@ class TestIotCentral(CentralLiveScenarioTest):
         result = self.cmd(command, api_version=self._api_version).get_output_in_json()
         assert result["id"] == org["id"]
         self._delete_organization(org_id=org["id"], api_version=self._api_version)
+
+    @pytest.mark.xfail(
+        condition=not IS_1_1_PREVIEW,
+        reason="Api version not supported",
+    )
+    def test_central_destination_export_methods_CRD(self):
+        dest_id = "aztestdest0001"
+        export_id = "aztestexport001"
+        dest = self._create_destination(api_version=self._api_version, dest_id=dest_id)
+        command = "iot central export destination show -n {} --dest-id {}".format(
+            APP_ID, dest["id"]
+        )
+        result = self.cmd(command, api_version=self._api_version).get_output_in_json()
+        assert result["id"] == dest["id"]
+
+        export = self._create_export(
+            api_version=self._api_version, export_id=export_id, dest_id=dest_id
+        )
+        command = "iot central export show -n {} --export-id {}".format(
+            APP_ID, export["id"]
+        )
+        export_result = self.cmd(
+            command, api_version=self._api_version
+        ).get_output_in_json()
+        assert export_result["id"] == export["id"]
+
+        self._delete_export(export_id=export["id"], api_version=self._api_version)
+        self._delete_destination(dest_id=dest_id, api_version=self._api_version)
+
+    @pytest.mark.xfail(
+        condition=not IS_1_1_PREVIEW,
+        reason="Api version not supported",
+    )
+    def test_central_query_methods_run(self):
+        (template_id, _) = self._create_device_template(api_version=self._api_version)
+        (device_id, _) = self._create_device(
+            template=template_id, api_version=self._api_version, simulated=True
+        )
+
+        command = 'iot central query -n {} --query-string "{}"'.format(
+            APP_ID,
+            "SELECT TOP 1 testDefaultCapability FROM dtmi:intTestDeviceTemplateid WHERE WITHIN_WINDOW(PT1H)",
+        )
+        response = self.cmd(command, api_version=self._api_version).get_output_in_json()
+
+        assert response["results"] is not None
+        self._delete_device(api_version=self._api_version, device_id=device_id)
+        self._delete_device_template(
+            api_version=self._api_version, template_id=template_id
+        )

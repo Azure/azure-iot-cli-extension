@@ -11,6 +11,9 @@ from azext_iot.central.providers import (
     CentralDeviceGroupProvider,
     CentralDeviceTemplateProvider,
     CentralJobProvider,
+    CentralQueryProvider,
+    CentralDestinationProvider,
+    CentralExportProvider,
 )
 from azext_iot.central.models.enum import ApiVersion
 import pytest
@@ -36,6 +39,7 @@ from azext_iot.central.models.v1_1_preview import (
     OrganizationV1_1_preview,
     JobV1_1_preview,
     FileUploadV1_1_preview,
+    QueryReponseV1_1_preview,
 )
 from azext_iot.central.models.v1 import RoleV1, TemplateV1
 
@@ -381,6 +385,188 @@ class TestCentralFileuploadProvider:
         # call counts should be at most 1 since the provider has a cache
         assert mock_fileupload_svc.get_fileupload.call_count == 1
         assert fileupload.connection_string == self._fileupload.connection_string
+
+
+class TestCentralQueryProvider:
+    _query_response = QueryReponseV1_1_preview(
+        load_json(FileNames.central_query_response_file)
+    )
+
+    @mock.patch("azext_iot.central.services.query")
+    def test_should_return_query_response(self, mock_query_svc):
+        # setup
+        provider = CentralQueryProvider(
+            cmd=None,
+            query=None,
+            app_id=app_id,
+            api_version=ApiVersion.v1_1_preview.value,
+        )
+        mock_query_svc.query_run.return_value = self._query_response
+
+        # act
+        query_response = provider.query_run()
+        # verify
+        assert mock_query_svc.query_run.call_count == 1
+        assert query_response.results == self._query_response.results
+
+
+class TestCentralDestinationProvider:
+    _destinations = list(load_json(FileNames.central_destination_file))
+
+    @mock.patch("azext_iot.central.services.destination")
+    def test_should_return_list_destinations(self, mock_destination_svc):
+        # setup
+        provider = CentralDestinationProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+        )
+        mock_destination_svc.list_destinations.return_value = self._destinations
+
+        # act
+        destinations = provider.list_destinations()
+        # verify
+        assert mock_destination_svc.list_destinations.call_count == 1
+        assert destinations == self._destinations
+
+    @mock.patch("azext_iot.central.services.destination")
+    def test_should_return_get_destination(self, mock_destination_svc):
+        # setup
+        provider = CentralDestinationProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+        )
+        mock_destination_svc.get_destination.return_value = self._destinations[0]
+
+        # act
+        destination = provider.get_destination(self._destinations[0]["id"])
+        # verify
+        assert mock_destination_svc.get_destination.call_count == 1
+        assert destination == self._destinations[0]
+
+    @mock.patch("azext_iot.central.services.destination")
+    def test_should_success_add_destinatio(self, mock_destination_svc):
+        # setup
+        provider = CentralDestinationProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+        )
+        mock_destination_svc.add_destination.return_value = self._destinations[0]
+
+        # act
+        destination = provider.add_destination(
+            self._destinations[0]["id"], self._destinations[0]
+        )
+        # verify
+        assert mock_destination_svc.add_destination.call_count == 1
+        assert provider._destinations[destination["id"]] == self._destinations[0]
+
+    @mock.patch("azext_iot.central.services.destination")
+    def test_should_success_update_destination(self, mock_destination_svc):
+        # setup
+        provider = CentralDestinationProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+        )
+        mock_destination_svc.update_destination.return_value = self._destinations[0]
+
+        # act
+        provider.add_destination(self._destinations[0]["id"], self._destinations[0])
+        destination = provider.update_destination(self._destinations[0]["id"], None)
+        # verify
+        assert mock_destination_svc.add_destination.call_count == 1
+        assert mock_destination_svc.update_destination.call_count == 1
+        assert provider._destinations[destination["id"]] == self._destinations[0]
+
+    @mock.patch("azext_iot.central.services.destination")
+    def test_should_success_delete_destination(self, mock_destination_svc):
+        # setup
+        provider = CentralDestinationProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+        )
+        mock_destination_svc.add_destination.return_value = self._destinations[0]
+
+        # act
+        provider.add_destination(self._destinations[0]["id"], self._destinations[0])
+        provider.delete_destination(self._destinations[0]["id"])
+        # verify
+        assert mock_destination_svc.add_destination.call_count == 1
+        assert mock_destination_svc.delete_destination.call_count == 1
+        assert provider._destinations.__len__() == 0
+
+
+class TestCentralExportProvider:
+    _exports = list(load_json(FileNames.central_export_file))
+
+    @mock.patch("azext_iot.central.services.export")
+    def test_should_return_list_exports(self, mock_export_svc):
+        # setup
+        provider = CentralExportProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+        )
+        mock_export_svc.list_exports.return_value = self._exports
+
+        # act
+        exports = provider.list_exports()
+        # verify
+        assert mock_export_svc.list_exports.call_count == 1
+        assert exports == self._exports
+
+    @mock.patch("azext_iot.central.services.export")
+    def test_should_return_get_export(self, mock_export_svc):
+        # setup
+        provider = CentralExportProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+        )
+        mock_export_svc.get_export.return_value = self._exports[0]
+
+        # act
+        export = provider.get_export(self._exports[0]["id"])
+        # verify
+        assert mock_export_svc.get_export.call_count == 1
+        assert export == self._exports[0]
+
+    @mock.patch("azext_iot.central.services.export")
+    def test_should_success_add_export(self, mock_export_svc):
+        # setup
+        provider = CentralExportProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+        )
+        mock_export_svc.add_export.return_value = self._exports[0]
+
+        # act
+        export = provider.add_export(self._exports[0]["id"], self._exports[0])
+        # verify
+        assert mock_export_svc.add_export.call_count == 1
+        assert export == self._exports[0]
+        assert provider._exports[export["id"]] == export
+
+    @mock.patch("azext_iot.central.services.export")
+    def test_should_success_update_export(self, mock_export_svc):
+        # setup
+        provider = CentralExportProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+        )
+        mock_export_svc.update_export.return_value = self._exports[0]
+
+        # act
+        provider.add_export(self._exports[0]["id"], self._exports[0])
+        export = provider.update_export(self._exports[0]["id"], None)
+        # verify
+        assert mock_export_svc.add_export.call_count == 1
+        assert mock_export_svc.update_export.call_count == 1
+        assert provider._exports[export["id"]] == self._exports[0]
+
+    @mock.patch("azext_iot.central.services.export")
+    def test_should_success_delete_export(self, mock_export_svc):
+        # setup
+        provider = CentralExportProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+        )
+        mock_export_svc.add_export.return_value = self._exports[0]
+
+        # act
+        export = provider.add_export(self._exports[0]["id"], self._exports[0])
+        provider.delete_export(export["id"])
+        # verify
+        assert mock_export_svc.add_export.call_count == 1
+        assert mock_export_svc.delete_export.call_count == 1
+        assert provider._exports.__len__() == 0
 
 
 class TestCentralPropertyMonitor:
