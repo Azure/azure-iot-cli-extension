@@ -92,13 +92,13 @@ stages:
       - template: templates/install-and-record-version.yml
 
   - ${{ each python_version in parameters.pythonVersionsForTesting }}:
-    - stage: 'test_python_version_{{python_version}}'
-      displayName: 'Run tests on python {{python_version}}'
+    - stage: 'test_python_version_${{python_version}}'
+      displayName: 'Run tests on python ${{python_version}}'
       pool:
         vmImage: ${{ parameters.vmImage }}
       dependsOn: build
       jobs:
-      - job: 'testCentral_{{python_version}}'
+      - job: 'testCentral_${{python_version}}'
         displayName: 'Test IoT Central'
         condition: and(succeeded(), eq('${{ parameters.testCentral }}', true))
         steps:
@@ -108,7 +108,7 @@ stages:
             name: 'iot-central'
             pythonVersion: ${{ python_version }}
       
-      - job: 'testADT_{{python_version}}'
+      - job: 'testADT_${{python_version}}'
         displayName: 'Test Azure DigitalTwins'
         condition: and(succeeded(), eq('${{ parameters.testADT }}', true))
         steps:
@@ -118,7 +118,7 @@ stages:
             name: 'azure-digitaltwins'
             pythonVersion: ${{ python_version }}
 
-      - job: 'testDPS_{{python_version}}'
+      - job: 'testDPS_${{python_version}}'
         displayName: 'Test DPS'
         condition: and(succeeded(), eq('${{ parameters.testDPS }}', true))
         steps:
@@ -128,7 +128,7 @@ stages:
             name: 'device-provisioning-service'
             pythonVersion: ${{ python_version }}
       
-      - job: 'testHub_job_1_{{python_version}}'
+      - job: 'testHub_job_1_${{python_version}}'
         displayName: 'Test IoT Hub - config, core and jobs'
         condition: and(succeeded(), eq('${{ parameters.testHub }}', true))
         steps:
@@ -138,7 +138,7 @@ stages:
             name: 'iot-hub-1'
             pythonVersion: ${{ python_version }}
       
-      - job: 'testHub_job_2_{{python_version}}'
+      - job: 'testHub_job_2_${{python_version}}'
         displayName: 'Test IoT Hub - devices, messaging and modules'
         condition: and(succeeded(), eq('${{ parameters.testHub }}', true))
         steps:
@@ -148,7 +148,7 @@ stages:
             name: 'iot-hub-2'
             pythonVersion: ${{ python_version }}
 
-      - job: 'unitTests_{{python_version}}'
+      - job: 'unitTests_${{python_version}}'
         displayName: 'Unit tests and code coverage'
         steps:
         - template: templates/run-tests-parallel.yml
