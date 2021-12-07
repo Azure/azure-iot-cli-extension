@@ -20,3 +20,6 @@ class FileNames:
     central_property_validation_template_file = (
         "central/json/property_validation_template.json"
     )
+    central_query_response_file = "central/json/query_response.json"
+    central_destination_file = "central/json/destination.json"
+    central_export_file = "central/json/export.json"

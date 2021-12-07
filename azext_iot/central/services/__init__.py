@@ -14,6 +14,9 @@ from azext_iot.central.services import (
     organization,
     job,
     file_upload,
+    query,
+    destination,
+    export,
 )
 
 
@@ -27,4 +30,7 @@ __all__ = [
     "organization",
     "job",
     "file_upload",
+    "query",
+    "destination",
+    "export",
 ]
