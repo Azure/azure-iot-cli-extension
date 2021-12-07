@@ -8,6 +8,8 @@ Release History
 
 **IoT Central updates**
 
+* Fixed iot hub token leak for device twin show
+
 * Adds new preview commands (v1.1-preview)
 
   - Query (az iot central query)
@@ -40,9 +42,6 @@ Release History
 **IoT Hub updates**
 
 * `az iot hub device-identity create` supports a device scope argument via `--device-scope` parameter.
-
-**IoT Central updates**
-  * Fixed hub token leak for device twin show
 
 0.11.0
 +++++++++++++++
