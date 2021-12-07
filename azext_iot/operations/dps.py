@@ -653,7 +653,7 @@ def iot_dps_connection_string_show(
                             else conn_str_getter(dps)[0],
                         }
                     )
-                except:
+                except Exception:
                     logger.warning(
                         f"Warning: The DPS {dps.name} in resource group "
                         + f"{dps.additional_properties['resourcegroup']} does "

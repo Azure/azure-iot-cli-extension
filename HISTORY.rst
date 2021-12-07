@@ -3,8 +3,12 @@
 Release History
 ===============
 
-0.11.1
+0.12.0
 +++++++++++++++
+
+** General Updates **
+
+* The IoT extension officially supports Python 3.10.
 
 **IoT DPS updates**
 

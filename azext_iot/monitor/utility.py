@@ -5,7 +5,6 @@
 # --------------------------------------------------------------------------------------------
 
 import asyncio
-from asyncio import AbstractEventLoop
 
 
 def generate_on_start_string(device_id=None):
@@ -22,7 +21,7 @@ def stop_monitor():
     raise KeyboardInterrupt()
 
 
-def get_loop() -> AbstractEventLoop:
+def get_loop() -> asyncio.AbstractEventLoop:
     loop = asyncio.get_event_loop()
     if loop.is_closed():
         loop = asyncio.new_event_loop()
