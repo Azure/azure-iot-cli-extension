@@ -24,10 +24,10 @@ parameters:
 - name: pythonVersionsForTesting
   type: object
   default:
-  - '3.6.x'
-  - '3.8.x'
-  - '3.9.x'
-  - '3.10.x'
+  - '3_6_x'
+  - '3_8_x'
+  - '3_9_x'
+  - '3_10_x'
 - name: architecture
   type: string
   default: 'x64'
@@ -92,7 +92,7 @@ stages:
       - template: templates/install-and-record-version.yml
 
   - ${{ each python_version in parameters.pythonVersionsForTesting }}:
-    - stage: 'test_python_version_${{replace(python_version,".","_")}}'
+    - stage: 'test_python_version_${{python_version}}'
       displayName: 'Run tests on python ${{python_version}}'
       pool:
         vmImage: ${{ parameters.vmImage }}
@@ -106,7 +106,7 @@ stages:
           parameters:
             path: 'azext_iot/tests/central'
             name: 'iot-central'
-            pythonVersion: ${{ python_version }}
+            pythonVersion: replace(${{ python_version }}, '_', '.')
       
       - job: 'testADT_${{python_version}}'
         displayName: 'Test Azure DigitalTwins'
@@ -116,7 +116,7 @@ stages:
           parameters:
             path: 'azext_iot/tests/digitaltwins'
             name: 'azure-digitaltwins'
-            pythonVersion: ${{ python_version }}
+            pythonVersion: replace(${{ python_version }}, '_', '.')
 
       - job: 'testDPS_${{python_version}}'
         displayName: 'Test DPS'
@@ -126,7 +126,7 @@ stages:
           parameters:
             path: 'azext_iot/tests/dps'
             name: 'device-provisioning-service'
-            pythonVersion: ${{ python_version }}
+            pythonVersion: replace(${{ python_version }}, '_', '.')
       
       - job: 'testHub_job_1_${{python_version}}'
         displayName: 'Test IoT Hub - config, core and jobs'
@@ -136,7 +136,7 @@ stages:
           parameters:
             path: 'azext_iot/tests/iothub/configurations azext_iot/tests/iothub/core azext_iot/tests/iothub/jobs'
             name: 'iot-hub-1'
-            pythonVersion: ${{ python_version }}
+            pythonVersion: replace(${{ python_version }}, '_', '.')
       
       - job: 'testHub_job_2_${{python_version}}'
         displayName: 'Test IoT Hub - devices, messaging and modules'
@@ -146,7 +146,7 @@ stages:
           parameters:
             path: 'azext_iot/tests/iothub/devices azext_iot/tests/iothub/messaging azext_iot/tests/iothub/modules'
             name: 'iot-hub-2'
-            pythonVersion: ${{ python_version }}
+            pythonVersion: replace(${{ python_version }}, '_', '.')
 
       - job: 'unitTests_${{python_version}}'
         displayName: 'Unit tests and code coverage'
@@ -155,7 +155,7 @@ stages:
           parameters:
             runIntTests: 'false'
             runUnitTests: 'true'
-            pythonVersion: ${{ python_version }}
+            pythonVersion: replace(${{ python_version }}, '_', '.')
 
   - stage: 'kpi'
     displayName: 'Build KPIs'
