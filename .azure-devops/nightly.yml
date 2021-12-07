@@ -129,7 +129,7 @@ stages:
       displayName: 'Run all tests against Windows MSI install on python ${{python_version}}'
       pool:
         vmImage: 'windows-2019'
-      dependsOn: test_min
+      dependsOn: test_min_${{python_version}}
       jobs:
       - template: templates/trigger-tests.yml
         parameters:
