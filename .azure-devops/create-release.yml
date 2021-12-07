@@ -159,7 +159,7 @@ stages:
 
   - stage: 'kpi'
     displayName: 'Build KPIs'
-    dependsOn: [build, test]
+    dependsOn: [build, test_python_version_3_6_x, test_python_version_3_8_x, test_python_version_3_9_x, test_python_version_3_10_x]
     jobs:
     - job: 'calculateCodeCoverage'
       displayName: 'Calculate distributed code coverage'
@@ -171,7 +171,7 @@ stages:
 
   - stage: 'release'
     displayName: 'Stage GitHub release'
-    dependsOn: [build, test]
+    dependsOn: [build, test_python_version_3_6_x, test_python_version_3_8_x, test_python_version_3_9_x, test_python_version_3_10_x]
     condition: and(succeeded(), eq(variables.OfficialBuild, 'true'))
     jobs:
     - deployment: 'StageGitHub'
