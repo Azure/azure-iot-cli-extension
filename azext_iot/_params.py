@@ -39,7 +39,23 @@ from azext_iot.assets.user_messages import info_param_properties_device
 from azure.cli.core.local_context import LocalContextAttribute, LocalContextAction
 
 
-auth_type_dataplane_param_type = CLIArgumentType(
+dps_auth_type_dataplane_param_type = CLIArgumentType(
+    options_list=["--auth-type"],
+    arg_type=get_enum_type(
+        AuthenticationTypeDataplane, AuthenticationTypeDataplane.key.value
+    ),
+    arg_group="Access Control",
+    help="Indicates whether the operation should auto-derive a policy key or use the current Azure AD session. "
+    "You can configure the default using `az configure --defaults iotdps-data-auth-type=<auth-type-value>`",
+    configured_default="iotdps-data-auth-type",
+    local_context_attribute=LocalContextAttribute(
+        name="iotdps-data-auth-type",
+        actions=[LocalContextAction.SET, LocalContextAction.GET],
+        scopes=["iot"],
+    ),
+)
+
+hub_auth_type_dataplane_param_type = CLIArgumentType(
     options_list=["--auth-type"],
     arg_type=get_enum_type(
         AuthenticationTypeDataplane, AuthenticationTypeDataplane.key.value
@@ -294,7 +310,7 @@ def load_arguments(self, _):
         context.argument(
             "auth_type_dataplane",
             options_list=["--auth-type"],
-            arg_type=auth_type_dataplane_param_type,
+            arg_type=hub_auth_type_dataplane_param_type,
         )
 
     with self.argument_context("iot hub connection-string") as context:
@@ -559,7 +575,7 @@ def load_arguments(self, _):
         context.argument(
             "auth_type_dataplane",
             options_list=["--auth-type"],
-            arg_type=auth_type_dataplane_param_type,
+            arg_type=hub_auth_type_dataplane_param_type,
         )
         context.argument("data", options_list=["--data", "--da"], help="Message body.")
         context.argument(
@@ -812,7 +828,7 @@ def load_arguments(self, _):
         context.argument(
             "auth_type_dataplane",
             options_list=["--auth-type"],
-            arg_type=auth_type_dataplane_param_type,
+            arg_type=hub_auth_type_dataplane_param_type,
         )
 
     with self.argument_context("iot dps") as context:
@@ -914,6 +930,11 @@ def load_arguments(self, _):
             help="The API version of the provisioning service types sent in the custom allocation"
             " request. Minimum supported version: 2018-09-01-preview.",
             arg_group="Allocation Policy"
+        )
+        context.argument(
+            "auth_type_dataplane",
+            options_list=["--auth-type"],
+            arg_type=dps_auth_type_dataplane_param_type,
         )
 
     with self.argument_context("iot dps compute-device-key") as context:

@@ -6,6 +6,7 @@
 
 import pytest
 import os
+from time import sleep
 
 from azext_iot.tests.settings import (
     DynamoSettings,
@@ -20,7 +21,7 @@ from azext_iot.common.shared import AuthenticationTypeDataplane
 
 DATAPLANE_AUTH_TYPES = [
     AuthenticationTypeDataplane.key.value,
-    # AuthenticationTypeDataplane.login.value,
+    AuthenticationTypeDataplane.login.value,
     "cstring",
 ]
 
@@ -33,6 +34,7 @@ PREFIX_DEVICE = "test-device-"
 PREFIX_EDGE_DEVICE = "test-edge-device-"
 PREFIX_INDIVIDUAL_ENROLLMENT = "test-enrollment-"
 PREFIX_GROUP_ENROLLMENT = "test-groupenroll-"
+USER_ROLE = "Device Provisioning Service Data Contributor"
 
 # Test Environment Variables
 settings = DynamoSettings(
@@ -107,6 +109,33 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     self.entity_dps_name, self.entity_rg
                 )
             )
+
+        new_dps = self.cmd(
+            "iot dps show --name {} --resource-group {} ".format(
+                self.entity_dps_name, self.entity_rg
+            )
+        ).get_output_in_json()
+
+        account = self.cmd("account show").get_output_in_json()
+        user = account["user"]
+        print(new_dps["id"])
+        print(user)
+
+        if user["name"] is None:
+            raise Exception("User not found")
+
+        while True:
+            role_assignments = self.get_role_assignments(new_dps["id"], USER_ROLE)
+            role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
+            if user["name"] in role_assignment_principal_names:
+                break
+            # else assign DPS Data Contributor role to current user and check again
+            self.cmd(
+                '''role assignment create --assignee "{}" --role "{}" --scope "{}"'''.format(
+                    user["name"], USER_ROLE, new_dps["id"]
+                )
+            )
+            sleep(10)
 
     def create_hub(self):
         """Create an IoT hub for DPS testing purposes."""
@@ -226,9 +255,17 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
         if auth_type == "cstring":
             return f"{command} --login {self.dps_cstring}"
 
-        return command
-        # Future iterations would support multiple auth-types
-        # return f"{command} --auth-type {auth_type}"
+        return f"{command} --auth-type {auth_type}"
+
+    def get_role_assignments(self, scope, role):
+
+        role_assignments = self.cmd(
+            'role assignment list --scope "{}" --role "{}"'.format(
+                scope, role
+            )
+        ).get_output_in_json()
+
+        return role_assignments
 
     @pytest.fixture(scope='class', autouse=True)
     def tearDownSuite(self):

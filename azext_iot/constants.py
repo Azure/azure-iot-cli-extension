@@ -37,6 +37,7 @@ TRACING_ALLOWED_FOR_LOCATION = ("northeurope", "westus2", "southeastasia")
 TRACING_ALLOWED_FOR_SKU = "standard"
 USER_AGENT = "IoTPlatformCliExtension/{}".format(VERSION)
 IOTHUB_RESOURCE_ID = "https://iothubs.azure.net"
+IOTDPS_RESOURCE_ID = "https://azure-devices-provisioning.net"
 DIGITALTWINS_RESOURCE_ID = "https://digitaltwins.azure.net"
 DEVICETWIN_POLLING_INTERVAL_SEC = 10
 DEVICETWIN_MONITOR_TIME_SEC = 15
