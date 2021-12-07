@@ -958,6 +958,11 @@ def load_arguments(self, _):
             help="The secondary symmetric shared access key stored in base64 format. ",
             arg_group="Authentication"
         )
+        context.argument(
+            "device_information",
+            options_list=["--device-information", "--info"],
+            help="Optional device information.",
+        )
 
     with self.argument_context("iot dps enrollment create") as context:
         context.argument(

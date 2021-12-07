@@ -117,6 +117,7 @@ def iot_dps_device_enrollment_create(
     iot_hubs=None,
     edge_enabled=False,
     webhook_url=None,
+    device_information=None,
     api_version=None,
     login=None,
 ):
@@ -171,6 +172,7 @@ def iot_dps_device_enrollment_create(
             allocation_policy=allocation_policy,
             iot_hubs=iot_hub_list,
             custom_allocation_definition=custom_allocation_definition,
+            optional_device_information=_get_twin_collection(device_information)
         )
         return sdk.individual_enrollment.create_or_update(enrollment_id, enrollment)
     except ProvisioningServiceErrorDetailsException as e:
@@ -200,6 +202,7 @@ def iot_dps_device_enrollment_update(
     iot_hubs=None,
     edge_enabled=None,
     webhook_url=None,
+    device_information=None,
     api_version=None,
     login=None,
 ):
@@ -274,6 +277,8 @@ def iot_dps_device_enrollment_update(
                 )
         if edge_enabled is not None:
             enrollment_record.capabilities = DeviceCapabilities(iot_edge=edge_enabled)
+        if device_information:
+            enrollment_record.optional_device_information = _get_twin_collection(device_information)
 
         return sdk.individual_enrollment.create_or_update(
             enrollment_id, enrollment_record, if_match=(etag if etag else "*")
@@ -741,25 +746,24 @@ def iot_dps_registration_delete(
         raise CLIError(e)
 
 
-def _get_initial_twin(initial_twin_tags=None, initial_twin_properties=None):
+def _get_twin_collection(properties):
+    """Convert a json into TwinCollection for use with the API."""
     from azext_iot.common.utility import dict_clean
 
-    if initial_twin_tags == "":
-        initial_twin_tags = None
-    elif initial_twin_tags:
-        initial_twin_tags = dict_clean(shell_safe_json_parse(str(initial_twin_tags)))
+    if properties == "":
+        properties = None
+    elif properties:
+        properties = dict_clean(shell_safe_json_parse(str(properties)))
 
-    if initial_twin_properties == "":
-        initial_twin_properties = None
-    elif initial_twin_properties:
-        initial_twin_properties = dict_clean(
-            shell_safe_json_parse(str(initial_twin_properties))
-        )
+    return TwinCollection(additional_properties=properties)
 
+
+def _get_initial_twin(initial_twin_tags=None, initial_twin_properties=None):
+    """Build up Inital Twin using given tags and properties."""
     return InitialTwin(
-        tags=TwinCollection(additional_properties=initial_twin_tags),
+        tags=_get_twin_collection(initial_twin_tags),
         properties=InitialTwinProperties(
-            desired=TwinCollection(additional_properties=initial_twin_properties)
+            desired=_get_twin_collection(initial_twin_properties)
         ),
     )
 

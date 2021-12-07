@@ -1122,14 +1122,14 @@ helps[
     - name: Create an enrollment '{enrollment_id}' with attestation type 'x509' in the Azure
             IoT Device Provisioning Service '{dps_name}' in the resource group
             '{resource_group_name}' with provisioning status 'disabled',
-            device id '{device_id}', initial twin properties '{"location":{"region":"US"}}'
-            and initial twin tags '{"version":"1"}'.
+            device id '{device_id}', initial twin properties '{"location":{"region":"US"}}',
+            initial twin tags '{"version":"1"}', and device information '{"color":"red"}'.
       text: >
         az iot dps enrollment create -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --attestation-type x509
         --certificate-path /certificates/Certificate.pem --provisioning-status disabled
         --initial-twin-properties "{'location':{'region':'US'}}"
-        --initial-twin-tags "{'version':'1'}" --device-id {device_id}
+        --initial-twin-tags "{'version':'1'}" --device-info "{'color':'red'}" --device-id {device_id}
     - name: Create an enrollment 'MyEnrollment' with attestation type 'tpm' in the Azure IoT
             Device Provisioning Service '{dps_name}' in the resource group '{resource_group_name}'.
       text: >
@@ -1205,11 +1205,12 @@ helps[
         --etag AAAAAAAAAAA= --iot-hubs "{iot_hub_host_name1} {iot_hub_host_name2} {iot_hub_host_name3}"
     - name: Update enrollment '{enrollment_id}' in the Azure IoT Device Provisioning Service '{dps_name}'
             in the resource group '{resource_group_name}' with
-            initial twin properties '{"location":{"region":"USA"}}' and initial twin tags '{"version":"2"}'.
+            initial twin properties '{"location":{"region":"USA"}}', initial twin tags '{"version":"2"}',
+            and device information '{"color":"red"}'.
       text: >
         az iot dps enrollment update -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --initial-twin-properties "{'location':{'region':'USA'}}"
-        --initial-twin-tags "{'version1':'2'}"
+        --initial-twin-tags "{'version1':'2'}" --device-info "{'color':'red'}"
 """
 
 helps[
