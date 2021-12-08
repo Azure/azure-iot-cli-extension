@@ -13,8 +13,8 @@ schedules:
     - dev
 
 variables:
-  - name: 'Semmle.SkipAnalysis'
-    value: 'true'
+  LGTM.UploadSnapshot: true
+  Semmle.SkipAnalysis: true
 
 stages:
   - stage: 'staticAnalysis'
