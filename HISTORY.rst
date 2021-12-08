@@ -20,7 +20,26 @@ Release History
 
 **IoT DPS updates**
 
-* Added RBAC support with --auth-type login.
+* Added RBAC support for dataplane commands, similar to the RBAC support for IoT Hub.
+  The type of auth used to execute commands can be controlled with the "--auth-type" parameter
+  which accepts the values "key" or "login". The value of "key" is set by default.
+
+  * When "--auth-type" has the value of "key", like before the CLI will auto-discover
+    a suitable policy when interacting with iothub.
+  * When "--auth-type" has the value "login", an access token from the Azure CLI logged in principal
+    will be used for the operation.
+
+  * The following commands currently support `--auth-type`:
+
+    * az iot dps enrollment
+    * az iot dps enrollment-group
+    * az iot dps registration
+
+* Update DPS dataplane SDK to use the newer 2021-10-01 API version. Most command
+  functionality has not changed. Updated commands include:
+
+  - `az iot dps enrollment create` and `az iot dps enrollment update` support
+    optional device information via `--device-info`
 
 * Added `az iot dps connection-string show` to show the DPS connection string with
   similar support as the IoT Hub connection string show.
