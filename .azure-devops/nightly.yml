@@ -129,26 +129,10 @@ stages:
           testCentral: ${{ parameters.testCentral }}
           testDPS: ${{ parameters.testDPS }}
           testHub: ${{ parameters.testHub }}
-
-  - ${{ each python_version in parameters.msiPythonVersions }}:
-    - stage: 'test_msi_${{python_version}}'
-      displayName: 'Run all tests against Windows MSI install on python ${{python_version}}'
-      pool:
-        vmImage: 'windows-2019'
-      dependsOn: test_min_${{python_version}}
-      jobs:
-      - template: templates/trigger-tests.yml
-        parameters:
-          azureCLIVersion: msi
-          pythonVersion: ${{replace(python_version, '_', '.')}}
-          testADT: ${{ parameters.testADT }}
-          testCentral: ${{ parameters.testCentral }}
-          testDPS: ${{ parameters.testDPS }}
-          testHub: ${{ parameters.testHub }}
           
   - stage: 'kpi'
     displayName: 'Build KPIs'
-    dependsOn: [build, test_min_3_6_x, test_min_3_8_x, test_min_3_9_x, test_min_3_10_x, test_msi_3_6_x, test_min_3_8_x, test_min_3_9_x, test_min_3_10_x]
+    dependsOn: [build, test_msi, test_min_3_6_x, test_min_3_8_x, test_min_3_9_x, test_min_3_10_x]
     jobs:
     - job: 'calculateCodeCoverage'
       displayName: 'Calculate distributed code coverage'
