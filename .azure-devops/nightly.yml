@@ -35,14 +35,6 @@ parameters:
   - '3_8_x'
   - '3_9_x'
   - '3_10_x'
-- name: msiPythonVersions
-  displayName: 'Python versions for msi CLI tests'
-  type: object
-  default:
-  - '3_6_x'
-  - '3_8_x'
-  - '3_9_x'
-  - '3_10_x'
 - name: architecture
   type: string
   default: 'x64'
@@ -107,13 +99,27 @@ stages:
           architecture: ${{ parameters.architecture }}
 
       - template: templates/install-and-record-version.yml
+  
+  - stage: 'test_msi'
+    displayName: 'Run all tests against Windows MSI install'
+    pool:
+      vmImage: 'windows-2019'
+    dependsOn: build
+    jobs:
+    - template: templates/trigger-tests.yml
+      parameters:
+        azureCLIVersion: msi
+        testADT: ${{ parameters.testADT }}
+        testCentral: ${{ parameters.testCentral }}
+        testDPS: ${{ parameters.testDPS }}
+        testHub: ${{ parameters.testHub }}
 
   - ${{ each python_version in parameters.minCLIPythonVersions }}:
     - stage: 'test_min_${{python_version}}'
       displayName: 'Run all tests with min CLI on python ${{python_version}}'
       pool:
         vmImage: ${{ parameters.vmImage }}
-      dependsOn: build
+      dependsOn: test_msi
       jobs:
       - template: templates/trigger-tests.yml
         parameters:
