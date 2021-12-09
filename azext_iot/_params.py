@@ -36,7 +36,6 @@ from azext_iot.common.shared import (
 )
 from azext_iot._validators import mode2_iot_login_handler
 from azext_iot.assets.user_messages import info_param_properties_device
-from azure.cli.core.local_context import LocalContextAttribute, LocalContextAction
 
 
 dps_auth_type_dataplane_param_type = CLIArgumentType(
@@ -48,11 +47,6 @@ dps_auth_type_dataplane_param_type = CLIArgumentType(
     help="Indicates whether the operation should auto-derive a policy key or use the current Azure AD session. "
     "You can configure the default using `az configure --defaults iotdps-data-auth-type=<auth-type-value>`",
     configured_default="iotdps-data-auth-type",
-    local_context_attribute=LocalContextAttribute(
-        name="iotdps-data-auth-type",
-        actions=[LocalContextAction.SET, LocalContextAction.GET],
-        scopes=["iot"],
-    ),
 )
 
 hub_auth_type_dataplane_param_type = CLIArgumentType(
@@ -64,11 +58,6 @@ hub_auth_type_dataplane_param_type = CLIArgumentType(
     help="Indicates whether the operation should auto-derive a policy key or use the current Azure AD session. "
     "You can configure the default using `az configure --defaults iothub-data-auth-type=<auth-type-value>`",
     configured_default="iothub-data-auth-type",
-    local_context_attribute=LocalContextAttribute(
-        name="iothub-data-auth-type",
-        actions=[LocalContextAction.SET, LocalContextAction.GET],
-        scopes=["iot"],
-    ),
 )
 
 hub_name_type = CLIArgumentType(
