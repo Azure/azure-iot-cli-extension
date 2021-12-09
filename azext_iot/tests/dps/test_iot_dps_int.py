@@ -295,7 +295,7 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                     self.check("provisioningStatus", EntityStatusType.enabled.value),
                     self.check("deviceId", device_id),
                     self.check("allocationPolicy", AllocationType.geolatency.value),
-                    # self.check("iotHubs", self.hub_host_name.split()),
+                    self.check("iotHubs", self.hub_host_name.split()),
                     self.check("initialTwin.tags", self.kwargs["generic_dict"]),
                     self.check("optionalDeviceInformation", self.kwargs["generic_dict"]),
                     self.check(
@@ -353,7 +353,7 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                     self.check("allocationPolicy", "custom"),
                     self.check("customAllocationDefinition.webhookUrl", WEBHOOK_URL),
                     self.check("customAllocationDefinition.apiVersion", API_VERSION),
-                    # self.check("iotHubs", self.hub_host_name.split()),
+                    self.check("iotHubs", None),
                     self.exists("initialTwin.tags"),
                     self.exists("initialTwin.properties.desired"),
                     self.check("attestation.symmetricKey.primaryKey", primary_key),
@@ -598,7 +598,7 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                     self.check("enrollmentGroupId", enrollment_id),
                     self.check("provisioningStatus", EntityStatusType.enabled.value),
                     self.check("allocationPolicy", AllocationType.geolatency.value),
-                    # self.check("iotHubs", self.hub_host_name.split()),
+                    self.check("iotHubs", self.hub_host_name.split()),
                     self.check("initialTwin.tags", self.kwargs["generic_dict"]),
                     self.check(
                         "initialTwin.properties.desired", self.kwargs["generic_dict"]
@@ -653,7 +653,7 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                     self.check("allocationPolicy", "custom"),
                     self.check("customAllocationDefinition.webhookUrl", WEBHOOK_URL),
                     self.check("customAllocationDefinition.apiVersion", API_VERSION),
-                    # self.check("iotHubs", self.hub_host_name.split()),
+                    self.check("iotHubs", None),
                     self.exists("initialTwin.tags"),
                     self.exists("initialTwin.properties.desired"),
                     self.check("attestation.symmetricKey.primaryKey", primary_key),

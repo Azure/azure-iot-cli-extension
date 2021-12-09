@@ -20,12 +20,12 @@ Release History
 
 **IoT DPS updates**
 
-* Added RBAC support for dataplane commands, similar to the RBAC support for IoT Hub.
+* Added RBAC support for DPS dataplane commands, similar to the RBAC support for IoT Hub.
   The type of auth used to execute commands can be controlled with the "--auth-type" parameter
   which accepts the values "key" or "login". The value of "key" is set by default.
 
   * When "--auth-type" has the value of "key", like before the CLI will auto-discover
-    a suitable policy when interacting with iothub.
+    a suitable policy when interacting with DPS.
   * When "--auth-type" has the value "login", an access token from the Azure CLI logged in principal
     will be used for the operation.
 

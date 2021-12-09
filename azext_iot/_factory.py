@@ -10,8 +10,7 @@ Factory functions for IoT Hub and Device Provisioning Service.
 
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.utility import ensure_iotdps_sdk_min_version
-from azext_iot.iothub.providers.aad_oauth import IoTHubOAuth
-from azext_iot.dps.providers.aad_oauth import IoTDPSOAuth
+from azext_iot.common.auth import IoTOAuth
 from azext_iot.common.shared import SdkType, AuthenticationTypeDataplane
 from azext_iot.constants import (
     IOTDPS_TRACK_2_SDK_MIN_VERSION,
@@ -114,7 +113,7 @@ class SdkResolver(object):
         if self.auth_override:
             credentials = self.auth_override
         elif self.target["policy"] == AuthenticationTypeDataplane.login.value:
-            credentials = IoTHubOAuth(
+            credentials = IoTOAuth(
                 cmd=self.target["cmd"],
                 resource_id=IOTHUB_RESOURCE_ID
             )
@@ -135,7 +134,7 @@ class SdkResolver(object):
         if self.auth_override:
             credentials = self.auth_override
         elif self.target["policy"] == AuthenticationTypeDataplane.login.value:
-            credentials = IoTDPSOAuth(
+            credentials = IoTOAuth(
                 cmd=self.target["cmd"],
                 resource_id=IOTDPS_RESOURCE_ID
             )

@@ -39,12 +39,12 @@ USER_ROLE = "IoT Hub Data Contributor"
 DEFAULT_CONTAINER = "devices"
 
 settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED, opt_env_set=ENV_SET_TEST_IOTHUB_OPTIONAL)
-
 ENTITY_RG = settings.env.azext_iot_testrg
 ENTITY_NAME = settings.env.azext_iot_testhub if settings.env.azext_iot_testhub else "test-hub-" + generate_generic_id()
 STORAGE_CONTAINER = (
     settings.env.azext_iot_teststoragecontainer if settings.env.azext_iot_teststoragecontainer else DEFAULT_CONTAINER
 )
+MAX_RBAC_ASSIGNMENT_TRIES = settings.env.azext_iot_rbac_max_tries if settings.env.azext_iot_rbac_max_tries else 10
 ROLE_ASSIGNMENT_REFRESH_TIME = 120
 
 
@@ -99,7 +99,8 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 if user["name"] is None:
                     raise Exception("User not found")
 
-                while True:
+                tries = 0
+                while tries < MAX_RBAC_ASSIGNMENT_TRIES:
                     role_assignments = self.get_role_assignments(new_hub["id"], USER_ROLE)
                     role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
                     if user["name"] in role_assignment_principal_names:
@@ -111,6 +112,12 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                         )
                     )
                     sleep(10)
+
+                if tries == MAX_RBAC_ASSIGNMENT_TRIES:
+                    raise Exception(
+                        "Reached max ({}) number of tries to assign RBAC role. Please re-run the test later "
+                        "or with more max number of tries.".format(MAX_RBAC_ASSIGNMENT_TRIES)
+                    )
 
         self.region = self.get_region()
         self.connection_string = self.get_hub_cstring()
