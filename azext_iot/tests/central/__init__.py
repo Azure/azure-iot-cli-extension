@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import json
 import os
 import time
 from typing import Tuple
@@ -381,6 +382,60 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 self.check("result", "success"),
             ],
         )
+
+    def _create_destination(self, api_version, dest_id):
+        self.kwargs["authorization"] = json.dumps(
+            {
+                "type": "connectionString",
+                "connectionString": STORAGE_CSTRING,
+                "containerName": STORAGE_CONTAINER,
+            }
+        )
+        command = "iot central export destination create --app-id {} \
+            --dest-id {} --type {} --name '{}' --authorization '{}'".format(
+            APP_ID,
+            dest_id,
+            "blobstorage@v1",
+            "Blob Storage",
+            "{authorization}",
+        )
+        return self.cmd(
+            command, api_version=api_version, checks=[self.check("id", dest_id)]
+        ).get_output_in_json()
+
+    def _delete_destination(self, api_version, dest_id):
+        command = (
+            "iot central export destination delete --app-id {} --dest-id {}".format(
+                APP_ID, dest_id
+            )
+        )
+        self.cmd(command, api_version=api_version)
+
+    def _create_export(self, api_version, export_id, dest_id):
+
+        self.kwargs["enrichments"] = json.dumps({"Simulated": {"path": "$simulated"}})
+        self.kwargs["destinations"] = json.dumps([{"id": dest_id}])
+
+        command = "iot central export create --app-id {} --export-id {} --name {} \
+            --filter {} --source {} --enabled {} --enrichments '{}' --destinations '{}'".format(
+            APP_ID,
+            export_id,
+            '"Test Export"',
+            '"SELECT * FROM devices WHERE $simulated = true"',
+            "Telemetry",
+            "True",
+            "{enrichments}",
+            "{destinations}",
+        )
+        return self.cmd(
+            command, api_version=api_version, checks=[self.check("id", export_id)]
+        ).get_output_in_json()
+
+    def _delete_export(self, api_version, export_id):
+        command = "iot central export delete --app-id {} --export-id {}".format(
+            APP_ID, export_id
+        )
+        self.cmd(command, api_version=api_version)
 
     def _wait_for_storage_configured(self, api_version):
         command = "iot central file-upload-config show --app-id {}".format(APP_ID)

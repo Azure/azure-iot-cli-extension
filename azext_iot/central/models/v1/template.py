@@ -23,8 +23,8 @@ class Template(BaseTemplate):
                     self.components
                 )
 
-        except Exception as ex:
-            raise CLIError("Could not parse iot central device template." + ex)
+        except Exception:
+            raise CLIError("Could not parse iot central device template.")
 
     def get_schema(self, name, is_component=False, identifier="") -> dict:
         entities = self.components if is_component else self.interfaces

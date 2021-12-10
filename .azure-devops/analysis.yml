@@ -1,0 +1,37 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+
+# Required for schedule only trigger
+trigger: none
+pr: none
+
+# Run weekly at midnight (Pacific).
+schedules:
+- cron: "0 8 * * 1"
+  displayName: 'Weekly Static Analysis'
+  branches:
+    include:
+    - dev
+
+variables:
+  LGTM.UploadSnapshot: true
+  Semmle.SkipAnalysis: true
+
+stages:
+  - stage: 'staticAnalysis'
+    displayName: 'Static Analysis'
+    jobs:
+      - job: 'codeQL'
+        displayName: 'Execute CodeQL Analysis'
+        pool:
+          vmImage: 'windows-2019'
+        steps:
+          - task: Semmle@1
+            inputs:
+              sourceCodeDirectory: '$(Build.SourcesDirectory)'
+              language: 'python'
+              querySuite: 'Recommended'
+              timeout: '1800'
+              ram: '16384'
+              addProjectDirToScanningExclusionList: true
+            env:
+              System_AccessToken: $(System.AccessToken)

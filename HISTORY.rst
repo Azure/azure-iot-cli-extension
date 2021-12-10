@@ -3,10 +3,23 @@
 Release History
 ===============
 
-0.11.1
+0.12.0
 +++++++++++++++
 
+**IoT Central updates**
+
+* Adds new preview commands (v1.1-preview)
+
+  - Query (az iot central query)
+  - Destination (az iot central export destination)
+  - Export (az iot central export)
+
+** General Updates **
+
+* The IoT extension officially supports Python 3.10.
+
 **IoT DPS updates**
+
 * Added `az iot dps connection-string show` to show the DPS connection string with
   similar support as the IoT Hub connection string show.
 
@@ -21,6 +34,8 @@ Release History
 * `az iot dps compute-device-key` now supports enrollment group identifiers in addition to
   enrollment group symmetric key. Please take a look at the `--help` docs for functionality
   and usage highlights.
+
+* Improvement to help documentation for DPS functions.
 
 **IoT Hub updates**
 
