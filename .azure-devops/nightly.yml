@@ -13,6 +13,9 @@ schedules:
     - dev
 
 parameters:
+- name: variableGroup
+  type: string
+  default: 'aziotcli_test_nightly'
 - name: vmImage
   type: string
   default: 'ubuntu-18.04'
@@ -52,7 +55,7 @@ parameters:
   default: true
 
 variables:
-  - group: aziotcli_test_nightly
+  - group: ${{ parameters.variableGroup }}
   - name: pythonVersion
     value: ${{ parameters.pythonVersion }}
   - name: architecture
@@ -119,7 +122,7 @@ stages:
       displayName: 'Run all tests with min CLI on python ${{python_version}}'
       pool:
         vmImage: ${{ parameters.vmImage }}
-      dependsOn: test_msi
+      dependsOn: build
       jobs:
       - template: templates/trigger-tests.yml
         parameters:
