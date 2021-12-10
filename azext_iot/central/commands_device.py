@@ -177,6 +177,21 @@ def run_manual_failback(
         device_id=device_id, central_dns_suffix=central_dns_suffix
     )
 
+def purge_c2d_messages(
+    cmd,
+    app_id: str,
+    device_id: str,
+    token=None,
+    api_version=ApiVersion.v1.value,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+) -> dict:
+    provider = CentralDeviceProvider(
+        cmd=cmd, app_id=app_id, token=token, api_version=api_version
+    )
+    return provider.purge_c2d_messages(
+        device_id=device_id, central_dns_suffix=central_dns_suffix
+    )
+
 
 def get_command_history(
     cmd,

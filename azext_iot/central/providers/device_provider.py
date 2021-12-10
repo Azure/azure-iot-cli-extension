@@ -312,6 +312,19 @@ class CentralDeviceProvider:
             token=self._token,
             central_dns_suffix=central_dns_suffix,
         )
+    def purge_c2d_messages(
+        self,
+        device_id: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.purge_c2d_messages(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix
+        )
 
     def _dps_populate_essential_info(self, dps_info, device_status: DeviceStatus):
         error = {

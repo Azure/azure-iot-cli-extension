@@ -134,6 +134,21 @@ def _load_central_devices_help():
     """
 
     helps[
+        "iot central device purge-messages"
+    ] = """
+        type: command
+        short-summary: Purges the cloud to device (C2D) message queue for the specified device. 
+        long-summary: Purges the cloud to device (C2D) message queue for the specified device. 
+
+        examples:
+        - name: Purges the cloud to device (C2D) message queue for the specified device.
+          text: >
+            az iot central device purge-messages
+            --app-id {appid}
+            --device-id {deviceid}
+    """
+
+    helps[
         "iot central device delete"
     ] = """
         type: command

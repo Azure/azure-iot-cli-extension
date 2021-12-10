@@ -573,3 +573,41 @@ def run_manual_failback(
     _utility.log_response_debug(response=response, logger=logger)
 
     return _utility.try_extract_result(response)
+
+def purge_c2d_messages(
+    cmd,
+    app_id: str,
+    device_id: str,
+    token: str,    
+    api_version: str,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+) :
+    """
+    Purges cloud to device (C2D) message queue for the specified device.
+
+    Args:
+        cmd: command passed into az
+        app_id: name of app (used for forming request URL)
+        device_id: unique case-sensitive device id,
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        {
+            "deviceId": "your-device-id",
+            "totalMessagesPurged": 1
+        } on success
+        Raises error on failure
+    """
+    url = "https://{}.{}/{}/{}/c2d".format(
+        app_id, central_dns_suffix, "system/iothub/devices", device_id
+    )
+    headers = _utility.get_headers(token, cmd)
+
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
+    response = requests.delete(url, headers=headers, params=query_parameters)
+    return _utility.try_extract_result(response)
