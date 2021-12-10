@@ -2,6 +2,13 @@ parameters:
 - name: pythonVersion
   type: string
   default: '3.8.x'
+- name: pythonVersionsForTesting
+  type: object
+  default:
+  - '3_6_x'
+  - '3_8_x'
+  - '3_9_x'
+  - '3_10_x'
 - name: architecture
   type: string
   default: 'x64'
@@ -33,13 +40,19 @@ jobs:
 - job: 'testCentral'
   displayName: 'Test IoT Central'
   condition: and(succeeded(), eq('${{ parameters.testCentral }}', true))
+  strategy:
+    matrix:
+      - ${{ each python_version in parameters.pythonVersionsForTesting }}:
+      Python_${{python_version}}:
+        python: '${{python_version}}'
+    maxParallel: 2
   steps:
   - template: run-tests-parallel.yml
     parameters:
       path: 'azext_iot/tests/central'
       name: 'iot-central'
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
-      pythonVersion: ${{ parameters.pythonVersion }}
+      pythonVersion: ${{replace(python, '_', '.')}}
 
 - job: 'testADT'
   displayName: 'Test Azure DigitalTwins'

@@ -91,24 +91,23 @@ stages:
 
       - template: templates/install-and-record-version.yml
 
-  - ${{ each python_version in parameters.pythonVersionsForTesting }}:
-    - stage: 'test_python_version_${{python_version}}'
-      displayName: 'Run tests on python ${{python_version}}'
-      pool:
-        vmImage: ${{ parameters.vmImage }}
-      dependsOn: build
-      jobs:
-      - template: templates/trigger-tests.yml
-        parameters:
-          pythonVersion: ${{replace(python_version, '_', '.')}}
-          testADT: ${{ parameters.testADT }}
-          testCentral: ${{ parameters.testCentral }}
-          testDPS: ${{ parameters.testDPS }}
-          testHub: ${{ parameters.testHub }}
+  - stage: 'test'
+    displayName: 'Run tests'
+    pool:
+      vmImage: ${{ parameters.vmImage }}
+    dependsOn: build
+    jobs:
+    - template: templates/trigger-tests.yml
+      parameters:
+        pythonVersionsForTesting: ${{ parameters.pythonVersionsForTesting }}
+        testADT: ${{ parameters.testADT }}
+        testCentral: ${{ parameters.testCentral }}
+        testDPS: ${{ parameters.testDPS }}
+        testHub: ${{ parameters.testHub }}
 
   - stage: 'kpi'
     displayName: 'Build KPIs'
-    dependsOn: [build, test_python_version_3_6_x, test_python_version_3_8_x, test_python_version_3_9_x, test_python_version_3_10_x]
+    dependsOn: [build, test]
     jobs:
     - job: 'calculateCodeCoverage'
       displayName: 'Calculate distributed code coverage'

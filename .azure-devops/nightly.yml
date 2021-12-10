@@ -36,8 +36,6 @@ parameters:
   default:
   - '3_6_x'
   - '3_8_x'
-  - '3_9_x'
-  - '3_10_x'
 - name: architecture
   type: string
   default: 'x64'
