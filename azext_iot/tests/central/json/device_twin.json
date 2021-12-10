@@ -72,5 +72,6 @@
     "x509Thumbprint": {
         "primaryThumbprint": null,
         "secondaryThumbprint": null
-    }
+    },
+    "_links": "next_page_link"
 }

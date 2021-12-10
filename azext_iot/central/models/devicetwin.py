@@ -13,8 +13,6 @@ class DeviceTwin:
         self.device_twin = device_twin
         if "_links" in device_twin:
             device_twin.pop("_links")
-        if "tags" in device_twin:
-            device_twin.pop("tags")
 
         self.device_id = device_twin.get("deviceId")
         self.desired_property = Property(
