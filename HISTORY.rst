@@ -3,15 +3,29 @@
 Release History
 ===============
 
-0.11.2
+
+0.12.1
 +++++++++++++++
 
 **IoT Central updates**
 
 * Added `az iot central device purge messages ` to purge cloud to device message queue
 
-0.11.1
+0.12.0
+
 +++++++++++++++
+
+**IoT Central updates**
+
+* Adds new preview commands (v1.1-preview)
+
+  - Query (az iot central query)
+  - Destination (az iot central export destination)
+  - Export (az iot central export)
+
+** General Updates **
+
+* The IoT extension officially supports Python 3.10.
 
 **IoT DPS updates**
 

@@ -12,9 +12,41 @@ from knack.log import logging
 from azext_iot import constants
 from azext_iot.common import auth
 
+import requests
 import uuid
 from importlib import import_module
 from azext_iot.central.models.enum import ApiVersion
+from azure.cli.core.util import should_disable_connection_verify
+
+
+def make_api_call(
+    cmd,
+    app_id: str,
+    method: str,
+    url: str,
+    payload,
+    token: str,
+    api_version: str,
+    central_dnx_suffix: str,
+) -> dict:
+
+    headers = get_headers(
+        token, cmd, has_json_payload=True if payload is not None else False
+    )
+
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
+    response = requests.request(
+        url=url,
+        method=method.upper(),
+        headers=headers,
+        params=query_parameters,
+        json=payload,
+        verify=not should_disable_connection_verify(),
+    )
+    return try_extract_result(response)
 
 
 def get_headers(token, cmd, has_json_payload=False):
@@ -41,7 +73,7 @@ def try_extract_result(response: Response):
 
     try:
         body = response.json()
-    except:
+    except Exception:
         raise CLIError("Error parsing response body")
 
     if "error" in body:
@@ -85,7 +117,7 @@ def get_object(data: dict, model: str, api_version) -> object:
                 model,
             )
             return module(data)
-    except:
+    except Exception:
         raise CLIError(
             "{} is not available for api version == {}".format(model, api_version)
         )

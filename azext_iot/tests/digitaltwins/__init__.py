@@ -158,5 +158,5 @@ class DTLiveScenarioTest(LiveScenarioTest):
                 self.embedded_cli.invoke(
                     "dt delete -n {} -g {} -y --no-wait".format(instance[0], instance[1])
                 )
-            except:
+            except Exception:
                 logger.info("The DT instance {} has already been deleted.".format(instance))

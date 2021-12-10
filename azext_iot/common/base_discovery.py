@@ -169,7 +169,7 @@ class BaseDiscovery(ABC):
                         resource_name=resource_name, resource_group_name=rg
                     )
                 )
-            except:  # pylint: disable=broad-except
+            except Exception:
                 raise CLIError(
                     "Unable to find {}: {} in resource group: {}".format(
                         self.resource_type, resource_name, rg

@@ -291,7 +291,7 @@ class TestVersionComparison(object):
     def test_ensure_iothub_sdk_min_version(self, mocker, current, minimum, expected):
         try:
             mocker.patch("azure.mgmt.iothub.__version__", current)
-        except:
+        except Exception:
             mocker.patch("azure.mgmt.iothub._version.VERSION", current)
 
         assert ensure_iothub_sdk_min_version(minimum) == expected
@@ -310,8 +310,10 @@ class TestVersionComparison(object):
     def test_ensure_iotdps_sdk_min_version(self, mocker, current, minimum, expected):
         try:
             mocker.patch("azure.mgmt.iothubprovisioningservices.__version__", current)
-        except:
-            mocker.patch("azure.mgmt.iothubprovisioningservices._version.VERSION", current)
+        except Exception:
+            mocker.patch(
+                "azure.mgmt.iothubprovisioningservices._version.VERSION", current
+            )
 
         assert ensure_iotdps_sdk_min_version(minimum) == expected
 
