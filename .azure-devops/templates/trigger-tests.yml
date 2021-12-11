@@ -43,7 +43,7 @@ jobs:
   strategy:
     matrix:
       - ${{ each python_version in parameters.pythonVersionsForTesting }}:
-      Python_${{python_version}}:
+      Python${{python_version}}:
         python: '${{python_version}}'
     maxParallel: 2
   steps:
