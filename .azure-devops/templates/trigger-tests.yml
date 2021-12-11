@@ -43,8 +43,8 @@ jobs:
   strategy:
     matrix:
       - ${{ each python_version in parameters.pythonVersionsForTesting }}:
-      Python${{python_version}}:
-        python: '${{python_version}}'
+        Python${{python_version}}:
+          python: '${{python_version}}'
     maxParallel: 2
   steps:
   - template: run-tests-parallel.yml
