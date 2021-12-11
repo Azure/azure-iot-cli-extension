@@ -72,6 +72,29 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         self.cmd(command, expect_failure=True)
         self._delete_device(device_id=device_id, api_version=self._api_version)
 
+    def test_central_device_c2d_purge_success(self):
+        (template_id, _) = self._create_device_template(api_version=self._api_version)
+        (device_id, _) = self._create_device(
+            template=template_id, api_version=self._api_version, simulated=True
+        )
+
+        # wait about a few seconds for simulator to kick in so that provisioning completes
+        time.sleep(60)
+
+        command = "iot central device purge-messages --app-id {} --device-id {}".format(
+            APP_ID, device_id
+        )
+
+        self.cmd(
+            command,
+            checks=[self.check("deviceId", device_id)],
+        )
+
+        self._delete_device(device_id=device_id, api_version=self._api_version)
+        self._delete_device_template(
+            template_id=template_id, api_version=self._api_version
+        )
+
     def test_central_device_twin_show_success(self):
         (template_id, _) = self._create_device_template(api_version=self._api_version)
         (device_id, _) = self._create_device(
