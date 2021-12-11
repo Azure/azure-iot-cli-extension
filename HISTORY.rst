@@ -17,6 +17,8 @@ Release History
 
 **IoT Central updates**
 
+* Fixed iot hub token leak for device twin show
+
 * Adds new preview commands (v1.1-preview)
 
   - Query (az iot central query)

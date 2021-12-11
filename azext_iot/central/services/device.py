@@ -7,12 +7,14 @@
 
 from typing import List, Union
 import requests
+from azext_iot.common.auth import get_aad_token
 
 from knack.util import CLIError
 from knack.log import get_logger
 
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
+from azext_iot.central.models.devicetwin import DeviceTwin
 from azext_iot.central.models.preview import DevicePreview
 from azext_iot.central.models.v1 import DeviceV1
 from azext_iot.central.models.v1_1_preview import DeviceV1_1_preview
@@ -495,6 +497,47 @@ def get_component_command_history(
 
     response = requests.get(url, headers=headers, params=query_parameters)
     return _utility.try_extract_result(response)
+
+
+def get_device_twin(
+    cmd,
+    app_id: str,
+    device_id: str,
+    token: str,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+) -> DeviceTwin:
+    """
+    Get device twin given a device id
+
+    Args:
+        cmd: command passed into az
+        device_id: unique case-sensitive device id,
+        app_id: name of app (used for forming request URL)
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        twin: dict
+    """
+
+    if not token:
+        aad_token = get_aad_token(cmd, resource="https://apps.azureiotcentral.com")[
+            "accessToken"
+        ]
+        token = "Bearer {}".format(aad_token)
+
+    url = f"https://{app_id}.{central_dns_suffix}/system/iothub/devices/{device_id}/get-twin?extendedInfo=true"
+    headers = _utility.get_headers(token, cmd)
+
+    # Construct parameters
+
+    response = requests.get(
+        url,
+        headers=headers,
+        verify=not should_disable_connection_verify(),
+    )
+    return DeviceTwin(_utility.try_extract_result(response))
 
 
 def run_manual_failover(

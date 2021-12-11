@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 # Dev note - think of this as a controller
 
+from azext_iot.central.models.devicetwin import DeviceTwin
 from azext_iot.central.providers import CentralDeviceProvider
 from knack.util import CLIError
 from typing import Union, List
@@ -44,6 +45,23 @@ def get_device(
     )
 
     return provider.get_device(device_id, central_dns_suffix=central_dns_suffix)
+
+
+def get_device_twin(
+    cmd,
+    app_id: str,
+    device_id: str,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+) -> DeviceTwin:
+
+    provider = CentralDeviceProvider(
+        cmd=cmd, app_id=app_id, token=token, api_version=ApiVersion.v1.value
+    )
+
+    return provider.get_device_twin(
+        device_id, central_dns_suffix=central_dns_suffix
+    ).device_twin
 
 
 def create_device(
@@ -247,7 +265,13 @@ def get_credentials(
     )
 
 
-def compute_device_key(cmd, primary_key, device_id):
+def compute_device_key(
+    cmd,
+    primary_key,
+    device_id,
+    api_version=ApiVersion.v1.value,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+):
     return utility.compute_device_key(
         primary_key=primary_key, registration_id=device_id
     )
