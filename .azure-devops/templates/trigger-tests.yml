@@ -36,7 +36,7 @@ parameters:
   default: true
 
 variables:
-  - pythonVersions: >
+  pythonVersions: >
     {
       Python36: 
       {
