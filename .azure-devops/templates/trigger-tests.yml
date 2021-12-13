@@ -35,8 +35,8 @@ parameters:
   type: boolean
   default: true
 
-variables: 
-  pythonVersions: >
+variables:
+  - pythonVersions: >
     {
       Python36: 
       {
