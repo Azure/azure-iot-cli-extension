@@ -38,16 +38,20 @@ parameters:
 variables:
   - pythonVersions: >
     {
-      Python36: {
+      Python36: 
+      {
         python: '3_6_x'
       },
-      Python38: {
+      Python38: 
+      {
         python: '3_8_x'
       },
-      Python39: {
+      Python39: 
+      {
         python: '3_9_x'
       },
-      Python310: {
+      Python310: 
+      {
         python: '3_10_x'
       }
     }
@@ -58,7 +62,7 @@ jobs:
   displayName: 'Test IoT Central'
   condition: and(succeeded(), eq('${{ parameters.testCentral }}', true))
   strategy:
-    matrix: $[ variables.pythonVersions ]
+    matrix: $[ variables['pythonVersions'] ]
     maxParallel: 2
   steps:
   - template: run-tests-parallel.yml
