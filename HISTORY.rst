@@ -3,6 +3,14 @@
 Release History
 ===============
 
+0.12.1
++++++++++++++++
+
+**IoT Central updates**
+
+* Added missing "update" sub-commands for all commands supporting it 
+  ("device", "device-template", "file-upload-config", "organization", "user")
+
 0.12.0
 +++++++++++++++
 
