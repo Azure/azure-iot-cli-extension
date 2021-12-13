@@ -56,20 +56,6 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
 
         self.cmd(command, expect_failure=True)
 
-        # Verify incorrect app-id throws error
-        command = (
-            "iot central device twin show --app-id incorrect-app --device-id {}".format(
-                device_id
-            )
-        )
-
-        self.cmd(command, expect_failure=True)
-        # Verify incorrect device-id throws error
-        command = "iot central device twin show --app-id {} --device-id incorrect-device".format(
-            APP_ID
-        )
-
-        self.cmd(command, expect_failure=True)
         self._delete_device(device_id=device_id, api_version=self._api_version)
 
     def test_central_device_twin_show_success(self):
@@ -87,17 +73,13 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
 
         self.cmd(
             command,
-            checks=[self.check("deviceId", device_id)],
+            checks=[
+                self.check("deviceId", device_id),
+                self.check("tags", {}),
+                self.check("_links", None),
+            ],
         )
 
-        command = "iot central device twin show --app-id {} --device-id {}".format(
-            APP_ID, device_id
-        )
-
-        self.cmd(
-            command,
-            checks=[self.check("deviceId", device_id)],
-        )
         self._delete_device(device_id=device_id, api_version=self._api_version)
         self._delete_device_template(
             template_id=template_id, api_version=self._api_version
@@ -317,7 +299,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
                     (
                         template
                         for template in deleted_device_template_list
-                        if template["id"] == template_id
+                        if self._get_template_id(template) == template_id
                     ),
                     None,
                 )
