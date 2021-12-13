@@ -362,12 +362,14 @@ class TestIotCentral(CentralLiveScenarioTest):
 
         # UPDATE
         command = (
-            "iot central file-upload-config update --app-id {} --sasTtl {}".format(
+            "iot central file-upload-config update --app-id {} --sas-ttl {}".format(
                 APP_ID, "PT4H"
             )
         )
-        checks = [self.check("sasTtl", "PT4H")]
-        self.cmd(command, api_version=self._api_version, checks=checks)
+        self.cmd(command, api_version=self._api_version)
+        result = self._wait_for_storage_configured(api_version=self._api_version)
+        assert result["state"] == "succeeded"
+        assert result["sasTtl"] == "PT4H"
 
         # DELETE
         self._delete_fileupload(api_version=self._api_version)
@@ -397,12 +399,14 @@ class TestIotCentral(CentralLiveScenarioTest):
 
         # UPDATE
         command = (
-            "iot central file-upload-config update --app-id {} --sasTtl {}".format(
+            "iot central file-upload-config update --app-id {} --sas-ttl {}".format(
                 APP_ID, "PT4H"
             )
         )
-        checks = [self.check("sasTtl", "PT4H")]
-        self.cmd(command, api_version=self._api_version, checks=checks)
+        self.cmd(command, api_version=self._api_version)
+        result = self._wait_for_storage_configured(api_version=self._api_version)
+        assert result["state"] == "succeeded"
+        assert result["sasTtl"] == "PT4H"
 
         self._delete_fileupload(api_version=self._api_version)
 

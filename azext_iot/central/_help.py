@@ -867,7 +867,7 @@ def _load_central_file_upload_configuration_help():
     examples:
       - name: Update file upload
         text: >
-          az iot central file-upload-config create
+          az iot central file-upload-config update
           --app-id {appid}
           --container {container}
     """

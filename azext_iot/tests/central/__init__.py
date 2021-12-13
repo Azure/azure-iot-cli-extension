@@ -331,7 +331,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         if account_name is not None:
             command += " --account {}".format(account_name)
         if sasttl is not None:
-            command += " --sasTtl {}".format(sasttl)
+            command += " --sas-ttl {}".format(sasttl)
 
         return self.cmd(
             command,

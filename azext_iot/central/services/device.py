@@ -23,6 +23,7 @@ from azext_iot.common.utility import dict_clean, parse_entity
 logger = get_logger(__name__)
 
 BASE_PATH = "api/devices"
+MODEL = "Device"
 
 
 def get_device(
@@ -63,7 +64,7 @@ def get_device(
     )
     result = _utility.try_extract_result(response)
 
-    return _utility.get_object(result, "Device", api_version)
+    return _utility.get_object(result, MODEL, api_version)
 
 
 def list_devices(
@@ -115,7 +116,7 @@ def list_devices(
 
         devices.extend(
             [
-                _utility.get_object(device, "Device", api_version)
+                _utility.get_object(device, MODEL, api_version)
                 for device in result["value"]
             ]
         )
@@ -169,7 +170,7 @@ def get_device_registration_summary(
 
         for device in result["value"]:
             registration_summary[
-                (_utility.get_object(device, "Device", api_version)).device_status.value
+                (_utility.get_object(device, MODEL, api_version))._device_status.value
             ] += 1
 
         print("Processed {} devices...".format(sum(registration_summary.values())))
@@ -227,12 +228,12 @@ def create_device(
     if organizations:
         payload["organizations"] = organizations.split(",")
 
-    data = _utility.get_object(payload, "Device", api_version)
+    data = _utility.get_object(payload, MODEL, api_version)
     json = _utility.to_camel_dict(dict_clean(parse_entity(data)))
     response = requests.put(url, headers=headers, json=json, params=query_parameters)
     result = _utility.try_extract_result(response)
 
-    return _utility.get_object(result, "Device", api_version)
+    return _utility.get_object(result, MODEL, api_version)
 
 
 def update_device(
@@ -303,7 +304,7 @@ def update_device(
 
     # sanitize device payload based on apiversion
 
-    data = _utility.get_object(payload, "Device", api_version)
+    data = _utility.get_object(payload, MODEL, api_version)
     json = _utility.to_camel_dict(dict_clean(parse_entity(data)))
 
     response = requests.patch(
@@ -314,7 +315,7 @@ def update_device(
     )
     result = _utility.try_extract_result(response)
 
-    return _utility.get_object(result, "Device", api_version)
+    return _utility.get_object(result, MODEL, api_version)
 
 
 def delete_device(

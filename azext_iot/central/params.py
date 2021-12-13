@@ -293,6 +293,29 @@ def load_central_arguments(self, _):
             " ISO 8601 duration standard. Default 1h.",
         )
 
+    with self.argument_context("iot central file-upload-config update") as context:
+        context.argument(
+            "connection_string",
+            options_list=["--connection-string", "-s"],
+            help="The connection string used to configure the storage account",
+        )
+        context.argument(
+            "container",
+            options_list=["--container", "-c"],
+            help="The name of the container inside the storage account",
+        )
+        context.argument(
+            "account",
+            options_list=["--account", "-a"],
+            help="The storage account name where to upload the file to",
+        )
+        context.argument(
+            "sasTtl",
+            options_list=["--sas-ttl"],
+            help="The amount of time the device’s request to upload a file is valid before it expires."
+            " ISO 8601 duration standard. Default 1h.",
+        )
+
     with self.argument_context("iot central organization") as context:
         context.argument(
             "org_id",

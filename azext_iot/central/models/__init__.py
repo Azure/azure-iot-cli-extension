@@ -20,8 +20,8 @@ class BaseTemplate:
                     self.components
                 )
 
-        except Exception as ex:
-            raise CLIError("Could not parse iot central device template." + ex)
+        except Exception:
+            raise CLIError("Could not parse iot central device template.")
 
     def _get_schema_name(self, schema) -> str:
         return "name" if "name" in schema else "@id"

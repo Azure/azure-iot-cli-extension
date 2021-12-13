@@ -261,8 +261,9 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
 
         # UPDATE
         new_template_name = f"{template_name}_new"
-        json_result["displayName"]
-        del json_result[self._get_template_id(json_result)]  # remove id
+        del json_result[self._get_template_id_key()]  # remove id
+        del json_result["@context"]
+        json_result["displayName"] = new_template_name
         command = (
             "iot central device-template update --app-id {} --dtid {} -c {}".format(
                 APP_ID, template_id, json_result
@@ -521,3 +522,8 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         if self._api_version == ApiVersion.preview.value:
             return template["id"]
         return template["@id"]
+
+    def _get_template_id_key(self):
+        if self._api_version == ApiVersion.preview.value:
+            return "id"
+        return "@id"

@@ -223,7 +223,7 @@ class CentralDeviceProvider:
             return info
 
         device = self.get_device(device_id, central_dns_suffix)
-        if device.device_status == DeviceStatus.provisioned:
+        if device._device_status == DeviceStatus.provisioned:
             credentials = self.get_device_credentials(
                 device_id=device_id,
                 central_dns_suffix=central_dns_suffix,
@@ -233,7 +233,7 @@ class CentralDeviceProvider:
             dps_state = dps_global_service.get_registration_state(
                 id_scope=id_scope, key=key, device_id=device_id
             )
-        dps_state = self._dps_populate_essential_info(dps_state, device.device_status)
+        dps_state = self._dps_populate_essential_info(dps_state, device._device_status)
 
         info = {
             "@device_id": device_id,
