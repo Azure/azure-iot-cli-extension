@@ -7,7 +7,7 @@
 
 import time
 import pytest
-
+import json
 from azext_iot.central.models.enum import DeviceStatus, ApiVersion
 from azext_iot.tests import helpers
 from azext_iot.tests.central import (
@@ -263,12 +263,21 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         new_template_name = f"{template_name}_new"
         del json_result[self._get_template_id_key()]  # remove id
         del json_result["@context"]
+        del json_result["etag"]
+
         json_result["displayName"] = new_template_name
         command = (
-            "iot central device-template update --app-id {} --dtid {} -c {}".format(
-                APP_ID, template_id, json_result
+            "iot central device-template update --app-id {} --dtid {} -k '{}'".format(
+                APP_ID,
+                template_id,
+                json.dumps(json_result)
+                .replace("{", "{{")
+                .replace(
+                    "}", "}}"
+                ),  # replace is mandatory here as processing involve string formatting
             )
         )
+
         checks = [self.check("displayName", new_template_name)]
         self.cmd(command, api_version=self._api_version, checks=checks)
 

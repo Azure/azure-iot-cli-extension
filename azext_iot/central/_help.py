@@ -747,14 +747,14 @@ def _load_central_device_templates_help():
         examples:
         - name: Update a device template with payload read from a file
           text: >
-            az iot central device-template create
+            az iot central device-template update
             --app-id {appid}
             --content {pathtofile}
             --device-template-id {devicetemplateid}
 
         - name: Update a device template with payload read from raw json
           text: >
-            az iot central device-template create
+            az iot central device-template update
             --app-id {appid}
             --content {json}
             --device-template-id {devicetemplateid}

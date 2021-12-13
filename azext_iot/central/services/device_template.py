@@ -16,7 +16,6 @@ from azext_iot.central.services import _utility
 from azext_iot.central.models.preview import TemplatePreview
 from azext_iot.central.models.v1 import TemplateV1
 from azext_iot.central.models.v1_1_preview import TemplateV1_1_preview
-from azext_iot.central.models.enum import ApiVersion
 
 logger = get_logger(__name__)
 
@@ -199,7 +198,6 @@ def update_device_template(
     query_parameters = {}
     query_parameters["api-version"] = api_version
 
-    print(payload)
     response = requests.patch(
         url, headers=headers, json=payload, params=query_parameters
     )
