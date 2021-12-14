@@ -50,8 +50,9 @@ jobs:
     inputs:
       scriptSource: 'inline'
       script: |
+        import json
         matrix = { 'Python3_6': { 'python': '3.6.x' } }
-        print("##vso[task.setvariable variable=pythonVersionsMatrix;isOutput=true]"+matrix)
+        print("##vso[task.setvariable variable=pythonVersionsMatrix;isOutput=true]"+json.dumps(matrix))
 
 - job: 'testCentral'
   displayName: 'Test IoT Central'
