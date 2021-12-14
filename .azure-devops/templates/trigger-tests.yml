@@ -49,7 +49,7 @@ jobs:
       path: 'azext_iot/tests/central'
       name: 'iot-central'
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
-      pythonVersion: $(python)
+      pythonVersion: replace($(python), '_', '.')
 
 - job: 'testADT'
   displayName: 'Test Azure DigitalTwins'

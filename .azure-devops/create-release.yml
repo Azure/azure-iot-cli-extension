@@ -101,19 +101,19 @@ stages:
         {
           Python36: 
           {
-            python: '3.6.x'
+            python: '3_6_x'
           },
           Python38: 
           {
-            python: '3.8.x'
+            python: '3_8_x'
           },
           Python39: 
           {
-            python: '3.9.x'
+            python: '3_9_x'
           },
           Python310: 
           {
-            python: '3.10.x'
+            python: '3_10_x'
           }
         }
     jobs:
