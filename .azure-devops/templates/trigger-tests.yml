@@ -1,4 +1,7 @@
 parameters:
+- name: pythonVersion
+  type: string
+  default: '3.8.x'
 - name: architecture
   type: string
   default: 'x64'
