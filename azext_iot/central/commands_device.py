@@ -177,6 +177,7 @@ def run_manual_failback(
         device_id=device_id, central_dns_suffix=central_dns_suffix
     )
 
+
 def purge_c2d_messages(
     cmd,
     app_id: str,

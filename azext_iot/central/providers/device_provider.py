@@ -312,6 +312,7 @@ class CentralDeviceProvider:
             token=self._token,
             central_dns_suffix=central_dns_suffix,
         )
+
     def purge_c2d_messages(
         self,
         device_id: str,

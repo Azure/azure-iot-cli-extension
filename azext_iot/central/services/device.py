@@ -574,11 +574,12 @@ def run_manual_failback(
 
     return _utility.try_extract_result(response)
 
+
 def purge_c2d_messages(
     cmd,
     app_id: str,
     device_id: str,
-    token: str,    
+    token: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) :

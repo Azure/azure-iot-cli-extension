@@ -401,8 +401,8 @@ def _load_central_devices_help():
         "iot central device purge-messages"
     ] = """
         type: command
-        short-summary: Purges the cloud to device (C2D) message queue for the specified device. 
-        long-summary: Purges the cloud to device (C2D) message queue for the specified device. 
+        short-summary: Purges the cloud to device (C2D) message queue for the specified device.
+        long-summary: Purges the cloud to device (C2D) message queue for the specified device.
 
         examples:
         - name: Purges the cloud to device (C2D) message queue for the specified device.

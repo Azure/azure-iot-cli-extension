@@ -39,7 +39,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             command, token=TOKEN, dns_suffix=DNS_SUFFIX, api_version=api_version
         )
         return super().cmd(command, checks=checks, expect_failure=expect_failure)
-    
+
     def cmd_withoutToken(self, command, api_version=None, checks=None, expect_failure=False):
         command = self._appendOptionalArgsToCommand(
             command, token=None, dns_suffix=None, api_version=api_version
