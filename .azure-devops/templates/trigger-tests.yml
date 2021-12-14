@@ -52,14 +52,21 @@ jobs:
       script: |
         import json
         matrix = { 'Python3_6': { 'python': '3.6.x' } }
-        print("##vso[task.setvariable variable=pythonVersionsMatrix;isOutput=true]"+json.dumps(matrix))
+        print("##vso[task.setvariable variable=pythonVersionsMatrix;isOutput=true]"+json.dumps(matrix))  
+  - task: PowerShell@2
+    displayName: 'Convert Versions Matrix to JSON'
+    inputs:
+      targetType: 'inline'
+      script: |
+        $pythonVersionsMatrixJson = $(pythonVersionsMatrix)| out-string | ConvertFrom-Json
+        Write-Output $pythonVersionsMatrixJson
 
 - job: 'testCentral'
   displayName: 'Test IoT Central'
   dependsOn: ['createTestStrategy']
   condition: and(succeeded(), eq('${{ parameters.testCentral }}', true))
   strategy:
-    matrix: $[ dependencies.createTestStrategy.outputs['pythonVersionsMatrix'] ]
+    matrix: $[ dependencies.createTestStrategy.outputs['pythonVersionsMatrixJson'] ]
     maxParallel: 2
   steps:
   - template: run-tests-parallel.yml
