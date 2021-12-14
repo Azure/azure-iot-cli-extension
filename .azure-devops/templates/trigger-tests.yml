@@ -46,7 +46,7 @@ jobs:
   displayName: 'Create Test Strategy'
   steps:
   - powershell: |
-      $pythonVersionsMatrixJson = '{ "test_vers": { "Python3_6": { "python": "3.6.x" } } }' | ConvertFrom-Json
+      $pythonVersionsMatrixJson = "{ 'test_vers': { 'Python3_6': { 'python': '3.6.x' } } }" | ConvertFrom-Json
       $pythonVersionsMatrixJson | Get-Member -MemberType NoteProperty | % { $o = $pythonVersionsMatrixJson.($_.Name); Write-Host "##vso[task.setvariable variable=$($_.Name);isOutput=true]$o" }
     displayName: 'Convert Versions Matrix to JSON'
     env: 
