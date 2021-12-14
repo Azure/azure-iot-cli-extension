@@ -179,6 +179,22 @@ def load_central_arguments(self, _):
             " Comma separated list of organization ids."
             " Minimum supported version: 1.1-preview.",
         )
+
+    with self.argument_context("iot central device update") as context:
+        context.argument(
+            "enabled",
+            options_list=["--enable"],
+            arg_type=get_three_state_flag(),
+            help="Add this flag if you would like IoT Central to enable or disable the device."
+        )
+        context.argument(
+            "organizations",
+            options_list=["--organizations", "--orgs"],
+            help="Assign the device to the specified organizations."
+            " Comma separated list of organization ids."
+            " Minimum supported version: 1.1-preview.",
+        )
+
     with self.argument_context("iot central device manual-failover") as context:
         context.argument(
             "ttl_minutes",
