@@ -3,6 +3,14 @@
 Release History
 ===============
 
+0.12.2
++++++++++++++++
+
+**IoT Central updates**
+
+* Added `az iot central device purge messages ` to purge cloud to device message queue
+
+
 0.12.1
 +++++++++++++++
 
