@@ -1,14 +1,4 @@
 parameters:
-- name: pythonVersion
-  type: string
-  default: '3.8.x'
-- name: pythonVersionsForTesting
-  type: object
-  default:
-  - '3_6_x'
-  - '3_8_x'
-  - '3_9_x'
-  - '3_10_x'
 - name: architecture
   type: string
   default: 'x64'
@@ -49,7 +39,7 @@ jobs:
       path: 'azext_iot/tests/central'
       name: 'iot-central'
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
-      pythonVersion: ${{ replace(variables['python'], '_', '.') }}
+      pythonVersion: $(python)
 
 - job: 'testADT'
   displayName: 'Test Azure DigitalTwins'
