@@ -34,9 +34,9 @@ parameters:
 - name: 'testHub'
   type: boolean
   default: true
-- name: 'pythonVersions'
-  type: object
-  default: >
+
+variables:
+  pythonVersions: >
     {
       Python36: 
       {
@@ -62,7 +62,7 @@ jobs:
   displayName: 'Test IoT Central'
   condition: and(succeeded(), eq('${{ parameters.testCentral }}', true))
   strategy:
-    matrix: ${{ parameters.pythonVersions }}
+    matrix: $[ variables['pythonVersions'] ]
     maxParallel: 2
   steps:
   - template: run-tests-parallel.yml
