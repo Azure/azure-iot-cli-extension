@@ -3,19 +3,20 @@
 Release History
 ===============
 
-
 0.12.1
 +++++++++++++++
 
-**IoT Central updates**
+**IoT DPS updates**
 
-* Added `az iot central device purge messages ` to purge cloud to device message queue
+* Resolves issue where usage of `--login` with connection string still required `az login`.
+
 
 0.12.0
-
 +++++++++++++++
 
 **IoT Central updates**
+
+* Fixed iot hub token leak for device twin show
 
 * Adds new preview commands (v1.1-preview)
 
@@ -23,7 +24,7 @@ Release History
   - Destination (az iot central export destination)
   - Export (az iot central export)
 
-** General Updates **
+**General Updates**
 
 * The IoT extension officially supports Python 3.10.
 
