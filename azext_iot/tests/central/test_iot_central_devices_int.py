@@ -71,10 +71,13 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
             APP_ID, device_id
         )
 
-        self.cmd(
+        cmd_output = self.cmd(
             command,
             checks=[self.check("deviceId", device_id)],
-        )
+        ).get_output_in_json()
+
+        assert cmd_output["deviceId"] == device_id
+        assert cmd_output["totalMessagesPurged"] == 0
 
         self._delete_device(device_id=device_id, api_version=self._api_version)
         self._delete_device_template(
