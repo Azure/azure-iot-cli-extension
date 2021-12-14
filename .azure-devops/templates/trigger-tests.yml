@@ -54,7 +54,7 @@ jobs:
         matrix = { 'Python3_6': { 'python': '3.6.x' } }
         print("##vso[task.setvariable variable=pythonVersionsMatrix;isOutput=true]"+json.dumps(matrix))  
   - powershell: |
-      $pythonVersionsMatrixJson = $env:matrix | ConvertFrom-Json
+      $pythonVersionsMatrixJson = '{ "Python3_6": { "python": "3.6.x" } }' | ConvertFrom-Json
       Write-Output $pythonVersionsMatrixJson
     displayName: 'Convert Versions Matrix to JSON'
     env: 
