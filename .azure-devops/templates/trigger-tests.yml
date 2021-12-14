@@ -53,13 +53,12 @@ jobs:
         import json
         matrix = { 'Python3_6': { 'python': '3.6.x' } }
         print("##vso[task.setvariable variable=pythonVersionsMatrix;isOutput=true]"+json.dumps(matrix))  
-  - task: PowerShell@2
+  - powershell: |
+      $pythonVersionsMatrixJson = $env:matrix| out-string | ConvertFrom-Json
+      Write-Output $pythonVersionsMatrixJson
     displayName: 'Convert Versions Matrix to JSON'
-    inputs:
-      targetType: 'inline'
-      script: |
-        $pythonVersionsMatrixJson = $(pythonVersionsMatrix)| out-string | ConvertFrom-Json
-        Write-Output $pythonVersionsMatrixJson
+    env: 
+      matrix: $(pythonVersionsMatrix)
 
 - job: 'testCentral'
   displayName: 'Test IoT Central'
