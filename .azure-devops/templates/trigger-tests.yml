@@ -51,7 +51,7 @@ jobs:
       scriptSource: 'inline'
       script: |
         matrix = { Python3_6: { python: '3.6.x' } }
-        echo "##vso[task.setvariable variable=pythonVersionsMatrix;isOutput=true;]$matrix"
+        print("##vso[task.setvariable variable=pythonVersionsMatrix;isOutput=true]"+matrix)
 
 - job: 'testCentral'
   displayName: 'Test IoT Central'
