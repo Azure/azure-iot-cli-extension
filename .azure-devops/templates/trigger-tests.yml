@@ -56,8 +56,10 @@ jobs:
   displayName: 'Test IoT Central'
   dependsOn: ['createTestStrategy']
   condition: and(succeeded(), eq('${{ parameters.testCentral }}', true))
+  variables:
+    matrix_strat: $(createTestStrategy.test_vers)
   strategy:
-    matrix: $(createTestStrategy.test_vers)
+    matrix: $[ variables['matrix_strat'] ]
     maxParallel: 2
   steps:
   - template: run-tests-parallel.yml
