@@ -50,7 +50,7 @@ jobs:
     inputs:
       scriptSource: 'inline'
       script: |
-        matrix = { Python3_6: { python: '3.6.x' } }
+        matrix = { 'Python3_6': { 'python': '3.6.x' } }
         print("##vso[task.setvariable variable=pythonVersionsMatrix;isOutput=true]"+matrix)
 
 - job: 'testCentral'
