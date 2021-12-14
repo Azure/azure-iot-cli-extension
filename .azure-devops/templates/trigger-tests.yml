@@ -56,6 +56,7 @@ jobs:
 
 - job: 'testCentral'
   displayName: 'Test IoT Central'
+  dependsOn: ['createTestStrategy']
   condition: and(succeeded(), eq('${{ parameters.testCentral }}', true))
   strategy:
     matrix: $[ dependencies.createTestStrategy.outputs['pythonVersionsMatrix'] ]
