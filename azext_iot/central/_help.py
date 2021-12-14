@@ -573,7 +573,7 @@ def _load_central_users_help():
         examples:
         - name: Update a user by email in the application
           text: >
-            az iot central user create
+            az iot central user update
             --user-id {userId}
             --app-id {appId}
             --email {emailAddress}
@@ -581,7 +581,7 @@ def _load_central_users_help():
 
         - name: Update a service-principal to the application
           text: >
-            az iot central user create
+            az iot central user update
             --user-id {userId}
             --app-id {appId}
             --tenant-id {tenantId}
@@ -993,7 +993,7 @@ def _load_central_organizations_help():
           az iot central organization update
           --app-id {appid}
           --org-id {organizationId}
-          --org_name {organizationName}
+          --org-name {organizationName}
         """
 
 

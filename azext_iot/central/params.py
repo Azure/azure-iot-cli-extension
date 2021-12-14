@@ -185,7 +185,7 @@ def load_central_arguments(self, _):
             "enabled",
             options_list=["--enable"],
             arg_type=get_three_state_flag(),
-            help="Add this flag if you would like IoT Central to enable or disable the device."
+            help="Add this flag if you would like IoT Central to enable or disable the device.",
         )
         context.argument(
             "organizations",
@@ -352,7 +352,6 @@ def load_central_arguments(self, _):
             options_list=["--parent-id"],
             help="The ID of the parent of the organization.",
         )
-    with self.argument_context("iot central organization create") as context:
         context.argument(
             "org_name",
             options_list=["--org-name"],
@@ -365,7 +364,6 @@ def load_central_arguments(self, _):
             options_list=["--parent-id"],
             help="The ID of the parent of the organization.",
         )
-    with self.argument_context("iot central organization update") as context:
         context.argument(
             "org_name",
             options_list=["--org-name"],
