@@ -139,7 +139,7 @@ stages:
 
   - stage: 'release'
     displayName: 'Stage GitHub release'
-    dependsOn: [build, test_python_version_3_6_x, test_python_version_3_8_x, test_python_version_3_9_x, test_python_version_3_10_x]
+    dependsOn: [build, test]
     condition: and(succeeded(), eq(variables.OfficialBuild, 'true'))
     jobs:
     - deployment: 'StageGitHub'
