@@ -96,6 +96,26 @@ stages:
     pool:
       vmImage: ${{ parameters.vmImage }}
     dependsOn: build
+    variables:
+      pythonVersions: >
+        {
+          Python36: 
+          {
+            python: '3_6_x'
+          },
+          Python38: 
+          {
+            python: '3_8_x'
+          },
+          Python39: 
+          {
+            python: '3_9_x'
+          },
+          Python310: 
+          {
+            python: '3_10_x'
+          }
+        }
     jobs:
     - template: templates/trigger-tests.yml
       parameters:
