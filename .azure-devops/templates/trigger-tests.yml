@@ -27,14 +27,38 @@ parameters:
 - name: 'testHub'
   type: boolean
   default: true
+- name: 'testOnPython3_6'
+  type: boolean
+  default: true
+- name: 'testOnPython3_8'
+  type: boolean
+  default: true
+- name: 'testOnPython3_9'
+  type: boolean
+  default: true
+- name: 'testOnPython3_10'
+  type: boolean
+  default: true
 
 jobs:
+
+- job: 'createTestStrategy'
+  displayName: 'Create Test Strategy'
+  steps:
+  - task: PythonScript@0
+    displayName: 'Create Python Versions Matrix'
+    inputs:
+      scriptSource: 'inline'
+      script: |
+        if ${{ parameters.testOnPython3_6 }}:
+          matrix = { Python3_6: { python: '3.6.x' } }
+        echo "##vso[task.setvariable variable=pythonVersionsMatrix;isOutput=true;]$matrix"
 
 - job: 'testCentral'
   displayName: 'Test IoT Central'
   condition: and(succeeded(), eq('${{ parameters.testCentral }}', true))
   strategy:
-    matrix: $[ variables['pythonVersions'] ]
+    matrix: $[ dependencies.createTestStrategy.outputs['pythonVersionsMatrix'] ]
     maxParallel: 2
   steps:
   - template: run-tests-parallel.yml
