@@ -21,7 +21,7 @@ parameters:
   - msi
 - name: azureSubscription
   type: string
-  default: 'az_cli_nightly_conn'
+  default: 'aziotcli-sp-prime'
 - name: 'testCentral'
   type: boolean
   default: true
