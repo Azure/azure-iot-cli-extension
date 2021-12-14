@@ -99,19 +99,19 @@ stages:
     variables:
       pythonVersions: >
         {
-          Python36: 
+          Python3_6: 
           {
             python: '3_6_x'
           },
-          Python38: 
+          Python3_8: 
           {
             python: '3_8_x'
           },
-          Python39: 
+          Python3_9: 
           {
             python: '3_9_x'
           },
-          Python310: 
+          Python3_10: 
           {
             python: '3_10_x'
           }
