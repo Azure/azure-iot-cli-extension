@@ -91,7 +91,7 @@ class CentralOrganizationProvider:
 
         return org
 
-    def create_organization(
+    def create_or_update_organization(
         self,
         org_id,
         org_name,
@@ -101,7 +101,7 @@ class CentralOrganizationProvider:
     ):
         if org_id in self._orgs:
             raise CLIError("Organization already exists")
-        org = central_services.organization.create_org(
+        org = central_services.organization.create_or_update_org(
             self._cmd,
             self._app_id,
             org_id=org_id,

@@ -357,6 +357,10 @@ def _load_central_devices_help():
     ] = """
         type: command
         short-summary: Update a device in IoT Central.
+        long-summary: |
+                    Allows to change the following properties of a device: "displayName", "template" and "simulated" and "enabled" flags.
+                    Device Id cannot be changed.
+                    If specified api version is "1.1-preview", organizations for the device can also be updated.
 
         examples:
         - name: Update a device display name
@@ -372,6 +376,20 @@ def _load_central_devices_help():
             --app-id {appid}
             --device-id {deviceid}
             --simulated false
+
+        - name: Update organizations for the device
+          text: >
+            az iot central device update
+            --app-id {appid}
+            --device-id {deviceid}
+            --organizations {organizations}
+
+        - name: Disable a device
+          text: >
+            az iot central device update
+            --app-id {appid}
+            --device-id {deviceid}
+            --enabled false
     """
 
     helps[
@@ -569,7 +587,12 @@ def _load_central_users_help():
         "iot central user update"
     ] = """
         type: command
-        short-summary: Update a user in the application
+        short-summary: Update roles for a user in the application.
+        long-summary: |
+                    Update a user with a different role. 
+                    Updating the tenantId or objectId for a service principal user is not allowed.
+                    Updating the email address for an email user is not allowed.
+
         examples:
         - name: Update a user by email in the application
           text: >
@@ -579,7 +602,7 @@ def _load_central_users_help():
             --email {emailAddress}
             --role admin
 
-        - name: Update a service-principal to the application
+        - name: Update a service-principal user in the application
           text: >
             az iot central user update
             --user-id {userId}

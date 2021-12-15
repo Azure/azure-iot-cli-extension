@@ -459,15 +459,15 @@ class TestCentralOrganizationProvider:
         provider = CentralOrganizationProvider(
             cmd=None, app_id=app_id, api_version=ApiVersion.v1.value
         )
-        mock_org_svc.create_org.return_value = updated_org
+        mock_org_svc.create_or_update_org.return_value = updated_org
 
         # act
-        org = provider.create_organization(
+        org = provider.create_or_update_organization(
             current_org.id, org_name="new_name", update=True, parent_org=None
         )
         # verify
         # call counts should be at most 1 since the provider has a cache
-        assert mock_org_svc.create_org.call_count == 1
+        assert mock_org_svc.create_or_update_org.call_count == 1
         assert org.display_name == "new_name"
 
 

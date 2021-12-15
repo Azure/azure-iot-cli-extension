@@ -9,7 +9,12 @@ Release History
 **IoT Central updates**
 
 * Added missing "update" sub-commands for all commands supporting it 
-  ("device", "device-template", "file-upload-config", "organization", "user")
+  
+  - az iot central device update
+  - az iot central device-template update
+  - az iot central file-upload-config update
+  - az iot central organization update
+  - az iot central user update
 
 0.12.1
 +++++++++++++++

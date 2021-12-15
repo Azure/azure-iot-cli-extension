@@ -147,7 +147,7 @@ def list_orgs(
     return orgs
 
 
-def create_org(
+def create_or_update_org(
     cmd,
     app_id: str,
     org_id: str,

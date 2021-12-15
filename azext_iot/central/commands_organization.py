@@ -74,7 +74,7 @@ def create_org(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
 
-    return provider.create_organization(
+    return provider.create_or_update_organization(
         org_id=org_id,
         org_name=org_name,
         parent_org=parent_org,
@@ -96,7 +96,7 @@ def update_org(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
 
-    return provider.create_organization(
+    return provider.create_or_update_organization(
         org_id=org_id,
         org_name=org_name,
         parent_org=parent_org,

@@ -76,18 +76,23 @@ class CentralDeviceTemplateProvider:
 
         if compact:  # if asked for compact, just keep reduced info
             for template in templates:
-                template.raw_template.pop("capabilityModel", None)
-                template.raw_template.pop("solutionModel", None)
-                template.raw_template.pop("deploymentManifest", None)
-                template.raw_template.pop("@context", None)
-                template.raw_template.pop("etag", None)
                 self._device_templates.update(
-                    {template.id: utility.dict_clean(template.raw_template)}
+                    {
+                        template.id: {
+                            "displayName": template.raw_template["displayName"],
+                            template.get_id_key(): template.raw_template[
+                                template.get_id_key()
+                            ],
+                            template.get_type_key(): template.raw_template[
+                                template.get_type_key()
+                            ],
+                        }
+                    }
                 )
-
-        self._device_templates.update(
-            {template.id: template.raw_template for template in templates}
-        )
+        else:
+            self._device_templates.update(
+                {template.id: template.raw_template for template in templates}
+            )
         return list(self._device_templates.values())
 
     def map_device_templates(

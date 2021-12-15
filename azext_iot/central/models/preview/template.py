@@ -76,3 +76,9 @@ class Template(BaseTemplate):
         return (
             interface["schema"]["@id"] if interface.get("@type") else interface["@id"]
         )
+
+    def get_id_key(self):
+        return "id"
+
+    def get_type_key(self):
+        return "types"

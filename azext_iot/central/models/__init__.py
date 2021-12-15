@@ -5,9 +5,10 @@
 # --------------------------------------------------------------------------------------------
 
 from knack.util import CLIError
+from abc import abstractmethod, ABCMeta
 
 
-class BaseTemplate:
+class BaseTemplate(metaclass=ABCMeta):
     def __init__(self, template: dict):
         self.id = None
         self.schema_names = None
@@ -29,13 +30,13 @@ class BaseTemplate:
     def _extract_schemas(self, entity: dict) -> dict:
         schema = entity.get("schema")
         if schema is not None:
-            # if schema.get("contents"):
-            return {
-                content[self._get_schema_name(content)]: content
-                for content in schema["contents"]
-            }
-            # else:
-            #     return entity
+            if schema.get("contents"):
+                return {
+                    content[self._get_schema_name(content)]: content
+                    for content in schema["contents"]
+                }
+            else:
+                return entity
         else:
             return {
                 schema[self._get_schema_name(schema)]: schema
@@ -83,3 +84,11 @@ class BaseTemplate:
                 )
             )
             raise CLIError(details)
+
+    @abstractmethod
+    def get_id_key(self):
+        """Get the Id property name depending on the API Version."""
+    
+    @abstractmethod
+    def get_type_key(self):
+        """Get the Type property name depending on the API Version."""

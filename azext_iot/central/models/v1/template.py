@@ -70,3 +70,9 @@ class Template(BaseTemplate):
                 self.id
             )
             raise CLIError(details)
+
+    def get_id_key(self):
+        return "@id"
+
+    def get_type_key(self):
+        return "@type"

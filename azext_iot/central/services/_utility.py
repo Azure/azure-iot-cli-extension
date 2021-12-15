@@ -117,7 +117,7 @@ def get_object(data: dict, model: str, api_version) -> object:
                 model,
             )
             return module(data)
-    except Exception:
+    except:
         raise CLIError(
             "{} is not available for api version == {}".format(model, api_version)
         )
@@ -125,7 +125,8 @@ def get_object(data: dict, model: str, api_version) -> object:
 
 def to_camel_dict(data: dict) -> dict:
     keys = list(data.keys())
+    res = {}
     for key in keys:
-        data[to_camel_case(key)] = data.pop(key)
+        res[to_camel_case(key)] = data[key]
 
-    return data
+    return res
