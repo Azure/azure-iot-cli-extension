@@ -72,17 +72,16 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         )
 
         cmd_output = self.cmd(
-            command,
-            checks=[self.check("deviceId", device_id)],
+            command
         ).get_output_in_json()
-
-        assert cmd_output["deviceId"] == device_id
-        assert cmd_output["totalMessagesPurged"] == 0
 
         self._delete_device(device_id=device_id, api_version=self._api_version)
         self._delete_device_template(
             template_id=template_id, api_version=self._api_version
         )
+
+        assert device_id in cmd_output["message"] 
+        assert "Total messages purged:" in cmd_output["message"]
 
     def test_central_device_twin_show_success(self):
         (template_id, _) = self._create_device_template(api_version=self._api_version)
