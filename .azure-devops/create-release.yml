@@ -7,7 +7,13 @@ parameters:
 - name: variableGroup
   type: string
   default: 'aziotcli_test_primary'
-- name: vmImage
+- name: buildAgentPoolVar
+  type: string
+  default: 'BuildAgentPool'
+- name: buildAgentVmImageVar
+  type: string
+  default: 'BuildAgentVmImage'
+- name: testAgentVmImage
   type: string
   default: 'ubuntu-18.04'
   values:
@@ -21,6 +27,9 @@ parameters:
   - '3.6.x'
   - '3.8.x'
   - '3.9.x'
+- name: stageForPublish
+  type: boolean
+  default: false
 - name: pythonVersionTestRun
   type: string
   default: '3.8.x'
@@ -55,8 +64,8 @@ stages:
 
     - job: 'Build_Publish_Azure_IoT_CLI_Extension'
       pool:
-        vmImage: ${{ parameters.vmImage }}
-
+        name: $[variables.${{ parameters.buildAgentPoolVar }}]
+        vmImage: $[variables.${{ parameters.buildAgentVmImageVar }}]
       steps:
       - task: UsePythonVersion@0
         inputs:
@@ -69,7 +78,7 @@ stages:
 
     - job: 'Build_Publish_Azure_CLI_Test_SDK'
       pool:
-        vmImage: ${{ parameters.vmImage }}
+        vmImage: ${{ parameters.testAgentVmImage }}
 
       steps:
       - task: UsePythonVersion@0
@@ -94,9 +103,10 @@ stages:
 
   - stage: 'test'
     displayName: 'Run tests'
-    pool:
-      vmImage: ${{ parameters.vmImage }}
     dependsOn: build
+    condition: succeeded()
+    pool:
+      vmImage: ${{ parameters.testAgentVmImage }}
     jobs:
     - job: 'testCentral'
       displayName: 'Test IoT Central'
@@ -171,8 +181,8 @@ stages:
 
   - stage: 'release'
     displayName: 'Stage GitHub release'
-    dependsOn: [build, test]
-    condition: and(succeeded(), eq(variables.OfficialBuild, 'true'))
+    dependsOn: build
+    condition: and(succeeded(), eq(${{ parameters.stageForPublish }}, 'true'))
     jobs:
     - deployment: 'StageGitHub'
       displayName: 'Stage CLI extension on GitHub'
@@ -180,7 +190,8 @@ stages:
 
     - job: 'Calculate_Sha_And_Create_Release'
       pool:
-        vmImage: 'windows-2019'
+        name: $[variables.${{ parameters.buildAgentPoolVar }}]
+        vmImage: $[variables.${{ parameters.buildAgentVmImageVar }}]
       variables:
         CLIVersion: $[ stageDependencies.build.recordVersion.outputs['setupVersion.CLIVersion'] ]
         ReleaseTitle: $[ stageDependencies.build.recordVersion.outputs['setupVersion.ReleaseTitle'] ]
