@@ -50,6 +50,7 @@ parameters:
       {
         python: '3.10.x'
       }
+    }
 - name: architecture
   type: string
   default: 'x64'
