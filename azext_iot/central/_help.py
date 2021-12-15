@@ -389,7 +389,7 @@ def _load_central_devices_help():
             az iot central device update
             --app-id {appid}
             --device-id {deviceid}
-            --enabled false
+            --enable false
     """
 
     helps[
