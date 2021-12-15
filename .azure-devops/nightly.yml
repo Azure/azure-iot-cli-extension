@@ -30,12 +30,26 @@ parameters:
   - '3.6.x'
   - '3.8.x'
   - '3.9.x'
-- name: minCLIPythonVersions
-  displayName: 'Python versions for min CLI tests'
+- name: pythonVersionsTestingMatrix
   type: object
-  default:
-  - '3_6_x'
-  - '3_8_x'
+  default: >
+    {
+      Python36: 
+      {
+        python: '3.6.x'
+      },
+      Python38: 
+      {
+        python: '3.8.x'
+      },
+      Python39: 
+      {
+        python: '3.9.x'
+      },
+      Python310: 
+      {
+        python: '3.10.x'
+      }
 - name: architecture
   type: string
   default: 'x64'
@@ -101,11 +115,28 @@ stages:
 
       - template: templates/install-and-record-version.yml
   
+  - stage: 'test_min'
+    displayName: 'Run all tests with min CLI'
+    pool:
+      vmImage: ${{ parameters.vmImage }}
+    dependsOn: build
+    variables:
+      pythonVersions: ${{ parameters.pythonVersionsTestingMatrix }}
+    jobs:
+    - template: templates/trigger-tests.yml
+      parameters:
+        azureCLIVersion: min
+        pythonVersion: ${{replace(python_version, '_', '.')}}
+        testADT: ${{ parameters.testADT }}
+        testCentral: ${{ parameters.testCentral }}
+        testDPS: ${{ parameters.testDPS }}
+        testHub: ${{ parameters.testHub }}
+  
   - stage: 'test_msi'
     displayName: 'Run all tests against Windows MSI install'
     pool:
       vmImage: 'windows-2019'
-    dependsOn: build
+    dependsOn: test_min
     jobs:
     - template: templates/trigger-tests.yml
       parameters:
@@ -114,26 +145,10 @@ stages:
         testCentral: ${{ parameters.testCentral }}
         testDPS: ${{ parameters.testDPS }}
         testHub: ${{ parameters.testHub }}
-
-  - ${{ each python_version in parameters.minCLIPythonVersions }}:
-    - stage: 'test_min_${{python_version}}'
-      displayName: 'Run all tests with min CLI on python ${{python_version}}'
-      pool:
-        vmImage: ${{ parameters.vmImage }}
-      dependsOn: build
-      jobs:
-      - template: templates/trigger-tests.yml
-        parameters:
-          azureCLIVersion: min
-          pythonVersion: ${{replace(python_version, '_', '.')}}
-          testADT: ${{ parameters.testADT }}
-          testCentral: ${{ parameters.testCentral }}
-          testDPS: ${{ parameters.testDPS }}
-          testHub: ${{ parameters.testHub }}
           
   - stage: 'kpi'
     displayName: 'Build KPIs'
-    dependsOn: [build, test_msi, test_min_3_6_x, test_min_3_8_x, test_min_3_9_x, test_min_3_10_x]
+    dependsOn: [build, test_msi, test_min]
     jobs:
     - job: 'calculateCodeCoverage'
       displayName: 'Calculate distributed code coverage'
