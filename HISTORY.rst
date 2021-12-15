@@ -3,6 +3,14 @@
 Release History
 ===============
 
+0.12.1
++++++++++++++++
+
+**IoT DPS updates**
+
+* Resolves issue where usage of `--login` with connection string still required `az login`.
+
+
 0.12.0
 +++++++++++++++
 
@@ -16,7 +24,7 @@ Release History
   - Destination (az iot central export destination)
   - Export (az iot central export)
 
-** General Updates **
+**General Updates**
 
 * The IoT extension officially supports Python 3.10.
 
