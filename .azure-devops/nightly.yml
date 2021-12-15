@@ -138,7 +138,7 @@ stages:
       vmImage: 'windows-2019'
     dependsOn: build
     variables:
-      pythonVersions: ${{ parameters.msiTestingMatrix }}
+      pythonVersions: $[variables['msiTestingMatrix']]
     jobs:
     - template: templates/trigger-tests.yml
       parameters:
