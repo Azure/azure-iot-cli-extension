@@ -6,7 +6,6 @@
 
 from typing import List, Union
 from knack.util import CLIError
-from azext_iot.common import utility
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.v1 import TemplateV1

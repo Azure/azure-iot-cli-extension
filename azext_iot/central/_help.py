@@ -589,7 +589,7 @@ def _load_central_users_help():
         type: command
         short-summary: Update roles for a user in the application.
         long-summary: |
-                    Update a user with a different role. 
+                    Update a user with a different role.
                     Updating the tenantId or objectId for a service principal user is not allowed.
                     Updating the email address for an email user is not allowed.
 

@@ -88,7 +88,7 @@ class BaseTemplate(metaclass=ABCMeta):
     @abstractmethod
     def get_id_key(self):
         """Get the Id property name depending on the API Version."""
-    
+
     @abstractmethod
     def get_type_key(self):
         """Get the Type property name depending on the API Version."""
