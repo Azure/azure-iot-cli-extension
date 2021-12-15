@@ -24,6 +24,9 @@ parameters:
 - name: 'testHub'
   type: boolean
   default: true
+- name: 'maxParallel'
+  type: number
+  default: 1
 
 jobs:
 
@@ -32,7 +35,7 @@ jobs:
   condition: and(succeeded(), eq('${{ parameters.testCentral }}', true))
   strategy:
     matrix: $[ variables['pythonVersions'] ]
-    maxParallel: 2
+    maxParallel: ${{ parameters.maxParallel }}
   steps:
   - template: run-tests-parallel.yml
     parameters:
@@ -46,7 +49,7 @@ jobs:
   condition: and(succeeded(), eq('${{ parameters.testADT }}', true))
   strategy:
     matrix: $[ variables['pythonVersions'] ]
-    maxParallel: 2
+    maxParallel: ${{ parameters.maxParallel }}
   steps:
   - template: run-tests-parallel.yml
     parameters:
@@ -60,7 +63,7 @@ jobs:
   condition: and(succeeded(), eq('${{ parameters.testDPS }}', true))
   strategy:
     matrix: $[ variables['pythonVersions'] ]
-    maxParallel: 2
+    maxParallel: ${{ parameters.maxParallel }}
   steps:
   - template: run-tests-parallel.yml
     parameters:
@@ -74,7 +77,7 @@ jobs:
   condition: and(succeeded(), eq('${{ parameters.testHub }}', true))
   strategy:
     matrix: $[ variables['pythonVersions'] ]
-    maxParallel: 2
+    maxParallel: ${{ parameters.maxParallel }}
   steps:
   - template: run-tests-parallel.yml
     parameters:
@@ -88,7 +91,7 @@ jobs:
   displayName: 'Test IoT Hub - devices, messaging and modules'
   strategy:
     matrix: $[ variables['pythonVersions'] ]
-    maxParallel: 2
+    maxParallel: ${{ parameters.maxParallel }}
   steps:
   - template: run-tests-parallel.yml
     parameters:
@@ -101,7 +104,7 @@ jobs:
   displayName: 'Unit tests and code coverage'
   strategy:
     matrix: $[ variables['pythonVersions'] ]
-    maxParallel: 2
+    maxParallel: ${{ parameters.maxParallel }}
   steps:
   - template: run-tests-parallel.yml
     parameters:

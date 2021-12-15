@@ -41,14 +41,6 @@ parameters:
       Python38: 
       {
         python: '3.8.x'
-      },
-      Python39: 
-      {
-        python: '3.9.x'
-      },
-      Python310: 
-      {
-        python: '3.10.x'
       }
     }
 - name: architecture
@@ -73,6 +65,14 @@ variables:
     value: ${{ parameters.pythonVersion }}
   - name: architecture
     value: ${{ parameters.architecture }}
+  - name: msiTestingMatrix
+    value: >
+      {
+        PythonMSI: 
+        {
+          python: '3.8.x'
+        }
+      }
 
 stages:
   - stage: 'build'
@@ -115,7 +115,7 @@ stages:
           architecture: ${{ parameters.architecture }}
 
       - template: templates/install-and-record-version.yml
-  
+
   - stage: 'test_min'
     displayName: 'Run all tests with min CLI'
     pool:
@@ -131,12 +131,14 @@ stages:
         testCentral: ${{ parameters.testCentral }}
         testDPS: ${{ parameters.testDPS }}
         testHub: ${{ parameters.testHub }}
-  
+
   - stage: 'test_msi'
     displayName: 'Run all tests against Windows MSI install'
     pool:
       vmImage: 'windows-2019'
-    dependsOn: test_min
+    dependsOn: build
+    variables:
+      pythonVersions: ${{ parameters.msiTestingMatrix }}
     jobs:
     - template: templates/trigger-tests.yml
       parameters:
@@ -145,7 +147,7 @@ stages:
         testCentral: ${{ parameters.testCentral }}
         testDPS: ${{ parameters.testDPS }}
         testHub: ${{ parameters.testHub }}
-          
+
   - stage: 'kpi'
     displayName: 'Build KPIs'
     dependsOn: [build, test_min, test_msi]
