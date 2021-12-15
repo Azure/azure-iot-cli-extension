@@ -21,23 +21,23 @@ parameters:
   - '3.6.x'
   - '3.8.x'
   - '3.9.x'
-- name: pythonVersionsForTesting
+- name: pythonVersionsTestingMatrix
   type: object
   default: >
     {
-      Python3_6: 
+      Python36: 
       {
         python: '3.6.x'
       },
-      Python3_8: 
+      Python38: 
       {
         python: '3.8.x'
       },
-      Python3_9: 
+      Python39: 
       {
         python: '3.9.x'
       },
-      Python3_10: 
+      Python310: 
       {
         python: '3.10.x'
       }
@@ -111,7 +111,7 @@ stages:
       vmImage: ${{ parameters.vmImage }}
     dependsOn: build
     variables:
-      pythonVersions: ${{ parameters.pythonVersionsForTesting }}
+      pythonVersions: ${{ parameters.pythonVersionsTestingMatrix }}
     jobs:
     - template: templates/trigger-tests.yml
       parameters:
