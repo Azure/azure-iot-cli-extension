@@ -8,7 +8,7 @@ Release History
 
 **IoT Central updates**
 
-* Added missing "update" sub-commands for all commands supporting it 
+* Added missing "update" sub-commands for all commands supporting it:
   
   - az iot central device update
   - az iot central device-template update
@@ -16,6 +16,9 @@ Release History
   - az iot central organization update
   - az iot central user update
 
+* Added "compact" mode for "az iot central device-template list" command:
+  When "-c" flag is passed, only Ids, display names and model types will be shown for the templates in the application.
+  
 0.12.1
 +++++++++++++++
 
