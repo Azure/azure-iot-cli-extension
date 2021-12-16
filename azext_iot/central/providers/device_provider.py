@@ -343,7 +343,6 @@ class CentralDeviceProvider:
             app_id=self._app_id,
             device_id=device_id,
             token=self._token,
-            api_version=self._api_version,
             central_dns_suffix=central_dns_suffix
         )
 

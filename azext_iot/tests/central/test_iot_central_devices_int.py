@@ -122,8 +122,8 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         command = "iot central device compute-device-key --pk {} -d {}".format(
             APP_PRIMARY_KEY, device_id
         )
-        device_primary_key = self.cmd_withoutToken(
-            command, api_version=self._api_version
+        device_primary_key = self.cmd_withoutParams(
+            command
         ).get_output_in_json()
 
         credentials = {

@@ -623,7 +623,6 @@ def purge_c2d_messages(
     app_id: str,
     device_id: str,
     token: str,
-    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) :
     """
@@ -639,8 +638,7 @@ def purge_c2d_messages(
 
     Returns:
         {
-            "deviceId": "your-device-id",
-            "totalMessagesPurged": 1
+             message: 'Cloud to device (C2D) message queue purged for device {device_id}. Total messages purged: {totalMessagesPurged}.'
         } on success
         Raises error on failure
     """
@@ -648,10 +646,5 @@ def purge_c2d_messages(
         app_id, central_dns_suffix, "system/iothub/devices", device_id
     )
     headers = _utility.get_headers(token, cmd)
-
-    # Construct parameters
-    query_parameters = {}
-    query_parameters["api-version"] = api_version
-
-    response = requests.delete(url, headers=headers, params=query_parameters)
+    response = requests.delete(url, headers=headers)
     return _utility.try_extract_result(response)

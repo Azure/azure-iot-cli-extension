@@ -40,10 +40,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         )
         return super().cmd(command, checks=checks, expect_failure=expect_failure)
 
-    def cmd_withoutToken(self, command, api_version=None, checks=None, expect_failure=False):
-        command = self._appendOptionalArgsToCommand(
-            command, token=None, dns_suffix=None, api_version=api_version
-        )
+    def cmd_withoutParams(self, command, checks=None, expect_failure=False):
         return super().cmd(command, checks=checks, expect_failure=expect_failure)
 
     def _create_device(self, api_version, **kwargs) -> Tuple[str, str]:

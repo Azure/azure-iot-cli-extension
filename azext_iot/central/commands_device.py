@@ -269,9 +269,7 @@ def get_credentials(
 def compute_device_key(
     cmd,
     primary_key,
-    device_id,
-    api_version=ApiVersion.v1.value,
-    central_dns_suffix=CENTRAL_ENDPOINT,
+    device_id
 ):
     return utility.compute_device_key(
         primary_key=primary_key, registration_id=device_id
