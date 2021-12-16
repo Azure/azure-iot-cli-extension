@@ -136,7 +136,7 @@ stages:
     displayName: 'Run all tests against Windows MSI install'
     pool:
       vmImage: 'windows-2019'
-    dependsOn: build
+    dependsOn: test_min
     variables:
       pythonVersions: $[variables['msiTestingMatrix']]
     jobs:
