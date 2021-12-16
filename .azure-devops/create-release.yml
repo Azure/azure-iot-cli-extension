@@ -129,7 +129,9 @@ stages:
         testCentral: ${{ parameters.testCentral }}
         testDPS: ${{ parameters.testDPS }}
         testHub: ${{ parameters.testHub }}
-        maxParallel: 2
+        maxParallelADT: 2
+        maxParallelDPS: 2
+        maxParallelHub: 2
 
   - stage: 'kpi'
     displayName: 'Build KPIs'
