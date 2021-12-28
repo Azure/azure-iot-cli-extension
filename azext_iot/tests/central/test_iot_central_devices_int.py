@@ -80,7 +80,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
             template_id=template_id, api_version=self._api_version
         )
 
-        assert device_id in cmd_output["message"] 
+        assert device_id in cmd_output["message"]
         assert "Total messages purged:" in cmd_output["message"]
 
     def test_central_device_twin_show_success(self):

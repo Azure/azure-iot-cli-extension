@@ -638,7 +638,8 @@ def purge_c2d_messages(
 
     Returns:
         {
-             message: 'Cloud to device (C2D) message queue purged for device {device_id}. Total messages purged: {totalMessagesPurged}.'
+            message: 'Cloud to device (C2D) message queue purged for device {device_id}.\\n
+            Total messages purged: {totalMessagesPurged}.'
         } on success
         Raises error on failure
     """
