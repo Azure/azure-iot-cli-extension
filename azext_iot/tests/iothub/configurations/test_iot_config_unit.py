@@ -57,6 +57,7 @@ def sample_config_edge(set_cwd, request):
     v11_path = "test_edge_deployment_v11.json"
     ea_v11_eh_v12_path = "test_edge_deployment_ea_v11_eh_v12.json"
     ea_v90_eh_v91_path = "test_edge_deployment_ea_v90_eh_v91.json"
+    billable_module_path = "test_edge_deployment_billable_module.json"
 
     payload = None
     if request.param == "inlineA":
@@ -75,6 +76,8 @@ def sample_config_edge(set_cwd, request):
         payload = json.dumps(json.loads(read_file_content(ea_v11_eh_v12_path)))
     elif request.param == "ea_v90_eh_v91":
         payload = json.dumps(json.loads(read_file_content(ea_v90_eh_v91_path)))
+    elif request.param == "billable_module":
+        payload = json.dumps(json.loads(read_file_content(billable_module_path)))
 
     return (request.param, payload)
 

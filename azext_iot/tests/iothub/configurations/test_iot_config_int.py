@@ -11,6 +11,7 @@ from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.conftest import get_context_path
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
 from azext_iot.common.utility import read_file_content
+from azext_iot.common.shared import AuthenticationTypeDataplane
 
 edge_content_path = get_context_path(__file__, "test_edge_deployment.json")
 edge_content_layered_path = get_context_path(
@@ -18,6 +19,7 @@ edge_content_layered_path = get_context_path(
 )
 edge_content_v11_path = get_context_path(__file__, "test_edge_deployment_v11.json")
 edge_content_v1_path = get_context_path(__file__, "test_edge_deployment_v1.json")
+edge_billable_module_path = get_context_path(__file__, "test_edge_deployment_billable_module.json")
 edge_content_malformed_path = get_context_path(
     __file__, "test_edge_deployment_malformed.json"
 )
@@ -83,7 +85,7 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
 
     def test_edge_deployments(self):
         for auth_phase in DATAPLANE_AUTH_TYPES:
-            config_count = 5
+            config_count = 6
             config_ids = self.generate_config_names(config_count)
 
             self.kwargs["generic_metrics"] = read_file_content(generic_metrics_path)
@@ -293,6 +295,53 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
                     self.check("metrics.queries", {}),
                 ],
             )
+
+            # Edge billable module deployment
+            if auth_phase == AuthenticationTypeDataplane.login.value:
+                self.cmd(
+                    self.set_cmd_auth_type(
+                        """iot edge deployment create --deployment-id {} --hub-name {} --resource-group {} --priority {}
+                        --target-condition \"{}\" --labels '{}' --content '{}'""".format(
+                            config_ids[5],
+                            self.entity_name,
+                            self.entity_rg,
+                            priority,
+                            condition,
+                            "{labels}",
+                            edge_billable_module_path,
+                        ),
+                        auth_type=auth_phase,
+                    ),
+                    checks=[
+                        self.check("id", config_ids[5]),
+                        self.check("priority", priority),
+                        self.check("targetCondition", condition),
+                        self.check("labels", json.loads(self.kwargs["labels"])),
+                        self.check(
+                            "content.modulesContent",
+                            json.loads(read_file_content(edge_billable_module_path))["modulesContent"],
+                        ),
+                        self.check("metrics.queries", {}),
+                    ],
+                )
+
+                # Show edge billable module deployment
+                self.cmd(
+                    self.set_cmd_auth_type(
+                        "iot edge deployment show --deployment-id {} --hub-name {} --resource-group {}".format(
+                            config_ids[5], self.entity_name, self.entity_rg
+                        ),
+                        auth_type=auth_phase,
+                    ),
+                    checks=[
+                        self.check("id", config_ids[5]),
+                        self.check("priority", priority),
+                        self.check("targetCondition", condition),
+                        self.check("labels", json.loads(self.kwargs["labels"])),
+                    ],
+                )
+            else:
+                config_count -= 1
 
             # Show deployment
             self.cmd(

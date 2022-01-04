@@ -21,16 +21,20 @@ class ConfigurationContent(Model):
     :type modules_content: dict[str, dict[str, object]]
     :param module_content: The module configuration content.
     :type module_content: dict[str, object]
+    :param modules_purchase: The modules purchase content.
+    :type modules_purchase: dict[str, dict[str, object]]
     """
 
     _attribute_map = {
         'device_content': {'key': 'deviceContent', 'type': '{object}'},
         'modules_content': {'key': 'modulesContent', 'type': '{{object}}'},
         'module_content': {'key': 'moduleContent', 'type': '{object}'},
+        'modules_purchase': {'key': 'modulesPurchase', 'type': '{{object}}'},
     }
 
-    def __init__(self, *, device_content=None, modules_content=None, module_content=None, **kwargs) -> None:
+    def __init__(self, *, device_content=None, modules_content=None, module_content=None, modules_purchase=None, **kwargs) -> None:
         super(ConfigurationContent, self).__init__(**kwargs)
         self.device_content = device_content
         self.modules_content = modules_content
         self.module_content = module_content
+        self.modules_purchase = modules_purchase

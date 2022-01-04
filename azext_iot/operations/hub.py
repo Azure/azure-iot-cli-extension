@@ -1377,6 +1377,7 @@ def _process_config_content(content, config_type):
     if config_type == ConfigType.edge or config_type == ConfigType.layered:
         valid_edge_key = "modulesContent"
         legacy_edge_key = "moduleContent"
+        purchase_edge_key = "modulesPurchase"
 
         if valid_edge_key in content:
             processed_content[valid_edge_key] = content[valid_edge_key]
@@ -1387,6 +1388,9 @@ def _process_config_content(content, config_type):
                 valid_edge_key,
             )
             processed_content[valid_edge_key] = content[legacy_edge_key]
+
+        if purchase_edge_key in content:
+            processed_content["modules_purchase"] = content[purchase_edge_key]
 
         if processed_content:
             # Schema based validation currently for IoT edge deployment only
