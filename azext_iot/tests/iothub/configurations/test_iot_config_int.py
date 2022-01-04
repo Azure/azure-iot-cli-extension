@@ -72,6 +72,18 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
                 checks=[self.check("length([*])", 4)],
             )
 
+            # Apply billable edge module
+            if auth_phase == AuthenticationTypeDataplane.login.value:
+                self.cmd(
+                    self.set_cmd_auth_type(
+                        "iot edge set-modules -d {} -n {} -g {} -k '{}'".format(
+                            edge_device_ids[0], self.entity_name, self.entity_rg, edge_billable_module_path
+                        ),
+                        auth_type=auth_phase,
+                    ),
+                    checks=[self.check("length([*])", 5)],
+                )
+
             # Error schema validation - Malformed deployment
             self.cmd(
                 self.set_cmd_auth_type(
