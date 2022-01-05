@@ -141,7 +141,6 @@ def load_central_commands(self, _):
         cmd_group.command("compute-device-key", "compute_device_key")
         cmd_group.command("manual-failover", "run_manual_failover")
         cmd_group.command("manual-failback", "run_manual_failback")
-        cmd_group.command("purge-messages", "purge_c2d_messages")
 
     with self.command_group(
         "iot central device twin",
@@ -151,6 +150,12 @@ def load_central_commands(self, _):
             "show",
             "get_device_twin",
         )
+
+    with self.command_group(
+        "iot central device c2d-message",
+        command_type=central_device_ops,
+    ) as cmd_group:
+        cmd_group.show_command("purge", "purge_c2d_messages")
 
     with self.command_group(
         "iot central device command",

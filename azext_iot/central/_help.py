@@ -58,6 +58,7 @@ def load_central_help():
     _load_central_command_help()
     _load_central_compute_device_key()
     _load_central_export_help()
+    _load_central_c2d_message_help()
 
 
 def _load_central_export_help():
@@ -398,21 +399,6 @@ def _load_central_devices_help():
     """
 
     helps[
-        "iot central device purge-messages"
-    ] = """
-        type: command
-        short-summary: Purges the cloud to device (C2D) message queue for the specified device.
-        long-summary: Purges the cloud to device (C2D) message queue for the specified device.
-
-        examples:
-        - name: Purges the cloud to device (C2D) message queue for the specified device.
-          text: >
-            az iot central device purge-messages
-            --app-id {appid}
-            --device-id {deviceid}
-    """
-
-    helps[
         "iot central device delete"
     ] = """
         type: command
@@ -525,6 +511,29 @@ def _load_central_command_help():
                 -k {payload}
         """
 
+
+def _load_central_c2d_message_help():
+    helps[
+        "iot central device c2d-message"
+    ] = """
+          type: group
+          short-summary: Run device cloud-to-device messaging commands.
+      """
+    helps[
+        "iot central device c2d-message purge"
+    ] = """
+        type: command
+        short-summary: Purges the cloud-to-device message queue for the target device.
+        long-summary: Purges the cloud-to-device message queue for the target device.
+
+        examples:
+        - name: Purges the cloud to device message queue for the target device.
+          text: >
+            az iot central device c2d-message purge
+            --app-id {appid}
+            --device-id {deviceid}
+    """
+    
 
 def _load_central_users_help():
     helps[
