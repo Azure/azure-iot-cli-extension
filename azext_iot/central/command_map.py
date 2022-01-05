@@ -152,6 +152,12 @@ def load_central_commands(self, _):
         )
 
     with self.command_group(
+        "iot central device c2d-message",
+        command_type=central_device_ops,
+    ) as cmd_group:
+        cmd_group.command("purge", "purge_c2d_messages")
+
+    with self.command_group(
         "iot central device command",
         command_type=central_device_ops,
     ) as cmd_group:
