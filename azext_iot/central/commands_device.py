@@ -201,11 +201,10 @@ def purge_c2d_messages(
     app_id: str,
     device_id: str,
     token=None,
-    api_version=ApiVersion.v1.value,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> dict:
     provider = CentralDeviceProvider(
-        cmd=cmd, app_id=app_id, token=token, api_version=api_version
+        cmd=cmd, app_id=app_id, token=token, api_version=ApiVersion.v1.value
     )
     return provider.purge_c2d_messages(
         device_id=device_id, central_dns_suffix=central_dns_suffix
