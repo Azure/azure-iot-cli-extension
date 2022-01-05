@@ -67,7 +67,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         # wait about a few seconds for simulator to kick in so that provisioning completes
         time.sleep(60)
 
-        command = "iot central device purge-messages --app-id {} --device-id {}".format(
+        command = "iot central device c2d-message purge --app-id {} --device-id {}".format(
             APP_ID, device_id
         )
 
