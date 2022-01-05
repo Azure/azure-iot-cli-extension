@@ -196,6 +196,21 @@ def run_manual_failback(
     )
 
 
+def purge_c2d_messages(
+    cmd,
+    app_id: str,
+    device_id: str,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+) -> dict:
+    provider = CentralDeviceProvider(
+        cmd=cmd, app_id=app_id, token=token, api_version=ApiVersion.v1.value
+    )
+    return provider.purge_c2d_messages(
+        device_id=device_id, central_dns_suffix=central_dns_suffix
+    )
+
+
 def get_command_history(
     cmd,
     app_id: str,
@@ -253,9 +268,7 @@ def get_credentials(
 def compute_device_key(
     cmd,
     primary_key,
-    device_id,
-    api_version=ApiVersion.v1.value,
-    central_dns_suffix=CENTRAL_ENDPOINT,
+    device_id
 ):
     return utility.compute_device_key(
         primary_key=primary_key, registration_id=device_id
