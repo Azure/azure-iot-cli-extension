@@ -4,6 +4,6 @@ steps:
 - script: python -m pip install -r dev_requirements
   displayName: 'Installing CI requirements'
 - script: python -m pip install -U pyOpenSSL
-  displayName: 'Remove pyOpenSSL'
+  displayName: 'Force upgrade pyOpenSSL'
 - script: python -m pip install cryptography
   displayName: 'Install cryptography'
