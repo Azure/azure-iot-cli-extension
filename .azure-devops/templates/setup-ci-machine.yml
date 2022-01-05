@@ -1,5 +1,9 @@
 steps:
 - script: python -m pip install --upgrade pip
   displayName: 'Upgrade pip'
-- script: pip install -r dev_requirements
+- script: python -m pip install -r dev_requirements
   displayName: 'Installing CI requirements'
+- script: python -m pip install -U pyOpenSSL
+  displayName: 'Remove pyOpenSSL'
+- script: python -m pip install cryptography
+  displayName: 'Install cryptography'
