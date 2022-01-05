@@ -533,7 +533,7 @@ def _load_central_c2d_message_help():
             --app-id {appid}
             --device-id {deviceid}
     """
-    
+
 
 def _load_central_users_help():
     helps[
