@@ -91,7 +91,7 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
                     ),
                     checks=[self.check("length([*])", 5)],
                 )
-            
+
             # Error - Applying Edge billable modules using Non AAD Auth
             if auth_phase != AuthenticationTypeDataplane.login.value:
                 self.cmd(
