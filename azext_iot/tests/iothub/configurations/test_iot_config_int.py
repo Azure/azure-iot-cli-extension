@@ -91,6 +91,18 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
                     ),
                     checks=[self.check("length([*])", 5)],
                 )
+            
+            # Error - Applying Edge billable modules using Non AAD Auth
+            if auth_phase != AuthenticationTypeDataplane.login.value:
+                self.cmd(
+                    self.set_cmd_auth_type(
+                        "iot edge set-modules -d {} -n {} -g {} -k '{}'".format(
+                            edge_device_ids[0], self.entity_name, self.entity_rg, edge_billable_module_path
+                        ),
+                        auth_type=auth_phase,
+                    ),
+                    expect_failure=True,
+                )
 
             # Error schema validation - Malformed deployment
             self.cmd(
