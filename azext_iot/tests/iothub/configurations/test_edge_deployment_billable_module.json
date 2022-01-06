@@ -3,15 +3,32 @@
         "$edgeAgent": {
             "properties.desired": {
                 "modules": {
-                    "paid-module": {
-                        "settings": {
-                            "image": "ancan.azurecr.io/ancan/paid-module-111502",
-                            "createOptions": ""
-                        },
-                        "type": "docker",
+                    "SimulatedTemperatureSensor": {
                         "version": "1.0",
+                        "type": "docker",
                         "status": "running",
-                        "restartPolicy": "always"
+                        "restartPolicy": "always",
+                        "startupOrder": 2,
+                        "settings": {
+                            "image": "mcr.microsoft.com/azureiotedge-simulated-temperature-sensor:1.0",
+                            "createOptions": "{}"
+                        }
+                    },
+                    "filtermodule": {
+                        "version": "1.0",
+                        "type": "docker",
+                        "status": "running",
+                        "restartPolicy": "always",
+                        "startupOrder": 1,
+                        "env": {
+                            "tempLimit": {
+                                "value": "100"
+                            }
+                        },
+                        "settings": {
+                            "image": "myacr.azurecr.io/filtermodule:latest",
+                            "createOptions": "{}"
+                        }
                     }
                 },
                 "runtime": {

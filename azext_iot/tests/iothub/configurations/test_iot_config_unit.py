@@ -48,6 +48,7 @@ def sample_config_edge_malformed(set_cwd):
         "v11",
         "ea_v11_eh_v12",
         "ea_v90_eh_v91",
+        "billable_module"
     ]
 )
 def sample_config_edge(set_cwd, request):
@@ -340,6 +341,15 @@ class TestConfigCreate:
             assert (
                 body["content"]["modulesContent"]
                 == json.loads(sample_config_edge[1])["content"]["moduleContent"]
+            )
+        elif sample_config_edge[0] == "billable_module":
+            assert (
+                body["content"]["modulesContent"]
+                == json.loads(sample_config_edge[1])["modulesContent"]
+            )
+            assert (
+                body["content"]["modulesPurchase"]
+                == json.loads(sample_config_edge[1])["modulesPurchase"]
             )
         else:
             assert (
@@ -842,6 +852,15 @@ class TestConfigApply:
             assert (
                 body["modulesContent"]
                 == json.loads(sample_config_edge[1])["content"]["moduleContent"]
+            )
+        elif sample_config_edge[0] == "billable_module":
+            assert (
+                body["modulesContent"]
+                == json.loads(sample_config_edge[1])["modulesContent"]
+            )
+            assert (
+                body["modulesPurchase"]
+                == json.loads(sample_config_edge[1])["modulesPurchase"]
             )
         else:
             assert (

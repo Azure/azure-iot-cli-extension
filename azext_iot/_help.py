@@ -951,6 +951,8 @@ helps[
     short-summary: Set edge modules on a single device.
     long-summary: |
                   Modules content is json and in the form of {"modulesContent":{...}} or {"content":{"modulesContent":{...}}}.
+                  Billable Edge modules are supported where the purchase info needs to be provided along with the modules content.
+                  Billable Edge modules JSON is in the form of {"modulesContent":{...}, "modulesPurchase":{...}} or {"content":{"modulesContent":{...}, "modulesPurchase":{...}}}.
 
                   By default properties of system modules $edgeAgent and $edgeHub are validated against schemas installed with the IoT extension.
                   This can be disabled by using the --no-validation switch.
