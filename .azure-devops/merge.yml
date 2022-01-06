@@ -5,6 +5,7 @@ trigger:
     include:
       - dev
       - main
+      - billable_modules
   paths:
     exclude:
     - '**/*.md'
@@ -14,6 +15,7 @@ pr:
     include:
       - dev
       - main
+      - billable_modules
   paths:
     exclude:
     - '**/*.md'
