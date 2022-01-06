@@ -1,4 +1,8 @@
 steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.8.x'
+      architecture: 'x64'
   - task: DownloadBuildArtifacts@0
     displayName : 'Download Extension wheel from Build Artifacts'
     inputs:

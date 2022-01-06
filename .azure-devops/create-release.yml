@@ -69,6 +69,10 @@ parameters:
 
 variables:
   - group: ${{ parameters.variableGroup }}
+  - name: vmImage
+    value: $[variables.${{ parameters.buildAgentVmImageVar }}]
+  - name: buildPool
+    value: $[variables.${{ parameters.buildAgentPoolVar }}]
 
 stages:
   - stage: 'build'
@@ -77,8 +81,10 @@ stages:
 
     - job: 'Build_Publish_Azure_IoT_CLI_Extension'
       pool:
-        name: $[variables.${{ parameters.buildAgentPoolVar }}]
-        vmImage: $[variables.${{ parameters.buildAgentVmImageVar }}]
+        name: $(buildPool)
+        vmImage: $(vmImage)
+        demands:
+        - ImageOverride -equals $(vmImage)
       steps:
       - task: UsePythonVersion@0
         inputs:
@@ -132,6 +138,10 @@ stages:
         maxParallelADT: 2
         maxParallelDPS: 2
         maxParallelHub: 2
+    - job: 'evaluateCmdTable'
+      displayName: 'Evaluate Command Table'
+      steps:
+      - template: templates/evaluate-command-table.yml
 
   - stage: 'kpi'
     displayName: 'Build KPIs'
@@ -155,9 +165,12 @@ stages:
       environment: 'production'
 
     - job: 'Calculate_Sha_And_Create_Release'
+      displayName: 'Calculate package hash and publish'
       pool:
-        name: $[variables.${{ parameters.buildAgentPoolVar }}]
-        vmImage: $[variables.${{ parameters.buildAgentVmImageVar }}]
+        name: $(buildPool)
+        vmImage: $(vmImage)
+        demands:
+        - ImageOverride -equals $(vmImage)
       variables:
         CLIVersion: $[ stageDependencies.build.recordVersion.outputs['setupVersion.CLIVersion'] ]
         ReleaseTitle: $[ stageDependencies.build.recordVersion.outputs['setupVersion.ReleaseTitle'] ]
