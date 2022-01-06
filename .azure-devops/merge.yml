@@ -39,7 +39,7 @@ jobs:
   steps:
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.6.x'
+      versionSpec: '3.8.x'
       architecture: 'x64'
 
   - template: templates/setup-ci-machine.yml
@@ -52,7 +52,7 @@ jobs:
   steps:
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.6.x'
+      versionSpec: '3.8.x'
       architecture: 'x64'
 
   - template: templates/setup-ci-machine.yml
@@ -147,12 +147,7 @@ jobs:
     vmImage: ${{ parameters.linuxImage }}
 
   steps:
-  - task: UsePythonVersion@0
-    inputs:
-      versionSpec: '3.6.x'
-      architecture: 'x64'
-
-  - template: templates/install-configure-azure-cli.yml
+  - template: templates/evaluate-command-table.yml
 
 - job: CredScan
   displayName: 'Credential Scan'
