@@ -3,6 +3,14 @@
 Release History
 ===============
 
+255.253.1 (IoT Edge billable modules preview)
++++++++++++++++
+
+**IoT Hub updates**
+
+* Support application of Billable Edge Modules to Edge devices
+* Upgrade CLI to use IoTHub API version 2021-11-30-preview
+
 0.12.2
 +++++++++++++++
 
