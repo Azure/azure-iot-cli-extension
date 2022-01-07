@@ -3,8 +3,6 @@
 trigger:
   branches:
     include:
-      - dev
-      - main
       - billable_modules
   paths:
     exclude:
@@ -13,8 +11,6 @@ trigger:
 pr:
   branches:
     include:
-      - dev
-      - main
       - billable_modules
   paths:
     exclude:
