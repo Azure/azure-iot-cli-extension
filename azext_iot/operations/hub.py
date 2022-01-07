@@ -28,7 +28,8 @@ from azext_iot.common.shared import (
     IoTHubStateType,
     DeviceAuthApiType,
     ConnectionStringParser,
-    EntityStatusType
+    EntityStatusType,
+    AuthenticationTypeDataplane
 )
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
@@ -1197,7 +1198,7 @@ def iot_edge_set_modules(
     try:
         content = process_json_arg(content, argument_name="content")
         processed_content = _process_config_content(
-            content, config_type=ConfigType.edge
+            content, auth_type_dataplane, config_type=ConfigType.edge
         )
 
         content = ConfigurationContent(**processed_content)
@@ -1304,7 +1305,7 @@ def _iot_hub_configuration_create(
     metrics_key = "queries"
 
     content = process_json_arg(content, argument_name="content")
-    processed_content = _process_config_content(content, config_type)
+    processed_content = _process_config_content(content, auth_type_dataplane, config_type)
     if "module_content" in processed_content:
         required_target_prefix = "from devices.modules where"
         lower_target_condition = target_condition.lower()
@@ -1351,7 +1352,7 @@ def _iot_hub_configuration_create(
         raise CLIError(unpack_msrest_error(e))
 
 
-def _process_config_content(content, config_type):
+def _process_config_content(content, auth_type, config_type):
     from knack.util import to_snake_case
 
     # Supports scenario where configuration payload is contained in 'content' key
@@ -1377,6 +1378,7 @@ def _process_config_content(content, config_type):
     if config_type == ConfigType.edge or config_type == ConfigType.layered:
         valid_edge_key = "modulesContent"
         legacy_edge_key = "moduleContent"
+        purchase_edge_key = "modulesPurchase"
 
         if valid_edge_key in content:
             processed_content[valid_edge_key] = content[valid_edge_key]
@@ -1387,6 +1389,14 @@ def _process_config_content(content, config_type):
                 valid_edge_key,
             )
             processed_content[valid_edge_key] = content[legacy_edge_key]
+
+        if purchase_edge_key in content:
+            if auth_type == AuthenticationTypeDataplane.login.value:
+                processed_content["modules_purchase"] = content[purchase_edge_key]
+            else:
+                raise CLIError(
+                    "Edge billable modules property: {} is supported only for AAD auth".format(purchase_edge_key)
+                )
 
         if processed_content:
             # Schema based validation currently for IoT edge deployment only

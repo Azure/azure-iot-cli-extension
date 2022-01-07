@@ -951,11 +951,14 @@ helps[
     short-summary: Set edge modules on a single device.
     long-summary: |
                   Modules content is json and in the form of {"modulesContent":{...}} or {"content":{"modulesContent":{...}}}.
+                  Billable Edge modules are supported only when using AAD Auth. The purchase info needs to be provided along with the modules content.
+                  Billable Edge modules JSON is in the form of {"modulesContent":{...}, "modulesPurchase":{...}} or {"content":{"modulesContent":{...}, "modulesPurchase":{...}}}.
 
                   By default properties of system modules $edgeAgent and $edgeHub are validated against schemas installed with the IoT extension.
                   This can be disabled by using the --no-validation switch.
 
                   Note: Upon execution the command will output the collection of modules applied to the device.
+                  Note: Billable modules are not supported when using a service principal's AAD Token.
     examples:
     - name: Test edge modules while in development by setting modules on a target device.
       text: >
