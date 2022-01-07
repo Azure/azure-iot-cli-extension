@@ -14,6 +14,7 @@ from random import randint
 from knack.cli import CLIError
 from azext_iot.operations import hub as subject
 from azext_iot.common.utility import read_file_content, evaluate_literal
+from azext_iot.common.shared import AuthenticationTypeDataplane
 from azext_iot.tests.conftest import (
     build_mock_response,
     path_service_client,
@@ -34,6 +35,13 @@ def sample_config_show(set_cwd):
 @pytest.fixture
 def sample_config_edge_malformed(set_cwd):
     path = "test_edge_deployment_malformed.json"
+    result = json.dumps(json.loads(read_file_content(path)))
+    return result
+
+
+@pytest.fixture
+def sample_config_edge_billable(set_cwd):
+    path = "test_edge_deployment_billable_module.json"
     result = json.dumps(json.loads(read_file_content(path)))
     return result
 
@@ -306,6 +314,7 @@ class TestConfigCreate:
             labels=labels,
             metrics=sample_config_metrics[1],
             layered=(sample_config_edge[0] == "layered"),
+            auth_type_dataplane=AuthenticationTypeDataplane.login.value if sample_config_edge[0] == "billable_module" else None,
         )
 
         args = serviceclient.call_args
@@ -815,6 +824,7 @@ class TestConfigApply:
             device_id=device_id,
             hub_name=mock_target["entity"],
             content=sample_config_edge[1],
+            auth_type_dataplane=AuthenticationTypeDataplane.login.value if sample_config_edge[0] == "billable_module" else None,
         )
 
         # For the actual apply configuration call
@@ -920,4 +930,23 @@ class TestConfigApply:
                 device_id=device_id,
                 hub_name=mock_target["entity"],
                 content=sample_config_edge_malformed,
+            )
+
+    @pytest.mark.parametrize(
+        "device_id, hub_name", [("test-device-01", mock_target["entity"])]
+    )
+    def test_config_apply_edge_billable_non_AAD_Auth_error(
+        self,
+        fixture_cmd,
+        serviceclient,
+        device_id,
+        hub_name,
+        sample_config_edge_billable,
+    ):
+        with pytest.raises(CLIError):
+            subject.iot_edge_set_modules(
+                cmd=fixture_cmd,
+                device_id=device_id,
+                hub_name=mock_target["entity"],
+                content=sample_config_edge_billable,
             )
