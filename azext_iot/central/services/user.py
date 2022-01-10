@@ -71,6 +71,7 @@ def create_roles(roles: str, api_version: str):
     result_roles = []
     parsed_roles = roles.split(",")
     for role in parsed_roles:
+        org_id = None
         match = search(ROLE_PATTERN, role)
         if match and len(match.groups()) == 2:
             # role is an org role
