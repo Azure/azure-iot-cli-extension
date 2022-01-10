@@ -19,6 +19,9 @@ Release History
 * Added "compact" mode for "az iot central device-template list" command:
   When "-c" flag is passed, only Ids, display names and model types will be shown for the templates in the application.
   
+* Added `az iot central device c2d-message purge` to purge cloud-to-device message queue
+
+
 0.12.1
 +++++++++++++++
 

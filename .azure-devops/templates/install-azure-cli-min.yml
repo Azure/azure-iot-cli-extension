@@ -10,5 +10,5 @@ steps:
           version = metadata['azext.minCliCoreVersion']
           print('##vso[task.setvariable variable=min_cli_version]{}'.format(version))
 - bash: |
-    pip install azure-cli==$(min_cli_version)
+    pip install -U azure-cli==$(min_cli_version)
   displayName: "Install minimum supported CLI version"

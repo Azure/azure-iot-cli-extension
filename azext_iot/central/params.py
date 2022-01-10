@@ -70,8 +70,8 @@ def load_central_arguments(self, _):
         context.argument(
             "device_id",
             options_list=["--device-id", "-d"],
-            help="The ID of the target device, "
-            "You can find the Device Id by clicking on the Connect button on the Device Details page.",
+            help="The device ID of the target device."
+            "You can find the device ID by, clicking on the Connect button on the Device Details page.",
         )
 
     with self.argument_context("iot central device-template") as context:

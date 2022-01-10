@@ -27,17 +27,30 @@ parameters:
   - '3.6.x'
   - '3.8.x'
   - '3.9.x'
+- name: pythonVersionsTestingMatrix
+  type: object
+  default: >
+    {
+      Python36: 
+      {
+        python: '3.6.x'
+      },
+      Python38: 
+      {
+        python: '3.8.x'
+      },
+      Python39: 
+      {
+        python: '3.9.x'
+      },
+      Python310: 
+      {
+        python: '3.10.x'
+      }
+    }
 - name: stageForPublish
   type: boolean
   default: false
-- name: pythonVersionTestRun
-  type: string
-  default: '3.8.x'
-  values:
-  - '3.6.x'
-  - '3.8.x'
-  - '3.9.x'
-  - '3.10.x'
 - name: architecture
   type: string
   default: 'x64'
@@ -56,6 +69,10 @@ parameters:
 
 variables:
   - group: ${{ parameters.variableGroup }}
+  - name: vmImage
+    value: $[variables.${{ parameters.buildAgentVmImageVar }}]
+  - name: buildPool
+    value: $[variables.${{ parameters.buildAgentPoolVar }}]
 
 stages:
   - stage: 'build'
@@ -64,8 +81,10 @@ stages:
 
     - job: 'Build_Publish_Azure_IoT_CLI_Extension'
       pool:
-        name: $[variables.${{ parameters.buildAgentPoolVar }}]
-        vmImage: $[variables.${{ parameters.buildAgentVmImageVar }}]
+        name: $(buildPool)
+        vmImage: $(vmImage)
+        demands:
+        - ImageOverride -equals $(vmImage)
       steps:
       - task: UsePythonVersion@0
         inputs:
@@ -104,68 +123,25 @@ stages:
   - stage: 'test'
     displayName: 'Run tests'
     dependsOn: build
+    variables:
+      pythonVersions: ${{ parameters.pythonVersionsTestingMatrix }}
     condition: succeeded()
     pool:
       vmImage: ${{ parameters.testAgentVmImage }}
     jobs:
-    - job: 'testCentral'
-      displayName: 'Test IoT Central'
-      condition: and(succeeded(), eq('${{ parameters.testCentral }}', true))
+    - template: templates/trigger-tests.yml
+      parameters:
+        testADT: ${{ parameters.testADT }}
+        testCentral: ${{ parameters.testCentral }}
+        testDPS: ${{ parameters.testDPS }}
+        testHub: ${{ parameters.testHub }}
+        maxParallelADT: 2
+        maxParallelDPS: 2
+        maxParallelHub: 2
+    - job: 'evaluateCmdTable'
+      displayName: 'Evaluate Command Table'
       steps:
-      - template: templates/run-tests-parallel.yml
-        parameters:
-          path: 'azext_iot/tests/central'
-          name: 'iot-central'
-          pythonVersion: ${{ parameters.pythonVersionTestRun }}
-    
-    - job: 'testADT'
-      displayName: 'Test Azure DigitalTwins'
-      condition: and(succeeded(), eq('${{ parameters.testADT }}', true))
-      steps:
-      - template: templates/run-tests-parallel.yml
-        parameters:
-          path: 'azext_iot/tests/digitaltwins'
-          name: 'azure-digitaltwins'
-          pythonVersion: ${{ parameters.pythonVersionTestRun }}
-
-    - job: 'testDPS'
-      displayName: 'Test DPS'
-      condition: and(succeeded(), eq('${{ parameters.testDPS }}', true))
-      steps:
-      - template: templates/run-tests-parallel.yml
-        parameters:
-          path: 'azext_iot/tests/dps'
-          name: 'device-provisioning-service'
-          pythonVersion: ${{ parameters.pythonVersionTestRun }}
-    
-    - job: 'testHub_job_1'
-      displayName: 'Test IoT Hub - config, core and jobs'
-      condition: and(succeeded(), eq('${{ parameters.testHub }}', true))
-      steps:
-      - template: templates/run-tests-parallel.yml
-        parameters:
-          path: 'azext_iot/tests/iothub/configurations azext_iot/tests/iothub/core azext_iot/tests/iothub/jobs'
-          name: 'iot-hub-1'
-          pythonVersion: ${{ parameters.pythonVersionTestRun }}
-    
-    - job: 'testHub_job_2'
-      displayName: 'Test IoT Hub - devices, messaging and modules'
-      condition: and(succeeded(), eq('${{ parameters.testHub }}', true))
-      steps:
-      - template: templates/run-tests-parallel.yml
-        parameters:
-          path: 'azext_iot/tests/iothub/devices azext_iot/tests/iothub/messaging azext_iot/tests/iothub/modules'
-          name: 'iot-hub-2'
-          pythonVersion: ${{ parameters.pythonVersionTestRun }}
-
-    - job: 'unitTests'
-      displayName: 'Unit tests and code coverage'
-      steps:
-      - template: templates/run-tests-parallel.yml
-        parameters:
-          runIntTests: 'false'
-          runUnitTests: 'true'
-          pythonVersion: ${{ parameters.pythonVersionTestRun }}
+      - template: templates/evaluate-command-table.yml
 
   - stage: 'kpi'
     displayName: 'Build KPIs'
@@ -176,7 +152,7 @@ stages:
       steps:
       - template: templates/calculate-code-coverage.yml
         parameters:
-          pythonVersion: ${{ parameters.pythonVersionTestRun }}
+          pythonVersion: ${{ parameters.pythonVersion }}
           architecture: ${{ parameters.architecture }}
 
   - stage: 'release'
@@ -189,9 +165,12 @@ stages:
       environment: 'production'
 
     - job: 'Calculate_Sha_And_Create_Release'
+      displayName: 'Calculate package hash and publish'
       pool:
-        name: $[variables.${{ parameters.buildAgentPoolVar }}]
-        vmImage: $[variables.${{ parameters.buildAgentVmImageVar }}]
+        name: $(buildPool)
+        vmImage: $(vmImage)
+        demands:
+        - ImageOverride -equals $(vmImage)
       variables:
         CLIVersion: $[ stageDependencies.build.recordVersion.outputs['setupVersion.CLIVersion'] ]
         ReleaseTitle: $[ stageDependencies.build.recordVersion.outputs['setupVersion.ReleaseTitle'] ]

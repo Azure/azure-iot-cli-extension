@@ -58,6 +58,31 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
 
         self._delete_device(device_id=device_id, api_version=self._api_version)
 
+    def test_central_device_c2d_purge_success(self):
+        (template_id, _) = self._create_device_template(api_version=self._api_version)
+        (device_id, _) = self._create_device(
+            template=template_id, api_version=self._api_version, simulated=True
+        )
+
+        # wait about a few seconds for simulator to kick in so that provisioning completes
+        time.sleep(60)
+
+        command = "iot central device c2d-message purge --app-id {} --device-id {}".format(
+            APP_ID, device_id
+        )
+
+        cmd_output = self.cmd(
+            command
+        ).get_output_in_json()
+
+        self._delete_device(device_id=device_id, api_version=self._api_version)
+        self._delete_device_template(
+            template_id=template_id, api_version=self._api_version
+        )
+
+        assert device_id in cmd_output["message"]
+        assert "Total messages purged:" in cmd_output["message"]
+
     def test_central_device_twin_show_success(self):
         (template_id, _) = self._create_device_template(api_version=self._api_version)
         (device_id, _) = self._create_device(
@@ -97,8 +122,8 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         command = "iot central device compute-device-key --pk {} -d {}".format(
             APP_PRIMARY_KEY, device_id
         )
-        device_primary_key = self.cmd(
-            command, api_version=self._api_version
+        device_primary_key = self.cmd_withoutParams(
+            command
         ).get_output_in_json()
 
         credentials = {
