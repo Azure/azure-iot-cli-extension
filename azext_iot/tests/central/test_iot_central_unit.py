@@ -401,15 +401,15 @@ class TestCentralUserProvider:
         provider = CentralUserProvider(
             cmd=None, app_id=app_id, api_version=ApiVersion.v1.value
         )
-        mock_user_svc.addorupdate_email.return_value = updated_user
+        mock_user_svc.addorupdate_email_user.return_value = updated_user
 
         # act
-        user = provider.update_email(
+        user = provider.update_email_user(
             current_user.id, email=current_user.email, role="new_role", org_id=None
         )
         # verify
         # call counts should be at most 1 since the provider has a cache
-        assert mock_user_svc.addorupdate_email.call_count == 1
+        assert mock_user_svc.addorupdate_email_user.call_count == 1
         assert user.roles[0]["role"] == "new_role"
 
 

@@ -100,7 +100,7 @@ def load_central_arguments(self, _):
         context.argument(
             "compact",
             options_list=["--compact", "-c"],
-            help="Shot templates in compact mode",
+            help="Show templates in compact mode. For each template will only display id, name and model types.",
         )
 
     with self.argument_context("iot central api-token") as context:

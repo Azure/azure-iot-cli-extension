@@ -56,11 +56,10 @@ def update_user(
     cmd,
     app_id: str,
     assignee: str,
-    role=None,
+    roles=None,
     email=None,
     tenant_id=None,
     object_id=None,
-    org_id=None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
@@ -70,20 +69,18 @@ def update_user(
     )
 
     if email:
-        return provider.update_email(
+        return provider.update_email_user(
             assignee=assignee,
             email=email,
-            org_id=org_id,
-            role=role,
+            roles=roles,
             central_dns_suffix=central_dns_suffix,
         )
 
     return provider.update_service_principal(
         assignee=assignee,
-        org_id=org_id,
         tenant_id=tenant_id,
         object_id=object_id,
-        role=role,
+        roles=roles,
         central_dns_suffix=central_dns_suffix,
     )
 

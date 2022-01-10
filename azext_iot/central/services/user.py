@@ -21,6 +21,7 @@ from azext_iot.central.models.enum import (
 from azext_iot.central.models.v1 import UserV1
 from azext_iot.central.models.v1_1_preview import UserV1_1_preview
 from azext_iot.central.models.preview import UserPreview
+from re import search
 
 User = Union[UserV1, UserV1_1_preview, UserPreview]
 
@@ -28,6 +29,7 @@ logger = get_logger(__name__)
 
 BASE_PATH = "api/users"
 MODEL = "User"
+ROLE_PATTERN = r"([\S]+)\\\\([\S]+)"
 
 
 def _make_call(
@@ -65,14 +67,39 @@ def _make_call(
     return _utility.try_extract_result(response)
 
 
-def addorupdate_service_principal(
+def create_roles(roles: str, api_version: str):
+    result_roles = []
+    parsed_roles = roles.split(",")
+    for role in parsed_roles:
+        match = search(ROLE_PATTERN, role)
+        if match and len(match.groups()) == 2:
+            # role is an org role
+            if api_version != ApiVersion.v1_1_preview.value:
+                raise CLIError(
+                    f"Api Version {ApiVersion[api_version].value} does not support organizations. Please use version >= 1.1-preview."
+                )
+            org_id = match[1]
+            role_id = (
+                Role[match[2]].value if match[2] in get_enum_keys(Role) else match[2]
+            )
+        else:
+            role_id = Role[role].value if role in get_enum_keys(Role) else role
+
+        if org_id:
+            result_roles.append({"role": role_id, "organization": org_id})
+        else:
+            result_roles.append({"role": role_id})
+
+    return result_roles
+
+
+def addorupdate_service_principal_user(
     cmd,
     app_id: str,
     assignee: str,
     tenant_id: str,
     object_id: str,
-    role: str,
-    org_id: str,
+    roles: str,
     token: str,
     api_version: str,
     update=False,
@@ -103,12 +130,8 @@ def addorupdate_service_principal(
         "type": user_type,
     }
 
-    if role:
-        role_id = Role[role].value if role in get_enum_keys(Role) else role
-        if org_id and api_version == ApiVersion.v1_1_preview.value:
-            payload["roles"] = [{"role": role_id, "organization": org_id}]
-        else:
-            payload["roles"] = [{"role": role_id}]
+    if roles:
+        payload["roles"] = create_roles(roles, api_version=api_version)
 
     if tenant_id:
         payload["tenantId"] = tenant_id
@@ -130,13 +153,12 @@ def addorupdate_service_principal(
     return _utility.get_object(result, MODEL, api_version)
 
 
-def addorupdate_email(
+def addorupdate_email_user(
     cmd,
     app_id: str,
     assignee: str,
     email: str,
-    role: Role,
-    org_id: str,
+    roles: str,
     token: str,
     api_version: str,
     update=False,
@@ -162,16 +184,10 @@ def addorupdate_email(
     else:
         user_type = UserTypeV1.email.value
 
-    payload = {
-        "type": user_type,
-    }
+    payload = {"type": user_type, "roles": []}
 
-    if role:
-        role_id = Role[role].value if role in get_enum_keys(Role) else role
-        if org_id and api_version == ApiVersion.v1_1_preview.value:
-            payload["roles"] = [{"role": role_id, "organization": org_id}]
-        else:
-            payload["roles"] = [{"role": role_id}]
+    if roles:
+        payload["roles"] = create_roles(roles, api_version=api_version)
 
     if email:
         payload["email"] = email
