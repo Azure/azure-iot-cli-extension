@@ -7,6 +7,7 @@
 from knack.log import get_logger
 from knack.util import CLIError
 from typing import List
+from azext_iot.central.models.enum import ApiVersion
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 
@@ -48,14 +49,18 @@ class CentralUserProvider:
         if not object_id:
             raise CLIError("Must specify --object-id when adding a service principal")
 
+        if org_id and self._api_version == ApiVersion.v1_1_preview.value:
+            roles = rf"{org_id}\{role}"
+        else:
+            roles = role
+
         return central_services.user.addorupdate_service_principal_user(
             cmd=self._cmd,
             app_id=self._app_id,
             assignee=assignee,
             tenant_id=tenant_id,
             object_id=object_id,
-            role=role,
-            org_id=org_id,
+            roles=roles,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
             api_version=self._api_version,
@@ -139,13 +144,17 @@ class CentralUserProvider:
         if not email:
             raise CLIError("Must specify --email when adding a user by email")
 
+        if org_id and self._api_version == ApiVersion.v1_1_preview.value:
+            roles = rf"{org_id}\{role}"
+        else:
+            roles = role
+
         return central_services.user.addorupdate_email_user(
             cmd=self._cmd,
             app_id=self._app_id,
             assignee=assignee,
             email=email,
-            role=role,
-            org_id=org_id,
+            roles=roles,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
             api_version=self._api_version,

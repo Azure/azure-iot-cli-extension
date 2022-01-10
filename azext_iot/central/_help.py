@@ -613,27 +613,17 @@ def _load_central_users_help():
         type: command
         short-summary: Update roles for a user in the application.
         long-summary: |
-                    Update a user with a different role.
+                    Update a user with a different roles.
                     Updating the tenantId or objectId for a service principal user is not allowed.
                     Updating the email address for an email user is not allowed.
 
         examples:
-        - name: Update a user by email in the application
+        - name: Update roles for a user by email or service principal in the application.
           text: >
             az iot central user update
             --user-id {userId}
             --app-id {appId}
-            --email {emailAddress}
-            --role admin
-
-        - name: Update a service-principal user in the application
-          text: >
-            az iot central user update
-            --user-id {userId}
-            --app-id {appId}
-            --tenant-id {tenantId}
-            --object-id {objectId}
-            --role operator
+            --roles "org1\\admin"
     """
 
     helps[

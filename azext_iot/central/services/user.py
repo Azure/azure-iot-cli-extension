@@ -76,7 +76,8 @@ def create_roles(roles: str, api_version: str):
             # role is an org role
             if api_version != ApiVersion.v1_1_preview.value:
                 raise CLIError(
-                    f"Api Version {ApiVersion[api_version].value} does not support organizations. Please use version >= 1.1-preview."
+                    f"Api Version {ApiVersion[api_version].value} does not support organizations."
+                    " Please use version >= 1.1-preview."
                 )
             org_id = match[1]
             role_id = (
@@ -189,7 +190,7 @@ def addorupdate_email_user(
     if roles:
         payload["roles"] = create_roles(roles, api_version=api_version)
 
-    if email:
+    if email and not update:
         payload["email"] = email
 
     result = _make_call(

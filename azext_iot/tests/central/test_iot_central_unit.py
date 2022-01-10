@@ -405,12 +405,34 @@ class TestCentralUserProvider:
 
         # act
         user = provider.update_email_user(
-            current_user.id, email=current_user.email, role="new_role", org_id=None
+            current_user.id, email=current_user.email, roles="new_role"
         )
         # verify
         # call counts should be at most 1 since the provider has a cache
         assert mock_user_svc.addorupdate_email_user.call_count == 1
         assert user.roles[0]["role"] == "new_role"
+
+    @mock.patch("azext_iot.central.services.user")
+    def test_should_update_user_with_org(self, mock_user_svc):
+        current_user = self._users[0]
+        updated_user = deepcopy(current_user)
+        updated_user.roles[0]["role"] = "new_role"
+        updated_user.roles[0]["organization"] = "new_org"
+        # setup
+        provider = CentralUserProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1.value
+        )
+        mock_user_svc.addorupdate_email_user.return_value = updated_user
+
+        # act
+        user = provider.update_email_user(
+            current_user.id, email=current_user.email, roles="new_org\\new_role"
+        )
+        # verify
+        # call counts should be at most 1 since the provider has a cache
+        assert mock_user_svc.addorupdate_email_user.call_count == 1
+        assert user.roles[0]["role"] == "new_role"
+        assert user.roles[0]["organization"] == "new_org"
 
 
 class TestCentralOrganizationProvider:

@@ -245,6 +245,19 @@ def load_central_arguments(self, _):
             " Only available for api-version == 1.1-preview",
         )
 
+    with self.argument_context("iot central user update") as context:
+        context.ignore("role")
+        context.ignore("org_id")
+        context.argument(
+            "roles",
+            options_list=["--roles"],
+            help="Comma-separated list of roles that will be associated with this user."
+            " You can specify one of the built-in roles, or specify the role ID of a custom role."
+            " See more at https://aka.ms/iotcentral-customrolesdocs."
+            " Organizations can be specified alongside roles when running with API version == 1.1-preview."
+            ' E.g. "organization_id\\role".',
+        )
+
     with self.argument_context("iot central diagnostics") as context:
         context.argument("timeout", arg_type=event_timeout_type)
         context.argument("properties", arg_type=event_msg_prop_type)
