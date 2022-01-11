@@ -152,7 +152,7 @@ def load_command_table(self, _):
     with self.command_group(
         "iot edge module image terms", command_type=iothub_ops
     ) as cmd_group:
-        cmd_group.command("show", "iot_edge_module_image_terms_show", is_experimental=True)
+        cmd_group.show_command("show", "iot_edge_module_image_terms_show", is_experimental=True)
         cmd_group.command("accept", "iot_edge_module_image_terms_accept", is_experimental=True)
         cmd_group.command("cancel", "iot_edge_module_image_terms_cancel", is_experimental=True)
 
