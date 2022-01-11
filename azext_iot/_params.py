@@ -815,6 +815,33 @@ def load_arguments(self, _):
             arg_type=auth_type_dataplane_param_type,
         )
 
+    with self.argument_context("iot edge module image terms") as context:
+        context.argument(
+            "offerId",
+            options_list=["--offer", "-f"],
+            help="IoT Edge module image offer.",
+        )
+        context.argument(
+            "planId",
+            options_list=["--plan"],
+            help="IoT Edge module image billing plan.",
+        )
+        context.argument(
+            "publisherId",
+            options_list=["--publisher", "-p"],
+            help="IoT Edge module image publisher.",
+        )
+        context.argument(
+            "urn",
+            options_list=["--urn"],
+            help="URN, in the format of 'publisher:offer:sku:version'. If specified, other argument values should be omitted.",
+        )
+        context.argument(
+            "azureSub",
+            options_list=["--sub", "-s"],
+            help="Name or ID of subscription. You can configure the default subscription using az account set -s NAME_OR_ID",
+        )
+
     with self.argument_context("iot dps") as context:
         context.argument(
             "login",

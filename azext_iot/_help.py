@@ -1081,6 +1081,57 @@ helps[
 """
 
 helps[
+    "iot edge module image terms show"
+] = """
+    type: command
+    short-summary: Get the details of IoT Edge module image terms.
+    examples:
+    - name: Get details of IoT Edge module image terms using URN
+      text: >
+        az iot edge module image terms show --urn {publisher:offer:sku:version}
+    - name: Get details of another Azure subscription's IoT Edge module image terms using URN
+      text: >
+        az iot edge module image terms show --urn {publisher:offer:sku:version} -s {subscription_id_or_name}
+    - name: Get details of Azure Marketplace image terms using Offer ID, Plan ID and Publisher ID
+      text: >
+        az iot edge module image terms show --offer {offer_id} --plan {plan_id} --publisher {publisher_id}
+"""
+
+helps[
+    "iot edge module image terms accept"
+] = """
+    type: command
+    short-summary: Get the details of IoT Edge module image terms.
+    examples:
+    - name: Accept IoT Edge module image terms using URN
+      text: >
+        az iot edge module image terms accept --urn {publisher:offer:sku:version}
+    - name: Accept another Azure subscription's IoT Edge module image terms using URN
+      text: >
+        az iot edge module image terms accept --urn {publisher:offer:sku:version} -s {subscription_id_or_name}
+    - name: Accept Azure Marketplace image terms using Offer ID, Plan ID and Publisher ID
+      text: >
+        az iot edge module image terms accept --offer {offer_id} --plan {plan_id} --publisher {publisher_id}
+"""
+
+helps[
+    "iot edge module image terms cancel"
+] = """
+    type: command
+    short-summary: Get the details of IoT Edge module image terms.
+    examples:
+    - name: Cancel IoT Edge module image terms using URN
+      text: >
+        az iot edge module image terms cancel --urn {publisher:offer:sku:version}
+    - name: Cancel another Azure subscription's IoT Edge module image terms using URN
+      text: >
+        az iot edge module image terms cancel --urn {publisher:offer:sku:version} -s {subscription_id_or_name}
+    - name: Cancel Azure Marketplace image terms using Offer ID, Plan ID and Publisher ID
+      text: >
+        az iot edge module image terms cancel --offer {offer_id} --plan {plan_id} --publisher {publisher_id}
+"""
+
+helps[
     "iot dps"
 ] = """
     type: group

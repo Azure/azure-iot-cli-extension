@@ -29,7 +29,8 @@ from azext_iot.common.shared import (
     DeviceAuthApiType,
     ConnectionStringParser,
     EntityStatusType,
-    AuthenticationTypeDataplane
+    AuthenticationTypeDataplane,
+    IotEdgeModuleImageTermsCommands
 )
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
@@ -1724,6 +1725,68 @@ def iot_hub_configuration_metric_show(
         return output
     except CloudError as e:
         raise CLIError(unpack_msrest_error(e))
+
+
+def _iot_edge_module_image_terms_invoke_command(
+    command_name: str = None,
+    offerId: str = None,
+    planId: str = None,
+    publisherId: str = None,
+    urn: str = None,
+    subscription: str = None
+):
+    from azext_iot.common.embedded_cli import EmbeddedCLI
+    embedded_cli = EmbeddedCLI()
+    command = "vm image terms " + command_name
+
+    if urn:
+        if (offerId or planId or publisherId):
+            raise CLIError('Offer Id, Plan Id or Publisher Id should not be specified when providing URN')
+        command += " --urn '{}'".format(urn)
+    else:
+        if (offerId and planId and publisherId):
+            command += " --offer '{}' --plan '{}' --publisher '{}'".format(offerId, planId, publisherId)
+        else:
+            raise CLIError('Publisher Id, Offer Id and Plan Id are mandatory when URN not specified')
+
+    output = embedded_cli.invoke(command, subscription).as_json()
+    return output
+
+
+def iot_edge_module_image_terms_show(
+    offerId=None,
+    planId=None,
+    publisherId=None,
+    urn=None,
+    azureSub=None
+):
+    return _iot_edge_module_image_terms_invoke_command(
+        IotEdgeModuleImageTermsCommands.Show.value, offerId, planId, publisherId, urn, azureSub
+    )
+
+
+def iot_edge_module_image_terms_accept(
+    offerId=None,
+    planId=None,
+    publisherId=None,
+    urn=None,
+    azureSub=None
+):
+    return _iot_edge_module_image_terms_invoke_command(
+        IotEdgeModuleImageTermsCommands.Accept.value, offerId, planId, publisherId, urn, azureSub
+    )
+
+
+def iot_edge_module_image_terms_cancel(
+    offerId=None,
+    planId=None,
+    publisherId=None,
+    urn=None,
+    azureSub=None
+):
+    return _iot_edge_module_image_terms_invoke_command(
+        IotEdgeModuleImageTermsCommands.Cancel.value, offerId, planId, publisherId, urn, azureSub
+    )
 
 
 # Device Twin

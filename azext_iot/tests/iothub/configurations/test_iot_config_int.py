@@ -800,3 +800,55 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
             )
 
             self.tearDown()
+
+    def test_edge_module_image_terms(self):
+
+        planId = "test_plan"
+        publisherId = "azure-iot"
+        offerId = "transactableiottestoffer3"
+
+        offer_checks = [
+            self.check("publisher", publisherId),
+            self.check("plan", planId),
+            self.check("product", offerId),
+        ]
+
+        # Show IoT Edge module terms accepted offer
+        self.cmd(
+            "iot edge module image terms show --offer {} --plan {} --publisher {}".format(
+                offerId, planId, publisherId
+            ),
+            checks=offer_checks.append(self.check("accepted", "true"))
+        )
+
+        # Cancel IoT Edge module terms offer
+        self.cmd(
+            "iot edge module image terms cancel --offer {} --plan {} --publisher {}".format(
+                offerId, planId, publisherId
+            ),
+            checks=offer_checks.append(self.check("accepted", "false"))
+        )
+
+        # Accept IoT Edge module terms offer
+        self.cmd(
+            "iot edge module image terms accept --offer {} --plan {} --publisher {}".format(
+                offerId, planId, publisherId
+            ),
+            checks=offer_checks.append(self.check("accepted", "true"))
+        )
+
+        # Error invalid offer
+        self.cmd(
+            "iot edge module image terms show --offer {} --plan {} --publisher {}".format(
+                "inavalid_offer", planId, publisherId
+            ),
+            expect_failure=True,
+        )
+
+        # Error invalid publisher
+        self.cmd(
+            "iot edge module image terms show --offer {} --plan {} --publisher {}".format(
+                offerId, planId, "invalid_publisher"
+            ),
+            expect_failure=True,
+        )
