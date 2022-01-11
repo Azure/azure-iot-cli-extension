@@ -1081,6 +1081,27 @@ helps[
 """
 
 helps[
+    "iot edge module"
+] = """
+    type: group
+    short-summary: Manage IoT Edge modules.
+"""
+
+helps[
+    "iot edge module image"
+] = """
+    type: group
+    short-summary: Manage IoT Edge module images.
+"""
+
+helps[
+    "iot edge module image terms"
+] = """
+    type: group
+    short-summary: Manage IoT Edge module image terms.
+"""
+
+helps[
     "iot edge module image terms show"
 ] = """
     type: command
