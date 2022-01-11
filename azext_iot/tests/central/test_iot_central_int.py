@@ -394,6 +394,10 @@ class TestIotCentral(CentralLiveScenarioTest):
         assert result["id"] == org["id"]
         self._delete_organization(org_id=org["id"], api_version=self._api_version)
 
+    @pytest.mark.skipif(
+        not STORAGE_CSTRING or not STORAGE_CONTAINER,
+        reason="empty azext_iot_central_storage_cstring or azext_iot_central_storage_container env var",
+    )
     @pytest.mark.xfail(
         condition=not IS_1_1_PREVIEW,
         reason="Api version not supported",

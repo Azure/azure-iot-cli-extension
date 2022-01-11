@@ -13,6 +13,9 @@ schedules:
     - dev
 
 parameters:
+- name: variableGroup
+  type: string
+  default: 'aziotcli_test_nightly'
 - name: vmImage
   type: string
   default: 'ubuntu-18.04'
@@ -27,14 +30,19 @@ parameters:
   - '3.6.x'
   - '3.8.x'
   - '3.9.x'
-- name: minCLIPythonVersion
-  displayName: 'Python version for min CLI tests'
-  type: string
-  default: '3.8.x'
-  values:
-  - '3.6.x'
-  - '3.7.x'
-  - '3.8.x'
+- name: pythonVersionsTestingMatrix
+  type: object
+  default: >
+    {
+      Python36: 
+      {
+        python: '3.6.x'
+      },
+      Python38: 
+      {
+        python: '3.8.x'
+      }
+    }
 - name: architecture
   type: string
   default: 'x64'
@@ -52,11 +60,19 @@ parameters:
   default: true
 
 variables:
-  - group: aziotcli_test_nightly
+  - group: ${{ parameters.variableGroup }}
   - name: pythonVersion
     value: ${{ parameters.pythonVersion }}
   - name: architecture
     value: ${{ parameters.architecture }}
+  - name: msiTestingMatrix
+    value: >
+      {
+        PythonMSI: 
+        {
+          python: '3.8.x'
+        }
+      }
 
 stages:
   - stage: 'build'
@@ -66,7 +82,6 @@ stages:
     jobs:
 
     - job: 'Build_Publish_Azure_IoT_CLI_Extension'
-
       steps:
       - task: UsePythonVersion@0
         inputs:
@@ -78,7 +93,6 @@ stages:
       - template: templates/build-publish-azure-iot-cli-extension.yml
 
     - job: 'Build_Publish_Azure_CLI_Test_SDK'
-
       steps:
       - task: UsePythonVersion@0
         inputs:
@@ -105,11 +119,12 @@ stages:
     pool:
       vmImage: ${{ parameters.vmImage }}
     dependsOn: build
+    variables:
+      pythonVersions: ${{ parameters.pythonVersionsTestingMatrix }}
     jobs:
-    - template: templates/nightly-tests.yml
+    - template: templates/trigger-tests.yml
       parameters:
         azureCLIVersion: min
-        pythonVersion: ${{ parameters.minCLIPythonVersion }}
         testADT: ${{ parameters.testADT }}
         testCentral: ${{ parameters.testCentral }}
         testDPS: ${{ parameters.testDPS }}
@@ -119,16 +134,18 @@ stages:
     displayName: 'Run all tests against Windows MSI install'
     pool:
       vmImage: 'windows-2019'
-    dependsOn: test_min
+    dependsOn: [build, test_min]
+    variables:
+      pythonVersions: $[variables['msiTestingMatrix']]
     jobs:
-    - template: templates/nightly-tests.yml
+    - template: templates/trigger-tests.yml
       parameters:
         azureCLIVersion: msi
         testADT: ${{ parameters.testADT }}
         testCentral: ${{ parameters.testCentral }}
         testDPS: ${{ parameters.testDPS }}
         testHub: ${{ parameters.testHub }}
-          
+
   - stage: 'kpi'
     displayName: 'Build KPIs'
     dependsOn: [build, test_min, test_msi]

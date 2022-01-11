@@ -56,21 +56,32 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
 
         self.cmd(command, expect_failure=True)
 
-        # Verify incorrect app-id throws error
-        command = (
-            "iot central device twin show --app-id incorrect-app --device-id {}".format(
-                device_id
-            )
-        )
-
-        self.cmd(command, expect_failure=True)
-        # Verify incorrect device-id throws error
-        command = "iot central device twin show --app-id {} --device-id incorrect-device".format(
-            APP_ID
-        )
-
-        self.cmd(command, expect_failure=True)
         self._delete_device(device_id=device_id, api_version=self._api_version)
+
+    def test_central_device_c2d_purge_success(self):
+        (template_id, _) = self._create_device_template(api_version=self._api_version)
+        (device_id, _) = self._create_device(
+            template=template_id, api_version=self._api_version, simulated=True
+        )
+
+        # wait about a few seconds for simulator to kick in so that provisioning completes
+        time.sleep(60)
+
+        command = "iot central device c2d-message purge --app-id {} --device-id {}".format(
+            APP_ID, device_id
+        )
+
+        cmd_output = self.cmd(
+            command
+        ).get_output_in_json()
+
+        self._delete_device(device_id=device_id, api_version=self._api_version)
+        self._delete_device_template(
+            template_id=template_id, api_version=self._api_version
+        )
+
+        assert device_id in cmd_output["message"]
+        assert "Total messages purged:" in cmd_output["message"]
 
     def test_central_device_twin_show_success(self):
         (template_id, _) = self._create_device_template(api_version=self._api_version)
@@ -87,17 +98,13 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
 
         self.cmd(
             command,
-            checks=[self.check("deviceId", device_id)],
+            checks=[
+                self.check("deviceId", device_id),
+                self.check("tags", {}),
+                self.check("_links", None),
+            ],
         )
 
-        command = "iot central device twin show --app-id {} --device-id {}".format(
-            APP_ID, device_id
-        )
-
-        self.cmd(
-            command,
-            checks=[self.check("deviceId", device_id)],
-        )
         self._delete_device(device_id=device_id, api_version=self._api_version)
         self._delete_device_template(
             template_id=template_id, api_version=self._api_version
@@ -115,8 +122,8 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         command = "iot central device compute-device-key --pk {} -d {}".format(
             APP_PRIMARY_KEY, device_id
         )
-        device_primary_key = self.cmd(
-            command, api_version=self._api_version
+        device_primary_key = self.cmd_withoutParams(
+            command
         ).get_output_in_json()
 
         credentials = {
@@ -281,7 +288,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
                     (
                         template
                         for template in deleted_device_template_list
-                        if template["id"] == template_id
+                        if self._get_template_id(template) == template_id
                     ),
                     None,
                 )

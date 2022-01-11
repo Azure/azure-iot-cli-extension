@@ -33,10 +33,6 @@ central_orgs_ops = CliCommandType(
 
 central_jobs_ops = CliCommandType(operations_tmpl="azext_iot.central.commands_job#{}")
 
-central_device_twin_ops = CliCommandType(
-    operations_tmpl="azext_iot.central.commands_device_twin#{}"
-)
-
 central_monitor_ops = CliCommandType(
     operations_tmpl="azext_iot.central.commands_monitor#{}"
 )
@@ -147,6 +143,21 @@ def load_central_commands(self, _):
         cmd_group.command("manual-failback", "run_manual_failback")
 
     with self.command_group(
+        "iot central device twin",
+        command_type=central_device_ops,
+    ) as cmd_group:
+        cmd_group.show_command(
+            "show",
+            "get_device_twin",
+        )
+
+    with self.command_group(
+        "iot central device c2d-message",
+        command_type=central_device_ops,
+    ) as cmd_group:
+        cmd_group.command("purge", "purge_c2d_messages")
+
+    with self.command_group(
         "iot central device command",
         command_type=central_device_ops,
     ) as cmd_group:
@@ -203,12 +214,3 @@ def load_central_commands(self, _):
         cmd_group.command("resume", "resume_job")
         cmd_group.command("get-devices", "get_job_devices")
         cmd_group.command("rerun", "rerun_job")
-
-    with self.command_group(
-        "iot central device twin",
-        command_type=central_device_twin_ops,
-    ) as cmd_group:
-        cmd_group.show_command(
-            "show",
-            "device_twin_show",
-        )

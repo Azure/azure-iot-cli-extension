@@ -1,7 +1,4 @@
 parameters:
-- name: pythonVersion
-  type: string
-  default: '3.8.x'
 - name: architecture
   type: string
   default: 'x64'
@@ -14,7 +11,7 @@ parameters:
   - msi
 - name: azureSubscription
   type: string
-  default: 'az_cli_nightly_conn'
+  default: 'aziotcli-sp-prime'
 - name: 'testCentral'
   type: boolean
   default: true
@@ -27,70 +24,103 @@ parameters:
 - name: 'testHub'
   type: boolean
   default: true
+- name: 'maxParallelCentral'
+  type: number
+  default: 1
+- name: 'maxParallelADT'
+  type: number
+  default: 1
+- name: 'maxParallelDPS'
+  type: number
+  default: 1
+- name: 'maxParallelHub'
+  type: number
+  default: 1
+- name: 'maxParallelUnit'
+  type: number
+  default: 1
 
 jobs:
 
 - job: 'testCentral'
   displayName: 'Test IoT Central'
   condition: and(succeeded(), eq('${{ parameters.testCentral }}', true))
+  strategy:
+    matrix: $[ variables['pythonVersions'] ]
+    maxParallel: ${{ parameters.maxParallelCentral }}
   steps:
   - template: run-tests-parallel.yml
     parameters:
       path: 'azext_iot/tests/central'
       name: 'iot-central'
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
-      pythonVersion: ${{ parameters.pythonVersion }}
+      pythonVersion: $(python)
 
 - job: 'testADT'
   displayName: 'Test Azure DigitalTwins'
   condition: and(succeeded(), eq('${{ parameters.testADT }}', true))
+  strategy:
+    matrix: $[ variables['pythonVersions'] ]
+    maxParallel: ${{ parameters.maxParallelADT }}
   steps:
   - template: run-tests-parallel.yml
     parameters:
       path: 'azext_iot/tests/digitaltwins'
       name: 'azure-digitaltwins'
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
-      pythonVersion: ${{ parameters.pythonVersion }}
+      pythonVersion: $(python)
 
 - job: 'testDPS'
   displayName: 'Test DPS'
   condition: and(succeeded(), eq('${{ parameters.testDPS }}', true))
+  strategy:
+    matrix: $[ variables['pythonVersions'] ]
+    maxParallel: ${{ parameters.maxParallelDPS }}
   steps:
   - template: run-tests-parallel.yml
     parameters:
       path: 'azext_iot/tests/dps'
       name: 'device-provisioning-service'
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
-      pythonVersion: ${{ parameters.pythonVersion }}
+      pythonVersion: $(python)
 
 - job: 'testHub_job_1'
   displayName: 'Test IoT Hub - config, core and jobs'
   condition: and(succeeded(), eq('${{ parameters.testHub }}', true))
+  strategy:
+    matrix: $[ variables['pythonVersions'] ]
+    maxParallel: ${{ parameters.maxParallelHub }}
   steps:
   - template: run-tests-parallel.yml
     parameters:
       path: 'azext_iot/tests/iothub/configurations azext_iot/tests/iothub/core azext_iot/tests/iothub/jobs'
       name: 'iot-hub-1'
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
-      pythonVersion: ${{ parameters.pythonVersion }}
+      pythonVersion: $(python)
 
 - job: 'testHub_job_2'
   condition: and(succeeded(), eq('${{ parameters.testHub }}', true))
   displayName: 'Test IoT Hub - devices, messaging and modules'
+  strategy:
+    matrix: $[ variables['pythonVersions'] ]
+    maxParallel: ${{ parameters.maxParallelHub }}
   steps:
   - template: run-tests-parallel.yml
     parameters:
       path: 'azext_iot/tests/iothub/devices azext_iot/tests/iothub/messaging azext_iot/tests/iothub/modules'
       name: 'iot-hub-2'
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
-      pythonVersion: ${{ parameters.pythonVersion }}
+      pythonVersion: $(python)
 
 - job: 'unitTests'
   displayName: 'Unit tests and code coverage'
+  strategy:
+    matrix: $[ variables['pythonVersions'] ]
+    maxParallel: ${{ parameters.maxParallelUnit }}
   steps:
   - template: run-tests-parallel.yml
     parameters:
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
       runIntTests: 'false'
       runUnitTests: 'true'
-      pythonVersion: ${{ parameters.pythonVersion }}
+      pythonVersion: $(python)
