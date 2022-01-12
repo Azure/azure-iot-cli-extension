@@ -220,17 +220,22 @@ def load_central_arguments(self, _):
         context.argument(
             "tenant_id",
             options_list=["--tenant-id", "--tnid"],
-            help="Tenant ID for service principal to be added to the app. Object ID must also be specified. ",
+            help="Tenant ID for service principal to be added to the app. Object ID must also be specified."
+            " If email is specified this gets ignored and the user will not be a service principal user"
+            ' but a standard "email" user.',
         )
         context.argument(
             "object_id",
             options_list=["--object-id", "--oid"],
-            help="Object ID for service principal to be added to the app. Tenant ID must also be specified. ",
+            help="Object ID for service principal to be added to the app. Tenant ID must also be specified."
+            " If email is specified this gets ignored and the user will not be a service principal user"
+            ' but a standard "email" user.',
         )
         context.argument(
             "email",
             options_list=["--email"],
-            help="Email address of user to be added to the app. ",
+            help="Email address of user to be added to the app."
+            " If this is specified, service principal parameters (tenant_id and object_id) will be ignored.",
         )
         context.argument(
             "assignee",
