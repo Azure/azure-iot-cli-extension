@@ -347,8 +347,8 @@ class BaseDiscovery(ABC):
                             **kwargs
                         )
                     )
-                except HttpResponseError as e:
-                    logger.warning("Could not access %s. %s", resource, e)
+                except (HttpResponseError, CLIError) as e:
+                    logger.warning("Could not access %s. %s", resource.name, e)
 
         return targets
 
