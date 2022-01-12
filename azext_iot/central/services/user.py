@@ -95,7 +95,7 @@ def create_roles(roles: str, api_version: str):
     return result_roles
 
 
-def addorupdate_service_principal_user(
+def add_or_update_service_principal_user(
     cmd,
     app_id: str,
     assignee: str,
@@ -155,7 +155,7 @@ def addorupdate_service_principal_user(
     return _utility.get_object(result, MODEL, api_version)
 
 
-def addorupdate_email_user(
+def add_or_update_email_user(
     cmd,
     app_id: str,
     assignee: str,

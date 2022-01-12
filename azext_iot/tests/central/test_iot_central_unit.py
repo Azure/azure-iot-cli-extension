@@ -401,7 +401,7 @@ class TestCentralUserProvider:
         provider = CentralUserProvider(
             cmd=None, app_id=app_id, api_version=ApiVersion.v1.value
         )
-        mock_user_svc.addorupdate_email_user.return_value = updated_user
+        mock_user_svc.add_or_update_email_user.return_value = updated_user
 
         # act
         user = provider.update_email_user(
@@ -409,7 +409,7 @@ class TestCentralUserProvider:
         )
         # verify
         # call counts should be at most 1 since the provider has a cache
-        assert mock_user_svc.addorupdate_email_user.call_count == 1
+        assert mock_user_svc.add_or_update_email_user.call_count == 1
         assert user.roles[0]["role"] == "new_role"
 
     @mock.patch("azext_iot.central.services.user")
@@ -422,7 +422,7 @@ class TestCentralUserProvider:
         provider = CentralUserProvider(
             cmd=None, app_id=app_id, api_version=ApiVersion.v1.value
         )
-        mock_user_svc.addorupdate_email_user.return_value = updated_user
+        mock_user_svc.add_or_update_email_user.return_value = updated_user
 
         # act
         user = provider.update_email_user(
@@ -430,7 +430,7 @@ class TestCentralUserProvider:
         )
         # verify
         # call counts should be at most 1 since the provider has a cache
-        assert mock_user_svc.addorupdate_email_user.call_count == 1
+        assert mock_user_svc.add_or_update_email_user.call_count == 1
         assert user.roles[0]["role"] == "new_role"
         assert user.roles[0]["organization"] == "new_org"
 

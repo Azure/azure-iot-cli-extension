@@ -29,19 +29,18 @@ class BaseTemplate(metaclass=ABCMeta):
 
     def _extract_schemas(self, entity: dict) -> dict:
         schema = entity.get("schema")
-        if schema is not None:
-            if schema.get("contents"):
-                return {
-                    content[self._get_schema_name(content)]: content
-                    for content in schema["contents"]
-                }
-            else:
-                return entity
-        else:
+        if schema is None:
             return {
                 schema[self._get_schema_name(schema)]: schema
                 for schema in entity["contents"]
             }
+        elif schema.get("contents"):
+            return {
+                content[self._get_schema_name(content)]: content
+                for content in schema["contents"]
+            }
+        else:
+            return entity
 
     def _extract_schema_names(self, entity: dict) -> dict:
         return {

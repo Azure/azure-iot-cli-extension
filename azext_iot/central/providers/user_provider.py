@@ -54,7 +54,7 @@ class CentralUserProvider:
         else:
             roles = role
 
-        return central_services.user.addorupdate_service_principal_user(
+        return central_services.user.add_or_update_service_principal_user(
             cmd=self._cmd,
             app_id=self._app_id,
             assignee=assignee,
@@ -80,7 +80,7 @@ class CentralUserProvider:
         if not object_id:
             raise CLIError("Must specify --object-id when adding a service principal")
 
-        return central_services.user.addorupdate_service_principal_user(
+        return central_services.user.add_or_update_service_principal_user(
             cmd=self._cmd,
             app_id=self._app_id,
             assignee=assignee,
@@ -149,7 +149,7 @@ class CentralUserProvider:
         else:
             roles = role
 
-        return central_services.user.addorupdate_email_user(
+        return central_services.user.add_or_update_email_user(
             cmd=self._cmd,
             app_id=self._app_id,
             assignee=assignee,
@@ -170,7 +170,7 @@ class CentralUserProvider:
         if not email:
             raise CLIError("Must specify --email when adding a user by email")
 
-        return central_services.user.addorupdate_email_user(
+        return central_services.user.add_or_update_email_user(
             cmd=self._cmd,
             app_id=self._app_id,
             assignee=assignee,
