@@ -11,15 +11,25 @@ from typing import Union, List
 from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
-from azext_iot.central.models.enum import Role, ApiVersion, UserTypePreview, UserTypeV1
+from azext_iot.central.models.enum import (
+    Role,
+    ApiVersion,
+    UserTypePreview,
+    UserTypeV1,
+    get_enum_keys,
+)
 from azext_iot.central.models.v1 import UserV1
 from azext_iot.central.models.v1_1_preview import UserV1_1_preview
 from azext_iot.central.models.preview import UserPreview
+from re import search
+
+User = Union[UserV1, UserV1_1_preview, UserPreview]
 
 logger = get_logger(__name__)
 
 BASE_PATH = "api/users"
 MODEL = "User"
+ROLE_PATTERN = r"([\S]+)\\\\([\S]+)"
 
 
 def _make_call(
@@ -32,7 +42,7 @@ def _make_call(
     central_dns_suffix: str,
     api_version: str,
     url=None,
-) -> Union[dict, UserV1, UserPreview, UserV1_1_preview]:
+) -> dict:
     if url is None:
         url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
 
@@ -57,19 +67,48 @@ def _make_call(
     return _utility.try_extract_result(response)
 
 
-def add_service_principal(
+def create_roles(roles: str, api_version: str):
+    result_roles = []
+    parsed_roles = roles.split(",")
+    for role in parsed_roles:
+        org_id = None
+        match = search(ROLE_PATTERN, role)
+        if match and len(match.groups()) == 2:
+            # role is an org role
+            if api_version != ApiVersion.v1_1_preview.value:
+                raise CLIError(
+                    f"Api Version {ApiVersion[api_version].value} does not support organizations."
+                    " Please use version >= 1.1-preview."
+                )
+            org_id = match[1]
+            role_id = (
+                Role[match[2]].value if match[2] in get_enum_keys(Role) else match[2]
+            )
+        else:
+            role_id = Role[role].value if role in get_enum_keys(Role) else role
+
+        if org_id:
+            result_roles.append({"role": role_id, "organization": org_id})
+        else:
+            result_roles.append({"role": role_id})
+
+    return result_roles
+
+
+def add_or_update_service_principal_user(
     cmd,
     app_id: str,
     assignee: str,
     tenant_id: str,
     object_id: str,
-    role: Role,
+    roles: str,
     token: str,
     api_version: str,
+    update=False,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> dict:
+) -> User:
     """
-    Add a user to a Central app
+    Add or update a user to a Central app
 
     Args:
         cmd: command passed into az
@@ -90,16 +129,22 @@ def add_service_principal(
         user_type = UserTypeV1.service_principal.value
 
     payload = {
-        "tenantId": tenant_id,
-        "objectId": object_id,
         "type": user_type,
-        "roles": [{"role": role.value}],
     }
+
+    if roles:
+        payload["roles"] = create_roles(roles, api_version=api_version)
+
+    if tenant_id:
+        payload["tenantId"] = tenant_id
+
+    if object_id:
+        payload["objectId"] = object_id
 
     result = _make_call(
         cmd,
         app_id=app_id,
-        method="put",
+        method="patch" if update else "put",
         path=assignee,
         payload=payload,
         token=token,
@@ -110,18 +155,19 @@ def add_service_principal(
     return _utility.get_object(result, MODEL, api_version)
 
 
-def add_email(
+def add_or_update_email_user(
     cmd,
     app_id: str,
     assignee: str,
     email: str,
-    role: Role,
+    roles: str,
     token: str,
     api_version: str,
+    update=False,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> dict:
+) -> User:
     """
-    Add a user to a Central app
+    Add or update a user to a Central app
 
     Args:
         cmd: command passed into az
@@ -140,16 +186,18 @@ def add_email(
     else:
         user_type = UserTypeV1.email.value
 
-    payload = {
-        "email": email,
-        "type": user_type,
-        "roles": [{"role": role.value}],
-    }
+    payload = {"type": user_type, "roles": []}
+
+    if roles:
+        payload["roles"] = create_roles(roles, api_version=api_version)
+
+    if email and not update:
+        payload["email"] = email
 
     result = _make_call(
         cmd,
         app_id=app_id,
-        method="put",
+        method="patch" if update else "put",
         path=assignee,
         payload=payload,
         token=token,
@@ -167,7 +215,7 @@ def get_user_list(
     api_version: str,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> List[Union[UserV1, UserV1_1_preview, UserPreview]]:
+) -> List[User]:
     """
     Get the list of users for central app.
 
@@ -218,7 +266,7 @@ def get_user(
     assignee: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[UserV1, UserV1_1_preview, UserPreview]:
+) -> User:
     """
     Get information for the specified user.
 

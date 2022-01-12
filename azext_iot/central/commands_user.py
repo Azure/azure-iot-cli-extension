@@ -8,7 +8,7 @@
 from typing import List, Union
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.providers import CentralUserProvider
-from azext_iot.central.models.enum import Role, ApiVersion
+from azext_iot.central.models.enum import ApiVersion
 from azext_iot.central.models.v1 import UserV1
 from azext_iot.central.models.preview import UserPreview
 from azext_iot.central.models.v1_1_preview import UserV1_1_preview
@@ -24,6 +24,7 @@ def add_user(
     email=None,
     tenant_id=None,
     object_id=None,
+    org_id=None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
@@ -36,15 +37,50 @@ def add_user(
         return provider.add_email(
             assignee=assignee,
             email=email,
-            role=Role[role],
+            org_id=org_id,
+            role=role,
             central_dns_suffix=central_dns_suffix,
         )
 
     return provider.add_service_principal(
         assignee=assignee,
+        org_id=org_id,
         tenant_id=tenant_id,
         object_id=object_id,
-        role=Role[role],
+        role=role,
+        central_dns_suffix=central_dns_suffix,
+    )
+
+
+def update_user(
+    cmd,
+    app_id: str,
+    assignee: str,
+    roles=None,
+    email=None,
+    tenant_id=None,
+    object_id=None,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
+) -> UserType:
+    provider = CentralUserProvider(
+        cmd=cmd, app_id=app_id, api_version=api_version, token=token
+    )
+
+    if email:
+        return provider.update_email_user(
+            assignee=assignee,
+            email=email,
+            roles=roles,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    return provider.update_service_principal(
+        assignee=assignee,
+        tenant_id=tenant_id,
+        object_id=object_id,
+        roles=roles,
         central_dns_suffix=central_dns_suffix,
     )
 

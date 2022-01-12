@@ -62,6 +62,7 @@ class CentralDeviceTemplateProvider:
 
     def list_device_templates(
         self,
+        compact=False,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> List[Union[TemplateV1, TemplateV1_1_preview, TemplatePreview]]:
         templates = central_services.device_template.list_device_templates(
@@ -72,9 +73,25 @@ class CentralDeviceTemplateProvider:
             api_version=self._api_version,
         )
 
-        self._device_templates.update(
-            {template.id: template.raw_template for template in templates}
-        )
+        if compact:  # if asked for compact, just keep reduced info
+            for template in templates:
+                self._device_templates.update(
+                    {
+                        template.id: {
+                            "displayName": template.raw_template["displayName"],
+                            template.get_id_key(): template.raw_template[
+                                template.get_id_key()
+                            ],
+                            template.get_type_key(): template.raw_template[
+                                template.get_type_key()
+                            ],
+                        }
+                    }
+                )
+        else:
+            self._device_templates.update(
+                {template.id: template.raw_template for template in templates}
+            )
         return list(self._device_templates.values())
 
     def map_device_templates(
@@ -99,6 +116,26 @@ class CentralDeviceTemplateProvider:
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         template = central_services.device_template.create_device_template(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_template_id=device_template_id,
+            payload=payload,
+            token=self._token,
+            central_dns_suffix=central_dns_suffix,
+            api_version=self._api_version,
+        )
+
+        self._device_templates[template.id] = template
+
+        return template
+
+    def update_device_template(
+        self,
+        device_template_id: str,
+        payload: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        template = central_services.device_template.update_device_template(
             cmd=self._cmd,
             app_id=self._app_id,
             device_template_id=device_template_id,

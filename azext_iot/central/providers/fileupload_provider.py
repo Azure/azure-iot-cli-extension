@@ -79,13 +79,37 @@ class CentralFileUploadProvider:
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         # get or add to cache
-        res = central_services.file_upload.create_fileupload(
+        res = central_services.file_upload.createorupdate_fileupload(
             cmd=self._cmd,
             app_id=self._app_id,
             connection_string=connection_string,
             container=container,
             account=account,
             sasTtl=sasTtl,
+            token=self._token,
+            central_dns_suffix=central_dns_suffix,
+            api_version=self._api_version,
+        )
+
+        return res
+
+    def update_fileupload(
+        self,
+        connection_string,
+        container,
+        account,
+        sasTtl,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        # get or add to cache
+        res = central_services.file_upload.createorupdate_fileupload(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            connection_string=connection_string,
+            container=container,
+            account=account,
+            sasTtl=sasTtl,
+            update=True,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
             api_version=self._api_version,

@@ -97,7 +97,11 @@ def invalid_primitive_schema_mismatch_template(field_name: str, data_type: str, 
     return (
         "Datatype of telemetry field '{}' does not match the datatype {}. Data sent by the device : {}. "
         "For more information, see: https://aka.ms/iotcentral-payloads"
-    ).format(field_name, data_type, data,)
+    ).format(
+        field_name,
+        data_type,
+        data,
+    )
 
 
 # to remove
@@ -143,7 +147,7 @@ def invalid_application_properties():
 
 # error
 def device_template_not_found(error: Exception):
-    return "Error retrieving template '{}'. Please try again later.".format(error)
+    return "Error retrieving template '{}'. Please try again later.".format(str(error))
 
 
 # error
