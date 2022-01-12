@@ -544,3 +544,9 @@ def ensure_azure_namespace_path():
         sys.path.insert(0, ext_path)
 
     return
+
+
+def get_current_user():
+    from azext_iot.common.embedded_cli import EmbeddedCLI
+    embedded_cli = EmbeddedCLI()
+    return embedded_cli.invoke("account show").as_json()["user"]

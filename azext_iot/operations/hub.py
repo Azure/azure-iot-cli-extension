@@ -1736,19 +1736,20 @@ def _iot_edge_module_image_terms_invoke_command(
     subscription: str = None
 ):
     from azext_iot.common.embedded_cli import EmbeddedCLI
-    embedded_cli = EmbeddedCLI()
+    from azext_iot.tests.settings import UserTypes
+    from azext_iot.common.utility import get_current_user
+
+    current_user = get_current_user()
+    if current_user["type"] != UserTypes.user.value:
+        raise CLIError('Edge module image terms operations are supported only for real user AAD tokens (not service principals)')
+
     command = "vm image terms " + command_name
+    command += " --urn '{}'".format(urn) if urn else ""
+    command += " --offer '{}'".format(offerId) if offerId else ""
+    command += " --plan '{}'".format(planId) if planId else ""
+    command += " --publisher '{}'".format(publisherId) if publisherId else ""
 
-    if urn:
-        if (offerId or planId or publisherId):
-            raise CLIError('Offer Id, Plan Id or Publisher Id should not be specified when providing URN')
-        command += " --urn '{}'".format(urn)
-    else:
-        if (offerId and planId and publisherId):
-            command += " --offer '{}' --plan '{}' --publisher '{}'".format(offerId, planId, publisherId)
-        else:
-            raise CLIError('Publisher Id, Offer Id and Plan Id are mandatory when URN not specified')
-
+    embedded_cli = EmbeddedCLI()
     output = embedded_cli.invoke(command, subscription).as_json()
     return output
 
