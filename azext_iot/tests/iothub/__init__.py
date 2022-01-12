@@ -47,6 +47,7 @@ STORAGE_CONTAINER = (
     settings.env.azext_iot_teststoragecontainer if settings.env.azext_iot_teststoragecontainer else DEFAULT_CONTAINER
 )
 ROLE_ASSIGNMENT_REFRESH_TIME = 120
+CURRENT_USER = get_current_user()
 
 
 class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
@@ -94,20 +95,18 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     "iot hub show -n {} -g {}".format(self.entity_name, self.entity_rg)
                 ).get_output_in_json()
 
-                user = get_current_user()
-
-                if user["name"] is None:
+                if CURRENT_USER["name"] is None:
                     raise Exception("User not found")
 
                 while True:
                     role_assignments = self.get_role_assignments(new_hub["id"], USER_ROLE)
                     role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
-                    if user["name"] in role_assignment_principal_names:
+                    if CURRENT_USER["name"] in role_assignment_principal_names:
                         break
                     # else assign IoT Hub Data Contributor role to current user and check again
                     self.cmd(
                         '''role assignment create --assignee "{}" --role "{}" --scope "{}"'''.format(
-                            user["name"], USER_ROLE, new_hub["id"]
+                            CURRENT_USER["name"], USER_ROLE, new_hub["id"]
                         )
                     )
                     sleep(10)

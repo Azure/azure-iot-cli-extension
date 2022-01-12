@@ -10,8 +10,8 @@ import pytest
 
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.conftest import get_context_path
-from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
-from azext_iot.common.utility import read_file_content, process_json_arg, get_current_user
+from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES, CURRENT_USER
+from azext_iot.common.utility import read_file_content, process_json_arg
 from azext_iot.common.shared import AuthenticationTypeDataplane
 from azext_iot.tests.settings import UserTypes
 
@@ -28,7 +28,6 @@ edge_content_malformed_path = get_context_path(
 generic_metrics_path = get_context_path(__file__, "test_config_generic_metrics.json")
 adm_content_module_path = get_context_path(__file__, "test_adm_module_content.json")
 adm_content_device_path = get_context_path(__file__, "test_adm_device_content.json")
-current_user = get_current_user()
 
 
 class TestIoTConfigurations(IoTLiveScenarioTest):
@@ -77,7 +76,7 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
 
             # Apply billable edge module (requires AAD Auth)
             # @avagraw - The billable edge modules can only be applied using user tokens (service principals are not supported)
-            if current_user["type"] == UserTypes.user.value:
+            if CURRENT_USER["type"] == UserTypes.user.value:
                 billable_module_content = process_json_arg(edge_billable_module_path, argument_name="content")
                 purchase_module = list(billable_module_content["modulesPurchase"].keys())[0]
                 self.cmd(
@@ -802,7 +801,7 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
             self.tearDown()
 
     @pytest.mark.skipif(
-        current_user["type"] != UserTypes.user.value,
+        CURRENT_USER["type"] != UserTypes.user.value,
         reason="Edge module image terms operations are supported only when using real user AAD tokens (not service principals)"
     )
     def test_edge_module_image_terms(self):
