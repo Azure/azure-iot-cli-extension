@@ -29,7 +29,7 @@ edge_content_malformed_path = get_context_path(
 generic_metrics_path = get_context_path(__file__, "test_config_generic_metrics.json")
 adm_content_module_path = get_context_path(__file__, "test_adm_module_content.json")
 adm_content_device_path = get_context_path(__file__, "test_adm_device_content.json")
-sleep(ROLE_ASSIGNMENT_REFRESH_TIME)
+sleep(300)
 current_user = get_current_user()
 
 
