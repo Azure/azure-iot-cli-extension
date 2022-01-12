@@ -8,6 +8,17 @@ Release History
 
 **IoT Central updates**
 
+* Added missing "update" sub-commands for all commands supporting it:
+  
+  - az iot central device update
+  - az iot central device-template update
+  - az iot central file-upload-config update
+  - az iot central organization update
+  - az iot central user update
+
+* Added "compact" mode for "az iot central device-template list" command:
+  When "-c" flag is passed, only Ids, display names and model types will be shown for the templates in the application.
+  
 * Added `az iot central device c2d-message purge` to purge cloud-to-device message queue
 
 

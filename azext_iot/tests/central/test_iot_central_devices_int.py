@@ -7,7 +7,7 @@
 
 import time
 import pytest
-
+import json
 from azext_iot.central.models.enum import DeviceStatus, ApiVersion
 from azext_iot.tests import helpers
 from azext_iot.tests.central import (
@@ -67,13 +67,13 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         # wait about a few seconds for simulator to kick in so that provisioning completes
         time.sleep(60)
 
-        command = "iot central device c2d-message purge --app-id {} --device-id {}".format(
-            APP_ID, device_id
+        command = (
+            "iot central device c2d-message purge --app-id {} --device-id {}".format(
+                APP_ID, device_id
+            )
         )
 
-        cmd_output = self.cmd(
-            command
-        ).get_output_in_json()
+        cmd_output = self.cmd(command).get_output_in_json()
 
         self._delete_device(device_id=device_id, api_version=self._api_version)
         self._delete_device_template(
@@ -122,9 +122,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         command = "iot central device compute-device-key --pk {} -d {}".format(
             APP_PRIMARY_KEY, device_id
         )
-        device_primary_key = self.cmd_withoutParams(
-            command
-        ).get_output_in_json()
+        device_primary_key = self.cmd_withoutParams(command).get_output_in_json()
 
         credentials = {
             "idScope": APP_SCOPE_ID,
@@ -144,7 +142,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
 
         assert device_client.connected
 
-    def test_central_device_methods_CRD(self):
+    def test_central_device_methods_CRUD(self):
 
         # list devices and get count
         start_device_list = self.cmd(
@@ -183,6 +181,22 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
             )
             is not None
         )
+
+        # UPDATES
+
+        new_device_name = f"{device_name}_new"
+        command = "iot central device update --app-id {} -d {} --device-name {}".format(
+            APP_ID,
+            device_id,
+            new_device_name,
+        )
+        checks = [
+            self.check("displayName", new_device_name),
+            self.check("id", device_id),
+        ]
+        self.cmd(command, api_version=self._api_version, checks=checks)
+
+        # DELETE
         self._delete_device(device_id=device_id, api_version=self._api_version)
 
         deleted_device_list = self.cmd(
@@ -201,7 +215,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
             is None
         )
 
-    def test_central_device_template_methods_CRD(self):
+    def test_central_device_template_methods_CRUD(self):
         # currently: create, show, list, delete
 
         # list device templates and get count
@@ -253,6 +267,42 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
             is not None
         )
 
+        # UPDATE
+        new_template_name = f"{template_name}_new"
+        del json_result[self._get_template_id_key()]  # remove id
+        del json_result["@context"]
+        del json_result["etag"]
+
+        json_result["displayName"] = new_template_name
+        json_result["capabilityModel"]["contents"].append(
+            {
+                "@id": "dtmi:newcap;1",
+                "@type": "Telemetry",
+                "displayName": "testNewCapability",
+                "name": "testNewCapability",
+                "schema": "double",
+            }
+        )
+        updated_contents = json_result["capabilityModel"]["contents"]
+        command = (
+            "iot central device-template update --app-id {} --dtid {} -k '{}'".format(
+                APP_ID,
+                template_id,
+                json.dumps(json_result)
+                .replace("{", "{{")
+                .replace(
+                    "}", "}}"
+                ),  # replace is mandatory here as processing involve string formatting
+            )
+        )
+
+        checks = [self.check("displayName", new_template_name)]
+        updated = self.cmd(
+            command, api_version=self._api_version, checks=checks
+        ).get_output_in_json()
+        assert updated["capabilityModel"]["contents"] == updated_contents
+
+        # DELETE
         self._delete_device_template(
             template_id=template_id, api_version=self._api_version
         )
@@ -502,3 +552,8 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         if self._api_version == ApiVersion.preview.value:
             return template["id"]
         return template["@id"]
+
+    def _get_template_id_key(self):
+        if self._api_version == ApiVersion.preview.value:
+            return "id"
+        return "@id"

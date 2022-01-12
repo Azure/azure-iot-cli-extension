@@ -106,7 +106,7 @@ def delete_fileupload(
     return result
 
 
-def create_fileupload(
+def createorupdate_fileupload(
     cmd,
     app_id: str,
     connection_string: str,
@@ -115,6 +115,7 @@ def create_fileupload(
     sasTtl: bool,
     token: str,
     api_version: str,
+    update=False,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> FileUploadV1_1_preview:
     """
@@ -143,16 +144,24 @@ def create_fileupload(
     query_parameters = {}
     query_parameters["api-version"] = api_version
 
-    payload = {
-        "connectionString": connection_string,
-        "container": container,
-    }
+    payload = {}
+    if connection_string:
+        payload["connectionString"] = connection_string
+    if container:
+        payload["container"] = container
     if account:
         payload["account"] = account
     if sasTtl:
         payload["sasTtl"] = sasTtl
 
-    response = requests.put(url, headers=headers, json=payload, params=query_parameters)
+    if update:
+        response = requests.patch(
+            url, headers=headers, json=payload, params=query_parameters
+        )
+    else:
+        response = requests.put(
+            url, headers=headers, json=payload, params=query_parameters
+        )
     result = _utility.try_extract_result(response)
 
     return _utility.get_object(result, MODEL, api_version)

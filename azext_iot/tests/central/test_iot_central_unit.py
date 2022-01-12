@@ -11,6 +11,7 @@ from azext_iot.central.providers import (
     CentralDeviceGroupProvider,
     CentralDeviceTemplateProvider,
     CentralJobProvider,
+    CentralUserProvider,
     CentralQueryProvider,
     CentralDestinationProvider,
     CentralExportProvider,
@@ -19,9 +20,10 @@ from azext_iot.central.models.enum import ApiVersion
 import pytest
 import json
 import responses
+from copy import deepcopy
 from unittest import mock
 from datetime import datetime
-from knack.util import CLIError
+from knack.util import CLIError, todict
 from azure.cli.core.mock import DummyCli
 from azext_iot.central import commands_device
 from azext_iot.central import commands_monitor
@@ -39,7 +41,8 @@ from azext_iot.central.models.v1_1_preview import (
     FileUploadV1_1_preview,
     QueryReponseV1_1_preview,
 )
-from azext_iot.central.models.v1 import RoleV1, TemplateV1
+from azext_iot.central.models.v1 import RoleV1, TemplateV1, UserV1
+from azext_iot.central.services._utility import get_object
 
 device_id = "mydevice"
 app_id = "myapp"
@@ -155,7 +158,9 @@ class TestCentralDeviceProvider:
         provider = CentralDeviceProvider(
             cmd=None, app_id=app_id, api_version=ApiVersion.v1.value
         )
-        mock_device_svc.get_device.return_value = self._device
+        mock_device_svc.get_device.return_value = get_object(
+            self._device, "Device", api_version=ApiVersion.v1.value
+        )
         mock_device_template_svc.get_device_template.return_value = (
             self._device_template
         )
@@ -169,7 +174,8 @@ class TestCentralDeviceProvider:
         # call counts should be at most 1 since the provider has a cache
         assert mock_device_svc.get_device.call_count == 1
         assert mock_device_svc.get_device_template.call_count == 0
-        assert device == self._device
+
+        assert todict(device) == todict(self._device)
 
     @mock.patch("azext_iot.central.services.device_template")
     @mock.patch("azext_iot.central.services.device")
@@ -194,6 +200,78 @@ class TestCentralDeviceProvider:
         # call counts should be at most 1 since the provider has a cache
         assert mock_device_template_svc.get_device_template.call_count == 1
         assert template == self._device_template
+
+    @mock.patch("azext_iot.central.services.device_template")
+    def test_should_update_device_template_name(self, mock_device_template_svc):
+        # setup
+        provider = CentralDeviceTemplateProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1.value
+        )
+        existing = get_object(
+            self._device_template, "Template", api_version=ApiVersion.v1.value
+        )
+        display_name = "NewName"
+        mock_device_template_svc.get_device_template.return_value = existing
+        updated_template_dict = deepcopy(self._device_template)
+        updated_template_dict["displayName"] = display_name
+        mock_device_template_svc.update_device_template.return_value = get_object(
+            updated_template_dict, "Template", api_version=ApiVersion.v1.value
+        )
+
+        # act
+        template = provider.update_device_template(
+            device_template_id=existing.id, payload=updated_template_dict
+        )
+
+        # verify
+        # call counts should be at most 1 since the provider has a cache
+        assert mock_device_template_svc.update_device_template.call_count == 1
+        assert template.name == display_name
+
+    @mock.patch("azext_iot.central.services.device_template")
+    @mock.patch("azext_iot.central.services.device")
+    def test_should_update_device_name(self, mock_device_svc, mock_device_template_svc):
+        # setup
+        provider = CentralDeviceProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1.value
+        )
+        existing = get_object(self._device, "Device", api_version=ApiVersion.v1.value)
+        display_name = "NewName"
+        mock_device_svc.get_device.return_value = existing
+        updated_device = deepcopy(existing)
+        updated_device.display_name = display_name
+        mock_device_svc.update_device.return_value = updated_device
+        mock_device_template_svc.get_device_template.return_value = (
+            self._device_template
+        )
+
+        # act
+        device = provider.update_device(device_id=existing.id, device_name=display_name)
+
+        # verify
+        # call counts should be at most 1 since the provider has a cache
+        assert mock_device_svc.update_device.call_count == 1
+        assert mock_device_svc.get_device_template.call_count == 0
+        assert device.display_name == display_name
+
+    @mock.patch("azext_iot.central.services.device")
+    def test_should_return_correct_device_version(self, mock_device_svc):
+        # setup
+        provider = CentralDeviceProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.preview.value
+        )
+        existing = get_object(
+            self._device, "Device", api_version=ApiVersion.preview.value
+        )
+        mock_device_svc.get_device.return_value = existing
+
+        # act
+        device = provider.get_device(device_id=existing.id)
+
+        # verify
+        # call counts should be at most 1 since the provider has a cache
+        assert mock_device_svc.get_device.call_count == 1
+        assert device.instance_of == self._device["template"]
 
     @mock.patch("azext_iot.central.services.device")
     def test_device_twin_show_calls_get_twin(self, mock_device_svc):
@@ -280,6 +358,83 @@ class TestCentralRoleProvider:
         assert role.id == self._roles[0].id
 
 
+class TestCentralUserProvider:
+    _users = [UserV1(user) for user in load_json(FileNames.central_user_file)]
+
+    @mock.patch("azext_iot.central.services.user")
+    def test_should_return_users(self, mock_user_svc):
+
+        # setup
+        provider = CentralUserProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1.value
+        )
+        mock_user_svc.get_user_list.return_value = self._users
+
+        # act
+        users = provider.get_user_list()
+        # verify
+        # call counts should be at most 1 since the provider has a cache
+        assert mock_user_svc.get_user_list.call_count == 1
+        assert set(users) == set(self._users)
+
+    @mock.patch("azext_iot.central.services.user")
+    def test_should_return_user(self, mock_user_svc):
+        # setup
+        provider = CentralUserProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1.value
+        )
+        mock_user_svc.get_user.return_value = self._users[0]
+
+        # act
+        user = provider.get_user(self._users[0].id)
+        # verify
+        # call counts should be at most 1 since the provider has a cache
+        assert mock_user_svc.get_user.call_count == 1
+        assert user.id == self._users[0].id
+
+    @mock.patch("azext_iot.central.services.user")
+    def test_should_update_user(self, mock_user_svc):
+        current_user = self._users[0]
+        updated_user = deepcopy(current_user)
+        updated_user.roles[0]["role"] = "new_role"
+        # setup
+        provider = CentralUserProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1.value
+        )
+        mock_user_svc.add_or_update_email_user.return_value = updated_user
+
+        # act
+        user = provider.update_email_user(
+            current_user.id, email=current_user.email, roles="new_role"
+        )
+        # verify
+        # call counts should be at most 1 since the provider has a cache
+        assert mock_user_svc.add_or_update_email_user.call_count == 1
+        assert user.roles[0]["role"] == "new_role"
+
+    @mock.patch("azext_iot.central.services.user")
+    def test_should_update_user_with_org(self, mock_user_svc):
+        current_user = self._users[0]
+        updated_user = deepcopy(current_user)
+        updated_user.roles[0]["role"] = "new_role"
+        updated_user.roles[0]["organization"] = "new_org"
+        # setup
+        provider = CentralUserProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1.value
+        )
+        mock_user_svc.add_or_update_email_user.return_value = updated_user
+
+        # act
+        user = provider.update_email_user(
+            current_user.id, email=current_user.email, roles="new_org\\new_role"
+        )
+        # verify
+        # call counts should be at most 1 since the provider has a cache
+        assert mock_user_svc.add_or_update_email_user.call_count == 1
+        assert user.roles[0]["role"] == "new_role"
+        assert user.roles[0]["organization"] == "new_org"
+
+
 class TestCentralOrganizationProvider:
     _orgs = [
         OrganizationV1_1_preview(org)
@@ -316,6 +471,26 @@ class TestCentralOrganizationProvider:
         # call counts should be at most 1 since the provider has a cache
         assert mock_org_svc.get_org.call_count == 1
         assert org.id == self._orgs[0].id
+
+    @mock.patch("azext_iot.central.services.organization")
+    def test_should_update_org(self, mock_org_svc):
+        current_org = self._orgs[0]
+        updated_org = deepcopy(current_org)
+        updated_org.display_name = "new_name"
+        # setup
+        provider = CentralOrganizationProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1.value
+        )
+        mock_org_svc.create_or_update_org.return_value = updated_org
+
+        # act
+        org = provider.create_or_update_organization(
+            current_org.id, org_name="new_name", update=True, parent_org=None
+        )
+        # verify
+        # call counts should be at most 1 since the provider has a cache
+        assert mock_org_svc.create_or_update_org.call_count == 1
+        assert org.display_name == "new_name"
 
 
 class TestCentralJobProvider:
@@ -370,6 +545,26 @@ class TestCentralFileuploadProvider:
         # call counts should be at most 1 since the provider has a cache
         assert mock_fileupload_svc.get_fileupload.call_count == 1
         assert fileupload.connection_string == self._fileupload.connection_string
+
+    @mock.patch("azext_iot.central.services.file_upload")
+    def test_should_update_fileupload(self, mock_fileupload_svc):
+
+        updated_file_upload = deepcopy(self._fileupload)
+        updated_file_upload.container = "new_container"
+        # setup
+        provider = CentralFileUploadProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+        )
+        mock_fileupload_svc.createorupdate_fileupload.return_value = updated_file_upload
+
+        # act
+        fileupload = provider.update_fileupload(
+            container="new_container", connection_string=None, account=None, sasTtl=None
+        )
+        # verify
+        # call counts should be at most 1 since the provider has a cache
+        assert mock_fileupload_svc.createorupdate_fileupload.call_count == 1
+        assert fileupload.container == "new_container"
 
 
 class TestCentralQueryProvider:

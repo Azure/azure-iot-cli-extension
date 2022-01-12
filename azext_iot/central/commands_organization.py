@@ -74,9 +74,32 @@ def create_org(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
 
-    return provider.create_organization(
+    return provider.create_or_update_organization(
         org_id=org_id,
         org_name=org_name,
         parent_org=parent_org,
+        central_dns_suffix=central_dns_suffix,
+    )
+
+
+def update_org(
+    cmd,
+    app_id: str,
+    org_id: str,
+    org_name=None,
+    parent_org=None,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1_1_preview.value,
+) -> OrganizationV1_1_preview:
+    provider = CentralOrganizationProvider(
+        cmd=cmd, app_id=app_id, api_version=api_version, token=token
+    )
+
+    return provider.create_or_update_organization(
+        org_id=org_id,
+        org_name=org_name,
+        parent_org=parent_org,
+        update=True,
         central_dns_suffix=central_dns_suffix,
     )

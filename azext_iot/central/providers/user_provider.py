@@ -6,10 +6,10 @@
 
 from knack.log import get_logger
 from knack.util import CLIError
-
+from typing import List
+from azext_iot.central.models.enum import ApiVersion
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
-from azext_iot.central.models.enum import Role
 
 
 logger = get_logger(__name__)
@@ -39,23 +39,56 @@ class CentralUserProvider:
         assignee: str,
         tenant_id: str,
         object_id: str,
-        role: Role,
+        role: str,
+        org_id: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> dict:
+    ) -> central_services.user.User:
         if not tenant_id:
             raise CLIError("Must specify --tenant-id when adding a service principal")
 
         if not object_id:
             raise CLIError("Must specify --object-id when adding a service principal")
 
-        return central_services.user.add_service_principal(
+        if org_id and self._api_version == ApiVersion.v1_1_preview.value:
+            roles = rf"{org_id}\{role}"
+        else:
+            roles = role
+
+        return central_services.user.add_or_update_service_principal_user(
             cmd=self._cmd,
             app_id=self._app_id,
             assignee=assignee,
             tenant_id=tenant_id,
             object_id=object_id,
-            role=role,
+            roles=roles,
             token=self._token,
+            central_dns_suffix=central_dns_suffix,
+            api_version=self._api_version,
+        )
+
+    def update_service_principal(
+        self,
+        assignee: str,
+        tenant_id: str,
+        object_id: str,
+        roles: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ) -> central_services.user.User:
+        if not tenant_id:
+            raise CLIError("Must specify --tenant-id when adding a service principal")
+
+        if not object_id:
+            raise CLIError("Must specify --object-id when adding a service principal")
+
+        return central_services.user.add_or_update_service_principal_user(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            assignee=assignee,
+            tenant_id=tenant_id,
+            object_id=object_id,
+            roles=roles,
+            token=self._token,
+            update=True,
             central_dns_suffix=central_dns_suffix,
             api_version=self._api_version,
         )
@@ -63,7 +96,7 @@ class CentralUserProvider:
     def get_user_list(
         self,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> dict:
+    ) -> List[central_services.user.User]:
         return central_services.user.get_user_list(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -76,7 +109,7 @@ class CentralUserProvider:
         self,
         assignee,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> dict:
+    ) -> central_services.user.User:
         return central_services.user.get_user(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -104,18 +137,46 @@ class CentralUserProvider:
         self,
         assignee: str,
         email: str,
-        role: Role,
+        role: str,
+        org_id: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> dict:
+    ) -> central_services.user.User:
         if not email:
             raise CLIError("Must specify --email when adding a user by email")
 
-        return central_services.user.add_email(
+        if org_id and self._api_version == ApiVersion.v1_1_preview.value:
+            roles = rf"{org_id}\{role}"
+        else:
+            roles = role
+
+        return central_services.user.add_or_update_email_user(
             cmd=self._cmd,
             app_id=self._app_id,
             assignee=assignee,
             email=email,
-            role=role,
+            roles=roles,
+            token=self._token,
+            central_dns_suffix=central_dns_suffix,
+            api_version=self._api_version,
+        )
+
+    def update_email_user(
+        self,
+        assignee: str,
+        email: str,
+        roles: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ) -> central_services.user.User:
+        if not email:
+            raise CLIError("Must specify --email when adding a user by email")
+
+        return central_services.user.add_or_update_email_user(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            assignee=assignee,
+            email=email,
+            roles=roles,
+            update=True,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
             api_version=self._api_version,

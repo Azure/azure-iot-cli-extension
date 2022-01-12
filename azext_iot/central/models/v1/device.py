@@ -16,7 +16,7 @@ class Device:
         self.template = device.get("template")
         self.provisioned = device.get("provisioned")
         self.simulated = device.get("simulated")
-        self.device_status = self._parse_device_status()
+        self._device_status = self._parse_device_status()
 
     def _parse_device_status(self) -> DeviceStatus:
         if not self.enabled:
@@ -32,7 +32,7 @@ class Device:
 
     def get_registration_info(self) -> dict:
         registration_info = {
-            "device_status": self.device_status.value,
+            "device_status": self._device_status.value,
             "display_name": self.display_name,
             "id": self.id,
             "simulated": self.simulated,

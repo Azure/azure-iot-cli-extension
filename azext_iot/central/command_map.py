@@ -115,6 +115,7 @@ def load_central_commands(self, _):
         command_type=central_user_ops,
     ) as cmd_group:
         cmd_group.command("create", "add_user")
+        cmd_group.command("update", "update_user")
         cmd_group.command("list", "list_users")
         cmd_group.show_command("show", "get_user")
         cmd_group.command("delete", "delete_user")
@@ -135,6 +136,7 @@ def load_central_commands(self, _):
         cmd_group.command("list", "list_devices")
         cmd_group.show_command("show", "get_device")
         cmd_group.command("create", "create_device")
+        cmd_group.command("update", "update_device")
         cmd_group.command("delete", "delete_device")
         cmd_group.command("registration-info", "registration_info")
         cmd_group.command("show-credentials", "get_credentials")
@@ -172,6 +174,7 @@ def load_central_commands(self, _):
         # cmd_group.command("map", "map_device_templates")
         cmd_group.show_command("show", "get_device_template")
         cmd_group.command("create", "create_device_template")
+        cmd_group.command("update", "update_device_template")
         cmd_group.command("delete", "delete_device_template")
 
     with self.command_group(
@@ -195,6 +198,7 @@ def load_central_commands(self, _):
         cmd_group.show_command("show", "get_fileupload")
         cmd_group.show_command("delete", "delete_fileupload")
         cmd_group.show_command("create", "create_fileupload")
+        cmd_group.show_command("update", "update_fileupload")
 
     with self.command_group(
         "iot central organization", command_type=central_orgs_ops, is_preview=True
@@ -203,6 +207,7 @@ def load_central_commands(self, _):
         cmd_group.command("list", "list_orgs")
         cmd_group.command("create", "create_org")
         cmd_group.command("delete", "delete_org")
+        cmd_group.command("update", "update_org")
 
     with self.command_group(
         "iot central job", command_type=central_jobs_ops, is_preview=True

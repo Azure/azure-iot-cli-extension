@@ -10,5 +10,5 @@ class FileUpload:
         self.account = fileupload.get("account")
         self.connection_string = fileupload.get("connectionString")
         self.container = fileupload.get("container")
-        self.sasttl = fileupload.get("sasTtl")
+        self.sas_ttl = fileupload.get("sasTtl")
         self.state = fileupload.get("state")

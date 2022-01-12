@@ -354,6 +354,46 @@ def _load_central_devices_help():
     """
 
     helps[
+        "iot central device update"
+    ] = """
+        type: command
+        short-summary: Update a device in IoT Central.
+        long-summary: |
+                    Allows to change the following properties of a device: "displayName", "template" and "simulated" and "enabled" flags.
+                    Device Id cannot be changed.
+                    If specified api version is "1.1-preview", organizations for the device can also be updated.
+
+        examples:
+        - name: Update a device display name
+          text: >
+            az iot central device update
+            --app-id {appid}
+            --device-id {deviceid}
+            --device-name {deviceName}
+
+        - name: Turn a simulated device to a real one
+          text: >
+            az iot central device update
+            --app-id {appid}
+            --device-id {deviceid}
+            --simulated false
+
+        - name: Update organizations for the device
+          text: >
+            az iot central device update
+            --app-id {appid}
+            --device-id {deviceid}
+            --organizations {organizations}
+
+        - name: Disable a device
+          text: >
+            az iot central device update
+            --app-id {appid}
+            --device-id {deviceid}
+            --enable false
+    """
+
+    helps[
         "iot central device show"
     ] = """
         type: command
@@ -566,6 +606,26 @@ def _load_central_users_help():
             --object-id {objectId}
             --role operator
     """
+
+    helps[
+        "iot central user update"
+    ] = """
+        type: command
+        short-summary: Update roles for a user in the application.
+        long-summary: |
+                    Update a user with a different roles.
+                    Updating the tenantId or objectId for a service principal user is not allowed.
+                    Updating the email address for an email user is not allowed.
+
+        examples:
+        - name: Update roles for a user by email or service principal in the application.
+          text: >
+            az iot central user update
+            --user-id {userId}
+            --app-id {appId}
+            --roles "org1\\admin"
+    """
+
     helps[
         "iot central user show"
     ] = """
@@ -716,6 +776,28 @@ def _load_central_device_templates_help():
     """
 
     helps[
+        "iot central device-template update"
+    ] = """
+        type: command
+        short-summary: Update a device template in IoT Central.
+
+        examples:
+        - name: Update a device template with payload read from a file
+          text: >
+            az iot central device-template update
+            --app-id {appid}
+            --content {pathtofile}
+            --device-template-id {devicetemplateid}
+
+        - name: Update a device template with payload read from raw json
+          text: >
+            az iot central device-template update
+            --app-id {appid}
+            --content {json}
+            --device-template-id {devicetemplateid}
+    """
+
+    helps[
         "iot central device-template show"
     ] = """
         type: command
@@ -811,6 +893,19 @@ def _load_central_file_upload_configuration_help():
           az iot central file-upload-config create
           --app-id {appid}
           --connection-string {conn_string}
+          --container {container}
+    """
+
+    helps[
+        "iot central file-upload-config update"
+    ] = """
+    type: command
+    short-summary: Update file upload storage account configuration
+    examples:
+      - name: Update file upload
+        text: >
+          az iot central file-upload-config update
+          --app-id {appid}
           --container {container}
     """
 
@@ -915,6 +1010,27 @@ def _load_central_organizations_help():
           --app-id {appid}
           --org-id {organizationId}
           --parent-id {parentId}
+        """
+
+    helps[
+        "iot central organization update"
+    ] = """
+    type: command
+    short-summary: Update an organization in the application.
+    examples:
+      - name: Update parent of an organization
+        text: >
+          az iot central organization update
+          --app-id {appid}
+          --org-id {organizationId}
+          --parent-id {parentId}
+
+      - name: Update name of an organization
+        text: >
+          az iot central organization update
+          --app-id {appid}
+          --org-id {organizationId}
+          --org-name {organizationName}
         """
 
 
