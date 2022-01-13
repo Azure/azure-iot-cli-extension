@@ -6,7 +6,6 @@
 
 import pytest
 from azure.cli.testsdk import LiveScenarioTest
-from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.settings import UserTypes
 from azext_iot.common.utility import get_current_user
 
@@ -20,9 +19,7 @@ terms_urn = "azure-iot:jlian-test-offer-paid:premium"
 class TestIoTEdgeImageTerms(LiveScenarioTest):
     def __init__(self, test_scenario):
         assert test_scenario
-
         super(TestIoTEdgeImageTerms, self).__init__(test_scenario)
-        self.embedded_cli = EmbeddedCLI()
         self.current_user = get_current_user()
 
     @pytest.fixture(scope="class")
