@@ -150,11 +150,11 @@ def load_command_table(self, _):
         )
 
     with self.command_group(
-        "iot edge module image terms", command_type=iothub_ops
+        "iot edge image terms", command_type=iothub_ops
     ) as cmd_group:
-        cmd_group.show_command("show", "iot_edge_module_image_terms_show", is_preview=True)
-        cmd_group.command("accept", "iot_edge_module_image_terms_accept", is_preview=True)
-        cmd_group.command("cancel", "iot_edge_module_image_terms_cancel", is_preview=True)
+        cmd_group.show_command("show", "iot_edge_image_terms_show", is_preview=True)
+        cmd_group.command("accept", "iot_edge_image_terms_accept", is_preview=True)
+        cmd_group.command("cancel", "iot_edge_image_terms_cancel", is_preview=True)
 
     with self.command_group("iot device", command_type=iothub_ops) as cmd_group:
         cmd_group.command("send-d2c-message", "iot_device_send_message")

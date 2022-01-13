@@ -300,7 +300,7 @@ class DiscoveryResourceType(Enum):
     DPS = "IoT Hub Device Provisioning Service"
 
 
-class IotEdgeModuleImageTermsCommands(Enum):
+class IotEdgeImageTermsCommands(Enum):
     Show = "show"
     Accept = "accept"
     Cancel = "cancel"

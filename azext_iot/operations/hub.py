@@ -30,7 +30,7 @@ from azext_iot.common.shared import (
     ConnectionStringParser,
     EntityStatusType,
     AuthenticationTypeDataplane,
-    IotEdgeModuleImageTermsCommands
+    IotEdgeImageTermsCommands
 )
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
@@ -1727,7 +1727,7 @@ def iot_hub_configuration_metric_show(
         raise CLIError(unpack_msrest_error(e))
 
 
-def _iot_edge_module_image_terms_invoke_command(
+def _iot_edge_image_terms_invoke_command(
     command_name: str = None,
     offerId: str = None,
     planId: str = None,
@@ -1741,52 +1741,60 @@ def _iot_edge_module_image_terms_invoke_command(
 
     current_user = get_current_user()
     if current_user["type"] != UserTypes.user.value:
-        raise CLIError('Edge module image terms operations are supported only for real user AAD tokens (not service principals)')
+        raise CLIError('Edge image terms operations are supported only for user principal AAD tokens (not service principals)')
 
     command = "vm image terms " + command_name
-    command += " --urn '{}'".format(urn) if urn else ""
-    command += " --offer '{}'".format(offerId) if offerId else ""
-    command += " --plan '{}'".format(planId) if planId else ""
-    command += " --publisher '{}'".format(publisherId) if publisherId else ""
+    if urn:
+        if (publisherId or offerId or planId):
+            raise CLIError('Publisher Id or Offer Id or Plan Id should not be specified when providing URN')
+        urn_parts = urn.split(":")
+        if urn_parts and len(urn_parts) == 3:
+            command += " --publisher '{}' --offer '{}' --plan '{}'".format(urn_parts[0], urn_parts[1], urn_parts[2])
+        else:
+            raise CLIError('Incorrect URN format. The correct format is publisherId:offerId:planId')
+    else:
+        command += " --publisher '{}'".format(publisherId) if publisherId else ""
+        command += " --offer '{}'".format(offerId) if offerId else ""
+        command += " --plan '{}'".format(planId) if planId else ""
 
     embedded_cli = EmbeddedCLI()
     output = embedded_cli.invoke(command, subscription).as_json()
     return output
 
 
-def iot_edge_module_image_terms_show(
+def iot_edge_image_terms_show(
     offerId=None,
     planId=None,
     publisherId=None,
     urn=None,
     azureSub=None
 ):
-    return _iot_edge_module_image_terms_invoke_command(
-        IotEdgeModuleImageTermsCommands.Show.value, offerId, planId, publisherId, urn, azureSub
+    return _iot_edge_image_terms_invoke_command(
+        IotEdgeImageTermsCommands.Show.value, offerId, planId, publisherId, urn, azureSub
     )
 
 
-def iot_edge_module_image_terms_accept(
+def iot_edge_image_terms_accept(
     offerId=None,
     planId=None,
     publisherId=None,
     urn=None,
     azureSub=None
 ):
-    return _iot_edge_module_image_terms_invoke_command(
-        IotEdgeModuleImageTermsCommands.Accept.value, offerId, planId, publisherId, urn, azureSub
+    return _iot_edge_image_terms_invoke_command(
+        IotEdgeImageTermsCommands.Accept.value, offerId, planId, publisherId, urn, azureSub
     )
 
 
-def iot_edge_module_image_terms_cancel(
+def iot_edge_image_terms_cancel(
     offerId=None,
     planId=None,
     publisherId=None,
     urn=None,
     azureSub=None
 ):
-    return _iot_edge_module_image_terms_invoke_command(
-        IotEdgeModuleImageTermsCommands.Cancel.value, offerId, planId, publisherId, urn, azureSub
+    return _iot_edge_image_terms_invoke_command(
+        IotEdgeImageTermsCommands.Cancel.value, offerId, planId, publisherId, urn, azureSub
     )
 
 

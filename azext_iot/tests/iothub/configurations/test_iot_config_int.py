@@ -6,6 +6,7 @@
 
 import random
 import json
+import pytest
 
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.conftest import get_context_path
@@ -27,6 +28,10 @@ edge_content_malformed_path = get_context_path(
 generic_metrics_path = get_context_path(__file__, "test_config_generic_metrics.json")
 adm_content_module_path = get_context_path(__file__, "test_adm_module_content.json")
 adm_content_device_path = get_context_path(__file__, "test_adm_device_content.json")
+terms_offerId = "jlian-test-offer-paid"
+terms_planId = "premium"
+terms_publisherId = "azure-iot"
+terms_urn = "azure-iot:jlian-test-offer-paid:premium"
 
 
 class TestIoTConfigurations(IoTLiveScenarioTest):
@@ -800,82 +805,94 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
 
             self.tearDown()
 
-    def test_edge_module_image_terms(self):
-
-        offerId = "jlian-test-offer-paid"
-        planId = "premium"
-        publisherId = "azure-iot"
-        urn = "azure-iot:jlian-test-offer-paid:sku:latest"
+    def test_edge_image_terms(self):
 
         if self.current_user["type"] == UserTypes.user.value:
 
-            self.setup_edge_module_image_terms_tests(offerId, planId, publisherId)
             offer_checks = [
-                self.check("product", offerId),
-                self.check("plan", planId),
-                self.check("publisher", publisherId),
+                self.check("product", terms_offerId),
+                self.check("plan", terms_planId),
+                self.check("publisher", terms_publisherId),
             ]
 
             # Show IoT Edge module terms offer
             self.cmd(
-                "iot edge module image terms show --offer {} --plan {} --publisher {}".format(
-                    offerId, planId, publisherId
+                "iot edge image terms show --offer {} --plan {} --publisher {}".format(
+                    terms_offerId, terms_planId, terms_publisherId
                 ),
                 checks=offer_checks.append(self.check("accepted", "false"))
             )
 
             # Accept IoT Edge module terms offer
             self.cmd(
-                "iot edge module image terms accept --offer {} --plan {} --publisher {}".format(
-                    offerId, planId, publisherId
+                "iot edge image terms accept --offer {} --plan {} --publisher {}".format(
+                    terms_offerId, terms_planId, terms_publisherId
                 ),
                 checks=offer_checks.append(self.check("accepted", "true"))
             )
 
             # Show the accepted IoT Edge module terms offer using URN
-            # self.cmd(
-            #     "iot edge module image terms show --urn {}".format(
-            #         urn
-            #     ),
-            #     checks=offer_checks.append(self.check("accepted", "true"))
-            # )
+            self.cmd(
+                "iot edge image terms show --urn {}".format(
+                    terms_urn
+                ),
+                checks=offer_checks.append(self.check("accepted", "true"))
+            )
 
             # Cancel IoT Edge module terms offer
             self.cmd(
-                "iot edge module image terms cancel --offer {} --plan {} --publisher {}".format(
-                    offerId, planId, publisherId
+                "iot edge image terms cancel --offer {} --plan {} --publisher {}".format(
+                    terms_offerId, terms_planId, terms_publisherId
                 ),
                 checks=offer_checks.append(self.check("accepted", "false"))
             )
 
             # Error - providing offer, plan and publisher when URN is already provided
             self.cmd(
-                "iot edge module image terms show --urn {} --offer {} --plan {} --publisher {}".format(
-                    urn, offerId, planId, publisherId
+                "iot edge image terms show --urn {} --offer {} --plan {} --publisher {}".format(
+                    terms_urn, terms_offerId, terms_planId, terms_publisherId
+                ),
+                expect_failure=True,
+            )
+
+            # Error - invalid URN format
+            self.cmd(
+                "iot edge image terms show --urn {}".format(
+                    "bad_URN"
                 ),
                 expect_failure=True,
             )
 
             # Error - invalid offer
             self.cmd(
-                "iot edge module image terms show --offer {} --plan {} --publisher {}".format(
-                    "invalid_offer", planId, publisherId
+                "iot edge image terms show --offer {} --plan {} --publisher {}".format(
+                    "invalid_offer", terms_planId, terms_publisherId
                 ),
                 expect_failure=True,
             )
 
             # Error - invalid publisher
             self.cmd(
-                "iot edge module image terms show --offer {} --plan {} --publisher {}".format(
-                    offerId, planId, "invalid_publisher"
+                "iot edge image terms show --offer {} --plan {} --publisher {}".format(
+                    terms_offerId, terms_planId, "invalid_publisher"
                 ),
                 expect_failure=True,
             )
         else:
             # Error - Command run by a service principal user
             self.cmd(
-                "iot edge module image terms show --offer {} --plan {} --publisher {}".format(
-                    offerId, planId, publisherId
+                "iot edge image terms show --offer {} --plan {} --publisher {}".format(
+                    terms_offerId, terms_planId, terms_publisherId
                 ),
                 expect_failure=True,
             )
+
+    @pytest.fixture(scope='class', autouse=True)
+    def setup_edge_image_terms_tests(self):
+        # Ensure Edge image offer terms are not accepted before the test starts
+        self.cmd(
+            "iot edge image terms cancel --offer {} --plan {} --publisher {}".format(
+                terms_offerId, terms_planId, terms_publisherId
+            )
+        )
+        yield
