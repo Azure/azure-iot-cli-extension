@@ -36,10 +36,20 @@ from azext_iot.common.shared import (
 )
 from azext_iot._validators import mode2_iot_login_handler
 from azext_iot.assets.user_messages import info_param_properties_device
-from azure.cli.core.local_context import LocalContextAttribute, LocalContextAction
 
 
-auth_type_dataplane_param_type = CLIArgumentType(
+dps_auth_type_dataplane_param_type = CLIArgumentType(
+    options_list=["--auth-type"],
+    arg_type=get_enum_type(
+        AuthenticationTypeDataplane, AuthenticationTypeDataplane.key.value
+    ),
+    arg_group="Access Control",
+    help="Indicates whether the operation should auto-derive a policy key or use the current Azure AD session. "
+    "You can configure the default using `az configure --defaults iotdps-data-auth-type=<auth-type-value>`",
+    configured_default="iotdps-data-auth-type",
+)
+
+hub_auth_type_dataplane_param_type = CLIArgumentType(
     options_list=["--auth-type"],
     arg_type=get_enum_type(
         AuthenticationTypeDataplane, AuthenticationTypeDataplane.key.value
@@ -48,11 +58,6 @@ auth_type_dataplane_param_type = CLIArgumentType(
     help="Indicates whether the operation should auto-derive a policy key or use the current Azure AD session. "
     "You can configure the default using `az configure --defaults iothub-data-auth-type=<auth-type-value>`",
     configured_default="iothub-data-auth-type",
-    local_context_attribute=LocalContextAttribute(
-        name="iothub-data-auth-type",
-        actions=[LocalContextAction.SET, LocalContextAction.GET],
-        scopes=["iot"],
-    ),
 )
 
 hub_name_type = CLIArgumentType(
@@ -294,7 +299,7 @@ def load_arguments(self, _):
         context.argument(
             "auth_type_dataplane",
             options_list=["--auth-type"],
-            arg_type=auth_type_dataplane_param_type,
+            arg_type=hub_auth_type_dataplane_param_type,
         )
 
     with self.argument_context("iot hub connection-string") as context:
@@ -559,7 +564,7 @@ def load_arguments(self, _):
         context.argument(
             "auth_type_dataplane",
             options_list=["--auth-type"],
-            arg_type=auth_type_dataplane_param_type,
+            arg_type=hub_auth_type_dataplane_param_type,
         )
         context.argument("data", options_list=["--data", "--da"], help="Message body.")
         context.argument(
@@ -812,7 +817,7 @@ def load_arguments(self, _):
         context.argument(
             "auth_type_dataplane",
             options_list=["--auth-type"],
-            arg_type=auth_type_dataplane_param_type,
+            arg_type=hub_auth_type_dataplane_param_type,
         )
 
     with self.argument_context("iot dps") as context:
@@ -915,11 +920,16 @@ def load_arguments(self, _):
             " request. Minimum supported version: 2018-09-01-preview.",
             arg_group="Allocation Policy"
         )
+        context.argument(
+            "auth_type_dataplane",
+            options_list=["--auth-type"],
+            arg_type=dps_auth_type_dataplane_param_type,
+        )
 
     with self.argument_context("iot dps compute-device-key") as context:
         context.argument(
             "enrollment_id",
-            options_list=["--enrollment-id", "--group-id"],
+            options_list=["--enrollment-id", "--eid", "--group-id", "--gid"],
             help="Enrollment group ID."
         )
         context.argument(
@@ -942,7 +952,7 @@ def load_arguments(self, _):
     with self.argument_context("iot dps enrollment") as context:
         context.argument(
             "enrollment_id",
-            options_list=["--enrollment-id"],
+            options_list=["--enrollment-id", "--eid"],
             help="Individual device enrollment ID."
         )
         context.argument("device_id", help="Device ID registered in the IoT Hub.")
@@ -957,6 +967,11 @@ def load_arguments(self, _):
             options_list=["--secondary-key", "--sk"],
             help="The secondary symmetric shared access key stored in base64 format. ",
             arg_group="Authentication"
+        )
+        context.argument(
+            "device_information",
+            options_list=["--device-information", "--info"],
+            help="Optional device information.",
         )
 
     with self.argument_context("iot dps enrollment create") as context:
@@ -1009,7 +1024,7 @@ def load_arguments(self, _):
     with self.argument_context("iot dps enrollment-group") as context:
         context.argument(
             "enrollment_id",
-            options_list=["--enrollment-id", "--group-id"],
+            options_list=["--enrollment-id", "--eid", "--group-id", "--gid"],
             help="Enrollment group ID."
         )
         context.argument(
@@ -1067,6 +1082,6 @@ def load_arguments(self, _):
     with self.argument_context("iot dps registration list") as context:
         context.argument(
             "enrollment_id",
-            options_list=["--enrollment-id", "--group-id"],
+            options_list=["--enrollment-id", "--eid", "--group-id", "--gid"],
             help="Enrollment group ID."
         )

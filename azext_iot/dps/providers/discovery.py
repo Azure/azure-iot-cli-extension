@@ -74,5 +74,6 @@ class DPSDiscovery(BaseDiscovery):
         result["primarykey"] = policy.primary_key
         result["secondarykey"] = policy.secondary_key
         result["subscription"] = self.sub_id
+        result["cmd"] = self.cmd
 
         return result

@@ -6,6 +6,7 @@
 
 import pytest
 import os
+from time import sleep
 
 from azext_iot.tests.settings import (
     DynamoSettings,
@@ -20,7 +21,7 @@ from azext_iot.common.shared import AuthenticationTypeDataplane
 
 DATAPLANE_AUTH_TYPES = [
     AuthenticationTypeDataplane.key.value,
-    # AuthenticationTypeDataplane.login.value,
+    AuthenticationTypeDataplane.login.value,
     "cstring",
 ]
 
@@ -33,15 +34,17 @@ PREFIX_DEVICE = "test-device-"
 PREFIX_EDGE_DEVICE = "test-edge-device-"
 PREFIX_INDIVIDUAL_ENROLLMENT = "test-enrollment-"
 PREFIX_GROUP_ENROLLMENT = "test-groupenroll-"
+USER_ROLE = "Device Provisioning Service Data Contributor"
 
 # Test Environment Variables
 settings = DynamoSettings(
     req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED,
-    opt_env_set=ENV_SET_TEST_IOTHUB_OPTIONAL + ENV_SET_TEST_IOTDPS_OPTIONAL
+    opt_env_set=list(set(ENV_SET_TEST_IOTHUB_OPTIONAL + ENV_SET_TEST_IOTDPS_OPTIONAL))
 )
 ENTITY_RG = settings.env.azext_iot_testrg
 ENTITY_DPS_NAME = settings.env.azext_iot_testdps if settings.env.azext_iot_testdps else "test-dps-" + generate_generic_id()
 ENTITY_HUB_NAME = settings.env.azext_iot_testhub if settings.env.azext_iot_testhub else "test-hub-" + generate_generic_id()
+MAX_RBAC_ASSIGNMENT_TRIES = settings.env.azext_iot_rbac_max_tries if settings.env.azext_iot_rbac_max_tries else 10
 
 
 class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
@@ -106,6 +109,39 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 "iot dps create --name {} --resource-group {} ".format(
                     self.entity_dps_name, self.entity_rg
                 )
+            )
+
+        new_dps = self.cmd(
+            "iot dps show --name {} --resource-group {} ".format(
+                self.entity_dps_name, self.entity_rg
+            )
+        ).get_output_in_json()
+
+        account = self.cmd("account show").get_output_in_json()
+        user = account["user"]
+
+        if user["name"] is None:
+            raise Exception("User not found")
+
+        tries = 0
+        while tries < MAX_RBAC_ASSIGNMENT_TRIES:
+            role_assignments = self.get_role_assignments(new_dps["id"], USER_ROLE)
+            role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
+            if user["name"] in role_assignment_principal_names:
+                break
+            # else assign DPS Data Contributor role to current user and check again
+            self.cmd(
+                '''role assignment create --assignee "{}" --role "{}" --scope "{}"'''.format(
+                    user["name"], USER_ROLE, new_dps["id"]
+                )
+            )
+            sleep(10)
+            tries += 1
+
+        if tries == MAX_RBAC_ASSIGNMENT_TRIES:
+            raise Exception(
+                "Reached max ({}) number of tries to assign RBAC role. Please re-run the test later "
+                "or with more max number of tries.".format(MAX_RBAC_ASSIGNMENT_TRIES)
             )
 
     def create_hub(self):
@@ -226,9 +262,17 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
         if auth_type == "cstring":
             return f"{command} --login {self.dps_cstring}"
 
-        return command
-        # Future iterations would support multiple auth-types
-        # return f"{command} --auth-type {auth_type}"
+        return f"{command} --auth-type {auth_type}"
+
+    def get_role_assignments(self, scope, role):
+
+        role_assignments = self.cmd(
+            'role assignment list --scope "{}" --role "{}"'.format(
+                scope, role
+            )
+        ).get_output_in_json()
+
+        return role_assignments
 
     @pytest.fixture(scope='class', autouse=True)
     def tearDownSuite(self):

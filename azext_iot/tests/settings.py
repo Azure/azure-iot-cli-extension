@@ -14,11 +14,13 @@ ENV_SET_TEST_IOTHUB_REQUIRED = [
 ENV_SET_TEST_IOTHUB_OPTIONAL = [
     "azext_iot_testhub",
     "azext_iot_teststorageaccount",
-    "azext_iot_teststoragecontainer"
+    "azext_iot_teststoragecontainer",
+    "azext_iot_rbac_max_tries"
 ]
 
 ENV_SET_TEST_IOTDPS_OPTIONAL = [
     "azext_iot_testdps",
+    "azext_iot_rbac_max_tries"
 ]
 
 

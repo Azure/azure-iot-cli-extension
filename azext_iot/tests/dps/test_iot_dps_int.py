@@ -46,7 +46,8 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                     "iot dps enrollment create --enrollment-id {} --attestation-type {}"
                     " -g {} --dps-name {} --endorsement-key {}"
                     " --provisioning-status {} --device-id {} --initial-twin-tags {}"
-                    " --initial-twin-properties {} --allocation-policy {} --iot-hubs {}".format(
+                    " --initial-twin-properties {} --device-information {} "
+                    "--allocation-policy {} --iot-hubs {}".format(
                         enrollment_id,
                         attestation_type,
                         self.entity_rg,
@@ -54,6 +55,7 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                         test_endorsement_key,
                         EntityStatusType.enabled.value,
                         device_id,
+                        '"{generic_dict}"',
                         '"{generic_dict}"',
                         '"{generic_dict}"',
                         AllocationType.static.value,
@@ -69,6 +71,7 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                     self.check("allocationPolicy", AllocationType.static.value),
                     self.check("iotHubs", self.hub_host_name.split()),
                     self.check("initialTwin.tags", self.kwargs["generic_dict"]),
+                    self.check("optionalDeviceInformation", self.kwargs["generic_dict"]),
                     self.check(
                         "initialTwin.properties.desired", self.kwargs["generic_dict"]
                     ),
@@ -119,8 +122,13 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot dps enrollment update -g {} --dps-name {} --enrollment-id {}"
-                    " --provisioning-status {} --etag {}".format(
-                        self.entity_rg, self.entity_dps_name, enrollment_id, EntityStatusType.disabled.value, etag
+                    " --provisioning-status {} --etag {} --info {}".format(
+                        self.entity_rg,
+                        self.entity_dps_name,
+                        enrollment_id,
+                        EntityStatusType.disabled.value,
+                        etag,
+                        '""'
                     ),
                     auth_type=auth_phase
                 ),
@@ -133,6 +141,7 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                     self.check("iotHubs", self.hub_host_name.split()),
                     self.exists("initialTwin.tags"),
                     self.exists("initialTwin.properties.desired"),
+                    self.exists("optionalDeviceInformation"),
                 ],
             )
 
@@ -214,8 +223,13 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot dps enrollment update -g {} --dps-name {} --enrollment-id {}"
-                    " --provisioning-status {} --etag {} --rc".format(
-                        self.entity_rg, self.entity_dps_name, enrollment_id, EntityStatusType.disabled.value, etag
+                    " --provisioning-status {} --etag {} --info {} --rc".format(
+                        self.entity_rg,
+                        self.entity_dps_name,
+                        enrollment_id,
+                        EntityStatusType.disabled.value,
+                        etag,
+                        '"{generic_dict}"',
                     ),
                     auth_type=auth_phase
                 ),
@@ -228,6 +242,7 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                     self.check("iotHubs", self.hub_host_name.split()),
                     self.exists("initialTwin.tags"),
                     self.exists("initialTwin.properties.desired"),
+                    self.check("optionalDeviceInformation", self.kwargs["generic_dict"]),
                     self.check("attestation.type.x509.clientCertificates.primary", None),
                 ],
             )
@@ -255,7 +270,7 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                     "iot dps enrollment create --enrollment-id {} --attestation-type {}"
                     " -g {} --dps-name {} --pk {} --sk {}"
                     " --provisioning-status {} --device-id {}"
-                    " --initial-twin-tags {} --initial-twin-properties {}"
+                    " --initial-twin-tags {} --initial-twin-properties {} --device-information {}"
                     " --allocation-policy {} --rp {} --iot-hubs {} --edge-enabled".format(
                         enrollment_id,
                         attestation_type,
@@ -265,6 +280,7 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                         secondary_key,
                         EntityStatusType.enabled.value,
                         device_id,
+                        '"{generic_dict}"',
                         '"{generic_dict}"',
                         '"{generic_dict}"',
                         AllocationType.geolatency.value.lower(),
@@ -279,8 +295,9 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                     self.check("provisioningStatus", EntityStatusType.enabled.value),
                     self.check("deviceId", device_id),
                     self.check("allocationPolicy", AllocationType.geolatency.value),
-                    # self.check("iotHubs", self.hub_host_name.split()),
+                    self.check("iotHubs", self.hub_host_name.split()),
                     self.check("initialTwin.tags", self.kwargs["generic_dict"]),
+                    self.check("optionalDeviceInformation", self.kwargs["generic_dict"]),
                     self.check(
                         "initialTwin.properties.desired", self.kwargs["generic_dict"]
                     ),
@@ -336,7 +353,7 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                     self.check("allocationPolicy", "custom"),
                     self.check("customAllocationDefinition.webhookUrl", WEBHOOK_URL),
                     self.check("customAllocationDefinition.apiVersion", API_VERSION),
-                    # self.check("iotHubs", self.hub_host_name.split()),
+                    self.check("iotHubs", None),
                     self.exists("initialTwin.tags"),
                     self.exists("initialTwin.properties.desired"),
                     self.check("attestation.symmetricKey.primaryKey", primary_key),
@@ -581,7 +598,7 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                     self.check("enrollmentGroupId", enrollment_id),
                     self.check("provisioningStatus", EntityStatusType.enabled.value),
                     self.check("allocationPolicy", AllocationType.geolatency.value),
-                    # self.check("iotHubs", self.hub_host_name.split()),
+                    self.check("iotHubs", self.hub_host_name.split()),
                     self.check("initialTwin.tags", self.kwargs["generic_dict"]),
                     self.check(
                         "initialTwin.properties.desired", self.kwargs["generic_dict"]
@@ -636,7 +653,7 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                     self.check("allocationPolicy", "custom"),
                     self.check("customAllocationDefinition.webhookUrl", WEBHOOK_URL),
                     self.check("customAllocationDefinition.apiVersion", API_VERSION),
-                    # self.check("iotHubs", self.hub_host_name.split()),
+                    self.check("iotHubs", None),
                     self.exists("initialTwin.tags"),
                     self.exists("initialTwin.properties.desired"),
                     self.check("attestation.symmetricKey.primaryKey", primary_key),
@@ -775,7 +792,7 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                     "iot dps enrollment create --enrollment-id {} --attestation-type {}"
                     " -g {} --dps-name {} --cp {} --scp {}"
                     " --provisioning-status {} --device-id {}"
-                    " --initial-twin-tags {} --initial-twin-properties {}"
+                    " --initial-twin-tags {} --initial-twin-properties {} --device-information {}"
                     " --allocation-policy {} --iot-hubs {}".format(
                         enrollment_id,
                         attestation_type,
@@ -787,6 +804,7 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                         device_id,
                         '"{generic_dict}"',
                         '"{twin_array_dict}"',
+                        '"{generic_dict}"',
                         AllocationType.hashed.value,
                         self.hub_host_name,
                     ),
@@ -800,6 +818,7 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                     self.check("allocationPolicy", AllocationType.hashed.value),
                     self.check("iotHubs", self.hub_host_name.split()),
                     self.check("initialTwin.tags", self.kwargs["generic_dict"]),
+                    self.check("optionalDeviceInformation", self.kwargs["generic_dict"]),
                     self.check(
                         "initialTwin.properties.desired", self.kwargs["twin_array_dict"]
                     ),

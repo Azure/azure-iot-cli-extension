@@ -9,5 +9,12 @@
 # regenerated.
 # --------------------------------------------------------------------------
 
-VERSION = "2021-10-01"
+from .individual_enrollment_operations import IndividualEnrollmentOperations
+from .enrollment_group_operations import EnrollmentGroupOperations
+from .device_registration_state_operations import DeviceRegistrationStateOperations
 
+__all__ = [
+    'IndividualEnrollmentOperations',
+    'EnrollmentGroupOperations',
+    'DeviceRegistrationStateOperations',
+]

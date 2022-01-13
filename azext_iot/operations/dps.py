@@ -47,12 +47,22 @@ logger = get_logger(__name__)
 
 
 def iot_dps_device_enrollment_list(
-    cmd, dps_name=None, resource_group_name=None, top=None, login=None,
+    cmd,
+    dps_name=None,
+    resource_group_name=None,
+    top=None,
+    login=None,
+    auth_type_dataplane=None,
 ):
     from azext_iot.sdk.dps.service.models.query_specification import QuerySpecification
 
     discovery = DPSDiscovery(cmd)
-    target = discovery.get_target(dps_name, resource_group_name, login=login)
+    target = discovery.get_target(
+        dps_name,
+        resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
 
     try:
         resolver = SdkResolver(target=target)
@@ -60,27 +70,38 @@ def iot_dps_device_enrollment_list(
 
         query_command = "SELECT *"
         query = [QuerySpecification(query=query_command)]
-        return _execute_query(query, sdk.query_individual_enrollments, top)
+        return _execute_query(query, sdk.individual_enrollment.query, top)
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
 
 def iot_dps_device_enrollment_get(
-    cmd, enrollment_id, dps_name=None, resource_group_name=None, show_keys=None, login=None,
+    cmd,
+    enrollment_id,
+    dps_name=None,
+    resource_group_name=None,
+    show_keys=None,
+    login=None,
+    auth_type_dataplane=None,
 ):
     discovery = DPSDiscovery(cmd)
-    target = discovery.get_target(dps_name, resource_group_name, login=login)
+    target = discovery.get_target(
+        dps_name,
+        resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
-        enrollment = sdk.get_individual_enrollment(
+        enrollment = sdk.individual_enrollment.get(
             enrollment_id, raw=True
         ).response.json()
         if show_keys:
             enrollment_type = enrollment["attestation"]["type"]
             if enrollment_type == AttestationType.symmetricKey.value:
-                attestation = sdk.get_individual_enrollment_attestation_mechanism(
+                attestation = sdk.individual_enrollment.get_attestation_mechanism(
                     enrollment_id, raw=True
                 ).response.json()
                 enrollment["attestation"] = attestation
@@ -117,11 +138,18 @@ def iot_dps_device_enrollment_create(
     iot_hubs=None,
     edge_enabled=False,
     webhook_url=None,
+    device_information=None,
     api_version=None,
     login=None,
+    auth_type_dataplane=None,
 ):
     discovery = DPSDiscovery(cmd)
-    target = discovery.get_target(dps_name, resource_group_name, login=login)
+    target = discovery.get_target(
+        dps_name,
+        resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
@@ -171,8 +199,9 @@ def iot_dps_device_enrollment_create(
             allocation_policy=allocation_policy,
             iot_hubs=iot_hub_list,
             custom_allocation_definition=custom_allocation_definition,
+            optional_device_information=_get_twin_collection(device_information)
         )
-        return sdk.create_or_update_individual_enrollment(enrollment_id, enrollment)
+        return sdk.individual_enrollment.create_or_update(enrollment_id, enrollment)
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
@@ -200,15 +229,22 @@ def iot_dps_device_enrollment_update(
     iot_hubs=None,
     edge_enabled=None,
     webhook_url=None,
+    device_information=None,
     api_version=None,
     login=None,
+    auth_type_dataplane=None,
 ):
     discovery = DPSDiscovery(cmd)
-    target = discovery.get_target(dps_name, resource_group_name, login=login)
+    target = discovery.get_target(
+        dps_name,
+        resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
-        enrollment_record = sdk.get_individual_enrollment(enrollment_id)
+        enrollment_record = sdk.individual_enrollment.get(enrollment_id)
 
         # Verify and update attestation information
         attestation_type = enrollment_record.attestation.type
@@ -234,7 +270,7 @@ def iot_dps_device_enrollment_update(
                 remove_secondary_certificate,
             )
         else:
-            enrollment_record.attestation = sdk.get_individual_enrollment_attestation_mechanism(
+            enrollment_record.attestation = sdk.individual_enrollment.get_attestation_mechanism(
                 enrollment_id
             )
             if primary_key:
@@ -274,8 +310,10 @@ def iot_dps_device_enrollment_update(
                 )
         if edge_enabled is not None:
             enrollment_record.capabilities = DeviceCapabilities(iot_edge=edge_enabled)
+        if device_information:
+            enrollment_record.optional_device_information = _get_twin_collection(device_information)
 
-        return sdk.create_or_update_individual_enrollment(
+        return sdk.individual_enrollment.create_or_update(
             enrollment_id, enrollment_record, if_match=(etag if etag else "*")
         )
     except ProvisioningServiceErrorDetailsException as e:
@@ -283,15 +321,26 @@ def iot_dps_device_enrollment_update(
 
 
 def iot_dps_device_enrollment_delete(
-    cmd, enrollment_id, dps_name=None, resource_group_name=None, etag=None, login=None,
+    cmd,
+    enrollment_id,
+    dps_name=None,
+    resource_group_name=None,
+    etag=None,
+    login=None,
+    auth_type_dataplane=None,
 ):
     discovery = DPSDiscovery(cmd)
-    target = discovery.get_target(dps_name, resource_group_name, login=login)
+    target = discovery.get_target(
+        dps_name,
+        resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
-        return sdk.delete_individual_enrollment(enrollment_id, if_match=(etag if etag else "*"))
+        return sdk.individual_enrollment.delete(enrollment_id, if_match=(etag if etag else "*"))
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
@@ -300,39 +349,55 @@ def iot_dps_device_enrollment_delete(
 
 
 def iot_dps_device_enrollment_group_list(
-    cmd, dps_name=None, resource_group_name=None, top=None, login=None,
+    cmd, dps_name=None, resource_group_name=None, top=None, login=None, auth_type_dataplane=None,
 ):
     from azext_iot.sdk.dps.service.models.query_specification import QuerySpecification
 
     discovery = DPSDiscovery(cmd)
-    target = discovery.get_target(dps_name, resource_group_name, login=login)
+    target = discovery.get_target(
+        dps_name,
+        resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
         query_command = "SELECT *"
         query1 = [QuerySpecification(query=query_command)]
-        return _execute_query(query1, sdk.query_enrollment_groups, top)
+        return _execute_query(query1, sdk.enrollment_group.query, top)
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
 
 def iot_dps_device_enrollment_group_get(
-    cmd, enrollment_id, dps_name=None, resource_group_name=None, show_keys=None, login=None,
+    cmd,
+    enrollment_id,
+    dps_name=None,
+    resource_group_name=None,
+    show_keys=None,
+    login=None,
+    auth_type_dataplane=None,
 ):
     discovery = DPSDiscovery(cmd)
-    target = discovery.get_target(dps_name, resource_group_name, login=login)
+    target = discovery.get_target(
+        dps_name,
+        resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
-        enrollment_group = sdk.get_enrollment_group(
+        enrollment_group = sdk.enrollment_group.get(
             enrollment_id, raw=True
         ).response.json()
         if show_keys:
             enrollment_type = enrollment_group["attestation"]["type"]
             if enrollment_type == AttestationType.symmetricKey.value:
-                attestation = sdk.get_enrollment_group_attestation_mechanism(
+                attestation = sdk.enrollment_group.get_attestation_mechanism(
                     enrollment_id, raw=True
                 ).response.json()
                 enrollment_group["attestation"] = attestation
@@ -370,9 +435,15 @@ def iot_dps_device_enrollment_group_create(
     webhook_url=None,
     api_version=None,
     login=None,
+    auth_type_dataplane=None,
 ):
     discovery = DPSDiscovery(cmd)
-    target = discovery.get_target(dps_name, resource_group_name, login=login)
+    target = discovery.get_target(
+        dps_name,
+        resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
@@ -429,7 +500,7 @@ def iot_dps_device_enrollment_group_create(
             iot_hubs=iot_hub_list,
             custom_allocation_definition=custom_allocation_definition,
         )
-        return sdk.create_or_update_enrollment_group(enrollment_id, group_enrollment)
+        return sdk.enrollment_group.create_or_update(enrollment_id, group_enrollment)
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
@@ -459,17 +530,23 @@ def iot_dps_device_enrollment_group_update(
     webhook_url=None,
     api_version=None,
     login=None,
+    auth_type_dataplane=None,
 ):
     discovery = DPSDiscovery(cmd)
-    target = discovery.get_target(dps_name, resource_group_name, login=login)
+    target = discovery.get_target(
+        dps_name,
+        resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
-        enrollment_record = sdk.get_enrollment_group(enrollment_id)
+        enrollment_record = sdk.enrollment_group.get(enrollment_id)
         # Update enrollment information
         if enrollment_record.attestation.type == AttestationType.symmetricKey.value:
-            enrollment_record.attestation = sdk.get_enrollment_group_attestation_mechanism(
+            enrollment_record.attestation = sdk.enrollment_group.get_attestation_mechanism(
                 enrollment_id
             )
             if primary_key:
@@ -551,7 +628,7 @@ def iot_dps_device_enrollment_group_update(
                 )
         if edge_enabled is not None:
             enrollment_record.capabilities = DeviceCapabilities(iot_edge=edge_enabled)
-        return sdk.create_or_update_enrollment_group(
+        return sdk.enrollment_group.create_or_update(
             enrollment_id, enrollment_record, if_match=(etag if etag else "*")
         )
     except ProvisioningServiceErrorDetailsException as e:
@@ -559,15 +636,26 @@ def iot_dps_device_enrollment_group_update(
 
 
 def iot_dps_device_enrollment_group_delete(
-    cmd, enrollment_id, dps_name=None, resource_group_name=None, etag=None, login=None,
+    cmd,
+    enrollment_id,
+    dps_name=None,
+    resource_group_name=None,
+    etag=None,
+    login=None,
+    auth_type_dataplane=None,
 ):
     discovery = DPSDiscovery(cmd)
-    target = discovery.get_target(dps_name, resource_group_name, login=login)
+    target = discovery.get_target(
+        dps_name,
+        resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
-        return sdk.delete_enrollment_group(enrollment_id, if_match=(etag if etag else "*"))
+        return sdk.enrollment_group.delete(enrollment_id, if_match=(etag if etag else "*"))
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
@@ -580,6 +668,7 @@ def iot_dps_compute_device_key(
     resource_group_name=None,
     symmetric_key=None,
     login=None,
+    auth_type_dataplane=None,
 ):
     if symmetric_key is None:
         if not all([dps_name, resource_group_name, enrollment_id]):
@@ -590,11 +679,16 @@ def iot_dps_compute_device_key(
             )
 
         discovery = DPSDiscovery(cmd)
-        target = discovery.get_target(dps_name, resource_group_name, login=login)
+        target = discovery.get_target(
+            dps_name,
+            resource_group_name,
+            login=login,
+            auth_type=auth_type_dataplane,
+        )
         try:
             resolver = SdkResolver(target=target)
             sdk = resolver.get_sdk(SdkType.dps_sdk)
-            attestation = sdk.get_enrollment_group_attestation_mechanism(
+            attestation = sdk.enrollment_group.get_attestation_mechanism(
                 enrollment_id, raw=True
             ).response.json()
             if attestation.get("type") != AttestationType.symmetricKey.value:
@@ -699,28 +793,42 @@ def _get_dps_connection_string(
 # DPS Registration
 
 
-def iot_dps_registration_list(cmd, enrollment_id, dps_name=None, resource_group_name=None, login=None):
+def iot_dps_registration_list(
+    cmd, enrollment_id, dps_name=None, resource_group_name=None, login=None, auth_type_dataplane=None,
+):
     discovery = DPSDiscovery(cmd)
-    target = discovery.get_target(dps_name, resource_group_name, login=login)
+    target = discovery.get_target(
+        dps_name,
+        resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
-        return sdk.query_device_registration_states(
+        return sdk.device_registration_state.query(
             enrollment_id, raw=True
         ).response.json()
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
 
-def iot_dps_registration_get(cmd, registration_id, dps_name=None, resource_group_name=None, login=None):
+def iot_dps_registration_get(
+    cmd, registration_id, dps_name=None, resource_group_name=None, login=None, auth_type_dataplane=None,
+):
     discovery = DPSDiscovery(cmd)
-    target = discovery.get_target(dps_name, resource_group_name, login=login)
+    target = discovery.get_target(
+        dps_name,
+        resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
-        return sdk.get_device_registration_state(
+        return sdk.device_registration_state.get(
             registration_id, raw=True
         ).response.json()
     except ProvisioningServiceErrorDetailsException as e:
@@ -728,38 +836,48 @@ def iot_dps_registration_get(cmd, registration_id, dps_name=None, resource_group
 
 
 def iot_dps_registration_delete(
-    cmd, registration_id, dps_name=None, resource_group_name=None, etag=None, login=None
+    cmd,
+    registration_id,
+    dps_name=None,
+    resource_group_name=None,
+    etag=None,
+    login=None,
+    auth_type_dataplane=None,
 ):
     discovery = DPSDiscovery(cmd)
-    target = discovery.get_target(dps_name, resource_group_name, login=login)
+    target = discovery.get_target(
+        dps_name,
+        resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
-        return sdk.delete_device_registration_state(registration_id, if_match=(etag if etag else "*"))
+        return sdk.device_registration_state.delete(registration_id, if_match=(etag if etag else "*"))
     except ProvisioningServiceErrorDetailsException as e:
         raise CLIError(e)
 
 
-def _get_initial_twin(initial_twin_tags=None, initial_twin_properties=None):
+def _get_twin_collection(properties):
+    """Convert a json into TwinCollection for use with the API."""
     from azext_iot.common.utility import dict_clean
 
-    if initial_twin_tags == "":
-        initial_twin_tags = None
-    elif initial_twin_tags:
-        initial_twin_tags = dict_clean(shell_safe_json_parse(str(initial_twin_tags)))
+    if properties == "":
+        properties = None
+    elif properties:
+        properties = dict_clean(shell_safe_json_parse(str(properties)))
 
-    if initial_twin_properties == "":
-        initial_twin_properties = None
-    elif initial_twin_properties:
-        initial_twin_properties = dict_clean(
-            shell_safe_json_parse(str(initial_twin_properties))
-        )
+    return TwinCollection(additional_properties=properties)
 
+
+def _get_initial_twin(initial_twin_tags=None, initial_twin_properties=None):
+    """Build up Inital Twin using given tags and properties."""
     return InitialTwin(
-        tags=TwinCollection(additional_properties=initial_twin_tags),
+        tags=_get_twin_collection(initial_twin_tags),
         properties=InitialTwinProperties(
-            desired=TwinCollection(additional_properties=initial_twin_properties)
+            desired=_get_twin_collection(initial_twin_properties)
         ),
     )
 

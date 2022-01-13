@@ -20,13 +20,18 @@ class IndividualEnrollment(Model):
 
     All required parameters must be populated in order to send to Azure.
 
-    :param registration_id: Required. The registration ID is alphanumeric,
-     lowercase, and may contain hyphens.
+    :param registration_id: Required. This id is used to uniquely identify a
+     device registration of an enrollment.
+     A case-insensitive string (up to 128 characters long) of alphanumeric
+     characters plus certain special characters : . _ -. No special characters
+     allowed at start or end.
     :type registration_id: str
     :param device_id: Desired IoT Hub device ID (optional).
     :type device_id: str
     :ivar registration_state: Current registration status.
     :vartype registration_state: ~dps.models.DeviceRegistrationState
+    :param optional_device_information: Optional Device Information.
+    :type optional_device_information: ~dps.models.TwinCollection
     :param attestation: Required. Attestation method used by the device.
     :type attestation: ~dps.models.AttestationMechanism
     :param capabilities: Capabilities of the device.
@@ -63,11 +68,12 @@ class IndividualEnrollment(Model):
      configuration. We recommend using Azure Functions to host your logic.
      Possible values include: 'hashed', 'geoLatency', 'static', 'custom'
     :type allocation_policy: str or ~dps.models.enum
-    :param iot_hubs: The list of names of IoT hubs the device(s) in this
+    :param iot_hubs: The list of IoT Hub hostnames the device(s) in this
      resource can be allocated to. Must be a subset of tenant level list of IoT
      hubs.
     :type iot_hubs: list[str]
-    :param custom_allocation_definition: Custom allocation definition.
+    :param custom_allocation_definition: This tells DPS which webhook to call
+     when using custom allocation.
     :type custom_allocation_definition: ~dps.models.CustomAllocationDefinition
     """
 
@@ -83,6 +89,7 @@ class IndividualEnrollment(Model):
         'registration_id': {'key': 'registrationId', 'type': 'str'},
         'device_id': {'key': 'deviceId', 'type': 'str'},
         'registration_state': {'key': 'registrationState', 'type': 'DeviceRegistrationState'},
+        'optional_device_information': {'key': 'optionalDeviceInformation', 'type': 'TwinCollection'},
         'attestation': {'key': 'attestation', 'type': 'AttestationMechanism'},
         'capabilities': {'key': 'capabilities', 'type': 'DeviceCapabilities'},
         'iot_hub_host_name': {'key': 'iotHubHostName', 'type': 'str'},
@@ -102,6 +109,7 @@ class IndividualEnrollment(Model):
         self.registration_id = kwargs.get('registration_id', None)
         self.device_id = kwargs.get('device_id', None)
         self.registration_state = None
+        self.optional_device_information = kwargs.get('optional_device_information', None)
         self.attestation = kwargs.get('attestation', None)
         self.capabilities = kwargs.get('capabilities', None)
         self.iot_hub_host_name = kwargs.get('iot_hub_host_name', None)

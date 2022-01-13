@@ -13,7 +13,7 @@ from msrest.serialization import Model
 
 
 class CustomAllocationDefinition(Model):
-    """Custom allocation definition.
+    """This tells DPS which webhook to call when using custom allocation.
 
     All required parameters must be populated in order to send to Azure.
 
