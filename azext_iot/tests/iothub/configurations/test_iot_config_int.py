@@ -805,7 +805,18 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
 
             self.tearDown()
 
-    def test_edge_image_terms(self):
+    @pytest.fixture
+    def setup_edge_image_terms_tests(self):
+        # Ensure Edge image offer terms are not accepted before the test starts
+        if self.current_user["type"] == UserTypes.user.value:
+            self.cmd(
+                "iot edge image terms cancel --offer {} --plan {} --publisher {}".format(
+                    terms_offerId, terms_planId, terms_publisherId
+                )
+            )
+        yield
+
+    def test_edge_image_terms(self, setup=setup_edge_image_terms_tests):
 
         if self.current_user["type"] == UserTypes.user.value:
 
@@ -886,14 +897,3 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
                 ),
                 expect_failure=True,
             )
-
-    @pytest.fixture(scope='class', autouse=True)
-    def setup_edge_image_terms_tests(self):
-        # Ensure Edge image offer terms are not accepted before the test starts
-        if self.current_user["type"] == UserTypes.user.value:
-            self.cmd(
-                "iot edge image terms cancel --offer {} --plan {} --publisher {}".format(
-                    terms_offerId, terms_planId, terms_publisherId
-                )
-            )
-        yield
