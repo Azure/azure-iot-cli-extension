@@ -29,7 +29,8 @@ from azext_iot.common.shared import (
     DeviceAuthApiType,
     ConnectionStringParser,
     EntityStatusType,
-    AuthenticationTypeDataplane
+    AuthenticationTypeDataplane,
+    IotEdgeImageTermsCommands
 )
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
@@ -1724,6 +1725,77 @@ def iot_hub_configuration_metric_show(
         return output
     except CloudError as e:
         raise CLIError(unpack_msrest_error(e))
+
+
+def _iot_edge_image_terms_invoke_command(
+    command_name: str = None,
+    offerId: str = None,
+    planId: str = None,
+    publisherId: str = None,
+    urn: str = None,
+    subscription: str = None
+):
+    from azext_iot.common.embedded_cli import EmbeddedCLI
+    from azext_iot.tests.settings import UserTypes
+    from azext_iot.common.utility import get_current_user
+
+    current_user = get_current_user()
+    if current_user["type"] != UserTypes.user.value:
+        raise CLIError('Edge image terms operations are supported only for user principal AAD tokens (not service principals)')
+
+    command = "vm image terms " + command_name
+    if urn:
+        if (publisherId or offerId or planId):
+            raise CLIError('Publisher Id or Offer Id or Plan Id should not be specified when providing URN')
+        urn_parts = urn.split(":")
+        if urn_parts and len(urn_parts) == 3:
+            command += " --publisher '{}' --offer '{}' --plan '{}'".format(urn_parts[0], urn_parts[1], urn_parts[2])
+        else:
+            raise CLIError('Incorrect URN format. The correct format is publisherId:offerId:planId')
+    else:
+        command += " --publisher '{}'".format(publisherId) if publisherId else ""
+        command += " --offer '{}'".format(offerId) if offerId else ""
+        command += " --plan '{}'".format(planId) if planId else ""
+
+    embedded_cli = EmbeddedCLI()
+    output = embedded_cli.invoke(command, subscription).as_json()
+    return output
+
+
+def iot_edge_image_terms_show(
+    offerId=None,
+    planId=None,
+    publisherId=None,
+    urn=None,
+    azureSub=None
+):
+    return _iot_edge_image_terms_invoke_command(
+        IotEdgeImageTermsCommands.Show.value, offerId, planId, publisherId, urn, azureSub
+    )
+
+
+def iot_edge_image_terms_accept(
+    offerId=None,
+    planId=None,
+    publisherId=None,
+    urn=None,
+    azureSub=None
+):
+    return _iot_edge_image_terms_invoke_command(
+        IotEdgeImageTermsCommands.Accept.value, offerId, planId, publisherId, urn, azureSub
+    )
+
+
+def iot_edge_image_terms_cancel(
+    offerId=None,
+    planId=None,
+    publisherId=None,
+    urn=None,
+    azureSub=None
+):
+    return _iot_edge_image_terms_invoke_command(
+        IotEdgeImageTermsCommands.Cancel.value, offerId, planId, publisherId, urn, azureSub
+    )
 
 
 # Device Twin

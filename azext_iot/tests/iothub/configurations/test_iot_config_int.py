@@ -10,7 +10,7 @@ import json
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.conftest import get_context_path
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
-from azext_iot.common.utility import read_file_content, process_json_arg
+from azext_iot.common.utility import read_file_content, process_json_arg, get_current_user
 from azext_iot.common.shared import AuthenticationTypeDataplane
 from azext_iot.tests.settings import UserTypes
 
@@ -34,8 +34,7 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
         super(TestIoTConfigurations, self).__init__(
             test_case
         )
-        account = self.cmd("account show").get_output_in_json()
-        self.user = account["user"]
+        self.current_user = get_current_user()
 
     def test_edge_set_modules(self):
         for auth_phase in DATAPLANE_AUTH_TYPES:
@@ -77,7 +76,7 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
 
             # Apply billable edge module (requires AAD Auth)
             # @avagraw - The billable edge modules can only be applied using user tokens (service principals are not supported)
-            if self.user["type"] == UserTypes.user.value:
+            if self.current_user["type"] == UserTypes.user.value:
                 billable_module_content = process_json_arg(edge_billable_module_path, argument_name="content")
                 purchase_module = list(billable_module_content["modulesPurchase"].keys())[0]
                 self.cmd(

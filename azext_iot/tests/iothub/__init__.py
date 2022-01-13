@@ -14,6 +14,7 @@ from azext_iot.tests import CaptureOutputLiveScenarioTest
 
 from azext_iot.common.certops import create_self_signed_certificate
 from azext_iot.common.shared import AuthenticationTypeDataplane
+from azext_iot.common.utility import get_current_user
 
 DATAPLANE_AUTH_TYPES = [
     AuthenticationTypeDataplane.key.value,
@@ -93,8 +94,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     "iot hub show -n {} -g {}".format(self.entity_name, self.entity_rg)
                 ).get_output_in_json()
 
-                account = self.cmd("account show").get_output_in_json()
-                user = account["user"]
+                user = get_current_user()
 
                 if user["name"] is None:
                     raise Exception("User not found")
