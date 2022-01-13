@@ -232,13 +232,6 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
         return role_assignments
 
-    def setup_edge_module_image_terms_tests(self, offerId, planId, publisherId):
-        self.cmd(
-            "iot edge module image terms cancel --offer {} --plan {} --publisher {}".format(
-                offerId, planId, publisherId
-            )
-        )
-
     @pytest.fixture(scope='class', autouse=True)
     def tearDownSuite(self):
         yield None

@@ -890,9 +890,10 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
     @pytest.fixture(scope='class', autouse=True)
     def setup_edge_image_terms_tests(self):
         # Ensure Edge image offer terms are not accepted before the test starts
-        self.cmd(
-            "iot edge image terms cancel --offer {} --plan {} --publisher {}".format(
-                terms_offerId, terms_planId, terms_publisherId
+        if self.current_user["type"] == UserTypes.user.value:
+            self.cmd(
+                "iot edge image terms cancel --offer {} --plan {} --publisher {}".format(
+                    terms_offerId, terms_planId, terms_publisherId
+                )
             )
-        )
         yield
