@@ -3,13 +3,13 @@
 Release History
 ===============
 
-0.12.2
+0.13.0
 +++++++++++++++
 
 **IoT Central updates**
 
 * Added missing "update" sub-commands for all commands supporting it:
-  
+
   - az iot central device update
   - az iot central device-template update
   - az iot central file-upload-config update
@@ -18,8 +18,31 @@ Release History
 
 * Added "compact" mode for "az iot central device-template list" command:
   When "-c" flag is passed, only Ids, display names and model types will be shown for the templates in the application.
-  
+
 * Added `az iot central device c2d-message purge` to purge cloud-to-device message queue
+
+**IoT DPS updates**
+
+* Added RBAC support for DPS dataplane commands, similar to the RBAC support for IoT Hub.
+  The type of auth used to execute commands can be controlled with the "--auth-type" parameter
+  which accepts the values "key" or "login". The value of "key" is set by default.
+
+  * When "--auth-type" has the value of "key", like before the CLI will auto-discover
+    a suitable policy when interacting with DPS.
+  * When "--auth-type" has the value "login", an access token from the Azure CLI logged in principal
+    will be used for the operation.
+
+  * The following commands currently support `--auth-type`:
+
+    * az iot dps enrollment
+    * az iot dps enrollment-group
+    * az iot dps registration
+
+* Update DPS dataplane SDK to use the newer 2021-10-01 API version. Most command
+  functionality has not changed. Updated commands include:
+
+  - `az iot dps enrollment create` and `az iot dps enrollment update` support
+    optional device information via `--device-info`
 
 
 0.12.1
@@ -48,27 +71,6 @@ Release History
 * The IoT extension officially supports Python 3.10.
 
 **IoT DPS updates**
-
-* Added RBAC support for DPS dataplane commands, similar to the RBAC support for IoT Hub.
-  The type of auth used to execute commands can be controlled with the "--auth-type" parameter
-  which accepts the values "key" or "login". The value of "key" is set by default.
-
-  * When "--auth-type" has the value of "key", like before the CLI will auto-discover
-    a suitable policy when interacting with DPS.
-  * When "--auth-type" has the value "login", an access token from the Azure CLI logged in principal
-    will be used for the operation.
-
-  * The following commands currently support `--auth-type`:
-
-    * az iot dps enrollment
-    * az iot dps enrollment-group
-    * az iot dps registration
-
-* Update DPS dataplane SDK to use the newer 2021-10-01 API version. Most command
-  functionality has not changed. Updated commands include:
-
-  - `az iot dps enrollment create` and `az iot dps enrollment update` support
-    optional device information via `--device-info`
 
 * Added `az iot dps connection-string show` to show the DPS connection string with
   similar support as the IoT Hub connection string show.
