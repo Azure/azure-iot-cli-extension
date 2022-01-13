@@ -819,17 +819,17 @@ def load_arguments(self, _):
         context.argument(
             "offerId",
             options_list=["--offer", "-f"],
-            help="IoT Edge image offer.",
+            help="IoT Edge module image offer.",
         )
         context.argument(
             "planId",
             options_list=["--plan"],
-            help="IoT Edge image billing plan.",
+            help="IoT Edge module image billing plan.",
         )
         context.argument(
             "publisherId",
             options_list=["--publisher", "-p"],
-            help="IoT Edge image publisher.",
+            help="IoT Edge module image publisher.",
         )
         context.argument(
             "urn",

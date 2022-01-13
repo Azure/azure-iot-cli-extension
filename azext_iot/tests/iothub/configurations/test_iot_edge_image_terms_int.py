@@ -25,7 +25,7 @@ class TestIoTEdgeImageTerms(LiveScenarioTest):
     @pytest.fixture(scope="class")
     def setup_edge_image_terms_tests(self):
         if self.current_user["type"] == UserTypes.user.value:
-            # Ensure Edge image offer terms are not accepted before the test starts
+            # Ensure Edge module image offer terms are not accepted before the test starts
             self.cmd(
                 "iot edge image terms cancel --offer {} --plan {} --publisher {}".format(
                     terms_offerId, terms_planId, terms_publisherId
@@ -40,7 +40,7 @@ class TestIoTEdgeImageTerms(LiveScenarioTest):
                 self.check("publisher", terms_publisherId),
             ]
 
-            # Show IoT Edge module terms offer
+            # Show IoT Edge module image terms offer
             self.cmd(
                 "iot edge image terms show --offer {} --plan {} --publisher {}".format(
                     terms_offerId, terms_planId, terms_publisherId
@@ -48,7 +48,7 @@ class TestIoTEdgeImageTerms(LiveScenarioTest):
                 checks=offer_checks.append(self.check("accepted", "false"))
             )
 
-            # Accept IoT Edge module terms offer
+            # Accept IoT Edge module image terms offer
             self.cmd(
                 "iot edge image terms accept --offer {} --plan {} --publisher {}".format(
                     terms_offerId, terms_planId, terms_publisherId
@@ -56,7 +56,7 @@ class TestIoTEdgeImageTerms(LiveScenarioTest):
                 checks=offer_checks.append(self.check("accepted", "true"))
             )
 
-            # Show the accepted IoT Edge module terms offer using URN
+            # Show the accepted IoT Edge module image terms offer using URN
             self.cmd(
                 "iot edge image terms show --urn {}".format(
                     terms_urn
@@ -64,7 +64,7 @@ class TestIoTEdgeImageTerms(LiveScenarioTest):
                 checks=offer_checks.append(self.check("accepted", "true"))
             )
 
-            # Cancel IoT Edge module terms offer
+            # Cancel IoT Edge module image terms offer
             self.cmd(
                 "iot edge image terms cancel --offer {} --plan {} --publisher {}".format(
                     terms_offerId, terms_planId, terms_publisherId

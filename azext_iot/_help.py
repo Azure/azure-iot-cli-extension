@@ -1084,29 +1084,29 @@ helps[
     "iot edge image"
 ] = """
     type: group
-    short-summary: Manage IoT Edge images.
+    short-summary: Manage IoT Edge module images.
 """
 
 helps[
     "iot edge image terms"
 ] = """
     type: group
-    short-summary: Manage IoT Edge image terms.
+    short-summary: Manage IoT Edge module image terms.
 """
 
 helps[
     "iot edge image terms show"
 ] = """
     type: command
-    short-summary: Get the details of IoT Edge image terms.
+    short-summary: Get the details of IoT Edge module image terms.
     examples:
-    - name: Get details of IoT Edge image terms using URN
+    - name: Get details of IoT Edge module image terms using URN
       text: >
         az iot edge image terms show --urn {publisherId:offerId:planId}
-    - name: Get details of another Azure subscription's IoT Edge image terms using URN
+    - name: Get details of another Azure subscription's IoT Edge module image terms using URN
       text: >
         az iot edge image terms show --urn {publisherId:offerId:planId} -s {subscription_id_or_name}
-    - name: Get details of Azure Marketplace image terms using Offer ID, Plan ID and Publisher ID
+    - name: Get details of IoT Edge module image terms using Offer ID, Plan ID and Publisher ID
       text: >
         az iot edge image terms show --offer {offer_id} --plan {plan_id} --publisher {publisher_id}
 """
@@ -1115,15 +1115,15 @@ helps[
     "iot edge image terms accept"
 ] = """
     type: command
-    short-summary: Get the details of IoT Edge image terms.
+    short-summary: Accept IoT Edge module image terms.
     examples:
-    - name: Accept IoT Edge image terms using URN
+    - name: Accept IoT Edge module image terms using URN
       text: >
         az iot edge image terms accept --urn {publisherId:offerId:planId}
-    - name: Accept another Azure subscription's IoT Edge image terms using URN
+    - name: Accept another Azure subscription's IoT Edge module image terms using URN
       text: >
         az iot edge image terms accept --urn {publisherId:offerId:planId} -s {subscription_id_or_name}
-    - name: Accept Azure Marketplace image terms using Offer ID, Plan ID and Publisher ID
+    - name: Accept IoT Edge module image terms using Offer ID, Plan ID and Publisher ID
       text: >
         az iot edge image terms accept --offer {offer_id} --plan {plan_id} --publisher {publisher_id}
 """
@@ -1132,15 +1132,15 @@ helps[
     "iot edge image terms cancel"
 ] = """
     type: command
-    short-summary: Get the details of IoT Edge image terms.
+    short-summary: Cancel IoT Edge module image terms.
     examples:
-    - name: Cancel IoT Edge image terms using URN
+    - name: Cancel IoT Edge module image terms using URN
       text: >
         az iot edge image terms cancel --urn {publisherId:offerId:planId}
-    - name: Cancel another Azure subscription's IoT Edge image terms using URN
+    - name: Cancel another Azure subscription's IoT Edge module image terms using URN
       text: >
         az iot edge image terms cancel --urn {publisherId:offerId:planId} -s {subscription_id_or_name}
-    - name: Cancel Azure Marketplace image terms using Offer ID, Plan ID and Publisher ID
+    - name: Cancel IoT Edge module image terms using Offer ID, Plan ID and Publisher ID
       text: >
         az iot edge image terms cancel --offer {offer_id} --plan {plan_id} --publisher {publisher_id}
 """
