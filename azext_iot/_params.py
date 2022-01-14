@@ -732,7 +732,7 @@ def load_arguments(self, _):
             "target_condition",
             options_list=["--target-condition", "--tc", "-t"],
             help="Target condition in which a device or module configuration applies to. "
-            "Configurations with no target condition will target no device or module. ",
+            "Configurations with no target condition will target no device or module.",
         )
         context.argument(
             "priority",
