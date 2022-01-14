@@ -2237,10 +2237,12 @@ def iot_device_send_message(
         properties = validate_key_value_pairs(properties)
     device = _iot_device_show(target, device_id)
     device_connection_string = _build_device_or_module_connection_string(device, KeyType.primary.value)
+    device_auth_api_type = device.get("authentication", {}).get("type", "") if device else None
     client_mqtt = mqtt_client(
         target=target,
         device_conn_string=device_connection_string,
-        device_id=device_id
+        device_id=device_id,
+        device_auth_api_type=device_auth_api_type
     )
     for _ in range(msg_count):
         client_mqtt.send_d2c_message(message_text=data, properties=properties)
@@ -2624,14 +2626,13 @@ def iot_simulate_device(
         device = _iot_device_show(target, device_id)
         if protocol_type == ProtocolType.mqtt.name:
             device_connection_string = _build_device_or_module_connection_string(device, KeyType.primary.value)
-
-            if device and device.get("authentication", {}).get("type", "") != DeviceAuthApiType.sas.value:
-                raise CLIError('MQTT simulation is only supported for symmetric key auth (SAS) based devices')
+            device_auth_api_type = device.get("authentication", {}).get("type", "") if device else None
 
             client_mqtt = mqtt_client(
                 target=target,
                 device_conn_string=device_connection_string,
                 device_id=device_id,
+                device_auth_api_type=device_auth_api_type,
                 method_response_code=method_response_code,
                 method_response_payload=method_response_payload,
                 init_reported_properties=init_reported_properties

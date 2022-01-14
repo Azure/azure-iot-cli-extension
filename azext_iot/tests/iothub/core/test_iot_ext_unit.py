@@ -17,6 +17,7 @@ import os
 import responses
 import re
 from azext_iot.operations import hub as subject
+from azext_iot.operations import _mqtt as mqtt_subject
 from azext_iot.common.utility import (
     validate_key_value_pairs,
     read_file_content,
@@ -2193,6 +2194,29 @@ class TestDeviceSimulate:
         with pytest.raises(CLIError):
             subject.iot_simulate_device(
                 fixture_cmd, device_id, hub_name=mock_target["entity"]
+            )
+
+
+class TestMQTTClientSetup:
+
+    def test_mqtt_client_creation_sas_device(self, mqttclient):
+        mqtt_subject.mqtt_client(
+            mock_target["entity"], "test_conn_string", "test_device_id", DeviceAuthApiType.sas.value
+        )
+
+    @pytest.mark.parametrize(
+        "deviceAuthApiType",
+        [
+            DeviceAuthApiType.selfSigned.value,
+            DeviceAuthApiType.certificateAuthority.value,
+            "Invalid_Auth_Api_Type",
+            None,
+        ],
+    )
+    def test_mqtt_client_creation_non_sas_device(self, mqttclient, deviceAuthApiType):
+        with pytest.raises(CLIError):
+            mqtt_subject.mqtt_client(
+                mock_target["entity"], "test_conn_string", "test_device_id", deviceAuthApiType
             )
 
 
