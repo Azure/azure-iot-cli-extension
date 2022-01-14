@@ -7,17 +7,22 @@
 import pprint
 from time import sleep
 from azext_iot.common.utility import ensure_azure_namespace_path
+from knack.util import CLIError
+from azext_iot.common.shared import DeviceAuthApiType
 
 printer = pprint.PrettyPrinter(indent=2)
 
 
 class mqtt_client(object):
     def __init__(
-        self, target, device_conn_string, device_id,
+        self, target, device_conn_string, device_id, device_auth_api_type,
         method_response_code=None, method_response_payload=None, init_reported_properties=None
     ):
         ensure_azure_namespace_path()
         from azure.iot.device import IoTHubDeviceClient as mqtt_device_client
+
+        if device_auth_api_type != DeviceAuthApiType.sas.value:
+            raise CLIError('MQTT simulation is only supported for symmetric key auth (SAS) based devices')
 
         self.device_id = device_id
         self.target = target
