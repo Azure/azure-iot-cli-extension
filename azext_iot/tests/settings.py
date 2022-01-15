@@ -5,7 +5,6 @@
 # --------------------------------------------------------------------------------------------
 
 from os import environ
-from enum import Enum
 
 ENV_SET_TEST_IOTHUB_REQUIRED = [
     "azext_iot_testrg"

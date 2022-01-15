@@ -12,7 +12,7 @@ from pathlib import Path
 
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
-from azext_iot.common.utility import ensure_iothub_sdk_min_version, 
+from azext_iot.common.utility import ensure_iothub_sdk_min_version, ensure_azure_namespace_path
 from azext_iot.common.shared import UserTypes
 
 from azext_iot.tests.generators import generate_generic_id

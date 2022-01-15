@@ -305,6 +305,7 @@ class IotEdgeImageTermsCommands(Enum):
     Accept = "accept"
     Cancel = "cancel"
 
+
 class UserTypes(Enum):
     user = "user"
     servicePrincipal = "servicePrincipal"
