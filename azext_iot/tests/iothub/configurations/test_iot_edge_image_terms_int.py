@@ -6,7 +6,7 @@
 
 import pytest
 from azure.cli.testsdk import LiveScenarioTest
-from azext_iot.tests.settings import UserTypes
+from azext_iot.common.shared import UserTypes
 from azext_iot.common.utility import get_current_user
 
 terms_offerId = "jlian-test-offer-paid"

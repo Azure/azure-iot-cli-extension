@@ -1736,7 +1736,7 @@ def _iot_edge_image_terms_invoke_command(
     subscription: str = None
 ):
     from azext_iot.common.embedded_cli import EmbeddedCLI
-    from azext_iot.tests.settings import UserTypes
+    from azext_iot.common.shared import UserTypes
     from azext_iot.common.utility import get_current_user
 
     current_user = get_current_user()

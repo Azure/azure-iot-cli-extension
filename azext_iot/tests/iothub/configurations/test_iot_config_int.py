@@ -12,7 +12,7 @@ from azext_iot.tests.conftest import get_context_path
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
 from azext_iot.common.utility import read_file_content, process_json_arg, get_current_user
 from azext_iot.common.shared import AuthenticationTypeDataplane
-from azext_iot.tests.settings import UserTypes
+from azext_iot.common.shared import UserTypes
 
 edge_content_path = get_context_path(__file__, "test_edge_deployment.json")
 edge_content_layered_path = get_context_path(
