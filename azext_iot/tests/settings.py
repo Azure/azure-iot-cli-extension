@@ -22,11 +22,6 @@ ENV_SET_TEST_IOTDPS_OPTIONAL = [
 ]
 
 
-class UserTypes(Enum):
-    user = "user"
-    servicePrincipal = "servicePrincipal"
-
-
 class Setting(object):
     pass
 
