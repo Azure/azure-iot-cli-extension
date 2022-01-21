@@ -3,6 +3,14 @@
 Release History
 ===============
 
+0.13.1
++++++++++++++++
+
+**DT Updates**
+
+* Enable routing tests to create the resources needed during the test run.
+
+
 0.13.0
 +++++++++++++++
 

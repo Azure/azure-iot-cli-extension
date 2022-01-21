@@ -4,15 +4,21 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import pytest
 from typing import List
 from collections import namedtuple
 from time import sleep
 from knack.log import get_logger
 from azext_iot.digitaltwins.common import ADTEndpointAuthType, ADTEndpointType
-from azext_iot.tests.settings import DynamoSettings
 from . import DTLiveScenarioTest
 from . import (
+    EP_RG,
+    EP_EVENTHUB_NAMESPACE,
+    EP_EVENTHUB_POLICY,
+    EP_EVENTHUB_TOPIC,
+    EP_EVENTGRID_TOPIC,
+    EP_SERVICEBUS_NAMESPACE,
+    EP_SERVICEBUS_POLICY,
+    EP_SERVICEBUS_TOPIC,
     MOCK_RESOURCE_TAGS,
     MOCK_RESOURCE_TAGS_DICT,
     MOCK_DEAD_LETTER_SECRET,
@@ -22,66 +28,43 @@ from . import (
 
 logger = get_logger(__name__)
 
-resource_test_env_vars = [
-    "azext_dt_ep_eventhub_namespace",
-    "azext_dt_ep_eventhub_policy",
-    "azext_dt_ep_eventhub_topic",
-    "azext_dt_ep_servicebus_namespace",
-    "azext_dt_ep_servicebus_policy",
-    "azext_dt_ep_servicebus_topic",
-    "azext_dt_ep_eventgrid_topic",
-    "azext_dt_ep_rg",
-]
-
-settings = DynamoSettings(opt_env_set=resource_test_env_vars)
-run_resource_tests = False
-run_endpoint_route_tests = False
-
-
-if all(
-    [
-        settings.env.azext_dt_ep_eventhub_namespace,
-        settings.env.azext_dt_ep_eventhub_policy,
-        settings.env.azext_dt_ep_eventhub_topic,
-        settings.env.azext_dt_ep_servicebus_namespace,
-        settings.env.azext_dt_ep_servicebus_policy,
-        settings.env.azext_dt_ep_servicebus_topic,
-        settings.env.azext_dt_ep_eventgrid_topic,
-        settings.env.azext_dt_ep_rg,
-    ]
-):
-    run_endpoint_route_tests = True
-
 
 class TestDTResourceLifecycle(DTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestDTResourceLifecycle, self).__init__(test_case)
+        self.ensure_eventgrid_resource()
+        self.ensure_eventhub_resource()
+        self.ensure_servicebus_resource()
 
-    @pytest.mark.skipif(
-        not all(
-            [
-                settings.env.azext_dt_ep_rg,
-                settings.env.azext_dt_ep_eventgrid_topic,
-                settings.env.azext_dt_ep_servicebus_topic,
-                settings.env.azext_dt_ep_servicebus_namespace,
-            ]
-        ),
-        reason="Required env vars missing.",
-    )
+    def tearDown(self):
+        super().tearDown()
+        try:
+            self.delete_eventhub_resources()
+        except Exception:
+            logger.info("The EventHub resources have already been deleted.")
+        try:
+            self.delete_eventgrid_resources()
+        except Exception:
+            logger.info("The Event Grid resources have already been deleted.")
+        try:
+            self.delete_servicebus_resources()
+        except Exception:
+            logger.info("The ServiceBus resources have already been deleted.")
+
     def test_dt_resource(self):
         self.wait_for_capacity(capacity=3)
 
         eventgrid_topic_id = self.cmd(
             "eventgrid topic show -g {} -n {}".format(
-                settings.env.azext_dt_ep_rg, settings.env.azext_dt_ep_eventgrid_topic
+                EP_RG, EP_EVENTGRID_TOPIC
             )
         ).get_output_in_json()["id"]
 
         servicebus_topic_id = self.cmd(
             "servicebus topic show -g {} -n {} --namespace-name {}".format(
-                settings.env.azext_dt_ep_rg,
-                settings.env.azext_dt_ep_servicebus_topic,
-                settings.env.azext_dt_ep_servicebus_namespace,
+                EP_RG,
+                EP_SERVICEBUS_TOPIC,
+                EP_SERVICEBUS_NAMESPACE,
             )
         ).get_output_in_json()["id"]
 
@@ -319,10 +302,6 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
 
         assert len(list_assigned_output) == 0
 
-    @pytest.mark.skipif(
-        not run_endpoint_route_tests,
-        reason="All azext_dt_ep_* env vars are required for endpoint and route tests.",
-    )
     def test_dt_endpoints_routes(self):
         self.wait_for_capacity()
         endpoints_instance_name = generate_resource_id()
@@ -330,17 +309,17 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
 
         sb_topic_resource_id = self.embedded_cli.invoke(
             "servicebus topic show --namespace-name {} -n {} -g {}".format(
-                settings.env.azext_dt_ep_servicebus_namespace,
-                settings.env.azext_dt_ep_servicebus_topic,
-                settings.env.azext_dt_ep_rg,
+                EP_SERVICEBUS_NAMESPACE,
+                EP_SERVICEBUS_TOPIC,
+                EP_RG,
             )
         ).as_json()["id"]
 
         eh_resource_id = self.embedded_cli.invoke(
             "eventhubs eventhub show --namespace-name {} -n {} -g {}".format(
-                settings.env.azext_dt_ep_eventhub_namespace,
-                settings.env.azext_dt_ep_eventhub_topic,
-                settings.env.azext_dt_ep_rg,
+                EP_EVENTHUB_NAMESPACE,
+                EP_EVENTHUB_TOPIC,
+                EP_RG,
             )
         ).as_json()["id"]
 
@@ -377,8 +356,6 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         ).get_output_in_json()
         assert len(list_ep_output) == 0
 
-        eventgrid_rg = settings.env.azext_dt_ep_rg
-        eventgrid_topic = settings.env.azext_dt_ep_eventgrid_topic
         eventgrid_endpoint = "myeventgridendpoint"
 
         logger.debug("Adding key based eventgrid endpoint...")
@@ -386,8 +363,8 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             "dt endpoint create eventgrid -n {} -g {} --egg {} --egt {} --en {} --dsu {}".format(
                 endpoints_instance_name,
                 self.rg,
-                eventgrid_rg,
-                eventgrid_topic,
+                EP_RG,
+                EP_EVENTGRID_TOPIC,
                 eventgrid_endpoint,
                 MOCK_DEAD_LETTER_SECRET,
             )
@@ -416,10 +393,6 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             )
         )
 
-        servicebus_rg = settings.env.azext_dt_ep_rg
-        servicebus_namespace = settings.env.azext_dt_ep_servicebus_namespace
-        servicebus_policy = settings.env.azext_dt_ep_servicebus_policy
-        servicebus_topic = settings.env.azext_dt_ep_servicebus_topic
         servicebus_endpoint = "myservicebusendpoint"
         servicebus_endpoint_msi = "{}identity".format(servicebus_endpoint)
 
@@ -427,10 +400,10 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         add_ep_sb_key_output = self.cmd(
             "dt endpoint create servicebus -n {} --sbg {} --sbn {} --sbp {} --sbt {} --en {} --dsu {}".format(
                 endpoints_instance_name,
-                servicebus_rg,
-                servicebus_namespace,
-                servicebus_policy,
-                servicebus_topic,
+                EP_RG,
+                EP_SERVICEBUS_NAMESPACE,
+                EP_SERVICEBUS_POLICY,
+                EP_SERVICEBUS_TOPIC,
                 servicebus_endpoint,
                 MOCK_DEAD_LETTER_SECRET,
             )
@@ -463,9 +436,9 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         add_ep_sb_identity_output = self.cmd(
             "dt endpoint create servicebus -n {} --sbg {} --sbn {} --sbt {} --en {} --du {} --auth-type IdentityBased".format(
                 endpoints_instance_name,
-                servicebus_rg,
-                servicebus_namespace,
-                servicebus_topic,
+                EP_RG,
+                EP_SERVICEBUS_NAMESPACE,
+                EP_SERVICEBUS_TOPIC,
                 servicebus_endpoint_msi,
                 MOCK_DEAD_LETTER_ENDPOINT,
             )
@@ -494,10 +467,6 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             )
         )
 
-        eventhub_rg = settings.env.azext_dt_ep_rg
-        eventhub_namespace = settings.env.azext_dt_ep_eventhub_namespace
-        eventhub_policy = settings.env.azext_dt_ep_eventhub_policy
-        eventhub_topic = settings.env.azext_dt_ep_eventhub_topic
         eventhub_endpoint = "myeventhubendpoint"
         eventhub_endpoint_msi = "{}identity".format(eventhub_endpoint)
 
@@ -505,10 +474,10 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         add_ep_output = self.cmd(
             "dt endpoint create eventhub -n {} --ehg {} --ehn {} --ehp {} --eh {} --ehs {} --en {} --dsu '{}'".format(
                 endpoints_instance_name,
-                eventhub_rg,
-                eventhub_namespace,
-                eventhub_policy,
-                eventhub_topic,
+                EP_RG,
+                EP_EVENTHUB_NAMESPACE,
+                EP_EVENTHUB_POLICY,
+                EP_EVENTHUB_TOPIC,
                 self.current_subscription,
                 eventhub_endpoint,
                 MOCK_DEAD_LETTER_SECRET,
@@ -543,9 +512,9 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             "dt endpoint create eventhub -n {} --ehg {} --ehn {} --eh {} --ehs {} --en {} --du {} "
             "--auth-type IdentityBased".format(
                 endpoints_instance_name,
-                eventhub_rg,
-                eventhub_namespace,
-                eventhub_topic,
+                EP_RG,
+                EP_EVENTHUB_NAMESPACE,
+                EP_EVENTHUB_TOPIC,
                 self.current_subscription,
                 eventhub_endpoint_msi,
                 MOCK_DEAD_LETTER_ENDPOINT,
