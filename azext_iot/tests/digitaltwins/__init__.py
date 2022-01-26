@@ -13,13 +13,39 @@ from knack.log import get_logger
 
 logger = get_logger(__name__)
 
-
 MOCK_RESOURCE_TAGS = "a=b c=d"
 MOCK_RESOURCE_TAGS_DICT = {"a": "b", "c": "d"}
 MOCK_DEAD_LETTER_ENDPOINT = "https://accountname.blob.core.windows.net/containerName"
 MOCK_DEAD_LETTER_SECRET = "{}?sasToken".format(MOCK_DEAD_LETTER_ENDPOINT)
 REGION_RESOURCE_LIMIT = 10
 REGION_LIST = ["westus2", "westcentralus", "eastus2", "eastus", "eastus2euap"]
+
+required_test_env_vars = ["azext_iot_testrg"]
+resource_test_env_vars = [
+    "azext_dt_ep_eventhub_namespace",
+    "azext_dt_ep_eventhub_policy",
+    "azext_dt_ep_eventhub_topic",
+    "azext_dt_ep_servicebus_namespace",
+    "azext_dt_ep_servicebus_policy",
+    "azext_dt_ep_servicebus_topic",
+    "azext_dt_ep_eventgrid_topic",
+    "azext_dt_ep_rg",
+    "azext_dt_region",
+]
+
+settings = DynamoSettings(req_env_set=required_test_env_vars, opt_env_set=resource_test_env_vars)
+# Endpoint resource group
+EP_RG = settings.env.azext_dt_ep_rg or settings.env.azext_iot_testrg
+# EventHub
+EP_EVENTHUB_NAMESPACE = settings.env.azext_dt_ep_eventhub_namespace or ("test-ehn-" + generate_generic_id())
+EP_EVENTHUB_POLICY = settings.env.azext_dt_ep_eventhub_policy or ("test-ehp-" + generate_generic_id())
+EP_EVENTHUB_TOPIC = settings.env.azext_dt_ep_eventhub_topic or ("test-eh-" + generate_generic_id())
+# Service Bus
+EP_SERVICEBUS_NAMESPACE = settings.env.azext_dt_ep_servicebus_namespace or ("test-sbn-" + generate_generic_id())
+EP_SERVICEBUS_POLICY = settings.env.azext_dt_ep_servicebus_policy or ("test-sbp-" + generate_generic_id())
+EP_SERVICEBUS_TOPIC = settings.env.azext_dt_ep_servicebus_topic or ("test-sbt-" + generate_generic_id())
+# EventGrid
+EP_EVENTGRID_TOPIC = settings.env.azext_dt_ep_eventgrid_topic or ("test-egt-" + generate_generic_id())
 
 
 def generate_resource_id():
@@ -36,9 +62,6 @@ class DTLiveScenarioTest(LiveScenarioTest):
         assert test_scenario
 
         super(DTLiveScenarioTest, self).__init__(test_scenario)
-        self.settings = DynamoSettings(
-            opt_env_set=["azext_iot_testrg", "azext_dt_region"]
-        )
         self.embedded_cli = EmbeddedCLI()
         self._bootup_scenario()
 
@@ -60,7 +83,7 @@ class DTLiveScenarioTest(LiveScenarioTest):
         )
 
     def _init_basic_env_vars(self):
-        self._force_region = self.settings.env.azext_dt_region
+        self._force_region = settings.env.azext_dt_region
         if self._force_region and not self.is_region_available(self._force_region):
             raise RuntimeError(
                 "Forced region: {} does not have capacity.".format(self._force_region)
@@ -69,7 +92,7 @@ class DTLiveScenarioTest(LiveScenarioTest):
         self.region = (
             self._force_region if self._force_region else self.get_available_region()
         )
-        self.rg = self.settings.env.azext_iot_testrg
+        self.rg = settings.env.azext_iot_testrg
         if not self.rg:
             pytest.skip(
                 "Digital Twins CLI tests requires at least 'azext_iot_testrg' for resource deployment."
@@ -148,6 +171,146 @@ class DTLiveScenarioTest(LiveScenarioTest):
                 capacity, self.current_subscription
             )
         )
+
+    def ensure_eventhub_resource(self):
+        """Ensure that the test has all Event hub resources."""
+        if not settings.env.azext_dt_ep_eventhub_namespace:
+            self.embedded_cli.invoke(
+                "eventhubs namespace create --name {} --resource-group {}".format(
+                    EP_EVENTHUB_NAMESPACE,
+                    EP_RG,
+                )
+            )
+
+        if not settings.env.azext_dt_ep_eventhub_topic:
+            self.embedded_cli.invoke(
+                "eventhubs eventhub create --namespace-name {} --resource-group {} --name {}".format(
+                    EP_EVENTHUB_NAMESPACE,
+                    EP_RG,
+                    EP_EVENTHUB_TOPIC
+                )
+            )
+
+        if not settings.env.azext_dt_ep_eventhub_policy:
+            self.embedded_cli.invoke(
+                "eventhubs eventhub authorization-rule create --namespace-name {} --resource-group {} "
+                "--eventhub-name {} --name {} --rights Send".format(
+                    EP_EVENTHUB_NAMESPACE,
+                    EP_RG,
+                    EP_EVENTHUB_TOPIC,
+                    EP_EVENTHUB_POLICY
+                )
+            )
+
+    def ensure_eventgrid_resource(self):
+        """Ensure that the test has the Event Grid."""
+        if not settings.env.azext_dt_ep_eventgrid_topic:
+            self.embedded_cli.invoke(
+                "eventgrid topic create --name {} --resource-group {} -l {}".format(
+                    EP_EVENTGRID_TOPIC,
+                    EP_RG,
+                    self.region,
+                )
+            )
+
+    def ensure_servicebus_resource(self):
+        """Ensure that the test has all Service Bus resources."""
+        if not settings.env.azext_dt_ep_servicebus_namespace:
+            self.embedded_cli.invoke(
+                "servicebus namespace create --name {} --resource-group {}".format(
+                    EP_SERVICEBUS_NAMESPACE,
+                    EP_RG,
+                )
+            )
+
+        if not settings.env.azext_dt_ep_servicebus_topic:
+            self.embedded_cli.invoke(
+                "servicebus topic create --namespace-name {} --resource-group {} --name {}".format(
+                    EP_SERVICEBUS_NAMESPACE,
+                    EP_RG,
+                    EP_SERVICEBUS_TOPIC
+                )
+            )
+
+        if not settings.env.azext_dt_ep_servicebus_policy:
+            self.embedded_cli.invoke(
+                "servicebus topic authorization-rule create --namespace-name {} --resource-group {} "
+                "--topic-name {} --name {} --rights Send".format(
+                    EP_SERVICEBUS_NAMESPACE,
+                    EP_RG,
+                    EP_SERVICEBUS_TOPIC,
+                    EP_SERVICEBUS_POLICY
+                )
+            )
+
+    def delete_eventhub_resources(self):
+        """Delete all created resources for endpoint tests."""
+        # Eventhub
+        if not settings.env.azext_dt_ep_eventhub_namespace:
+            self.embedded_cli.invoke(
+                "eventhubs namespace delete --name {} --resource-group {}".format(
+                    EP_EVENTHUB_NAMESPACE,
+                    EP_RG,
+                )
+            )
+        elif not settings.env.azext_dt_ep_eventhub_topic:
+            self.embedded_cli.invoke(
+                "eventhubs eventhub delete --namespace-name {} --resource-group {} --name {}".format(
+                    EP_EVENTHUB_NAMESPACE,
+                    EP_RG,
+                    EP_EVENTHUB_TOPIC
+                )
+            )
+        elif not settings.env.azext_dt_ep_eventhub_policy:
+            self.embedded_cli.invoke(
+                "eventhubs eventhub authorization-rule delete --namespace-name {} --resource-group {} "
+                "--topic-name {} --name {} --rights Send".format(
+                    EP_EVENTHUB_NAMESPACE,
+                    EP_RG,
+                    EP_EVENTHUB_TOPIC,
+                    EP_EVENTHUB_POLICY
+                )
+            )
+
+    def delete_eventgrid_resources(self):
+        """Delete all created resources for endpoint tests."""
+        # Event Grid
+        if not settings.env.azext_dt_ep_eventgrid_topic:
+            self.embedded_cli.invoke(
+                "eventgrid topic delete --name {} --resource-group {}".format(
+                    EP_EVENTGRID_TOPIC,
+                    EP_RG,
+                )
+            )
+
+    def delete_servicebus_resources(self):
+        """Delete all created resources for endpoint tests."""
+        # Service Bus
+        if not settings.env.azext_dt_ep_servicebus_namespace:
+            self.embedded_cli.invoke(
+                "servicebus namespace delete --name {} --resource-group {}".format(
+                    EP_SERVICEBUS_NAMESPACE,
+                    EP_RG,
+                )
+            )
+        elif not settings.env.azext_dt_ep_servicebus_topic:
+            self.embedded_cli.invoke(
+                "servicebus topic delete --namespace-name {} --resource-group {} --name {}".format(
+                    EP_SERVICEBUS_NAMESPACE,
+                    EP_RG,
+                    EP_SERVICEBUS_TOPIC
+                )
+            )
+        elif not settings.env.azext_dt_ep_servicebus_policy:
+            self.embedded_cli.invoke(
+                "servicebus topic authorization-rule delete --namespace-name {} --resource-group {} "
+                "--topic-name {} --name {} ".format(
+                    EP_SERVICEBUS_NAMESPACE,
+                    EP_RG,
+                    EP_SERVICEBUS_TOPIC,
+                    EP_SERVICEBUS_POLICY
+                )
+            )
 
     def track_instance(self, instance: dict):
         self.tracked_instances.append((instance["name"], instance["resourceGroup"]))
