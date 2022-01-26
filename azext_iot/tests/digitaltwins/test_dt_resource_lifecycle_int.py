@@ -8,6 +8,7 @@ from typing import List
 from collections import namedtuple
 from time import sleep
 from knack.log import get_logger
+from azext_iot.common.utility import unpack_msrest_error
 from azext_iot.digitaltwins.common import ADTEndpointAuthType, ADTEndpointType
 from . import DTLiveScenarioTest
 from . import (
@@ -40,16 +41,24 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         super().tearDown()
         try:
             self.delete_eventhub_resources()
-        except Exception:
-            logger.info("The EventHub resources have already been deleted.")
+        except Exception as e:
+            logger.warn(
+                "Failed to delete the EventHub resources. Additional details: " +
+                unpack_msrest_error(e)
+            )
         try:
             self.delete_eventgrid_resources()
-        except Exception:
-            logger.info("The Event Grid resources have already been deleted.")
+        except Exception as e:
+            logger.warn(
+                "Failed to delete the Event Grid resources. Additional details: " +
+                unpack_msrest_error(e)
+            )
         try:
             self.delete_servicebus_resources()
-        except Exception:
-            logger.info("The ServiceBus resources have already been deleted.")
+        except Exception as e:
+            logger.warn(
+                "Failed to delete the ServiceBus resources. Additional details: " +
+                unpack_msrest_error(e))
 
     def test_dt_resource(self):
         self.wait_for_capacity(capacity=3)
