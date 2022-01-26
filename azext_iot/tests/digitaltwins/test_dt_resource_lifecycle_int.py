@@ -42,21 +42,21 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         try:
             self.delete_eventhub_resources()
         except Exception as e:
-            logger.warn(
+            logger.warning(
                 "Failed to delete the EventHub resources. Additional details: " +
                 unpack_msrest_error(e)
             )
         try:
             self.delete_eventgrid_resources()
         except Exception as e:
-            logger.warn(
+            logger.warning(
                 "Failed to delete the Event Grid resources. Additional details: " +
                 unpack_msrest_error(e)
             )
         try:
             self.delete_servicebus_resources()
         except Exception as e:
-            logger.warn(
+            logger.warning(
                 "Failed to delete the ServiceBus resources. Additional details: " +
                 unpack_msrest_error(e))
 
