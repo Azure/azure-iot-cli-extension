@@ -6,51 +6,64 @@
 
 from time import sleep
 from knack.log import get_logger
+from azext_iot.common.utility import unpack_msrest_error
 from . import DTLiveScenarioTest
-from azext_iot.tests.settings import DynamoSettings
-from . import generate_generic_id
+from . import (
+    ADX_RG,
+    ADX_CLUSTER,
+    ADX_DATABASE,
+    EP_RG,
+    EP_EVENTHUB_NAMESPACE,
+    EP_EVENTHUB_TOPIC,
+    generate_generic_id
+)
 
 logger = get_logger(__name__)
-
-resource_test_env_vars = [
-    "azext_dt_ep_eventhub_namespace",
-    "azext_dt_ep_eventhub_topic_consumer_group",
-    "azext_dt_ep_rg",
-    "azext_dt_adx_cluster",
-    "azext_dt_adx_database",
-    "azext_dt_adx_rg",
-    "azext_dt_testdt",
-]
-settings = DynamoSettings(opt_env_set=resource_test_env_vars)
 
 
 class TestDTConnections(DTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestDTConnections, self).__init__(test_case)
-        self.adx_cluster_name = settings.env.azext_dt_adx_cluster
-        self.adx_database_name = settings.env.azext_dt_adx_database
-        self.adx_resource_group = settings.env.azext_dt_adx_rg
-        self.eventhub_namespace = settings.env.azext_dt_ep_eventhub_namespace
-        self.eventhub_resource_group = settings.env.azext_dt_ep_rg
-        self.tracked_eventhubs = []
+        self.ensure_eventhub_resource()
 
         self.adx_database_id = (
             "/subscriptions/{}/resourceGroups/{}/providers/Microsoft.Kusto/clusters/{}"
             "/Databases/{}".format(
                 self.current_subscription,
-                self.adx_resource_group,
-                self.adx_cluster_name,
-                self.adx_database_name
+                ADX_RG,
+                ADX_CLUSTER,
+                ADX_DATABASE
             )
         )
+
+        # TODO fix to right resource group
+        self.eventhub_instance_id = (
+            "/subscriptions/{}/resourceGroups/{}/providers/Microsoft.Kusto/clusters/{}"
+            "/Databases/{}".format(
+                self.current_subscription,
+                EP_RG,
+                EP_EVENTHUB_NAMESPACE,
+                EP_EVENTHUB_TOPIC,
+            )
+        )
+
+    def tearDown(self):
+        super().tearDown()
+        try:
+            self.delete_eventhub_resources()
+        except Exception as e:
+            logger.warning(
+                "Failed to delete the EventHub resources. Additional details: " +
+                unpack_msrest_error(e)
+            )
 
     def test_dt_data_history_adx(self):
         self.wait_for_capacity()
         instance_name = f"dt{generate_generic_id()}"
         connection_name = f"cn-{generate_generic_id()}"
         table_name = f"tb_{generate_generic_id()}"
-        eventhub_name = f"e{generate_generic_id()}"
-        consumer_group = "test"
+        consumer_group = "test" # TODO see what limits on consumer group naming
+        self.add_eventhub_consumer_group(consumer_group=consumer_group)
 
         create_output = self.cmd(
             "dt create -n {} -g {} -l {} --assign-identity".format(
@@ -71,23 +84,17 @@ class TestDTConnections(DTLiveScenarioTest):
         sleep(60)
 
         # Add required roles and create event hub
-        eventhub_instance_id = self.create_new_eventhub(
-            eventhub_namespace=self.eventhub_namespace,
-            eventhub_name=eventhub_name,
-            eventhub_rg=self.eventhub_resource_group,
-            consumer_group=consumer_group
-        )
 
         expected_attributes = {
             "dt_name": instance_name,
             "rg": self.rg,
             "connection_name": connection_name,
-            "adx_database_name": self.adx_database_name,
-            "adx_cluster_name": self.adx_cluster_name,
-            "eventhub_namespace": self.eventhub_namespace,
-            "eventhub_name": eventhub_name,
-            "adx_resource_group": self.adx_resource_group,
-            "eventhub_resource_group": self.eventhub_resource_group,
+            "adx_database_name": ADX_DATABASE,
+            "adx_cluster_name": ADX_CLUSTER,
+            "eventhub_namespace": EP_EVENTHUB_NAMESPACE,
+            "eventhub_name": EP_EVENTHUB_TOPIC,
+            "adx_resource_group": ADX_RG,
+            "eventhub_resource_group": EP_RG,
             "consumer_group": "$Default",
             "location": create_output["location"],
             "table_name": "adt_dh_{}_{}".format(
@@ -102,12 +109,12 @@ class TestDTConnections(DTLiveScenarioTest):
                 instance_name,
                 self.rg,
                 connection_name,
-                self.adx_database_name,
-                self.adx_resource_group,
-                self.adx_cluster_name,
-                self.eventhub_namespace,
-                eventhub_name,
-                self.eventhub_resource_group,
+                ADX_DATABASE,
+                ADX_RG,
+                ADX_CLUSTER,
+                EP_EVENTHUB_NAMESPACE,
+                EP_EVENTHUB_TOPIC,
+                EP_RG,
             )
         ).get_output_in_json()
         assert_common_connection_attributes(
@@ -117,7 +124,7 @@ class TestDTConnections(DTLiveScenarioTest):
         # Check role assignments - needed once
         principal_id = create_output.get("identity").get("principalId")
         assert len(self.get_role_assignment(
-            role="Azure Event Hubs Data Owner", scope=eventhub_instance_id, assignee=principal_id
+            role="Azure Event Hubs Data Owner", scope=self.eventhub_instance_id, assignee=principal_id
         )) == 1
         assert len(self.get_role_assignment(
             role="Contributor", scope=self.adx_database_id, assignee=principal_id
@@ -132,12 +139,12 @@ class TestDTConnections(DTLiveScenarioTest):
                 self.rg,
                 connection_name,
                 table_name,
-                self.adx_database_name,
-                self.adx_resource_group,
-                self.adx_cluster_name,
-                self.eventhub_namespace,
-                eventhub_name,
-                self.eventhub_resource_group,
+                ADX_DATABASE,
+                ADX_RG,
+                ADX_CLUSTER,
+                EP_EVENTHUB_NAMESPACE,
+                EP_EVENTHUB_TOPIC,
+                EP_RG,
                 consumer_group,
             )
         ).get_output_in_json()
@@ -155,12 +162,12 @@ class TestDTConnections(DTLiveScenarioTest):
                 instance_name,
                 self.rg,
                 generate_generic_id(),
-                self.adx_database_name,
-                self.adx_resource_group,
-                self.adx_cluster_name,
-                self.eventhub_namespace,
-                eventhub_name,
-                self.eventhub_resource_group,
+                ADX_DATABASE,
+                ADX_RG,
+                ADX_CLUSTER,
+                EP_EVENTHUB_NAMESPACE,
+                EP_EVENTHUB_TOPIC,
+                EP_RG,
             ),
             expect_failure=True
         )
@@ -198,12 +205,6 @@ class TestDTConnections(DTLiveScenarioTest):
         self.wait_for_capacity()
         instance_name = f"dt{generate_generic_id()}"
         connection_name = f"cn-{generate_generic_id()}"
-        eventhub_name = f"e{generate_generic_id()}"
-        self.create_new_eventhub(
-            eventhub_namespace=self.eventhub_namespace,
-            eventhub_name=eventhub_name,
-            eventhub_rg=self.eventhub_resource_group
-        )
 
         create_output = self.cmd(
             "dt create -n {} -g {} -l {} --assign-identity".format(
@@ -226,12 +227,12 @@ class TestDTConnections(DTLiveScenarioTest):
                 instance_name,
                 self.rg,
                 "t",
-                self.adx_database_name,
-                self.adx_resource_group,
-                self.adx_cluster_name,
-                self.eventhub_namespace,
-                eventhub_name,
-                self.eventhub_resource_group,
+                ADX_DATABASE,
+                ADX_RG,
+                ADX_CLUSTER,
+                EP_EVENTHUB_NAMESPACE,
+                EP_EVENTHUB_TOPIC,
+                EP_RG,
             ),
             expect_failure=True
         )
@@ -243,11 +244,11 @@ class TestDTConnections(DTLiveScenarioTest):
                 self.rg,
                 connection_name,
                 "testresource",
-                self.adx_resource_group,
-                self.adx_cluster_name,
-                self.eventhub_namespace,
-                eventhub_name,
-                self.eventhub_resource_group,
+                ADX_RG,
+                ADX_CLUSTER,
+                EP_EVENTHUB_NAMESPACE,
+                EP_EVENTHUB_TOPIC,
+                EP_RG,
             ),
             expect_failure=True
         )
@@ -258,12 +259,12 @@ class TestDTConnections(DTLiveScenarioTest):
                 instance_name,
                 self.rg,
                 connection_name,
-                self.adx_database_name,
-                self.adx_resource_group,
+                ADX_DATABASE,
+                ADX_RG,
                 "testresource",
-                self.eventhub_namespace,
-                eventhub_name,
-                self.eventhub_resource_group,
+                EP_EVENTHUB_NAMESPACE,
+                EP_EVENTHUB_TOPIC,
+                EP_RG,
             ),
             expect_failure=True
         )
@@ -274,12 +275,12 @@ class TestDTConnections(DTLiveScenarioTest):
                 instance_name,
                 self.rg,
                 connection_name,
-                self.adx_database_name,
-                self.adx_resource_group,
-                self.adx_cluster_name,
+                ADX_DATABASE,
+                ADX_RG,
+                ADX_CLUSTER,
                 "testresource",
-                eventhub_name,
-                self.eventhub_resource_group,
+                EP_EVENTHUB_TOPIC,
+                EP_RG,
             ),
             expect_failure=True
         )
@@ -290,12 +291,12 @@ class TestDTConnections(DTLiveScenarioTest):
                 instance_name,
                 self.rg,
                 connection_name,
-                self.adx_database_name,
-                self.adx_resource_group,
-                self.adx_cluster_name,
-                self.eventhub_namespace,
+                ADX_DATABASE,
+                ADX_RG,
+                ADX_CLUSTER,
+                EP_EVENTHUB_NAMESPACE,
                 "testresource",
-                self.eventhub_resource_group,
+                EP_RG,
             ),
             expect_failure=True
         )
@@ -306,12 +307,12 @@ class TestDTConnections(DTLiveScenarioTest):
                 instance_name,
                 self.rg,
                 connection_name,
-                self.adx_database_name,
-                self.adx_resource_group,
-                self.adx_cluster_name,
-                self.eventhub_namespace,
-                eventhub_name,
-                self.eventhub_resource_group,
+                ADX_DATABASE,
+                ADX_RG,
+                ADX_CLUSTER,
+                EP_EVENTHUB_NAMESPACE,
+                EP_EVENTHUB_TOPIC,
+                EP_RG,
                 "testresource",
             ),
             expect_failure=True
@@ -329,38 +330,6 @@ class TestDTConnections(DTLiveScenarioTest):
             if principal["name"] == assignee_name:
                 return [principal]
         return []
-
-    def get_role_assignment(self, scope, role, assignee):
-        return self.cmd(
-            'role assignment list --scope "{}" --role "{}" --assignee {}'.format(
-                scope, role, assignee
-            )
-        ).get_output_in_json()
-
-    def create_new_eventhub(self, eventhub_namespace, eventhub_name, eventhub_rg, consumer_group=None):
-        resource_id = self.cmd(
-            "eventhubs eventhub create --namespace-name {} -n {} -g {}".format(
-                eventhub_namespace, eventhub_name, eventhub_rg
-            )
-        ).get_output_in_json()["id"]
-        self.tracked_eventhubs.append(resource_id)
-        if consumer_group:
-            self.cmd(
-                "eventhubs eventhub consumer-group create --namespace-name {} --eventhub-name {} "
-                "-g {} -n {}".format(
-                    eventhub_namespace, eventhub_name, eventhub_rg, consumer_group
-                )
-            )
-        return resource_id
-
-    def tearDown(self):
-        for eventhub in self.tracked_eventhubs:
-            self.cmd(
-                "eventhubs eventhub delete --ids {}".format(
-                    eventhub
-                )
-            )
-        return super().tearDown()
 
 
 def assert_common_connection_attributes(

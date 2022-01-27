@@ -22,6 +22,9 @@ REGION_LIST = ["westus2", "westcentralus", "eastus2", "eastus", "eastus2euap"]
 
 required_test_env_vars = ["azext_iot_testrg"]
 resource_test_env_vars = [
+    "azext_dt_adx_cluster",
+    "azext_dt_adx_database",
+    "azext_dt_adx_rg",
     "azext_dt_ep_eventhub_namespace",
     "azext_dt_ep_eventhub_policy",
     "azext_dt_ep_eventhub_topic",
@@ -46,6 +49,10 @@ EP_SERVICEBUS_POLICY = settings.env.azext_dt_ep_servicebus_policy or ("test-sbp-
 EP_SERVICEBUS_TOPIC = settings.env.azext_dt_ep_servicebus_topic or ("test-sbt-" + generate_generic_id())
 # EventGrid
 EP_EVENTGRID_TOPIC = settings.env.azext_dt_ep_eventgrid_topic or ("test-egt-" + generate_generic_id())
+# Azure Data Explorer
+ADX_CLUSTER = settings.env.azext_dt_adx_cluster or ("test-adxc-" + generate_generic_id())
+ADX_DATABASE = settings.env.azext_dt_adx_database or ("test-adxd-" + generate_generic_id())
+ADX_RG = settings.env.azext_dt_adx_rg or settings.env.azext_iot_testrg
 
 
 def generate_resource_id():
@@ -172,6 +179,26 @@ class DTLiveScenarioTest(LiveScenarioTest):
             )
         )
 
+    def ensure_adx_resource(self):
+        """Ensure that the test has all ADX resources."""
+        # TODO: fix, see if we can use the kusto extension
+        if not settings.env.azext_dt_adx_cluster:
+            self.embedded_cli.invoke(
+                "eventhubs namespace create --name {} --resource-group {}".format(
+                    EP_EVENTHUB_NAMESPACE,
+                    EP_RG,
+                )
+            )
+
+        if not settings.env.azext_dt_adx_database:
+            self.embedded_cli.invoke(
+                "eventhubs eventhub create --namespace-name {} --resource-group {} --name {}".format(
+                    EP_EVENTHUB_NAMESPACE,
+                    EP_RG,
+                    EP_EVENTHUB_TOPIC
+                )
+            )
+
     def ensure_eventhub_resource(self):
         """Ensure that the test has all Event hub resources."""
         if not settings.env.azext_dt_ep_eventhub_namespace:
@@ -201,6 +228,18 @@ class DTLiveScenarioTest(LiveScenarioTest):
                     EP_EVENTHUB_POLICY
                 )
             )
+
+    def add_eventhub_consumer_group(self, consumer_group="test"):
+        """Add an eventhub consumer group."""
+        self.cmd(
+            "eventhubs eventhub consumer-group create --namespace-name {} --resource-group {} "
+            "--eventhub-name {} -n {}".format(
+                EP_EVENTHUB_NAMESPACE,
+                EP_RG,
+                EP_EVENTHUB_TOPIC,
+                consumer_group
+            )
+        )
 
     def ensure_eventgrid_resource(self):
         """Ensure that the test has the Event Grid."""
@@ -311,6 +350,13 @@ class DTLiveScenarioTest(LiveScenarioTest):
                     EP_SERVICEBUS_POLICY
                 )
             )
+
+    def get_role_assignment(self, scope, role, assignee):
+        return self.cmd(
+            'role assignment list --scope "{}" --role "{}" --assignee {}'.format(
+                scope, role, assignee
+            )
+        ).get_output_in_json()
 
     def track_instance(self, instance: dict):
         self.tracked_instances.append((instance["name"], instance["resourceGroup"]))
