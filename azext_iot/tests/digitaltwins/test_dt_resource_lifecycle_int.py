@@ -8,6 +8,7 @@ from typing import List
 from collections import namedtuple
 from time import sleep
 from knack.log import get_logger
+import pytest
 from azext_iot.common.utility import unpack_msrest_error
 from azext_iot.digitaltwins.common import ADTEndpointAuthType, ADTEndpointType
 from . import DTLiveScenarioTest
@@ -37,8 +38,9 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         self.ensure_eventhub_resource()
         self.ensure_servicebus_resource()
 
-    def tearDown(self):
-        super().tearDown()
+    @pytest.fixture(scope='class', autouse=True)
+    def tearDownSuite(self):
+        yield None
         try:
             self.delete_eventhub_resources()
         except Exception as e:
