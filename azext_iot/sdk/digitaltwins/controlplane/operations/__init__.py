@@ -14,6 +14,7 @@ from .digital_twins_endpoint_operations import DigitalTwinsEndpointOperations
 from .operations import Operations
 from .private_link_resources_operations import PrivateLinkResourcesOperations
 from .private_endpoint_connections_operations import PrivateEndpointConnectionsOperations
+from .time_series_database_connections_operations import TimeSeriesDatabaseConnectionsOperations
 
 __all__ = [
     'DigitalTwinsOperations',
@@ -21,4 +22,5 @@ __all__ = [
     'Operations',
     'PrivateLinkResourcesOperations',
     'PrivateEndpointConnectionsOperations',
+    'TimeSeriesDatabaseConnectionsOperations',
 ]

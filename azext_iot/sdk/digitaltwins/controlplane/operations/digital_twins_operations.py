@@ -24,7 +24,7 @@ class DigitalTwinsOperations(object):
     :param config: Configuration of service client.
     :param serializer: An object model serializer.
     :param deserializer: An object model deserializer.
-    :ivar api_version: Version of the DigitalTwinsInstance Management API. Constant value: "2020-12-01".
+    :ivar api_version: Version of the DigitalTwinsInstance Management API. Constant value: "2021-06-30-preview".
     """
 
     models = models
@@ -34,7 +34,7 @@ class DigitalTwinsOperations(object):
         self._client = client
         self._serialize = serializer
         self._deserialize = deserializer
-        self.api_version = "2020-12-01"
+        self.api_version = "2021-06-30-preview"
 
         self.config = config
 
@@ -53,10 +53,10 @@ class DigitalTwinsOperations(object):
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
         :return: DigitalTwinsDescription or ClientRawResponse if raw=true
-        :rtype: ~controlplane.models.DigitalTwinsDescription or
+        :rtype: ~azure.mgmt.digitaltwins.models.DigitalTwinsDescription or
          ~msrest.pipeline.ClientRawResponse
         :raises:
-         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
+         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
         """
         # Construct URL
         url = self.get.metadata['url']
@@ -73,7 +73,7 @@ class DigitalTwinsOperations(object):
 
         # Construct headers
         header_parameters = {}
-        header_parameters['Accept'] = 'application/json'
+        header_parameters['Content-Type'] = 'application/json; charset=utf-8'
         if self.config.generate_client_request_id:
             header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
         if custom_headers:
@@ -82,8 +82,8 @@ class DigitalTwinsOperations(object):
             header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
 
         # Construct and send request
-        request = self._client.get(url, query_parameters, header_parameters)
-        response = self._client.send(request, stream=False, **operation_config)
+        request = self._client.get(url, query_parameters)
+        response = self._client.send(request, header_parameters, stream=False, **operation_config)
 
         if response.status_code not in [200]:
             raise models.ErrorResponseException(self._deserialize, response)
@@ -118,7 +118,6 @@ class DigitalTwinsOperations(object):
 
         # Construct headers
         header_parameters = {}
-        header_parameters['Accept'] = 'application/json'
         header_parameters['Content-Type'] = 'application/json; charset=utf-8'
         if self.config.generate_client_request_id:
             header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
@@ -131,8 +130,9 @@ class DigitalTwinsOperations(object):
         body_content = self._serialize.body(digital_twins_create, 'DigitalTwinsDescription')
 
         # Construct and send request
-        request = self._client.put(url, query_parameters, header_parameters, body_content)
-        response = self._client.send(request, stream=False, **operation_config)
+        request = self._client.put(url, query_parameters)
+        response = self._client.send(
+            request, header_parameters, body_content, stream=False, **operation_config)
 
         if response.status_code not in [200, 201]:
             raise models.ErrorResponseException(self._deserialize, response)
@@ -165,7 +165,7 @@ class DigitalTwinsOperations(object):
         :param digital_twins_create: The DigitalTwinsInstance and security
          metadata.
         :type digital_twins_create:
-         ~controlplane.models.DigitalTwinsDescription
+         ~azure.mgmt.digitaltwins.models.DigitalTwinsDescription
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: The poller return type is ClientRawResponse, the
          direct response alongside the deserialized response
@@ -174,11 +174,11 @@ class DigitalTwinsOperations(object):
         :return: An instance of LROPoller that returns DigitalTwinsDescription
          or ClientRawResponse<DigitalTwinsDescription> if raw==True
         :rtype:
-         ~msrestazure.azure_operation.AzureOperationPoller[~controlplane.models.DigitalTwinsDescription]
+         ~msrestazure.azure_operation.AzureOperationPoller[~azure.mgmt.digitaltwins.models.DigitalTwinsDescription]
          or
-         ~msrestazure.azure_operation.AzureOperationPoller[~msrest.pipeline.ClientRawResponse[~controlplane.models.DigitalTwinsDescription]]
+         ~msrestazure.azure_operation.AzureOperationPoller[~msrest.pipeline.ClientRawResponse[~azure.mgmt.digitaltwins.models.DigitalTwinsDescription]]
         :raises:
-         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
+         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
         """
         raw_result = self._create_or_update_initial(
             resource_group_name=resource_group_name,
@@ -225,7 +225,6 @@ class DigitalTwinsOperations(object):
 
         # Construct headers
         header_parameters = {}
-        header_parameters['Accept'] = 'application/json'
         header_parameters['Content-Type'] = 'application/json; charset=utf-8'
         if self.config.generate_client_request_id:
             header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
@@ -238,8 +237,9 @@ class DigitalTwinsOperations(object):
         body_content = self._serialize.body(digital_twins_patch_description, 'DigitalTwinsPatchDescription')
 
         # Construct and send request
-        request = self._client.patch(url, query_parameters, header_parameters, body_content)
-        response = self._client.send(request, stream=False, **operation_config)
+        request = self._client.patch(url, query_parameters)
+        response = self._client.send(
+            request, header_parameters, body_content, stream=False, **operation_config)
 
         if response.status_code not in [200, 202]:
             raise models.ErrorResponseException(self._deserialize, response)
@@ -269,7 +269,7 @@ class DigitalTwinsOperations(object):
         :param digital_twins_patch_description: The DigitalTwinsInstance and
          security metadata.
         :type digital_twins_patch_description:
-         ~controlplane.models.DigitalTwinsPatchDescription
+         ~azure.mgmt.digitaltwins.models.DigitalTwinsPatchDescription
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: The poller return type is ClientRawResponse, the
          direct response alongside the deserialized response
@@ -278,11 +278,11 @@ class DigitalTwinsOperations(object):
         :return: An instance of LROPoller that returns DigitalTwinsDescription
          or ClientRawResponse<DigitalTwinsDescription> if raw==True
         :rtype:
-         ~msrestazure.azure_operation.AzureOperationPoller[~controlplane.models.DigitalTwinsDescription]
+         ~msrestazure.azure_operation.AzureOperationPoller[~azure.mgmt.digitaltwins.models.DigitalTwinsDescription]
          or
-         ~msrestazure.azure_operation.AzureOperationPoller[~msrest.pipeline.ClientRawResponse[~controlplane.models.DigitalTwinsDescription]]
+         ~msrestazure.azure_operation.AzureOperationPoller[~msrest.pipeline.ClientRawResponse[~azure.mgmt.digitaltwins.models.DigitalTwinsDescription]]
         :raises:
-         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
+         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
         """
         raw_result = self._update_initial(
             resource_group_name=resource_group_name,
@@ -329,7 +329,7 @@ class DigitalTwinsOperations(object):
 
         # Construct headers
         header_parameters = {}
-        header_parameters['Accept'] = 'application/json'
+        header_parameters['Content-Type'] = 'application/json; charset=utf-8'
         if self.config.generate_client_request_id:
             header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
         if custom_headers:
@@ -338,8 +338,8 @@ class DigitalTwinsOperations(object):
             header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
 
         # Construct and send request
-        request = self._client.delete(url, query_parameters, header_parameters)
-        response = self._client.send(request, stream=False, **operation_config)
+        request = self._client.delete(url, query_parameters)
+        response = self._client.send(request, header_parameters, stream=False, **operation_config)
 
         if response.status_code not in [200, 202, 204]:
             raise models.ErrorResponseException(self._deserialize, response)
@@ -374,11 +374,11 @@ class DigitalTwinsOperations(object):
         :return: An instance of LROPoller that returns DigitalTwinsDescription
          or ClientRawResponse<DigitalTwinsDescription> if raw==True
         :rtype:
-         ~msrestazure.azure_operation.AzureOperationPoller[~controlplane.models.DigitalTwinsDescription]
+         ~msrestazure.azure_operation.AzureOperationPoller[~azure.mgmt.digitaltwins.models.DigitalTwinsDescription]
          or
-         ~msrestazure.azure_operation.AzureOperationPoller[~msrest.pipeline.ClientRawResponse[~controlplane.models.DigitalTwinsDescription]]
+         ~msrestazure.azure_operation.AzureOperationPoller[~msrest.pipeline.ClientRawResponse[~azure.mgmt.digitaltwins.models.DigitalTwinsDescription]]
         :raises:
-         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
+         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
         """
         raw_result = self._delete_initial(
             resource_group_name=resource_group_name,
@@ -417,9 +417,9 @@ class DigitalTwinsOperations(object):
          overrides<msrest:optionsforoperations>`.
         :return: An iterator like instance of DigitalTwinsDescription
         :rtype:
-         ~controlplane.models.DigitalTwinsDescriptionPaged[~controlplane.models.DigitalTwinsDescription]
+         ~azure.mgmt.digitaltwins.models.DigitalTwinsDescriptionPaged[~azure.mgmt.digitaltwins.models.DigitalTwinsDescription]
         :raises:
-         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
+         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
         """
         def internal_paging(next_link=None, raw=False):
 
@@ -441,7 +441,7 @@ class DigitalTwinsOperations(object):
 
             # Construct headers
             header_parameters = {}
-            header_parameters['Accept'] = 'application/json'
+            header_parameters['Content-Type'] = 'application/json; charset=utf-8'
             if self.config.generate_client_request_id:
                 header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
             if custom_headers:
@@ -450,8 +450,9 @@ class DigitalTwinsOperations(object):
                 header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
 
             # Construct and send request
-            request = self._client.get(url, query_parameters, header_parameters)
-            response = self._client.send(request, stream=False, **operation_config)
+            request = self._client.get(url, query_parameters)
+            response = self._client.send(
+                request, header_parameters, stream=False, **operation_config)
 
             if response.status_code not in [200]:
                 raise models.ErrorResponseException(self._deserialize, response)
@@ -483,9 +484,9 @@ class DigitalTwinsOperations(object):
          overrides<msrest:optionsforoperations>`.
         :return: An iterator like instance of DigitalTwinsDescription
         :rtype:
-         ~controlplane.models.DigitalTwinsDescriptionPaged[~controlplane.models.DigitalTwinsDescription]
+         ~azure.mgmt.digitaltwins.models.DigitalTwinsDescriptionPaged[~azure.mgmt.digitaltwins.models.DigitalTwinsDescription]
         :raises:
-         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
+         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
         """
         def internal_paging(next_link=None, raw=False):
 
@@ -508,7 +509,7 @@ class DigitalTwinsOperations(object):
 
             # Construct headers
             header_parameters = {}
-            header_parameters['Accept'] = 'application/json'
+            header_parameters['Content-Type'] = 'application/json; charset=utf-8'
             if self.config.generate_client_request_id:
                 header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
             if custom_headers:
@@ -517,8 +518,9 @@ class DigitalTwinsOperations(object):
                 header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
 
             # Construct and send request
-            request = self._client.get(url, query_parameters, header_parameters)
-            response = self._client.send(request, stream=False, **operation_config)
+            request = self._client.get(url, query_parameters)
+            response = self._client.send(
+                request, header_parameters, stream=False, **operation_config)
 
             if response.status_code not in [200]:
                 raise models.ErrorResponseException(self._deserialize, response)
@@ -550,10 +552,10 @@ class DigitalTwinsOperations(object):
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
         :return: CheckNameResult or ClientRawResponse if raw=true
-        :rtype: ~controlplane.models.CheckNameResult or
+        :rtype: ~azure.mgmt.digitaltwins.models.CheckNameResult or
          ~msrest.pipeline.ClientRawResponse
         :raises:
-         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
+         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
         """
         digital_twins_instance_check_name = models.CheckNameRequest(name=name)
 
@@ -571,7 +573,6 @@ class DigitalTwinsOperations(object):
 
         # Construct headers
         header_parameters = {}
-        header_parameters['Accept'] = 'application/json'
         header_parameters['Content-Type'] = 'application/json; charset=utf-8'
         if self.config.generate_client_request_id:
             header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
@@ -584,8 +585,9 @@ class DigitalTwinsOperations(object):
         body_content = self._serialize.body(digital_twins_instance_check_name, 'CheckNameRequest')
 
         # Construct and send request
-        request = self._client.post(url, query_parameters, header_parameters, body_content)
-        response = self._client.send(request, stream=False, **operation_config)
+        request = self._client.post(url, query_parameters)
+        response = self._client.send(
+            request, header_parameters, body_content, stream=False, **operation_config)
 
         if response.status_code not in [200]:
             raise models.ErrorResponseException(self._deserialize, response)

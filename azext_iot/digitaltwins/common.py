@@ -13,6 +13,7 @@ from enum import Enum
 
 MAX_ADT_CREATE_RETRIES = 5
 ADT_CREATE_RETRY_AFTER = 60
+MAX_ADT_DH_CREATE_RETRIES = 20
 
 
 class ADTEndpointType(Enum):

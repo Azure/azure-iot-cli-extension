@@ -24,14 +24,18 @@ class EventGrid(DigitalTwinsEndpointResourceProperties):
      'Provisioning', 'Deleting', 'Succeeded', 'Failed', 'Canceled', 'Deleted',
      'Warning', 'Suspending', 'Restoring', 'Moving', 'Disabled'
     :vartype provisioning_state: str or
-     ~controlplane.models.EndpointProvisioningState
+     ~azure.mgmt.digitaltwins.models.EndpointProvisioningState
     :ivar created_time: Time when the Endpoint was added to
      DigitalTwinsInstance.
     :vartype created_time: datetime
     :param authentication_type: Specifies the authentication type being used
-     for connecting to the endpoint. Possible values include: 'KeyBased',
-     'IdentityBased'
-    :type authentication_type: str or ~controlplane.models.AuthenticationType
+     for connecting to the endpoint. Defaults to 'KeyBased'. If 'KeyBased' is
+     selected, a connection string must be specified (at least the primary
+     connection string). If 'IdentityBased' is select, the endpointUri and
+     entityPath properties must be specified. Possible values include:
+     'KeyBased', 'IdentityBased'
+    :type authentication_type: str or
+     ~azure.mgmt.digitaltwins.models.AuthenticationType
     :param dead_letter_secret: Dead letter storage secret for key-based
      authentication. Will be obfuscated during read.
     :type dead_letter_secret: str
@@ -40,7 +44,7 @@ class EventGrid(DigitalTwinsEndpointResourceProperties):
     :type dead_letter_uri: str
     :param endpoint_type: Required. Constant filled by server.
     :type endpoint_type: str
-    :param topic_endpoint: Required. EventGrid Topic Endpoint
+    :param topic_endpoint: Required. EventGrid Topic Endpoint.
     :type topic_endpoint: str
     :param access_key1: Required. EventGrid secondary accesskey. Will be
      obfuscated during read.

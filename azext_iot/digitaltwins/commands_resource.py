@@ -250,3 +250,53 @@ def wait_private_endpoint_conn(cmd, name, conn_name, resource_group_name=None):
         conn_name=conn_name,
         wait=True
     )
+
+def create_adx_data_connection(
+    cmd,
+    name,
+    conn_name,
+    adx_cluster_name,
+    adx_database_name,
+    eh_namespace,
+    eh_entity_path,
+    adx_table_name=None,
+    adx_resource_group=None,
+    adx_subscription=None,
+    eh_consumer_group="$Default",
+    eh_resource_group=None,
+    eh_subscription=None,
+    resource_group_name=None,
+    yes=False,
+):
+    rp = ResourceProvider(cmd)
+    return rp.create_adx_data_connection(
+        name=name,
+        conn_name=conn_name,
+        adx_cluster_name=adx_cluster_name,
+        adx_database_name=adx_database_name,
+        adx_table_name=adx_table_name,
+        adx_resource_group=adx_resource_group,
+        adx_subscription=adx_subscription,
+        eh_namespace=eh_namespace,
+        eh_entity_path=eh_entity_path,
+        eh_consumer_group=eh_consumer_group,
+        eh_resource_group=eh_resource_group,
+        eh_subscription=eh_subscription,
+        resource_group_name=resource_group_name,
+        yes=yes,
+    )
+
+
+def show_adx_data_connection(cmd, name, conn_name, resource_group_name=None):
+    rp = ResourceProvider(cmd)
+    return rp.get_adx_data_connection(name=name, conn_name=conn_name, resource_group_name=resource_group_name)
+
+
+def list_adx_data_connection(cmd, name, resource_group_name=None):
+    rp = ResourceProvider(cmd)
+    return rp.list_adx_data_connection(name=name, resource_group_name=resource_group_name)
+
+
+def delete_adx_data_connection(cmd, name, conn_name, resource_group_name=None):
+    rp = ResourceProvider(cmd)
+    return rp.delete_adx_data_connection(name=name, conn_name=conn_name, resource_group_name=resource_group_name)

@@ -20,8 +20,9 @@ class GroupIdInformation(Model):
 
     All required parameters must be populated in order to send to Azure.
 
-    :param properties: Required.
-    :type properties: ~controlplane.models.GroupIdInformationPropertiesModel
+    :param properties: Required. The group information properties.
+    :type properties:
+     ~azure.mgmt.digitaltwins.models.GroupIdInformationProperties
     :param id: The resource identifier.
     :type id: str
     :ivar name: The resource name.
@@ -37,7 +38,7 @@ class GroupIdInformation(Model):
     }
 
     _attribute_map = {
-        'properties': {'key': 'properties', 'type': 'GroupIdInformationPropertiesModel'},
+        'properties': {'key': 'properties', 'type': 'GroupIdInformationProperties'},
         'id': {'key': 'id', 'type': 'str'},
         'name': {'key': 'name', 'type': 'str'},
         'type': {'key': 'type', 'type': 'str'},

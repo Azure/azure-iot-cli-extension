@@ -18,13 +18,13 @@ class OperationDisplay(Model):
     Variables are only populated by the server, and will be ignored when
     sending a request.
 
-    :ivar provider: Service provider: Microsoft DigitalTwins
+    :ivar provider: Service provider: Microsoft DigitalTwins.
     :vartype provider: str
-    :ivar resource: Resource Type: DigitalTwinsInstances
+    :ivar resource: Resource Type: DigitalTwinsInstances.
     :vartype resource: str
-    :ivar operation: Name of the operation
+    :ivar operation: Name of the operation.
     :vartype operation: str
-    :ivar description: Friendly description for the operation,
+    :ivar description: Friendly description for the operation.
     :vartype description: str
     """
 

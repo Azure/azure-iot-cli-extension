@@ -17,7 +17,7 @@ class GroupIdInformationResponse(Model):
 
     :param value: The list of available private link resources for a Digital
      Twin.
-    :type value: list[~controlplane.models.GroupIdInformation]
+    :type value: list[~azure.mgmt.digitaltwins.models.GroupIdInformation]
     """
 
     _attribute_map = {

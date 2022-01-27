@@ -31,7 +31,10 @@ class DigitalTwinsResource(Model):
     :param tags: The resource tags.
     :type tags: dict[str, str]
     :param identity: The managed identity for the DigitalTwinsInstance.
-    :type identity: ~controlplane.models.DigitalTwinsIdentity
+    :type identity: ~azure.mgmt.digitaltwins.models.DigitalTwinsIdentity
+    :ivar system_data: Metadata pertaining to creation and last modification
+     of the DigitalTwinsInstance.
+    :vartype system_data: ~azure.mgmt.digitaltwins.models.SystemData
     """
 
     _validation = {
@@ -39,6 +42,7 @@ class DigitalTwinsResource(Model):
         'name': {'readonly': True, 'pattern': r'^(?!-)[A-Za-z0-9-]{3,63}(?<!-)$'},
         'type': {'readonly': True},
         'location': {'required': True},
+        'system_data': {'readonly': True},
     }
 
     _attribute_map = {
@@ -48,6 +52,7 @@ class DigitalTwinsResource(Model):
         'location': {'key': 'location', 'type': 'str'},
         'tags': {'key': 'tags', 'type': '{str}'},
         'identity': {'key': 'identity', 'type': 'DigitalTwinsIdentity'},
+        'system_data': {'key': 'systemData', 'type': 'SystemData'},
     }
 
     def __init__(self, *, location: str, tags=None, identity=None, **kwargs) -> None:
@@ -58,3 +63,4 @@ class DigitalTwinsResource(Model):
         self.location = location
         self.tags = tags
         self.identity = identity
+        self.system_data = None

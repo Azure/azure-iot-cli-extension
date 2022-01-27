@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 from azext_iot.digitaltwins.common import (
+    MAX_ADT_DH_CREATE_RETRIES,
     ADTEndpointAuthType,
     ADTPublicNetworkAccessType,
     ADT_CREATE_RETRY_AFTER,
@@ -492,6 +493,139 @@ class ResourceProvider(DigitalTwinsResourceManager):
                 resource_group_name=resource_group_name,
                 resource_name=name,
                 private_endpoint_connection_name=conn_name
+            )
+        except ErrorResponseException as e:
+            raise CLIError(unpack_msrest_error(e))
+
+    def create_adx_data_connection(
+        self,
+        name,
+        conn_name,
+        adx_cluster_name,
+        adx_database_name,
+        eh_namespace,
+        eh_entity_path,
+        adx_table_name=None,
+        adx_resource_group=None,
+        adx_subscription=None,
+        eh_consumer_group="$Default",
+        eh_resource_group=None,
+        eh_subscription=None,
+        resource_group_name=None,
+        yes=False,
+    ):
+        target_instance = self.find_instance(
+            name=name, resource_group_name=resource_group_name
+        )
+        if not resource_group_name:
+            resource_group_name = self.get_rg(target_instance)
+        subscription = target_instance.id.split("/")[2]
+
+        if len(conn_name) <= 2:
+            raise CLIError(
+                "The connection name must have a length greater than 2"
+            )
+
+        adx_resource_group = adx_resource_group if adx_resource_group else resource_group_name
+        eh_resource_group = eh_resource_group if eh_resource_group else resource_group_name
+        adx_subscription = adx_subscription if adx_subscription else subscription
+        eh_subscription = eh_subscription if eh_subscription else subscription
+
+        from azext_iot.digitaltwins.providers.connection.builders import build_adx_connection_properties
+        properties = build_adx_connection_properties(
+            adx_cluster_name=adx_cluster_name,
+            adx_database_name=adx_database_name,
+            adx_table_name=adx_table_name,
+            adx_resource_group=adx_resource_group,
+            adx_subscription=adx_subscription,
+            dt_instance=target_instance,
+            eh_namespace=eh_namespace,
+            eh_entity_path=eh_entity_path,
+            eh_consumer_group=eh_consumer_group,
+            eh_resource_group=eh_resource_group,
+            eh_subscription=eh_subscription,
+            yes=yes,
+        )
+
+        try:
+            def check_state(lro):
+                from time import sleep
+                instance = lro.resource().as_dict()
+                properties = instance.get('properties', None)
+                if properties is None:
+                    return
+                state = properties.get('provisioning_state', None)
+                retries = 0
+                while (state.lower() not in ProvisioningStateType.FINISHED.value) and retries < MAX_ADT_DH_CREATE_RETRIES:
+                    retries += 1
+                    sleep(int(lro._response.headers.get('retry-after', ADT_CREATE_RETRY_AFTER)))
+                    lro.update_status()
+                    properties = instance.get('properties', None)
+                    if properties is None:
+                        return
+                    state = properties.get('provisioning_state', None)
+                if state and state.lower() not in ProvisioningStateType.FINISHED.value:
+                    logger.warning(
+                        "The resource has been created and has not finished provisioning. Please monitor the status of "
+                        "the Data History Connection using `az dt data-history show -n {} -g {} --cn {}`".format(
+                            name, resource_group_name, conn_name
+                        )
+                    )
+
+            create_or_update = self.mgmt_sdk.time_series_database_connections.create_or_update(
+                resource_group_name=resource_group_name,
+                resource_name=name,
+                time_series_database_connection_name=conn_name,
+                properties=properties
+            )
+            create_or_update.add_done_callback(check_state)
+            return create_or_update
+        except ErrorResponseException as e:
+            raise CLIError(unpack_msrest_error(e))
+
+    def get_adx_data_connection(self, name, conn_name, resource_group_name=None):
+        target_instance = self.find_instance(
+            name=name, resource_group_name=resource_group_name
+        )
+        if not resource_group_name:
+            resource_group_name = self.get_rg(target_instance)
+
+        try:
+            return self.mgmt_sdk.time_series_database_connections.get(
+                resource_group_name=resource_group_name,
+                resource_name=name,
+                time_series_database_connection_name=conn_name,
+            )
+        except ErrorResponseException as e:
+            raise CLIError(unpack_msrest_error(e))
+
+    def list_adx_data_connection(self, name, resource_group_name=None):
+        target_instance = self.find_instance(
+            name=name, resource_group_name=resource_group_name
+        )
+        if not resource_group_name:
+            resource_group_name = self.get_rg(target_instance)
+
+        try:
+            return self.mgmt_sdk.time_series_database_connections.list(
+                resource_group_name=resource_group_name,
+                resource_name=name,
+            )
+        except ErrorResponseException as e:
+            raise CLIError(unpack_msrest_error(e))
+
+    def delete_adx_data_connection(self, name, conn_name, resource_group_name=None):
+        target_instance = self.find_instance(
+            name=name, resource_group_name=resource_group_name
+        )
+        if not resource_group_name:
+            resource_group_name = self.get_rg(target_instance)
+
+        try:
+            return self.mgmt_sdk.time_series_database_connections.delete(
+                resource_group_name=resource_group_name,
+                resource_name=name,
+                time_series_database_connection_name=conn_name,
             )
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))

@@ -24,7 +24,7 @@ class ErrorDefinition(Model):
     :ivar message: Description of the error.
     :vartype message: str
     :ivar details: Internal error details.
-    :vartype details: list[~controlplane.models.ErrorDefinition]
+    :vartype details: list[~azure.mgmt.digitaltwins.models.ErrorDefinition]
     """
 
     _validation = {

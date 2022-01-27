@@ -433,3 +433,91 @@ def load_digitaltwins_arguments(self, _):
     with self.argument_context("dt network private-endpoint connection wait") as context:
         context.ignore("created")
         context.ignore("exists")
+
+    with self.argument_context("dt data-history") as context:
+        context.argument(
+            "conn_name",
+            options_list=["--conn-name", "--cn"],
+            help="Name of time series database connection.",
+            arg_group="TimeSeries Connection",
+        )
+
+    with self.argument_context("dt data-history create adx") as context:
+        context.argument(
+            "adx_cluster_name",
+            options_list=["--adx-cluster-name", "--adxc"],
+            help="Name of Azure Data Explorer cluster to integrate with.",
+            arg_group="Azure Database Explorer Arugments",
+        )
+
+        context.argument(
+            "adx_database_name",
+            options_list=["--adx-database-name", "--adxd"],
+            help="Name of Azure Data Explorer database to integrate with.",
+            arg_group="Azure Database Explorer Arugments",
+        )
+
+        context.argument(
+            "adx_resource_group",
+            options_list=["--adx-resource-group", "--adxg"],
+            help="Name of Azure Data Explorer resource group. If not provided, will use the Digital Twin's resource group.",
+            arg_group="Azure Database Explorer Arugments",
+        )
+
+        context.argument(
+            "adx_subscription",
+            options_list=["--adx-subscription", "--adxs"],
+            help="Name or ID of subscription where the Azure Data Explorer exists. If not provided, will use the subscription "
+                 "that contains the Digital Twin Instance.",
+            arg_group="Azure Database Explorer Arugments",
+        )
+
+        context.argument(
+            "adx_table_name",
+            options_list=["--adx-table-name", "--adxt"],
+            help="Name of Azure Data Explorer table to be created. If not provided, will use the format "
+                 "adt_dh_{dt_name}_{dt_location}.",
+            arg_group="Azure Database Explorer Arugments",
+        )
+
+        context.argument(
+            "eh_namespace",
+            options_list=["--eventhub-namespace", "--ehn"],
+            help="EventHub Namespace identifier.",
+            arg_group="Event Hub Arguments",
+        )
+
+        context.argument(
+            "eh_entity_path",
+            options_list=["--eventhub", "--eh"],
+            help="Name of EventHub to integrate with.",
+            arg_group="Event Hub Arguments",
+        )
+
+        context.argument(
+            "eh_consumer_group",
+            options_list=["--eventhub-consumer-group", "--ehc"],
+            help="The EventHub consumer group to use when ADX reads from EventHub.",
+            arg_group="Event Hub Arguments",
+        )
+
+        context.argument(
+            "eh_resource_group",
+            options_list=["--eventhub-resource-group", "--ehg"],
+            help="Name of EventHub resource group. If not provided, will use the Digital Twin's resource group.",
+            arg_group="Event Hub Arguments",
+        )
+
+        context.argument(
+            "eh_subscription",
+            options_list=["--eventhub-supscription", "--ehs"],
+            help="Name or ID of subscription where the EventHub exists. If not provided, will use the subscription that contains"
+                 " the Digital Twin Instance..",
+            arg_group="Event Hub Arguments",
+        )
+
+        context.argument(
+            'yes',
+            options_list=['--yes', '-y'],
+            help='Do not prompt for confirmation when assigning required roles.',
+        )

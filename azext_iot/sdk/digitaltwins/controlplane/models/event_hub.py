@@ -24,14 +24,18 @@ class EventHub(DigitalTwinsEndpointResourceProperties):
      'Provisioning', 'Deleting', 'Succeeded', 'Failed', 'Canceled', 'Deleted',
      'Warning', 'Suspending', 'Restoring', 'Moving', 'Disabled'
     :vartype provisioning_state: str or
-     ~controlplane.models.EndpointProvisioningState
+     ~azure.mgmt.digitaltwins.models.EndpointProvisioningState
     :ivar created_time: Time when the Endpoint was added to
      DigitalTwinsInstance.
     :vartype created_time: datetime
     :param authentication_type: Specifies the authentication type being used
-     for connecting to the endpoint. Possible values include: 'KeyBased',
-     'IdentityBased'
-    :type authentication_type: str or ~controlplane.models.AuthenticationType
+     for connecting to the endpoint. Defaults to 'KeyBased'. If 'KeyBased' is
+     selected, a connection string must be specified (at least the primary
+     connection string). If 'IdentityBased' is select, the endpointUri and
+     entityPath properties must be specified. Possible values include:
+     'KeyBased', 'IdentityBased'
+    :type authentication_type: str or
+     ~azure.mgmt.digitaltwins.models.AuthenticationType
     :param dead_letter_secret: Dead letter storage secret for key-based
      authentication. Will be obfuscated during read.
     :type dead_letter_secret: str
@@ -47,7 +51,7 @@ class EventHub(DigitalTwinsEndpointResourceProperties):
      endpoint for key-based authentication. Will be obfuscated during read.
     :type connection_string_secondary_key: str
     :param endpoint_uri: The URL of the EventHub namespace for identity-based
-     authentication. It must include the protocol sb://
+     authentication. It must include the protocol 'sb://'.
     :type endpoint_uri: str
     :param entity_path: The EventHub name in the EventHub namespace for
      identity-based authentication.

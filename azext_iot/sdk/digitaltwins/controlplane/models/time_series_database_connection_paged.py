@@ -12,16 +12,16 @@
 from msrest.paging import Paged
 
 
-class DigitalTwinsEndpointResourcePaged(Paged):
+class TimeSeriesDatabaseConnectionPaged(Paged):
     """
-    A paging container for iterating over a list of :class:`DigitalTwinsEndpointResource <azure.mgmt.digitaltwins.models.DigitalTwinsEndpointResource>` object
+    A paging container for iterating over a list of :class:`TimeSeriesDatabaseConnection <azure.mgmt.digitaltwins.models.TimeSeriesDatabaseConnection>` object
     """
 
     _attribute_map = {
         'next_link': {'key': 'nextLink', 'type': 'str'},
-        'current_page': {'key': 'value', 'type': '[DigitalTwinsEndpointResource]'}
+        'current_page': {'key': 'value', 'type': '[TimeSeriesDatabaseConnection]'}
     }
 
     def __init__(self, *args, **kwargs):
 
-        super(DigitalTwinsEndpointResourcePaged, self).__init__(*args, **kwargs)
+        super(TimeSeriesDatabaseConnectionPaged, self).__init__(*args, **kwargs)

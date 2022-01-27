@@ -7,7 +7,7 @@
 
 import os
 
-VERSION = "0.13.1"
+VERSION = "255.255.14"
 EXTENSION_NAME = "azure-iot"
 EXTENSION_ROOT = os.path.dirname(os.path.abspath(__file__))
 EXTENSION_CONFIG_ROOT_KEY = "iotext"

@@ -26,16 +26,20 @@ class DigitalTwinsEndpointResource(ExternalResource):
     :vartype name: str
     :ivar type: The resource type.
     :vartype type: str
+    :ivar system_data: Metadata pertaining to creation and last modification
+     of the resource.
+    :vartype system_data: ~azure.mgmt.digitaltwins.models.SystemData
     :param properties: Required. DigitalTwinsInstance endpoint resource
      properties.
     :type properties:
-     ~controlplane.models.DigitalTwinsEndpointResourceProperties
+     ~azure.mgmt.digitaltwins.models.DigitalTwinsEndpointResourceProperties
     """
 
     _validation = {
         'id': {'readonly': True},
         'name': {'readonly': True, 'pattern': r'^(?![0-9]+$)(?!-)[a-zA-Z0-9-]{2,49}[a-zA-Z0-9]$'},
         'type': {'readonly': True},
+        'system_data': {'readonly': True},
         'properties': {'required': True},
     }
 
@@ -43,6 +47,7 @@ class DigitalTwinsEndpointResource(ExternalResource):
         'id': {'key': 'id', 'type': 'str'},
         'name': {'key': 'name', 'type': 'str'},
         'type': {'key': 'type', 'type': 'str'},
+        'system_data': {'key': 'systemData', 'type': 'SystemData'},
         'properties': {'key': 'properties', 'type': 'DigitalTwinsEndpointResourceProperties'},
     }
 

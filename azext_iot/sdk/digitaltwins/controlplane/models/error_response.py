@@ -17,7 +17,7 @@ class ErrorResponse(Model):
     """Error response.
 
     :param error: Error description
-    :type error: ~controlplane.models.ErrorDefinition
+    :type error: ~azure.mgmt.digitaltwins.models.ErrorDefinition
     """
 
     _attribute_map = {

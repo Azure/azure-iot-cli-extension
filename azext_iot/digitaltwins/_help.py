@@ -140,6 +140,91 @@ def load_digitaltwins_help():
             az dt reset -n {instance_name}
     """
 
+    helps["dt data-history"] = """
+        type: group
+        short-summary: Manage and configure data history connections.
+    """
+
+    helps["dt data-history create"] = """
+        type: group
+        short-summary: Creates a data history connection between a Digital Twins instance and another resource.
+    """
+
+    helps["dt data-history create adx"] = """
+        type: command
+        short-summary: Creates a data-history connection between a Digital Twins instance and an Azure Database Explorer.
+            Requires pre-created Azure Database Explorer and Eventhub resources.
+        examples:
+        - name: Adds a data history connection to a target instance with the $Default event hub consumer group.
+          text: >
+            az dt data-history create adx -n {instance_name}
+            --cn {time_series_database_connection_name}
+            --adx-cluster-name {adx_cluster_name}
+            --adx-database-name {adx_database_name}
+            --eventhub {event_hub}
+            --eventhub-namespace {event_hub_namespace}
+        - name: Adds a data history connection to a target instance with a custom Azure Database Explorer table name
+            and event hub consumer group.
+          text: >
+            az dt data-history create adx -n {instance_name}
+            --cn {time_series_database_connection_name}
+            --adx-cluster-name {adx_cluster_name}
+            --adx-database-name {adx_database_name}
+            --adx-table-name {adx_table_name}
+            --eventhub {event_hub}
+            --eventhub-namespace {event_hub_namespace}
+            --eventhub-consumer-group {event_hub_consumer_group}
+        - name: Adds a data history connection to a target instance with an Event Hub and Azure
+            Database Explorer instances in different resource groups and subscriptions from the Digital
+            Twin instance.
+          text: >
+            az dt data-history create adx -n {instance_name}
+            --cn {time_series_database_connection_name}
+            --adx-cluster-name {adx_cluster_name}
+            --adx-database-name {adx_database_name}
+            --adx-resource-group {adx_resource_group}
+            --adx-subscription {adx_subscription}
+            --eventhub {event_hub}
+            --eventhub-namespace {event_hub_namespace}
+            --eventhub-resource-group {event_hub_resource_group}
+            --eventhub-subscription {event_subscription}
+    """
+
+    helps["dt data-history list"] = """
+        type: command
+        short-summary: List all data history connections configured on a Digital Twins instance.
+        examples:
+        - name: List all data history connections configured on an instance.
+          text: >
+            az dt connection list -n {instance_name}
+    """
+
+    helps["dt data-history show"] = """
+        type: command
+        short-summary: Show details of a data history connection configured on a Digital Twins instance.
+        examples:
+        - name: Show a data history connection configured on an instance.
+          text: >
+            az dt connection show -n {instance_name} --cn {time_series_database_connection_name}
+    """
+
+    helps["dt data-history delete"] = """
+        type: command
+        short-summary: Delete a data history connection configured on a Digital Twins instance.
+        examples:
+        - name: Delete a data history connection configured on an instance
+            and block until the operation is complete.
+          text: >
+            az dt data-history delete -n {instance_name}
+            --cn {time_series_database_connection_name}
+        - name: Delete a data history connection configured on an instance
+            without confirmation or blocking.
+          text: >
+            az dt data-history delete -n {instance_name}
+            --cn {time_series_database_connection_name}
+            -y --no-wait
+    """
+
     helps["dt endpoint"] = """
         type: group
         short-summary: Manage and configure Digital Twins instance endpoints.

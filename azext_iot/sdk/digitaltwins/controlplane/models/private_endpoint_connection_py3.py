@@ -26,8 +26,11 @@ class PrivateEndpointConnection(Model):
     :vartype name: str
     :ivar type: The resource type.
     :vartype type: str
-    :param properties: Required.
-    :type properties: ~controlplane.models.PrivateEndpointConnectionProperties
+    :param properties: Required. The connection properties.
+    :type properties: ~azure.mgmt.digitaltwins.models.ConnectionProperties
+    :ivar system_data: Metadata pertaining to creation and last modification
+     of the private endpoint connection.
+    :vartype system_data: ~azure.mgmt.digitaltwins.models.SystemData
     """
 
     _validation = {
@@ -35,13 +38,15 @@ class PrivateEndpointConnection(Model):
         'name': {'readonly': True, 'pattern': r'^(?![0-9]+$)(?!-)[a-zA-Z0-9-]{2,49}[a-zA-Z0-9]$'},
         'type': {'readonly': True},
         'properties': {'required': True},
+        'system_data': {'readonly': True},
     }
 
     _attribute_map = {
         'id': {'key': 'id', 'type': 'str'},
         'name': {'key': 'name', 'type': 'str'},
         'type': {'key': 'type', 'type': 'str'},
-        'properties': {'key': 'properties', 'type': 'PrivateEndpointConnectionProperties'},
+        'properties': {'key': 'properties', 'type': 'ConnectionProperties'},
+        'system_data': {'key': 'systemData', 'type': 'SystemData'},
     }
 
     def __init__(self, *, properties, **kwargs) -> None:
@@ -50,3 +55,4 @@ class PrivateEndpointConnection(Model):
         self.name = None
         self.type = None
         self.properties = properties
+        self.system_data = None

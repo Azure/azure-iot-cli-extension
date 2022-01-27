@@ -14,7 +14,7 @@ from msrest.paging import Paged
 
 class DigitalTwinsDescriptionPaged(Paged):
     """
-    A paging container for iterating over a list of :class:`DigitalTwinsDescription <controlplane.models.DigitalTwinsDescription>` object
+    A paging container for iterating over a list of :class:`DigitalTwinsDescription <azure.mgmt.digitaltwins.models.DigitalTwinsDescription>` object
     """
 
     _attribute_map = {

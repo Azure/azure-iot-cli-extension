@@ -20,7 +20,7 @@ class ConnectionState(Model):
     :param status: Required. The status of a private endpoint connection.
      Possible values include: 'Pending', 'Approved', 'Rejected', 'Disconnected'
     :type status: str or
-     ~controlplane.models.PrivateLinkServiceConnectionStatus
+     ~azure.mgmt.digitaltwins.models.PrivateLinkServiceConnectionStatus
     :param description: Required. The description for the current state of a
      private endpoint connection.
     :type description: str
