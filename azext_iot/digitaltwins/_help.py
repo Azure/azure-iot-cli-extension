@@ -196,7 +196,7 @@ def load_digitaltwins_help():
         examples:
         - name: List all data history connections configured on an instance.
           text: >
-            az dt connection list -n {instance_name}
+            az dt data-history list -n {instance_name}
     """
 
     helps["dt data-history show"] = """
@@ -205,7 +205,7 @@ def load_digitaltwins_help():
         examples:
         - name: Show a data history connection configured on an instance.
           text: >
-            az dt connection show -n {instance_name} --cn {time_series_database_connection_name}
+            az dt data-history show -n {instance_name} --cn {time_series_database_connection_name}
     """
 
     helps["dt data-history delete"] = """

@@ -510,7 +510,7 @@ def load_digitaltwins_arguments(self, _):
 
         context.argument(
             "eh_subscription",
-            options_list=["--eventhub-supscription", "--ehs"],
+            options_list=["--eventhub-subscription", "--ehs"],
             help="Name or ID of subscription where the EventHub exists. If not provided, will use the subscription that contains"
                  " the Digital Twin Instance..",
             arg_group="Event Hub Arguments",

@@ -251,6 +251,7 @@ def wait_private_endpoint_conn(cmd, name, conn_name, resource_group_name=None):
         wait=True
     )
 
+
 def create_adx_data_connection(
     cmd,
     name,
