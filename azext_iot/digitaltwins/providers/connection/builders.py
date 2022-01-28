@@ -109,7 +109,7 @@ class AdxConnectionValidator(ABC):
         adx_resource_group: str,
         adx_subscription: str,
     ):
-        api_version ="api-version=2021-01-01"
+        api_version = "api-version=2021-01-01"
         self.adx_resource_id = (
             "/subscriptions/{}/resourceGroups/{}/providers/Microsoft.Kusto/clusters/{}".format(
                 adx_subscription,
@@ -149,14 +149,13 @@ class AdxConnectionValidator(ABC):
         )
         self.add_adx_principal(adx_database_name, api_version)
 
-
     def add_dt_role_assignment(self, role, resource_id):
-        role_str = f"'{role}' role to the Digital Twins instance for the scope '{resource_id}'"
+        role_str = f"'{role}' role on the Azure Digital Twins instance for the scope '{resource_id}'"
         logger.debug(f"Trying to add the {role_str}.")
         if not (self.yes or prompt_y_n(msg=f"Add the {role_str}?", default="y")):
             print(
                 f"Skipping addition of the '{role}' role. "
-                "This may cause the connection to fail creation."
+                "This may prevent creation of the data history connection."
             )
             return
 
@@ -194,7 +193,7 @@ class AdxConnectionValidator(ABC):
 
     def add_adx_principal(self, adx_database_name: str, api_version: str):
         role_str = (
-            "'Database Admin' permission to the Digital Twins instance for the Azure Data Explorer"
+            "'Database Admin' permission on the Azure Digital Twins instance for the Azure Data Explorer"
             f" database '{adx_database_name}'"
         )
         try:
@@ -202,7 +201,7 @@ class AdxConnectionValidator(ABC):
             if not (self.yes or prompt_y_n(msg=f"Add the {role_str}?", default="y")):
                 print(
                     "Skipping addition of the 'Database Admin' permission. "
-                    "This may cause the connection to fail creation."
+                    "This may prevent creation of the data history connection."
                 )
                 return
 
@@ -241,7 +240,11 @@ class AdxConnectionValidator(ABC):
             logger.debug(f"Finished adding the {role_str}.")
 
         except CLIError:
-            print("{} assign 'Database Admin' role to the Digital Twins instance. Please assign this role manually.".format(self.error_prefix))
+            print(
+                "{} assign 'Database Admin' role to the Digital Twins instance. Please assign this role manually.".format(
+                    self.error_prefix
+                )
+            )
             if not prompt_y_n(msg="Continue with Data History Connection create anyway?", default="n"):
                 raise CLIError("Command was aborted.")
             return
