@@ -6,6 +6,7 @@
 
 from time import sleep
 from knack.log import get_logger
+import pytest
 from azext_iot.common.utility import unpack_msrest_error
 from . import DTLiveScenarioTest
 from . import (
@@ -25,6 +26,7 @@ class TestDTConnections(DTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestDTConnections, self).__init__(test_case)
         self.ensure_eventhub_resource()
+        self.ensure_adx_resource()
 
         self.adx_database_id = (
             "/subscriptions/{}/resourceGroups/{}/providers/Microsoft.Kusto/clusters/{}"
@@ -36,10 +38,9 @@ class TestDTConnections(DTLiveScenarioTest):
             )
         )
 
-        # TODO fix to right resource group
         self.eventhub_instance_id = (
-            "/subscriptions/{}/resourceGroups/{}/providers/Microsoft.Kusto/clusters/{}"
-            "/Databases/{}".format(
+            "/subscriptions/{}/resourceGroups/{}/providers/Microsoft.EventHub/"
+            "namespaces/{}/eventhubs/{}".format(
                 self.current_subscription,
                 EP_RG,
                 EP_EVENTHUB_NAMESPACE,
@@ -47,13 +48,21 @@ class TestDTConnections(DTLiveScenarioTest):
             )
         )
 
-    def tearDown(self):
-        super().tearDown()
+    @pytest.fixture(scope='class', autouse=True)
+    def tearDownSuite(self):
+        yield None
         try:
             self.delete_eventhub_resources()
         except Exception as e:
             logger.warning(
                 "Failed to delete the EventHub resources. Additional details: " +
+                unpack_msrest_error(e)
+            )
+        try:
+            self.delete_adx_resources()
+        except Exception as e:
+            logger.warning(
+                "Failed to delete the ADX resources. Additional details: " +
                 unpack_msrest_error(e)
             )
 
@@ -62,7 +71,7 @@ class TestDTConnections(DTLiveScenarioTest):
         instance_name = f"dt{generate_generic_id()}"
         connection_name = f"cn-{generate_generic_id()}"
         table_name = f"tb_{generate_generic_id()}"
-        consumer_group = "test" # TODO see what limits on consumer group naming
+        consumer_group = f"cg-{generate_generic_id()}"
         self.add_eventhub_consumer_group(consumer_group=consumer_group)
 
         create_output = self.cmd(
@@ -82,8 +91,6 @@ class TestDTConnections(DTLiveScenarioTest):
 
         # wait for identity assignment
         sleep(60)
-
-        # Add required roles and create event hub
 
         expected_attributes = {
             "dt_name": instance_name,
