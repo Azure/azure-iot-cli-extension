@@ -583,7 +583,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
 
-    def get_adx_data_connection(self, name, conn_name, resource_group_name=None):
+    def get_adx_data_connection(self, name, conn_name, resource_group_name=None, wait=False):
         target_instance = self.find_instance(
             name=name, resource_group_name=resource_group_name
         )
@@ -597,6 +597,9 @@ class ResourceProvider(DigitalTwinsResourceManager):
                 time_series_database_connection_name=conn_name,
             )
         except ErrorResponseException as e:
+            if wait:
+                e.status_code = e.response.status_code
+                raise e
             raise CLIError(unpack_msrest_error(e))
 
     def list_adx_data_connection(self, name, resource_group_name=None):

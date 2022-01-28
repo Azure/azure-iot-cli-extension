@@ -23,9 +23,6 @@ dt data-history create adx:
     eh_resource_group:
       rule_exclusions:
       - parameter_should_not_end_in_resource_group
-dt data-history:
-  rule_exclusions:
-  - require_wait_command_if_no_wait
 iot dps enrollment update:
   parameters:
     auth_type_dataplane:

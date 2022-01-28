@@ -188,6 +188,15 @@ def load_digitaltwins_help():
             --eventhub-namespace {event_hub_namespace}
             --eventhub-resource-group {event_hub_resource_group}
             --eventhub-subscription {event_subscription}
+        - name: Adds a data history connection to a target instance with the $Default event hub consumer group
+            and skip the role assignment prompts.
+          text: >
+            az dt data-history create adx -n {instance_name} -y
+            --cn {time_series_database_connection_name}
+            --adx-cluster-name {adx_cluster_name}
+            --adx-database-name {adx_database_name}
+            --eventhub {event_hub}
+            --eventhub-namespace {event_hub_namespace}
     """
 
     helps["dt data-history list"] = """
@@ -206,6 +215,18 @@ def load_digitaltwins_help():
         - name: Show a data history connection configured on an instance.
           text: >
             az dt data-history show -n {instance_name} --cn {time_series_database_connection_name}
+    """
+
+    helps["dt data-history wait"] = """
+        type: command
+        short-summary: Wait until an operation on a data history connection is complete.
+        examples:
+        - name: Wait until a data history connection is created.
+          text: >
+            az dt data-history wait -n {instance_name} --created
+        - name: Wait until an existing data history connection is deleted.
+          text: >
+            az dt data-history wait -n {instance_name} --deleted
     """
 
     helps["dt data-history delete"] = """

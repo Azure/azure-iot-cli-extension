@@ -325,6 +325,116 @@ class TestDTConnections(DTLiveScenarioTest):
             expect_failure=True
         )
 
+    def test_dt_data_history_adx_wait(self):
+        self.wait_for_capacity()
+        instance_name = f"dt{generate_generic_id()}"
+        connection_name = f"cn-{generate_generic_id()}"
+        consumer_group = f"cg-{generate_generic_id()}"
+        self.add_eventhub_consumer_group(consumer_group=consumer_group)
+
+        create_output = self.cmd(
+            "dt create -n {} -g {} -l {} --assign-identity".format(
+                instance_name,
+                self.rg,
+                "northeurope"
+            )
+        ).get_output_in_json()
+        self.track_instance(create_output)
+
+        # Fail test if hostName missing
+        assert create_output.get(
+            "hostName"
+        ), "Service failed to provision DT instance: {}.".format(instance_name)
+        assert create_output["publicNetworkAccess"] == "Enabled"
+
+        # wait for identity assignment
+        sleep(60)
+
+        expected_attributes = {
+            "dt_name": instance_name,
+            "rg": self.rg,
+            "connection_name": connection_name,
+            "adx_database_name": ADX_DATABASE,
+            "adx_cluster_name": ADX_CLUSTER,
+            "eventhub_namespace": EP_EVENTHUB_NAMESPACE,
+            "eventhub_name": EP_EVENTHUB_TOPIC,
+            "adx_resource_group": ADX_RG,
+            "eventhub_resource_group": EP_RG,
+            "consumer_group": consumer_group,
+            "location": create_output["location"],
+            "table_name": "adt_dh_{}_{}".format(
+                instance_name,
+                create_output["location"]
+            )
+        }
+
+        self.cmd(
+            "dt data-history create adx -n {} -g {} --cn {} --adxd {} --adxg {} "
+            "--adxc {} --ehn {} --eh {} --ehg {} --ehc {} -y --no-wait".format(
+                instance_name,
+                self.rg,
+                connection_name,
+                ADX_DATABASE,
+                ADX_RG,
+                ADX_CLUSTER,
+                EP_EVENTHUB_NAMESPACE,
+                EP_EVENTHUB_TOPIC,
+                EP_RG,
+                consumer_group,
+            )
+        )
+
+        self.cmd(
+            "dt data-history wait --created -n {} -g {} --cn {}".format(
+                instance_name,
+                self.rg,
+                connection_name,
+            )
+        )
+
+        connection_result = self.cmd(
+            "dt data-history show -n {} -g {} --cn {}".format(
+                instance_name,
+                self.rg,
+                connection_name,
+            )
+        ).get_output_in_json()
+
+        assert_common_connection_attributes(
+            connection_output=connection_result, expected_attributes=expected_attributes
+        )
+
+        # Check role assignments - needed once
+        principal_id = create_output.get("identity").get("principalId")
+        assert len(self.get_role_assignment(
+            role="Azure Event Hubs Data Owner", scope=self.eventhub_instance_id, assignee=principal_id
+        )) == 1
+        assert len(self.get_role_assignment(
+            role="Contributor", scope=self.adx_database_id, assignee=principal_id
+        )) == 1
+        assert len(self.get_adx_role(assignee_name=instance_name)) == 1
+
+        self.cmd(
+            "dt data-history delete -n {} -g {} --cn {} -y --no-wait".format(
+                instance_name, self.rg, connection_name
+            )
+        )
+
+        self.cmd(
+            "dt data-history wait --deleted -n {} -g {} --cn {}".format(
+                instance_name,
+                self.rg,
+                connection_name,
+            )
+        )
+
+        list_result = self.cmd(
+            "dt data-history list -n {} -g {}".format(
+                instance_name, self.rg
+            )
+        ).get_output_in_json()
+        assert len(list_result) == 0
+
     def get_adx_role(self, assignee_name):
         api_version = "api-version=2021-01-01"
         database_admin_list = self.cmd(

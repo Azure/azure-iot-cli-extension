@@ -293,6 +293,11 @@ def show_adx_data_connection(cmd, name, conn_name, resource_group_name=None):
     return rp.get_adx_data_connection(name=name, conn_name=conn_name, resource_group_name=resource_group_name)
 
 
+def wait_adx_data_connection(cmd, name, conn_name, resource_group_name=None):
+    rp = ResourceProvider(cmd)
+    return rp.get_adx_data_connection(name=name, conn_name=conn_name, resource_group_name=resource_group_name, wait=True)
+
+
 def list_adx_data_connection(cmd, name, resource_group_name=None):
     rp = ResourceProvider(cmd)
     return rp.list_adx_data_connection(name=name, resource_group_name=resource_group_name)
