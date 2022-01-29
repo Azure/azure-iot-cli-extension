@@ -28,11 +28,11 @@ class DigitalTwinsEndpointResource(ExternalResource):
     :vartype type: str
     :ivar system_data: Metadata pertaining to creation and last modification
      of the resource.
-    :vartype system_data: ~azure.mgmt.digitaltwins.models.SystemData
+    :vartype system_data: ~controlplane.models.SystemData
     :param properties: Required. DigitalTwinsInstance endpoint resource
      properties.
     :type properties:
-     ~azure.mgmt.digitaltwins.models.DigitalTwinsEndpointResourceProperties
+     ~controlplane.models.DigitalTwinsEndpointResourceProperties
     """
 
     _validation = {

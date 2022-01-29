@@ -26,7 +26,7 @@ class ExternalResource(Model):
     :vartype type: str
     :ivar system_data: Metadata pertaining to creation and last modification
      of the resource.
-    :vartype system_data: ~azure.mgmt.digitaltwins.models.SystemData
+    :vartype system_data: ~controlplane.models.SystemData
     """
 
     _validation = {

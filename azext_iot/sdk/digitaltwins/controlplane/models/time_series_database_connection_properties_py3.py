@@ -27,7 +27,7 @@ class TimeSeriesDatabaseConnectionProperties(Model):
      'Provisioning', 'Deleting', 'Succeeded', 'Failed', 'Canceled', 'Deleted',
      'Warning', 'Suspending', 'Restoring', 'Moving', 'Disabled'
     :vartype provisioning_state: str or
-     ~azure.mgmt.digitaltwins.models.TimeSeriesDatabaseConnectionState
+     ~controlplane.models.TimeSeriesDatabaseConnectionState
     :param connection_type: Required. Constant filled by server.
     :type connection_type: str
     """

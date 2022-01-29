@@ -61,17 +61,17 @@ class AzureDigitalTwinsManagementClient(SDKClient):
     :vartype config: AzureDigitalTwinsManagementClientConfiguration
 
     :ivar digital_twins: DigitalTwins operations
-    :vartype digital_twins: azure.mgmt.digitaltwins.operations.DigitalTwinsOperations
+    :vartype digital_twins: controlplane.operations.DigitalTwinsOperations
     :ivar digital_twins_endpoint: DigitalTwinsEndpoint operations
-    :vartype digital_twins_endpoint: azure.mgmt.digitaltwins.operations.DigitalTwinsEndpointOperations
+    :vartype digital_twins_endpoint: controlplane.operations.DigitalTwinsEndpointOperations
     :ivar operations: Operations operations
-    :vartype operations: azure.mgmt.digitaltwins.operations.Operations
+    :vartype operations: controlplane.operations.Operations
     :ivar private_link_resources: PrivateLinkResources operations
-    :vartype private_link_resources: azure.mgmt.digitaltwins.operations.PrivateLinkResourcesOperations
+    :vartype private_link_resources: controlplane.operations.PrivateLinkResourcesOperations
     :ivar private_endpoint_connections: PrivateEndpointConnections operations
-    :vartype private_endpoint_connections: azure.mgmt.digitaltwins.operations.PrivateEndpointConnectionsOperations
+    :vartype private_endpoint_connections: controlplane.operations.PrivateEndpointConnectionsOperations
     :ivar time_series_database_connections: TimeSeriesDatabaseConnections operations
-    :vartype time_series_database_connections: azure.mgmt.digitaltwins.operations.TimeSeriesDatabaseConnectionsOperations
+    :vartype time_series_database_connections: controlplane.operations.TimeSeriesDatabaseConnectionsOperations
 
     :param credentials: Credentials needed for the client to connect to Azure.
     :type credentials: :mod:`A msrestazure Credentials

@@ -14,7 +14,7 @@ from msrest.paging import Paged
 
 class TimeSeriesDatabaseConnectionPaged(Paged):
     """
-    A paging container for iterating over a list of :class:`TimeSeriesDatabaseConnection <azure.mgmt.digitaltwins.models.TimeSeriesDatabaseConnection>` object
+    A paging container for iterating over a list of :class:`TimeSeriesDatabaseConnection <controlplane.models.TimeSeriesDatabaseConnection>` object
     """
 
     _attribute_map = {

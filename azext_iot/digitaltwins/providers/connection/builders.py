@@ -150,7 +150,7 @@ class AdxConnectionValidator(ABC):
         self.add_adx_principal(adx_database_name, api_version)
 
     def add_dt_role_assignment(self, role, resource_id):
-        role_str = f"'{role}' role on the Azure Digital Twins instance for the scope '{resource_id}'"
+        role_str = f"'{role}' role on the Digital Twins instance for the scope '{resource_id}'"
         logger.debug(f"Trying to add the {role_str}.")
         if not (self.yes or prompt_y_n(msg=f"Add the {role_str}?", default="y")):
             print(
@@ -193,7 +193,7 @@ class AdxConnectionValidator(ABC):
 
     def add_adx_principal(self, adx_database_name: str, api_version: str):
         role_str = (
-            "'Database Admin' permission on the Azure Digital Twins instance for the Azure Data Explorer"
+            "'Database Admin' permission on the Digital Twins instance for the Azure Data Explorer"
             f" database '{adx_database_name}'"
         )
         try:

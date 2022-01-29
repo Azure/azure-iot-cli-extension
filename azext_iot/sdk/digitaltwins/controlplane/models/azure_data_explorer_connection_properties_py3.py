@@ -25,7 +25,7 @@ class AzureDataExplorerConnectionProperties(TimeSeriesDatabaseConnectionProperti
      'Provisioning', 'Deleting', 'Succeeded', 'Failed', 'Canceled', 'Deleted',
      'Warning', 'Suspending', 'Restoring', 'Moving', 'Disabled'
     :vartype provisioning_state: str or
-     ~azure.mgmt.digitaltwins.models.TimeSeriesDatabaseConnectionState
+     ~controlplane.models.TimeSeriesDatabaseConnectionState
     :param connection_type: Required. Constant filled by server.
     :type connection_type: str
     :param adx_resource_id: Required. The resource ID of the Azure Data

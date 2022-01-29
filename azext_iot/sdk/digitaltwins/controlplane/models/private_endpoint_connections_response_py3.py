@@ -18,7 +18,7 @@ class PrivateEndpointConnectionsResponse(Model):
     :param value: The list of available private link connections for a Digital
      Twin.
     :type value:
-     list[~azure.mgmt.digitaltwins.models.PrivateEndpointConnection]
+     list[~controlplane.models.PrivateEndpointConnection]
     """
 
     _attribute_map = {

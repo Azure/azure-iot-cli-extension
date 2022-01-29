@@ -53,10 +53,10 @@ class DigitalTwinsOperations(object):
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
         :return: DigitalTwinsDescription or ClientRawResponse if raw=true
-        :rtype: ~azure.mgmt.digitaltwins.models.DigitalTwinsDescription or
+        :rtype: ~controlplane.models.DigitalTwinsDescription or
          ~msrest.pipeline.ClientRawResponse
         :raises:
-         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
         """
         # Construct URL
         url = self.get.metadata['url']
@@ -165,7 +165,7 @@ class DigitalTwinsOperations(object):
         :param digital_twins_create: The DigitalTwinsInstance and security
          metadata.
         :type digital_twins_create:
-         ~azure.mgmt.digitaltwins.models.DigitalTwinsDescription
+         ~controlplane.models.DigitalTwinsDescription
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: The poller return type is ClientRawResponse, the
          direct response alongside the deserialized response
@@ -174,11 +174,11 @@ class DigitalTwinsOperations(object):
         :return: An instance of LROPoller that returns DigitalTwinsDescription
          or ClientRawResponse<DigitalTwinsDescription> if raw==True
         :rtype:
-         ~msrestazure.azure_operation.AzureOperationPoller[~azure.mgmt.digitaltwins.models.DigitalTwinsDescription]
+         ~msrestazure.azure_operation.AzureOperationPoller[~controlplane.models.DigitalTwinsDescription]
          or
-         ~msrestazure.azure_operation.AzureOperationPoller[~msrest.pipeline.ClientRawResponse[~azure.mgmt.digitaltwins.models.DigitalTwinsDescription]]
+         ~msrestazure.azure_operation.AzureOperationPoller[~msrest.pipeline.ClientRawResponse[~controlplane.models.DigitalTwinsDescription]]
         :raises:
-         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
         """
         raw_result = self._create_or_update_initial(
             resource_group_name=resource_group_name,
@@ -269,7 +269,7 @@ class DigitalTwinsOperations(object):
         :param digital_twins_patch_description: The DigitalTwinsInstance and
          security metadata.
         :type digital_twins_patch_description:
-         ~azure.mgmt.digitaltwins.models.DigitalTwinsPatchDescription
+         ~controlplane.models.DigitalTwinsPatchDescription
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: The poller return type is ClientRawResponse, the
          direct response alongside the deserialized response
@@ -278,11 +278,11 @@ class DigitalTwinsOperations(object):
         :return: An instance of LROPoller that returns DigitalTwinsDescription
          or ClientRawResponse<DigitalTwinsDescription> if raw==True
         :rtype:
-         ~msrestazure.azure_operation.AzureOperationPoller[~azure.mgmt.digitaltwins.models.DigitalTwinsDescription]
+         ~msrestazure.azure_operation.AzureOperationPoller[~controlplane.models.DigitalTwinsDescription]
          or
-         ~msrestazure.azure_operation.AzureOperationPoller[~msrest.pipeline.ClientRawResponse[~azure.mgmt.digitaltwins.models.DigitalTwinsDescription]]
+         ~msrestazure.azure_operation.AzureOperationPoller[~msrest.pipeline.ClientRawResponse[~controlplane.models.DigitalTwinsDescription]]
         :raises:
-         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
         """
         raw_result = self._update_initial(
             resource_group_name=resource_group_name,
@@ -374,11 +374,11 @@ class DigitalTwinsOperations(object):
         :return: An instance of LROPoller that returns DigitalTwinsDescription
          or ClientRawResponse<DigitalTwinsDescription> if raw==True
         :rtype:
-         ~msrestazure.azure_operation.AzureOperationPoller[~azure.mgmt.digitaltwins.models.DigitalTwinsDescription]
+         ~msrestazure.azure_operation.AzureOperationPoller[~controlplane.models.DigitalTwinsDescription]
          or
-         ~msrestazure.azure_operation.AzureOperationPoller[~msrest.pipeline.ClientRawResponse[~azure.mgmt.digitaltwins.models.DigitalTwinsDescription]]
+         ~msrestazure.azure_operation.AzureOperationPoller[~msrest.pipeline.ClientRawResponse[~controlplane.models.DigitalTwinsDescription]]
         :raises:
-         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
         """
         raw_result = self._delete_initial(
             resource_group_name=resource_group_name,
@@ -417,9 +417,9 @@ class DigitalTwinsOperations(object):
          overrides<msrest:optionsforoperations>`.
         :return: An iterator like instance of DigitalTwinsDescription
         :rtype:
-         ~azure.mgmt.digitaltwins.models.DigitalTwinsDescriptionPaged[~azure.mgmt.digitaltwins.models.DigitalTwinsDescription]
+         ~controlplane.models.DigitalTwinsDescriptionPaged[~controlplane.models.DigitalTwinsDescription]
         :raises:
-         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
         """
         def internal_paging(next_link=None, raw=False):
 
@@ -484,9 +484,9 @@ class DigitalTwinsOperations(object):
          overrides<msrest:optionsforoperations>`.
         :return: An iterator like instance of DigitalTwinsDescription
         :rtype:
-         ~azure.mgmt.digitaltwins.models.DigitalTwinsDescriptionPaged[~azure.mgmt.digitaltwins.models.DigitalTwinsDescription]
+         ~controlplane.models.DigitalTwinsDescriptionPaged[~controlplane.models.DigitalTwinsDescription]
         :raises:
-         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
         """
         def internal_paging(next_link=None, raw=False):
 
@@ -552,10 +552,10 @@ class DigitalTwinsOperations(object):
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
         :return: CheckNameResult or ClientRawResponse if raw=true
-        :rtype: ~azure.mgmt.digitaltwins.models.CheckNameResult or
+        :rtype: ~controlplane.models.CheckNameResult or
          ~msrest.pipeline.ClientRawResponse
         :raises:
-         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
         """
         digital_twins_instance_check_name = models.CheckNameRequest(name=name)
 

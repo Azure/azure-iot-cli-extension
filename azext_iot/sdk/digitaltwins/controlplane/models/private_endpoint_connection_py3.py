@@ -27,10 +27,10 @@ class PrivateEndpointConnection(Model):
     :ivar type: The resource type.
     :vartype type: str
     :param properties: Required. The connection properties.
-    :type properties: ~azure.mgmt.digitaltwins.models.ConnectionProperties
+    :type properties: ~controlplane.models.ConnectionProperties
     :ivar system_data: Metadata pertaining to creation and last modification
      of the private endpoint connection.
-    :vartype system_data: ~azure.mgmt.digitaltwins.models.SystemData
+    :vartype system_data: ~controlplane.models.SystemData
     """
 
     _validation = {

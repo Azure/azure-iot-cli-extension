@@ -22,7 +22,7 @@ class GroupIdInformation(Model):
 
     :param properties: Required. The group information properties.
     :type properties:
-     ~azure.mgmt.digitaltwins.models.GroupIdInformationProperties
+     ~controlplane.models.GroupIdInformationProperties
     :param id: The resource identifier.
     :type id: str
     :ivar name: The resource name.

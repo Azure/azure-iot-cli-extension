@@ -51,10 +51,10 @@ class PrivateLinkResourcesOperations(object):
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
         :return: GroupIdInformationResponse or ClientRawResponse if raw=true
-        :rtype: ~azure.mgmt.digitaltwins.models.GroupIdInformationResponse or
+        :rtype: ~controlplane.models.GroupIdInformationResponse or
          ~msrest.pipeline.ClientRawResponse
         :raises:
-         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
         """
         # Construct URL
         url = self.list.metadata['url']
@@ -115,10 +115,10 @@ class PrivateLinkResourcesOperations(object):
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
         :return: GroupIdInformation or ClientRawResponse if raw=true
-        :rtype: ~azure.mgmt.digitaltwins.models.GroupIdInformation or
+        :rtype: ~controlplane.models.GroupIdInformation or
          ~msrest.pipeline.ClientRawResponse
         :raises:
-         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
         """
         # Construct URL
         url = self.get.metadata['url']

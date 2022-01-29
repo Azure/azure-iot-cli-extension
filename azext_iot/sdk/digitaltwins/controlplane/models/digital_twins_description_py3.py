@@ -31,10 +31,10 @@ class DigitalTwinsDescription(DigitalTwinsResource):
     :param tags: The resource tags.
     :type tags: dict[str, str]
     :param identity: The managed identity for the DigitalTwinsInstance.
-    :type identity: ~azure.mgmt.digitaltwins.models.DigitalTwinsIdentity
+    :type identity: ~controlplane.models.DigitalTwinsIdentity
     :ivar system_data: Metadata pertaining to creation and last modification
      of the DigitalTwinsInstance.
-    :vartype system_data: ~azure.mgmt.digitaltwins.models.SystemData
+    :vartype system_data: ~controlplane.models.SystemData
     :ivar created_time: Time when DigitalTwinsInstance was created.
     :vartype created_time: datetime
     :ivar last_updated_time: Time when DigitalTwinsInstance was updated.
@@ -43,16 +43,16 @@ class DigitalTwinsDescription(DigitalTwinsResource):
      'Provisioning', 'Deleting', 'Updating', 'Succeeded', 'Failed', 'Canceled',
      'Deleted', 'Warning', 'Suspending', 'Restoring', 'Moving'
     :vartype provisioning_state: str or
-     ~azure.mgmt.digitaltwins.models.ProvisioningState
+     ~controlplane.models.ProvisioningState
     :ivar host_name: Api endpoint to work with DigitalTwinsInstance.
     :vartype host_name: str
     :param private_endpoint_connections: The private endpoint connections.
     :type private_endpoint_connections:
-     list[~azure.mgmt.digitaltwins.models.PrivateEndpointConnection]
+     list[~controlplane.models.PrivateEndpointConnection]
     :param public_network_access: Public network access for the
      DigitalTwinsInstance. Possible values include: 'Enabled', 'Disabled'
     :type public_network_access: str or
-     ~azure.mgmt.digitaltwins.models.PublicNetworkAccess
+     ~controlplane.models.PublicNetworkAccess
     """
 
     _validation = {

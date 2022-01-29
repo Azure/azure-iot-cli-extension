@@ -438,8 +438,7 @@ def load_digitaltwins_arguments(self, _):
         context.argument(
             "conn_name",
             options_list=["--conn-name", "--cn"],
-            help="Name of time series database connection.",
-            arg_group="TimeSeries Connection",
+            help="Name of data history connection."
         )
 
     with self.argument_context("dt data-history create adx") as context:
@@ -447,21 +446,21 @@ def load_digitaltwins_arguments(self, _):
             "adx_cluster_name",
             options_list=["--adx-cluster-name", "--adxc"],
             help="Name of Azure Data Explorer cluster to integrate with.",
-            arg_group="Azure Database Explorer Arugments",
+            arg_group="Azure Data Explorer",
         )
 
         context.argument(
             "adx_database_name",
             options_list=["--adx-database-name", "--adxd"],
             help="Name of Azure Data Explorer database to integrate with.",
-            arg_group="Azure Database Explorer Arugments",
+            arg_group="Azure Data Explorer",
         )
 
         context.argument(
             "adx_resource_group",
             options_list=["--adx-resource-group", "--adxg"],
             help="Name of Azure Data Explorer resource group. If not provided, will use the Digital Twin's resource group.",
-            arg_group="Azure Database Explorer Arugments",
+            arg_group="Azure Data Explorer",
         )
 
         context.argument(
@@ -469,7 +468,7 @@ def load_digitaltwins_arguments(self, _):
             options_list=["--adx-subscription", "--adxs"],
             help="Name or ID of subscription where the Azure Data Explorer exists. If not provided, will use the subscription "
                  "that contains the Digital Twin Instance.",
-            arg_group="Azure Database Explorer Arugments",
+            arg_group="Azure Data Explorer",
         )
 
         context.argument(
@@ -477,43 +476,43 @@ def load_digitaltwins_arguments(self, _):
             options_list=["--adx-table-name", "--adxt"],
             help="Name of Azure Data Explorer table to be created. If not provided, will use the format "
                  "adt_dh_{dt_name}_{dt_location}.",
-            arg_group="Azure Database Explorer Arugments",
+            arg_group="Azure Data Explorer",
         )
 
         context.argument(
             "eh_namespace",
             options_list=["--eventhub-namespace", "--ehn"],
             help="EventHub Namespace identifier.",
-            arg_group="Event Hub Arguments",
+            arg_group="Event Hub",
         )
 
         context.argument(
             "eh_entity_path",
             options_list=["--eventhub", "--eh"],
             help="Name of EventHub to integrate with.",
-            arg_group="Event Hub Arguments",
+            arg_group="Event Hub",
         )
 
         context.argument(
             "eh_consumer_group",
             options_list=["--eventhub-consumer-group", "--ehc"],
             help="The EventHub consumer group to use when ADX reads from EventHub.",
-            arg_group="Event Hub Arguments",
+            arg_group="Event Hub",
         )
 
         context.argument(
             "eh_resource_group",
             options_list=["--eventhub-resource-group", "--ehg"],
             help="Name of EventHub resource group. If not provided, will use the Digital Twin's resource group.",
-            arg_group="Event Hub Arguments",
+            arg_group="Event Hub",
         )
 
         context.argument(
             "eh_subscription",
             options_list=["--eventhub-subscription", "--ehs"],
             help="Name or ID of subscription where the EventHub exists. If not provided, will use the subscription that contains"
-                 " the Digital Twin Instance..",
-            arg_group="Event Hub Arguments",
+                 " the Digital Twin Instance.",
+            arg_group="Event Hub",
         )
 
         context.argument(

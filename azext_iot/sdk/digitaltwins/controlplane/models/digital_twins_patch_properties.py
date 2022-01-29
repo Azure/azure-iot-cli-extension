@@ -18,7 +18,7 @@ class DigitalTwinsPatchProperties(Model):
     :param public_network_access: Public network access for the
      DigitalTwinsInstance. Possible values include: 'Enabled', 'Disabled'
     :type public_network_access: str or
-     ~azure.mgmt.digitaltwins.models.PublicNetworkAccess
+     ~controlplane.models.PublicNetworkAccess
     """
 
     _attribute_map = {

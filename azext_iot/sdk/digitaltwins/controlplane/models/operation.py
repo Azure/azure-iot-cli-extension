@@ -22,7 +22,7 @@ class Operation(Model):
      delete}
     :vartype name: str
     :param display: Operation properties display
-    :type display: ~azure.mgmt.digitaltwins.models.OperationDisplay
+    :type display: ~controlplane.models.OperationDisplay
     :ivar origin: The intended executor of the operation.
     :vartype origin: str
     :ivar is_data_action: If the operation is a data action (for data plane

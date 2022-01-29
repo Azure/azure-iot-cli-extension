@@ -27,7 +27,7 @@ class DigitalTwinsEndpointResourceProperties(Model):
      'Provisioning', 'Deleting', 'Succeeded', 'Failed', 'Canceled', 'Deleted',
      'Warning', 'Suspending', 'Restoring', 'Moving', 'Disabled'
     :vartype provisioning_state: str or
-     ~azure.mgmt.digitaltwins.models.EndpointProvisioningState
+     ~controlplane.models.EndpointProvisioningState
     :ivar created_time: Time when the Endpoint was added to
      DigitalTwinsInstance.
     :vartype created_time: datetime
@@ -38,7 +38,7 @@ class DigitalTwinsEndpointResourceProperties(Model):
      entityPath properties must be specified. Possible values include:
      'KeyBased', 'IdentityBased'
     :type authentication_type: str or
-     ~azure.mgmt.digitaltwins.models.AuthenticationType
+     ~controlplane.models.AuthenticationType
     :param dead_letter_secret: Dead letter storage secret for key-based
      authentication. Will be obfuscated during read.
     :type dead_letter_secret: str

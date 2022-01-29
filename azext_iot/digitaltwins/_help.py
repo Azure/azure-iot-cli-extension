@@ -147,15 +147,21 @@ def load_digitaltwins_help():
 
     helps["dt data-history create"] = """
         type: group
-        short-summary: Creates a data history connection between a Digital Twins instance and another resource.
+        short-summary: Creates a data history connection between a Digital Twins instance and supported resources.
     """
 
     helps["dt data-history create adx"] = """
         type: command
-        short-summary: Creates a data-history connection between a Digital Twins instance and an Azure Database Explorer.
-            Requires pre-created Azure Database Explorer and Eventhub resources.
+        short-summary: Creates a data history connection between a Digital Twins instance and an Azure
+            Data Explorer Cluster. Requires pre-created Azure Data Explorer and Event Hub resources.
+        long-summary: Will prompt the user to add the following roles and permissions on the Digital Twins instance
+            needed to successfully create the connection: |
+            - 'Contributor' role for the Azure Data Explorer Database scope |
+            - 'Database Admin' permission for the Azure Data Explorer Database scope |
+            - 'Azure Event Hubs Data Owner' role for the Event Hub scope |
         examples:
-        - name: Adds a data history connection to a target instance with the $Default event hub consumer group.
+        - name: Adds a data history connection to a target Digital Twins instance with the $Default Event Hub
+          consumer group.
           text: >
             az dt data-history create adx -n {instance_name}
             --cn {time_series_database_connection_name}
@@ -163,8 +169,8 @@ def load_digitaltwins_help():
             --adx-database-name {adx_database_name}
             --eventhub {event_hub}
             --eventhub-namespace {event_hub_namespace}
-        - name: Adds a data history connection to a target instance with a custom Azure Database Explorer table name
-            and event hub consumer group.
+        - name: Adds a data history connection to a target Digital Twins instance with a custom Azure Data Explorer
+          table name and Event Hub consumer group.
           text: >
             az dt data-history create adx -n {instance_name}
             --cn {time_series_database_connection_name}
@@ -174,9 +180,8 @@ def load_digitaltwins_help():
             --eventhub {event_hub}
             --eventhub-namespace {event_hub_namespace}
             --eventhub-consumer-group {event_hub_consumer_group}
-        - name: Adds a data history connection to a target instance with an Event Hub and Azure
-            Database Explorer instances in different resource groups and subscriptions from the Digital
-            Twin instance.
+        - name: Adds a data history connection to a target Digital Twins instance integrating with an Event Hub and Azure
+          Data Explorer instances in different resource groups and subscriptions from the target instance.
           text: >
             az dt data-history create adx -n {instance_name}
             --cn {time_series_database_connection_name}
@@ -188,7 +193,7 @@ def load_digitaltwins_help():
             --eventhub-namespace {event_hub_namespace}
             --eventhub-resource-group {event_hub_resource_group}
             --eventhub-subscription {event_subscription}
-        - name: Adds a data history connection to a target instance with the $Default event hub consumer group
+        - name: Adds a data history connection to a target Digital Twins instance with the $Default Event Hub consumer group
             and skip the role assignment prompts.
           text: >
             az dt data-history create adx -n {instance_name} -y
@@ -223,10 +228,10 @@ def load_digitaltwins_help():
         examples:
         - name: Wait until a data history connection is created.
           text: >
-            az dt data-history wait -n {instance_name} --created
+            az dt data-history wait -n {instance_name} --cn {time_series_database_connection_name} --created
         - name: Wait until an existing data history connection is deleted.
           text: >
-            az dt data-history wait -n {instance_name} --deleted
+            az dt data-history wait -n {instance_name} --cn {time_series_database_connection_name} --deleted
     """
 
     helps["dt data-history delete"] = """

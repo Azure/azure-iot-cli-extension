@@ -55,10 +55,10 @@ class PrivateEndpointConnectionsOperations(object):
         :return: PrivateEndpointConnectionsResponse or ClientRawResponse if
          raw=true
         :rtype:
-         ~azure.mgmt.digitaltwins.models.PrivateEndpointConnectionsResponse or
+         ~controlplane.models.PrivateEndpointConnectionsResponse or
          ~msrest.pipeline.ClientRawResponse
         :raises:
-         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
         """
         # Construct URL
         url = self.list.metadata['url']
@@ -121,10 +121,10 @@ class PrivateEndpointConnectionsOperations(object):
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
         :return: PrivateEndpointConnection or ClientRawResponse if raw=true
-        :rtype: ~azure.mgmt.digitaltwins.models.PrivateEndpointConnection or
+        :rtype: ~controlplane.models.PrivateEndpointConnection or
          ~msrest.pipeline.ClientRawResponse
         :raises:
-         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
         """
         # Construct URL
         url = self.get.metadata['url']
@@ -229,7 +229,7 @@ class PrivateEndpointConnectionsOperations(object):
         :rtype: ~msrestazure.azure_operation.AzureOperationPoller[None] or
          ~msrestazure.azure_operation.AzureOperationPoller[~msrest.pipeline.ClientRawResponse[None]]
         :raises:
-         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
         """
         raw_result = self._delete_initial(
             resource_group_name=resource_group_name,
@@ -320,7 +320,7 @@ class PrivateEndpointConnectionsOperations(object):
          endpoint connection.
         :type private_endpoint_connection_name: str
         :param properties: The connection properties.
-        :type properties: ~azure.mgmt.digitaltwins.models.ConnectionProperties
+        :type properties: ~controlplane.models.ConnectionProperties
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: The poller return type is ClientRawResponse, the
          direct response alongside the deserialized response
@@ -330,11 +330,11 @@ class PrivateEndpointConnectionsOperations(object):
          PrivateEndpointConnection or
          ClientRawResponse<PrivateEndpointConnection> if raw==True
         :rtype:
-         ~msrestazure.azure_operation.AzureOperationPoller[~azure.mgmt.digitaltwins.models.PrivateEndpointConnection]
+         ~msrestazure.azure_operation.AzureOperationPoller[~controlplane.models.PrivateEndpointConnection]
          or
-         ~msrestazure.azure_operation.AzureOperationPoller[~msrest.pipeline.ClientRawResponse[~azure.mgmt.digitaltwins.models.PrivateEndpointConnection]]
+         ~msrestazure.azure_operation.AzureOperationPoller[~msrest.pipeline.ClientRawResponse[~controlplane.models.PrivateEndpointConnection]]
         :raises:
-         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
         """
         raw_result = self._create_or_update_initial(
             resource_group_name=resource_group_name,

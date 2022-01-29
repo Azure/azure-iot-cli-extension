@@ -55,9 +55,9 @@ class TimeSeriesDatabaseConnectionsOperations(object):
          overrides<msrest:optionsforoperations>`.
         :return: An iterator like instance of TimeSeriesDatabaseConnection
         :rtype:
-         ~azure.mgmt.digitaltwins.models.TimeSeriesDatabaseConnectionPaged[~azure.mgmt.digitaltwins.models.TimeSeriesDatabaseConnection]
+         ~controlplane.models.TimeSeriesDatabaseConnectionPaged[~controlplane.models.TimeSeriesDatabaseConnection]
         :raises:
-         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
         """
         def internal_paging(next_link=None, raw=False):
 
@@ -128,10 +128,10 @@ class TimeSeriesDatabaseConnectionsOperations(object):
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
         :return: TimeSeriesDatabaseConnection or ClientRawResponse if raw=true
-        :rtype: ~azure.mgmt.digitaltwins.models.TimeSeriesDatabaseConnection
+        :rtype: ~controlplane.models.TimeSeriesDatabaseConnection
          or ~msrest.pipeline.ClientRawResponse
         :raises:
-         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
         """
         # Construct URL
         url = self.get.metadata['url']
@@ -244,7 +244,7 @@ class TimeSeriesDatabaseConnectionsOperations(object):
         :param properties: Properties of a specific time series database
          connection.
         :type properties:
-         ~azure.mgmt.digitaltwins.models.TimeSeriesDatabaseConnectionProperties
+         ~controlplane.models.TimeSeriesDatabaseConnectionProperties
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: The poller return type is ClientRawResponse, the
          direct response alongside the deserialized response
@@ -254,11 +254,11 @@ class TimeSeriesDatabaseConnectionsOperations(object):
          TimeSeriesDatabaseConnection or
          ClientRawResponse<TimeSeriesDatabaseConnection> if raw==True
         :rtype:
-         ~msrestazure.azure_operation.AzureOperationPoller[~azure.mgmt.digitaltwins.models.TimeSeriesDatabaseConnection]
+         ~msrestazure.azure_operation.AzureOperationPoller[~controlplane.models.TimeSeriesDatabaseConnection]
          or
-         ~msrestazure.azure_operation.AzureOperationPoller[~msrest.pipeline.ClientRawResponse[~azure.mgmt.digitaltwins.models.TimeSeriesDatabaseConnection]]
+         ~msrestazure.azure_operation.AzureOperationPoller[~msrest.pipeline.ClientRawResponse[~controlplane.models.TimeSeriesDatabaseConnection]]
         :raises:
-         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
         """
         raw_result = self._create_or_update_initial(
             resource_group_name=resource_group_name,
@@ -356,11 +356,11 @@ class TimeSeriesDatabaseConnectionsOperations(object):
          TimeSeriesDatabaseConnection or
          ClientRawResponse<TimeSeriesDatabaseConnection> if raw==True
         :rtype:
-         ~msrestazure.azure_operation.AzureOperationPoller[~azure.mgmt.digitaltwins.models.TimeSeriesDatabaseConnection]
+         ~msrestazure.azure_operation.AzureOperationPoller[~controlplane.models.TimeSeriesDatabaseConnection]
          or
-         ~msrestazure.azure_operation.AzureOperationPoller[~msrest.pipeline.ClientRawResponse[~azure.mgmt.digitaltwins.models.TimeSeriesDatabaseConnection]]
+         ~msrestazure.azure_operation.AzureOperationPoller[~msrest.pipeline.ClientRawResponse[~controlplane.models.TimeSeriesDatabaseConnection]]
         :raises:
-         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
         """
         raw_result = self._delete_initial(
             resource_group_name=resource_group_name,

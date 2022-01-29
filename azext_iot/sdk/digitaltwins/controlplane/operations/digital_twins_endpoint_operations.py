@@ -54,9 +54,9 @@ class DigitalTwinsEndpointOperations(object):
          overrides<msrest:optionsforoperations>`.
         :return: An iterator like instance of DigitalTwinsEndpointResource
         :rtype:
-         ~azure.mgmt.digitaltwins.models.DigitalTwinsEndpointResourcePaged[~azure.mgmt.digitaltwins.models.DigitalTwinsEndpointResource]
+         ~controlplane.models.DigitalTwinsEndpointResourcePaged[~controlplane.models.DigitalTwinsEndpointResource]
         :raises:
-         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
         """
         def internal_paging(next_link=None, raw=False):
 
@@ -126,10 +126,10 @@ class DigitalTwinsEndpointOperations(object):
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
         :return: DigitalTwinsEndpointResource or ClientRawResponse if raw=true
-        :rtype: ~azure.mgmt.digitaltwins.models.DigitalTwinsEndpointResource
+        :rtype: ~controlplane.models.DigitalTwinsEndpointResource
          or ~msrest.pipeline.ClientRawResponse
         :raises:
-         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
         """
         # Construct URL
         url = self.get.metadata['url']
@@ -240,7 +240,7 @@ class DigitalTwinsEndpointOperations(object):
         :type endpoint_name: str
         :param properties: DigitalTwinsInstance endpoint resource properties.
         :type properties:
-         ~azure.mgmt.digitaltwins.models.DigitalTwinsEndpointResourceProperties
+         ~controlplane.models.DigitalTwinsEndpointResourceProperties
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: The poller return type is ClientRawResponse, the
          direct response alongside the deserialized response
@@ -250,11 +250,11 @@ class DigitalTwinsEndpointOperations(object):
          DigitalTwinsEndpointResource or
          ClientRawResponse<DigitalTwinsEndpointResource> if raw==True
         :rtype:
-         ~msrestazure.azure_operation.AzureOperationPoller[~azure.mgmt.digitaltwins.models.DigitalTwinsEndpointResource]
+         ~msrestazure.azure_operation.AzureOperationPoller[~controlplane.models.DigitalTwinsEndpointResource]
          or
-         ~msrestazure.azure_operation.AzureOperationPoller[~msrest.pipeline.ClientRawResponse[~azure.mgmt.digitaltwins.models.DigitalTwinsEndpointResource]]
+         ~msrestazure.azure_operation.AzureOperationPoller[~msrest.pipeline.ClientRawResponse[~controlplane.models.DigitalTwinsEndpointResource]]
         :raises:
-         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
         """
         raw_result = self._create_or_update_initial(
             resource_group_name=resource_group_name,
@@ -351,11 +351,11 @@ class DigitalTwinsEndpointOperations(object):
          DigitalTwinsEndpointResource or
          ClientRawResponse<DigitalTwinsEndpointResource> if raw==True
         :rtype:
-         ~msrestazure.azure_operation.AzureOperationPoller[~azure.mgmt.digitaltwins.models.DigitalTwinsEndpointResource]
+         ~msrestazure.azure_operation.AzureOperationPoller[~controlplane.models.DigitalTwinsEndpointResource]
          or
-         ~msrestazure.azure_operation.AzureOperationPoller[~msrest.pipeline.ClientRawResponse[~azure.mgmt.digitaltwins.models.DigitalTwinsEndpointResource]]
+         ~msrestazure.azure_operation.AzureOperationPoller[~msrest.pipeline.ClientRawResponse[~controlplane.models.DigitalTwinsEndpointResource]]
         :raises:
-         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
         """
         raw_result = self._delete_initial(
             resource_group_name=resource_group_name,

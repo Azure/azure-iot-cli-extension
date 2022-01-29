@@ -26,11 +26,11 @@ class TimeSeriesDatabaseConnection(ExternalResource):
     :vartype type: str
     :ivar system_data: Metadata pertaining to creation and last modification
      of the resource.
-    :vartype system_data: ~azure.mgmt.digitaltwins.models.SystemData
+    :vartype system_data: ~controlplane.models.SystemData
     :param properties: Properties of a specific time series database
      connection.
     :type properties:
-     ~azure.mgmt.digitaltwins.models.TimeSeriesDatabaseConnectionProperties
+     ~controlplane.models.TimeSeriesDatabaseConnectionProperties
     """
 
     _validation = {

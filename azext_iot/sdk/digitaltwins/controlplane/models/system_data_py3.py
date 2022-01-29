@@ -20,7 +20,7 @@ class SystemData(Model):
     :param created_by_type: The type of identity that created the resource.
      Possible values include: 'User', 'Application', 'ManagedIdentity', 'Key'
     :type created_by_type: str or
-     ~azure.mgmt.digitaltwins.models.CreatedByType
+     ~controlplane.models.CreatedByType
     :param created_at: The timestamp of resource creation (UTC).
     :type created_at: datetime
     :param last_modified_by: The identity that last modified the resource.
@@ -29,7 +29,7 @@ class SystemData(Model):
      resource. Possible values include: 'User', 'Application',
      'ManagedIdentity', 'Key'
     :type last_modified_by_type: str or
-     ~azure.mgmt.digitaltwins.models.CreatedByType
+     ~controlplane.models.CreatedByType
     :param last_modified_at: The timestamp of resource last modification (UTC)
     :type last_modified_at: datetime
     """

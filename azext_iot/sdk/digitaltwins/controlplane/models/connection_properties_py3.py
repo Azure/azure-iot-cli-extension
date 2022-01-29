@@ -21,15 +21,15 @@ class ConnectionProperties(Model):
     :ivar provisioning_state: The provisioning state. Possible values include:
      'Pending', 'Approved', 'Rejected', 'Disconnected'
     :vartype provisioning_state: str or
-     ~azure.mgmt.digitaltwins.models.ConnectionPropertiesProvisioningState
+     ~controlplane.models.ConnectionPropertiesProvisioningState
     :param private_endpoint: The private endpoint.
-    :type private_endpoint: ~azure.mgmt.digitaltwins.models.PrivateEndpoint
+    :type private_endpoint: ~controlplane.models.PrivateEndpoint
     :param group_ids: The list of group ids for the private endpoint
      connection.
     :type group_ids: list[str]
     :param private_link_service_connection_state: The connection state.
     :type private_link_service_connection_state:
-     ~azure.mgmt.digitaltwins.models.ConnectionPropertiesPrivateLinkServiceConnectionState
+     ~controlplane.models.ConnectionPropertiesPrivateLinkServiceConnectionState
     """
 
     _validation = {

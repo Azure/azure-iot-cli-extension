@@ -47,9 +47,9 @@ class Operations(object):
          overrides<msrest:optionsforoperations>`.
         :return: An iterator like instance of Operation
         :rtype:
-         ~azure.mgmt.digitaltwins.models.OperationPaged[~azure.mgmt.digitaltwins.models.Operation]
+         ~controlplane.models.OperationPaged[~controlplane.models.Operation]
         :raises:
-         :class:`ErrorResponseException<azure.mgmt.digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<controlplane.models.ErrorResponseException>`
         """
         def internal_paging(next_link=None, raw=False):
 

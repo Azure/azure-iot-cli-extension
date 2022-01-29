@@ -31,10 +31,10 @@ class DigitalTwinsResource(Model):
     :param tags: The resource tags.
     :type tags: dict[str, str]
     :param identity: The managed identity for the DigitalTwinsInstance.
-    :type identity: ~azure.mgmt.digitaltwins.models.DigitalTwinsIdentity
+    :type identity: ~controlplane.models.DigitalTwinsIdentity
     :ivar system_data: Metadata pertaining to creation and last modification
      of the DigitalTwinsInstance.
-    :vartype system_data: ~azure.mgmt.digitaltwins.models.SystemData
+    :vartype system_data: ~controlplane.models.SystemData
     """
 
     _validation = {

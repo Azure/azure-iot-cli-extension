@@ -18,10 +18,10 @@ class DigitalTwinsPatchDescription(Model):
     :param tags: Instance patch properties
     :type tags: dict[str, str]
     :param identity: The managed identity for the DigitalTwinsInstance.
-    :type identity: ~azure.mgmt.digitaltwins.models.DigitalTwinsIdentity
+    :type identity: ~controlplane.models.DigitalTwinsIdentity
     :param properties: Properties for the DigitalTwinsInstance.
     :type properties:
-     ~azure.mgmt.digitaltwins.models.DigitalTwinsPatchProperties
+     ~controlplane.models.DigitalTwinsPatchProperties
     """
 
     _attribute_map = {
