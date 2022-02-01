@@ -11,6 +11,22 @@ from abc import ABC
 from knack.util import CLIError
 from knack.log import get_logger
 from knack.prompting import prompt_y_n
+from azext_iot.digitaltwins.common import (
+    DT_IDENTITY_ERROR,
+    ERROR_PREFIX,
+    FINISHED_CHECK_RESOURCE_LOG_MSG,
+    ADX_ROLE_MSG,
+    RBAC_ROLE_MSG,
+    TRY_ADD_ROLE_LOG_MSG,
+    PRESENT_ADD_ROLE_LOG_MSG,
+    FINISHED_ADD_ROLE_LOG_MSG,
+    SKIP_MSG,
+    FAIL_RBAC_MSG,
+    FAIL_GENERIC_MSG,
+    ABORT_MSG,
+    ADD_INPUT_MSG,
+    CONT_INPUT_MSG
+)
 
 logger = get_logger(__name__)
 
@@ -32,12 +48,9 @@ class AdxConnectionValidator(ABC):
     ):
         self.cli = EmbeddedCLI()
         self.yes = yes
-        self.error_prefix = "Could not create ADT instance connection. Unable to"
         self.dt = dt_instance
         if self.dt.identity is None:
-            raise CLIError(
-                "DT instance does not have System-Assigned Identity enabled. Please enable and try again."
-            )
+            raise CLIError(DT_IDENTITY_ERROR)
 
         # Populate adx_cluster_uri, adx_location, adx_resource_id and perform checks
         self.validate_adx(
@@ -73,7 +86,7 @@ class AdxConnectionValidator(ABC):
             endpoint_resource_policy=None,
             endpoint_subscription=eh_subscription,
         )
-        eh_endpoint.error_prefix = self.error_prefix + " find"
+        eh_endpoint.error_prefix = ERROR_PREFIX + " find"
         self.eh_endpoint_uri = eh_endpoint.build_identity_based().endpoint_uri
 
         eh_consumer_group_op = self.cli.invoke(
@@ -86,7 +99,7 @@ class AdxConnectionValidator(ABC):
             subscription=eh_subscription,
         )
         if not eh_consumer_group_op.success():
-            raise CLIError("{} retrieve Event Hub Consumer Group.".format(self.error_prefix))
+            raise CLIError("{} retrieve Event Hub Consumer Group.".format(ERROR_PREFIX))
 
         self.eh_namespace_resource_id = (
             "/subscriptions/{}/resourceGroups/{}/providers/Microsoft.EventHub/namespaces/{}".format(
@@ -95,7 +108,7 @@ class AdxConnectionValidator(ABC):
                 eh_namespace,
             )
         )
-        logger.debug("Finished checking the EventHub resource.")
+        logger.debug(FINISHED_CHECK_RESOURCE_LOG_MSG.format("Event Hub"))
 
         self.add_dt_role_assignment(
             role="Azure Event Hubs Data Owner",
@@ -125,7 +138,7 @@ class AdxConnectionValidator(ABC):
             )
         )
         if not adx_cluster_op.success():
-            raise CLIError("{} retrieve Cluster.".format(self.error_prefix))
+            raise CLIError("{} retrieve Cluster.".format(ERROR_PREFIX))
 
         adx_cluster_meta = adx_cluster_op.as_json()
         self.adx_cluster_uri = adx_cluster_meta["properties"]["uri"]
@@ -139,9 +152,9 @@ class AdxConnectionValidator(ABC):
             )
         )
         if not adx_database_op.success():
-            raise CLIError("{} retrieve Database.".format(self.error_prefix))
+            raise CLIError("{} retrieve Database.".format(ERROR_PREFIX))
 
-        logger.debug("Finished checking the ADX resource.")
+        logger.debug(FINISHED_CHECK_RESOURCE_LOG_MSG.format("Azure Data Explorer"))
 
         self.add_dt_role_assignment(
             role="Contributor",
@@ -150,13 +163,10 @@ class AdxConnectionValidator(ABC):
         self.add_adx_principal(adx_database_name, api_version)
 
     def add_dt_role_assignment(self, role, resource_id):
-        role_str = f"'{role}' role on the Digital Twins instance for the scope '{resource_id}'"
-        logger.debug(f"Trying to add the {role_str}.")
-        if not (self.yes or prompt_y_n(msg=f"Add the {role_str}?", default="y")):
-            print(
-                f"Skipping addition of the '{role}' role. "
-                "This may prevent creation of the data history connection."
-            )
+        role_str = RBAC_ROLE_MSG.format(role, resource_id)
+        logger.debug(TRY_ADD_ROLE_LOG_MSG.format(role_str))
+        if not (self.yes or prompt_y_n(msg=ADD_INPUT_MSG.format(role_str), default="y")):
+            print(SKIP_MSG.format(role_str))
             return
 
         current_roles_op = self.cli.invoke(
@@ -168,7 +178,7 @@ class AdxConnectionValidator(ABC):
         )
 
         if current_roles_op.success() and len(current_roles_op.as_json()) > 1:
-            logger.debug(f"The {role_str} is already present.")
+            logger.debug(PRESENT_ADD_ROLE_LOG_MSG.format(role_str))
             return
 
         role_command = (
@@ -181,28 +191,18 @@ class AdxConnectionValidator(ABC):
         )
         role_op = self.cli.invoke(role_command)
         if not role_op.success():
-            print(
-                "{} assign {}. Please assign role manually with the command `az {}`.".format(
-                    self.error_prefix, role_str, role_command
-                )
-            )
-            if not prompt_y_n(msg="Continue with Data History Connection create anyway?", default="n"):
-                raise CLIError("Command was aborted.")
+            print(FAIL_RBAC_MSG.format(role_str, role_command))
+            if not prompt_y_n(msg=CONT_INPUT_MSG, default="n"):
+                raise CLIError(ABORT_MSG)
 
-        logger.debug(f"Finished adding the {role_str}.")
+        logger.debug(FINISHED_ADD_ROLE_LOG_MSG.format(role_str))
 
     def add_adx_principal(self, adx_database_name: str, api_version: str):
-        role_str = (
-            "'Database Admin' permission on the Digital Twins instance for the Azure Data Explorer"
-            f" database '{adx_database_name}'"
-        )
+        role_str = ADX_ROLE_MSG.format(adx_database_name)
+        logger.debug(TRY_ADD_ROLE_LOG_MSG.format(role_str))
         try:
-            logger.debug(f"Trying to add the {role_str}.")
-            if not (self.yes or prompt_y_n(msg=f"Add the {role_str}?", default="y")):
-                print(
-                    "Skipping addition of the 'Database Admin' permission. "
-                    "This may prevent creation of the data history connection."
-                )
+            if not (self.yes or prompt_y_n(msg=ADD_INPUT_MSG.format(role_str), default="y")):
+                print(SKIP_MSG.format(role_str))
                 return
 
             database_admin_list_op = self.cli.invoke(
@@ -217,7 +217,7 @@ class AdxConnectionValidator(ABC):
 
             for principal in database_admin_list_op.as_json()["value"]:
                 if principal["name"] == self.dt.name:
-                    logger.debug(f"The {role_str} is already present.")
+                    logger.debug(PRESENT_ADD_ROLE_LOG_MSG.format(role_str))
                     return
 
             database_admin_op = self.cli.invoke(
@@ -237,17 +237,12 @@ class AdxConnectionValidator(ABC):
             )
             if not database_admin_op.success():
                 raise database_admin_op.az_cli.result.error
-            logger.debug(f"Finished adding the {role_str}.")
 
+            logger.debug(FINISHED_ADD_ROLE_LOG_MSG.format(role_str))
         except CLIError:
-            print(
-                "{} assign 'Database Admin' role to the Digital Twins instance. Please assign this role manually.".format(
-                    self.error_prefix
-                )
-            )
-            if not prompt_y_n(msg="Continue with Data History Connection create anyway?", default="n"):
-                raise CLIError("Command was aborted.")
-            return
+            print(FAIL_GENERIC_MSG.format(role_str))
+            if not prompt_y_n(msg=CONT_INPUT_MSG, default="n"):
+                raise CLIError(ABORT_MSG)
 
 
 def build_adx_connection_properties(

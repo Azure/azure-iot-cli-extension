@@ -8,6 +8,7 @@ from time import sleep
 from knack.log import get_logger
 import pytest
 from azext_iot.common.utility import unpack_msrest_error
+from azext_iot.tests.digitaltwins.dt_helpers import assert_system_data_attributes
 from . import DTLiveScenarioTest
 from . import (
     ADX_RG,
@@ -453,8 +454,7 @@ def assert_common_connection_attributes(
     connection_output,
     expected_attributes,
 ):
-    assert connection_output["systemData"]
-    assert connection_output["systemData"]["createdAt"]
+    assert_system_data_attributes(connection_output.get("systemData"))
 
     assert connection_output["name"] == expected_attributes["connection_name"]
     assert connection_output["id"].endswith(expected_attributes["connection_name"])
