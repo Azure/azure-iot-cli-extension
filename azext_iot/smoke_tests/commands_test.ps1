@@ -4,6 +4,7 @@
 # --------------------------------------------------------------------------------------------
 
 # Setting this environment variable enables the az command failures to be thrown and not swallowed
+
 $ErrorActionPreference = "Stop"
 
 $resource_group_name = "cli-int-test-rg"
@@ -16,10 +17,10 @@ $device_id = "smoke-test-device"
 $desired_twin_properties = "`"{'conditions':{'temperature':{'warning':70, 'critical':100}}}`""
 
 $edge_deployment_name = "smoke-test-deployment"
-$edge_deployment_content = "./edge_deployment_content.json"
+$edge_deployment_content = "'azext_iot\smoke_tests\edge_deployment_content.json'"
 $edge_deployment_metrics = "`"{'queries':{'mymetric':'SELECT deviceId from devices where properties.reported.lastDesiredStatus.code = 200'}}`"" 
 $edge_deployment_condition = "`"tags.environment='dev'`""
-$edge_module_content = "./edge_module_content.json"
+$edge_module_content = "'azext_iot\smoke_tests\edge_module_content.json'"
 
 $dps_name = "smoketest-dps-$(New-Guid)"
 $dps_registration_id = "smoke-test-dps-registration"
@@ -69,6 +70,7 @@ $commands += "az iot dps enrollment-group create -g $resource_group_name --dps-n
 $commands += "az iot dps enrollment-group show -g $resource_group_name --dps-name $dps_name --enrollment-id $dps_enrollment_group_id"
 $commands += "az iot dps enrollment create -g $resource_group_name --dps-name $dps_name --enrollment-id $dps_enrollment_id --attestation-type tpm --endorsement-key $dps_endorsement_key"
 $commands += "az iot dps enrollment show -g $resource_group_name --dps-name $dps_name --enrollment-id $dps_enrollment_id"
+$commands += "az iot dps registration list -g $resource_group_name --dps-name $dps_name --enrollment-id $dps_enrollment_group_id"
 $commands += "az iot dps connection-string show -g $resource_group_name --dps-name $dps_name --all"
 
 # Resource Cleanup
@@ -81,7 +83,7 @@ $commands += "az iot dps enrollment-group delete -g $resource_group_name --dps-n
 $commands += "az iot dps delete -g $resource_group_name --name $dps_name"
 $commands += "az iot hub delete -g $resource_group_name --name $iothub_name"
 
-Write-Host "Running smoke test commands..."
+Write-Host "`r`nRunning smoke test commands..."
 
 # Execute commands
 foreach ($command in $commands) {
@@ -104,4 +106,4 @@ foreach ($command in $commands) {
     }
 }
 
-Write-Host "Smoke testing complete."
+Write-Output "`r`nSmoke testing complete."

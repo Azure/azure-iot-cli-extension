@@ -23,14 +23,7 @@
                     },
                     "runtime": {
                         "settings": {
-                            "minDockerVersion": "v1.25",
-                            "registryCredentials": {
-                                "registry": {
-                                    "address": "myregistry",
-                                    "password": "password",
-                                    "username": "username"
-                                }
-                            }
+                            "minDockerVersion": "v1.25"
                         },
                         "type": "docker"
                     },
