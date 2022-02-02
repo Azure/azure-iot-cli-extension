@@ -7,7 +7,6 @@
 import json
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.sdk.digitaltwins.controlplane.models import AzureDataExplorerConnectionProperties
-from abc import ABC
 from knack.util import CLIError
 from knack.log import get_logger
 from knack.prompting import prompt_y_n
@@ -18,7 +17,6 @@ from azext_iot.digitaltwins.common import (
     ADX_ROLE_MSG,
     RBAC_ROLE_MSG,
     TRY_ADD_ROLE_LOG_MSG,
-    PRESENT_ADD_ROLE_LOG_MSG,
     FINISHED_ADD_ROLE_LOG_MSG,
     SKIP_MSG,
     FAIL_RBAC_MSG,
@@ -31,7 +29,7 @@ from azext_iot.digitaltwins.common import (
 logger = get_logger(__name__)
 
 
-class AdxConnectionValidator(ABC):
+class AdxConnectionValidator(object):
     def __init__(
         self,
         adx_cluster_name: str,
@@ -169,18 +167,6 @@ class AdxConnectionValidator(ABC):
             print(SKIP_MSG.format(role_str))
             return
 
-        current_roles_op = self.cli.invoke(
-            "role assignment list --role '{}' --assignee {} --scope {}".format(
-                role,
-                self.dt.identity.principal_id,
-                resource_id
-            )
-        )
-
-        if current_roles_op.success() and len(current_roles_op.as_json()) > 0:
-            logger.debug(PRESENT_ADD_ROLE_LOG_MSG.format(role_str))
-            return
-
         role_command = (
             "role assignment create --role '{}' --assignee-object-id {} "
             "--assignee-principal-type ServicePrincipal --scope {}".format(
@@ -200,49 +186,32 @@ class AdxConnectionValidator(ABC):
     def add_adx_principal(self, adx_database_name: str, api_version: str):
         role_str = ADX_ROLE_MSG.format(adx_database_name)
         logger.debug(TRY_ADD_ROLE_LOG_MSG.format(role_str))
-        try:
-            if not (self.yes or prompt_y_n(msg=ADD_INPUT_MSG.format(role_str), default="y")):
-                print(SKIP_MSG.format(role_str))
-                return
+        if not (self.yes or prompt_y_n(msg=ADD_INPUT_MSG.format(role_str), default="y")):
+            print(SKIP_MSG.format(role_str))
+            return
 
-            database_admin_list_op = self.cli.invoke(
-                "rest --method POST --url {}/databases/{}/listPrincipals?{}".format(
-                    self.adx_resource_id,
-                    adx_database_name,
-                    api_version,
-                )
+        database_admin_op = self.cli.invoke(
+            "rest --method POST --url {}/databases/{}/addPrincipals?{} -b '{}'".format(
+                self.adx_resource_id,
+                adx_database_name,
+                api_version,
+                json.dumps({
+                    "value": [{
+                        "role": "Admin",
+                        "name": self.dt.name,
+                        "type": "App",
+                        "appId": self.dt.identity.principal_id,
+                    }]
+                })
             )
-            if not database_admin_list_op.success():
-                raise database_admin_list_op.az_cli.result.error
-
-            for principal in database_admin_list_op.as_json()["value"]:
-                if principal["name"] == self.dt.name:
-                    logger.debug(PRESENT_ADD_ROLE_LOG_MSG.format(role_str))
-                    return
-
-            database_admin_op = self.cli.invoke(
-                "rest --method POST --url {}/databases/{}/addPrincipals?{} -b '{}'".format(
-                    self.adx_resource_id,
-                    adx_database_name,
-                    api_version,
-                    json.dumps({
-                        "value": [{
-                            "role": "Admin",
-                            "name": self.dt.name,
-                            "type": "App",
-                            "appId": self.dt.identity.principal_id,
-                        }]
-                    })
-                )
-            )
-            if not database_admin_op.success():
-                raise database_admin_op.az_cli.result.error
-
-            logger.debug(FINISHED_ADD_ROLE_LOG_MSG.format(role_str))
-        except CLIError:
+        )
+        if not database_admin_op.success():
             print(FAIL_GENERIC_MSG.format(role_str))
             if not prompt_y_n(msg=CONT_INPUT_MSG, default="n"):
                 raise CLIError(ABORT_MSG)
+            return
+
+        logger.debug(FINISHED_ADD_ROLE_LOG_MSG.format(role_str))
 
 
 def build_adx_connection_properties(

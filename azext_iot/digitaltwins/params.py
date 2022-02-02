@@ -441,7 +441,7 @@ def load_digitaltwins_arguments(self, _):
             help="Name of data history connection."
         )
 
-    with self.argument_context("dt data-history create adx") as context:
+    with self.argument_context("dt data-history connection create adx") as context:
         context.argument(
             "adx_cluster_name",
             options_list=["--adx-cluster-name", "--adxc"],
@@ -516,7 +516,7 @@ def load_digitaltwins_arguments(self, _):
         )
 
         context.argument(
-            'yes',
+            "yes",
             options_list=['--yes', '-y'],
             help='Do not prompt for confirmation when assigning required roles.',
         )

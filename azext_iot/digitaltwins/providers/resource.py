@@ -7,15 +7,14 @@ from azext_iot.digitaltwins.common import (
     MAX_ADT_DH_CREATE_RETRIES,
     ADTEndpointAuthType,
     ADTPublicNetworkAccessType,
-    ADT_CREATE_RETRY_AFTER,
     MAX_ADT_CREATE_RETRIES,
-    ProvisioningStateType,
 )
 from azext_iot.digitaltwins.providers import (
     DigitalTwinsResourceManager,
     CloudError,
     ErrorResponseException,
 )
+from azext_iot.digitaltwins.providers.generic import generic_check_state
 from azext_iot.digitaltwins.providers.rbac import RbacProvider
 from azext_iot.sdk.digitaltwins.controlplane.models import (
     DigitalTwinsDescription,
@@ -76,23 +75,11 @@ class ResourceProvider(DigitalTwinsResourceManager):
             )
 
             def check_state(lro):
-                from time import sleep
-                instance = lro.resource().as_dict()
-                state = instance.get('provisioning_state', None)
-                retries = 0
-                while (state.lower() not in ProvisioningStateType.FINISHED.value) and retries < MAX_ADT_CREATE_RETRIES:
-                    retries += 1
-                    sleep(int(lro._response.headers.get('retry-after', ADT_CREATE_RETRY_AFTER)))
-                    lro.update_status()
-                    instance = lro.resource().as_dict()
-                    state = instance.get('provisioning_state', None)
-                if state and state.lower() not in ProvisioningStateType.FINISHED.value:
-                    logger.warning(
-                        "The resource has been created and has not finished provisioning. Please monitor the status of "
-                        "the Digital Twin instance using az dt show -n {} -g {}".format(
-                            name, resource_group_name
-                        )
-                    )
+                generic_check_state(
+                    lro=lro,
+                    show_cmd=f"az dt show -n {name} -g {resource_group_name}",
+                    max_retires=MAX_ADT_CREATE_RETRIES
+                )
 
             def rbac_handler(lro):
                 instance = lro.resource().as_dict()
@@ -549,28 +536,13 @@ class ResourceProvider(DigitalTwinsResourceManager):
 
         try:
             def check_state(lro):
-                from time import sleep
-                instance = lro.resource().as_dict()
-                properties = instance.get('properties', None)
-                if properties is None:
-                    return
-                state = properties.get('provisioning_state', None)
-                retries = 0
-                while (state.lower() not in ProvisioningStateType.FINISHED.value) and retries < MAX_ADT_DH_CREATE_RETRIES:
-                    retries += 1
-                    sleep(int(lro._response.headers.get('retry-after', ADT_CREATE_RETRY_AFTER)))
-                    lro.update_status()
-                    properties = instance.get('properties', None)
-                    if properties is None:
-                        return
-                    state = properties.get('provisioning_state', None)
-                if state and state.lower() not in ProvisioningStateType.FINISHED.value:
-                    logger.warning(
-                        "The resource has been created and has not finished provisioning. Please monitor the status of "
-                        "the Data History Connection using `az dt data-history show -n {} -g {} --cn {}`".format(
-                            name, resource_group_name, conn_name
-                        )
-                    )
+                generic_check_state(
+                    lro=lro,
+                    show_cmd="az dt data-history show -n {} -g {} --cn {}".format(
+                        name, resource_group_name, conn_name
+                    ),
+                    max_retires=MAX_ADT_DH_CREATE_RETRIES
+                )
 
             create_or_update = self.mgmt_sdk.time_series_database_connections.create_or_update(
                 resource_group_name=resource_group_name,

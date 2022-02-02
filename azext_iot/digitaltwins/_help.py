@@ -142,18 +142,23 @@ def load_digitaltwins_help():
 
     helps["dt data-history"] = """
         type: group
+        short-summary: Manage and configure data history.
+    """
+
+    helps["dt data-history connection"] = """
+        type: group
         short-summary: Manage and configure data history connections.
     """
 
-    helps["dt data-history create"] = """
+    helps["dt data-history connection create"] = """
         type: group
         short-summary: Creates a data history connection between a Digital Twins instance and supported resources.
     """
 
-    helps["dt data-history create adx"] = """
+    helps["dt data-history connection create adx"] = """
         type: command
         short-summary: Creates a data history connection between a Digital Twins instance and an Azure
-            Data Explorer Cluster. Requires pre-created Azure Data Explorer and Event Hub resources.
+            Data Explorer database. Requires pre-created Azure Data Explorer and Event Hub resources.
         long-summary: |
             Will prompt the user to add the following roles and permissions on the Digital Twins instance needed to successfully create the connection:
             - 'Contributor' role for the Azure Data Explorer Database scope
@@ -205,7 +210,7 @@ def load_digitaltwins_help():
             --eventhub-namespace {event_hub_namespace}
     """
 
-    helps["dt data-history list"] = """
+    helps["dt data-history connection list"] = """
         type: command
         short-summary: List all data history connections configured on a Digital Twins instance.
         examples:
@@ -214,7 +219,7 @@ def load_digitaltwins_help():
             az dt data-history list -n {instance_name}
     """
 
-    helps["dt data-history show"] = """
+    helps["dt data-history connection show"] = """
         type: command
         short-summary: Show details of a data history connection configured on a Digital Twins instance.
         examples:
@@ -223,7 +228,7 @@ def load_digitaltwins_help():
             az dt data-history show -n {instance_name} --cn {time_series_database_connection_name}
     """
 
-    helps["dt data-history wait"] = """
+    helps["dt data-history connection wait"] = """
         type: command
         short-summary: Wait until an operation on a data history connection is complete.
         examples:
@@ -235,7 +240,7 @@ def load_digitaltwins_help():
             az dt data-history wait -n {instance_name} --cn {time_series_database_connection_name} --deleted
     """
 
-    helps["dt data-history delete"] = """
+    helps["dt data-history connection delete"] = """
         type: command
         short-summary: Delete a data history connection configured on a Digital Twins instance.
         examples:

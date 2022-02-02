@@ -28,10 +28,10 @@ PRESENT_ADD_ROLE_LOG_MSG = "The {0} is already present."
 FINISHED_ADD_ROLE_LOG_MSG = "Finished adding the {0}."
 SKIP_MSG = "Skipping addition of the {0}. This may prevent creation of the data history connection."
 FAIL_GENERIC_MSG = ERROR_PREFIX + " assign {0}. Please assign this role manually."
-FAIL_RBAC_MSG = ERROR_PREFIX + " assign {0}. Please assign this role manuallywith the command `az {1}`."
+FAIL_RBAC_MSG = ERROR_PREFIX + " assign {0}. Please assign this role manually with the command `az {1}`."
 ABORT_MSG = "Command was aborted."
 ADD_INPUT_MSG = "Add the {0}?"
-CONT_INPUT_MSG = "Continue with Data History Connection create anyway?"
+CONT_INPUT_MSG = "Continue with Data History connection creation anyway?"
 
 
 # Enums

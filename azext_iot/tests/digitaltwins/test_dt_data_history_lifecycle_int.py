@@ -112,7 +112,7 @@ class TestDTConnections(DTLiveScenarioTest):
         }
 
         connection_result = self.cmd(
-            "dt data-history create adx -n {} -g {} --cn {} --adxd {} --adxg {} "
+            "dt data-history connection create adx -n {} -g {} --cn {} --adxd {} --adxg {} "
             "--adxc {} --ehn {} --eh {} --ehg {} -y".format(
                 instance_name,
                 self.rg,
@@ -141,7 +141,7 @@ class TestDTConnections(DTLiveScenarioTest):
 
         # Add custom consumer group and table
         connection_result = self.cmd(
-            "dt data-history create adx -n {} -g {} --cn {} --adxt {} --adxd {} --adxg {} "
+            "dt data-history connection create adx -n {} -g {} --cn {} --adxt {} --adxd {} --adxg {} "
             "--adxc {} --ehn {} --eh {} --ehg {} --ehc {} -y".format(
                 instance_name,
                 self.rg,
@@ -165,7 +165,7 @@ class TestDTConnections(DTLiveScenarioTest):
 
         # One connection per dt instance
         self.cmd(
-            "dt data-history create adx -n {} -g {} --cn {} --adxd {} --adxg {} "
+            "dt data-history connection create adx -n {} -g {} --cn {} --adxd {} --adxg {} "
             "--adxc {} --ehn {} --eh {} --ehg {} -y".format(
                 instance_name,
                 self.rg,
@@ -181,14 +181,14 @@ class TestDTConnections(DTLiveScenarioTest):
         )
 
         list_result = self.cmd(
-            "dt data-history list -n {} -g {}".format(
+            "dt data-history connection list -n {} -g {}".format(
                 instance_name, self.rg
             )
         ).get_output_in_json()
         assert len(list_result) == 1
 
         show_result = self.cmd(
-            "dt data-history show -n {} -g {} --cn {}".format(
+            "dt data-history connection show -n {} -g {} --cn {}".format(
                 instance_name, self.rg, connection_name
             )
         ).get_output_in_json()
@@ -197,13 +197,13 @@ class TestDTConnections(DTLiveScenarioTest):
         )
 
         self.cmd(
-            "dt data-history delete -n {} -g {} --cn {} -y".format(
+            "dt data-history connection delete -n {} -g {} --cn {} -y".format(
                 instance_name, self.rg, connection_name
             )
         )
 
         list_result = self.cmd(
-            "dt data-history list -n {} -g {}".format(
+            "dt data-history connection list -n {} -g {}".format(
                 instance_name, self.rg
             )
         ).get_output_in_json()
@@ -230,7 +230,7 @@ class TestDTConnections(DTLiveScenarioTest):
         assert create_output["publicNetworkAccess"] == "Enabled"
 
         self.cmd(
-            "dt data-history create adx -n {} -g {} --cn {} --adxd {} --adxg {} "
+            "dt data-history connection create adx -n {} -g {} --cn {} --adxd {} --adxg {} "
             "--adxc {} --ehn {} --eh {} --ehg {} -y".format(
                 instance_name,
                 self.rg,
@@ -246,7 +246,7 @@ class TestDTConnections(DTLiveScenarioTest):
         )
 
         self.cmd(
-            "dt data-history create adx -n {} -g {} --cn {} --adxd {} --adxg {} "
+            "dt data-history connection create adx -n {} -g {} --cn {} --adxd {} --adxg {} "
             "--adxc {} --ehn {} --eh {} --ehg {} -y".format(
                 instance_name,
                 self.rg,
@@ -262,7 +262,7 @@ class TestDTConnections(DTLiveScenarioTest):
         )
 
         self.cmd(
-            "dt data-history create adx -n {} -g {} --cn {} --adxd {} --adxg {} "
+            "dt data-history connection create adx -n {} -g {} --cn {} --adxd {} --adxg {} "
             "--adxc {} --ehn {} --eh {} --ehg {} -y".format(
                 instance_name,
                 self.rg,
@@ -278,7 +278,7 @@ class TestDTConnections(DTLiveScenarioTest):
         )
 
         self.cmd(
-            "dt data-history create adx -n {} -g {} --cn {} --adxd {} --adxg {} "
+            "dt data-history connection create adx -n {} -g {} --cn {} --adxd {} --adxg {} "
             "--adxc {} --ehn {} --eh {} --ehg {} -y".format(
                 instance_name,
                 self.rg,
@@ -294,7 +294,7 @@ class TestDTConnections(DTLiveScenarioTest):
         )
 
         self.cmd(
-            "dt data-history create adx -n {} -g {} --cn {} --adxd {} --adxg {} "
+            "dt data-history connection create adx -n {} -g {} --cn {} --adxd {} --adxg {} "
             "--adxc {} --ehn {} --eh {} --ehg {} -y".format(
                 instance_name,
                 self.rg,
@@ -310,7 +310,7 @@ class TestDTConnections(DTLiveScenarioTest):
         )
 
         self.cmd(
-            "dt data-history create adx -n {} -g {} --cn {} --adxd {} --adxg {} "
+            "dt data-history connection create adx -n {} -g {} --cn {} --adxd {} --adxg {} "
             "--adxc {} --ehn {} --eh {} --ehg {} --ehc {} -y".format(
                 instance_name,
                 self.rg,
@@ -370,7 +370,7 @@ class TestDTConnections(DTLiveScenarioTest):
         }
 
         self.cmd(
-            "dt data-history create adx -n {} -g {} --cn {} --adxd {} --adxg {} "
+            "dt data-history connection create adx -n {} -g {} --cn {} --adxd {} --adxg {} "
             "--adxc {} --ehn {} --eh {} --ehg {} --ehc {} -y --no-wait".format(
                 instance_name,
                 self.rg,
@@ -386,7 +386,7 @@ class TestDTConnections(DTLiveScenarioTest):
         )
 
         self.cmd(
-            "dt data-history wait --created -n {} -g {} --cn {}".format(
+            "dt data-history connection wait --created -n {} -g {} --cn {}".format(
                 instance_name,
                 self.rg,
                 connection_name,
@@ -394,7 +394,7 @@ class TestDTConnections(DTLiveScenarioTest):
         )
 
         connection_result = self.cmd(
-            "dt data-history show -n {} -g {} --cn {}".format(
+            "dt data-history connection show -n {} -g {} --cn {}".format(
                 instance_name,
                 self.rg,
                 connection_name,
@@ -416,13 +416,13 @@ class TestDTConnections(DTLiveScenarioTest):
         assert len(self.get_adx_role(assignee_name=instance_name)) == 1
 
         self.cmd(
-            "dt data-history delete -n {} -g {} --cn {} -y --no-wait".format(
+            "dt data-history connection delete -n {} -g {} --cn {} -y --no-wait".format(
                 instance_name, self.rg, connection_name
             )
         )
 
         self.cmd(
-            "dt data-history wait --deleted -n {} -g {} --cn {}".format(
+            "dt data-history connection wait --deleted -n {} -g {} --cn {}".format(
                 instance_name,
                 self.rg,
                 connection_name,
@@ -430,7 +430,7 @@ class TestDTConnections(DTLiveScenarioTest):
         )
 
         list_result = self.cmd(
-            "dt data-history list -n {} -g {}".format(
+            "dt data-history connection list -n {} -g {}".format(
                 instance_name, self.rg
             )
         ).get_output_in_json()
