@@ -177,7 +177,7 @@ class AdxConnectionValidator(ABC):
             )
         )
 
-        if current_roles_op.success() and len(current_roles_op.as_json()) > 1:
+        if current_roles_op.success() and len(current_roles_op.as_json()) > 0:
             logger.debug(PRESENT_ADD_ROLE_LOG_MSG.format(role_str))
             return
 
