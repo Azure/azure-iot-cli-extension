@@ -19,7 +19,7 @@ MAX_ADT_DH_CREATE_RETRIES = 20
 
 # Data History strings
 DT_IDENTITY_ERROR = "Digital Twins instance does not have System-Assigned Identity enabled. Please enable and try again."
-ERROR_PREFIX = "Could not create ADT instance connection. Unable to"
+ERROR_PREFIX = "Unable to"
 FINISHED_CHECK_RESOURCE_LOG_MSG = "Finished checking the {0} resource."
 ADX_ROLE_MSG = "'Database Admin' permission on the Digital Twins instance for the Azure Data Explorer database '{0}'"
 RBAC_ROLE_MSG = "'{0}' role on the Digital Twins instance for the scope '{1}'"

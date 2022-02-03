@@ -169,7 +169,7 @@ def load_digitaltwins_help():
         - name: Adds a data history connection to a target Digital Twins instance with the $Default Event Hub
             consumer group.
           text: >
-            az dt data-history create adx -n {instance_name}
+            az dt data-history connection create adx -n {instance_name}
             --cn {time_series_database_connection_name}
             --adx-cluster-name {adx_cluster_name}
             --adx-database-name {adx_database_name}
@@ -178,7 +178,7 @@ def load_digitaltwins_help():
         - name: Adds a data history connection to a target Digital Twins instance with a custom Azure Data Explorer
             table name and Event Hub consumer group.
           text: >
-            az dt data-history create adx -n {instance_name}
+            az dt data-history connection create adx -n {instance_name}
             --cn {time_series_database_connection_name}
             --adx-cluster-name {adx_cluster_name}
             --adx-database-name {adx_database_name}
@@ -189,7 +189,7 @@ def load_digitaltwins_help():
         - name: Adds a data history connection to a target Digital Twins instance integrating with an Event Hub and Azure
             Data Explorer instances in different resource groups and subscriptions from the target instance.
           text: >
-            az dt data-history create adx -n {instance_name}
+            az dt data-history connection create adx -n {instance_name}
             --cn {time_series_database_connection_name}
             --adx-cluster-name {adx_cluster_name}
             --adx-database-name {adx_database_name}
@@ -202,7 +202,7 @@ def load_digitaltwins_help():
         - name: Adds a data history connection to a target Digital Twins instance with the $Default Event Hub consumer group
             and skip the role assignment prompts.
           text: >
-            az dt data-history create adx -n {instance_name} -y
+            az dt data-history connection create adx -n {instance_name} -y
             --cn {time_series_database_connection_name}
             --adx-cluster-name {adx_cluster_name}
             --adx-database-name {adx_database_name}
@@ -216,7 +216,7 @@ def load_digitaltwins_help():
         examples:
         - name: List all data history connections configured on an instance.
           text: >
-            az dt data-history list -n {instance_name}
+            az dt data-history connection list -n {instance_name}
     """
 
     helps["dt data-history connection show"] = """
@@ -225,7 +225,7 @@ def load_digitaltwins_help():
         examples:
         - name: Show a data history connection configured on an instance.
           text: >
-            az dt data-history show -n {instance_name} --cn {time_series_database_connection_name}
+            az dt data-history connection show -n {instance_name} --cn {time_series_database_connection_name}
     """
 
     helps["dt data-history connection wait"] = """
@@ -237,7 +237,7 @@ def load_digitaltwins_help():
             az dt data-history wait -n {instance_name} --cn {time_series_database_connection_name} --created
         - name: Wait until an existing data history connection is deleted.
           text: >
-            az dt data-history wait -n {instance_name} --cn {time_series_database_connection_name} --deleted
+            az dt data-history connection wait -n {instance_name} --cn {time_series_database_connection_name} --deleted
     """
 
     helps["dt data-history connection delete"] = """
@@ -247,12 +247,12 @@ def load_digitaltwins_help():
         - name: Delete a data history connection configured on an instance
             and block until the operation is complete.
           text: >
-            az dt data-history delete -n {instance_name}
+            az dt data-history connection delete -n {instance_name}
             --cn {time_series_database_connection_name}
         - name: Delete a data history connection configured on an instance
             without confirmation or blocking.
           text: >
-            az dt data-history delete -n {instance_name}
+            az dt data-history connection delete -n {instance_name}
             --cn {time_series_database_connection_name}
             -y --no-wait
     """
