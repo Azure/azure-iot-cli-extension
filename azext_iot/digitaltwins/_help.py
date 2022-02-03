@@ -234,7 +234,7 @@ def load_digitaltwins_help():
         examples:
         - name: Wait until a data history connection is created.
           text: >
-            az dt data-history wait -n {instance_name} --cn {time_series_database_connection_name} --created
+            az dt data-history connection wait -n {instance_name} --cn {time_series_database_connection_name} --created
         - name: Wait until an existing data history connection is deleted.
           text: >
             az dt data-history connection wait -n {instance_name} --cn {time_series_database_connection_name} --deleted
