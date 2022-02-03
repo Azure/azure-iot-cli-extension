@@ -1,0 +1,42 @@
+parameters:
+- name: pythonVersion
+  type: string
+  default: '3.8.x'
+- name: architecture
+  type: string
+  default: 'x64'
+- name: azureCLIVersion
+  type: string
+  default: released
+  values:
+  - min
+  - released
+  - msi
+
+steps:
+ - task: UsePythonVersion@0
+    inputs:
+      versionSpec: ${{ parameters.pythonVersion }}
+      architecture: ${{ parameters.architecture }}
+
+  - ${{ if eq(parameters.azureCLIVersion, 'min') }}:
+    - template: install-azure-cli-min.yml
+
+  - ${{ if eq(parameters.azureCLIVersion, 'released') }}:
+    - template: install-azure-cli-released.yml
+
+  - ${{ if eq(parameters.azureCLIVersion, 'msi') }}:
+    - template: install-azure-cli-msi.yml
+
+  - template: setup-ci-machine.yml
+
+  - template: download-install-local-azure-iot-cli-extension.yml
+
+  - template: set-pythonpath.yml
+
+  - task: PowerShell@2
+    displayName: 'Evaluate with pylint'
+    inputs:
+      targetType: 'inline'
+      script: 'azext_iot\smoke_tests\commands_test.ps1'
+      workingDirectory: '.'

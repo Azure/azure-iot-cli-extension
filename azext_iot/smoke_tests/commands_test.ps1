@@ -17,10 +17,10 @@ $device_id = "smoke-test-device"
 $desired_twin_properties = "`"{'conditions':{'temperature':{'warning':70, 'critical':100}}}`""
 
 $edge_deployment_name = "smoke-test-deployment"
-$edge_deployment_content = "'azext_iot\smoke_tests\edge_deployment_content.json'"
+$edge_deployment_content = "azext_iot\smoke_tests\edge_deployment_content.json"
 $edge_deployment_metrics = "`"{'queries':{'mymetric':'SELECT deviceId from devices where properties.reported.lastDesiredStatus.code = 200'}}`"" 
 $edge_deployment_condition = "`"tags.environment='dev'`""
-$edge_module_content = "'azext_iot\smoke_tests\edge_module_content.json'"
+$edge_module_content = "azext_iot\smoke_tests\edge_module_content.json"
 
 $dps_name = "smoketest-dps-$(New-Guid)"
 $dps_registration_id = "smoke-test-dps-registration"
@@ -88,16 +88,14 @@ Write-Host "`r`nRunning smoke test commands..."
 # Execute commands
 foreach ($command in $commands) {
     try {
-        Invoke-Expression $command -OutVariable standardOut 2>&1 >$null
+        # Redirecting output to null prevents output to be printed during execution
+        Invoke-Expression "$command --only-show-errors" 2>&1 >$null -OutVariable standardOut
     }
     catch {
-        # Warning should not be considered a failure
-        if ($_ -notlike "*warning*" ) {
-            az iot dps delete -g $resource_group_name --name $dps_name
-            az iot hub delete -g $resource_group_name --name $iothub_name
-            Write-Host "Failed to execute command:`r`n$command`r`nAn error occurred:"
-            throw
-        }
+        az iot dps delete -g $resource_group_name --name $dps_name
+        az iot hub delete -g $resource_group_name --name $iothub_name
+        Write-Host "Failed to execute command:`r`n$command`r`nAn error occurred:"
+        throw
     }
     Write-Host "`r`nSuccessfully executed command:`r`n$command"
     if ($standardOut) {
