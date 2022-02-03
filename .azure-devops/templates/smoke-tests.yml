@@ -14,28 +14,14 @@ parameters:
   - msi
 
 steps:
-  - task: UsePythonVersion@0
-    inputs:
-      versionSpec: ${{ parameters.pythonVersion }}
+  - template: setup-dev-test-env.yml
+    parameters:
       architecture: ${{ parameters.architecture }}
-
-  - ${{ if eq(parameters.azureCLIVersion, 'min') }}:
-    - template: install-azure-cli-min.yml
-
-  - ${{ if eq(parameters.azureCLIVersion, 'released') }}:
-    - template: install-azure-cli-released.yml
-
-  - ${{ if eq(parameters.azureCLIVersion, 'msi') }}:
-    - template: install-azure-cli-msi.yml
-
-  - template: setup-ci-machine.yml
-
-  - template: download-install-local-azure-iot-cli-extension.yml
-
-  - template: set-pythonpath.yml
-
+      pythonVersion: ${{ parameters.pythonVersion }}
+      azureCLIVersion: ${{ parameters.azureCLIVersion }}
+    
   - task: PowerShell@2
-    displayName: 'Evaluate with pylint'
+    displayName: 'Run smoke test commands'
     inputs:
       targetType: 'inline'
       script: 'azext_iot\smoke_tests\commands_test.ps1'
