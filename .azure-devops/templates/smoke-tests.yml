@@ -25,4 +25,4 @@ steps:
     inputs:
       targetType: 'inline'
       script: 'azext_iot\smoke_tests\commands_test.ps1'
-      workingDirectory: '.'
+      workingDirectory: '$(System.ArtifactsDirectory)/extension'
