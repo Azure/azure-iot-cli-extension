@@ -19,10 +19,13 @@ steps:
       architecture: ${{ parameters.architecture }}
       pythonVersion: ${{ parameters.pythonVersion }}
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
-    
-  - task: PowerShell@2
+
+  # Fix for DNS resolution issues: https://github.com/actions/virtual-environments/issues/798
+  - script: |
+      sudo ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
+    displayName: Bypass local DNS server to workaround issue resolving ADT hostnames
+    condition: and(succeededOrFailed(), eq( variables['Agent.OS'], 'Linux' ))
+
+  - script: |
+      ./azext_iot/smoke_tests/commands_test.ps1
     displayName: 'Run smoke test commands'
-    inputs:
-      targetType: 'inline'
-      script: 'azext_iot\smoke_tests\commands_test.ps1'
-      workingDirectory: '$(System.ArtifactsDirectory)/extension'

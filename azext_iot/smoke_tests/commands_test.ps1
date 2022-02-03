@@ -1,10 +1,11 @@
+#!/usr/bin/env pwsh
+
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
 # Setting this environment variable enables the az command failures to be thrown and not swallowed
-
 $ErrorActionPreference = "Stop"
 
 $resource_group_name = "cli-int-test-rg"
