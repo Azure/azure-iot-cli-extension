@@ -30,7 +30,7 @@ steps:
     displayName: 'Run smoke test commands'
     inputs:
       azureSubscription: $(AzureServiceConnection)
-      scriptType: ps
+      scriptType: pscore
       scriptLocation: scriptPath
       scriptPath: 'azext_iot/smoke_tests/commands_test.ps1'
       workingDirectory: '$(System.ArtifactsDirectory)/extension'
