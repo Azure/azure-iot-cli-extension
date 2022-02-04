@@ -6,7 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 # Setting this environment variable enables the az command failures to be thrown and not swallowed
-# $ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Stop"
 
 $resource_group_name = "cli-int-test-rg"
 $iothub_name = "smoketest-hub-$(New-Guid)"
