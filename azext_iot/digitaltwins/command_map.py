@@ -55,7 +55,6 @@ def load_digitaltwins_commands(self, _):
     with self.command_group(
         "dt data-history connection",
         command_type=digitaltwins_resource_ops,
-        is_preview=True
     ) as cmd_group:
         cmd_group.show_command("show", "show_adx_data_connection")
         cmd_group.wait_command("wait", "wait_adx_data_connection")

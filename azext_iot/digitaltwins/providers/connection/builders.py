@@ -18,11 +18,11 @@ from azext_iot.digitaltwins.common import (
     RBAC_ROLE_MSG,
     TRY_ADD_ROLE_LOG_MSG,
     FINISHED_ADD_ROLE_LOG_MSG,
-    SKIP_MSG,
+    SKIP_ADD_ROLE_MSG,
     FAIL_RBAC_MSG,
     FAIL_GENERIC_MSG,
     ABORT_MSG,
-    ADD_INPUT_MSG,
+    ADD_ROLE_INPUT_MSG,
     CONT_INPUT_MSG
 )
 
@@ -163,8 +163,8 @@ class AdxConnectionValidator(object):
     def add_dt_role_assignment(self, role, resource_id):
         role_str = RBAC_ROLE_MSG.format(role, resource_id)
         logger.debug(TRY_ADD_ROLE_LOG_MSG.format(role_str))
-        if not (self.yes or prompt_y_n(msg=ADD_INPUT_MSG.format(role_str), default="y")):
-            print(SKIP_MSG.format(role_str))
+        if not (self.yes or prompt_y_n(msg=ADD_ROLE_INPUT_MSG.format(role_str), default="y")):
+            print(SKIP_ADD_ROLE_MSG.format(role_str))
             return
 
         role_command = (
@@ -186,8 +186,8 @@ class AdxConnectionValidator(object):
     def add_adx_principal(self, adx_database_name: str, api_version: str):
         role_str = ADX_ROLE_MSG.format(adx_database_name)
         logger.debug(TRY_ADD_ROLE_LOG_MSG.format(role_str))
-        if not (self.yes or prompt_y_n(msg=ADD_INPUT_MSG.format(role_str), default="y")):
-            print(SKIP_MSG.format(role_str))
+        if not (self.yes or prompt_y_n(msg=ADD_ROLE_INPUT_MSG.format(role_str), default="y")):
+            print(SKIP_ADD_ROLE_MSG.format(role_str))
             return
 
         database_admin_op = self.cli.invoke(
