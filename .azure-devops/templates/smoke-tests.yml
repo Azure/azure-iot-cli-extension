@@ -33,5 +33,6 @@ steps:
       scriptType: ps
       scriptLocation: scriptPath
       scriptPath: 'azext_iot/smoke_tests/commands_test.ps1'
+      workingDirectory: '$(System.ArtifactsDirectory)/extension'
       powerShellErrorActionPreference: 'stop'
       failOnStandardError: 'true'
