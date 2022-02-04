@@ -18,10 +18,10 @@ $device_id = "smoke-test-device"
 $desired_twin_properties = "`"{'conditions':{'temperature':{'warning':70, 'critical':100}}}`""
 
 $edge_deployment_name = "smoke-test-deployment"
-$edge_deployment_content = "azext_iot\smoke_tests\edge_deployment_content.json"
+$edge_deployment_content = "azext_iot/smoke_tests/edge_deployment_content.json"
 $edge_deployment_metrics = "`"{'queries':{'mymetric':'SELECT deviceId from devices where properties.reported.lastDesiredStatus.code = 200'}}`"" 
 $edge_deployment_condition = "`"tags.environment='dev'`""
-$edge_module_content = "azext_iot\smoke_tests\edge_module_content.json"
+$edge_module_content = "azext_iot/smoke_tests/edge_module_content.json"
 
 $dps_name = "smoketest-dps-$(New-Guid)"
 $dps_registration_id = "smoke-test-dps-registration"
@@ -89,7 +89,7 @@ Write-Host "`r`nRunning smoke test commands...`r`n"
 # Execute commands
 foreach ($command in $commands) {
     try {
-        Invoke-Expression "$command --only-show-errors"
+        Invoke-Expression "$command --only-show-errors" 2>&1 >$null -OutVariable standardOut
     }
     catch {
         az iot dps delete -g $resource_group_name --name $dps_name
@@ -98,6 +98,10 @@ foreach ($command in $commands) {
         throw
     }
     Write-Host "`r`nSuccessfully executed command:`r`n$command"
+    if ($standardOut) {
+        $standardOutString = Out-String -InputObject $standardOut
+        Write-Host "Output:`r`n$standardOutString"
+    }
 }
 
 Write-Host "`r`nSmoke testing complete."
