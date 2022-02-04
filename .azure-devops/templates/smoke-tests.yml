@@ -25,11 +25,13 @@ steps:
       sudo ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
     displayName: Bypass local DNS server to workaround issue resolving ADT hostnames
     condition: and(succeededOrFailed(), eq( variables['Agent.OS'], 'Linux' ))
-  
-  - task: PowerShell@2
+
+  - task: AzureCLI@2
+    displayName: 'Run smoke test commands'
     inputs:
-      targetType: 'filePath'
-      filePath: 'azext_iot/smoke_tests/commands_test.ps1'
-      workingDirectory: '$(System.ArtifactsDirectory)/extension'
-      errorActionPreference: 'stop'
-      failOnStderr: 'true'
+      azureSubscription: $(AzureServiceConnection)
+      scriptType: ps
+      scriptLocation: scriptPath
+      scriptPath: 'azext_iot/smoke_tests/commands_test.ps1'
+      powerShellErrorActionPreference: 'stop'
+      failOnStandardError: 'true'

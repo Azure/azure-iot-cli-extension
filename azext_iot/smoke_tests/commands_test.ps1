@@ -89,10 +89,7 @@ Write-Host "`r`nRunning smoke test commands...`r`n"
 # Execute commands
 foreach ($command in $commands) {
     try {
-        # Redirecting output to null prevents output to be printed during execution
-        $allOutput = Invoke-Expression "$command --only-show-errors" 2>&1
-        $standardErr = $allOutput | ?{ $_ -is [System.Management.Automation.ErrorRecord] }
-        $standardOut = $allOutput | ?{ $_ -isnot [System.Management.Automation.ErrorRecord] }
+        Invoke-Expression "$command --only-show-errors"
     }
     catch {
         az iot dps delete -g $resource_group_name --name $dps_name
@@ -100,17 +97,7 @@ foreach ($command in $commands) {
         Write-Host "Failed to execute command:`r`n$command`r`nAn error occurred:"
         throw
     }
-    if ($standardErr) {
-        az iot dps delete -g $resource_group_name --name $dps_name
-        az iot hub delete -g $resource_group_name --name $iothub_name
-        Write-Host "Failed to execute command:`r`n$command`r`nAn error occurred:"
-        return
-    }
     Write-Host "`r`nSuccessfully executed command:`r`n$command"
-    if ($standardOut) {
-        $standardOutString = Out-String -InputObject $standardOut
-        Write-Host "Output:`r`n$standardOutString"
-    }
 }
 
 Write-Host "`r`nSmoke testing complete."
