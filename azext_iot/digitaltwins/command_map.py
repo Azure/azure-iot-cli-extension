@@ -56,11 +56,11 @@ def load_digitaltwins_commands(self, _):
         "dt data-history connection",
         command_type=digitaltwins_resource_ops,
     ) as cmd_group:
-        cmd_group.show_command("show", "show_adx_data_connection")
-        cmd_group.wait_command("wait", "wait_adx_data_connection")
-        cmd_group.command("list", "list_adx_data_connection")
+        cmd_group.show_command("show", "show_data_connection")
+        cmd_group.wait_command("wait", "wait_data_connection")
+        cmd_group.command("list", "list_data_connection")
         cmd_group.command(
-            "delete", "delete_adx_data_connection", confirmation=True, supports_no_wait=True
+            "delete", "delete_data_connection", confirmation=True, supports_no_wait=True
         )
 
     with self.command_group(

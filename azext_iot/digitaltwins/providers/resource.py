@@ -555,7 +555,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
 
-    def get_adx_data_connection(self, name, conn_name, resource_group_name=None, wait=False):
+    def get_data_connection(self, name, conn_name, resource_group_name=None, wait=False):
         target_instance = self.find_instance(
             name=name, resource_group_name=resource_group_name
         )
@@ -574,7 +574,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
                 raise e
             raise CLIError(unpack_msrest_error(e))
 
-    def list_adx_data_connection(self, name, resource_group_name=None):
+    def list_data_connection(self, name, resource_group_name=None):
         target_instance = self.find_instance(
             name=name, resource_group_name=resource_group_name
         )
@@ -589,7 +589,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
         except ErrorResponseException as e:
             raise CLIError(unpack_msrest_error(e))
 
-    def delete_adx_data_connection(self, name, conn_name, resource_group_name=None):
+    def delete_data_connection(self, name, conn_name, resource_group_name=None):
         target_instance = self.find_instance(
             name=name, resource_group_name=resource_group_name
         )
