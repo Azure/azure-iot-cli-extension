@@ -25,7 +25,8 @@ steps:
       sudo ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
     displayName: Bypass local DNS server to workaround issue resolving ADT hostnames
     condition: and(succeededOrFailed(), eq( variables['Agent.OS'], 'Linux' ))
-
-  - script: |
-      sudo pwsh ./azext_iot/smoke_tests/commands_test.ps1
-    displayName: 'Run smoke test commands'
+  
+  - task: PowerShell@2
+    inputs:
+      targetType: 'filePath'
+      filePath: 'azext_iot\smoke_tests\commands_test.ps1'
