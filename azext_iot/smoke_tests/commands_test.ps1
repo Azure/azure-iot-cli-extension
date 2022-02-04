@@ -90,7 +90,7 @@ Write-Host "`r`nRunning smoke test commands...`r`n"
 foreach ($command in $commands) {
     try {
         # Redirecting output to null prevents output to be printed during execution
-        Invoke-Expression "$command --only-show-errors" 2>&1
+        Invoke-Expression "$command --only-show-errors"
     }
     catch {
         az iot dps delete -g $resource_group_name --name $dps_name
