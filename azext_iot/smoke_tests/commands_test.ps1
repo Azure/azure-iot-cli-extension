@@ -5,10 +5,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-# Setting this environment variable enables the az command failures to be thrown and not swallowed
-$ErrorActionPreference = "Stop"
-
-$resource_group_name = "cli-int-test-rg"
+$resource_group_name = $args[0]
 $iothub_name = "smoketest-hub-$(New-Guid)"
 $hub_module_id = "smoke-test-module"
 $hub_config_name = "smoke-test-config"
@@ -88,21 +85,8 @@ Write-Host "`r`nRunning smoke test commands...`r`n"
 
 # Execute commands
 foreach ($command in $commands) {
-    try {
-        Invoke-Expression "$command --only-show-errors" 2>&1 >$null -OutVariable standardOut
-    }
-    catch {
-        az iot dps delete -g $resource_group_name --name $dps_name
-        az iot hub delete -g $resource_group_name --name $iothub_name
-        Write-Host "Failed to execute command:`r`n$command`r`nAn error occurred:"
-        throw
-    }
-    Write-Host "`r`nSuccessfully executed command:`r`n$command"
-    if ($standardOut) {
-        $standardOutString = Out-String -InputObject $standardOut
-        Write-Host "Output:`r`n$standardOutString"
-    }
+    Write-Host "`r`nExecuting command:`r`n$command"
+    Invoke-Expression "$command --only-show-errors"
 }
 
 Write-Host "`r`nSmoke testing complete."
-return 0

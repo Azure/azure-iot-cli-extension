@@ -32,7 +32,7 @@ steps:
       azureSubscription: $(AzureServiceConnection)
       scriptType: pscore
       scriptLocation: scriptPath
+      arguments: '$(AZEXT_IOT_TESTRG)'
       scriptPath: 'azext_iot/smoke_tests/commands_test.ps1'
       workingDirectory: '$(System.ArtifactsDirectory)/extension'
-      powerShellErrorActionPreference: 'stop'
       failOnStandardError: 'true'
