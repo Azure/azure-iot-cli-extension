@@ -31,3 +31,5 @@ steps:
       targetType: 'filePath'
       filePath: 'azext_iot/smoke_tests/commands_test.ps1'
       workingDirectory: '$(System.ArtifactsDirectory)/extension'
+      errorActionPreference: 'stop'
+      failOnStderr: 'true'

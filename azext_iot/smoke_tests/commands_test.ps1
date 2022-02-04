@@ -84,13 +84,13 @@ $commands += "az iot dps enrollment-group delete -g $resource_group_name --dps-n
 $commands += "az iot dps delete -g $resource_group_name --name $dps_name"
 $commands += "az iot hub delete -g $resource_group_name --name $iothub_name"
 
-Write-Host "`r`nRunning smoke test commands..."
+Write-Host "`r`nRunning smoke test commands...`r`n"
 
 # Execute commands
 foreach ($command in $commands) {
     try {
         # Redirecting output to null prevents output to be printed during execution
-        Invoke-Expression "$command --only-show-errors" 2>&1 >$null -OutVariable standardOut
+        Invoke-Expression "$command --only-show-errors" 2>&1
     }
     catch {
         az iot dps delete -g $resource_group_name --name $dps_name
@@ -99,10 +99,11 @@ foreach ($command in $commands) {
         throw
     }
     Write-Host "`r`nSuccessfully executed command:`r`n$command"
-    if ($standardOut) {
-        $standardOutString = Out-String -InputObject $standardOut
-        Write-Host "Output:`r`n$standardOutString"
-    }
+    # if ($standardOut) {
+    #     $standardOutString = Out-String -InputObject $standardOut
+    #     Write-Host "Output:`r`n$standardOutString"
+    # }
 }
 
-Write-Output "`r`nSmoke testing complete."
+Write-Host "`r`nSmoke testing complete."
+return 0
