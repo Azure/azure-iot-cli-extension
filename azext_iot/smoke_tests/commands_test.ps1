@@ -90,13 +90,19 @@ Write-Host "`r`nRunning smoke test commands...`r`n"
 foreach ($command in $commands) {
     try {
         # Redirecting output to null prevents output to be printed during execution
-        Invoke-Expression "$command --only-show-errors"
+        Invoke-Expression "$command --only-show-errors" -OutVariable standardOut -ErrorVariable errout
     }
     catch {
         az iot dps delete -g $resource_group_name --name $dps_name
         az iot hub delete -g $resource_group_name --name $iothub_name
         Write-Host "Failed to execute command:`r`n$command`r`nAn error occurred:"
         throw
+    }
+    if ($errout) {
+        az iot dps delete -g $resource_group_name --name $dps_name
+        az iot hub delete -g $resource_group_name --name $iothub_name
+        Write-Host "Failed to execute command:`r`n$command`r`nAn error occurred:"
+        return
     }
     Write-Host "`r`nSuccessfully executed command:`r`n$command"
     # if ($standardOut) {
