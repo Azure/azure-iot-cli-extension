@@ -1,7 +1,4 @@
 parameters:
-- name: pythonVersion
-  type: string
-  default: '3.8.x'
 - name: architecture
   type: string
   default: 'x64'
@@ -12,27 +9,37 @@ parameters:
   - min
   - released
   - msi
+- name: 'maxParallelSmoke'
+  type: number
+  default: 1
 
-steps:
-  - template: setup-dev-test-env.yml
-    parameters:
-      architecture: ${{ parameters.architecture }}
-      pythonVersion: ${{ parameters.pythonVersion }}
-      azureCLIVersion: ${{ parameters.azureCLIVersion }}
+jobs:
+  - job: 'smokeTests'
+    displayName: 'Smoke Testing Azure CLI'
+    strategy:
+      matrix: $[ variables['pythonVersions'] ]
+      maxParallel: ${{ parameters.maxParallelSmoke }}
+    steps:
+      - template: setup-dev-test-env.yml
+        parameters:
+          architecture: ${{ parameters.architecture }}
+          pythonVersion: $(python)
+          azureCLIVersion: ${{ parameters.azureCLIVersion }}
 
-  # Fix for DNS resolution issues: https://github.com/actions/virtual-environments/issues/798
-  - script: |
-      sudo ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
-    displayName: Bypass local DNS server to workaround issue resolving ADT hostnames
-    condition: and(succeededOrFailed(), eq( variables['Agent.OS'], 'Linux' ))
+      # Fix for DNS resolution issues: https://github.com/actions/virtual-environments/issues/798
+      - script: |
+          sudo ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
+        displayName: Bypass local DNS server to workaround issue resolving ADT hostnames
+        condition: and(succeededOrFailed(), eq( variables['Agent.OS'], 'Linux' ))
 
-  - task: AzureCLI@2
-    displayName: 'Run smoke test commands'
-    inputs:
-      azureSubscription: $(AzureServiceConnection)
-      scriptType: pscore
-      scriptLocation: scriptPath
-      arguments: '$(AZEXT_IOT_TESTRG)'
-      scriptPath: 'azext_iot/smoke_tests/commands_test.ps1'
-      workingDirectory: '$(System.ArtifactsDirectory)/extension'
-      failOnStandardError: 'true'
+      - task: AzureCLI@2
+        displayName: 'Run smoke test commands'
+        inputs:
+          azureSubscription: $(AzureServiceConnection)
+          scriptType: pscore
+          scriptLocation: scriptPath
+          arguments: '$(AZEXT_IOT_TESTRG)', 'smokyhub'
+          scriptPath: 'scripts/smoke_tests/commands_test.ps1'
+          workingDirectory: '$(System.ArtifactsDirectory)/extension'
+          powerShellErrorActionPreference: 'continue'
+          failOnStandardError: 'true'

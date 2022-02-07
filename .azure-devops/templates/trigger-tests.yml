@@ -39,15 +39,6 @@ parameters:
 - name: 'maxParallelUnit'
   type: number
   default: 1
-- name: 'maxParallelSmoke'
-  type: number
-  default: 1
-- name: smokeTestCLIVersions
-  type: object
-  default:
-  - min
-  - released
-  - msi
 
 jobs:
 
@@ -131,17 +122,5 @@ jobs:
     parameters:
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
       runIntTests: 'false'
-      runUnitTests: 'true'
+      runUnitTests: 'false'
       pythonVersion: $(python)
-
-- ${{ each cliVersion in parameters.smokeTestCLIVersions }}:
-  - job: 'smokeTests_${{ cliVersion }}'
-    displayName: 'Smoke Testing Azure CLI ${{ cliVersion }}'
-    strategy:
-      matrix: $[ variables['pythonVersions'] ]
-      maxParallel: ${{ parameters.maxParallelSmoke }}
-    steps:
-    - template: smoke-tests.yml
-      parameters:
-        azureCLIVersion: ${{ cliVersion }}
-        pythonVersion: $(python)

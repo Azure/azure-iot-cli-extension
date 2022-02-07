@@ -5,8 +5,16 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+# Setup
 $resource_group_name = $args[0]
-$iothub_name = "smoketest-hub-$(New-Guid)"
+if ($args[1]) {
+    $iothub_name = $args[1]
+}
+else {
+    $iothub_name = "smoketest-hub-$(New-Guid)"
+    az iot hub create -g $resource_group_name --name $iothub_name --sku S1
+}
+
 $hub_module_id = "smoke-test-module"
 $hub_config_name = "smoke-test-config"
 $hub_config_content = "`"{'moduleContent': {'properties.desired.chillerWaterSettings': {'temperature': 38, 'pressure': 78}}}`""
@@ -15,10 +23,10 @@ $device_id = "smoke-test-device"
 $desired_twin_properties = "`"{'conditions':{'temperature':{'warning':70, 'critical':100}}}`""
 
 $edge_deployment_name = "smoke-test-deployment"
-$edge_deployment_content = "azext_iot/smoke_tests/edge_deployment_content.json"
+$edge_deployment_content = "scripts/smoke_tests/edge_deployment_content.json"
 $edge_deployment_metrics = "`"{'queries':{'mymetric':'SELECT deviceId from devices where properties.reported.lastDesiredStatus.code = 200'}}`"" 
 $edge_deployment_condition = "`"tags.environment='dev'`""
-$edge_module_content = "azext_iot/smoke_tests/edge_module_content.json"
+$edge_module_content = "scripts/smoke_tests/edge_module_content.json"
 
 $dps_name = "smoketest-dps-$(New-Guid)"
 $dps_registration_id = "smoke-test-dps-registration"
@@ -29,7 +37,6 @@ $dps_endorsement_key = "AToAAQALAAMAsgAgg3GXZ0SEs/gakMyNRqXXJP1S124GUgtk8qHaGzMU
 $commands = @()
 
 # IoT Hub
-$commands += "az iot hub create -g $resource_group_name --name $iothub_name --sku S1"
 $commands += "az iot hub connection-string show -g $resource_group_name -n $iothub_name --all"
 
 # IoT Hub Configuration
@@ -79,14 +86,20 @@ $commands += "az iot edge deployment delete -g $resource_group_name -d $edge_dep
 $commands += "az iot dps enrollment delete -g $resource_group_name --dps-name $dps_name --enrollment-id $dps_enrollment_id"
 $commands += "az iot dps enrollment-group delete -g $resource_group_name --dps-name $dps_name --enrollment-id $dps_enrollment_group_id"
 $commands += "az iot dps delete -g $resource_group_name --name $dps_name"
-$commands += "az iot hub delete -g $resource_group_name --name $iothub_name"
 
+(Get-Item .).FullName
 Write-Host "`r`nRunning smoke test commands...`r`n"
 
 # Execute commands
 foreach ($command in $commands) {
     Write-Host "`r`nExecuting command:`r`n$command"
     Invoke-Expression "$command --only-show-errors"
+}
+
+# Delete IoT Hub if created for smoke tests
+if (!$args[1]) {
+    Write-Host "`r`nDeleting the temporarily created hub..."
+    az iot hub delete -g $resource_group_name --name $iothub_name
 }
 
 Write-Host "`r`nSmoke testing complete."
