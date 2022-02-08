@@ -138,10 +138,10 @@ stages:
         maxParallelADT: 2
         maxParallelDPS: 2
         maxParallelHub: 2
-    - job: 'evaluateCmdTable'
-      displayName: 'Evaluate Command Table'
-      steps:
-      - template: templates/evaluate-command-table.yml
+    # - job: 'evaluateCmdTable'
+    #   displayName: 'Evaluate Command Table'
+    #   steps:
+    #   - template: templates/evaluate-command-table.yml
 
   - stage: 'smokeTest'
     displayName: 'Run smoke tests'
