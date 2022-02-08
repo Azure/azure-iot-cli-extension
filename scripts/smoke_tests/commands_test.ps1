@@ -11,6 +11,7 @@ if ($args[1]) {
     $iothub_name = $args[1]
 }
 else {
+    Write-Host "`r`nCreating IoT Hub for running smoke tests..."
     $iothub_name = "smoketest-hub-$(New-Guid)"
     az iot hub create -g $resource_group_name --name $iothub_name --sku S1
 }
@@ -87,7 +88,6 @@ $commands += "az iot dps enrollment delete -g $resource_group_name --dps-name $d
 $commands += "az iot dps enrollment-group delete -g $resource_group_name --dps-name $dps_name --enrollment-id $dps_enrollment_group_id"
 $commands += "az iot dps delete -g $resource_group_name --name $dps_name"
 
-(Get-Item .).FullName
 Write-Host "`r`nRunning smoke test commands...`r`n"
 
 # Execute commands
@@ -96,9 +96,9 @@ foreach ($command in $commands) {
     Invoke-Expression "$command --only-show-errors"
 }
 
-# Delete IoT Hub if created for smoke tests
+# IoT Hub needs to be deleted if it was created for running smoke tests
 if (!$args[1]) {
-    Write-Host "`r`nDeleting the temporarily created hub..."
+    Write-Host "`r`nDeleting the temporarily created IoT Hub..."
     az iot hub delete -g $resource_group_name --name $iothub_name
 }
 

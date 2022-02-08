@@ -112,15 +112,15 @@ jobs:
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
       pythonVersion: $(python)
 
-# - job: 'unitTests'
-#   displayName: 'Unit tests and code coverage'
-#   strategy:
-#     matrix: $[ variables['pythonVersions'] ]
-#     maxParallel: ${{ parameters.maxParallelUnit }}
-#   steps:
-#   - template: run-tests-parallel.yml
-#     parameters:
-#       azureCLIVersion: ${{ parameters.azureCLIVersion }}
-#       runIntTests: 'false'
-#       runUnitTests: 'true'
-#       pythonVersion: $(python)
+- job: 'unitTests'
+  displayName: 'Unit tests and code coverage'
+  strategy:
+    matrix: $[ variables['pythonVersions'] ]
+    maxParallel: ${{ parameters.maxParallelUnit }}
+  steps:
+  - template: run-tests-parallel.yml
+    parameters:
+      azureCLIVersion: ${{ parameters.azureCLIVersion }}
+      runIntTests: 'false'
+      runUnitTests: 'true'
+      pythonVersion: $(python)
