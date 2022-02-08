@@ -22,7 +22,7 @@ class DigitalTwinModelsOperations(object):
     :param config: Configuration of service client.
     :param serializer: An object model serializer.
     :param deserializer: An object model deserializer.
-    :ivar api_version: The API version to use for the request. Constant value: "2020-10-31".
+    :ivar api_version: The requested API version. Constant value: "2021-06-30-preview".
     """
 
     models = models
@@ -32,7 +32,7 @@ class DigitalTwinModelsOperations(object):
         self._client = client
         self._serialize = serializer
         self._deserialize = deserializer
-        self.api_version = "2020-10-31"
+        self.api_version = "2021-06-30-preview"
 
         self.config = config
 
@@ -56,17 +56,17 @@ class DigitalTwinModelsOperations(object):
         :param digital_twin_models_add_options: Additional parameters for the
          operation
         :type digital_twin_models_add_options:
-         ~digitaltwins.models.DigitalTwinModelsAddOptions
+         ~dataplane.models.DigitalTwinModelsAddOptions
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
          deserialized response
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
         :return: list or ClientRawResponse if raw=true
-        :rtype: list[~digitaltwins.models.DigitalTwinsModelData] or
+        :rtype: list[~dataplane.models.DigitalTwinsModelData] or
          ~msrest.pipeline.ClientRawResponse
         :raises:
-         :class:`ErrorResponseException<digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<dataplane.models.ErrorResponseException>`
         """
         traceparent = None
         if digital_twin_models_add_options is not None:
@@ -84,7 +84,6 @@ class DigitalTwinModelsOperations(object):
 
         # Construct headers
         header_parameters = {}
-        header_parameters['Accept'] = 'application/json'
         header_parameters['Content-Type'] = 'application/json; charset=utf-8'
         if self.config.generate_client_request_id:
             header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
@@ -104,12 +103,23 @@ class DigitalTwinModelsOperations(object):
             body_content = None
 
         # Construct and send request
-        request = self._client.post(url, query_parameters, header_parameters, body_content)
-        response = self._client.send(request, stream=False, **operation_config)
+        request = self._client.post(url, query_parameters)
+        response = self._client.send(
+            request, header_parameters, body_content, stream=False, **operation_config)
 
-        # @digimaun - custom response handling
-        return response
+        if response.status_code not in [201]:
+            raise models.ErrorResponseException(self._deserialize, response)
 
+        deserialized = None
+
+        if response.status_code == 201:
+            deserialized = self._deserialize('[DigitalTwinsModelData]', response)
+
+        if raw:
+            client_raw_response = ClientRawResponse(deserialized, response)
+            return client_raw_response
+
+        return deserialized
     add.metadata = {'url': '/models'}
 
     def list(
@@ -133,7 +143,7 @@ class DigitalTwinModelsOperations(object):
         :param digital_twin_models_list_options: Additional parameters for the
          operation
         :type digital_twin_models_list_options:
-         ~digitaltwins.models.DigitalTwinModelsListOptions
+         ~dataplane.models.DigitalTwinModelsListOptions
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
          deserialized response
@@ -141,19 +151,19 @@ class DigitalTwinModelsOperations(object):
          overrides<msrest:optionsforoperations>`.
         :return: An iterator like instance of DigitalTwinsModelData
         :rtype:
-         ~digitaltwins.models.DigitalTwinsModelDataPaged[~digitaltwins.models.DigitalTwinsModelData]
+         ~dataplane.models.DigitalTwinsModelDataPaged[~dataplane.models.DigitalTwinsModelData]
         :raises:
-         :class:`ErrorResponseException<digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<dataplane.models.ErrorResponseException>`
         """
+        max_items_per_page = None
+        if digital_twin_models_list_options is not None:
+            max_items_per_page = digital_twin_models_list_options.max_items_per_page
         traceparent = None
         if digital_twin_models_list_options is not None:
             traceparent = digital_twin_models_list_options.traceparent
         tracestate = None
         if digital_twin_models_list_options is not None:
             tracestate = digital_twin_models_list_options.tracestate
-        max_items_per_page = None
-        if digital_twin_models_list_options is not None:
-            max_items_per_page = digital_twin_models_list_options.max_items_per_page
 
         def internal_paging(next_link=None, raw=False):
 
@@ -164,15 +174,7 @@ class DigitalTwinModelsOperations(object):
                 # Construct parameters
                 query_parameters = {}
                 if dependencies_for is not None:
-                    # @digimaun - super hackery to support collectionFormat: multi
-                    concatted_qs = ""
-                    for dtmi in dependencies_for:
-                        concatted_qs = concatted_qs + self._serialize.query("dependencies_for", dtmi, 'str')
-                        if dtmi != dependencies_for[-1]:
-                            concatted_qs = concatted_qs + "&dependenciesFor="
-
-                    query_parameters['dependenciesFor'] = concatted_qs
-
+                    query_parameters['dependenciesFor'] = self._serialize.query("dependencies_for", dependencies_for, '[str]', div=',')
                 if include_model_definition is not None:
                     query_parameters['includeModelDefinition'] = self._serialize.query("include_model_definition", include_model_definition, 'bool')
                 query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
@@ -183,23 +185,24 @@ class DigitalTwinModelsOperations(object):
 
             # Construct headers
             header_parameters = {}
-            header_parameters['Accept'] = 'application/json'
+            header_parameters['Content-Type'] = 'application/json; charset=utf-8'
             if self.config.generate_client_request_id:
                 header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
             if custom_headers:
                 header_parameters.update(custom_headers)
             if self.config.accept_language is not None:
                 header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
+            if max_items_per_page is not None:
+                header_parameters['max-items-per-page'] = self._serialize.header("max_items_per_page", max_items_per_page, 'int')
             if traceparent is not None:
                 header_parameters['traceparent'] = self._serialize.header("traceparent", traceparent, 'str')
             if tracestate is not None:
                 header_parameters['tracestate'] = self._serialize.header("tracestate", tracestate, 'str')
-            if max_items_per_page is not None:
-                header_parameters['max-items-per-page'] = self._serialize.header("max_items_per_page", max_items_per_page, 'int')
 
             # Construct and send request
-            request = self._client.get(url, query_parameters, header_parameters)
-            response = self._client.send(request, stream=False, **operation_config)
+            request = self._client.get(url, query_parameters)
+            response = self._client.send(
+                request, header_parameters, stream=False, **operation_config)
 
             if response.status_code not in [200]:
                 raise models.ErrorResponseException(self._deserialize, response)
@@ -237,17 +240,17 @@ class DigitalTwinModelsOperations(object):
         :param digital_twin_models_get_by_id_options: Additional parameters
          for the operation
         :type digital_twin_models_get_by_id_options:
-         ~digitaltwins.models.DigitalTwinModelsGetByIdOptions
+         ~dataplane.models.DigitalTwinModelsGetByIdOptions
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
          deserialized response
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
         :return: DigitalTwinsModelData or ClientRawResponse if raw=true
-        :rtype: ~digitaltwins.models.DigitalTwinsModelData or
+        :rtype: ~dataplane.models.DigitalTwinsModelData or
          ~msrest.pipeline.ClientRawResponse
         :raises:
-         :class:`ErrorResponseException<digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<dataplane.models.ErrorResponseException>`
         """
         traceparent = None
         if digital_twin_models_get_by_id_options is not None:
@@ -271,7 +274,7 @@ class DigitalTwinModelsOperations(object):
 
         # Construct headers
         header_parameters = {}
-        header_parameters['Accept'] = 'application/json'
+        header_parameters['Content-Type'] = 'application/json; charset=utf-8'
         if self.config.generate_client_request_id:
             header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
         if custom_headers:
@@ -284,8 +287,8 @@ class DigitalTwinModelsOperations(object):
             header_parameters['tracestate'] = self._serialize.header("tracestate", tracestate, 'str')
 
         # Construct and send request
-        request = self._client.get(url, query_parameters, header_parameters)
-        response = self._client.send(request, stream=False, **operation_config)
+        request = self._client.get(url, query_parameters)
+        response = self._client.send(request, header_parameters, stream=False, **operation_config)
 
         if response.status_code not in [200]:
             raise models.ErrorResponseException(self._deserialize, response)
@@ -303,7 +306,7 @@ class DigitalTwinModelsOperations(object):
     get_by_id.metadata = {'url': '/models/{id}'}
 
     def update(
-            self, update_model, id, digital_twin_models_update_options=None, custom_headers=None, raw=False, **operation_config):
+            self, id, update_model, digital_twin_models_update_options=None, custom_headers=None, raw=False, **operation_config):
         """Updates the metadata for a model.
         Status codes:
         * 204 No Content
@@ -317,16 +320,16 @@ class DigitalTwinModelsOperations(object):
         * ModelReferencesNotDecommissioned - The model refers to models that
         are not decommissioned.
 
-        :param update_model: An update specification described by JSON Patch.
-         Only the decommissioned property can be replaced.
-        :type update_model: list[object]
         :param id: The id for the model. The id is globally unique and case
          sensitive.
         :type id: str
+        :param update_model: An update specification described by JSON Patch.
+         Only the decommissioned property can be replaced.
+        :type update_model: list[object]
         :param digital_twin_models_update_options: Additional parameters for
          the operation
         :type digital_twin_models_update_options:
-         ~digitaltwins.models.DigitalTwinModelsUpdateOptions
+         ~dataplane.models.DigitalTwinModelsUpdateOptions
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
          deserialized response
@@ -335,7 +338,7 @@ class DigitalTwinModelsOperations(object):
         :return: None or ClientRawResponse if raw=true
         :rtype: None or ~msrest.pipeline.ClientRawResponse
         :raises:
-         :class:`ErrorResponseException<digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<dataplane.models.ErrorResponseException>`
         """
         traceparent = None
         if digital_twin_models_update_options is not None:
@@ -373,8 +376,9 @@ class DigitalTwinModelsOperations(object):
         body_content = self._serialize.body(update_model, '[object]')
 
         # Construct and send request
-        request = self._client.patch(url, query_parameters, header_parameters, body_content)
-        response = self._client.send(request, stream=False, **operation_config)
+        request = self._client.patch(url, query_parameters)
+        response = self._client.send(
+            request, header_parameters, body_content, stream=False, **operation_config)
 
         if response.status_code not in [204]:
             raise models.ErrorResponseException(self._deserialize, response)
@@ -405,7 +409,7 @@ class DigitalTwinModelsOperations(object):
         :param digital_twin_models_delete_options: Additional parameters for
          the operation
         :type digital_twin_models_delete_options:
-         ~digitaltwins.models.DigitalTwinModelsDeleteOptions
+         ~dataplane.models.DigitalTwinModelsDeleteOptions
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
          deserialized response
@@ -414,7 +418,7 @@ class DigitalTwinModelsOperations(object):
         :return: None or ClientRawResponse if raw=true
         :rtype: None or ~msrest.pipeline.ClientRawResponse
         :raises:
-         :class:`ErrorResponseException<digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<dataplane.models.ErrorResponseException>`
         """
         traceparent = None
         if digital_twin_models_delete_options is not None:
@@ -436,6 +440,7 @@ class DigitalTwinModelsOperations(object):
 
         # Construct headers
         header_parameters = {}
+        header_parameters['Content-Type'] = 'application/json; charset=utf-8'
         if self.config.generate_client_request_id:
             header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
         if custom_headers:
@@ -448,8 +453,8 @@ class DigitalTwinModelsOperations(object):
             header_parameters['tracestate'] = self._serialize.header("tracestate", tracestate, 'str')
 
         # Construct and send request
-        request = self._client.delete(url, query_parameters, header_parameters)
-        response = self._client.send(request, stream=False, **operation_config)
+        request = self._client.delete(url, query_parameters)
+        response = self._client.send(request, header_parameters, stream=False, **operation_config)
 
         if response.status_code not in [204]:
             raise models.ErrorResponseException(self._deserialize, response)

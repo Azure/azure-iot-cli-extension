@@ -14,7 +14,7 @@ from msrest.paging import Paged
 
 class EventRoutePaged(Paged):
     """
-    A paging container for iterating over a list of :class:`EventRoute <digitaltwins.models.EventRoute>` object
+    A paging container for iterating over a list of :class:`EventRoute <dataplane.models.EventRoute>` object
     """
 
     _attribute_map = {

@@ -14,7 +14,7 @@ from msrest.paging import Paged
 
 class IncomingRelationshipPaged(Paged):
     """
-    A paging container for iterating over a list of :class:`IncomingRelationship <digitaltwins.models.IncomingRelationship>` object
+    A paging container for iterating over a list of :class:`IncomingRelationship <dataplane.models.IncomingRelationship>` object
     """
 
     _attribute_map = {
