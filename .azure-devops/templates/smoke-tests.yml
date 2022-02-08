@@ -21,7 +21,7 @@ jobs:
       maxParallel: ${{ parameters.maxParallelSmoke }}
     steps:
       - task: UsePythonVersion@0
-         inputs:
+        inputs:
           versionSpec: $(python)
           architecture: ${{ parameters.architecture }}
 
