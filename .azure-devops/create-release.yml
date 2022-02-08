@@ -153,6 +153,8 @@ stages:
       vmImage: ${{ parameters.testAgentVmImage }}
     jobs:
     - template: templates/smoke-tests.yml
+      parameters:
+        azureCLIVersion: released
   
   - stage: 'kpi'
     displayName: 'Build KPIs'
