@@ -46,6 +46,5 @@ jobs:
           scriptLocation: scriptPath
           arguments: '$(AZEXT_IOT_TESTRG) $(AZEXT_IOT_TESTHUB)'
           scriptPath: 'scripts/smoke_tests/commands_test.ps1'
-          workingDirectory: '$(System.ArtifactsDirectory)/extension'
           powerShellErrorActionPreference: 'continue'
           failOnStandardError: 'true'
