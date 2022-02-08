@@ -143,6 +143,19 @@ stages:
       steps:
       - template: templates/evaluate-command-table.yml
 
+  - stage: 'smokeTest'
+    displayName: 'Run smoke tests'
+    dependsOn: test
+    variables:
+      pythonVersions: ${{ parameters.pythonVersionsTestingMatrix }}
+    condition: succeeded()
+    pool:
+      vmImage: ${{ parameters.testAgentVmImage }}
+    jobs:
+    - template: templates/smoke-tests.yml
+      parameters:
+        azureCLIVersion: released
+  
   - stage: 'kpi'
     displayName: 'Build KPIs'
     dependsOn: [build, test]
