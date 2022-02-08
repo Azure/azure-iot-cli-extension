@@ -20,17 +20,21 @@ jobs:
       matrix: $[ variables['pythonVersions'] ]
       maxParallel: ${{ parameters.maxParallelSmoke }}
     steps:
-      - template: setup-dev-test-env.yml
-        parameters:
+      - task: UsePythonVersion@0
+         inputs:
+          versionSpec: $(python)
           architecture: ${{ parameters.architecture }}
-          pythonVersion: $(python)
-          azureCLIVersion: ${{ parameters.azureCLIVersion }}
 
-      # Fix for DNS resolution issues: https://github.com/actions/virtual-environments/issues/798
-      - script: |
-          sudo ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
-        displayName: Bypass local DNS server to workaround issue resolving ADT hostnames
-        condition: and(succeededOrFailed(), eq( variables['Agent.OS'], 'Linux' ))
+      - ${{ if eq(parameters.azureCLIVersion, 'min') }}:
+        - template: install-azure-cli-min.yml
+
+      - ${{ if eq(parameters.azureCLIVersion, 'released') }}:
+        - template: install-azure-cli-released.yml
+
+      - ${{ if eq(parameters.azureCLIVersion, 'msi') }}:
+        - template: install-azure-cli-msi.yml
+
+      - template: download-install-local-azure-iot-cli-extension.yml
 
       - task: AzureCLI@2
         displayName: 'Run smoke test commands'
