@@ -109,16 +109,16 @@ stages:
 
       - template: templates/build-publish-azure-cli-test-sdk.yml
 
-    - job: 'recordVersion'
-      displayName: 'Install and verify version'
-      dependsOn: [Build_Publish_Azure_IoT_CLI_Extension, Build_Publish_Azure_CLI_Test_SDK]
-      steps:
-      - template: templates/setup-dev-test-env.yml
-        parameters:
-          pythonVersion: ${{ parameters.pythonVersion }}
-          architecture: ${{ parameters.architecture }}
+    # - job: 'recordVersion'
+    #   displayName: 'Install and verify version'
+    #   dependsOn: [Build_Publish_Azure_IoT_CLI_Extension, Build_Publish_Azure_CLI_Test_SDK]
+    #   steps:
+    #   - template: templates/setup-dev-test-env.yml
+    #     parameters:
+    #       pythonVersion: ${{ parameters.pythonVersion }}
+    #       architecture: ${{ parameters.architecture }}
 
-      - template: templates/install-and-record-version.yml
+    #   - template: templates/install-and-record-version.yml
 
   - stage: 'test'
     displayName: 'Run tests'
