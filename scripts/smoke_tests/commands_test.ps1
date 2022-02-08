@@ -60,7 +60,7 @@ $commands += "az iot hub module-twin show -g $resource_group_name -m $hub_module
 $commands += "az iot hub module-twin update -g $resource_group_name -m $hub_module_id -d $device_id -n $iothub_name --desired $desired_twin_properties"
 
 # IoT Device
-$commands += "az iot device c2d-message send -g $resource_group_name -d $device_id -n $iothub_name --data 'Hello World' --props 'key0=value0;key1=value1'"
+$commands += "az iot device c2d-message send -g $resource_group_name -d $device_id -n $iothub_name --data 'Hello World' --props 'key0=value0;key1=value1' -y"
 $commands += "az iot device c2d-message receive -g $resource_group_name -d $device_id -n $iothub_name -g $resource_group_name --complete"
 $commands += "az iot device send-d2c-message -g $resource_group_name -n $iothub_name -d $device_id --data 'Test Message'"
 
