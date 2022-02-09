@@ -107,19 +107,8 @@ class DigitalTwinModelsOperations(object):
         response = self._client.send(
             request, header_parameters, body_content, stream=False, **operation_config)
 
-        if response.status_code not in [201]:
-            raise models.ErrorResponseException(self._deserialize, response)
-
-        deserialized = None
-
-        if response.status_code == 201:
-            deserialized = self._deserialize('[DigitalTwinsModelData]', response)
-
-        if raw:
-            client_raw_response = ClientRawResponse(deserialized, response)
-            return client_raw_response
-
-        return deserialized
+        # @digimaun - custom response handling
+        return response
     add.metadata = {'url': '/models'}
 
     def list(
@@ -174,7 +163,14 @@ class DigitalTwinModelsOperations(object):
                 # Construct parameters
                 query_parameters = {}
                 if dependencies_for is not None:
-                    query_parameters['dependenciesFor'] = self._serialize.query("dependencies_for", dependencies_for, '[str]', div=',')
+                    # @digimaun - super hackery to support collectionFormat: multi
+                    concatted_qs = ""
+                    for dtmi in dependencies_for:
+                        concatted_qs = concatted_qs + self._serialize.query("dependencies_for", dtmi, 'str')
+                        if dtmi != dependencies_for[-1]:
+                            concatted_qs = concatted_qs + "&dependenciesFor="
+
+                    query_parameters['dependenciesFor'] = concatted_qs
                 if include_model_definition is not None:
                     query_parameters['includeModelDefinition'] = self._serialize.query("include_model_definition", include_model_definition, 'bool')
                 query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
