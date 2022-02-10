@@ -145,6 +145,32 @@ stages:
         testCentral: ${{ parameters.testCentral }}
         testDPS: ${{ parameters.testDPS }}
         testHub: ${{ parameters.testHub }}
+  
+  - stage: 'smokeTests_min'
+    displayName: 'Run smoke tests with min CLI'
+    dependsOn: test_min
+    variables:
+      pythonVersions: ${{ parameters.pythonVersionsTestingMatrix }}
+    condition: succeeded()
+    pool:
+      vmImage: ${{ parameters.vmImage }}
+    jobs:
+    - template: templates/smoke-tests.yml
+      parameters:
+        azureCLIVersion: min
+
+  - stage: 'smokeTests_msi'
+    displayName: 'Run smoke tests against Windows MSI install'
+    dependsOn: test_msi
+    variables:
+      pythonVersions: $[variables['msiTestingMatrix']]
+    condition: succeeded()
+    pool:
+      vmImage: 'windows-2019'
+    jobs:
+    - template: templates/smoke-tests.yml
+      parameters:
+        azureCLIVersion: msi
 
   - stage: 'kpi'
     displayName: 'Build KPIs'

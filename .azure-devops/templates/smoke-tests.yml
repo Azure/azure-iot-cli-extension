@@ -1,0 +1,48 @@
+parameters:
+- name: architecture
+  type: string
+  default: 'x64'
+- name: azureCLIVersion
+  type: string
+  default: released
+  values:
+  - min
+  - released
+  - msi
+- name: 'maxParallelSmoke'
+  type: number
+  default: 1
+
+jobs:
+  - job: 'smokeTests'
+    displayName: 'Smoke Testing Azure CLI'
+    strategy:
+      matrix: $[ variables['pythonVersions'] ]
+      maxParallel: ${{ parameters.maxParallelSmoke }}
+    steps:
+      - task: UsePythonVersion@0
+        inputs:
+          versionSpec: $(python)
+          architecture: ${{ parameters.architecture }}
+
+      - ${{ if eq(parameters.azureCLIVersion, 'min') }}:
+        - template: install-azure-cli-min.yml
+
+      - ${{ if eq(parameters.azureCLIVersion, 'released') }}:
+        - template: install-azure-cli-released.yml
+
+      - ${{ if eq(parameters.azureCLIVersion, 'msi') }}:
+        - template: install-azure-cli-msi.yml
+
+      - template: download-install-local-azure-iot-cli-extension.yml
+
+      - task: AzureCLI@2
+        displayName: 'Run smoke test commands'
+        inputs:
+          azureSubscription: $(AzureServiceConnection)
+          scriptType: pscore
+          scriptLocation: scriptPath
+          arguments: '$(AZEXT_IOT_TESTRG) $(AZEXT_IOT_TESTHUB)'
+          scriptPath: 'scripts/smoke_tests/commands_test.ps1'
+          powerShellErrorActionPreference: 'continue'
+          failOnStandardError: 'true'

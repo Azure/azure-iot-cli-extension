@@ -1,0 +1,76 @@
+{
+    "content": {
+        "$schema": "http://json.schemastore.org/azure-iot-edge-deployment-2.0",
+        "modulesContent": {
+            "$edgeAgent": {
+                "properties.desired": {
+                    "modules": {
+                        "mymodule0": {
+                            "settings": {
+                                "image": "myimageuri",
+                                "createOptions": "{\"MemorySwap\":0,\"MemoryReservation\":0}"
+                            },
+                            "type": "docker",
+                            "env": {
+                                "envvar0": {
+                                    "value": "envvarval0"
+                                }
+                            },
+                            "status": "running",
+                            "restartPolicy": "always",
+                            "version": "1.0"
+                        }
+                    },
+                    "runtime": {
+                        "settings": {
+                            "minDockerVersion": "v1.25"
+                        },
+                        "type": "docker"
+                    },
+                    "schemaVersion": "1.0",
+                    "systemModules": {
+                        "edgeAgent": {
+                            "settings": {
+                                "image": "mcr.microsoft.com/azureiotedge-agent:1.0",
+                                "createOptions": ""
+                            },
+                            "type": "docker"
+                        },
+                        "edgeHub": {
+                            "settings": {
+                                "image": "mcr.microsoft.com/azureiotedge-hub:1.0",
+                                "createOptions": "{\"HostConfig\":{\"PortBindings\":{\"8883/tcp\":[{\"HostPort\":\"8883\"}],\"443/tcp\":[{\"HostPort\":\"443\"}]}}}"
+                            },
+                            "type": "docker",
+                            "status": "running",
+                            "restartPolicy": "always"
+                        }
+                    }
+                }
+            },
+            "$edgeHub": {
+                "properties.desired": {
+                    "routes": {
+                        "route0": "FROM /messages/* INTO $upstream"
+                    },
+                    "schemaVersion": "1.0",
+                    "storeAndForwardConfiguration": {
+                        "timeToLiveSecs": 7200
+                    }
+                }
+            },
+            "mymodule0": {
+                "properties.desired": {
+                    "settings": {
+                        "prop0": "val0"
+                    }
+                }
+            }
+        }
+    },
+    "metrics": {
+        "queries": {
+            "mymetric": "SELECT deviceId FROM devices WHERE properties.reported.lastDesiredStatus.code = 200"
+        }
+    }
+}
