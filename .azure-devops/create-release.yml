@@ -6,7 +6,7 @@ trigger: none
 parameters:
 - name: variableGroup
   type: string
-  default: 'aziotcli_test_primary'
+  default: 'vilit-test-variables'
 - name: buildAgentPoolVar
   type: string
   default: 'BuildAgentPool'
