@@ -359,7 +359,7 @@ class DTLiveScenarioTest(LiveScenarioTest):
         # Once the az kusto is no longer private, enable just in time resource generation
         if not settings.env.azext_dt_adx_cluster:
             self.embedded_cli.invoke(
-                "rest --method DELETE --url https://management.azure.com/subscriptions/{}/resourceGroups/"
+                "rest --method DELETE --url /subscriptions/{}/resourceGroups/"
                 "{}/providers/Microsoft.Kusto/clusters/{}?api-version=2021-08-27".format(
                     self.get_subscription_id(),
                     ADX_RG,
@@ -368,7 +368,7 @@ class DTLiveScenarioTest(LiveScenarioTest):
             )
         elif not settings.env.azext_dt_adx_database:
             self.embedded_cli.invoke(
-                "rest --method DELETE --url https://management.azure.com/subscriptions/{}/resourceGroups/"
+                "rest --method DELETE --url /subscriptions/{}/resourceGroups/"
                 "{}/providers/Microsoft.Kusto/clusters/{}/databases/{}?api-version=2021-08-27".format(
                     self.get_subscription_id(),
                     ADX_RG,
