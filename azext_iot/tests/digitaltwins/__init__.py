@@ -4,7 +4,10 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import json
+from time import sleep
 import pytest
+from azext_iot.digitaltwins.common import ProvisioningStateType
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests.settings import DynamoSettings
 from azure.cli.testsdk import LiveScenarioTest
@@ -19,6 +22,7 @@ MOCK_DEAD_LETTER_ENDPOINT = "https://accountname.blob.core.windows.net/container
 MOCK_DEAD_LETTER_SECRET = "{}?sasToken".format(MOCK_DEAD_LETTER_ENDPOINT)
 REGION_RESOURCE_LIMIT = 10
 REGION_LIST = ["westus2", "westcentralus", "eastus2", "eastus", "eastus2euap"]
+MAX_ADX_RETRIES = 5
 
 required_test_env_vars = ["azext_iot_testrg"]
 resource_test_env_vars = [
@@ -50,8 +54,8 @@ EP_SERVICEBUS_TOPIC = settings.env.azext_dt_ep_servicebus_topic or ("test-sbt-" 
 # EventGrid
 EP_EVENTGRID_TOPIC = settings.env.azext_dt_ep_eventgrid_topic or ("test-egt-" + generate_generic_id())
 # Azure Data Explorer
-ADX_CLUSTER = settings.env.azext_dt_adx_cluster
-ADX_DATABASE = settings.env.azext_dt_adx_database
+ADX_CLUSTER = settings.env.azext_dt_adx_cluster or ("testadxc" + generate_generic_id()[:4])
+ADX_DATABASE = settings.env.azext_dt_adx_database or ("testadxd" + generate_generic_id()[:4])
 ADX_RG = settings.env.azext_dt_adx_rg or settings.env.azext_iot_testrg
 
 
@@ -182,8 +186,90 @@ class DTLiveScenarioTest(LiveScenarioTest):
     def ensure_adx_resource(self):
         """Ensure that the test has all ADX resources."""
         # Once the az kusto is no longer private, enable just in time resource generation
-        assert ADX_CLUSTER
-        assert ADX_DATABASE
+        if not settings.env.azext_dt_adx_cluster:
+            self.kwargs["cluster_body"] = json.dumps(
+                {
+                    "location": "eastus",
+                    "sku": {
+                        "name": "Dev(No SLA)_Standard_E2a_v4",
+                        "capacity": 1,
+                        "tier": "Basic"
+                    },
+                    "properties": {
+                        "enableDiskEncryption": False,
+                        "enableStreamingIngest": False,
+                        "enablePurge": False,
+                        "enableDoubleEncryption": False,
+                        "publicNetworkAccess": "Enabled",
+                        "engineType": "V3",
+                        "enableAutoStop": True
+                    }
+                }
+            )
+
+            cluster_create_state = self.embedded_cli.invoke(
+                "rest --method PUT --url '/subscriptions/{}/resourceGroups/"
+                "{}/providers/Microsoft.Kusto/clusters/{}?api-version=2021-08-27' --body '{}'".format(
+                    self.get_subscription_id(),
+                    ADX_RG,
+                    ADX_CLUSTER,
+                    self.kwargs["cluster_body"],
+                )
+            ).as_json().get("properties").get("state")
+            retries = 0
+            while cluster_create_state not in ProvisioningStateType.FINISHED.value and retries < MAX_ADX_RETRIES:
+                sleep(300)
+                cluster_create_state = self.embedded_cli.invoke(
+                    "rest --method GET --url '/subscriptions/{}/resourceGroups/"
+                    "{}/providers/Microsoft.Kusto/clusters/{}?api-version=2021-08-27'".format(
+                        self.get_subscription_id(),
+                        ADX_RG,
+                        ADX_CLUSTER,
+                    )
+                ).as_json().get("properties").get("state")
+                retries += 1
+
+            if retries == MAX_ADX_RETRIES:
+                logger.error("Waited 25 minutes for ADX cluster creation and cluster has not been created yet.")
+
+        if not settings.env.azext_dt_adx_database:
+            self.kwargs["database_body"] = json.dumps(
+                {
+                    "location": "eastus",
+                    "kind": "ReadWrite",
+                    "properties": {
+                        "softDeletePeriod": "P1D"
+                    }
+                }
+            )
+            database_creation_op = self.embedded_cli.invoke(
+                "rest --method PUT --url '/subscriptions/{}/resourceGroups/"
+                "{}/providers/Microsoft.Kusto/clusters/{}/databases/{}?api-version=2021-08-27' --body '{}'".format(
+                    self.get_subscription_id(),
+                    ADX_RG,
+                    ADX_CLUSTER,
+                    ADX_DATABASE,
+                    self.kwargs["database_body"]
+                )
+            )
+
+            database_creation_state = database_creation_op.as_json().get("properties").get("state")
+            retries = 0
+            while database_creation_state not in ProvisioningStateType.FINISHED.value and retries < MAX_ADX_RETRIES:
+                sleep(30)
+                database_creation_state = self.embedded_cli.invoke(
+                    "rest --method GET --url '/subscriptions/{}/resourceGroups/"
+                    "{}/providers/Microsoft.Kusto/clusters/{}/databases/{}?api-version=2021-08-27'".format(
+                        self.get_subscription_id(),
+                        ADX_RG,
+                        ADX_CLUSTER,
+                        ADX_DATABASE,
+                    )
+                ).as_json().get("properties").get("state")
+                retries += 1
+
+            if retries == MAX_ADX_RETRIES:
+                logger.error("Waited 2.5 minutes for database creation and database has not been created yet.")
 
     def ensure_eventhub_resource(self):
         """Ensure that the test has all Event hub resources."""
@@ -271,7 +357,25 @@ class DTLiveScenarioTest(LiveScenarioTest):
     def delete_adx_resources(self):
         """Delete all created ADX resources."""
         # Once the az kusto is no longer private, enable just in time resource generation
-        pass
+        if not settings.env.azext_dt_adx_cluster:
+            self.embedded_cli.invoke(
+                "rest --method DELETE --url https://management.azure.com/subscriptions/{}/resourceGroups/"
+                "{}/providers/Microsoft.Kusto/clusters/{}?api-version=2021-08-27".format(
+                    self.get_subscription_id(),
+                    ADX_RG,
+                    ADX_CLUSTER,
+                )
+            )
+        elif not settings.env.azext_dt_adx_database:
+            self.embedded_cli.invoke(
+                "rest --method DELETE --url https://management.azure.com/subscriptions/{}/resourceGroups/"
+                "{}/providers/Microsoft.Kusto/clusters/{}/databases/{}?api-version=2021-08-27".format(
+                    self.get_subscription_id(),
+                    ADX_RG,
+                    ADX_CLUSTER,
+                    ADX_DATABASE,
+                )
+            )
 
     def delete_eventhub_resources(self):
         """Delete all created Eventhub resources."""
