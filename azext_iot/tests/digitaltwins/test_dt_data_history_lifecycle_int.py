@@ -26,9 +26,6 @@ logger = get_logger(__name__)
 class TestDTConnections(DTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestDTConnections, self).__init__(test_case)
-        self.ensure_eventhub_resource()
-        self.ensure_adx_resource()
-
         self.adx_database_id = (
             "/subscriptions/{}/resourceGroups/{}/providers/Microsoft.Kusto/clusters/{}"
             "/Databases/{}".format(
@@ -48,6 +45,11 @@ class TestDTConnections(DTLiveScenarioTest):
                 EP_EVENTHUB_TOPIC,
             )
         )
+
+    @pytest.fixture(scope='class', autouse=True)
+    def setupSuite(self):
+        self.ensure_eventhub_resource()
+        self.ensure_adx_resource()
 
     @pytest.fixture(scope='class', autouse=True)
     def tearDownSuite(self):
