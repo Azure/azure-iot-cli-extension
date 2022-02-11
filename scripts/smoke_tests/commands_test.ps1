@@ -126,23 +126,22 @@ $commands += "az dt twin relationship create -n $dt_instance_name --relationship
 $commands += "az dt twin relationship show -n $dt_instance_name --twin-id $dt_twin_id --relationship-id $dt_twin_relationship_id"
 
 # Resource Cleanup
-$commands += "az dt endpoint delete -n $dt_instance_name -g $resource_group_name --en $dt_eventgrid_endpoint"
 $commands += "az dt model delete -n $dt_instance_name --dtmi 'dtmi:com:example:Floor;1'"
 $commands += "az dt model delete -n $dt_instance_name --dtmi 'dtmi:com:example:Room;1'"
-$commands += "az dt twin relationship delete-all -n $dt_instance_name --twin-id $dt_twin_id"
+$commands += "az dt twin relationship delete-all -n $dt_instance_name --twin-id $dt_twin_id -y"
 $commands += "az dt twin delete -n $dt_instance_name --twin-id $dt_twin_id"
 $commands += "az dt twin delete -n $dt_instance_name --twin-id $dt_target_twin_id"
 $commands += "az dt route delete -n $dt_instance_name --route-name $dt_route_name"
+$commands += "az dt endpoint delete -n $dt_instance_name -g $resource_group_name --en $dt_eventgrid_endpoint -y"
 $commands += "az eventgrid topic delete --name $dt_eventgrid_topic --resource-group $resource_group_name"
-$commands += "az dt reset -n $dt_instance_name"
-$commands += "az dt delete -n $dt_instance_name"
+$commands += "az dt reset -n $dt_instance_name -y"
+$commands += "az dt delete -n $dt_instance_name -y"
 $commands += "az iot hub module-identity delete -g $resource_group_name -m $hub_module_id -d $device_id -n $iothub_name"
 $commands += "az iot hub configuration delete -g $resource_group_name -c $hub_config_name -n $iothub_name"
 $commands += "az iot hub device-identity delete -g $resource_group_name -n $iothub_name -d $device_id"
 $commands += "az iot edge deployment delete -g $resource_group_name -d $edge_deployment_name -n $iothub_name"
 $commands += "az iot dps enrollment delete -g $resource_group_name --dps-name $dps_name --enrollment-id $dps_enrollment_id"
 $commands += "az iot dps enrollment-group delete -g $resource_group_name --dps-name $dps_name --enrollment-id $dps_enrollment_group_id"
-$commands += "az iot dps delete -g $resource_group_name --name $dps_name"
 
 Write-Host "`r`nRunning smoke test commands...`r`n"
 
