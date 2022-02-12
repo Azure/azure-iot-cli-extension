@@ -42,7 +42,7 @@ jobs:
           azureSubscription: $(AzureServiceConnection)
           scriptType: pscore
           scriptLocation: scriptPath
-          arguments: '$(AZEXT_IOT_TESTRG) $(AZEXT_IOT_TESTHUB) $(AZEXT_IOT_TESTDPS)'
+          arguments: '$(AZEXT_IOT_TESTRG) $(AZEXT_IOT_CENTRAL_APP_ID) $(AZEXT_IOT_TESTHUB) $(AZEXT_IOT_TESTDPS)'
           scriptPath: 'scripts/smoke_tests/commands_test.ps1'
           powerShellErrorActionPreference: 'continue'
           failOnStandardError: 'true'

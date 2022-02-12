@@ -6,9 +6,15 @@
 # --------------------------------------------------------------------------------------------
 
 # Setup
+if (!$args[0] -Or !$args[1]) {
+    Write-Error -Message "Error: Both resource group and central app id arguments are mandatory to run the script." -Category InvalidArgument
+    exit
+}
 $resource_group_name = $args[0]
-if ($args[1]) {
-    $iothub_name = $args[1]
+$central_app_id = $args[1]
+
+if ($args[2]) {
+    $iothub_name = $args[2]
 }
 else {
     Write-Host "`r`nCreating IoT Hub for running smoke tests..."
@@ -16,8 +22,8 @@ else {
     az iot hub create -g $resource_group_name --name $iothub_name --sku S1
 }
 
-if ($args[2]) {
-    $dps_name = $args[2]
+if ($args[3]) {
+    $dps_name = $args[3]
 }
 else {
     Write-Host "`r`nProvisioning DPS for running smoke tests..."
@@ -56,8 +62,21 @@ $dt_twin_id = "smoketest-dt-twin"
 $dt_target_twin_id = "smoketest-dt-target-twin"
 $dt_twin_relationship_id = "smoketest-dt-twin-relationship"
 
+$central_device_template_id = "dtmi:smokeTestDeviceTemplateid"
+$central_device_template_content = "scripts/smoke_tests/central_device_template.json"
+$central_device_id = "smoke-test-central-device-id"
+$central_device_name = "smoke-test-central-device-name"
+$central_device_command = "testRootCommand"
+$central_device_command_payload = "`"{'request':{'argument':'value'}}`""
+$central_device_query = "SELECT TOP 1 testDefaultCapability FROM dtmi:smokeTestDeviceTemplateid WHERE WITHIN_WINDOW(PT1H)"
+$central_api_token_id = "smoke-test-central-api-token-id"
+$central_org = "smoke-test-central-org"
+$central_export_id = "smoke-test-central-export-id"
+$central_export_destination_id = "smoke-test-central-export-destination-id"
+$central_export_destinations_json = "`"[{'id' : 'smoke-test-central-export-destination-id'}]`""
+
 # DT Setup
-Write-Host "`r`nSetting up environment to run digital twin commands..."
+Write-Host "`r`nCreating digital twins instance and eventgrid topic..."
 az dt create -n $dt_instance_name -g $resource_group_name -l $dt_location
 az eventgrid topic create --name $dt_eventgrid_topic --resource-group $resource_group_name -l $dt_location
 
@@ -125,7 +144,44 @@ $commands += "az dt twin create -n $dt_instance_name --dtmi 'dtmi:com:example:Ro
 $commands += "az dt twin relationship create -n $dt_instance_name --relationship-id $dt_twin_relationship_id --relationship contains --twin-id $dt_twin_id --target $dt_target_twin_id"
 $commands += "az dt twin relationship show -n $dt_instance_name --twin-id $dt_twin_id --relationship-id $dt_twin_relationship_id"
 
+# IoT Central
+$commands += "az iot central device-template create --app-id $central_app_id --device-template-id $central_device_template_id --content $central_device_template_content"
+$commands += "az iot central device-template show --app-id $central_app_id --device-template-id $central_device_template_id"
+
+$commands += "az iot central device create --app-id $central_app_id --device-id $central_device_id --template $central_device_template_id --simulated"
+# Sleeping to ensure device creation is completed
+$commands += "Start-Sleep -s 30"
+$commands += "az iot central device update --app-id $central_app_id --device-id $central_device_id --device-name $central_device_name"
+$commands += "az iot central device show --app-id $central_app_id --device-id $central_device_id"
+
+$commands += "az iot central device command run --app-id $central_app_id --device-id $central_device_id --command-name $central_device_command --content $central_device_command_payload"
+$commands += "az iot central device command history --app-id $central_app_id --device-id $central_device_id --command-name $central_device_command"
+
+$commands += "az iot central query --app-id $central_app_id --query-string '$central_device_query'"
+$commands += "az iot central export list --app-id $central_app_id"
+$commands += "az iot central role list --app-id $central_app_id"
+$commands += "az iot central user list --app-id $central_app_id"
+
+$commands += "az iot central api-token create --app-id $central_app_id --token-id $central_api_token_id -r 'operator'"
+$commands += "az iot central api-token show --app-id $central_app_id --token-id $central_api_token_id"
+
+$commands += "az iot central organization create --app-id $central_app_id --org-id $central_org"
+$commands += "az iot central organization show --app-id $central_app_id --org-id $central_org"
+
+$commands += "az iot central export destination create --app-id $central_app_id --dest-id $central_export_destination_id --type 'webhook@v1' --name 'Smoke Test Export Destination' --url 'https://www.microsoft.com'"
+$commands += "az iot central export destination show --app-id $central_app_id --dest-id $central_export_destination_id"
+$commands += "az iot central export create --app-id $central_app_id --export-id $central_export_id --destinations $central_export_destinations_json --name 'Smoke Test Export' --source 'Telemetry'"
+$commands += "az iot central export show --app-id $central_app_id --export-id $central_export_id"
+
+$commands += "az iot central diagnostics registration-summary --app-id $central_app_id"
+
 # Resource Cleanup
+$commands += "az iot central export delete --app-id $central_app_id --export-id $central_export_id"
+$commands += "az iot central export destination delete --app-id $central_app_id --dest-id $central_export_destination_id"
+$commands += "az iot central organization delete --app-id $central_app_id --org-id $central_org"
+$commands += "az iot central api-token delete --app-id $central_app_id --token-id $central_api_token_id"
+$commands += "az iot central device delete --app-id $central_app_id --device-id $central_device_id"
+$commands += "az iot central device-template delete --app-id $central_app_id --device-template-id $central_device_template_id"
 $commands += "az dt model delete -n $dt_instance_name --dtmi 'dtmi:com:example:Floor;1'"
 $commands += "az dt model delete -n $dt_instance_name --dtmi 'dtmi:com:example:Room;1'"
 $commands += "az dt twin relationship delete-all -n $dt_instance_name --twin-id $dt_twin_id -y"
@@ -148,16 +204,20 @@ Write-Host "`r`nRunning smoke test commands...`r`n"
 # Execute commands
 foreach ($command in $commands) {
     Write-Host "`r`nExecuting command:`r`n$command"
-    Invoke-Expression "$command --only-show-errors"
+    if ($command -like 'az*') {
+        $command += " --only-show-errors"
+    }
+    Invoke-Expression $command
 }
 
 # IoT Hub needs to be deleted if it was created for running smoke tests
-if (!$args[1]) {
+if (!$args[2]) {
     Write-Host "`r`nDeleting the temporarily created IoT Hub..."
     az iot hub delete -g $resource_group_name --name $iothub_name
 }
 
-if (!$args[2]) {
+# DPS Instance needs to be deleted if it was created for running smoke tests
+if (!$args[3]) {
     Write-Host "`r`nDeleting the temporarily provisioned DPS instance..."
     az iot dps delete -g $resource_group_name --name $dps_name
 }
