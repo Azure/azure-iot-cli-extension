@@ -23,6 +23,9 @@ from . import (
 logger = get_logger(__name__)
 
 
+ADH_REGION = "northeurope"
+
+
 class TestDTConnections(DTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestDTConnections, self).__init__(test_case)
@@ -70,7 +73,7 @@ class TestDTConnections(DTLiveScenarioTest):
             )
 
     def test_dt_data_history_adx(self):
-        self.wait_for_capacity()
+        self.wait_for_capacity(region=ADH_REGION)
         instance_name = f"dt{generate_generic_id()}"
         connection_name = f"cn-{generate_generic_id()}"
         table_name = f"tb_{generate_generic_id()}"
@@ -81,7 +84,7 @@ class TestDTConnections(DTLiveScenarioTest):
             "dt create -n {} -g {} -l {} --assign-identity".format(
                 instance_name,
                 self.rg,
-                "northeurope"
+                ADH_REGION
             )
         ).get_output_in_json()
         self.track_instance(create_output)
@@ -212,7 +215,7 @@ class TestDTConnections(DTLiveScenarioTest):
         assert len(list_result) == 0
 
     def test_dt_data_history_adx_create_incorrect_resource(self):
-        self.wait_for_capacity()
+        self.wait_for_capacity(region=ADH_REGION)
         instance_name = f"dt{generate_generic_id()}"
         connection_name = f"cn-{generate_generic_id()}"
 
@@ -220,7 +223,7 @@ class TestDTConnections(DTLiveScenarioTest):
             "dt create -n {} -g {} -l {} --assign-identity".format(
                 instance_name,
                 self.rg,
-                "northeurope"
+                ADH_REGION
             )
         ).get_output_in_json()
         self.track_instance(create_output)
@@ -329,7 +332,7 @@ class TestDTConnections(DTLiveScenarioTest):
         )
 
     def test_dt_data_history_adx_wait(self):
-        self.wait_for_capacity()
+        self.wait_for_capacity(region=ADH_REGION)
         instance_name = f"dt{generate_generic_id()}"
         connection_name = f"cn-{generate_generic_id()}"
         consumer_group = f"cg-{generate_generic_id()}"
@@ -339,7 +342,7 @@ class TestDTConnections(DTLiveScenarioTest):
             "dt create -n {} -g {} -l {} --assign-identity".format(
                 instance_name,
                 self.rg,
-                "northeurope"
+                ADH_REGION
             )
         ).get_output_in_json()
         self.track_instance(create_output)
