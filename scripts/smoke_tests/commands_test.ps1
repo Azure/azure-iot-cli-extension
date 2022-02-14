@@ -114,6 +114,12 @@ $commands += "az iot edge set-modules -g $resource_group_name --hub-name $iothub
 $commands += "az iot edge deployment create -g $resource_group_name -d $edge_deployment_name -n $iothub_name --content $edge_deployment_content --target-condition $edge_deployment_condition --priority 10 --metrics $edge_deployment_metrics --layered"
 $commands += "az iot edge deployment show -g $resource_group_name -d $edge_deployment_name -n $iothub_name"
 
+# Hub Resource Cleanup 
+$commands += "az iot hub module-identity delete -g $resource_group_name -m $hub_module_id -d $device_id -n $iothub_name"
+$commands += "az iot hub configuration delete -g $resource_group_name -c $hub_config_name -n $iothub_name"
+$commands += "az iot hub device-identity delete -g $resource_group_name -n $iothub_name -d $device_id"
+$commands += "az iot edge deployment delete -g $resource_group_name -d $edge_deployment_name -n $iothub_name"
+
 # IoT DPS
 $commands += "az iot dps compute-device-key -g $resource_group_name --key $dps_endorsement_key --registration-id $dps_registration_id"
 $commands += "az iot dps enrollment-group create -g $resource_group_name --dps-name $dps_name --enrollment-id $dps_enrollment_group_id"
@@ -122,6 +128,10 @@ $commands += "az iot dps enrollment create -g $resource_group_name --dps-name $d
 $commands += "az iot dps enrollment show -g $resource_group_name --dps-name $dps_name --enrollment-id $dps_enrollment_id"
 $commands += "az iot dps registration list -g $resource_group_name --dps-name $dps_name --enrollment-id $dps_enrollment_group_id"
 $commands += "az iot dps connection-string show -g $resource_group_name --dps-name $dps_name --all"
+
+# DPS Resource Cleanup
+$commands += "az iot dps enrollment delete -g $resource_group_name --dps-name $dps_name --enrollment-id $dps_enrollment_id"
+$commands += "az iot dps enrollment-group delete -g $resource_group_name --dps-name $dps_name --enrollment-id $dps_enrollment_group_id"
 
 # Digital Twins
 $commands += "az dt show -n $dt_instance_name"
@@ -143,6 +153,18 @@ $commands += "az dt model create -n $dt_instance_name --models $dtmi_target_mode
 $commands += "az dt twin create -n $dt_instance_name --dtmi 'dtmi:com:example:Room;1' --twin-id $dt_target_twin_id"
 $commands += "az dt twin relationship create -n $dt_instance_name --relationship-id $dt_twin_relationship_id --relationship contains --twin-id $dt_twin_id --target $dt_target_twin_id"
 $commands += "az dt twin relationship show -n $dt_instance_name --twin-id $dt_twin_id --relationship-id $dt_twin_relationship_id"
+
+# Digital Twins Resource Cleanup
+$commands += "az dt model delete -n $dt_instance_name --dtmi 'dtmi:com:example:Floor;1'"
+$commands += "az dt model delete -n $dt_instance_name --dtmi 'dtmi:com:example:Room;1'"
+$commands += "az dt twin relationship delete-all -n $dt_instance_name --twin-id $dt_twin_id -y"
+$commands += "az dt twin delete -n $dt_instance_name --twin-id $dt_twin_id"
+$commands += "az dt twin delete -n $dt_instance_name --twin-id $dt_target_twin_id"
+$commands += "az dt route delete -n $dt_instance_name --route-name $dt_route_name"
+$commands += "az dt endpoint delete -n $dt_instance_name -g $resource_group_name --en $dt_eventgrid_endpoint -y"
+$commands += "az eventgrid topic delete --name $dt_eventgrid_topic --resource-group $resource_group_name"
+$commands += "az dt reset -n $dt_instance_name -y"
+$commands += "az dt delete -n $dt_instance_name -y"
 
 # IoT Central
 $commands += "az iot central device-template create --app-id $central_app_id --device-template-id $central_device_template_id --content $central_device_template_content"
@@ -175,29 +197,14 @@ $commands += "az iot central export show --app-id $central_app_id --export-id $c
 
 $commands += "az iot central diagnostics registration-summary --app-id $central_app_id"
 
-# Resource Cleanup
+# Central Resource Cleanup
 $commands += "az iot central export delete --app-id $central_app_id --export-id $central_export_id"
 $commands += "az iot central export destination delete --app-id $central_app_id --dest-id $central_export_destination_id"
 $commands += "az iot central organization delete --app-id $central_app_id --org-id $central_org"
 $commands += "az iot central api-token delete --app-id $central_app_id --token-id $central_api_token_id"
 $commands += "az iot central device delete --app-id $central_app_id --device-id $central_device_id"
 $commands += "az iot central device-template delete --app-id $central_app_id --device-template-id $central_device_template_id"
-$commands += "az dt model delete -n $dt_instance_name --dtmi 'dtmi:com:example:Floor;1'"
-$commands += "az dt model delete -n $dt_instance_name --dtmi 'dtmi:com:example:Room;1'"
-$commands += "az dt twin relationship delete-all -n $dt_instance_name --twin-id $dt_twin_id -y"
-$commands += "az dt twin delete -n $dt_instance_name --twin-id $dt_twin_id"
-$commands += "az dt twin delete -n $dt_instance_name --twin-id $dt_target_twin_id"
-$commands += "az dt route delete -n $dt_instance_name --route-name $dt_route_name"
-$commands += "az dt endpoint delete -n $dt_instance_name -g $resource_group_name --en $dt_eventgrid_endpoint -y"
-$commands += "az eventgrid topic delete --name $dt_eventgrid_topic --resource-group $resource_group_name"
-$commands += "az dt reset -n $dt_instance_name -y"
-$commands += "az dt delete -n $dt_instance_name -y"
-$commands += "az iot hub module-identity delete -g $resource_group_name -m $hub_module_id -d $device_id -n $iothub_name"
-$commands += "az iot hub configuration delete -g $resource_group_name -c $hub_config_name -n $iothub_name"
-$commands += "az iot hub device-identity delete -g $resource_group_name -n $iothub_name -d $device_id"
-$commands += "az iot edge deployment delete -g $resource_group_name -d $edge_deployment_name -n $iothub_name"
-$commands += "az iot dps enrollment delete -g $resource_group_name --dps-name $dps_name --enrollment-id $dps_enrollment_id"
-$commands += "az iot dps enrollment-group delete -g $resource_group_name --dps-name $dps_name --enrollment-id $dps_enrollment_group_id"
+
 
 Write-Host "`r`nRunning smoke test commands...`r`n"
 
