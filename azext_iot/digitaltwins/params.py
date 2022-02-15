@@ -325,6 +325,11 @@ def load_digitaltwins_arguments(self, _):
             options_list=["--component"],
             help="The path to the DTDL component. If set, telemetry will be emitted on behalf of the component.",
         )
+        context.argument(
+            "telemetry_source_time",
+            options_list=["--telemetry-source-time", "--tst"],
+            help="An RFC 3339 timestamp that identifies the time the telemetry was measured.",
+        )
 
     with self.argument_context("dt twin relationship") as context:
         context.argument(

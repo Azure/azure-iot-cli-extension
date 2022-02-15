@@ -859,6 +859,9 @@ def load_digitaltwins_help():
         - name: Send twin telemetry
           text: >
             az dt twin telemetry send -n {instance_or_hostname} --twin-id {twin_id}
+        - name: Send twin telemetry with a custom telemetry source timestamp and message identifier
+          text: >
+            az dt twin telemetry send -n {instance_or_hostname} --twin-id {twin_id} --tst {telemetry_source_timestamp} --dt-id {dt_id}
     """
 
     helps["dt twin component"] = """
