@@ -4,7 +4,7 @@ Release History
 ===============
 
 
-0.13.1
+0.14.0
 +++++++++++++++
 
 **Digital Twin updates**
@@ -12,6 +12,9 @@ Release History
 * Added `az dt data-history` command group, which will allow users to configure a data history connection
   for a Digital Twins instance using an Event Hub and Azure Data Explorer database. Once configured,
   changes to the Digital Twins instance can be seen in the Azure Data Explorer database.
+
+* Added optional `--telemetry-source-time` parameter to `az dt twin telemetry send` to allow users to
+  add a custom timestamp to the sent telemetry.
 
 
 0.13.0
