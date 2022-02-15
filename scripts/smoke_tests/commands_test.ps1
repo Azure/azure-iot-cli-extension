@@ -105,7 +105,7 @@ $commands += "az iot hub module-twin update -g $resource_group_name -m $hub_modu
 
 # IoT Device
 $commands += "az iot device c2d-message send -g $resource_group_name -d $device_id -n $iothub_name --data 'Hello World' --props 'key0=value0;key1=value1' -y"
-$commands += "az iot device c2d-message receive -g $resource_group_name -d $device_id -n $iothub_name -g $resource_group_name --complete"
+$commands += "az iot device c2d-message receive -g $resource_group_name -d $device_id -n $iothub_name --complete"
 $commands += "az iot device send-d2c-message -g $resource_group_name -n $iothub_name -d $device_id --data 'Test Message'"
 
 # IoT Edge
@@ -139,31 +139,31 @@ $commands += "az dt endpoint create eventgrid -n $dt_instance_name -g $resource_
 $commands += "az dt endpoint wait --created -n $dt_instance_name -g $resource_group_name --en $dt_eventgrid_endpoint --interval 1"
 
 $commands += "az dt route create -n $dt_instance_name -g $resource_group_name --endpoint-name $dt_eventgrid_endpoint --route-name $dt_route_name"
-$commands += "az dt route show -n $dt_instance_name --route-name $dt_route_name"
+$commands += "az dt route show -g $resource_group_name -n $dt_instance_name --route-name $dt_route_name"
 
-$commands += "az dt model create -n $dt_instance_name --models $dtmi_model_content"
-$commands += "az dt model show -n $dt_instance_name --dtmi 'dtmi:com:example:Floor;1' --definition"
+$commands += "az dt model create -g $resource_group_name -n $dt_instance_name --models $dtmi_model_content"
+$commands += "az dt model show -g $resource_group_name -n $dt_instance_name --dtmi 'dtmi:com:example:Floor;1' --definition"
 
-$commands += "az dt twin create -n $dt_instance_name --dtmi 'dtmi:com:example:Floor;1' --twin-id $dt_twin_id"
-$commands += "az dt twin show -n $dt_instance_name --twin-id $dt_twin_id"
-$commands += "az dt twin query -n $dt_instance_name -q 'select * from digitaltwins' --show-cost"
-$commands += "az dt twin telemetry send -n $dt_instance_name --twin-id $dt_twin_id"
-$commands += "az dt model create -n $dt_instance_name --models $dtmi_target_model_content"
-$commands += "az dt twin create -n $dt_instance_name --dtmi 'dtmi:com:example:Room;1' --twin-id $dt_target_twin_id"
-$commands += "az dt twin relationship create -n $dt_instance_name --relationship-id $dt_twin_relationship_id --relationship contains --twin-id $dt_twin_id --target $dt_target_twin_id"
-$commands += "az dt twin relationship show -n $dt_instance_name --twin-id $dt_twin_id --relationship-id $dt_twin_relationship_id"
+$commands += "az dt twin create -g $resource_group_name -n $dt_instance_name --dtmi 'dtmi:com:example:Floor;1' --twin-id $dt_twin_id"
+$commands += "az dt twin show -g $resource_group_name -n $dt_instance_name --twin-id $dt_twin_id"
+$commands += "az dt twin query -g $resource_group_name -n $dt_instance_name -q 'select * from digitaltwins' --show-cost"
+$commands += "az dt twin telemetry send -g $resource_group_name -n $dt_instance_name --twin-id $dt_twin_id"
+$commands += "az dt model create -g $resource_group_name -n $dt_instance_name --models $dtmi_target_model_content"
+$commands += "az dt twin create -g $resource_group_name -n $dt_instance_name --dtmi 'dtmi:com:example:Room;1' --twin-id $dt_target_twin_id"
+$commands += "az dt twin relationship create -g $resource_group_name -n $dt_instance_name --relationship-id $dt_twin_relationship_id --relationship contains --twin-id $dt_twin_id --target $dt_target_twin_id"
+$commands += "az dt twin relationship show -g $resource_group_name -n $dt_instance_name --twin-id $dt_twin_id --relationship-id $dt_twin_relationship_id"
 
 # Digital Twins Resource Cleanup
-$commands += "az dt model delete -n $dt_instance_name --dtmi 'dtmi:com:example:Floor;1'"
-$commands += "az dt model delete -n $dt_instance_name --dtmi 'dtmi:com:example:Room;1'"
-$commands += "az dt twin relationship delete-all -n $dt_instance_name --twin-id $dt_twin_id -y"
-$commands += "az dt twin delete -n $dt_instance_name --twin-id $dt_twin_id"
-$commands += "az dt twin delete -n $dt_instance_name --twin-id $dt_target_twin_id"
-$commands += "az dt route delete -n $dt_instance_name --route-name $dt_route_name"
+$commands += "az dt model delete -g $resource_group_name -n $dt_instance_name --dtmi 'dtmi:com:example:Floor;1'"
+$commands += "az dt model delete -g $resource_group_name -n $dt_instance_name --dtmi 'dtmi:com:example:Room;1'"
+$commands += "az dt twin relationship delete-all -g $resource_group_name -n $dt_instance_name --twin-id $dt_twin_id -y"
+$commands += "az dt twin delete -g $resource_group_name -n $dt_instance_name --twin-id $dt_twin_id"
+$commands += "az dt twin delete -g $resource_group_name -n $dt_instance_name --twin-id $dt_target_twin_id"
+$commands += "az dt route delete -g $resource_group_name -n $dt_instance_name --route-name $dt_route_name"
 $commands += "az dt endpoint delete -n $dt_instance_name -g $resource_group_name --en $dt_eventgrid_endpoint -y"
-$commands += "az eventgrid topic delete --name $dt_eventgrid_topic --resource-group $resource_group_name"
-$commands += "az dt reset -n $dt_instance_name -y"
-$commands += "az dt delete -n $dt_instance_name -y"
+$commands += "az eventgrid topic delete -g $resource_group_name --name $dt_eventgrid_topic --resource-group $resource_group_name"
+$commands += "az dt reset -g $resource_group_name -n $dt_instance_name -y"
+$commands += "az dt delete -g $resource_group_name -n $dt_instance_name -y"
 
 # IoT Central
 $commands += "az iot central device-template create --app-id $central_app_id --device-template-id $central_device_template_id --content $central_device_template_content"
