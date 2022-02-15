@@ -8,7 +8,7 @@
 # Setup
 if (!$args[0] -Or !$args[1]) {
     Write-Error -Message "Error: Both resource group and central app id arguments are mandatory to run the script." -Category InvalidArgument
-    exit
+    exit 1
 }
 $resource_group_name = $args[0]
 $central_app_id = $args[1]
@@ -54,7 +54,6 @@ $dt_location = "westus2"
 $dt_eventgrid_endpoint = "smoketest-dt-eventgrid-endpoint"
 $dt_eventgrid_topic = "smoketest-dt-eventgrid-topic"
 $dt_eventgrid_secret = "https://accountname.blob.core.windows.net/containerName?sasToken"
-$dt_connection_name = "smoketest-dt-connection"
 $dt_route_name = "smoketest-dt-route"
 $dtmi_model_content = "scripts/smoke_tests/dtmi_model.json"
 $dtmi_target_model_content = "scripts/smoke_tests/Room.json"
