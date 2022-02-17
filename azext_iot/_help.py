@@ -407,7 +407,9 @@ helps[
 ] = """
     type: command
     short-summary: Update device twin desired properties and tags.
-    long-summary: Provide --desired or --tags arguments for PATCH behavior.
+    long-summary: Provide --desired or --tags arguments for PATCH behavior. Both parameters
+                  support inline json or a file path to json content.
+
                   Usage of generic update args (i.e. --set) will reflect PUT behavior
                   and are deprecated.
     examples:
@@ -419,6 +421,10 @@ helps[
       text: >
         az iot hub device-twin update -n {iothub_name} -d {device_id}
         --tags '{"country": "USA"}'
+    - name: Patch device twin tags with json file content.
+      text: >
+        az iot hub device-twin update -n {iothub_name} -d {device_id}
+        --tags /path/to/file
     - name: Patch removal of 'critical' desired property from parent 'temperature'
       text: >
         az iot hub device-twin update -n {iothub_name} -d {device_id}
@@ -535,7 +541,9 @@ helps[
 ] = """
     type: command
     short-summary: Update module twin desired properties and tags.
-    long-summary: Provide --desired or --tags arguments for PATCH behavior.
+    long-summary: Provide --desired or --tags arguments for PATCH behavior. Both parameters
+                  support inline json or a file path to json content.
+
                   Usage of generic update args (i.e. --set) will reflect PUT behavior
                   and are deprecated.
     examples:
@@ -547,6 +555,10 @@ helps[
       text: >
         az iot hub module-twin update -n {iothub_name} -d {device_id} -m {module_id}
         --tags '{"country": "USA"}'
+    - name: Patch module twin tags with json file content.
+      text: >
+        az iot hub module-twin update -n {iothub_name} -d {device_id} -m {module_id}
+        --tags /path/to/file
     - name: Patch removal of 'critical' desired property from parent 'temperature'
       text: >
         az iot hub module-twin update -n {iothub_name} -d {device_id} -m {module_id}
