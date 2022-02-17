@@ -12,13 +12,14 @@ if (!$args[0] -Or !$args[1]) {
 }
 $resource_group_name = $args[0]
 $central_app_id = $args[1]
+$run_id = $(New-Guid)
 
 if ($args[2]) {
     $iothub_name = $args[2]
 }
 else {
     Write-Host "`r`nCreating IoT Hub for running smoke tests..."
-    $iothub_name = "smoketest-hub-$(New-Guid)"
+    $iothub_name = "smoketest-hub-$run_id"
     az iot hub create -g $resource_group_name --name $iothub_name --sku S1
 }
 
@@ -27,29 +28,29 @@ if ($args[3]) {
 }
 else {
     Write-Host "`r`nProvisioning DPS for running smoke tests..."
-    $dps_name = "smoketest-dps-$(New-Guid)"
+    $dps_name = "smoketest-dps-$run_id"
     az iot dps create -g $resource_group_name --name $dps_name
 }
 
 $hub_module_id = "smoke-test-module"
-$hub_config_name = "smoke-test-config"
+$hub_config_name = "smoke-config-$run_id"
 $hub_config_content = "`"{'moduleContent': {'properties.desired.chillerWaterSettings': {'temperature': 38, 'pressure': 78}}}`""
 
-$device_id = "smoke-test-device"
+$device_id = "smoke-device-$run_id"
 $desired_twin_properties = "`"{'conditions':{'temperature':{'warning':70, 'critical':100}}}`""
 
-$edge_deployment_name = "smoke-test-deployment"
+$edge_deployment_name = "smoke-deploy-$run_id"
 $edge_deployment_content = "scripts/smoke_tests/edge_deployment_content.json"
 $edge_deployment_metrics = "`"{'queries':{'mymetric':'SELECT deviceId from devices where properties.reported.lastDesiredStatus.code = 200'}}`"" 
 $edge_deployment_condition = "`"tags.environment='dev'`""
 $edge_module_content = "scripts/smoke_tests/edge_module_content.json"
 
-$dps_registration_id = "smoke-test-dps-registration"
-$dps_enrollment_id = "smoke-test-dps-enrollment"
-$dps_enrollment_group_id = "smoke-test-dps-enrollment-group"
+$dps_registration_id = "smoke-reg-$run_id"
+$dps_enrollment_id = "smoke-enroll-$run_id"
+$dps_enrollment_group_id = "smoke-enr-grp-$run_id"
 $dps_endorsement_key = "AToAAQALAAMAsgAgg3GXZ0SEs/gakMyNRqXXJP1S124GUgtk8qHaGzMUaaoABgCAAEMAEAgAAAAAAAEAibym9HQP9vxCGF5dVc1QQsAGe021aUGJzNol1/gycBx3jFsTpwmWbISRwnFvflWd0w2Mc44FAAZNaJOAAxwZvG8GvyLlHh6fGKdh+mSBL4iLH2bZ4Ry22cB3CJVjXmdGoz9Y/j3/NwLndBxQC+baNvzvyVQZ4/A2YL7vzIIj2ik4y+ve9ir7U0GbNdnxskqK1KFIITVVtkTIYyyFTIR0BySjPrRIDj7r7Mh5uF9HBppGKQCBoVSVV8dI91lNazmSdpGWyqCkO7iM4VvUMv2HT/ym53aYlUrau+Qq87Tu+uQipWYgRdF11KDfcpMHqqzBQQ1NpOJVhrsTrhyJzO7KNw=="
 
-$dt_instance_name = "smoketest-dt-$(New-Guid)"
+$dt_instance_name = "smoketest-dt-$run_id"
 $dt_location = "westus2"
 $dt_eventgrid_endpoint = "smoketest-dt-eventgrid-endpoint"
 $dt_eventgrid_topic = "smoketest-dt-eventgrid-topic"
@@ -61,18 +62,18 @@ $dt_twin_id = "smoketest-dt-twin"
 $dt_target_twin_id = "smoketest-dt-target-twin"
 $dt_twin_relationship_id = "smoketest-dt-twin-relationship"
 
-$central_device_template_id = "dtmi:smokeTestDeviceTemplateid"
+$central_device_template_id = "dtmi:id_$run_id".Replace("-", "_")
 $central_device_template_content = "scripts/smoke_tests/central_device_template.json"
-$central_device_id = "smoke-test-central-device-id"
+$central_device_id = "smoke-central-$run_id"
 $central_device_name = "smoke-test-central-device-name"
 $central_device_command = "testRootCommand"
 $central_device_command_payload = "`"{'request':{'argument':'value'}}`""
-$central_device_query = "SELECT TOP 1 testDefaultCapability FROM dtmi:smokeTestDeviceTemplateid WHERE WITHIN_WINDOW(PT1H)"
-$central_api_token_id = "smoke-test-central-api-token-id"
+$central_device_query = "SELECT TOP 1 testDefaultCapability FROM $central_device_template_id WHERE WITHIN_WINDOW(PT1H)"
+$central_api_token_id = "tid-$run_id"
 $central_org = "smoke-test-central-org"
-$central_export_id = "smoke-test-central-export-id"
-$central_export_destination_id = "smoke-test-central-export-destination-id"
-$central_export_destinations_json = "`"[{'id' : 'smoke-test-central-export-destination-id'}]`""
+$central_export_id = "smoke-export-$run_id"
+$central_export_destination_id = "smoke-dest-$run_id"
+$central_export_destinations_json = "`"[{'id' : '$central_export_destination_id'}]`""
 
 # DT Setup
 Write-Host "`r`nCreating digital twins instance and eventgrid topic..."
@@ -189,7 +190,7 @@ $commands += "az iot central api-token show --app-id $central_app_id --token-id 
 $commands += "az iot central organization create --app-id $central_app_id --org-id $central_org"
 $commands += "az iot central organization show --app-id $central_app_id --org-id $central_org"
 
-$commands += "az iot central export destination create --app-id $central_app_id --dest-id $central_export_destination_id --type 'webhook@v1' --name 'Smoke Test Export Destination' --url 'https://www.microsoft.com'"
+$commands += "az iot central export destination create --app-id $central_app_id --dest-id $central_export_destination_id --type 'webhook@v1' --name 'Smoke Test Export Destination' --url 'https://microsoft.sharepoint.com/'"
 $commands += "az iot central export destination show --app-id $central_app_id --dest-id $central_export_destination_id"
 $commands += "az iot central export create --app-id $central_app_id --export-id $central_export_id --destinations $central_export_destinations_json --name 'Smoke Test Export' --source 'Telemetry'"
 $commands += "az iot central export show --app-id $central_app_id --export-id $central_export_id"
@@ -203,11 +204,32 @@ $commands += "az iot central organization delete --app-id $central_app_id --org-
 $commands += "az iot central api-token delete --app-id $central_app_id --token-id $central_api_token_id"
 $commands += "az iot central device delete --app-id $central_app_id --device-id $central_device_id"
 $commands += "az iot central device-template delete --app-id $central_app_id --device-template-id $central_device_template_id"
+$commands += "az iot central export delete --app-id $central_app_id --export-id $central_export_id"
 
+# Fetch connection strings
+$hub_connection = az iot hub connection-string show -g $resource_group_name -n $iothub_name | ConvertFrom-Json
+$hub_conn_string = $hub_connection."connectionString"
+$dps_connection = az iot dps connection-string show -g $resource_group_name -n $dps_name | ConvertFrom-Json
+$dps_conn_string = $dps_connection."connectionString"
 
-Write-Host "`r`nRunning smoke test commands...`r`n"
+# Logout to prevent command execution using credentials
+$commands += "az logout"
+
+# Execute Commands using connection string
+$commands += "az iot edge deployment create -g $resource_group_name -d $edge_deployment_name --auth-type 'login' -l '$hub_conn_string' --content $edge_deployment_content --target-condition $edge_deployment_condition --priority 10 --metrics $edge_deployment_metrics --layered"
+$commands += "az iot edge deployment show -g $resource_group_name -d $edge_deployment_name --auth-type 'login' -l '$hub_conn_string'"
+$commands += "az iot dps enrollment-group create -g $resource_group_name --auth-type 'login' -l '$dps_conn_string' --enrollment-id $dps_enrollment_group_id"
+$commands += "az iot dps enrollment-group show -g $resource_group_name --auth-type 'login' -l '$dps_conn_string' --enrollment-id $dps_enrollment_group_id"
+
+# Cleanup resources created using connection string
+$commands += "az iot edge deployment delete -g $resource_group_name -d $edge_deployment_name --auth-type 'login' -l '$hub_conn_string'"
+$commands += "az iot dps enrollment-group delete -g $resource_group_name --auth-type 'login' -l '$dps_conn_string' --enrollment-id $dps_enrollment_group_id"
+
+# Login again
+$commands += "az login --identity"
 
 # Execute commands
+Write-Host "`r`nRunning smoke test commands...`r`n"
 foreach ($command in $commands) {
     Write-Host "`r`nExecuting command:`r`n$command"
     if ($command -like 'az*') {
