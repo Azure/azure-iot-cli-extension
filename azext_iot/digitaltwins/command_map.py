@@ -30,6 +30,9 @@ digitaltwins_rbac_ops = CliCommandType(
 )
 
 
+enabled_data_history = False
+
+
 def load_digitaltwins_commands(self, _):
     """
     Load CLI commands
@@ -46,32 +49,30 @@ def load_digitaltwins_commands(self, _):
         cmd_group.command("reset", "reset_instance", confirmation=True, is_preview=True)
 
     # TODO: unhide in with Public preview for data history
-    with self.command_group(
-        "dt data-history",
-        command_type=digitaltwins_resource_ops,
-        is_preview=True,
-        hide=True
-    ) as cmd_group:
-        pass
+    if enabled_data_history:
+        with self.command_group(
+            "dt data-history",
+            command_type=digitaltwins_resource_ops,
+            is_preview=True,
+        ) as cmd_group:
+            pass
 
-    with self.command_group(
-        "dt data-history connection",
-        command_type=digitaltwins_resource_ops,
-        hide=True
-    ) as cmd_group:
-        cmd_group.show_command("show", "show_data_connection")
-        cmd_group.wait_command("wait", "wait_data_connection")
-        cmd_group.command("list", "list_data_connection")
-        cmd_group.command(
-            "delete", "delete_data_connection", confirmation=True, supports_no_wait=True
-        )
+        with self.command_group(
+            "dt data-history connection",
+            command_type=digitaltwins_resource_ops,
+        ) as cmd_group:
+            cmd_group.show_command("show", "show_data_connection")
+            cmd_group.wait_command("wait", "wait_data_connection")
+            cmd_group.command("list", "list_data_connection")
+            cmd_group.command(
+                "delete", "delete_data_connection", confirmation=True, supports_no_wait=True
+            )
 
-    with self.command_group(
-        "dt data-history connection create",
-        command_type=digitaltwins_resource_ops,
-        hide=True
-    ) as cmd_group:
-        cmd_group.command("adx", "create_adx_data_connection", supports_no_wait=True)
+        with self.command_group(
+            "dt data-history connection create",
+            command_type=digitaltwins_resource_ops,
+        ) as cmd_group:
+            cmd_group.command("adx", "create_adx_data_connection", supports_no_wait=True)
 
     with self.command_group(
         "dt endpoint", command_type=digitaltwins_resource_ops
