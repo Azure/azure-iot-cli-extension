@@ -36,13 +36,19 @@ jobs:
 
       - template: download-install-local-azure-iot-cli-extension.yml
 
+      # Fix for DNS resolution issues: https://github.com/actions/virtual-environments/issues/798
+      - script: |
+          sudo ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
+        displayName: Bypass local DNS server to workaround issue resolving ADT hostnames
+        condition: and(succeededOrFailed(), eq( variables['Agent.OS'], 'Linux' ))
+
       - task: AzureCLI@2
         displayName: 'Run smoke test commands'
         inputs:
           azureSubscription: $(AzureServiceConnection)
           scriptType: pscore
           scriptLocation: scriptPath
-          arguments: '$(AZEXT_IOT_TESTRG) $(AZEXT_IOT_TESTHUB)'
+          arguments: '$(AZEXT_IOT_TESTRG) $(AZEXT_IOT_CENTRAL_APP_ID) $(AZEXT_IOT_TESTHUB) $(AZEXT_IOT_TESTDPS)'
           scriptPath: 'scripts/smoke_tests/commands_test.ps1'
           powerShellErrorActionPreference: 'continue'
           failOnStandardError: 'true'
