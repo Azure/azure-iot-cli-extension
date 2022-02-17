@@ -7,6 +7,7 @@
 """
 Load CLI commands
 """
+import os
 from azure.cli.core.commands import CliCommandType
 
 digitaltwins_resource_ops = CliCommandType(
@@ -30,7 +31,7 @@ digitaltwins_rbac_ops = CliCommandType(
 )
 
 
-enabled_data_history = False
+enabled_data_history = os.environ.get("ADT_DH_PREVIEW_ENABLE")
 
 
 def load_digitaltwins_commands(self, _):
