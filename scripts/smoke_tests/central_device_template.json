@@ -1,0 +1,220 @@
+{
+    "displayName": "dtmi:smokeTestDeviceTemplate",
+    "capabilityModel": {
+        "@id": "dtmi:sampleApp:modelOnebz;3",
+        "@type": "Interface",
+        "contents": [
+            {
+                "@id": "dtmi:testazuresphere:AzureSphereSampleDevice614:testDefaultCapability;2",
+                "@type": "Telemetry",
+                "displayName": "testDefaultCapability",
+                "name": "testDefaultCapability",
+                "schema": "double"
+            },
+            {
+                "@id": "dtmi:sampleApp:modelOnebz:dtmiIntTestDeviceTemplateV33jl;3",
+                "@type": "Component",
+                "displayName": "Component",
+                "name": "dtmiIntTestDeviceTemplateV33jl",
+                "schema": {
+                    "@id": "dtmi:cliIntegrationtestApp:dtmiIntTestDeviceTemplateV33jl;1",
+                    "@type": "Interface",
+                    "contents": [
+                        {
+                            "@id": "dtmi:cliIntegrationtestApp:dtmiIntTestDeviceTemplateV33jl:testCommand;1",
+                            "@type": "Command",
+                            "commandType": "synchronous",
+                            "displayName": "testCommand",
+                            "name": "testCommand"
+                        }
+                    ],
+                    "displayName": "Component"
+                }
+            },
+            {
+                "@id": "urn:rigado:RS40_Occupancy_Sensor:testRootCommand:9",
+                "@type": "Command",
+                "commandType": "synchronous",
+                "displayName": {
+                    "en": "testRootCommand"
+                },
+                "name": "testRootCommand"
+            }
+        ],
+        "displayName": "larger-telemetry-device",
+        "extends": [
+            {
+                "@id": "dtmi:sampleApp:modelOneg4;1",
+                "@type": "Interface",
+                "contents": [
+                    {
+                        "@id": "dtmi:sampleApp:modelOneg4:Bool;1",
+                        "@type": "Telemetry",
+                        "displayName": "Bool",
+                        "name": "Bool",
+                        "schema": "boolean"
+                    },
+                    {
+                        "@id": "dtmi:sampleApp:modelOneg4:Date;1",
+                        "@type": "Telemetry",
+                        "displayName": "Date",
+                        "name": "Date",
+                        "schema": "date"
+                    },
+                    {
+                        "@id": "dtmi:sampleApp:modelOneg4:DateTime;1",
+                        "@type": "Telemetry",
+                        "displayName": "DateTime",
+                        "name": "DateTime",
+                        "schema": "dateTime"
+                    },
+                    {
+                        "@id": "dtmi:sampleApp:modelOneg4:Double;1",
+                        "@type": "Telemetry",
+                        "displayName": "Double",
+                        "name": "Double",
+                        "schema": "double"
+                    },
+                    {
+                        "@id": "dtmi:sampleApp:modelOneg4:Duration;1",
+                        "@type": "Telemetry",
+                        "displayName": "Duration",
+                        "name": "Duration",
+                        "schema": "duration"
+                    },
+                    {
+                        "@id": "dtmi:sampleApp:modelOneg4:IntEnum;1",
+                        "@type": "Telemetry",
+                        "displayName": "IntEnum",
+                        "name": "IntEnum",
+                        "schema": {
+                            "@id": "dtmi:sampleApp:modelOneg4:IntEnum:pgkbdhard;1",
+                            "@type": "Enum",
+                            "displayName": "Enum",
+                            "enumValues": [
+                                {
+                                    "@id": "dtmi:sampleApp:modelOneg4:IntEnum:pgkbdhard:Enum1;1",
+                                    "displayName": "Enum1",
+                                    "enumValue": 1,
+                                    "name": "Enum1"
+                                },
+                                {
+                                    "@id": "dtmi:sampleApp:modelOneg4:IntEnum:pgkbdhard:Enum2;1",
+                                    "displayName": "Enum2",
+                                    "enumValue": 2,
+                                    "name": "Enum2"
+                                }
+                            ],
+                            "valueSchema": "integer"
+                        }
+                    },
+                    {
+                        "@id": "dtmi:sampleApp:modelOneg4:StringEnum;1",
+                        "@type": "Telemetry",
+                        "displayName": "StringEnum",
+                        "name": "StringEnum",
+                        "schema": {
+                            "@id": "dtmi:sampleApp:modelOneg4:StringEnum:kyesuinpsx;1",
+                            "@type": "Enum",
+                            "displayName": "Enum",
+                            "enumValues": [
+                                {
+                                    "@id": "dtmi:sampleApp:modelOneg4:StringEnum:kyesuinpsx:EnumA;1",
+                                    "displayName": "EnumA",
+                                    "enumValue": "A",
+                                    "name": "EnumA"
+                                },
+                                {
+                                    "@id": "dtmi:sampleApp:modelOneg4:StringEnum:kyesuinpsx:EnumB;1",
+                                    "displayName": "EnumB",
+                                    "enumValue": "B",
+                                    "name": "EnumB"
+                                }
+                            ],
+                            "valueSchema": "string"
+                        }
+                    },
+                    {
+                        "@id": "dtmi:sampleApp:modelOneg4:Float;1",
+                        "@type": "Telemetry",
+                        "displayName": "Float",
+                        "name": "Float",
+                        "schema": "float"
+                    },
+                    {
+                        "@id": "dtmi:sampleApp:modelOneg4:Geopoint;1",
+                        "@type": "Telemetry",
+                        "displayName": "Geopoint",
+                        "name": "Geopoint",
+                        "schema": "geopoint"
+                    },
+                    {
+                        "@id": "dtmi:sampleApp:modelOneg4:Int;1",
+                        "@type": "Telemetry",
+                        "displayName": "Int",
+                        "name": "Int",
+                        "schema": "integer"
+                    },
+                    {
+                        "@id": "dtmi:sampleApp:modelOneg4:Long;1",
+                        "@type": "Telemetry",
+                        "displayName": "Long",
+                        "name": "Long",
+                        "schema": "long"
+                    },
+                    {
+                        "@id": "dtmi:sampleApp:modelOneg4:String;1",
+                        "@type": "Telemetry",
+                        "displayName": "String",
+                        "name": "String",
+                        "schema": "string"
+                    },
+                    {
+                        "@id": "dtmi:sampleApp:modelOneg4:Time;1",
+                        "@type": "Telemetry",
+                        "displayName": "Time",
+                        "name": "Time",
+                        "schema": "time"
+                    },
+                    {
+                        "@id": "dtmi:sampleApp:modelOneg4:Vector;1",
+                        "@type": "Telemetry",
+                        "displayName": "Vector",
+                        "name": "Vector",
+                        "schema": "vector"
+                    },
+                    {
+                        "@id": "dtmi:sampleApp:modelOneg4:synccmd;1",
+                        "@type": "Command",
+                        "commandType": "synchronous",
+                        "displayName": "synccmd",
+                        "name": "synccmd",
+                        "request": {
+                            "@type": "CommandPayload",
+                            "displayName": "argument",
+                            "name": "argument",
+                            "schema": "string"
+                        },
+                        "response": {
+                            "@type": "CommandPayload",
+                            "displayName": "status",
+                            "name": "status",
+                            "schema": "double"
+                        },
+                        "durable": false
+                    }
+                ],
+                "displayName": "Interface"
+            }
+        ]
+    },
+    "@id": "dtmi:ulu38i3jr:intTestDeviceTemplateid",
+    "@type": [
+        "DeviceModel",
+        "ModelDefinition"
+    ],
+    "@context": [
+        "dtmi:iotcentral:context;2",
+        "dtmi:dtdl:context;2"
+    ]
+}
