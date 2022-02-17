@@ -11,11 +11,27 @@ from typing import Tuple
 from knack.util import CLIError
 from azext_iot.tests import CaptureOutputLiveScenarioTest
 from azext_iot.tests.conftest import get_context_path
+from azext_iot.tests.generators import generate_generic_id
+from azext_iot.tests.settings import DynamoSettings
 from azext_iot.common import utility
 from azext_iot.central.models.enum import Role, UserTypePreview, UserTypeV1, ApiVersion
 
-APP_ID = os.environ.get("azext_iot_central_app_id")
-APP_PRIMARY_KEY = os.environ.get("azext_iot_central_primarykey")
+CENTRAL_SETTINGS = [
+    "azext_iot_testrg",
+    "azext_iot_central_app_id",
+    "azext_iot_central_primarykey",
+    "azext_iot_central_scope_id",
+    "azext_iot_central_token",
+    "azext_iot_central_dns_suffix",
+    "azext_iot_central_storage_cstring",
+    "azext_iot_central_storage_container"
+]
+settings = DynamoSettings(opt_env_set=CENTRAL_SETTINGS)
+APP_RG = settings.env.azext_iot_testrg
+APP_ID = settings.env.azext_iot_central_app_id or "test-app-" + generate_generic_id()
+
+APP_PRIMARY_KEY = settings.env.azext_iot_central_primarykey
+
 APP_SCOPE_ID = os.environ.get("azext_iot_central_scope_id")
 DEVICE_ID = os.environ.get("azext_iot_central_device_id")
 TOKEN = os.environ.get("azext_iot_central_token")
@@ -42,6 +58,32 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
     def cmd_withoutParams(self, command, checks=None, expect_failure=False):
         return super().cmd(command, checks=checks, expect_failure=expect_failure)
+
+    def _create_app(self):
+        self.app_id = APP_ID
+        self.app_primary_key = settings.env.azext_iot_central_primarykey
+
+        # Create the app, will overwrite other parameters
+        if not settings.env.azext_iot_central_app_id:
+            assert APP_RG is not None
+            app = self.cmd(
+                "iot central app create -n {} -g {} -s {} --mi-system-assigned".format(
+                    APP_ID,
+                    APP_RG,
+                    APP_ID
+                )
+            ).get_output_in_json()
+            self.app_primary_key = app["identity"]["principalId"]
+
+        if not settings.env.azext_iot_central_primarykey:
+            self.app_primary_key = self.cmd(
+                "iot central app identity assign -n {} -g {} --system-assigned".format(
+                    APP_ID,
+                    APP_RG,
+                )
+            ).get_output_in_json()["principalId"]
+
+
 
     def _create_device(self, api_version, **kwargs) -> Tuple[str, str]:
         """
