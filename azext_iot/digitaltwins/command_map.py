@@ -45,16 +45,19 @@ def load_digitaltwins_commands(self, _):
         cmd_group.wait_command("wait", "wait_instance")
         cmd_group.command("reset", "reset_instance", confirmation=True, is_preview=True)
 
+    # TODO: unhide in with Public preview for data history
     with self.command_group(
         "dt data-history",
         command_type=digitaltwins_resource_ops,
-        is_preview=True
+        is_preview=True,
+        hide=True
     ) as cmd_group:
         pass
 
     with self.command_group(
         "dt data-history connection",
         command_type=digitaltwins_resource_ops,
+        hide=True
     ) as cmd_group:
         cmd_group.show_command("show", "show_data_connection")
         cmd_group.wait_command("wait", "wait_data_connection")
@@ -66,6 +69,7 @@ def load_digitaltwins_commands(self, _):
     with self.command_group(
         "dt data-history connection create",
         command_type=digitaltwins_resource_ops,
+        hide=True
     ) as cmd_group:
         cmd_group.command("adx", "create_adx_data_connection", supports_no_wait=True)
 

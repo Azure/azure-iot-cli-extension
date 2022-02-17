@@ -78,7 +78,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
                 generic_check_state(
                     lro=lro,
                     show_cmd=f"az dt show -n {name} -g {resource_group_name}",
-                    max_retires=MAX_ADT_CREATE_RETRIES
+                    max_retries=MAX_ADT_CREATE_RETRIES
                 )
 
             def rbac_handler(lro):
@@ -541,7 +541,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
                     show_cmd="az dt data-history show -n {} -g {} --cn {}".format(
                         name, resource_group_name, conn_name
                     ),
-                    max_retires=MAX_ADT_DH_CREATE_RETRIES
+                    max_retries=MAX_ADT_DH_CREATE_RETRIES
                 )
 
             create_or_update = self.mgmt_sdk.time_series_database_connections.create_or_update(

@@ -54,7 +54,7 @@ def remove_prefix(text, prefix):
     return text
 
 
-def generic_check_state(lro, show_cmd, max_retires):
+def generic_check_state(lro, show_cmd, max_retries):
     """
     Refresh the instance from the LRO poller until the refresh limit or the instance
     has finished creating.
@@ -63,7 +63,7 @@ def generic_check_state(lro, show_cmd, max_retires):
     instance = lro.resource().as_dict()
     state = _get_provisioning_state(instance)
     retries = 0
-    while (state and state.lower() not in ProvisioningStateType.FINISHED.value) and retries < max_retires:
+    while (state and state.lower() not in ProvisioningStateType.FINISHED.value) and retries < max_retries:
         retries += 1
         sleep(int(lro._response.headers.get('retry-after', ADT_CREATE_RETRY_AFTER)))
         lro.update_status()

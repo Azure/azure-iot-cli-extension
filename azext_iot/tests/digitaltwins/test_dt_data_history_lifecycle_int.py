@@ -21,11 +21,10 @@ from . import (
 )
 
 logger = get_logger(__name__)
-
-
 ADH_REGION = "northeurope"
 
 
+@pytest.mark.skip("Wait until Data History Public Preview")
 class TestDTConnections(DTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestDTConnections, self).__init__(test_case)
