@@ -212,24 +212,25 @@ $hub_conn_string = $hub_connection."connectionString"
 $dps_connection = az iot dps connection-string show -g $resource_group_name -n $dps_name | ConvertFrom-Json
 $dps_conn_string = $dps_connection."connectionString"
 
-# Logout to prevent command execution using credentials
-$commands += "az logout"
+# Ensure that hub and dps don't need to be deleted after logging out
+if ($args[2] -And $args[3]) {
+    # Logout to prevent command execution using credentials
+    $commands += "az logout"
 
-# Execute Commands using connection string
-$commands += "az iot edge deployment create -g $resource_group_name -d $edge_deployment_name --auth-type 'login' -l '$hub_conn_string' --content $edge_deployment_content --target-condition $edge_deployment_condition --priority 10 --metrics $edge_deployment_metrics --layered"
-$commands += "az iot edge deployment show -g $resource_group_name -d $edge_deployment_name --auth-type 'login' -l '$hub_conn_string'"
-$commands += "az iot dps enrollment-group create -g $resource_group_name --auth-type 'login' -l '$dps_conn_string' --enrollment-id $dps_enrollment_group_id"
-$commands += "az iot dps enrollment-group show -g $resource_group_name --auth-type 'login' -l '$dps_conn_string' --enrollment-id $dps_enrollment_group_id"
+    # Execute Commands using connection string
+    $commands += "az iot edge deployment create -g $resource_group_name -d $edge_deployment_name --auth-type 'login' -l '$hub_conn_string' --content $edge_deployment_content --target-condition $edge_deployment_condition --priority 10 --metrics $edge_deployment_metrics --layered"
+    $commands += "az iot edge deployment show -g $resource_group_name -d $edge_deployment_name --auth-type 'login' -l '$hub_conn_string'"
+    $commands += "az iot dps enrollment-group create -g $resource_group_name --auth-type 'login' -l '$dps_conn_string' --enrollment-id $dps_enrollment_group_id"
+    $commands += "az iot dps enrollment-group show -g $resource_group_name --auth-type 'login' -l '$dps_conn_string' --enrollment-id $dps_enrollment_group_id"
 
-# Cleanup resources created using connection string
-$commands += "az iot edge deployment delete -g $resource_group_name -d $edge_deployment_name --auth-type 'login' -l '$hub_conn_string'"
-$commands += "az iot dps enrollment-group delete -g $resource_group_name --auth-type 'login' -l '$dps_conn_string' --enrollment-id $dps_enrollment_group_id"
+    # Cleanup resources created using connection string
+    $commands += "az iot edge deployment delete -g $resource_group_name -d $edge_deployment_name --auth-type 'login' -l '$hub_conn_string'"
+    $commands += "az iot dps enrollment-group delete -g $resource_group_name --auth-type 'login' -l '$dps_conn_string' --enrollment-id $dps_enrollment_group_id"
+}
 
-# Login again
-$commands += "az login --identity"
+Write-Host "`r`nRunning smoke test commands...`r`n"
 
 # Execute commands
-Write-Host "`r`nRunning smoke test commands...`r`n"
 foreach ($command in $commands) {
     Write-Host "`r`nExecuting command:`r`n$command"
     if ($command -like 'az*') {
