@@ -26,7 +26,7 @@ ADH_REGION = "northeurope"
 enabled_data_history = os.environ.get("ADT_DH_PREVIEW_ENABLE")
 
 
-@pytest.mark.skipif(not enabled_data_history, "Wait until Data History Public Preview")
+@pytest.mark.skipif(not enabled_data_history, reason="Wait until Data History Public Preview")
 class TestDTConnections(DTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestDTConnections, self).__init__(test_case)
