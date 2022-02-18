@@ -75,7 +75,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             ).get_output_in_json()
             self.app_primary_key = app["identity"]["principalId"]
 
-        if not settings.env.azext_iot_central_primarykey:
+        elif not settings.env.azext_iot_central_primarykey:
             self.app_primary_key = self.cmd(
                 "iot central app identity assign -n {} -g {} --system-assigned".format(
                     APP_ID,
@@ -83,6 +83,21 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 )
             ).get_output_in_json()["principalId"]
 
+        if not settings.env.azext_iot_central_token:
+            token_mapping = self.cmd(
+                "iot central app token list -n {}".format(
+                    APP_ID,
+                )
+            ).get_output_in_json()
+            parsed_mapping = {token["displayName"]: token["id"] for token in token_mapping}
+            admin_id = parsed_mapping["Administrator"]
+            self.token = self.cmd(
+                "iot central api-token create -n {} --tkid {} -r {}".format(
+                    APP_ID,
+                    "token1",
+                    admin_id,
+                )
+            ).get_output_in_json()["token"]
 
 
     def _create_device(self, api_version, **kwargs) -> Tuple[str, str]:
