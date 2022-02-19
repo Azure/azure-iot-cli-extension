@@ -28,12 +28,15 @@ class Operation(Model):
     :ivar is_data_action: If the operation is a data action (for data plane
      rbac).
     :vartype is_data_action: bool
+    :ivar properties: Operation properties.
+    :vartype properties: dict[str, object]
     """
 
     _validation = {
         'name': {'readonly': True},
         'origin': {'readonly': True},
         'is_data_action': {'readonly': True},
+        'properties': {'readonly': True},
     }
 
     _attribute_map = {
@@ -41,6 +44,7 @@ class Operation(Model):
         'display': {'key': 'display', 'type': 'OperationDisplay'},
         'origin': {'key': 'origin', 'type': 'str'},
         'is_data_action': {'key': 'isDataAction', 'type': 'bool'},
+        'properties': {'key': 'properties', 'type': '{object}'},
     }
 
     def __init__(self, *, display=None, **kwargs) -> None:
@@ -49,3 +53,4 @@ class Operation(Model):
         self.display = display
         self.origin = None
         self.is_data_action = None
+        self.properties = None

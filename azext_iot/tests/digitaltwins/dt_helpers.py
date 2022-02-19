@@ -51,3 +51,15 @@ def generate_twin_result(randomized=False):
             "$model": generate_generic_id() if randomized else model_id
         }
     }
+
+
+def assert_system_data_attributes(
+    system_data
+):
+    assert system_data
+    assert system_data["createdAt"]
+    assert system_data["createdBy"]
+    assert system_data["createdByType"]
+    assert system_data["lastModifiedAt"]
+    assert system_data["lastModifiedBy"]
+    assert system_data["lastModifiedByType"]

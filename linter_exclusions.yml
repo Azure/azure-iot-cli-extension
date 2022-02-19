@@ -13,6 +13,14 @@ dt endpoint create eventhub:
     eventhub_resource_group:
       rule_exclusions:
       - parameter_should_not_end_in_resource_group
+dt data-history create adx:
+  parameters:
+    adx_resource_group:
+      rule_exclusions:
+      - parameter_should_not_end_in_resource_group
+    eh_resource_group:
+      rule_exclusions:
+      - parameter_should_not_end_in_resource_group
 iot dps enrollment update:
   parameters:
     auth_type_dataplane:

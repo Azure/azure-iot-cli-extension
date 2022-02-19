@@ -15,25 +15,25 @@ from msrest.serialization import Model
 class DigitalTwinsUpdateRelationshipOptions(Model):
     """Additional parameters for update_relationship operation.
 
+    :param if_match: Only perform the operation if the entity's etag matches
+     one of the etags provided or * is provided.
+    :type if_match: str
     :param traceparent: Identifies the request in a distributed tracing
      system.
     :type traceparent: str
     :param tracestate: Provides vendor-specific trace identification
      information and is a companion to traceparent.
     :type tracestate: str
-    :param if_match: Only perform the operation if the entity's etag matches
-     one of the etags provided or * is provided.
-    :type if_match: str
     """
 
     _attribute_map = {
+        'if_match': {'key': '', 'type': 'str'},
         'traceparent': {'key': '', 'type': 'str'},
         'tracestate': {'key': '', 'type': 'str'},
-        'if_match': {'key': '', 'type': 'str'},
     }
 
     def __init__(self, **kwargs):
         super(DigitalTwinsUpdateRelationshipOptions, self).__init__(**kwargs)
+        self.if_match = kwargs.get('if_match', None)
         self.traceparent = kwargs.get('traceparent', None)
         self.tracestate = kwargs.get('tracestate', None)
-        self.if_match = kwargs.get('if_match', None)

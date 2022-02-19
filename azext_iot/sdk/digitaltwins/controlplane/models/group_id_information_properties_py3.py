@@ -15,7 +15,7 @@ from msrest.serialization import Model
 class GroupIdInformationProperties(Model):
     """The properties for a group information object.
 
-    :param group_id: The group id
+    :param group_id: The group id.
     :type group_id: str
     :param required_members: The required members for a specific group id.
     :type required_members: list[str]

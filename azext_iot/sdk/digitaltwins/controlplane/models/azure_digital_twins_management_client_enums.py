@@ -33,6 +33,22 @@ class ProvisioningState(str, Enum):
     moving = "Moving"
 
 
+class ConnectionPropertiesProvisioningState(str, Enum):
+
+    pending = "Pending"
+    approved = "Approved"
+    rejected = "Rejected"
+    disconnected = "Disconnected"
+
+
+class CreatedByType(str, Enum):
+
+    user = "User"
+    application = "Application"
+    managed_identity = "ManagedIdentity"
+    key = "Key"
+
+
 class DigitalTwinsIdentityType(str, Enum):
 
     none = "None"
@@ -74,9 +90,16 @@ class PrivateLinkServiceConnectionStatus(str, Enum):
     disconnected = "Disconnected"
 
 
-class ConnectionPropertiesProvisioningState(str, Enum):
+class TimeSeriesDatabaseConnectionState(str, Enum):
 
-    pending = "Pending"
-    approved = "Approved"
-    rejected = "Rejected"
-    disconnected = "Disconnected"
+    provisioning = "Provisioning"
+    deleting = "Deleting"
+    succeeded = "Succeeded"
+    failed = "Failed"
+    canceled = "Canceled"
+    deleted = "Deleted"
+    warning = "Warning"
+    suspending = "Suspending"
+    restoring = "Restoring"
+    moving = "Moving"
+    disabled = "Disabled"
