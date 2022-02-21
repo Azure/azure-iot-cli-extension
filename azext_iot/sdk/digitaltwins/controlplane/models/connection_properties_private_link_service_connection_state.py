@@ -13,7 +13,7 @@ from .connection_state import ConnectionState
 
 
 class ConnectionPropertiesPrivateLinkServiceConnectionState(ConnectionState):
-    """ConnectionPropertiesPrivateLinkServiceConnectionState.
+    """The connection state.
 
     All required parameters must be populated in order to send to Azure.
 

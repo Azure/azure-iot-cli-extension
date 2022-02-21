@@ -3,6 +3,18 @@
 Release History
 ===============
 
+
+0.14.0
++++++++++++++++
+
+**Digital Twin updates**
+
+* Added optional `--telemetry-source-time` parameter to `az dt twin telemetry send` to allow users to
+  add a custom timestamp to the sent telemetry.
+
+* Updated both controlplane and dataplane SDKs to now use the newer 2021-06-30-preview API version.
+
+
 0.13.0
 +++++++++++++++
 

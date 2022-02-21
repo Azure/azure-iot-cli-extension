@@ -209,7 +209,7 @@ def _load_central_destination_help():
             --type webhook@v1
             --header '{"x-custom-region":{"value":"westus", "secret": false}}'
 
-        - name: Create a blob stoarge export destination with json payload
+        - name: Create a blob storage export destination with json payload
           text: >
             az iot central export destination create
             --app-id {appid}
@@ -222,7 +222,7 @@ def _load_central_destination_help():
               "containerName": "test"
             }'
 
-        - name: create a Azure Data Explorer export destination with json payload
+        - name: Create an Azure Data Explorer export destination with json payload
           text: >
             az iot central export destination create
             --app-id {appid}
@@ -239,7 +239,7 @@ def _load_central_destination_help():
               "clientSecret": "[Secret]"
             }'
 
-        - name: create an Event Hub export destination with json payload
+        - name: Create an Event Hub export destination with json payload
           text: >
             az iot central export destination create
             --app-id {appid}
@@ -251,7 +251,7 @@ def _load_central_destination_help():
               "connectionString": "Endpoint=sb://[hubName].servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=*****;EntityPath=entityPath1"
             }'
 
-        - name: create an Service Bus Queue destination with json payload
+        - name: Create a Service Bus Queue destination with json payload
           text: >
             az iot central export destination create
             --app-id {appid}
@@ -263,7 +263,7 @@ def _load_central_destination_help():
               "connectionString": "Endpoint=sb://[namespance].servicebus.windows.net/;SharedAccessKeyName=xxx;SharedAccessKey=[key];EntityPath=[name]"
             }'
 
-        - name: create an Service Bus Topic destination with json payload
+        - name: Create a Service Bus Topic destination with json payload
           text: >
             az iot central export destination create
             --app-id {appid}

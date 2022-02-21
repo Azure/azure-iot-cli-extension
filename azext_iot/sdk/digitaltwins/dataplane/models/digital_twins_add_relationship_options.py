@@ -15,25 +15,25 @@ from msrest.serialization import Model
 class DigitalTwinsAddRelationshipOptions(Model):
     """Additional parameters for add_relationship operation.
 
+    :param if_none_match: Only perform the operation if the entity does not
+     already exist. Possible values include: '*'
+    :type if_none_match: str or ~dataplane.models.enum
     :param traceparent: Identifies the request in a distributed tracing
      system.
     :type traceparent: str
     :param tracestate: Provides vendor-specific trace identification
      information and is a companion to traceparent.
     :type tracestate: str
-    :param if_none_match: Only perform the operation if the entity does not
-     already exist. Possible values include: '*'
-    :type if_none_match: str or ~digitaltwins.models.enum
     """
 
     _attribute_map = {
+        'if_none_match': {'key': '', 'type': 'str'},
         'traceparent': {'key': '', 'type': 'str'},
         'tracestate': {'key': '', 'type': 'str'},
-        'if_none_match': {'key': '', 'type': 'str'},
     }
 
     def __init__(self, **kwargs):
         super(DigitalTwinsAddRelationshipOptions, self).__init__(**kwargs)
+        self.if_none_match = kwargs.get('if_none_match', None)
         self.traceparent = kwargs.get('traceparent', None)
         self.tracestate = kwargs.get('tracestate', None)
-        self.if_none_match = kwargs.get('if_none_match', None)

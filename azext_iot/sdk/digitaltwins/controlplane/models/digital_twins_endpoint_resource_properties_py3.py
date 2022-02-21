@@ -32,9 +32,13 @@ class DigitalTwinsEndpointResourceProperties(Model):
      DigitalTwinsInstance.
     :vartype created_time: datetime
     :param authentication_type: Specifies the authentication type being used
-     for connecting to the endpoint. Possible values include: 'KeyBased',
-     'IdentityBased'
-    :type authentication_type: str or ~controlplane.models.AuthenticationType
+     for connecting to the endpoint. Defaults to 'KeyBased'. If 'KeyBased' is
+     selected, a connection string must be specified (at least the primary
+     connection string). If 'IdentityBased' is select, the endpointUri and
+     entityPath properties must be specified. Possible values include:
+     'KeyBased', 'IdentityBased'
+    :type authentication_type: str or
+     ~controlplane.models.AuthenticationType
     :param dead_letter_secret: Dead letter storage secret for key-based
      authentication. Will be obfuscated during read.
     :type dead_letter_secret: str

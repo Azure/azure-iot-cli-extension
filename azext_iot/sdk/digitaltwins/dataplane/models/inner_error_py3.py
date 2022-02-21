@@ -21,7 +21,7 @@ class InnerError(Model):
     :type code: str
     :param innererror: An object containing more specific information than the
      current object about the error.
-    :type innererror: ~digitaltwins.models.InnerError
+    :type innererror: ~dataplane.models.InnerError
     """
 
     _attribute_map = {

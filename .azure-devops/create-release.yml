@@ -31,19 +31,19 @@ parameters:
   type: object
   default: >
     {
-      Python36: 
+      Python36:
       {
         python: '3.6.x'
       },
-      Python38: 
+      Python38:
       {
         python: '3.8.x'
       },
-      Python39: 
+      Python39:
       {
         python: '3.9.x'
       },
-      Python310: 
+      Python310:
       {
         python: '3.10.x'
       }
@@ -143,6 +143,19 @@ stages:
       steps:
       - template: templates/evaluate-command-table.yml
 
+  - stage: 'smokeTest'
+    displayName: 'Run smoke tests'
+    dependsOn: test
+    variables:
+      pythonVersions: ${{ parameters.pythonVersionsTestingMatrix }}
+    condition: succeeded()
+    pool:
+      vmImage: ${{ parameters.testAgentVmImage }}
+    jobs:
+    - template: templates/smoke-tests.yml
+      parameters:
+        azureCLIVersion: released
+
   - stage: 'kpi'
     displayName: 'Build KPIs'
     dependsOn: [build, test]
@@ -192,7 +205,7 @@ stages:
             $extensions = Get-ChildItem -Filter "*.whl" -Recurse | Select-Object FullName
             Foreach ($extension in $extensions)
             {
-                Write-Host "calculating sha256 for " $extension.FullName   
+                Write-Host "calculating sha256 for " $extension.FullName
                 (Get-Filehash -Path $extension.Fullname -Algorithm SHA256).Hash.ToLower()
             }
             Write-Host "done"
@@ -207,7 +220,7 @@ stages:
           tagSource: userSpecifiedTag
           tag: 'v$(CLIVersion)'
           title: $(ReleaseTitle)
-          assets: '$(System.ArtifactsDirectory)/extension/**/*.whl' 
+          assets: '$(System.ArtifactsDirectory)/extension/**/*.whl'
           assetUploadMode: 'replace'
           isDraft: true
           isPreRelease: false

@@ -96,7 +96,7 @@ class TestTwinCreateInstance(object):
         yield mocked_response
 
     def test_create_instance_with_retry(self, fixture_cmd, mocker, service_client_with_retry):
-        mocker.patch.object(azext_iot.digitaltwins.providers.resource, "ADT_CREATE_RETRY_AFTER", 0.0001)
+        mocker.patch.object(azext_iot.digitaltwins.providers.generic, "ADT_CREATE_RETRY_AFTER", 0.0001)
         subject.create_instance(
             cmd=fixture_cmd,
             name=name,
@@ -144,7 +144,7 @@ class TestTwinCreateInstance(object):
         yield mocked_response
 
     def test_create_instance_with_failed_retry(self, fixture_cmd, mocker, service_client_with_failed_retry):
-        mocker.patch.object(azext_iot.digitaltwins.providers.resource, "ADT_CREATE_RETRY_AFTER", 0.0001)
+        mocker.patch.object(azext_iot.digitaltwins.providers.generic, "ADT_CREATE_RETRY_AFTER", 0.0001)
         result = subject.create_instance(
             cmd=fixture_cmd,
             name=name,

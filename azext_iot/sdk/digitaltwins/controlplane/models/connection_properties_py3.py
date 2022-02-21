@@ -22,13 +22,12 @@ class ConnectionProperties(Model):
      'Pending', 'Approved', 'Rejected', 'Disconnected'
     :vartype provisioning_state: str or
      ~controlplane.models.ConnectionPropertiesProvisioningState
-    :param private_endpoint:
-    :type private_endpoint:
-     ~controlplane.models.ConnectionPropertiesPrivateEndpoint
+    :param private_endpoint: The private endpoint.
+    :type private_endpoint: ~controlplane.models.PrivateEndpoint
     :param group_ids: The list of group ids for the private endpoint
      connection.
     :type group_ids: list[str]
-    :param private_link_service_connection_state:
+    :param private_link_service_connection_state: The connection state.
     :type private_link_service_connection_state:
      ~controlplane.models.ConnectionPropertiesPrivateLinkServiceConnectionState
     """
@@ -39,7 +38,7 @@ class ConnectionProperties(Model):
 
     _attribute_map = {
         'provisioning_state': {'key': 'provisioningState', 'type': 'str'},
-        'private_endpoint': {'key': 'privateEndpoint', 'type': 'ConnectionPropertiesPrivateEndpoint'},
+        'private_endpoint': {'key': 'privateEndpoint', 'type': 'PrivateEndpoint'},
         'group_ids': {'key': 'groupIds', 'type': '[str]'},
         'private_link_service_connection_state': {'key': 'privateLinkServiceConnectionState', 'type': 'ConnectionPropertiesPrivateLinkServiceConnectionState'},
     }

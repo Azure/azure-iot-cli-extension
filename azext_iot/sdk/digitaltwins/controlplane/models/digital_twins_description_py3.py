@@ -32,6 +32,9 @@ class DigitalTwinsDescription(DigitalTwinsResource):
     :type tags: dict[str, str]
     :param identity: The managed identity for the DigitalTwinsInstance.
     :type identity: ~controlplane.models.DigitalTwinsIdentity
+    :ivar system_data: Metadata pertaining to creation and last modification
+     of the DigitalTwinsInstance.
+    :vartype system_data: ~controlplane.models.SystemData
     :ivar created_time: Time when DigitalTwinsInstance was created.
     :vartype created_time: datetime
     :ivar last_updated_time: Time when DigitalTwinsInstance was updated.
@@ -39,10 +42,11 @@ class DigitalTwinsDescription(DigitalTwinsResource):
     :ivar provisioning_state: The provisioning state. Possible values include:
      'Provisioning', 'Deleting', 'Updating', 'Succeeded', 'Failed', 'Canceled',
      'Deleted', 'Warning', 'Suspending', 'Restoring', 'Moving'
-    :vartype provisioning_state: str or ~controlplane.models.ProvisioningState
+    :vartype provisioning_state: str or
+     ~controlplane.models.ProvisioningState
     :ivar host_name: Api endpoint to work with DigitalTwinsInstance.
     :vartype host_name: str
-    :param private_endpoint_connections:
+    :param private_endpoint_connections: The private endpoint connections.
     :type private_endpoint_connections:
      list[~controlplane.models.PrivateEndpointConnection]
     :param public_network_access: Public network access for the
@@ -56,6 +60,7 @@ class DigitalTwinsDescription(DigitalTwinsResource):
         'name': {'readonly': True, 'pattern': r'^(?!-)[A-Za-z0-9-]{3,63}(?<!-)$'},
         'type': {'readonly': True},
         'location': {'required': True},
+        'system_data': {'readonly': True},
         'created_time': {'readonly': True},
         'last_updated_time': {'readonly': True},
         'provisioning_state': {'readonly': True},
@@ -69,6 +74,7 @@ class DigitalTwinsDescription(DigitalTwinsResource):
         'location': {'key': 'location', 'type': 'str'},
         'tags': {'key': 'tags', 'type': '{str}'},
         'identity': {'key': 'identity', 'type': 'DigitalTwinsIdentity'},
+        'system_data': {'key': 'systemData', 'type': 'SystemData'},
         'created_time': {'key': 'properties.createdTime', 'type': 'iso-8601'},
         'last_updated_time': {'key': 'properties.lastUpdatedTime', 'type': 'iso-8601'},
         'provisioning_state': {'key': 'properties.provisioningState', 'type': 'str'},
