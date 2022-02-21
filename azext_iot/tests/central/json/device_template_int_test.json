@@ -208,7 +208,7 @@
             }
         ]
     },
-    "@id": "dtmi:ulu38i3jr:intTestDeviceTemplateid",
+    "@id": "dtmi:intTestDeviceTemplateid;1",
     "@type": [
         "DeviceModel",
         "ModelDefinition"

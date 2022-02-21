@@ -7,6 +7,7 @@
 
 from typing import List, Union
 import requests
+from azext_iot.central.models.edge import EdgeModule
 from azext_iot.common.auth import get_aad_token
 
 from knack.util import CLIError
@@ -599,7 +600,16 @@ def get_device_twin(
         headers=headers,
         verify=not should_disable_connection_verify(),
     )
-    return DeviceTwin(_utility.try_extract_result(response))
+    response_data = _utility.try_extract_result(response)
+    message = response_data.get("message")
+
+    if (
+        message == f"Twin for device {device_id} was not found"
+        or response_data.get("code") is not None
+    ):  # there is an error
+        raise CLIError(f"Twin for device '{device_id}' was not found")
+    else:
+        return DeviceTwin(response_data)
 
 
 def run_manual_failover(
@@ -686,7 +696,7 @@ def purge_c2d_messages(
     device_id: str,
     token: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) :
+):
     """
     Purges cloud to device (C2D) message queue for the specified device.
 
@@ -711,3 +721,98 @@ def purge_c2d_messages(
     headers = _utility.get_headers(token, cmd)
     response = requests.delete(url, headers=headers)
     return _utility.try_extract_result(response)
+
+
+def list_device_modules(
+    cmd,
+    app_id: str,
+    device_id: str,
+    token: str,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+) -> List[EdgeModule]:
+    """
+    Get edge device modules
+
+    Args:
+        cmd: command passed into az
+        device_id: unique case-sensitive device id,
+        app_id: name of app (used for forming request URL)
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        modules: list
+    """
+
+    if not token:
+        aad_token = get_aad_token(cmd, resource="https://apps.azureiotcentral.com")[
+            "accessToken"
+        ]
+        token = "Bearer {}".format(aad_token)
+
+    url = f"https://{app_id}.{central_dns_suffix}/system/iotedge/devices/{device_id}/modules"
+    headers = _utility.get_headers(token, cmd)
+
+    # Construct parameters
+
+    response = requests.get(
+        url,
+        headers=headers,
+        verify=not should_disable_connection_verify(),
+    )
+
+    response_data = _utility.try_extract_result(response).get("modules")
+
+    if not response_data:
+        raise CLIError(f"No modules available on device {device_id}")
+    return [EdgeModule(dict_clean(module)) for module in response_data]
+
+
+def restart_device_module(
+    cmd,
+    app_id: str,
+    device_id: str,
+    module_id: str,
+    token: str,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+) -> EdgeModule:
+    """
+    Restart a device module
+
+    Args:
+        cmd: command passed into az
+        device_id: unique case-sensitive device id,
+        module_id: unique case-sensitive module id,
+        app_id: name of app (used for forming request URL)
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        module: dict
+    """
+
+    if not token:
+        aad_token = get_aad_token(cmd, resource="https://apps.azureiotcentral.com")[
+            "accessToken"
+        ]
+        token = "Bearer {}".format(aad_token)
+
+    url = f"https://{app_id}.{central_dns_suffix}/system/iotedge/devices/{device_id}/modules/$edgeAgent/directmethods"
+    json = {
+        "methodName": "RestartModule",
+        "payload": {"schemaVersion": "1.0", "id": module_id},
+    }
+    headers = _utility.get_headers(token, cmd)
+
+    # Construct parameters
+
+    response = requests.post(
+        url,
+        json=json,
+        headers=headers,
+        verify=not should_disable_connection_verify(),
+    )
+
+    return response.json()

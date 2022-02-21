@@ -59,6 +59,7 @@ def load_central_help():
     _load_central_compute_device_key()
     _load_central_export_help()
     _load_central_c2d_message_help()
+    _load_central_edge_help()
 
 
 def _load_central_export_help():
@@ -1301,4 +1302,119 @@ def _load_central_monitors_help():
     ] = """
         type: command
         short-summary: Get the device twin from IoT Hub.
+    """
+
+
+def _load_central_edge_help():
+    helps[
+        "iot central device edge"
+    ] = """
+        type: group
+        short-summary: Manage and configure IoT Central edge devices
+    """
+
+    helps[
+        "iot central device edge list"
+    ] = """
+        type: command
+        short-summary: Get the list of edge devices for an IoT Central application.
+        examples:
+        - name: List all edge devices in an application, sorted by device Id (default)
+          text: >
+            az iot central device edge list
+            --app-id {appid}
+    """
+
+    helps[
+        "iot central device edge show"
+    ] = """
+        type: command
+        short-summary: Get an IoT Edge device for an IoT Central application.
+        examples:
+        - name: Get an IoT Edge device in an application.
+          text: >
+            az iot central device edge show
+            --app-id {appid}
+            --device-id {deviceId}
+    """
+
+    helps[
+        "iot central device edge get-children"
+    ] = """
+        type: command
+        short-summary: Get the list of children devices for an IoT Edge device in an IoT Central application.
+        examples:
+        - name: List all children devices for an edge in an application.
+          text: >
+            az iot central device edge get-children
+            --app-id {appid}
+            --device-id {deviceId}
+    """
+
+    helps[
+        "iot central device edge module"
+    ] = """
+        type: group
+        short-summary: Manage IoT Edge device modules.
+    """
+
+    helps[
+        "iot central device edge manifest"
+    ] = """
+        type: group
+        short-summary: Manage IoT Edge device manifests.
+    """
+
+    helps[
+        "iot central device edge module list"
+    ] = """
+        type: command
+        short-summary: Get the list of modules in an IoT Edge device.
+        examples:
+        - name: List all modules in a device. (default)
+          text: >
+            az iot central device edge module list
+            --app-id {appid}
+            --device-id {deviceId}
+    """
+
+    helps[
+        "iot central device edge module restart"
+    ] = """
+        type: command
+        short-summary: Restart a module in an IoT Edge device.
+        examples:
+        - name: Restart a module in a device.
+          text: >
+            az iot central device edge module restart
+            --app-id {appid}
+            --device-id {deviceId}
+            --module-id {moduleId}
+    """
+
+    helps[
+        "iot central device edge module show"
+    ] = """
+        type: command
+        short-summary: Get a module in an IoT Edge device.
+        examples:
+        - name: Get a module in a device.
+          text: >
+            az iot central device edge module show
+            --app-id {appid}
+            --device-id {deviceId}
+            --module-id {moduleId}
+    """
+
+    helps[
+        "iot central device edge manifest show"
+    ] = """
+        type: command
+        short-summary: Get the deployment manifest associated to the specified IoT Edge device.
+        examples:
+        - name: Get a deployment manifest.
+          text: >
+            az iot central device edge manifest show
+            --app-id {appid}
+            --device-id {deviceId}
     """

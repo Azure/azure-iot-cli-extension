@@ -7,6 +7,7 @@
 
 class FileNames:
     central_device_template_file = "central/json/device_template.json"
+    central_edge_template_file = "central/json/device_template_edge.json"
     central_deeply_nested_device_template_file = (
         "central/json/deeply_nested_template.json"
     )
@@ -18,6 +19,7 @@ class FileNames:
     central_job_file = "central/json/job.json"
     central_fileupload_file = "central/json/fileupload.json"
     central_device_twin_file = "central/json/device_twin.json"
+    central_edge_modules_file = "central/json/edge_modules.json"
     central_property_validation_template_file = (
         "central/json/property_validation_template.json"
     )

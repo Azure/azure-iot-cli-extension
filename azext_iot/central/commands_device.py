@@ -6,9 +6,13 @@
 # Dev note - think of this as a controller
 
 from azext_iot.central.models.devicetwin import DeviceTwin
-from azext_iot.central.providers import CentralDeviceProvider
+from azext_iot.central.models.edge import EdgeModule
+from azext_iot.central.providers import (
+    CentralDeviceProvider,
+    CentralDeviceTemplateProvider,
+)
 from knack.util import CLIError
-from typing import Union, List
+from typing import Union, List, Any
 from azext_iot.central.models.v1 import DeviceV1
 from azext_iot.central.models.preview import DevicePreview
 from azext_iot.central.models.v1_1_preview import DeviceV1_1_preview
@@ -262,6 +266,183 @@ def get_command_history(
     )
 
 
+def list_edge_devices(
+    cmd,
+    app_id: str,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
+) -> List[DeviceType]:
+    edge_devices = []
+    provider = CentralDeviceProvider(
+        cmd=cmd, app_id=app_id, token=token, api_version=api_version
+    )
+    devices = provider.list_devices(central_dns_suffix=central_dns_suffix)
+    for device in devices:
+        if device.provisioned:
+            twin = provider.get_device_twin(
+                device.id, central_dns_suffix=central_dns_suffix
+            )
+            if twin.device_twin["capabilities"]["iotEdge"]:
+                edge_devices.append(device)
+
+    return edge_devices
+
+
+def get_children_devices(
+    cmd,
+    app_id: str,
+    device_id: str,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
+) -> List[DeviceType]:
+    children = []
+    provider = CentralDeviceProvider(
+        cmd=cmd, app_id=app_id, token=token, api_version=api_version
+    )
+
+    # get iotedge device
+    edge_twin = provider.get_device_twin(
+        device_id=device_id, central_dns_suffix=central_dns_suffix
+    )
+    edge_scope_id = edge_twin.device_twin.get("deviceScope")
+
+    # list all application device twins
+    devices = provider.list_devices(central_dns_suffix=central_dns_suffix)
+    for device in devices:
+        if device.provisioned:
+            twin = provider.get_device_twin(
+                device.id, central_dns_suffix=central_dns_suffix
+            )
+            device_scope_id = twin.device_twin.get("deviceScope")
+            if (
+                device_scope_id
+                and device_scope_id == edge_scope_id
+                and device.id != device_id  # skip current device
+            ):
+                children.append(device)
+
+    return children
+
+
+def get_edge_device(
+    cmd,
+    app_id: str,
+    device_id: str,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1.value,
+) -> Any:
+    provider = CentralDeviceProvider(
+        cmd=cmd, app_id=app_id, token=token, api_version=api_version
+    )
+
+    def raise_error():
+        raise CLIError("The specified device Id does not identify an IoT Edge device.")
+
+    # check if device is edge
+    try:
+        twin = provider.get_device_twin(
+            device_id, central_dns_suffix=central_dns_suffix
+        )
+        capabilities = twin.device_twin.get("capabilities")
+        if not capabilities:
+            raise_error()
+
+        iot_edge = capabilities.get("iotEdge")
+        if not iot_edge:
+            raise_error()
+
+        return provider.get_device(
+            device_id=device_id, central_dns_suffix=central_dns_suffix
+        )
+    except Exception:
+        raise_error()
+
+
+def list_device_modules(
+    cmd,
+    app_id: str,
+    device_id: str,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+) -> List[EdgeModule]:
+
+    provider = CentralDeviceProvider(
+        cmd=cmd, app_id=app_id, token=token, api_version=ApiVersion.v1.value
+    )
+
+    return provider.list_device_modules(
+        device_id, central_dns_suffix=central_dns_suffix
+    )
+
+
+def get_device_module(
+    cmd,
+    app_id: str,
+    device_id: str,
+    module_id: str,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+) -> EdgeModule:
+
+    provider = CentralDeviceProvider(
+        cmd=cmd, app_id=app_id, token=token, api_version=ApiVersion.v1.value
+    )
+
+    modules = provider.list_device_modules(
+        device_id, central_dns_suffix=central_dns_suffix
+    )
+
+    for module in modules:
+        if module.module_id == module_id:
+            return module
+
+    raise CLIError(
+        f"A module named '{module_id}' does not exist on device {device_id} or is not currently available"
+    )
+
+
+def get_edge_manifest(
+    cmd, app_id: str, device_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT
+):
+    # force API v1.1 for this to work
+    template_provider = CentralDeviceTemplateProvider(
+        cmd=cmd, app_id=app_id, token=token, api_version=ApiVersion.v1_1_preview.value
+    )
+
+    device = get_edge_device(
+        cmd,
+        app_id=app_id,
+        device_id=device_id,
+        token=token,
+        central_dns_suffix=central_dns_suffix,
+    )
+    template = template_provider.get_device_template(
+        device.template, central_dns_suffix=central_dns_suffix
+    )
+    return template.deployment_manifest
+
+
+def restart_device_module(
+    cmd,
+    app_id: str,
+    device_id: str,
+    module_id: str,
+    token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+) -> List[EdgeModule]:
+
+    provider = CentralDeviceProvider(
+        cmd=cmd, app_id=app_id, token=token, api_version=ApiVersion.v1.value
+    )
+
+    return provider.restart_device_module(
+        device_id, module_id, central_dns_suffix=central_dns_suffix
+    )
+
+
 def registration_summary(
     cmd,
     app_id: str,
@@ -294,11 +475,7 @@ def get_credentials(
     )
 
 
-def compute_device_key(
-    cmd,
-    primary_key,
-    device_id
-):
+def compute_device_key(cmd, primary_key, device_id):
     return utility.compute_device_key(
         primary_key=primary_key, registration_id=device_id
     )

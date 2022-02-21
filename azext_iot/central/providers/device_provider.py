@@ -8,6 +8,7 @@ from typing import List, Union
 from knack.util import CLIError
 from knack.log import get_logger
 from azext_iot.central.models.devicetwin import DeviceTwin
+from azext_iot.central.models.edge import EdgeModule
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.enum import DeviceStatus, ApiVersion
@@ -324,6 +325,52 @@ class CentralDeviceProvider:
             api_version=self._api_version,
         )
 
+    def list_device_modules(
+        self,
+        device_id,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ) -> List[EdgeModule]:
+
+        modules = central_services.device.list_device_modules(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            token=self._token,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+        if not modules:
+            raise CLIError(
+                "No modules found for device with id: '{}'.".format(device_id)
+            )
+
+        return modules
+
+    def restart_device_module(
+        self,
+        device_id,
+        module_id,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ) -> List[EdgeModule]:
+
+        status = central_services.device.restart_device_module(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            module_id=module_id,
+            token=self._token,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+        if not status or status != 200:
+            raise CLIError(
+                "No module found for device {} with id: '{}'.".format(
+                    device_id, module_id
+                )
+            )
+
+        return status
+
     def get_device_twin(
         self,
         device_id,
@@ -381,7 +428,7 @@ class CentralDeviceProvider:
             app_id=self._app_id,
             device_id=device_id,
             token=self._token,
-            central_dns_suffix=central_dns_suffix
+            central_dns_suffix=central_dns_suffix,
         )
 
     def _dps_populate_essential_info(self, dps_info, device_status: DeviceStatus):

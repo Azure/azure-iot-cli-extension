@@ -26,6 +26,9 @@ device_template_path = get_context_path(__file__, "json/device_template_int_test
 device_template_path_preview = get_context_path(
     __file__, "json/device_template_int_test_preview.json"
 )
+edge_template_path_preview = get_context_path(
+    __file__, "json/device_template_edge.json"
+)
 sync_command_params = get_context_path(__file__, "json/sync_command_args.json")
 DEFAULT_FILE_UPLOAD_TTL = "PT1H"
 
@@ -184,25 +187,43 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             command, api_version=api_version, checks=[self.check("result", "success")]
         )
 
-    def _create_device_template(self, api_version):
-        if api_version == ApiVersion.preview.value:
-            template = utility.process_json_arg(
-                device_template_path_preview,
-                argument_name="device_template_path_preview",
-            )
+    def _create_device_template(self, api_version, edge=False):
+        if edge:
+            template_path = edge_template_path_preview
+        elif api_version == ApiVersion.preview.value:
+            template_path = device_template_path_preview
         else:
-            template = utility.process_json_arg(
-                device_template_path, argument_name="device_template_path"
-            )
+            template_path = device_template_path
+
+        template = utility.process_json_arg(
+            template_path,
+            argument_name="template_path",
+        )
+
         template_name = template["displayName"]
-        template_id = template_name + "id"
+        template_id = template_name + "id;1"
+
+        if (
+            edge
+        ):  # check if template already exists as a create call does not work for edge templates
+            # since deployment manifest cannot be changed
+            try:
+                command = "iot central device-template show --app-id {} --device-template-id {}".format(
+                    APP_ID, template_id
+                )
+                result = self.cmd(command, api_version=api_version).get_output_in_json()
+
+                if (
+                    result
+                    and result.get(self._get_template_id_key(api_version=api_version))
+                    == template_id
+                ):
+                    return (template_id, template_name)
+            except Exception:
+                pass
 
         command = "iot central device-template create --app-id {} --device-template-id {} -k '{}'".format(
-            APP_ID,
-            template_id,
-            device_template_path_preview
-            if api_version == ApiVersion.preview.value
-            else device_template_path,
+            APP_ID, template_id, template_path
         )
 
         result = self.cmd(
@@ -214,10 +235,11 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         )
         json_result = result.get_output_in_json()
 
-        if api_version == ApiVersion.preview.value:
-            assert json_result["id"] == template_id
-        else:
-            assert json_result["@id"] == template_id
+        assert (
+            json_result[self._get_template_id_key(api_version=api_version)]
+            == template_id
+        )
+
         return (template_id, template_name)
 
     def _delete_device_template(self, api_version, template_id):
@@ -473,3 +495,13 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             command += " --api-version {}".format(api_version)
 
         return command
+
+    def _get_template_id(self, api_version, template):
+        if api_version == ApiVersion.preview.value:
+            return template["id"]
+        return template["@id"]
+
+    def _get_template_id_key(self, api_version):
+        if api_version == ApiVersion.preview.value:
+            return "id"
+        return "@id"
