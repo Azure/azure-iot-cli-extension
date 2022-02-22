@@ -481,7 +481,7 @@ class TestIotCentral(CentralLiveScenarioTest):
 
         command = 'iot central query -n {} --query-string "{}"'.format(
             APP_ID,
-            "SELECT TOP 1 testDefaultCapability FROM dtmi:intTestDeviceTemplateid WHERE WITHIN_WINDOW(PT1H)",
+            f"SELECT TOP 1 testDefaultCapability FROM {template_id} WHERE WITHIN_WINDOW(PT1H)",
         )
         response = self.cmd(command, api_version=self._api_version).get_output_in_json()
 
