@@ -5,7 +5,6 @@
 # --------------------------------------------------------------------------------------------
 
 import json
-import os
 import time
 from typing import Tuple
 from knack.util import CLIError
@@ -16,6 +15,7 @@ from azext_iot.tests.settings import DynamoSettings
 from azext_iot.common import utility
 from azext_iot.central.models.enum import Role, UserTypePreview, UserTypeV1, ApiVersion
 
+DEFAULT_CONTAINER = "devices"
 CENTRAL_SETTINGS = [
     "azext_iot_testrg",
     "azext_iot_central_app_id",
@@ -30,14 +30,7 @@ settings = DynamoSettings(opt_env_set=CENTRAL_SETTINGS)
 APP_RG = settings.env.azext_iot_testrg
 APP_ID = settings.env.azext_iot_central_app_id or "test-app-" + generate_generic_id()
 
-APP_PRIMARY_KEY = settings.env.azext_iot_central_primarykey
-
-APP_SCOPE_ID = os.environ.get("azext_iot_central_scope_id")
-DEVICE_ID = os.environ.get("azext_iot_central_device_id")
-TOKEN = os.environ.get("azext_iot_central_token")
-DNS_SUFFIX = os.environ.get("azext_iot_central_dns_suffix")
-STORAGE_CSTRING = os.environ.get("azext_iot_central_storage_cstring")
-STORAGE_CONTAINER = os.environ.get("azext_iot_central_storage_container")
+DEFAULT_CONTAINER = "central"
 device_template_path = get_context_path(__file__, "json/device_template_int_test.json")
 device_template_path_preview = get_context_path(
     __file__, "json/device_template_int_test_preview.json"
@@ -49,59 +42,100 @@ DEFAULT_FILE_UPLOAD_TTL = "PT1H"
 class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def __init__(self, test_scenario):
         super(CentralLiveScenarioTest, self).__init__(test_scenario)
+        self._create_app()
+        self.storage_container = settings.env.azext_iot_central_storage_container or DEFAULT_CONTAINER
+        self.storage_cstring = settings.env.azext_iot_central_storage_cstring
+        self.storage_account_name = None
+        self.token = None
+        self.dns_suffix = None
 
-    def cmd(self, command, api_version=None, checks=None, expect_failure=False):
-        command = self._appendOptionalArgsToCommand(
-            command, token=TOKEN, dns_suffix=DNS_SUFFIX, api_version=api_version
-        )
-        return super().cmd(command, checks=checks, expect_failure=expect_failure)
-
-    def cmd_withoutParams(self, command, checks=None, expect_failure=False):
+    def cmd(
+        self,
+        command,
+        api_version=None,
+        checks=None,
+        expect_failure=False,
+        include_opt_args=True
+    ):
+        if include_opt_args:
+            command = self._appendOptionalArgsToCommand(
+                command, token=self.token, dns_suffix=self.dns_suffix, api_version=api_version
+            )
         return super().cmd(command, checks=checks, expect_failure=expect_failure)
 
     def _create_app(self):
-        self.app_id = APP_ID
-        self.app_primary_key = settings.env.azext_iot_central_primarykey
+        """
+        Create an Iot Central Application if a name is not given in the pytest configuration.
 
-        # Create the app, will overwrite other parameters
-        if not settings.env.azext_iot_central_app_id:
-            assert APP_RG is not None
-            app = self.cmd(
-                "iot central app create -n {} -g {} -s {} --mi-system-assigned".format(
-                    APP_ID,
-                    APP_RG,
-                    APP_ID
+        Will populate the following variables based on given pytest configuration or values returned
+        from the service:
+          - app_primary_key
+          - token
+          - dns_suffix
+        """
+        self.app_id = settings.env.azext_iot_central_app_id or "test-app-" + generate_generic_id()
+        self.app_rg = APP_RG
+        self.app_primary_key = settings.env.azext_iot_central_primarykey
+        self.dns_suffix = settings.env.azext_iot_central_dns_suffix
+        # Can populate scope id once a device is created
+        self._scope_id = settings.env.azext_iot_central_scope_id
+
+        # Create the app and get the app_primary_key if needed
+        if not APP_RG:
+            if not settings.env.azext_iot_central_app_id:
+                raise Exception("Tests need either app name or resource group.")
+
+            self.app_rg = self.cmd(
+                "iot central app show -n {}".format(
+                    self.app_id,
                 )
+            ).get_output_in_json()["resourceGroup"]
+
+        elif not settings.env.azext_iot_central_app_id:
+            app = self.cmd(
+                "iot central app create -n {} -g {} -s {} --mi-system-assigned -l {}".format(
+                    self.app_id,
+                    self.app_rg,
+                    self.app_id,
+                    "westus"
+                ),
+                include_opt_args=False
             ).get_output_in_json()
             self.app_primary_key = app["identity"]["principalId"]
 
-        elif not settings.env.azext_iot_central_primarykey:
+        elif not self.app_primary_key:
             self.app_primary_key = self.cmd(
                 "iot central app identity assign -n {} -g {} --system-assigned".format(
-                    APP_ID,
-                    APP_RG,
-                )
+                    self.app_id,
+                    self.app_rg,
+                ),
+                include_opt_args=False
             ).get_output_in_json()["principalId"]
 
-        if not settings.env.azext_iot_central_token:
-            token_mapping = self.cmd(
-                "iot central app token list -n {}".format(
-                    APP_ID,
-                )
-            ).get_output_in_json()
-            parsed_mapping = {token["displayName"]: token["id"] for token in token_mapping}
-            admin_id = parsed_mapping["Administrator"]
-            self.token = self.cmd(
-                "iot central api-token create -n {} --tkid {} -r {}".format(
-                    APP_ID,
-                    "token1",
-                    admin_id,
-                )
-            ).get_output_in_json()["token"]
-
+        # TODO: figure out what tokens are used for
+        # if not settings.env.azext_iot_central_token:
+        #     token_mapping = self.cmd(
+        #         "iot central app token list -n {}".format(
+        #             self.app_id,
+        #         ),
+        #         include_opt_args=False
+        #     ).get_output_in_json()
+        #     parsed_mapping = {token["displayName"]: token["id"] for token in token_mapping}
+        #     admin_id = parsed_mapping["Administrator"]
+        #     self.token = self.cmd(
+        #         "iot central api-token create -n {} --tkid {} -r {}".format(
+        #             self.app_id,
+        #             "token1",
+        #             admin_id,
+        #         ),
+        #         include_opt_args=False
+        #     ).get_output_in_json()["token"]
 
     def _create_device(self, api_version, **kwargs) -> Tuple[str, str]:
         """
+        Will populate the following variables if not populated already:
+          - scope_id
+
         kwargs:
             instance_of: template_id (str)
             simulated: if the device is to be simulated (bool)
@@ -110,7 +144,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         device_name = self.create_random_name(prefix="aztest", length=24)
 
         command = "iot central device create --app-id {} -d {} --device-name {}".format(
-            APP_ID, device_id, device_name
+            self.app_id, device_id, device_name
         )
 
         checks = [
@@ -142,7 +176,25 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         checks.append(self.check("simulated", simulated))
 
         self.cmd(command, api_version=api_version, checks=checks)
+
         return (device_id, device_name)
+
+    def get_app_scope_id(self, api_version):
+        """
+        Scope ID is taken from device credentials. If needed, create and delete a throwaway device
+        so we can see the scope id.
+        """
+        if not self._scope_id:
+            (device_id, _) = self._create_device(api_version=api_version)
+            self._scope_id = self.cmd(
+                "iot central device show-credentials -n {} -d {}".format(
+                    self.app_id, device_id
+                )
+            ).get_output_in_json()["idScope"]
+
+            self._delete_device(api_version=api_version, device_id=device_id)
+
+        return self._scope_id
 
     def _create_users(self, api_version):
 
@@ -151,7 +203,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             user_id = self.create_random_name(prefix="aztest", length=24)
             email = user_id + "@microsoft.com"
             command = "iot central user create --app-id {} --user-id {} -r {} --email {}".format(
-                APP_ID,
+                self.app_id,
                 user_id,
                 role.name,
                 email,
@@ -178,19 +230,18 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
     def _delete_user(self, api_version, user_id) -> None:
         self.cmd(
-            "iot central user delete --app-id {} --user-id {}".format(APP_ID, user_id),
+            "iot central user delete --app-id {} --user-id {}".format(self.app_id, user_id),
             api_version=api_version,
             checks=[self.check("result", "success")],
         )
 
     def _create_api_tokens(self, api_version):
-
         tokens = []
         for role in Role:
             token_id = self.create_random_name(prefix="aztest", length=24)
             command = (
                 "iot central api-token create --app-id {} --token-id {} -r {}".format(
-                    APP_ID,
+                    self.app_id,
                     token_id,
                     role.name,
                 )
@@ -211,14 +262,14 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def _delete_api_token(self, api_version, token_id) -> None:
         self.cmd(
             "iot central api-token delete --app-id {} --token-id {}".format(
-                APP_ID, token_id
+                self.app_id, token_id
             ),
             api_version=api_version,
             checks=[self.check("result", "success")],
         )
 
     def _wait_for_provisioned(self, api_version, device_id):
-        command = "iot central device show --app-id {} -d {}".format(APP_ID, device_id)
+        command = "iot central device show --app-id {} -d {}".format(self.app_id, device_id)
 
         while True:
             result = self.cmd(command, api_version=api_version)
@@ -234,7 +285,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def _delete_device(self, api_version, device_id) -> None:
 
         command = "iot central device delete --app-id {} -d {} ".format(
-            APP_ID, device_id
+            self.app_id, device_id
         )
 
         self.cmd(
@@ -255,7 +306,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         template_id = template_name + "id"
 
         command = "iot central device-template create --app-id {} --device-template-id {} -k '{}'".format(
-            APP_ID,
+            self.app_id,
             template_id,
             device_template_path_preview
             if api_version == ApiVersion.preview.value
@@ -280,7 +331,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def _delete_device_template(self, api_version, template_id):
         attempts = range(0, 10)
         command = "iot central device-template delete --app-id {} --device-template-id {}".format(
-            APP_ID, template_id
+            self.app_id, template_id
         )
 
         # retry logic to delete the template
@@ -312,7 +363,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                         if device_template == template_id:
                             self.cmd(
                                 "iot central device delete --app-id {} --device-id {}".format(
-                                    APP_ID, device["id"]
+                                    self.app_id, device["id"]
                                 ),
                                 api_version=api_version,
                             )
@@ -335,7 +386,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def _get_credentials(self, api_version, device_id):
         return self.cmd(
             "iot central device show-credentials --app-id {} -d {}".format(
-                APP_ID, device_id
+                self.app_id, device_id
             ),
             api_version=api_version,
         ).get_output_in_json()
@@ -353,7 +404,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             " --et {} "
             " --duration {} "
             " --mm {} -y --style json".format(
-                APP_ID, device_id, enqueued_time, duration, max_messages
+                self.app_id, device_id, enqueued_time, duration, max_messages
             ),
             asserts,
         )
@@ -371,7 +422,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
         output = self.command_execute_assert(
             "iot central diagnostics monitor-events -n {} -d {} --et {} --to 1 -y".format(
-                APP_ID, device_id, enqueued_time
+                self.app_id, device_id, enqueued_time
             ),
             asserts,
         )
@@ -384,7 +435,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def _create_fileupload(self, api_version, account_name=None, sasttl=None):
         command = (
             'iot central file-upload-config create --app-id {} -s "{}" -c "{}"'.format(
-                APP_ID, STORAGE_CSTRING, STORAGE_CONTAINER
+                self.app_id, self.storage_cstring, self.storage_container
             )
         )
 
@@ -397,8 +448,8 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             command,
             api_version=api_version,
             checks=[
-                self.check("connectionString", STORAGE_CSTRING),
-                self.check("container", STORAGE_CONTAINER),
+                self.check("connectionString", self.storage_cstring),
+                self.check("container", self.storage_container),
                 self.check("account", None if account_name is None else account_name),
                 self.check("state", "pending"),
                 self.check(
@@ -420,7 +471,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def _create_organization(self, api_version):
         org_id = self.create_random_name(prefix="aztest", length=24)
         command = "iot central organization create --app-id {} --org-id {}".format(
-            APP_ID, org_id
+            self.app_id, org_id
         )
 
         return self.cmd(
@@ -433,7 +484,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
     def _delete_organization(self, api_version, org_id):
         command = "iot central organization delete --app-id {} --org-id {}".format(
-            APP_ID, org_id
+            self.app_id, org_id
         )
         self.cmd(
             command,
@@ -447,13 +498,13 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         self.kwargs["authorization"] = json.dumps(
             {
                 "type": "connectionString",
-                "connectionString": STORAGE_CSTRING,
-                "containerName": STORAGE_CONTAINER,
+                "connectionString": self.storage_cstring,
+                "containerName": self.storage_container,
             }
         )
         command = "iot central export destination create --app-id {} \
             --dest-id {} --type {} --name '{}' --authorization '{}'".format(
-            APP_ID,
+            self.app_id,
             dest_id,
             "blobstorage@v1",
             "Blob Storage",
@@ -466,7 +517,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def _delete_destination(self, api_version, dest_id):
         command = (
             "iot central export destination delete --app-id {} --dest-id {}".format(
-                APP_ID, dest_id
+                self.app_id, dest_id
             )
         )
         self.cmd(command, api_version=api_version)
@@ -478,7 +529,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
         command = "iot central export create --app-id {} --export-id {} --name {} \
             --filter {} --source {} --enabled {} --enrichments '{}' --destinations '{}'".format(
-            APP_ID,
+            self.app_id,
             export_id,
             '"Test Export"',
             '"SELECT * FROM devices WHERE $simulated = true"',
@@ -493,9 +544,51 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
     def _delete_export(self, api_version, export_id):
         command = "iot central export delete --app-id {} --export-id {}".format(
-            APP_ID, export_id
+            self.app_id, export_id
         )
         self.cmd(command, api_version=api_version)
+
+    def _create_storage_account(self):
+        """
+        Create a storage account and container if the storage connection string was not provided and
+        a storage account was not created yet. Populate the following variables if needed:
+          - storage_account_name
+          - storage_container
+          - storage_cstring
+        """
+        if not settings.env.azext_iot_central_storage_cstring and self.storage_account_name is None:
+            self.storage_account_name = "iotstore" + generate_generic_id()
+            self.cmd(
+                "storage account create -n {} -g {}".format(
+                    self.storage_account_name, self.app_rg
+                ),
+                include_opt_args=False
+            )
+            self.storage_cstring = self.cmd(
+                "storage account show-connection-string -n {} -g {}".format(
+                    self.storage_account_name, self.app_rg
+                ),
+                include_opt_args=False
+            ).get_output_in_json()["connectionString"]
+            self.cmd(
+                "storage container create -n {} --connection-string '{}'".format(
+                    self.storage_container, self.storage_cstring
+                ),
+                include_opt_args=False
+            )
+
+    def _delete_storage_account(self):
+        """
+        Delete the storage account if it was created. The variable storage_account_name will only
+        be populated if a storage account was created and thus must be deleted at the end of the test.
+        """
+        if self.storage_account_name:
+            self.cmd(
+                "storage account delete -n {} -g {} -y".format(
+                    self.storage_account_name, APP_RG
+                ),
+                include_opt_args=False
+            )
 
     def _wait_for_storage_configured(self, api_version):
         command = "iot central file-upload-config show --app-id {}".format(APP_ID)
@@ -530,3 +623,13 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             command += " --api-version {}".format(api_version)
 
         return command
+
+    def tearDown(self):
+        if not settings.env.azext_iot_central_app_id:
+            self.cmd(
+                "iot central app delete -n {} -g {} -y".format(
+                    self.app_id, self.app_rg
+                )
+            )
+        if self.storage_account_name:
+            self._delete_storage_account()
