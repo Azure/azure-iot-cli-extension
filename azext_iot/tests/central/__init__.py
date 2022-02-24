@@ -28,7 +28,6 @@ CENTRAL_SETTINGS = [
 ]
 settings = DynamoSettings(opt_env_set=CENTRAL_SETTINGS)
 APP_RG = settings.env.azext_iot_testrg
-APP_ID = settings.env.azext_iot_central_app_id or "test-app-" + generate_generic_id()
 
 DEFAULT_CONTAINER = "central"
 device_template_path = get_context_path(__file__, "json/device_template_int_test.json")
@@ -59,7 +58,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
     ):
         if include_opt_args:
             command = self._appendOptionalArgsToCommand(
-                command, token=self.token, dns_suffix=self.dns_suffix, api_version=api_version
+                command, api_version=api_version
             )
         return super().cmd(command, checks=checks, expect_failure=expect_failure)
 
@@ -67,32 +66,28 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         """
         Create an Iot Central Application if a name is not given in the pytest configuration.
 
-        Will populate the following variables based on given pytest configuration or values returned
-        from the service:
+        Will populate the following variables based on given pytest configuration:
           - app_primary_key
           - token
           - dns_suffix
         """
         self.app_id = settings.env.azext_iot_central_app_id or "test-app-" + generate_generic_id()
         self.app_rg = APP_RG
-        self.app_primary_key = settings.env.azext_iot_central_primarykey
-        self.dns_suffix = settings.env.azext_iot_central_dns_suffix
-        # Can populate scope id once a device is created
+        # If not populated here, will be populated with get_app_scope_id
         self._scope_id = settings.env.azext_iot_central_scope_id
 
-        # Create the app and get the app_primary_key if needed
-        if not APP_RG:
-            if not settings.env.azext_iot_central_app_id:
+        # only populate these if given in the test configuration variables
+        self.app_primary_key = settings.env.azext_iot_central_primarykey
+        self.dns_suffix = settings.env.azext_iot_central_dns_suffix
+        self.token = settings.env.azext_iot_central_token
+
+        # Create Central App if it does not exist. Note that app_primary_key will be nullified since
+        # there is no current way to get the app_primary_key and not all tests can be executed.
+        if not settings.env.azext_iot_central_app_id:
+            if not APP_RG:
                 raise Exception("Tests need either app name or resource group.")
 
-            self.app_rg = self.cmd(
-                "iot central app show -n {}".format(
-                    self.app_id,
-                )
-            ).get_output_in_json()["resourceGroup"]
-
-        elif not settings.env.azext_iot_central_app_id:
-            app = self.cmd(
+            self.cmd(
                 "iot central app create -n {} -g {} -s {} --mi-system-assigned -l {}".format(
                     self.app_id,
                     self.app_rg,
@@ -100,36 +95,15 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     "westus"
                 ),
                 include_opt_args=False
-            ).get_output_in_json()
-            self.app_primary_key = app["identity"]["principalId"]
-
-        elif not self.app_primary_key:
-            self.app_primary_key = self.cmd(
-                "iot central app identity assign -n {} -g {} --system-assigned".format(
+            )
+            self.app_primary_key = None
+        # Get Central App rg if needed (for storage account creation)
+        elif not APP_RG:
+            self.app_rg = self.cmd(
+                "iot central app show -n {}".format(
                     self.app_id,
-                    self.app_rg,
-                ),
-                include_opt_args=False
-            ).get_output_in_json()["principalId"]
-
-        # TODO: figure out what tokens are used for
-        # if not settings.env.azext_iot_central_token:
-        #     token_mapping = self.cmd(
-        #         "iot central app token list -n {}".format(
-        #             self.app_id,
-        #         ),
-        #         include_opt_args=False
-        #     ).get_output_in_json()
-        #     parsed_mapping = {token["displayName"]: token["id"] for token in token_mapping}
-        #     admin_id = parsed_mapping["Administrator"]
-        #     self.token = self.cmd(
-        #         "iot central api-token create -n {} --tkid {} -r {}".format(
-        #             self.app_id,
-        #             "token1",
-        #             admin_id,
-        #         ),
-        #         include_opt_args=False
-        #     ).get_output_in_json()["token"]
+                )
+            ).get_output_in_json()["resourceGroup"]
 
     def _create_device(self, api_version, **kwargs) -> Tuple[str, str]:
         """
@@ -348,7 +322,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             except Exception as e:
                 error = e
                 # delete associated devices if any.
-                command = "iot central device list --app-id {}".format(APP_ID)
+                command = "iot central device list --app-id {}".format(self.app_id)
                 devices = self.cmd(
                     command, api_version=api_version
                 ).get_output_in_json()
@@ -375,12 +349,12 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         )
 
     def _list_device_groups(self, api_version):
-        command = "iot central device-group list --app-id {}".format(APP_ID)
+        command = "iot central device-group list --app-id {}".format(self.app_id)
         return self.cmd(command, api_version=api_version).get_output_in_json()
 
     def _list_roles(self, api_version):
         return self.cmd(
-            "iot central role list --app-id {}".format(APP_ID), api_version=api_version
+            "iot central role list --app-id {}".format(self.app_id), api_version=api_version
         ).get_output_in_json()
 
     def _get_credentials(self, api_version, device_id):
@@ -459,7 +433,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         ).get_output_in_json()
 
     def _delete_fileupload(self, api_version):
-        command = "iot central file-upload-config delete --app-id {}".format(APP_ID)
+        command = "iot central file-upload-config delete --app-id {}".format(self.app_id)
         self.cmd(
             command,
             api_version=api_version,
@@ -557,7 +531,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
           - storage_cstring
         """
         if not settings.env.azext_iot_central_storage_cstring and self.storage_account_name is None:
-            self.storage_account_name = "iotstore" + generate_generic_id()
+            self.storage_account_name = "iotstore" + generate_generic_id()[:4]
             self.cmd(
                 "storage account create -n {} -g {}".format(
                     self.storage_account_name, self.app_rg
@@ -591,7 +565,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             )
 
     def _wait_for_storage_configured(self, api_version):
-        command = "iot central file-upload-config show --app-id {}".format(APP_ID)
+        command = "iot central file-upload-config show --app-id {}".format(self.app_id)
 
         while True:
             try:
@@ -613,12 +587,12 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             time.sleep(10)
 
     def _appendOptionalArgsToCommand(
-        self, command: str, token: str, dns_suffix: str, api_version: str
+        self, command: str, api_version: str
     ):
-        if token:
-            command += ' --token "{}"'.format(token)
-        if dns_suffix:
-            command += ' --central-dns-suffix "{}"'.format(dns_suffix)
+        if self.token:
+            command += ' --token "{}"'.format(self.token)
+        if self.dns_suffix:
+            command += ' --central-dns-suffix "{}"'.format(self.dns_suffix)
         if api_version:
             command += " --api-version {}".format(api_version)
 

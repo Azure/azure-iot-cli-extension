@@ -104,11 +104,13 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         )
 
     def test_device_connect(self):
+        if self.app_primary_key is None:
+            pytest.skip(
+                "Cannot test without primary key. Currently there is no way of retrieving the app "
+                "primary key from the IoT Central App."
+            )
         app_scope_id = self.get_app_scope_id(api_version=self._api_version)
-        print("test_device_connect")
-        print("scope id: " + app_scope_id)
         device_id = "testDevice"
-        print(self.app_primary_key, device_id)
 
         command = "iot central device compute-device-key --pk {} -d {}".format(
             self.app_primary_key, device_id
@@ -134,7 +136,6 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         assert device_client.connected
 
     def test_central_device_methods_CRUD(self):
-
         # list devices and get count
         start_device_list = self.cmd(
             "iot central device list --app-id {}".format(self.app_id),
