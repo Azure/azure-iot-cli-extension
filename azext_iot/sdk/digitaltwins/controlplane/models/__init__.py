@@ -11,7 +11,10 @@
 
 try:
     from .digital_twins_patch_properties_py3 import DigitalTwinsPatchProperties
-    from .private_endpoint_connection_properties_py3 import PrivateEndpointConnectionProperties
+    from .private_endpoint_py3 import PrivateEndpoint
+    from .connection_properties_private_link_service_connection_state_py3 import ConnectionPropertiesPrivateLinkServiceConnectionState
+    from .connection_properties_py3 import ConnectionProperties
+    from .system_data_py3 import SystemData
     from .private_endpoint_connection_py3 import PrivateEndpointConnection
     from .digital_twins_description_py3 import DigitalTwinsDescription
     from .digital_twins_identity_py3 import DigitalTwinsIdentity
@@ -30,18 +33,19 @@ try:
     from .event_hub_py3 import EventHub
     from .event_grid_py3 import EventGrid
     from .group_id_information_properties_py3 import GroupIdInformationProperties
-    from .group_id_information_properties_model_py3 import GroupIdInformationPropertiesModel
     from .group_id_information_py3 import GroupIdInformation
     from .private_endpoint_connections_response_py3 import PrivateEndpointConnectionsResponse
     from .group_id_information_response_py3 import GroupIdInformationResponse
     from .connection_state_py3 import ConnectionState
-    from .private_endpoint_py3 import PrivateEndpoint
-    from .connection_properties_private_endpoint_py3 import ConnectionPropertiesPrivateEndpoint
-    from .connection_properties_private_link_service_connection_state_py3 import ConnectionPropertiesPrivateLinkServiceConnectionState
-    from .connection_properties_py3 import ConnectionProperties
+    from .time_series_database_connection_properties_py3 import TimeSeriesDatabaseConnectionProperties
+    from .time_series_database_connection_py3 import TimeSeriesDatabaseConnection
+    from .azure_data_explorer_connection_properties_py3 import AzureDataExplorerConnectionProperties
 except (SyntaxError, ImportError):
     from .digital_twins_patch_properties import DigitalTwinsPatchProperties
-    from .private_endpoint_connection_properties import PrivateEndpointConnectionProperties
+    from .private_endpoint import PrivateEndpoint
+    from .connection_properties_private_link_service_connection_state import ConnectionPropertiesPrivateLinkServiceConnectionState
+    from .connection_properties import ConnectionProperties
+    from .system_data import SystemData
     from .private_endpoint_connection import PrivateEndpointConnection
     from .digital_twins_description import DigitalTwinsDescription
     from .digital_twins_identity import DigitalTwinsIdentity
@@ -60,32 +64,36 @@ except (SyntaxError, ImportError):
     from .event_hub import EventHub
     from .event_grid import EventGrid
     from .group_id_information_properties import GroupIdInformationProperties
-    from .group_id_information_properties_model import GroupIdInformationPropertiesModel
     from .group_id_information import GroupIdInformation
     from .private_endpoint_connections_response import PrivateEndpointConnectionsResponse
     from .group_id_information_response import GroupIdInformationResponse
     from .connection_state import ConnectionState
-    from .private_endpoint import PrivateEndpoint
-    from .connection_properties_private_endpoint import ConnectionPropertiesPrivateEndpoint
-    from .connection_properties_private_link_service_connection_state import ConnectionPropertiesPrivateLinkServiceConnectionState
-    from .connection_properties import ConnectionProperties
+    from .time_series_database_connection_properties import TimeSeriesDatabaseConnectionProperties
+    from .time_series_database_connection import TimeSeriesDatabaseConnection
+    from .azure_data_explorer_connection_properties import AzureDataExplorerConnectionProperties
 from .digital_twins_description_paged import DigitalTwinsDescriptionPaged
 from .digital_twins_endpoint_resource_paged import DigitalTwinsEndpointResourcePaged
 from .operation_paged import OperationPaged
+from .time_series_database_connection_paged import TimeSeriesDatabaseConnectionPaged
 from .azure_digital_twins_management_client_enums import (
     PublicNetworkAccess,
     ProvisioningState,
+    ConnectionPropertiesProvisioningState,
+    CreatedByType,
     DigitalTwinsIdentityType,
     Reason,
     EndpointProvisioningState,
     AuthenticationType,
     PrivateLinkServiceConnectionStatus,
-    ConnectionPropertiesProvisioningState,
+    TimeSeriesDatabaseConnectionState,
 )
 
 __all__ = [
     'DigitalTwinsPatchProperties',
-    'PrivateEndpointConnectionProperties',
+    'PrivateEndpoint',
+    'ConnectionPropertiesPrivateLinkServiceConnectionState',
+    'ConnectionProperties',
+    'SystemData',
     'PrivateEndpointConnection',
     'DigitalTwinsDescription',
     'DigitalTwinsIdentity',
@@ -104,24 +112,25 @@ __all__ = [
     'EventHub',
     'EventGrid',
     'GroupIdInformationProperties',
-    'GroupIdInformationPropertiesModel',
     'GroupIdInformation',
     'PrivateEndpointConnectionsResponse',
     'GroupIdInformationResponse',
     'ConnectionState',
-    'PrivateEndpoint',
-    'ConnectionPropertiesPrivateEndpoint',
-    'ConnectionPropertiesPrivateLinkServiceConnectionState',
-    'ConnectionProperties',
+    'TimeSeriesDatabaseConnectionProperties',
+    'TimeSeriesDatabaseConnection',
+    'AzureDataExplorerConnectionProperties',
     'DigitalTwinsDescriptionPaged',
     'DigitalTwinsEndpointResourcePaged',
     'OperationPaged',
+    'TimeSeriesDatabaseConnectionPaged',
     'PublicNetworkAccess',
     'ProvisioningState',
+    'ConnectionPropertiesProvisioningState',
+    'CreatedByType',
     'DigitalTwinsIdentityType',
     'Reason',
     'EndpointProvisioningState',
     'AuthenticationType',
     'PrivateLinkServiceConnectionStatus',
-    'ConnectionPropertiesProvisioningState',
+    'TimeSeriesDatabaseConnectionState',
 ]

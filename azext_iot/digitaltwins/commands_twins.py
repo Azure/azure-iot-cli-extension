@@ -139,11 +139,16 @@ def send_telemetry(
     dt_id=None,
     component_path=None,
     telemetry=None,
+    telemetry_source_time=None,
     resource_group_name=None,
 ):
     twin_provider = TwinProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
     return twin_provider.send_telemetry(
-        twin_id=twin_id, dt_id=dt_id, component_path=component_path, telemetry=telemetry
+        twin_id=twin_id,
+        dt_id=dt_id,
+        component_path=component_path,
+        telemetry=telemetry,
+        telemetry_source_time=telemetry_source_time
     )
 
 

@@ -325,6 +325,11 @@ def load_digitaltwins_arguments(self, _):
             options_list=["--component"],
             help="The path to the DTDL component. If set, telemetry will be emitted on behalf of the component.",
         )
+        context.argument(
+            "telemetry_source_time",
+            options_list=["--telemetry-source-time", "--tst"],
+            help="An RFC 3339 timestamp that identifies the time the telemetry was measured.",
+        )
 
     with self.argument_context("dt twin relationship") as context:
         context.argument(
@@ -433,3 +438,90 @@ def load_digitaltwins_arguments(self, _):
     with self.argument_context("dt network private-endpoint connection wait") as context:
         context.ignore("created")
         context.ignore("exists")
+
+    with self.argument_context("dt data-history") as context:
+        context.argument(
+            "conn_name",
+            options_list=["--conn-name", "--cn"],
+            help="Name of data history connection."
+        )
+
+    with self.argument_context("dt data-history connection create adx") as context:
+        context.argument(
+            "adx_cluster_name",
+            options_list=["--adx-cluster-name", "--adxc"],
+            help="Name of Azure Data Explorer cluster to integrate with.",
+            arg_group="Azure Data Explorer",
+        )
+
+        context.argument(
+            "adx_database_name",
+            options_list=["--adx-database-name", "--adxd"],
+            help="Name of Azure Data Explorer database to integrate with.",
+            arg_group="Azure Data Explorer",
+        )
+
+        context.argument(
+            "adx_resource_group",
+            options_list=["--adx-resource-group", "--adxg"],
+            help="Name of Azure Data Explorer resource group. If not provided, will use the Digital Twin's resource group.",
+            arg_group="Azure Data Explorer",
+        )
+
+        context.argument(
+            "adx_subscription",
+            options_list=["--adx-subscription", "--adxs"],
+            help="Name or ID of subscription where the Azure Data Explorer exists. If not provided, will use the subscription "
+                 "that contains the Digital Twin Instance.",
+            arg_group="Azure Data Explorer",
+        )
+
+        context.argument(
+            "adx_table_name",
+            options_list=["--adx-table-name", "--adxt"],
+            help="Name of Azure Data Explorer table to be created. If not provided, will use the format "
+                 "adt_dh_{dt_name}_{dt_location}.",
+            arg_group="Azure Data Explorer",
+        )
+
+        context.argument(
+            "eh_namespace",
+            options_list=["--eventhub-namespace", "--ehn"],
+            help="EventHub Namespace identifier.",
+            arg_group="Event Hub",
+        )
+
+        context.argument(
+            "eh_entity_path",
+            options_list=["--eventhub", "--eh"],
+            help="Name of EventHub to integrate with.",
+            arg_group="Event Hub",
+        )
+
+        context.argument(
+            "eh_consumer_group",
+            options_list=["--eventhub-consumer-group", "--ehc"],
+            help="The EventHub consumer group to use when ADX reads from EventHub.",
+            arg_group="Event Hub",
+        )
+
+        context.argument(
+            "eh_resource_group",
+            options_list=["--eventhub-resource-group", "--ehg"],
+            help="Name of EventHub resource group. If not provided, will use the Digital Twin's resource group.",
+            arg_group="Event Hub",
+        )
+
+        context.argument(
+            "eh_subscription",
+            options_list=["--eventhub-subscription", "--ehs"],
+            help="Name or ID of subscription where the EventHub exists. If not provided, will use the subscription that contains"
+                 " the Digital Twin Instance.",
+            arg_group="Event Hub",
+        )
+
+        context.argument(
+            "yes",
+            options_list=['--yes', '-y'],
+            help='Do not prompt for confirmation when assigning required roles.',
+        )

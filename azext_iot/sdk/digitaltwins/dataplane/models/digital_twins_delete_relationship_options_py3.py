@@ -15,25 +15,25 @@ from msrest.serialization import Model
 class DigitalTwinsDeleteRelationshipOptions(Model):
     """Additional parameters for delete_relationship operation.
 
+    :param if_match: Only perform the operation if the entity's etag matches
+     one of the etags provided or * is provided.
+    :type if_match: str
     :param traceparent: Identifies the request in a distributed tracing
      system.
     :type traceparent: str
     :param tracestate: Provides vendor-specific trace identification
      information and is a companion to traceparent.
     :type tracestate: str
-    :param if_match: Only perform the operation if the entity's etag matches
-     one of the etags provided or * is provided.
-    :type if_match: str
     """
 
     _attribute_map = {
+        'if_match': {'key': '', 'type': 'str'},
         'traceparent': {'key': '', 'type': 'str'},
         'tracestate': {'key': '', 'type': 'str'},
-        'if_match': {'key': '', 'type': 'str'},
     }
 
-    def __init__(self, *, traceparent: str=None, tracestate: str=None, if_match: str=None, **kwargs) -> None:
+    def __init__(self, *, if_match: str=None, traceparent: str=None, tracestate: str=None, **kwargs) -> None:
         super(DigitalTwinsDeleteRelationshipOptions, self).__init__(**kwargs)
+        self.if_match = if_match
         self.traceparent = traceparent
         self.tracestate = tracestate
-        self.if_match = if_match

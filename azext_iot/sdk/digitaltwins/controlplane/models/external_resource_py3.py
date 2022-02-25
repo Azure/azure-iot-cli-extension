@@ -24,18 +24,23 @@ class ExternalResource(Model):
     :vartype name: str
     :ivar type: The resource type.
     :vartype type: str
+    :ivar system_data: Metadata pertaining to creation and last modification
+     of the resource.
+    :vartype system_data: ~controlplane.models.SystemData
     """
 
     _validation = {
         'id': {'readonly': True},
         'name': {'readonly': True, 'pattern': r'^(?![0-9]+$)(?!-)[a-zA-Z0-9-]{2,49}[a-zA-Z0-9]$'},
         'type': {'readonly': True},
+        'system_data': {'readonly': True},
     }
 
     _attribute_map = {
         'id': {'key': 'id', 'type': 'str'},
         'name': {'key': 'name', 'type': 'str'},
         'type': {'key': 'type', 'type': 'str'},
+        'system_data': {'key': 'systemData', 'type': 'SystemData'},
     }
 
     def __init__(self, **kwargs) -> None:
@@ -43,3 +48,4 @@ class ExternalResource(Model):
         self.id = None
         self.name = None
         self.type = None
+        self.system_data = None

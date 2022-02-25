@@ -13,7 +13,7 @@ steps:
             "AZURE_TEST_RUN_LIVE":True,
             "azext_iot_testrg": os.environ.get("AZEXT_IOT_TESTRG", sentinel_value),
             "azext_iot_testhub": os.environ.get("AZEXT_IOT_TESTHUB", sentinel_value),
-            "azext_iot_testdps": os.environ.get("AZEXT_IOT_TESTDPS", sentinel_value),         
+            "azext_iot_testdps": os.environ.get("AZEXT_IOT_TESTDPS", sentinel_value),
             "azext_iot_teststorageaccount": os.environ.get("AZEXT_IOT_TESTSTORAGEACCOUNT", sentinel_value),
             "azext_iot_teststoragecontainer": os.environ.get("AZEXT_IOT_TESTSTORAGECONTAINER", sentinel_value),
             "azext_iot_central_app_id": os.environ.get("AZEXT_IOT_CENTRAL_APP_ID", sentinel_value),
@@ -29,6 +29,10 @@ steps:
             "azext_dt_ep_eventhub_policy": os.environ.get("AZEXT_DT_EP_EVENTHUB_POLICY", sentinel_value),
             "azext_dt_ep_eventhub_topic": os.environ.get("AZEXT_DT_EP_EVENTHUB_TOPIC", sentinel_value),
             "azext_dt_ep_rg": os.environ.get("AZEXT_DT_EP_RG", sentinel_value),
+            "azext_dt_adx_cluster": os.environ.get("AZEXT_DT_ADX_CLUSTER", sentinel_value),
+            "azext_dt_adx_database": os.environ.get("AZEXT_DT_ADX_DATABASE", sentinel_value),
+            "azext_dt_adx_rg": os.environ.get("AZEXT_DT_ADX_RG", sentinel_value),
+            "azext_dt_region": os.environ.get("AZEXT_DT_REGION", sentinel_value),
         }
         f = open("./pytest.ini", "w+")
         f.write("[pytest]\n")

@@ -11,6 +11,7 @@ from knack.log import get_logger
 import pytest
 from azext_iot.common.utility import unpack_msrest_error
 from azext_iot.digitaltwins.common import ADTEndpointAuthType, ADTEndpointType
+from azext_iot.tests.digitaltwins.dt_helpers import assert_system_data_attributes
 from . import DTLiveScenarioTest
 from . import (
     EP_RG,
@@ -675,6 +676,7 @@ def assert_common_resource_attributes(
     instance_output, resource_id, group_id, location, tags=None, assign_identity=False
 ):
     assert instance_output["createdTime"]
+    assert_system_data_attributes(instance_output.get("systemData"))
     hostname = instance_output.get("hostName")
 
     assert hostname, "Provisioned instance is missing hostName."
@@ -716,6 +718,7 @@ def assert_common_endpoint_attributes(
     dead_letter_endpoint=None,
     auth_type=ADTEndpointAuthType.keybased,
 ):
+    assert_system_data_attributes(endpoint_output.get("systemData"))
     assert endpoint_output["id"].endswith("/{}".format(endpoint_name))
     assert (
         endpoint_output["type"]

@@ -17,7 +17,7 @@ class ErrorResponse(Model):
     """Error response.
 
     :param error: The error details.
-    :type error: ~digitaltwins.models.Error
+    :type error: ~dataplane.models.Error
     """
 
     _attribute_map = {

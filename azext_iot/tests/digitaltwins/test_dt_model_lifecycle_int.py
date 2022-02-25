@@ -30,6 +30,7 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
         models_directory = "./models"
         inline_model = "./models/Floor.json"
         room_dtmi = "dtmi:com:example:Room;1"
+        floor_dtmi = "dtmi:com:example:Floor;1"
 
         create_output = self.cmd(
             "dt create -n {} -g {} -l {}".format(instance_name, self.rg, self.region)
@@ -78,6 +79,16 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
             )
         ).get_output_in_json()
         assert len(model_dependencies_output) == 2
+
+        # Multiple dependencies-for should return union of all dependencies
+        model_multi_dependencies_output = self.cmd(
+            "dt model list -n {} -g {} --dependencies-for '{}'".format(
+                instance_name,
+                self.rg,
+                "' '".join([room_dtmi, floor_dtmi]),
+            )
+        ).get_output_in_json()
+        assert len(model_multi_dependencies_output) == 3
 
         for model in create_models_output:
             model_show_output = self.cmd(

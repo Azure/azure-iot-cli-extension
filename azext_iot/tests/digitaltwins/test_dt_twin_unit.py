@@ -1253,17 +1253,20 @@ class TestTwinSendTelemetry(object):
         yield mocked_response
 
     @pytest.mark.parametrize(
-        "dt_id, component_path, telemetry, resource_group_name",
+        "dt_id, component_path, telemetry, telemetry_source_time, resource_group_name",
         [
-            (None, None, json.dumps({}), None),
-            ("DT_ID", None, json.dumps({}), None),
-            (None, component_path, json.dumps({}), None),
-            (None, None, generic_patch_1, None),
-            (None, None, generic_patch_2, None),
-            (None, None, json.dumps({}), resource_group)
+            (None, None, json.dumps({}), None, None),
+            ("DT_ID", None, json.dumps({}), None, None),
+            (None, component_path, json.dumps({}), None, None),
+            (None, None, generic_patch_1, None, None),
+            (None, None, generic_patch_2, None, None),
+            (None, None, generic_patch_2, "2019-10-12T07:20:50.52Z", None),
+            (None, None, json.dumps({}), None, resource_group)
         ]
     )
-    def test_send_telemetry(self, fixture_cmd, service_client, dt_id, component_path, telemetry, resource_group_name):
+    def test_send_telemetry(
+        self, fixture_cmd, service_client, dt_id, component_path, telemetry, telemetry_source_time, resource_group_name
+    ):
         result = subject.send_telemetry(
             cmd=fixture_cmd,
             name_or_hostname=hostname,
@@ -1271,6 +1274,7 @@ class TestTwinSendTelemetry(object):
             dt_id=dt_id,
             component_path=component_path,
             telemetry=telemetry,
+            telemetry_source_time=telemetry_source_time,
             resource_group_name=resource_group_name,
         )
 
@@ -1301,6 +1305,8 @@ class TestTwinSendTelemetry(object):
 
         if dt_id:
             twin_telemetry_request.headers["Message-Id"] == dt_id
+        if telemetry_source_time:
+            twin_telemetry_request.headers["Telemetry-Source-Time"] == telemetry_source_time
 
         assert result is None
 
