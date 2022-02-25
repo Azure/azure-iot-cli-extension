@@ -176,10 +176,10 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         updated_tags = "env=test tier=premium"
         updated_tags_dict = {"env": "test", "tier": "premium"}
         self.cmd(
-            "dt create -n {} -g {} --assign-identity false --tags {}".format(
+            "dt create -n {} -g {} --assign-identity false --tags {} --no-wait".format(
                 instance_names[1], self.rg, updated_tags
             )
-        ).get_output_in_json()
+        )
 
         self.cmd(
             "dt wait -n {} -g {} --custom \"{}\" --interval {} --timeout {}".format(
@@ -371,6 +371,371 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         eventgrid_endpoint = "myeventgridendpoint"
 
         logger.debug("Adding key based eventgrid endpoint...")
+        self.cmd(
+            "dt endpoint create eventgrid -n {} -g {} --egg {} --egt {} --en {} --dsu {} --no-wait".format(
+                endpoints_instance_name,
+                self.rg,
+                EP_RG,
+                EP_EVENTGRID_TOPIC,
+                eventgrid_endpoint,
+                MOCK_DEAD_LETTER_SECRET,
+            )
+        )
+
+        # self.cmd(
+        #     "dt endpoint wait --created -n {} -g {} --en {}".format(
+        #         endpoints_instance_name,
+        #         self.rg,
+        #         eventgrid_endpoint
+        #     )
+        # )
+
+        # show_ep_output = self.cmd(
+        #     "dt endpoint show -n {} -g {} --en {}".format(
+        #         endpoints_instance_name,
+        #         self.rg,
+        #         eventgrid_endpoint
+        #     )
+        # ).get_output_in_json()
+
+        # assert_common_endpoint_attributes(
+        #     show_ep_output,
+        #     eventgrid_endpoint,
+        #     ADTEndpointType.eventgridtopic,
+        #     dead_letter_secret=MOCK_DEAD_LETTER_SECRET,
+        # )
+
+        endpoint_tuple_collection.append(
+            EndpointTuple(
+                eventgrid_endpoint,
+                ADTEndpointType.eventgridtopic,
+                ADTEndpointAuthType.keybased,
+            )
+        )
+
+        servicebus_endpoint = "myservicebusendpoint"
+        servicebus_endpoint_msi = "{}identity".format(servicebus_endpoint)
+
+        logger.debug("Adding key based servicebus topic endpoint...")
+        self.cmd(
+            "dt endpoint create servicebus -n {} --sbg {} --sbn {} --sbp {} --sbt {} --en {} --dsu {} --no-wait".format(
+                endpoints_instance_name,
+                EP_RG,
+                EP_SERVICEBUS_NAMESPACE,
+                EP_SERVICEBUS_POLICY,
+                EP_SERVICEBUS_TOPIC,
+                servicebus_endpoint,
+                MOCK_DEAD_LETTER_SECRET,
+            )
+        )
+
+        # self.cmd(
+        #     "dt endpoint wait --created -n {} -g {} --en {}".format(
+        #         endpoints_instance_name,
+        #         self.rg,
+        #         servicebus_endpoint
+        #     )
+        # )
+
+        # show_ep_sb_key_output = self.cmd(
+        #     "dt endpoint show -n {} -g {} --en {}".format(
+        #         endpoints_instance_name,
+        #         self.rg,
+        #         servicebus_endpoint
+        #     )
+        # ).get_output_in_json()
+
+        # assert_common_endpoint_attributes(
+        #     show_ep_sb_key_output,
+        #     servicebus_endpoint,
+        #     endpoint_type=ADTEndpointType.servicebus,
+        #     auth_type=ADTEndpointAuthType.keybased,
+        #     dead_letter_secret=MOCK_DEAD_LETTER_SECRET,
+        # )
+        endpoint_tuple_collection.append(
+            EndpointTuple(
+                servicebus_endpoint,
+                ADTEndpointType.servicebus,
+                ADTEndpointAuthType.keybased,
+            )
+        )
+
+        logger.debug("Adding identity based servicebus topic endpoint...")
+        self.cmd(
+            "dt endpoint create servicebus -n {} --sbg {} --sbn {} --sbt {} --en {} --du {} "
+            "--auth-type IdentityBased --no-wait".format(
+                endpoints_instance_name,
+                EP_RG,
+                EP_SERVICEBUS_NAMESPACE,
+                EP_SERVICEBUS_TOPIC,
+                servicebus_endpoint_msi,
+                MOCK_DEAD_LETTER_ENDPOINT,
+            )
+        )
+
+        # self.cmd(
+        #     "dt endpoint wait --created -n {} -g {} --en {} --interval 1".format(
+        #         endpoints_instance_name,
+        #         self.rg,
+        #         servicebus_endpoint_msi,
+        #     )
+        # )
+
+        # assert_common_endpoint_attributes(
+        #     add_ep_sb_identity_output,
+        #     servicebus_endpoint_msi,
+        #     endpoint_type=ADTEndpointType.servicebus,
+        #     auth_type=ADTEndpointAuthType.identitybased,
+        #     dead_letter_endpoint=MOCK_DEAD_LETTER_ENDPOINT,
+        # )
+        endpoint_tuple_collection.append(
+            EndpointTuple(
+                servicebus_endpoint_msi,
+                ADTEndpointType.servicebus,
+                ADTEndpointAuthType.identitybased,
+            )
+        )
+
+        eventhub_endpoint = "myeventhubendpoint"
+        eventhub_endpoint_msi = "{}identity".format(eventhub_endpoint)
+
+        logger.debug("Adding key based eventhub endpoint...")
+        self.cmd(
+            "dt endpoint create eventhub -n {} --ehg {} --ehn {} --ehp {} --eh {} --ehs {} --en {} "
+            "--dsu '{}' --no-wait".format(
+                endpoints_instance_name,
+                EP_RG,
+                EP_EVENTHUB_NAMESPACE,
+                EP_EVENTHUB_POLICY,
+                EP_EVENTHUB_TOPIC,
+                self.current_subscription,
+                eventhub_endpoint,
+                MOCK_DEAD_LETTER_SECRET,
+            )
+        )
+
+        # self.cmd(
+        #     "dt endpoint wait --created -n {} -g {} --en {} --interval 1".format(
+        #         endpoints_instance_name,
+        #         self.rg,
+        #         eventhub_endpoint,
+        #     )
+        # )
+
+        # assert_common_endpoint_attributes(
+        #     add_ep_output,
+        #     eventhub_endpoint,
+        #     ADTEndpointType.eventhub,
+        #     auth_type=ADTEndpointAuthType.keybased,
+        #     dead_letter_secret=MOCK_DEAD_LETTER_SECRET,
+        # )
+        endpoint_tuple_collection.append(
+            EndpointTuple(
+                eventhub_endpoint,
+                ADTEndpointType.eventhub,
+                ADTEndpointAuthType.keybased,
+            )
+        )
+
+        logger.debug("Adding identity based eventhub endpoint...")
+        self.cmd(
+            "dt endpoint create eventhub -n {} --ehg {} --ehn {} --eh {} --ehs {} --en {} --du {} "
+            "--auth-type IdentityBased --no-wait".format(
+                endpoints_instance_name,
+                EP_RG,
+                EP_EVENTHUB_NAMESPACE,
+                EP_EVENTHUB_TOPIC,
+                self.current_subscription,
+                eventhub_endpoint_msi,
+                MOCK_DEAD_LETTER_ENDPOINT,
+            )
+        )
+
+        # wait for the last endpoint to create, just in case
+        self.cmd(
+            "dt endpoint wait -n {} -g {} --en {} --created".format(
+                endpoints_instance_name,
+                self.rg,
+                eventhub_endpoint_msi,
+            )
+        )
+
+        # show_ep_output = self.cmd(
+        #     "dt endpoint show -n {} -g {} --en {}".format(
+        #         endpoints_instance_name,
+        #         self.rg,
+        #         eventhub_endpoint_msi,
+        #     )
+        # ).get_output_in_json()
+
+        # assert_common_endpoint_attributes(
+        #     show_ep_output,
+        #     eventhub_endpoint_msi,
+        #     endpoint_type=ADTEndpointType.eventhub,
+        #     auth_type=ADTEndpointAuthType.identitybased,
+        #     dead_letter_endpoint=MOCK_DEAD_LETTER_ENDPOINT,
+        # )
+        endpoint_tuple_collection.append(
+            EndpointTuple(
+                eventhub_endpoint_msi,
+                ADTEndpointType.eventhub,
+                ADTEndpointAuthType.identitybased,
+            )
+        )
+
+        for ep in endpoint_tuple_collection:
+            is_last = ep.endpoint_name == endpoint_tuple_collection[-1].endpoint_name
+            show_ep_output = self.cmd(
+                "dt endpoint show -n {} --en {} {}".format(
+                    endpoints_instance_name,
+                    ep.endpoint_name,
+                    "-g {}".format(self.rg) if is_last else "",
+                )
+            ).get_output_in_json()
+
+            assert_common_endpoint_attributes(
+                show_ep_output,
+                ep.endpoint_name,
+                endpoint_type=ep.endpoint_type,
+                auth_type=ep.auth_type,
+            )
+
+        list_ep_output = self.cmd(
+            "dt endpoint list -n {} -g {}".format(endpoints_instance_name, self.rg)
+        ).get_output_in_json()
+        assert len(list_ep_output) == 5
+
+        endpoint_names = [eventgrid_endpoint, servicebus_endpoint, eventhub_endpoint]
+        filter_values = ["", "false", "type = Microsoft.DigitalTwins.Twin.Create"]
+
+        # Test Routes
+        list_routes_output = self.cmd(
+            "dt route list -n {}".format(endpoints_instance_name)
+        ).get_output_in_json()
+        assert len(list_routes_output) == 0
+
+        for endpoint_name in endpoint_names:
+            is_last = endpoint_name == endpoint_names[-1]
+            route_name = "routefor{}".format(endpoint_name)
+            filter_value = filter_values.pop()
+            add_route_output = self.cmd(
+                "dt route create -n {} --rn {} --en {} --filter '{}' {}".format(
+                    endpoints_instance_name,
+                    route_name,
+                    endpoint_name,
+                    filter_value,
+                    "-g {}".format(self.rg) if is_last else "",
+                )
+            ).get_output_in_json()
+
+            assert_common_route_attributes(
+                add_route_output, route_name, endpoint_name, filter_value
+            )
+
+            show_route_output = self.cmd(
+                "dt route show -n {} --rn {} {}".format(
+                    endpoints_instance_name,
+                    route_name,
+                    "-g {}".format(self.rg) if is_last else "",
+                )
+            ).get_output_in_json()
+
+            assert_common_route_attributes(
+                show_route_output, route_name, endpoint_name, filter_value
+            )
+
+        list_routes_output = self.cmd(
+            "dt route list -n {} -g {}".format(endpoints_instance_name, self.rg)
+        ).get_output_in_json()
+        assert len(list_routes_output) == 3
+
+        for endpoint_name in endpoint_names:
+            is_last = endpoint_name == endpoint_names[-1]
+            route_name = "routefor{}".format(endpoint_name)
+            self.cmd(
+                "dt route delete -n {} --rn {} {}".format(
+                    endpoints_instance_name,
+                    route_name,
+                    "-g {}".format(self.rg) if is_last else "",
+                )
+            )
+
+        list_routes_output = self.cmd(
+            "dt route list -n {} -g {}".format(endpoints_instance_name, self.rg)
+        ).get_output_in_json()
+        assert len(list_routes_output) == 0
+
+        for ep in endpoint_tuple_collection:
+            logger.debug("Deleting endpoint {}...".format(ep.endpoint_name))
+            is_last = ep.endpoint_name == endpoint_tuple_collection[-1].endpoint_name
+            self.cmd(
+                "dt endpoint delete -y -n {} --en {} --no-wait {}".format(
+                    endpoints_instance_name,
+                    ep.endpoint_name,
+                    "-g {}".format(self.rg) if is_last else "",
+                )
+            )
+
+        list_endpoint_output = self.cmd(
+            "dt endpoint list -n {} -g {}".format(endpoints_instance_name, self.rg)
+        ).get_output_in_json()
+        assert (
+            len(list_endpoint_output) == 0
+            or len(
+                [
+                    ep
+                    for ep in list_endpoint_output
+                    if ep["properties"]["provisioningState"].lower() != "deleting"
+                ]
+            )
+            == 0
+        )
+
+    def test_dt_endpoints(self):
+        self.wait_for_capacity()
+        endpoints_instance_name = generate_resource_id()
+        target_scope_role = "Contributor"
+
+        sb_topic_resource_id = self.embedded_cli.invoke(
+            "servicebus topic show --namespace-name {} -n {} -g {}".format(
+                EP_SERVICEBUS_NAMESPACE,
+                EP_SERVICEBUS_TOPIC,
+                EP_RG,
+            )
+        ).as_json()["id"]
+
+        eh_resource_id = self.embedded_cli.invoke(
+            "eventhubs eventhub show --namespace-name {} -n {} -g {}".format(
+                EP_EVENTHUB_NAMESPACE,
+                EP_EVENTHUB_TOPIC,
+                EP_RG,
+            )
+        ).as_json()["id"]
+
+        endpoint_instance = self.cmd(
+            "dt create -n {} -g {} -l {} --assign-identity --scopes {} {} --role {}".format(
+                endpoints_instance_name,
+                self.rg,
+                self.region,
+                sb_topic_resource_id,
+                eh_resource_id,
+                target_scope_role,
+            )
+        ).get_output_in_json()
+        self.track_instance(endpoint_instance)
+
+        EndpointTuple = namedtuple(
+            "endpoint_tuple", ["endpoint_name", "endpoint_type", "auth_type"]
+        )
+        endpoint_tuple_collection: List[EndpointTuple] = []
+        list_ep_output = self.cmd(
+            "dt endpoint list -n {}".format(endpoints_instance_name)
+        ).get_output_in_json()
+        assert len(list_ep_output) == 0
+
+        eventgrid_endpoint = "myeventgridendpoint"
+
+        logger.debug("Adding key based eventgrid endpoint...")
         add_ep_output = self.cmd(
             "dt endpoint create eventgrid -n {} -g {} --egg {} --egt {} --en {} --dsu {}".format(
                 endpoints_instance_name,
@@ -392,6 +757,49 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
 
         assert_common_endpoint_attributes(
             add_ep_output,
+            eventgrid_endpoint,
+            ADTEndpointType.eventgridtopic,
+            dead_letter_secret=MOCK_DEAD_LETTER_SECRET,
+        )
+
+        # Delete and re-add endpoint with no wait
+        self.cmd(
+            "dt endpoint delete -n {} -g {} --en {} -y".format(
+                endpoints_instance_name,
+                self.rg,
+                eventgrid_endpoint
+            )
+        )
+
+        self.cmd(
+            "dt endpoint create eventgrid -n {} -g {} --egg {} --egt {} --en {} --dsu {} --no-wait".format(
+                endpoints_instance_name,
+                self.rg,
+                EP_RG,
+                EP_EVENTGRID_TOPIC,
+                eventgrid_endpoint,
+                MOCK_DEAD_LETTER_SECRET,
+            )
+        )
+
+        self.cmd(
+            "dt endpoint wait --created -n {} -g {} --en {}".format(
+                endpoints_instance_name,
+                self.rg,
+                eventgrid_endpoint
+            )
+        )
+
+        show_ep_output = self.cmd(
+            "dt endpoint show -n {} -g {} --en {}".format(
+                endpoints_instance_name,
+                self.rg,
+                eventgrid_endpoint
+            )
+        ).get_output_in_json()
+
+        assert_common_endpoint_attributes(
+            show_ep_output,
             eventgrid_endpoint,
             ADTEndpointType.eventgridtopic,
             dead_letter_secret=MOCK_DEAD_LETTER_SECRET,
@@ -431,6 +839,51 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
 
         assert_common_endpoint_attributes(
             add_ep_sb_key_output,
+            servicebus_endpoint,
+            endpoint_type=ADTEndpointType.servicebus,
+            auth_type=ADTEndpointAuthType.keybased,
+            dead_letter_secret=MOCK_DEAD_LETTER_SECRET,
+        )
+
+        # Delete and re-add endpoint with no wait
+        self.cmd(
+            "dt endpoint delete -n {} -g {} --en {} -y".format(
+                endpoints_instance_name,
+                self.rg,
+                servicebus_endpoint
+            )
+        )
+
+        self.cmd(
+            "dt endpoint create servicebus -n {} --sbg {} --sbn {} --sbp {} --sbt {} --en {} --dsu {} --no-wait".format(
+                endpoints_instance_name,
+                EP_RG,
+                EP_SERVICEBUS_NAMESPACE,
+                EP_SERVICEBUS_POLICY,
+                EP_SERVICEBUS_TOPIC,
+                servicebus_endpoint,
+                MOCK_DEAD_LETTER_SECRET,
+            )
+        )
+
+        self.cmd(
+            "dt endpoint wait --created -n {} -g {} --en {}".format(
+                endpoints_instance_name,
+                self.rg,
+                servicebus_endpoint
+            )
+        )
+
+        show_ep_sb_key_output = self.cmd(
+            "dt endpoint show -n {} -g {} --en {}".format(
+                endpoints_instance_name,
+                self.rg,
+                servicebus_endpoint
+            )
+        ).get_output_in_json()
+
+        assert_common_endpoint_attributes(
+            show_ep_sb_key_output,
             servicebus_endpoint,
             endpoint_type=ADTEndpointType.servicebus,
             auth_type=ADTEndpointAuthType.keybased,
@@ -548,6 +1001,52 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             auth_type=ADTEndpointAuthType.identitybased,
             dead_letter_endpoint=MOCK_DEAD_LETTER_ENDPOINT,
         )
+
+        # Delete and re-add endpoint with no wait
+        self.cmd(
+            "dt endpoint delete -n {} -g {} --en {} -y".format(
+                endpoints_instance_name,
+                self.rg,
+                eventhub_endpoint_msi,
+            )
+        )
+
+        self.cmd(
+            "dt endpoint create eventhub -n {} --ehg {} --ehn {} --eh {} --ehs {} --en {} --du {} "
+            "--auth-type IdentityBased --no-wait".format(
+                endpoints_instance_name,
+                EP_RG,
+                EP_EVENTHUB_NAMESPACE,
+                EP_EVENTHUB_TOPIC,
+                self.current_subscription,
+                eventhub_endpoint_msi,
+                MOCK_DEAD_LETTER_ENDPOINT,
+            )
+        )
+
+        self.cmd(
+            "dt endpoint wait -n {} -g {} --en {} --created".format(
+                endpoints_instance_name,
+                self.rg,
+                eventhub_endpoint_msi,
+            )
+        )
+
+        show_ep_output = self.cmd(
+            "dt endpoint show -n {} -g {} --en {}".format(
+                endpoints_instance_name,
+                self.rg,
+                eventhub_endpoint_msi,
+            )
+        ).get_output_in_json()
+
+        assert_common_endpoint_attributes(
+            show_ep_output,
+            eventhub_endpoint_msi,
+            endpoint_type=ADTEndpointType.eventhub,
+            auth_type=ADTEndpointAuthType.identitybased,
+            dead_letter_endpoint=MOCK_DEAD_LETTER_ENDPOINT,
+        )
         endpoint_tuple_collection.append(
             EndpointTuple(
                 eventhub_endpoint_msi,
@@ -577,66 +1076,6 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             "dt endpoint list -n {} -g {}".format(endpoints_instance_name, self.rg)
         ).get_output_in_json()
         assert len(list_ep_output) == 5
-
-        endpoint_names = [eventgrid_endpoint, servicebus_endpoint, eventhub_endpoint]
-        filter_values = ["", "false", "type = Microsoft.DigitalTwins.Twin.Create"]
-
-        # Test Routes
-        list_routes_output = self.cmd(
-            "dt route list -n {}".format(endpoints_instance_name)
-        ).get_output_in_json()
-        assert len(list_routes_output) == 0
-
-        for endpoint_name in endpoint_names:
-            is_last = endpoint_name == endpoint_names[-1]
-            route_name = "routefor{}".format(endpoint_name)
-            filter_value = filter_values.pop()
-            add_route_output = self.cmd(
-                "dt route create -n {} --rn {} --en {} --filter '{}' {}".format(
-                    endpoints_instance_name,
-                    route_name,
-                    endpoint_name,
-                    filter_value,
-                    "-g {}".format(self.rg) if is_last else "",
-                )
-            ).get_output_in_json()
-
-            assert_common_route_attributes(
-                add_route_output, route_name, endpoint_name, filter_value
-            )
-
-            show_route_output = self.cmd(
-                "dt route show -n {} --rn {} {}".format(
-                    endpoints_instance_name,
-                    route_name,
-                    "-g {}".format(self.rg) if is_last else "",
-                )
-            ).get_output_in_json()
-
-            assert_common_route_attributes(
-                show_route_output, route_name, endpoint_name, filter_value
-            )
-
-        list_routes_output = self.cmd(
-            "dt route list -n {} -g {}".format(endpoints_instance_name, self.rg)
-        ).get_output_in_json()
-        assert len(list_routes_output) == 3
-
-        for endpoint_name in endpoint_names:
-            is_last = endpoint_name == endpoint_names[-1]
-            route_name = "routefor{}".format(endpoint_name)
-            self.cmd(
-                "dt route delete -n {} --rn {} {}".format(
-                    endpoints_instance_name,
-                    route_name,
-                    "-g {}".format(self.rg) if is_last else "",
-                )
-            )
-
-        list_routes_output = self.cmd(
-            "dt route list -n {} -g {}".format(endpoints_instance_name, self.rg)
-        ).get_output_in_json()
-        assert len(list_routes_output) == 0
 
         for ep in endpoint_tuple_collection:
             logger.debug("Deleting endpoint {}...".format(ep.endpoint_name))

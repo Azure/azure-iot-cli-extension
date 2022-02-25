@@ -168,22 +168,13 @@ class TestDTPrivateLinksLifecycle(DTLiveScenarioTest):
         random_desc_rejected = "{} {}".format(
             generate_generic_id(), generate_generic_id()
         )
-        set_connection_output = self.cmd(
-            "dt network private-endpoint connection set -n {} -g {} --cn {} --status Rejected --desc '{}'".format(
+        self.cmd(
+            "dt network private-endpoint connection set -n {} -g {} --cn {} --status Rejected --desc '{}' --no-wait".format(
                 instance_name, self.rg, instance_connection_id, random_desc_rejected
             )
-        ).get_output_in_json()
-
-        assert (
-            set_connection_output["properties"]["privateLinkServiceConnectionState"]["status"]
-            == "Rejected"
-        )
-        assert (
-            set_connection_output["properties"]["privateLinkServiceConnectionState"]["description"]
-            == random_desc_rejected
         )
 
-        self.cmd("dt network private-endpoint connection wait -n {} -g {} --cn {} --updated --interval 1 --timeout 30".format(
+        self.cmd("dt network private-endpoint connection wait -n {} -g {} --cn {} --updated --interval 3 --timeout 30".format(
             instance_name, self.rg, instance_connection_id
         ))
 
