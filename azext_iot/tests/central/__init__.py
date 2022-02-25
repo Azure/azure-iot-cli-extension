@@ -29,7 +29,13 @@ CENTRAL_SETTINGS = [
 settings = DynamoSettings(opt_env_set=CENTRAL_SETTINGS)
 APP_RG = settings.env.azext_iot_testrg
 
+# Storage Account
 DEFAULT_CONTAINER = "central"
+STORAGE_CONTAINER = settings.env.azext_iot_central_storage_container or DEFAULT_CONTAINER
+STORAGE_CSTRING = settings.env.azext_iot_central_storage_cstring
+STORAGE_NAME = None if settings.env.azext_iot_central_storage_cstring else "iotstore" + generate_generic_id()[:4]
+
+# Device templates
 device_template_path = get_context_path(__file__, "json/device_template_int_test.json")
 device_template_path_preview = get_context_path(
     __file__, "json/device_template_int_test_preview.json"
@@ -42,9 +48,9 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def __init__(self, test_scenario):
         super(CentralLiveScenarioTest, self).__init__(test_scenario)
         self._create_app()
-        self.storage_container = settings.env.azext_iot_central_storage_container or DEFAULT_CONTAINER
-        self.storage_cstring = settings.env.azext_iot_central_storage_cstring
-        self.storage_account_name = None
+        self.storage_container = STORAGE_CONTAINER
+        self.storage_cstring = STORAGE_CSTRING
+        self.storage_account_name = STORAGE_NAME
         self.token = None
         self.dns_suffix = None
 
@@ -407,6 +413,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         return output
 
     def _create_fileupload(self, api_version, account_name=None, sasttl=None):
+        self._populate_storage_cstring()
         command = (
             'iot central file-upload-config create --app-id {} -s "{}" -c "{}"'.format(
                 self.app_id, self.storage_cstring, self.storage_container
@@ -469,6 +476,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         )
 
     def _create_destination(self, api_version, dest_id):
+        self._populate_storage_cstring()
         self.kwargs["authorization"] = json.dumps(
             {
                 "type": "connectionString",
@@ -530,26 +538,32 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
           - storage_container
           - storage_cstring
         """
-        if not settings.env.azext_iot_central_storage_cstring and self.storage_account_name is None:
-            self.storage_account_name = "iotstore" + generate_generic_id()[:4]
+        if not self.storage_cstring:
             self.cmd(
                 "storage account create -n {} -g {}".format(
                     self.storage_account_name, self.app_rg
                 ),
                 include_opt_args=False
             )
-            self.storage_cstring = self.cmd(
-                "storage account show-connection-string -n {} -g {}".format(
-                    self.storage_account_name, self.app_rg
-                ),
-                include_opt_args=False
-            ).get_output_in_json()["connectionString"]
+            self._populate_storage_cstring()
             self.cmd(
                 "storage container create -n {} --connection-string '{}'".format(
                     self.storage_container, self.storage_cstring
                 ),
                 include_opt_args=False
             )
+
+    def _populate_storage_cstring(self):
+        """
+        Method to populate storage_cstring
+        """
+        if not self.storage_cstring:
+            self.storage_cstring = self.cmd(
+                "storage account show-connection-string -n {} -g {}".format(
+                    self.storage_account_name, self.app_rg
+                ),
+                include_opt_args=False
+            ).get_output_in_json()["connectionString"]
 
     def _delete_storage_account(self):
         """
@@ -605,5 +619,3 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     self.app_id, self.app_rg
                 )
             )
-        if self.storage_account_name:
-            self._delete_storage_account()

@@ -39,6 +39,12 @@ class TestIotCentral(CentralLiveScenarioTest):
         self._create_storage_account()
         yield None
 
+    @pytest.fixture(scope='class', autouse=True)
+    def tearDownSuite(self):
+        yield None
+        if self.storage_account_name:
+            self._delete_storage_account()
+
     def __init__(self, test_scenario):
         super(TestIotCentral, self).__init__(test_scenario=test_scenario)
 
