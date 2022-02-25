@@ -13,6 +13,7 @@ from azext_iot.digitaltwins.common import (
     ADTPublicNetworkAccessType,
 )
 from knack.log import get_logger
+from knack.util import CLIError
 
 logger = get_logger(__name__)
 
@@ -27,7 +28,12 @@ def create_instance(
     scopes=None,
     role_type="Contributor",
     public_network_access=ADTPublicNetworkAccessType.enabled.value,
+    no_wait=False,
 ):
+    if no_wait and scopes:
+        raise CLIError(
+            "Cannot assign scopes in a no wait operation. Please run the command without --no-wait."
+        )
     rp = ResourceProvider(cmd)
     return rp.create(
         name=name,

@@ -124,6 +124,14 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             expect_failure=True,
         )
 
+        # Assert that --no-wait and --scopes will not work
+        self.cmd(
+            "dt create -n {} -g {} --assign-identity --scopes {} --no-wait".format(
+                instance_names[1], self.rg, " ".join(scope_ids)
+            ),
+            expect_failure=True,
+        )
+
         # No location specified. Use the resource group location.
         create_msi_output = self.cmd(
             "dt create -n {} -g {} --assign-identity --scopes {}".format(
