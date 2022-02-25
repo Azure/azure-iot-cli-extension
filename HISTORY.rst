@@ -4,6 +4,19 @@ Release History
 ===============
 
 
+
+0.14.1
++++++++++++++++
+
+**Digital Twin updates**
+
+* Added `--no-wait` parameter to the following functions:
+
+  - az dt create
+  - az dt endpoint create
+  - az dt private-endpoint create
+
+
 0.14.0
 +++++++++++++++
 
