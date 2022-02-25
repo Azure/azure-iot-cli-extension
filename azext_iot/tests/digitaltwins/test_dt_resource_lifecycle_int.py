@@ -381,30 +381,6 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
                 MOCK_DEAD_LETTER_SECRET,
             )
         )
-
-        # self.cmd(
-        #     "dt endpoint wait --created -n {} -g {} --en {}".format(
-        #         endpoints_instance_name,
-        #         self.rg,
-        #         eventgrid_endpoint
-        #     )
-        # )
-
-        # show_ep_output = self.cmd(
-        #     "dt endpoint show -n {} -g {} --en {}".format(
-        #         endpoints_instance_name,
-        #         self.rg,
-        #         eventgrid_endpoint
-        #     )
-        # ).get_output_in_json()
-
-        # assert_common_endpoint_attributes(
-        #     show_ep_output,
-        #     eventgrid_endpoint,
-        #     ADTEndpointType.eventgridtopic,
-        #     dead_letter_secret=MOCK_DEAD_LETTER_SECRET,
-        # )
-
         endpoint_tuple_collection.append(
             EndpointTuple(
                 eventgrid_endpoint,
@@ -428,30 +404,6 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
                 MOCK_DEAD_LETTER_SECRET,
             )
         )
-
-        # self.cmd(
-        #     "dt endpoint wait --created -n {} -g {} --en {}".format(
-        #         endpoints_instance_name,
-        #         self.rg,
-        #         servicebus_endpoint
-        #     )
-        # )
-
-        # show_ep_sb_key_output = self.cmd(
-        #     "dt endpoint show -n {} -g {} --en {}".format(
-        #         endpoints_instance_name,
-        #         self.rg,
-        #         servicebus_endpoint
-        #     )
-        # ).get_output_in_json()
-
-        # assert_common_endpoint_attributes(
-        #     show_ep_sb_key_output,
-        #     servicebus_endpoint,
-        #     endpoint_type=ADTEndpointType.servicebus,
-        #     auth_type=ADTEndpointAuthType.keybased,
-        #     dead_letter_secret=MOCK_DEAD_LETTER_SECRET,
-        # )
         endpoint_tuple_collection.append(
             EndpointTuple(
                 servicebus_endpoint,
@@ -472,22 +424,6 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
                 MOCK_DEAD_LETTER_ENDPOINT,
             )
         )
-
-        # self.cmd(
-        #     "dt endpoint wait --created -n {} -g {} --en {} --interval 1".format(
-        #         endpoints_instance_name,
-        #         self.rg,
-        #         servicebus_endpoint_msi,
-        #     )
-        # )
-
-        # assert_common_endpoint_attributes(
-        #     add_ep_sb_identity_output,
-        #     servicebus_endpoint_msi,
-        #     endpoint_type=ADTEndpointType.servicebus,
-        #     auth_type=ADTEndpointAuthType.identitybased,
-        #     dead_letter_endpoint=MOCK_DEAD_LETTER_ENDPOINT,
-        # )
         endpoint_tuple_collection.append(
             EndpointTuple(
                 servicebus_endpoint_msi,
@@ -514,21 +450,6 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             )
         )
 
-        # self.cmd(
-        #     "dt endpoint wait --created -n {} -g {} --en {} --interval 1".format(
-        #         endpoints_instance_name,
-        #         self.rg,
-        #         eventhub_endpoint,
-        #     )
-        # )
-
-        # assert_common_endpoint_attributes(
-        #     add_ep_output,
-        #     eventhub_endpoint,
-        #     ADTEndpointType.eventhub,
-        #     auth_type=ADTEndpointAuthType.keybased,
-        #     dead_letter_secret=MOCK_DEAD_LETTER_SECRET,
-        # )
         endpoint_tuple_collection.append(
             EndpointTuple(
                 eventhub_endpoint,
@@ -559,22 +480,6 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
                 eventhub_endpoint_msi,
             )
         )
-
-        # show_ep_output = self.cmd(
-        #     "dt endpoint show -n {} -g {} --en {}".format(
-        #         endpoints_instance_name,
-        #         self.rg,
-        #         eventhub_endpoint_msi,
-        #     )
-        # ).get_output_in_json()
-
-        # assert_common_endpoint_attributes(
-        #     show_ep_output,
-        #     eventhub_endpoint_msi,
-        #     endpoint_type=ADTEndpointType.eventhub,
-        #     auth_type=ADTEndpointAuthType.identitybased,
-        #     dead_letter_endpoint=MOCK_DEAD_LETTER_ENDPOINT,
-        # )
         endpoint_tuple_collection.append(
             EndpointTuple(
                 eventhub_endpoint_msi,
