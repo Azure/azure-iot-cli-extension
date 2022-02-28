@@ -144,6 +144,9 @@ helps[
     long-summary: |
                   When using the auth method of shared_private_key (also known as symmetric keys),
                   if no custom keys are provided the service will generate them for the device.
+
+                  If a device scope is provided for an edge device, the value will automatically be
+                  converted to a parent scope.
     examples:
     - name: Create an edge enabled IoT device with default authorization (shared private key).
       text: >
@@ -163,10 +166,13 @@ helps[
       text: >
         az iot hub device-identity create -n {iothub_name} -d {device_id} --am x509_thumbprint
         --ptp {thumbprint_1} --stp {thumbprint_2}
-    - name: Create an IoT device with root CA authorization with disabled status and reason
+    - name: Create an IoT device with root CA authorization with disabled status and reason.
       text: >
         az iot hub device-identity create -n {iothub_name} -d {device_id} --am x509_ca
         --status disabled --status-reason 'for reasons'
+    - name: Create an IoT device with a device scope.
+      text: >
+        az iot hub device-identity create -n {iothub_name} -d {device_id} --device-scope 'ms-azure-iot-edge://edge0-123456789123456789'
 """
 
 helps[
@@ -302,16 +308,16 @@ helps[
     "iot hub device-identity parent"
 ] = """
     type: group
-    short-summary: Manage IoT device\'s parent device.
+    short-summary: Manage parent device relationships for IoT devices.
 """
 
 helps[
     "iot hub device-identity parent show"
 ] = """
     type: command
-    short-summary: Get the parent device of the specified device.
+    short-summary: Get the parent device of a target device.
     examples:
-    - name: Get the parent device of the specified device.
+    - name: Get the parent device of a target device.
       text: >
         az iot hub device-identity parent show -d {device_id} -n {iothub_name}
 """
@@ -320,37 +326,36 @@ helps[
     "iot hub device-identity parent set"
 ] = """
     type: command
-    short-summary: Set the parent device of the specified device.
+    short-summary: Set the parent device of a target device.
     examples:
-    - name: Set the parent device of the specified device.
+    - name: Set the parent device of a target device.
       text: >
         az iot hub device-identity parent set -d {device_id} --pd {edge_device_id} -n {iothub_name}
-    - name: Set the parent device of the specified device and overwrites its original parent.
+    - name: Set the parent device of a target device and overwrite the existing parent.
       text: >
-        az iot hub device-identity parent set -d {device_id} --pd {edge_device_id} --force -n {iothub_name}
+        az iot hub device-identity parent set -d {device_id} --pd {edge_device_id} -n {iothub_name} --force
 """
 
 helps[
     "iot hub device-identity children"
 ] = """
     type: group
-    short-summary: Manage IoT device\'s children device.
+    short-summary: Manage children device relationships for IoT edge devices.
 """
 
 helps[
     "iot hub device-identity children add"
 ] = """
     type: command
-    short-summary: Add specified space-separated list of device ids as children of specified edge device.
+    short-summary: Add devices as children to a target edge device.
     examples:
-    - name: Add devices as a children to the edge device.
+    - name: Add a space-separated list of device Ids as children to the target edge device.
       text: >
-        az iot hub device-identity children add -d {edge_device_id} --child-list {space_separated_device_id}
+        az iot hub device-identity children add -d {edge_device_id} --child-list {child_device_id_1} {child_device_id_2}
         -n {iothub_name}
-    - name: Add devices as children to the edge device and overwrites children devices'
-            original parent.
+    - name: Add devices as children to the edge device and overwrite the children devices' existing parent.
       text: >
-        az iot hub device-identity children add -d {edge_device_id} --child-list {space_separated_device_id}
+        az iot hub device-identity children add -d {edge_device_id} --child-list {child_device_id_1} {child_device_id_2}
         -n {iothub_name} -f
 """
 
@@ -358,12 +363,12 @@ helps[
     "iot hub device-identity children list"
 ] = """
     type: command
-    short-summary: Outputs list of assigned child devices.
+    short-summary: Outputs the collection of assigned child devices.
     examples:
-    - name: Show all assigned children devices as list.
+    - name: List all assigned children devices.
       text: >
         az iot hub device-identity children list -d {edge_device_id} -n {iothub_name}
-    - name: Show all assigned children devices as list whose device ID contains substring of 'test'.
+    - name: List all assigned children devices whose device Id contains a substring of 'test'.
       text: >
         az iot hub device-identity children list -d {edge_device_id} -n {iothub_name} --query "[?contains(@,'test')]"
 """
@@ -372,13 +377,13 @@ helps[
     "iot hub device-identity children remove"
 ] = """
     type: command
-    short-summary: Remove devices as children from specified edge device.
+    short-summary: Remove child devices from a target edge device.
     examples:
-    - name: Remove all mentioned devices as children of specified device.
+    - name: Remove a space-seperated list of child devices from a target parent device.
       text: >
         az iot hub device-identity children remove -d {edge_device_id} --child-list {space_separated_device_id}
         -n {iothub_name}
-    - name: Remove all devices as children specified edge device.
+    - name: Remove all child devices from a target parent device.
       text: >
         az iot hub device-identity children remove -d {edge_device_id} --remove-all
 """
@@ -402,7 +407,9 @@ helps[
 ] = """
     type: command
     short-summary: Update device twin desired properties and tags.
-    long-summary: Provide --desired or --tags arguments for PATCH behavior.
+    long-summary: Provide --desired or --tags arguments for PATCH behavior. Both parameters
+                  support inline json or a file path to json content.
+
                   Usage of generic update args (i.e. --set) will reflect PUT behavior
                   and are deprecated.
     examples:
@@ -414,6 +421,10 @@ helps[
       text: >
         az iot hub device-twin update -n {iothub_name} -d {device_id}
         --tags '{"country": "USA"}'
+    - name: Patch device twin tags with json file content.
+      text: >
+        az iot hub device-twin update -n {iothub_name} -d {device_id}
+        --tags /path/to/file
     - name: Patch removal of 'critical' desired property from parent 'temperature'
       text: >
         az iot hub device-twin update -n {iothub_name} -d {device_id}
@@ -530,7 +541,9 @@ helps[
 ] = """
     type: command
     short-summary: Update module twin desired properties and tags.
-    long-summary: Provide --desired or --tags arguments for PATCH behavior.
+    long-summary: Provide --desired or --tags arguments for PATCH behavior. Both parameters
+                  support inline json or a file path to json content.
+
                   Usage of generic update args (i.e. --set) will reflect PUT behavior
                   and are deprecated.
     examples:
@@ -542,6 +555,10 @@ helps[
       text: >
         az iot hub module-twin update -n {iothub_name} -d {device_id} -m {module_id}
         --tags '{"country": "USA"}'
+    - name: Patch module twin tags with json file content.
+      text: >
+        az iot hub module-twin update -n {iothub_name} -d {device_id} -m {module_id}
+        --tags /path/to/file
     - name: Patch removal of 'critical' desired property from parent 'temperature'
       text: >
         az iot hub module-twin update -n {iothub_name} -d {device_id} -m {module_id}
@@ -884,19 +901,29 @@ helps[
                    While the device simulation is running, the device will automatically receive
                    and acknowledge cloud-to-device (c2d) messages. For mqtt simulation, all c2d messages will
                    be acknowledged with completion. For http simulation c2d acknowledgement is based on user
-                   selection which can be complete, reject or abandon. Additionally, mqtt simulation is only
-                   supported for symmetric key auth (SAS) based devices
+                   selection which can be complete, reject or abandon. The mqtt simulation also supports direct
+                   method invocation which can be acknowledged by a response status code and response payload.
+
+                   Note: MQTT simulation is only supported for symmetric key auth (SAS) based devices.
 
                    Note: The command by default will set content-type to application/json and content-encoding
                    to utf-8. This can be overriden.
     examples:
     - name: Basic usage (mqtt)
       text: az iot device simulate -n {iothub_name} -d {device_id}
-    - name: Basic usage (mqtt) with sending mixed properties
+    - name: Send mixed properties (mqtt)
       text: az iot device simulate -n {iothub_name} -d {device_id} --properties "myprop=myvalue;$.ct=application/json"
+    - name: Send direct method response status code and direct method response payload as raw json (mqtt only)
+      text: az iot device simulate -n {iothub_name} -d {device_id} --method-response-code 201 --method-response-payload '{"result":"Direct method successful"}'
+    - name: Send direct method response status code and direct method response payload as path to local file (mqtt only)
+      text: az iot device simulate -n {iothub_name} -d {device_id} --method-response-code 201 --method-response-payload '../my_direct_method_payload.json'
+    - name: Send the initial state of device twin reported properties as raw json for the target device (mqtt only)
+      text: az iot device simulate -n {iothub_name} -d {device_id} --init-reported-properties '{"reported_prop_1":"val_1", "reported_prop_2":val_2}'
+    - name: Send the initial state of device twin reported properties as path to local file for the target device (mqtt only)
+      text: az iot device simulate -n {iothub_name} -d {device_id} --init-reported-properties '../my_device_twin_reported_properties.json'
     - name: Basic usage (http)
       text: az iot device simulate -n {iothub_name} -d {device_id} --protocol http
-    - name: Basic usage (http) with sending mixed properties
+    - name: Send mixed properties (http)
       text: az iot device simulate -n {iothub_name} -d {device_id} --protocol http --properties
             "iothub-app-myprop=myvalue;content-type=application/json;iothub-correlationid=12345"
     - name: Choose total message count and interval between messages
@@ -1066,7 +1093,7 @@ helps[
     "iot dps"
 ] = """
     type: group
-    short-summary: Manage entities in an Azure IoT Hub Device Provisioning Service.
+    short-summary: Manage entities in an Azure IoT Hub Device Provisioning Service (DPS).
                    Augmented with the IoT extension.
 """
 
@@ -1074,21 +1101,21 @@ helps[
     "iot dps enrollment"
 ] = """
     type: group
-    short-summary: Manage enrollments in an Azure IoT Hub Device Provisioning Service.
+    short-summary: Manage individual device enrollments in an Azure IoT Hub Device Provisioning Service.
 """
 
 helps[
     "iot dps enrollment list"
 ] = """
     type: command
-    short-summary: List device enrollments in an Azure IoT Hub Device Provisioning Service.
+    short-summary: List individual device enrollments in an Azure IoT Hub Device Provisioning Service.
 """
 
 helps[
     "iot dps enrollment show"
 ] = """
     type: command
-    short-summary: Get device enrollment details in an Azure IoT Hub Device Provisioning Service.
+    short-summary: Get individual device enrollment details in an Azure IoT Hub Device Provisioning Service.
     examples:
     - name: Basic usage
       text: >
@@ -1102,26 +1129,19 @@ helps[
     "iot dps enrollment create"
 ] = """
     type: command
-    short-summary: Create a device enrollment in an Azure IoT Hub Device Provisioning Service.
+    short-summary: Create an individual device enrollment in an Azure IoT Hub Device Provisioning Service.
     examples:
     - name: Create an enrollment '{enrollment_id}' with attestation type 'x509' in the Azure
-            IoT provisioning service '{dps_name}' in the resource group '{resource_group_name}'
-      text: >
-        az iot dps enrollment create -g {resource_group_name} --dps-name {dps_name}
-        --enrollment-id {enrollment_id} --attestation-type x509
-        --certificate-path /certificates/Certificate.pem
-    - name: Create an enrollment '{enrollment_id}' with attestation type 'x509' in the Azure
             IoT Device Provisioning Service '{dps_name}' in the resource group
-            '{resource_group_name}' with provisioning status 'disabled', target IoT Hub
-            '{iothub_host_name}', device id '{device_id}', initial twin properties
-            '{"location":{"region":"US"}}' and initial twin tags '{"version":"1"}'.
+            '{resource_group_name}' with provisioning status 'disabled',
+            device id '{device_id}', initial twin properties '{"location":{"region":"US"}}',
+            initial twin tags '{"version":"1"}', and device information '{"color":"red"}'.
       text: >
         az iot dps enrollment create -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --attestation-type x509
         --certificate-path /certificates/Certificate.pem --provisioning-status disabled
-        --iot-hub-host-name {iothub_host_name}
         --initial-twin-properties "{'location':{'region':'US'}}"
-        --initial-twin-tags "{'version':'1'}" --device-id {device_id}
+        --initial-twin-tags "{'version':'1'}" --device-info "{'color':'red'}" --device-id {device_id}
     - name: Create an enrollment 'MyEnrollment' with attestation type 'tpm' in the Azure IoT
             Device Provisioning Service '{dps_name}' in the resource group '{resource_group_name}'.
       text: >
@@ -1163,7 +1183,7 @@ helps[
     "iot dps enrollment update"
 ] = """
     type: command
-    short-summary: Update a device enrollment in an Azure IoT Hub Device Provisioning Service.
+    short-summary: Update an individual device enrollment in an Azure IoT Hub Device Provisioning Service.
     examples:
     - name: Update enrollment '{enrollment_id}' with a new x509 certificate in the Azure IoT
             Device Provisioning Service '{dps_name}' in the resource group '{resource_group_name}'.
@@ -1197,25 +1217,26 @@ helps[
         --etag AAAAAAAAAAA= --iot-hubs "{iot_hub_host_name1} {iot_hub_host_name2} {iot_hub_host_name3}"
     - name: Update enrollment '{enrollment_id}' in the Azure IoT Device Provisioning Service '{dps_name}'
             in the resource group '{resource_group_name}' with
-            initial twin properties '{"location":{"region":"USA"}}' and initial twin tags '{"version":"2"}'.
+            initial twin properties '{"location":{"region":"USA"}}', initial twin tags '{"version":"2"}',
+            and device information '{"color":"red"}'.
       text: >
         az iot dps enrollment update -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --initial-twin-properties "{'location':{'region':'USA'}}"
-        --initial-twin-tags "{'version1':'2'}"
+        --initial-twin-tags "{'version1':'2'}" --device-info "{'color':'red'}"
 """
 
 helps[
     "iot dps enrollment delete"
 ] = """
     type: command
-    short-summary: Delete a device enrollment in an Azure IoT Hub Device Provisioning Service.
+    short-summary: Delete an individual device enrollment in an Azure IoT Hub Device Provisioning Service.
 """
 
 helps[
     "iot dps enrollment-group"
 ] = """
     type: group
-    short-summary: Manage Azure IoT Hub Device Provisioning Service.
+    short-summary: Manage enrollment groups in an Azure IoT Hub Device Provisioning Service.
 """
 
 helps[
@@ -1229,7 +1250,7 @@ helps[
     "iot dps enrollment-group show"
 ] = """
     type: command
-    short-summary: Get the details of an enrollment group in an Azure IoT Hub Device Provisioning Service.
+    short-summary: Get an enrollment group's details in an Azure IoT Hub Device Provisioning Service.
     examples:
     - name: Basic usage
       text: >
@@ -1258,14 +1279,13 @@ helps[
         --enrollment-id {enrollment_id} --secondary-ca-name {certificate_name}
     - name: Create an enrollment group '{enrollment_id}' in the Azure IoT provisioning service
             'MyDps' in the resource group '{resource_group_name}' with provisioning status
-            'enabled', target IoT Hub '{iothub_host_name}', initial twin properties
+            'enabled', initial twin properties
             '{"location":{"region":"US"}}' and initial twin tags '{"version_dps":"1"}'
             using an intermediate certificate as primary certificate'.
       text: >
         az iot dps enrollment-group create -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --certificate-path /certificates/Certificate.pem
-        --provisioning-status enabled --iot-hub-host-name {iothub_host_name}
-        --initial-twin-properties "{'location':{'region':'US'}}"
+        --provisioning-status enabled --initial-twin-properties "{'location':{'region':'US'}}"
         --initial-twin-tags "{'version_dps':'1'}"
     - name: Create an enrollment group '{enrollment_id}' in the Azure IoT provisioning service
             '{dps_name}' in the resource group '{resource_group_name} with attestation type 'symmetrickey'.
@@ -1324,22 +1344,24 @@ helps[
     "iot dps registration"
 ] = """
     type: group
-    short-summary: Manage Azure IoT Hub Device Provisioning Service registrations.
+    short-summary: Manage device registrations for an enrollment group in an Azure IoT Hub Device
+        Provisioning Service.
 """
 
 helps[
     "iot dps registration list"
 ] = """
     type: command
-    short-summary: List device registration state in an Azure IoT Hub Device Provisioning
-        Service enrollment group.
+    short-summary: List device registrations for an enrollment group in an Azure IoT Hub Device
+        Provisioning Service.
 """
 
 helps[
     "iot dps registration show"
 ] = """
     type: command
-    short-summary: Get the device registration state in an Azure IoT Hub Device Provisioning Service.
+    short-summary: Get a device registration for an enrollment group in an Azure IoT Hub Device
+        Provisioning Service.
 """
 
 helps[
@@ -1354,9 +1376,46 @@ helps[
 ] = """
     type: command
     short-summary: Generate a derived device SAS key.
-    long-summary: Generate a derived device key from a DPS enrollment group symmetric key.
+    long-summary: Generate a derived device key for a DPS enrollment group.
     examples:
-    - name: Basic usage
+    - name: Compute the device key with the given symmetric key.
       text: >
         az iot dps compute-device-key --key {enrollement_group_symmetric_key} --registration-id {registration_id}
+    - name: Compute the device key with the given enrollment group.
+      text: >
+        az iot dps compute-device-key -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id} --registration-id {registration_id}
+"""
+
+helps[
+    "iot dps connection-string"
+] = """
+    type: group
+    short-summary: Manage connection strings for an Azure IoT Hub Device Provisioning Service instance.
+"""
+
+helps[
+    "iot dps connection-string show"
+] = """
+    type: command
+    short-summary: Show the connection strings for the specified Device Provisioning Services using the given
+                   policy name and key.
+    examples:
+    - name: Show the connection strings for all active state DPS instances in a subscription
+            using the default policy and primary key.
+      text: >
+          az iot dps connection-string show
+    - name: Show the connection strings for all active state DPS instances in a resource group
+            using the default policy and primary key.
+      text: >
+          az iot dps connection-string show --resource-group MyResourceGroup
+    - name: Show all connection strings of the given DPS using primary key.
+      text: >
+          az iot dps connection-string show -n MyDPS --all
+    - name: Show the connection string of the given DPS using the default policy and primary key.
+      text: >
+          az iot dps connection-string show -n MyDPS
+    - name: Show the connection string of the given DPS using policy 'service' and secondary key.
+      text: >
+          az iot dps connection-string show -n MyDPS --policy-name service --key-type secondary
 """

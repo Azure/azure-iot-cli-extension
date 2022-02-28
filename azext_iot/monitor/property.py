@@ -4,7 +4,9 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from azext_iot.central.models.enum import ApiVersion
 import datetime
+
 import isodate
 import time
 from azext_iot.monitor.parsers import strings
@@ -16,12 +18,11 @@ from azext_iot.constants import (
     PNP_DTDLV2_COMPONENT_MARKER,
 )
 
-from azext_iot.central.models.devicetwin import DeviceTwin, Property
+from azext_iot.central.models.devicetwin import Property
 
-from azext_iot.central.providers import CentralDeviceTwinProvider
-from azext_iot.central.providers.v1 import (
-    CentralDeviceProviderV1,
-    CentralDeviceTemplateProviderV1,
+from azext_iot.central.providers import (
+    CentralDeviceProvider,
+    CentralDeviceTemplateProvider,
 )
 from azext_iot.monitor.parsers.issue import IssueHandler
 
@@ -40,17 +41,17 @@ class PropertyMonitor:
         self._device_id = device_id
         self._token = token
         self._central_dns_suffix = central_dns_suffix
-        self._device_twin_provider = CentralDeviceTwinProvider(
+        self._central_device_provider = CentralDeviceProvider(
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
-            device_id=self._device_id,
+            api_version=ApiVersion.v1.value,
         )
-        self._central_device_provider = CentralDeviceProviderV1(
-            cmd=self._cmd, app_id=self._app_id, token=self._token
-        )
-        self._central_template_provider = CentralDeviceTemplateProviderV1(
-            cmd=self._cmd, app_id=self._app_id, token=self._token
+        self._central_template_provider = CentralDeviceTemplateProvider(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            token=self._token,
+            api_version=ApiVersion.v1.value,
         )
         self._template = self._get_device_template()
 
@@ -59,7 +60,11 @@ class PropertyMonitor:
             return
 
         changes = {
-            key: self._changed_props(prop.props[key], prop.metadata[key], key,)
+            key: self._changed_props(
+                prop.props[key],
+                prop.metadata[key],
+                key,
+            )
             for key, val in prop.metadata.items()
             if self._is_relevant(key, val)
         }
@@ -117,8 +122,8 @@ class PropertyMonitor:
                     name_miss, self._template.schema_names
                 )
 
-            interfaces_with_specified_property = self._template._get_interface_list_property(
-                name
+            interfaces_with_specified_property = (
+                self._template._get_interface_list_property(name)
             )
 
             if len(interfaces_with_specified_property) > 1:
@@ -161,25 +166,30 @@ class PropertyMonitor:
         return issues_handler.get_issues_with_minimum_severity(minimum_severity)
 
     def _get_device_template(self):
-        device = self._central_device_provider.get_device(self._device_id, central_dns_suffix=self._central_dns_suffix)
+        device = self._central_device_provider.get_device(
+            self._device_id, central_dns_suffix=self._central_dns_suffix
+        )
         template = self._central_template_provider.get_device_template(
             device_template_id=device.template,
             central_dns_suffix=self._central_dns_suffix,
         )
         return template
 
-    def start_property_monitor(self,):
+    def start_property_monitor(
+        self,
+    ):
         prev_twin = None
 
         while True:
-            raw_twin = self._device_twin_provider.get_device_twin(
+            twin = self._central_device_provider.get_device_twin(
+                device_id=self._device_id,
                 central_dns_suffix=self._central_dns_suffix
             )
 
-            twin = DeviceTwin(raw_twin)
             if prev_twin:
                 change_d = self._compare_properties(
-                    prev_twin.desired_property, twin.desired_property,
+                    prev_twin.desired_property,
+                    twin.desired_property,
                 )
                 change_r = self._compare_properties(
                     prev_twin.reported_property, twin.reported_property
@@ -204,11 +214,11 @@ class PropertyMonitor:
 
         while True:
 
-            raw_twin = self._device_twin_provider.get_device_twin(
+            twin = self._central_device_provider.get_device_twin(
+                device_id=self._device_id,
                 central_dns_suffix=self._central_dns_suffix
             )
 
-            twin = DeviceTwin(raw_twin)
             if prev_twin:
                 change_r = self._compare_properties(
                     prev_twin.reported_property, twin.reported_property

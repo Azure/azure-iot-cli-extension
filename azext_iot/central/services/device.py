@@ -7,19 +7,25 @@
 
 from typing import List, Union
 import requests
+from azext_iot.common.auth import get_aad_token
 
 from knack.log import get_logger
 
 from azure.cli.core.azclierror import AzureResponseError
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
-from azext_iot.central import models as central_models
-from azext_iot.central.models.enum import DeviceStatus, ApiVersion
+from azext_iot.central.models.devicetwin import DeviceTwin
+from azext_iot.central.models.preview import DevicePreview
+from azext_iot.central.models.v1 import DeviceV1
+from azext_iot.central.models.v1_1_preview import DeviceV1_1_preview
+from azext_iot.central.models.enum import DeviceStatus
 from azure.cli.core.util import should_disable_connection_verify
+from azext_iot.common.utility import dict_clean, parse_entity
 
 logger = get_logger(__name__)
 
 BASE_PATH = "api/devices"
+MODEL = "Device"
 
 
 def get_device(
@@ -27,9 +33,9 @@ def get_device(
     app_id: str,
     device_id: str,
     token: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
-) -> Union[central_models.DevicePreview, central_models.DeviceV1]:
+) -> Union[DeviceV1_1_preview, DeviceV1, DevicePreview]:
     """
     Get device info given a device id
 
@@ -60,20 +66,17 @@ def get_device(
     )
     result = _utility.try_extract_result(response)
 
-    if api_version == ApiVersion.preview.value:
-        return central_models.DevicePreview(result)
-    else:
-        return central_models.DeviceV1(result)
+    return _utility.get_object(result, MODEL, api_version)
 
 
 def list_devices(
     cmd,
     app_id: str,
     token: str,
+    api_version: str,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
-) -> List[Union[central_models.DevicePreview, central_models.DeviceV1]]:
+) -> List[Union[DeviceV1, DeviceV1_1_preview, DevicePreview]]:
     """
     Get a list of all devices in IoTC app
 
@@ -113,14 +116,12 @@ def list_devices(
         if "value" not in result:
             raise AzureResponseError("Value is not present in body: {}".format(result))
 
-        if api_version == ApiVersion.preview.value:
-            devices.extend(
-                [central_models.DevicePreview(device) for device in result["value"]]
-            )
-        else:
-            devices.extend(
-                [central_models.DeviceV1(device) for device in result["value"]]
-            )
+        devices.extend(
+            [
+                _utility.get_object(device, MODEL, api_version)
+                for device in result["value"]
+            ]
+        )
 
         url = result.get("nextLink", None)
         pages_processed = pages_processed + 1
@@ -132,6 +133,7 @@ def get_device_registration_summary(
     cmd,
     app_id: str,
     token: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> dict:
     """
@@ -151,7 +153,7 @@ def get_device_registration_summary(
     registration_summary = {status.value: 0 for status in DeviceStatus}
 
     url = "https://{}.{}/{}?api-version={}".format(
-        app_id, central_dns_suffix, BASE_PATH, ApiVersion.v1.value
+        app_id, central_dns_suffix, BASE_PATH, api_version
     )
     headers = _utility.get_headers(token, cmd)
 
@@ -170,7 +172,7 @@ def get_device_registration_summary(
 
         for device in result["value"]:
             registration_summary[
-                central_models.DeviceV1(device).device_status.value
+                (_utility.get_object(device, MODEL, api_version))._device_status.value
             ] += 1
 
         print("Processed {} devices...".format(sum(registration_summary.values())))
@@ -186,10 +188,11 @@ def create_device(
     device_name: str,
     template: str,
     simulated: bool,
+    organizations: str,
     token: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
-) -> Union[central_models.DevicePreview, central_models.DeviceV1]:
+) -> Union[DeviceV1, DeviceV1_1_preview, DevicePreview]:
     """
     Create a device in IoTC
 
@@ -219,30 +222,102 @@ def create_device(
     query_parameters = {}
     query_parameters["api-version"] = api_version
 
-    if api_version == ApiVersion.preview.value:
-        payload = {
-            "displayName": device_name,
-            "simulated": simulated,
-            "approved": True,
-        }
-        if template:
-            payload["instanceOf"] = template
-    else:
-        payload = {
-            "displayName": device_name,
-            "simulated": simulated,
-            "enabled": True,
-        }
-        if template:
-            payload["template"] = template
+    payload = {"displayName": device_name, "simulated": simulated, "enabled": True}
 
-    response = requests.put(url, headers=headers, json=payload, params=query_parameters)
+    if template:
+        payload["template"] = template
+
+    if organizations:
+        payload["organizations"] = organizations.split(",")
+
+    data = _utility.get_object(payload, MODEL, api_version)
+    json = _utility.to_camel_dict(dict_clean(parse_entity(data)))
+    response = requests.put(url, headers=headers, json=json, params=query_parameters)
     result = _utility.try_extract_result(response)
 
-    if api_version == ApiVersion.preview.value:
-        return central_models.DevicePreview(result)
-    else:
-        return central_models.DeviceV1(result)
+    return _utility.get_object(result, MODEL, api_version)
+
+
+def update_device(
+    cmd,
+    app_id: str,
+    device_id: str,
+    device_name: str,
+    template: str,
+    simulated: bool,
+    enabled: bool,
+    organizations: str,
+    token: str,
+    api_version: str,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+) -> Union[DeviceV1, DeviceV1_1_preview, DevicePreview]:
+    """
+    Update a device in IoTC
+
+    Args:
+        cmd: command passed into az
+        app_id: name of app (used for forming request URL)
+        device_id: unique case-sensitive device id
+        device_name: (non-unique) human readable name for the device
+        template: (optional) string that maps to the device_template_id
+            of the device template that this device is to be an instance of
+        simulated: if IoTC is to simulate data for this device
+        enabled: if device is enabled
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        device: dict
+    """
+
+    url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, device_id)
+    headers = _utility.get_headers(token, cmd, has_json_payload=True)
+
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
+    current_device = get_device(
+        cmd=cmd,
+        app_id=app_id,
+        device_id=device_id,
+        token=token,
+        api_version=api_version,
+        central_dns_suffix=central_dns_suffix,
+    )
+
+    payload = dict_clean(parse_entity(current_device))
+
+    if device_name is not None:
+        payload["displayName"] = device_name
+
+    if template is not None:
+        payload["template"] = template
+
+    if enabled is not None:
+        payload["enabled"] = enabled
+
+    if simulated is not None:
+        payload["simulated"] = simulated
+
+    if organizations is not None:
+        payload["organizations"] = organizations.split(",")
+
+    # sanitize device payload based on apiversion
+
+    data = _utility.get_object(payload, MODEL, api_version)
+    json = _utility.to_camel_dict(dict_clean(parse_entity(data)))
+
+    response = requests.patch(
+        url,
+        headers=headers,
+        json=json,
+        params=query_parameters,
+    )
+    result = _utility.try_extract_result(response)
+
+    return _utility.get_object(result, MODEL, api_version)
 
 
 def delete_device(
@@ -250,8 +325,8 @@ def delete_device(
     app_id: str,
     device_id: str,
     token: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
 ) -> dict:
     """
     Delete a device from IoTC
@@ -284,8 +359,8 @@ def get_device_credentials(
     app_id: str,
     device_id: str,
     token: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
 ):
     """
     Get device credentials from IoTC
@@ -321,8 +396,8 @@ def run_command(
     device_id: str,
     command_name: str,
     payload: dict,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
 ):
     """
     Execute a direct method on a device
@@ -369,8 +444,8 @@ def run_component_command(
     interface_id: str,
     command_name: str,
     payload: dict,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
 ):
     """
     Execute a direct method on a device
@@ -416,8 +491,8 @@ def get_command_history(
     token: str,
     device_id: str,
     command_name: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
 ):
     """
     Get command history
@@ -454,8 +529,8 @@ def get_component_command_history(
     device_id: str,
     interface_id: str,
     command_name: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
 ):
     """
     Get component command history
@@ -484,6 +559,47 @@ def get_component_command_history(
 
     response = requests.get(url, headers=headers, params=query_parameters)
     return _utility.try_extract_result(response)
+
+
+def get_device_twin(
+    cmd,
+    app_id: str,
+    device_id: str,
+    token: str,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+) -> DeviceTwin:
+    """
+    Get device twin given a device id
+
+    Args:
+        cmd: command passed into az
+        device_id: unique case-sensitive device id,
+        app_id: name of app (used for forming request URL)
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        twin: dict
+    """
+
+    if not token:
+        aad_token = get_aad_token(cmd, resource="https://apps.azureiotcentral.com")[
+            "accessToken"
+        ]
+        token = "Bearer {}".format(aad_token)
+
+    url = f"https://{app_id}.{central_dns_suffix}/system/iothub/devices/{device_id}/get-twin?extendedInfo=true"
+    headers = _utility.get_headers(token, cmd)
+
+    # Construct parameters
+
+    response = requests.get(
+        url,
+        headers=headers,
+        verify=not should_disable_connection_verify(),
+    )
+    return DeviceTwin(_utility.try_extract_result(response))
 
 
 def run_manual_failover(
@@ -561,4 +677,37 @@ def run_manual_failback(
     )
     _utility.log_response_debug(response=response, logger=logger)
 
+    return _utility.try_extract_result(response)
+
+
+def purge_c2d_messages(
+    cmd,
+    app_id: str,
+    device_id: str,
+    token: str,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+) :
+    """
+    Purges cloud to device (C2D) message queue for the specified device.
+
+    Args:
+        cmd: command passed into az
+        app_id: name of app (used for forming request URL)
+        device_id: unique case-sensitive device id,
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        {
+            message: 'Cloud to device (C2D) message queue purged for device {device_id}.\\n
+            Total messages purged: {totalMessagesPurged}.'
+        } on success
+        Raises error on failure
+    """
+    url = "https://{}.{}/{}/{}/c2d".format(
+        app_id, central_dns_suffix, "system/iothub/devices", device_id
+    )
+    headers = _utility.get_headers(token, cmd)
+    response = requests.delete(url, headers=headers)
     return _utility.try_extract_result(response)

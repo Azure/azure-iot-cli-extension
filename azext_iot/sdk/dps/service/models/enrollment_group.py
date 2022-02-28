@@ -58,11 +58,12 @@ class EnrollmentGroup(Model):
      configuration. We recommend using Azure Functions to host your logic.
      Possible values include: 'hashed', 'geoLatency', 'static', 'custom'
     :type allocation_policy: str or ~dps.models.enum
-    :param iot_hubs: The list of names of IoT hubs the device(s) in this
+    :param iot_hubs: The list of IoT Hub hostnames the device(s) in this
      resource can be allocated to. Must be a subset of tenant level list of IoT
      hubs.
     :type iot_hubs: list[str]
-    :param custom_allocation_definition: Custom allocation definition.
+    :param custom_allocation_definition: This tells DPS which webhook to call
+     when using custom allocation.
     :type custom_allocation_definition: ~dps.models.CustomAllocationDefinition
     """
 

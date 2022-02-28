@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 # This is largely derived from https://docs.microsoft.com/en-us/rest/api/iotcentral/deviceGroups
 
-from typing import List
+from typing import List, Union
 import requests
 
 from knack.log import get_logger
@@ -13,7 +13,8 @@ from knack.log import get_logger
 from azure.cli.core.azclierror import AzureResponseError
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
-from azext_iot.central import models as central_models
+from azext_iot.central.models.preview import DeviceGroupPreview
+from azext_iot.central.models.v1_1_preview import DeviceGroupV1_1_preview
 from azext_iot.central.models.enum import ApiVersion
 
 logger = get_logger(__name__)
@@ -25,10 +26,10 @@ def list_device_groups(
     cmd,
     app_id: str,
     token: str,
+    api_version: str,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.preview.value,
-) -> List[central_models.DeviceGroupPreview]:
+) -> List[Union[DeviceGroupPreview, DeviceGroupV1_1_preview]]:
     """
     Get a list of all device groups in IoTC app
 
@@ -62,7 +63,9 @@ def list_device_groups(
 
         device_groups.extend(
             [
-                central_models.DeviceGroupPreview(device_group)
+                DeviceGroupPreview(device_group)
+                if api_version == ApiVersion.preview.value
+                else DeviceGroupV1_1_preview(device_group)
                 for device_group in result["value"]
             ]
         )

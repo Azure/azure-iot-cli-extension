@@ -17,7 +17,11 @@ class BulkEnrollmentOperationError(Model):
 
     All required parameters must be populated in order to send to Azure.
 
-    :param registration_id: Required. Device registration id.
+    :param registration_id: Required. This id is used to uniquely identify a
+     device registration of an enrollment.
+     A case-insensitive string (up to 128 characters long) of alphanumeric
+     characters plus certain special characters : . _ -. No special characters
+     allowed at start or end.
     :type registration_id: str
     :param error_code: Required. Error code
     :type error_code: int

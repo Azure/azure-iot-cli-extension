@@ -118,13 +118,13 @@ You can either manually set the environment variables or use the `pytest.ini.exa
     azext_iot_testrg="Resource Group that contains your IoT Hub"
     azext_iot_testhub="IoT Hub Name"
     azext_iot_testdps="IoT Hub DPS Name"
-    azext_iot_teststorageuri="Blob Container SAS Uri"
-    azext_iot_identity_teststorageid="Storage Account ID"
+    azext_iot_teststorageaccount="Storage Account Name"
+    azext_iot_teststoragecontainer="Blob container name"
 ```
 
-`azext_iot_teststorageuri` is optional and only required when you want to test device export and file upload functionality. You can generate a SAS Uri for your Blob container using the [Azure Storage Explorer](https://azure.microsoft.com/en-us/features/storage-explorer/).  You must also configure your IoT Hub's File Upload storage container via the Azure Portal for this test to pass.
+`azext_iot_teststorageaccount` is the storage account used for running iothub storage tests. Optional variable, specify only when you want to run storage tests. During these tests, your hub will be assigned a System-Assigned AAD identity, and will be granted the role of "Storage Blob Data Contributor" on the storage account you provide. Both the hub's identity and the RBAC role will be removed once the test completes.
 
-`azext_iot_identity_teststorageid` is optional and only required when you want to test Identity-Based device export and file upload functionality. During this test, your hub will be assigned a System-Assigned AAD identity, and will be granted the role of "Storage Blob Data Contributor" on the storage account you provide. Both the hub's identity and the RBAC role will be removed once the test completes.
+`azext_iot_teststoragecontainer` is the name of blob container belonging to the above mentioned storage account. Optional environment variable, defaults to 'devices' when not specified.
 
 ##### IoT Hub
 
@@ -138,6 +138,18 @@ Execute the following command to run the IoT Hub DPS integration tests:
 
 `pytest azext_iot/tests/dps/ -k "_int"`
 
+##### IoT Central
+Execute the following command to run the IoT Central integration tests:
+
+`pytest azext_iot/tests/central/ -k "_int"`
+
+IoT Central integration tests can be run against all available api versions using command line argument "--api-version"
+
+e.g. run tests against v 1.0
+
+`pytest azext_iot/tests/central/ -k "_int" --api-version "1.0"`
+
+If argument is not specified, all runs act against default api version for each tested command.
 #### Unit and Integration Tests Single Command
 
 Execute the following command to run both Unit and Integration tests and output a code coverage report to the console and to a `.coverage` file.  You can configure code coverage with the `.coveragerc` file.

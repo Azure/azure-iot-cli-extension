@@ -13,11 +13,11 @@ from msrest.serialization import Model
 
 
 class QuerySpecification(Model):
-    """A Json query request.
+    """QuerySpecification.
 
     All required parameters must be populated in order to send to Azure.
 
-    :param query: Required. The query.
+    :param query: Required.
     :type query: str
     """
 

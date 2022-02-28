@@ -35,8 +35,6 @@ if not PACKAGE_NAME:
 
 
 # The following dependencies are needed by the IoT extension but used from Az CLI Core.
-# 'msrestazure>=0.4.29,<2.0.0',
-# 'paho-mqtt==1.5.0',
 # 'jmespath',
 # 'pyyaml'
 # 'knack'
@@ -46,9 +44,12 @@ if not PACKAGE_NAME:
 # for compatibility reasons.
 
 DEPENDENCIES = [
-    "paho-mqtt==1.5.0",
-    "jsonschema==3.2.0",
+    "msrestazure>=0.6.3,<2.0.0",
+    "jsonschema~=3.2.0",
     "importlib_metadata;python_version<'3.8'",
+    "azure-iot-device~=2.5",
+    "tqdm~=4.62",
+    "packaging"
 ]
 EXTRAS = {"uamqp": ["uamqp~=1.2"]}
 
@@ -61,6 +62,8 @@ CLASSIFIERS = [
     "Programming Language :: Python :: 3.6",
     "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
     "License :: OSI Approved :: MIT License",
 ]
 
@@ -83,7 +86,6 @@ setup(
     package_data={
         EXTENSION_REF_NAME: [
             "azext_metadata.json",
-            "digicert.pem",
             "assets/*",
         ]
     },

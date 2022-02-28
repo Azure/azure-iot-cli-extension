@@ -4,31 +4,111 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from azure.cli.core.util import should_disable_connection_verify
+from knack.util import CLIError
 import requests
-
+from typing import Union, List
 from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
-from azext_iot.central.models.enum import Role, ApiVersion, UserTypePreview, UserTypeV1
+from azext_iot.central.models.enum import (
+    Role,
+    ApiVersion,
+    UserTypePreview,
+    UserTypeV1,
+    get_enum_keys,
+)
+from azext_iot.central.models.v1 import UserV1
+from azext_iot.central.models.v1_1_preview import UserV1_1_preview
+from azext_iot.central.models.preview import UserPreview
+from re import search
+
+User = Union[UserV1, UserV1_1_preview, UserPreview]
 
 logger = get_logger(__name__)
 
 BASE_PATH = "api/users"
+MODEL = "User"
+ROLE_PATTERN = r"([\S]+)\\\\([\S]+)"
 
 
-def add_service_principal(
+def _make_call(
+    cmd,
+    app_id: str,
+    method: str,
+    path: str,
+    payload: str,
+    token: str,
+    central_dns_suffix: str,
+    api_version: str,
+    url=None,
+) -> dict:
+    if url is None:
+        url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
+
+    if path is not None:
+        url = "{}/{}".format(url, path)
+    headers = _utility.get_headers(
+        token, cmd, has_json_payload=True if payload is not None else False
+    )
+
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
+    response = requests.request(
+        url=url,
+        method=method.upper(),
+        headers=headers,
+        params=query_parameters,
+        json=payload,
+        verify=not should_disable_connection_verify(),
+    )
+    return _utility.try_extract_result(response)
+
+
+def create_roles(roles: str, api_version: str):
+    result_roles = []
+    parsed_roles = roles.split(",")
+    for role in parsed_roles:
+        org_id = None
+        match = search(ROLE_PATTERN, role)
+        if match and len(match.groups()) == 2:
+            # role is an org role
+            if api_version != ApiVersion.v1_1_preview.value:
+                raise CLIError(
+                    f"Api Version {ApiVersion[api_version].value} does not support organizations."
+                    " Please use version >= 1.1-preview."
+                )
+            org_id = match[1]
+            role_id = (
+                Role[match[2]].value if match[2] in get_enum_keys(Role) else match[2]
+            )
+        else:
+            role_id = Role[role].value if role in get_enum_keys(Role) else role
+
+        if org_id:
+            result_roles.append({"role": role_id, "organization": org_id})
+        else:
+            result_roles.append({"role": role_id})
+
+    return result_roles
+
+
+def add_or_update_service_principal_user(
     cmd,
     app_id: str,
     assignee: str,
     tenant_id: str,
     object_id: str,
-    role: Role,
+    roles: str,
     token: str,
+    api_version: str,
+    update=False,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
-) -> dict:
+) -> User:
     """
-    Add a user to a Central app
+    Add or update a user to a Central app
 
     Args:
         cmd: command passed into az
@@ -42,42 +122,52 @@ def add_service_principal(
     Returns:
         user: dict
     """
-    url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, assignee)
 
-    if api_version == ApiVersion.v1.value:
-        user_type = UserTypeV1.service_principal.value
-    else:
+    if api_version == ApiVersion.preview.value:
         user_type = UserTypePreview.service_principal.value
+    else:
+        user_type = UserTypeV1.service_principal.value
 
     payload = {
-        "tenantId": tenant_id,
-        "objectId": object_id,
         "type": user_type,
-        "roles": [{"role": role.value}],
     }
 
-    headers = _utility.get_headers(token, cmd, has_json_payload=True)
+    if roles:
+        payload["roles"] = create_roles(roles, api_version=api_version)
 
-    # Construct parameters
-    query_parameters = {}
-    query_parameters["api-version"] = api_version
+    if tenant_id:
+        payload["tenantId"] = tenant_id
 
-    response = requests.put(url, headers=headers, json=payload, params=query_parameters)
-    return _utility.try_extract_result(response)
+    if object_id:
+        payload["objectId"] = object_id
+
+    result = _make_call(
+        cmd,
+        app_id=app_id,
+        method="patch" if update else "put",
+        path=assignee,
+        payload=payload,
+        token=token,
+        central_dns_suffix=central_dns_suffix,
+        api_version=api_version,
+    )
+
+    return _utility.get_object(result, MODEL, api_version)
 
 
-def add_email(
+def add_or_update_email_user(
     cmd,
     app_id: str,
     assignee: str,
     email: str,
-    role: Role,
+    roles: str,
     token: str,
+    api_version: str,
+    update=False,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
-) -> dict:
+) -> User:
     """
-    Add a user to a Central app
+    Add or update a user to a Central app
 
     Args:
         cmd: command passed into az
@@ -90,36 +180,42 @@ def add_email(
     Returns:
         user: dict
     """
-    url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, assignee)
 
-    if api_version == ApiVersion.v1.value:
-        user_type = UserTypeV1.email.value
-    else:
+    if api_version == ApiVersion.preview.value:
         user_type = UserTypePreview.email.value
+    else:
+        user_type = UserTypeV1.email.value
 
-    payload = {
-        "email": email,
-        "type": user_type,
-        "roles": [{"role": role.value}],
-    }
+    payload = {"type": user_type, "roles": []}
 
-    headers = _utility.get_headers(token, cmd, has_json_payload=True)
+    if roles:
+        payload["roles"] = create_roles(roles, api_version=api_version)
 
-    # Construct parameters
-    query_parameters = {}
-    query_parameters["api-version"] = api_version
+    if email and not update:
+        payload["email"] = email
 
-    response = requests.put(url, headers=headers, json=payload, params=query_parameters)
-    return _utility.try_extract_result(response)
+    result = _make_call(
+        cmd,
+        app_id=app_id,
+        method="patch" if update else "put",
+        path=assignee,
+        payload=payload,
+        token=token,
+        central_dns_suffix=central_dns_suffix,
+        api_version=api_version,
+    )
+
+    return _utility.get_object(result, MODEL, api_version)
 
 
 def get_user_list(
     cmd,
     app_id: str,
     token: str,
+    api_version: str,
+    max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
-) -> dict:
+) -> List[User]:
     """
     Get the list of users for central app.
 
@@ -133,16 +229,34 @@ def get_user_list(
     Returns:
         users: dict
     """
+    users = []
+
     url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
+    pages_processed = 0
+    while (max_pages == 0 or pages_processed < max_pages) and url:
+        result = _make_call(
+            cmd,
+            app_id=app_id,
+            url=url,
+            method="get",
+            path=None,
+            payload=None,
+            token=token,
+            central_dns_suffix=central_dns_suffix,
+            api_version=api_version,
+        )
 
-    headers = _utility.get_headers(token, cmd)
+        if "value" not in result:
+            raise CLIError("Value is not present in body: {}".format(result))
 
-    # Construct parameters
-    query_parameters = {}
-    query_parameters["api-version"] = api_version
+        users.extend(
+            [_utility.get_object(user, MODEL, api_version) for user in result["value"]]
+        )
 
-    response = requests.get(url, headers=headers, params=query_parameters)
-    return _utility.try_extract_result(response)
+        url = result.get("nextLink", None)
+        pages_processed = pages_processed + 1
+
+    return users
 
 
 def get_user(
@@ -150,9 +264,9 @@ def get_user(
     app_id: str,
     token: str,
     assignee: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
-) -> dict:
+) -> User:
     """
     Get information for the specified user.
 
@@ -167,16 +281,18 @@ def get_user(
     Returns:
         users: dict
     """
-    url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, assignee)
+    result = _make_call(
+        cmd,
+        app_id=app_id,
+        method="get",
+        path=assignee,
+        payload=None,
+        token=token,
+        central_dns_suffix=central_dns_suffix,
+        api_version=api_version,
+    )
 
-    headers = _utility.get_headers(token, cmd)
-
-    # Construct parameters
-    query_parameters = {}
-    query_parameters["api-version"] = api_version
-
-    response = requests.get(url, headers=headers, params=query_parameters)
-    return _utility.try_extract_result(response)
+    return _utility.get_object(result, MODEL, api_version)
 
 
 def delete_user(
@@ -184,8 +300,8 @@ def delete_user(
     app_id: str,
     token: str,
     assignee: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
 ) -> dict:
     """
     delete user from theapp.
@@ -201,13 +317,15 @@ def delete_user(
     Returns:
         users: dict
     """
-    url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, assignee)
+    result = _make_call(
+        cmd,
+        app_id=app_id,
+        method="delete",
+        path=assignee,
+        payload=None,
+        token=token,
+        central_dns_suffix=central_dns_suffix,
+        api_version=api_version,
+    )
 
-    headers = _utility.get_headers(token, cmd)
-
-    # Construct parameters
-    query_parameters = {}
-    query_parameters["api-version"] = api_version
-
-    response = requests.delete(url, headers=headers, params=query_parameters)
-    return _utility.try_extract_result(response)
+    return result

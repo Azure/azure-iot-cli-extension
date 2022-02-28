@@ -52,7 +52,7 @@ class EmbeddedCLI(object):
     def as_json(self):
         try:
             return json.loads(self.output)
-        except:
+        except Exception:
             raise CLIInternalError(
                 "Issue parsing received payload '{}' as json. Please try again or check resource status.".format(
                     self.output

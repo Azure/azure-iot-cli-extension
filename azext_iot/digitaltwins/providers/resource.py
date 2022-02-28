@@ -5,18 +5,22 @@
 # --------------------------------------------------------------------------------------------
 from azure.cli.core.azclierror import (
     ArgumentUsageError,
+    InvalidArgumentValueError,
     RequiredArgumentMissingError,
     ResourceNotFoundError,
 )
 from azext_iot.digitaltwins.common import (
+    MAX_ADT_DH_CREATE_RETRIES,
     ADTEndpointAuthType,
     ADTPublicNetworkAccessType,
+    MAX_ADT_CREATE_RETRIES,
 )
 from azext_iot.digitaltwins.providers import (
     DigitalTwinsResourceManager,
     CloudError,
     ErrorResponseException,
 )
+from azext_iot.digitaltwins.providers.generic import generic_check_state
 from azext_iot.digitaltwins.providers.rbac import RbacProvider
 from azext_iot.sdk.digitaltwins.controlplane.models import (
     DigitalTwinsDescription,
@@ -77,6 +81,13 @@ class ResourceProvider(DigitalTwinsResourceManager):
                 long_running_operation_timeout=timeout,
             )
 
+            def check_state(lro):
+                generic_check_state(
+                    lro=lro,
+                    show_cmd=f"az dt show -n {name} -g {resource_group_name}",
+                    max_retries=MAX_ADT_CREATE_RETRIES
+                )
+
             def rbac_handler(lro):
                 instance = lro.resource().as_dict()
                 identity = instance.get("identity")
@@ -102,6 +113,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
                                 role_type=role_type,
                             )
 
+            create_or_update.add_done_callback(check_state)
             create_or_update.add_done_callback(rbac_handler)
             return create_or_update
         except CloudError as e:
@@ -196,8 +208,6 @@ class ResourceProvider(DigitalTwinsResourceManager):
         target_instance = self.find_instance(
             name=name, resource_group_name=resource_group_name
         )
-        if not resource_group_name:
-            resource_group_name = self.get_rg(target_instance)
 
         return self.rbac.list_assignments(
             dt_scope=target_instance.id,
@@ -209,8 +219,6 @@ class ResourceProvider(DigitalTwinsResourceManager):
         target_instance = self.find_instance(
             name=name, resource_group_name=resource_group_name
         )
-        if not resource_group_name:
-            resource_group_name = self.get_rg(target_instance)
 
         return self.rbac.assign_role(
             dt_scope=target_instance.id, assignee=assignee, role_type=role_type
@@ -220,8 +228,6 @@ class ResourceProvider(DigitalTwinsResourceManager):
         target_instance = self.find_instance(
             name=name, resource_group_name=resource_group_name
         )
-        if not resource_group_name:
-            resource_group_name = self.get_rg(target_instance)
 
         return self.rbac.remove_role(
             dt_scope=target_instance.id, assignee=assignee, role_type=role_type
@@ -481,6 +487,127 @@ class ResourceProvider(DigitalTwinsResourceManager):
                 resource_group_name=resource_group_name,
                 resource_name=name,
                 private_endpoint_connection_name=conn_name
+            )
+        except ErrorResponseException as e:
+             handle_service_exception(e)
+
+    def create_adx_data_connection(
+        self,
+        name,
+        conn_name,
+        adx_cluster_name,
+        adx_database_name,
+        eh_namespace,
+        eh_entity_path,
+        adx_table_name=None,
+        adx_resource_group=None,
+        adx_subscription=None,
+        eh_consumer_group="$Default",
+        eh_resource_group=None,
+        eh_subscription=None,
+        resource_group_name=None,
+        yes=False,
+    ):
+        target_instance = self.find_instance(
+            name=name, resource_group_name=resource_group_name
+        )
+        if not resource_group_name:
+            resource_group_name = self.get_rg(target_instance)
+        subscription = target_instance.id.split("/")[2]
+
+        if len(conn_name) <= 2:
+            raise InvalidArgumentValueError(
+                "The connection name must have a length greater than 2"
+            )
+
+        adx_resource_group = adx_resource_group if adx_resource_group else resource_group_name
+        eh_resource_group = eh_resource_group if eh_resource_group else resource_group_name
+        adx_subscription = adx_subscription if adx_subscription else subscription
+        eh_subscription = eh_subscription if eh_subscription else subscription
+
+        from azext_iot.digitaltwins.providers.connection.builders import build_adx_connection_properties
+        properties = build_adx_connection_properties(
+            adx_cluster_name=adx_cluster_name,
+            adx_database_name=adx_database_name,
+            adx_table_name=adx_table_name,
+            adx_resource_group=adx_resource_group,
+            adx_subscription=adx_subscription,
+            dt_instance=target_instance,
+            eh_namespace=eh_namespace,
+            eh_entity_path=eh_entity_path,
+            eh_consumer_group=eh_consumer_group,
+            eh_resource_group=eh_resource_group,
+            eh_subscription=eh_subscription,
+            yes=yes,
+        )
+
+        try:
+            def check_state(lro):
+                generic_check_state(
+                    lro=lro,
+                    show_cmd="az dt data-history show -n {} -g {} --cn {}".format(
+                        name, resource_group_name, conn_name
+                    ),
+                    max_retries=MAX_ADT_DH_CREATE_RETRIES
+                )
+
+            create_or_update = self.mgmt_sdk.time_series_database_connections.create_or_update(
+                resource_group_name=resource_group_name,
+                resource_name=name,
+                time_series_database_connection_name=conn_name,
+                properties=properties
+            )
+            create_or_update.add_done_callback(check_state)
+            return create_or_update
+        except ErrorResponseException as e:
+            handle_service_exception(e)
+
+    def get_data_connection(self, name, conn_name, resource_group_name=None, wait=False):
+        target_instance = self.find_instance(
+            name=name, resource_group_name=resource_group_name
+        )
+        if not resource_group_name:
+            resource_group_name = self.get_rg(target_instance)
+
+        try:
+            return self.mgmt_sdk.time_series_database_connections.get(
+                resource_group_name=resource_group_name,
+                resource_name=name,
+                time_series_database_connection_name=conn_name,
+            )
+        except ErrorResponseException as e:
+            if wait:
+                e.status_code = e.response.status_code
+                raise e
+            handle_service_exception(e)
+
+    def list_data_connection(self, name, resource_group_name=None):
+        target_instance = self.find_instance(
+            name=name, resource_group_name=resource_group_name
+        )
+        if not resource_group_name:
+            resource_group_name = self.get_rg(target_instance)
+
+        try:
+            return self.mgmt_sdk.time_series_database_connections.list(
+                resource_group_name=resource_group_name,
+                resource_name=name,
+            )
+        except ErrorResponseException as e:
+            handle_service_exception(e)
+
+    def delete_data_connection(self, name, conn_name, resource_group_name=None):
+        target_instance = self.find_instance(
+            name=name, resource_group_name=resource_group_name
+        )
+        if not resource_group_name:
+            resource_group_name = self.get_rg(target_instance)
+
+        try:
+            return self.mgmt_sdk.time_series_database_connections.delete(
+                resource_group_name=resource_group_name,
+                resource_name=name,
+                time_series_database_connection_name=conn_name,
             )
         except ErrorResponseException as e:
             handle_service_exception(e)

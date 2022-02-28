@@ -18,6 +18,7 @@ from .operations.digital_twins_endpoint_operations import DigitalTwinsEndpointOp
 from .operations.operations import Operations
 from .operations.private_link_resources_operations import PrivateLinkResourcesOperations
 from .operations.private_endpoint_connections_operations import PrivateEndpointConnectionsOperations
+from .operations.time_series_database_connections_operations import TimeSeriesDatabaseConnectionsOperations
 from . import models
 
 
@@ -46,7 +47,8 @@ class AzureDigitalTwinsManagementClientConfiguration(AzureConfiguration):
 
         super(AzureDigitalTwinsManagementClientConfiguration, self).__init__(base_url)
 
-        self.add_user_agent('azure-mgmt-digitaltwins/{}'.format(VERSION))
+        self.add_user_agent('azuredigitaltwinsmanagementclient/{}'.format(VERSION))
+        self.add_user_agent('Azure-SDK-For-Python')
 
         self.credentials = credentials
         self.subscription_id = subscription_id
@@ -68,6 +70,8 @@ class AzureDigitalTwinsManagementClient(SDKClient):
     :vartype private_link_resources: controlplane.operations.PrivateLinkResourcesOperations
     :ivar private_endpoint_connections: PrivateEndpointConnections operations
     :vartype private_endpoint_connections: controlplane.operations.PrivateEndpointConnectionsOperations
+    :ivar time_series_database_connections: TimeSeriesDatabaseConnections operations
+    :vartype time_series_database_connections: controlplane.operations.TimeSeriesDatabaseConnectionsOperations
 
     :param credentials: Credentials needed for the client to connect to Azure.
     :type credentials: :mod:`A msrestazure Credentials
@@ -84,7 +88,7 @@ class AzureDigitalTwinsManagementClient(SDKClient):
         super(AzureDigitalTwinsManagementClient, self).__init__(self.config.credentials, self.config)
 
         client_models = {k: v for k, v in models.__dict__.items() if isinstance(v, type)}
-        self.api_version = '2020-12-01'
+        self.api_version = '2021-06-30-preview'
         self._serialize = Serializer(client_models)
         self._deserialize = Deserializer(client_models)
 
@@ -97,4 +101,6 @@ class AzureDigitalTwinsManagementClient(SDKClient):
         self.private_link_resources = PrivateLinkResourcesOperations(
             self._client, self.config, self._serialize, self._deserialize)
         self.private_endpoint_connections = PrivateEndpointConnectionsOperations(
+            self._client, self.config, self._serialize, self._deserialize)
+        self.time_series_database_connections = TimeSeriesDatabaseConnectionsOperations(
             self._client, self.config, self._serialize, self._deserialize)

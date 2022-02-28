@@ -1,26 +1,22 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+
 trigger:
   branches:
     include:
       - dev
-      - master
+      - main
   paths:
     exclude:
-    - README.md
-    - docs/alt-install-methods.md
-    - docs/install-help.md
-    - docs/scenario-automation.md
+    - '**/*.md'
 
 pr:
   branches:
     include:
       - dev
-      - master
+      - main
   paths:
     exclude:
-    - README.md
-    - docs/alt-install-methods.md
-    - docs/install-help.md
-    - docs/scenario-automation.md
+    - '**/*.md'
 
 variables:
   iot_ext_package: azure-iot
@@ -31,7 +27,6 @@ parameters:
   type: string
   default: 'ubuntu-18.04'
   values:
-  - 'ubuntu-16.04'
   - 'ubuntu-18.04'
   - 'ubuntu-latest'
 
@@ -44,7 +39,7 @@ jobs:
   steps:
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.6.x'
+      versionSpec: '3.8.x'
       architecture: 'x64'
 
   - template: templates/setup-ci-machine.yml
@@ -57,7 +52,7 @@ jobs:
   steps:
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.6.x'
+      versionSpec: '3.8.x'
       architecture: 'x64'
 
   - template: templates/setup-ci-machine.yml
@@ -75,12 +70,16 @@ jobs:
         python.version: '3.7.x'
       Python38:
         python.version: '3.8.x'
+      Python39:
+        python.version: '3.9.x'
+      Python310:
+        python.version: '3.10.x'
     maxParallel: 3
 
   steps:
   - bash: sudo rm -R -f /usr/local/lib/azureExtensionDir
 
-  - template: templates/run-tests.yml
+  - template: templates/run-tests-parallel.yml
     parameters:
       pythonVersion: '$(python.version)'
       runUnitTests: true
@@ -89,10 +88,10 @@ jobs:
 - job: 'run_unit_tests_macOs'
   dependsOn: ['build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']
   pool:
-    vmImage: 'macOS-10.14'
+    vmImage: 'macOS-10.15'
 
   steps:
-  - template: templates/run-tests.yml
+  - template: templates/run-tests-parallel.yml
     parameters:
       pythonVersion: '3.8.x'
       runUnitTests: true
@@ -103,7 +102,7 @@ jobs:
 - job: 'run_unit_tests_windows'
   dependsOn : [ 'build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']
   pool:
-    vmImage: 'vs2017-win2016'
+    vmImage: 'windows-2019'
 
   steps:
   - task: PowerShell@2
@@ -111,7 +110,7 @@ jobs:
       targetType: 'inline'
       script : 'ren "C:\Program Files\Common Files\AzureCliExtensionDirectory" "C:\Program Files\Common Files\AzureCliExtensionDirectory1"'
 
-  - template: templates/run-tests.yml
+  - template: templates/run-tests-parallel.yml
     parameters:
       pythonVersion: '3.8.x'
       runUnitTests: true
@@ -148,17 +147,12 @@ jobs:
     vmImage: ${{ parameters.linuxImage }}
 
   steps:
-  - task: UsePythonVersion@0
-    inputs:
-      versionSpec: '3.6.x'
-      architecture: 'x64'
-
-  - template: templates/install-configure-azure-cli.yml
+  - template: templates/evaluate-command-table.yml
 
 - job: CredScan
   displayName: 'Credential Scan'
   pool:
-    vmImage: 'vs2017-win2016'
+    vmImage: 'windows-2019'
 
   steps:
   - task: CredScan@3

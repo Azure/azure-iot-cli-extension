@@ -15,25 +15,25 @@ from msrest.serialization import Model
 class QueryQueryTwinsOptions(Model):
     """Additional parameters for query_twins operation.
 
+    :param max_items_per_page: The maximum number of items to retrieve per
+     request. The server may choose to return less than the requested number.
+    :type max_items_per_page: int
     :param traceparent: Identifies the request in a distributed tracing
      system.
     :type traceparent: str
     :param tracestate: Provides vendor-specific trace identification
      information and is a companion to traceparent.
     :type tracestate: str
-    :param max_items_per_page: The maximum number of items to retrieve per
-     request. The server may choose to return less than the requested number.
-    :type max_items_per_page: int
     """
 
     _attribute_map = {
+        'max_items_per_page': {'key': '', 'type': 'int'},
         'traceparent': {'key': '', 'type': 'str'},
         'tracestate': {'key': '', 'type': 'str'},
-        'max_items_per_page': {'key': '', 'type': 'int'},
     }
 
     def __init__(self, **kwargs):
         super(QueryQueryTwinsOptions, self).__init__(**kwargs)
+        self.max_items_per_page = kwargs.get('max_items_per_page', None)
         self.traceparent = kwargs.get('traceparent', None)
         self.tracestate = kwargs.get('tracestate', None)
-        self.max_items_per_page = kwargs.get('max_items_per_page', None)

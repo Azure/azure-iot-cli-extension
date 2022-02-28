@@ -301,7 +301,9 @@ class TwinProvider(DigitalTwinsProvider):
         except ErrorResponseException as e:
             handle_service_exception(e)
 
-    def send_telemetry(self, twin_id, telemetry=None, dt_id=None, component_path=None):
+    def send_telemetry(
+        self, twin_id, telemetry=None, dt_id=None, component_path=None, telemetry_source_time=None
+    ):
         from uuid import uuid4
         from datetime import datetime, timezone
 
@@ -329,6 +331,7 @@ class TwinProvider(DigitalTwinsProvider):
                     dt_timestamp=dt_timestamp,
                     component_path=component_path,
                     telemetry=telemetry_request,
+                    telemetry_source_time=telemetry_source_time
                 )
 
             self.twins_sdk.send_telemetry(
@@ -336,6 +339,7 @@ class TwinProvider(DigitalTwinsProvider):
                 message_id=dt_id,
                 dt_timestamp=dt_timestamp,
                 telemetry=telemetry_request,
+                telemetry_source_time=telemetry_source_time
             )
         except ErrorResponseException as e:
             handle_service_exception(e)

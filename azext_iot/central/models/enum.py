@@ -10,6 +10,7 @@ Enum definitions for central
 """
 
 from enum import Enum
+from typing import List, Any
 
 
 class DeviceStatus(Enum):
@@ -60,3 +61,12 @@ class ApiVersion(Enum):
 
     preview = "preview"
     v1 = "1.0"
+    v1_1_preview = "1.1-preview"
+
+
+def get_enum_keys(enum: Enum) -> List[str]:
+    return [f'{key}' for key, _ in enum.__members__.items()]
+
+
+def get_enum_values(enum: Enum) -> List[Any]:
+    return [item.value for _, item in enum.__members__.items()]

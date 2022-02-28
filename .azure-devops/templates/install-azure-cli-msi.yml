@@ -1,0 +1,16 @@
+steps:
+  # Ensure azure CLI is already installed (and where) and check version information.
+  - task: PowerShell@2
+    inputs:
+      targetType: inline
+      script: |
+        (Get-Command az).source
+        az -v
+    displayName: 'Show AZ CLI version info'
+  - task: PowerShell@2
+    displayName: 'Set Windows MSI Python Executable PATH'
+    inputs:
+      targetType: 'inline'
+      script: |
+        echo "##vso[task.prependPath]C:\Program Files (x86)\Microsoft SDKs\Azure\CLI2"
+        echo "##vso[task.prependPath]C:\Program Files (x86)\Microsoft SDKs\Azure\CLI2\Scripts"

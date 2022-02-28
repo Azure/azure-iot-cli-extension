@@ -5,10 +5,9 @@
 # --------------------------------------------------------------------------------------------
 # Dev note - think of this as a controller
 
-
+from typing import List
 from azext_iot.constants import CENTRAL_ENDPOINT
-from azext_iot.central.providers.preview import CentralApiTokenProviderPreview
-from azext_iot.central.providers.v1 import CentralApiTokenProviderV1
+from azext_iot.central.providers import CentralApiTokenProvider
 from azext_iot.central.models.enum import Role, ApiVersion
 
 
@@ -17,18 +16,24 @@ def add_api_token(
     app_id: str,
     token_id: str,
     role: str,
+    org_id=None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
-):
-    if api_version == ApiVersion.preview.value:
-        provider = CentralApiTokenProviderPreview(cmd=cmd, app_id=app_id, token=token)
-    else:
-        provider = CentralApiTokenProviderV1(cmd=cmd, app_id=app_id, token=token)
+) -> dict:
+    provider = CentralApiTokenProvider(
+        cmd=cmd, app_id=app_id, token=token, api_version=api_version
+    )
+
+    try:
+        role = Role[role].value
+    except Exception:
+        pass
 
     return provider.add_api_token(
         token_id=token_id,
-        role=Role[role],
+        org_id=org_id,
+        role=role,
         central_dns_suffix=central_dns_suffix,
     )
 
@@ -39,12 +44,11 @@ def list_api_tokens(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
-):
+) -> List[dict]:
 
-    if api_version == ApiVersion.preview.value:
-        provider = CentralApiTokenProviderPreview(cmd=cmd, app_id=app_id, token=token)
-    else:
-        provider = CentralApiTokenProviderV1(cmd=cmd, app_id=app_id, token=token)
+    provider = CentralApiTokenProvider(
+        cmd=cmd, app_id=app_id, token=token, api_version=api_version
+    )
 
     return provider.get_api_token_list(central_dns_suffix=central_dns_suffix)
 
@@ -58,10 +62,9 @@ def get_api_token(
     api_version=ApiVersion.v1.value,
 ):
 
-    if api_version == ApiVersion.preview.value:
-        provider = CentralApiTokenProviderPreview(cmd=cmd, app_id=app_id, token=token)
-    else:
-        provider = CentralApiTokenProviderV1(cmd=cmd, app_id=app_id, token=token)
+    provider = CentralApiTokenProvider(
+        cmd=cmd, app_id=app_id, token=token, api_version=api_version
+    )
 
     return provider.get_api_token(
         token_id=token_id,
@@ -76,11 +79,10 @@ def delete_api_token(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
-):
-    if api_version == ApiVersion.preview.value:
-        provider = CentralApiTokenProviderPreview(cmd=cmd, app_id=app_id, token=token)
-    else:
-        provider = CentralApiTokenProviderV1(cmd=cmd, app_id=app_id, token=token)
+) -> dict:
+    provider = CentralApiTokenProvider(
+        cmd=cmd, app_id=app_id, token=token, api_version=api_version
+    )
 
     return provider.delete_api_token(
         token_id=token_id,

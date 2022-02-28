@@ -22,7 +22,7 @@ class QueryOperations(object):
     :param config: Configuration of service client.
     :param serializer: An object model serializer.
     :param deserializer: An object model deserializer.
-    :ivar api_version: The API version to use for the request. Constant value: "2020-10-31".
+    :ivar api_version: The requested API version. Constant value: "2021-06-30-preview".
     """
 
     models = models
@@ -32,7 +32,7 @@ class QueryOperations(object):
         self._client = client
         self._serialize = serializer
         self._deserialize = deserializer
-        self.api_version = "2020-10-31"
+        self.api_version = "2021-06-30-preview"
 
         self.config = config
 
@@ -45,6 +45,8 @@ class QueryOperations(object):
         * 400 Bad Request
         * BadRequest - The continuation token is invalid.
         * SqlQueryError - The query contains some errors.
+        * TimeoutError - The query execution timed out after 60 seconds. Try
+        simplifying the query or adding conditions to reduce the result size.
         * 429 Too Many Requests
         * QuotaReachedError - The maximum query rate limit has been reached.
 
@@ -57,27 +59,27 @@ class QueryOperations(object):
         :param query_query_twins_options: Additional parameters for the
          operation
         :type query_query_twins_options:
-         ~digitaltwins.models.QueryQueryTwinsOptions
+         ~dataplane.models.QueryQueryTwinsOptions
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
          deserialized response
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
         :return: QueryResult or ClientRawResponse if raw=true
-        :rtype: ~digitaltwins.models.QueryResult or
+        :rtype: ~dataplane.models.QueryResult or
          ~msrest.pipeline.ClientRawResponse
         :raises:
-         :class:`ErrorResponseException<digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<dataplane.models.ErrorResponseException>`
         """
+        max_items_per_page = None
+        if query_query_twins_options is not None:
+            max_items_per_page = query_query_twins_options.max_items_per_page
         traceparent = None
         if query_query_twins_options is not None:
             traceparent = query_query_twins_options.traceparent
         tracestate = None
         if query_query_twins_options is not None:
             tracestate = query_query_twins_options.tracestate
-        max_items_per_page = None
-        if query_query_twins_options is not None:
-            max_items_per_page = query_query_twins_options.max_items_per_page
         query_specification = models.QuerySpecification(query=query, continuation_token=continuation_token)
 
         # Construct URL
@@ -89,7 +91,6 @@ class QueryOperations(object):
 
         # Construct headers
         header_parameters = {}
-        header_parameters['Accept'] = 'application/json'
         header_parameters['Content-Type'] = 'application/json; charset=utf-8'
         if self.config.generate_client_request_id:
             header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
@@ -97,19 +98,20 @@ class QueryOperations(object):
             header_parameters.update(custom_headers)
         if self.config.accept_language is not None:
             header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
+        if max_items_per_page is not None:
+            header_parameters['max-items-per-page'] = self._serialize.header("max_items_per_page", max_items_per_page, 'int')
         if traceparent is not None:
             header_parameters['traceparent'] = self._serialize.header("traceparent", traceparent, 'str')
         if tracestate is not None:
             header_parameters['tracestate'] = self._serialize.header("tracestate", tracestate, 'str')
-        if max_items_per_page is not None:
-            header_parameters['max-items-per-page'] = self._serialize.header("max_items_per_page", max_items_per_page, 'int')
 
         # Construct body
         body_content = self._serialize.body(query_specification, 'QuerySpecification')
 
         # Construct and send request
-        request = self._client.post(url, query_parameters, header_parameters, body_content)
-        response = self._client.send(request, stream=False, **operation_config)
+        request = self._client.post(url, query_parameters)
+        response = self._client.send(
+            request, header_parameters, body_content, stream=False, **operation_config)
 
         if response.status_code not in [200]:
             raise models.ErrorResponseException(self._deserialize, response)

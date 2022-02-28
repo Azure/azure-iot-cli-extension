@@ -1,52 +1,103 @@
-# Run nightly at midnight.
+# Copyright (c) Microsoft Corporation. All rights reserved.
+
+# Required for schedule only trigger
+trigger: none
+pr: none
+
+# Run nightly at midnight (Pacific).
 schedules:
-- cron: "0 0 * * *"
-  displayName: Nightly Integration Build
+- cron: "0 8 * * *"
+  displayName: 'Nightly Integration Build'
   branches:
     include:
     - dev
 
-variables:
-  pythonVersion: '3.6.x'
-  architecture: 'x64'
-
 parameters:
+- name: variableGroup
+  type: string
+  default: 'aziotcli_test_nightly'
 - name: vmImage
   type: string
   default: 'ubuntu-18.04'
   values:
-  - 'ubuntu-16.04'
   - 'ubuntu-18.04'
   - 'ubuntu-latest'
+- name: pythonVersion
+  displayName: 'Python version for building wheel, KPIs'
+  type: string
+  default: '3.8.x'
+  values:
+  - '3.6.x'
+  - '3.8.x'
+  - '3.9.x'
+- name: pythonVersionsTestingMatrix
+  type: object
+  default: >
+    {
+      Python36: 
+      {
+        python: '3.6.x'
+      },
+      Python38: 
+      {
+        python: '3.8.x'
+      }
+    }
+- name: architecture
+  type: string
+  default: 'x64'
+- name: 'testCentral'
+  type: boolean
+  default: true
+- name: 'testADT'
+  type: boolean
+  default: true
+- name: 'testDPS'
+  type: boolean
+  default: true
+- name: 'testHub'
+  type: boolean
+  default: true
+
+variables:
+  - group: ${{ parameters.variableGroup }}
+  - name: pythonVersion
+    value: ${{ parameters.pythonVersion }}
+  - name: architecture
+    value: ${{ parameters.architecture }}
+  - name: msiTestingMatrix
+    value: >
+      {
+        PythonMSI: 
+        {
+          python: '3.8.x'
+        }
+      }
 
 stages:
   - stage: 'build'
     displayName: 'Build and Publish Artifacts'
+    pool:
+      vmImage: ${{ parameters.vmImage }}
     jobs:
 
     - job: 'Build_Publish_Azure_IoT_CLI_Extension'
-      pool:
-        vmImage: ${{ parameters.vmImage }}
-
       steps:
       - task: UsePythonVersion@0
         inputs:
-          versionSpec: $(pythonVersion)
-          architecture: $(architecture)
+          versionSpec: ${{ parameters.pythonVersion }}
+          architecture: ${{ parameters.architecture }}
 
       - template: templates/setup-ci-machine.yml
 
       - template: templates/build-publish-azure-iot-cli-extension.yml
 
     - job: 'Build_Publish_Azure_CLI_Test_SDK'
-      pool:
-        vmImage: ${{ parameters.vmImage }}
-
       steps:
       - task: UsePythonVersion@0
         inputs:
-          versionSpec: $(pythonVersion)
-          architecture: $(architecture)
+          versionSpec: ${{ parameters.pythonVersion }}
+          architecture: ${{ parameters.architecture }}
 
       - template: templates/setup-ci-machine.yml
 
@@ -58,40 +109,77 @@ stages:
       steps:
       - template: templates/setup-dev-test-env.yml
         parameters:
-          pythonVersion: $(pythonVersion)
-          architecture: $(architecture)
+          pythonVersion: ${{ parameters.pythonVersion }}
+          architecture: ${{ parameters.architecture }}
 
       - template: templates/install-and-record-version.yml
 
-  - stage: 'test'
-    displayName: 'Run all tests'
+  - stage: 'test_min'
+    displayName: 'Run all tests with min CLI'
     pool:
       vmImage: ${{ parameters.vmImage }}
     dependsOn: build
+    variables:
+      pythonVersions: ${{ parameters.pythonVersionsTestingMatrix }}
     jobs:
-    - job: 'azEdge'
-      displayName: 'Test against edge AZ CLI'
-      steps:
-      - template: templates/nightly-tests.yml
-        parameters:
-          azureCLIVersion: 'edge'
-    - job: 'azMin'
-      dependsOn: 'azEdge'
-      displayName: 'Test against minimum supported AZ CLI'
-      steps:
-      - template: templates/nightly-tests.yml
-        parameters:
-          azureCLIVersion: 'min'
-          
+    - template: templates/trigger-tests.yml
+      parameters:
+        azureCLIVersion: min
+        testADT: ${{ parameters.testADT }}
+        testCentral: ${{ parameters.testCentral }}
+        testDPS: ${{ parameters.testDPS }}
+        testHub: ${{ parameters.testHub }}
+
+  - stage: 'test_msi'
+    displayName: 'Run all tests against Windows MSI install'
+    pool:
+      vmImage: 'windows-2019'
+    dependsOn: [build, test_min]
+    variables:
+      pythonVersions: $[variables['msiTestingMatrix']]
+    jobs:
+    - template: templates/trigger-tests.yml
+      parameters:
+        azureCLIVersion: msi
+        testADT: ${{ parameters.testADT }}
+        testCentral: ${{ parameters.testCentral }}
+        testDPS: ${{ parameters.testDPS }}
+        testHub: ${{ parameters.testHub }}
+  
+  - stage: 'smokeTests_min'
+    displayName: 'Run smoke tests with min CLI'
+    dependsOn: test_min
+    variables:
+      pythonVersions: ${{ parameters.pythonVersionsTestingMatrix }}
+    condition: succeeded()
+    pool:
+      vmImage: ${{ parameters.vmImage }}
+    jobs:
+    - template: templates/smoke-tests.yml
+      parameters:
+        azureCLIVersion: min
+
+  - stage: 'smokeTests_msi'
+    displayName: 'Run smoke tests against Windows MSI install'
+    dependsOn: test_msi
+    variables:
+      pythonVersions: $[variables['msiTestingMatrix']]
+    condition: succeeded()
+    pool:
+      vmImage: 'windows-2019'
+    jobs:
+    - template: templates/smoke-tests.yml
+      parameters:
+        azureCLIVersion: msi
+
   - stage: 'kpi'
     displayName: 'Build KPIs'
-    dependsOn: [build, test]
+    dependsOn: [build, test_min, test_msi]
     jobs:
     - job: 'calculateCodeCoverage'
       displayName: 'Calculate distributed code coverage'
       steps:
       - template: templates/calculate-code-coverage.yml
         parameters:
-          pythonVersion: $(pythonVersion)
-          architecture: $(architecture)
-
+          pythonVersion: ${{ parameters.pythonVersion }}
+          architecture: ${{ parameters.architecture }}

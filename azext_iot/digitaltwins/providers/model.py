@@ -6,8 +6,8 @@
 
 import json
 from knack.log import get_logger
-from azure.cli.core.azclierror import ForbiddenError, RequiredArgumentMissingError
-from azext_iot.common.utility import process_json_arg, handle_service_exception, scantree
+from azure.cli.core.azclierror import AzureResponseError, ForbiddenError, RequiredArgumentMissingError
+from azext_iot.common.utility import process_json_arg, handle_service_exception, scantree, unpack_msrest_error
 from azext_iot.digitaltwins.providers.base import DigitalTwinsProvider
 from azext_iot.sdk.digitaltwins.dataplane.models import ErrorResponseException
 
@@ -76,24 +76,14 @@ class ModelProvider(DigitalTwinsProvider):
 
         logger.info("Models payload %s", json.dumps(payload))
 
-        # TODO: Not standard - have to revisit.
+        # @vilit - hack to customize 403's to have more specific error messages
         try:
-            response = self.model_sdk.add(payload)
+            return self.model_sdk.add(payload, raw=True).response.json()
         except ErrorResponseException as e:
-            handle_service_exception(e)
-
-        if response.status_code not in [200, 201]:
-            error_text = response.text
-            if response.status_code == 403 and not error_text:
+            if e.response.status_code == 403:
                 error_text = "Current principal access is forbidden. Please validate rbac role assignments."
-            else:
-                try:
-                    error_text = response.json()
-                except Exception:
-                    pass
-            raise ForbiddenError(error_text)
-
-        return response.json()
+                raise ForbiddenError(error_text)
+            handle_service_exception(e)
 
     def _process_directory(self, from_directory):
         logger.debug(
@@ -128,7 +118,7 @@ class ModelProvider(DigitalTwinsProvider):
     ):  # top is guarded for int() in arg def
         from azext_iot.sdk.digitaltwins.dataplane.models import DigitalTwinModelsListOptions
 
-        list_options = DigitalTwinModelsListOptions(max_item_count=top)
+        list_options = DigitalTwinModelsListOptions(max_items_per_page=top)
 
         return self.model_sdk.list(
             dependencies_for=dependencies_for,

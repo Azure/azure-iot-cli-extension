@@ -36,10 +36,20 @@ from azext_iot.common.shared import (
 )
 from azext_iot._validators import mode2_iot_login_handler
 from azext_iot.assets.user_messages import info_param_properties_device
-from azure.cli.core.local_context import LocalContextAttribute, LocalContextAction
 
 
-auth_type_dataplane_param_type = CLIArgumentType(
+dps_auth_type_dataplane_param_type = CLIArgumentType(
+    options_list=["--auth-type"],
+    arg_type=get_enum_type(
+        AuthenticationTypeDataplane, AuthenticationTypeDataplane.key.value
+    ),
+    arg_group="Access Control",
+    help="Indicates whether the operation should auto-derive a policy key or use the current Azure AD session. "
+    "You can configure the default using `az configure --defaults iotdps-data-auth-type=<auth-type-value>`",
+    configured_default="iotdps-data-auth-type",
+)
+
+hub_auth_type_dataplane_param_type = CLIArgumentType(
     options_list=["--auth-type"],
     arg_type=get_enum_type(
         AuthenticationTypeDataplane, AuthenticationTypeDataplane.key.value
@@ -48,11 +58,6 @@ auth_type_dataplane_param_type = CLIArgumentType(
     help="Indicates whether the operation should auto-derive a policy key or use the current Azure AD session. "
     "You can configure the default using `az configure --defaults iothub-data-auth-type=<auth-type-value>`",
     configured_default="iothub-data-auth-type",
-    local_context_attribute=LocalContextAttribute(
-        name="iothub-data-auth-type",
-        actions=[LocalContextAction.SET, LocalContextAction.GET],
-        scopes=["iot"],
-    ),
 )
 
 hub_name_type = CLIArgumentType(
@@ -74,18 +79,6 @@ children_list_prop_type = CLIArgumentType(
     help="Child device list (space separated).",
 )
 
-# There is a bug in CLI core preventing treating --qos as an integer.
-# Until its resolved, ensure casting of value to integer
-# TODO: azure.cli.core.parser line 180 difflib.get_close_matches
-qos_type = CLIArgumentType(
-    options_list=["--qos"],
-    type=str,
-    nargs="?",
-    choices=["0", "1"],
-    help="Quality of Service. 0 = At most once, 1 = At least once. 2 (Exactly once) is not supported."
-    "This command parameter has been deprecated and will be removed in the next release."
-)
-
 event_timeout_type = CLIArgumentType(
     options_list=["--timeout", "--to", "-t"],
     type=int,
@@ -98,6 +91,12 @@ def load_arguments(self, _):
     Load CLI Args for Knack parser
     """
     with self.argument_context("iot") as context:
+        context.argument("resource_group_name", arg_type=resource_group_name_type)
+        context.argument(
+            "hub_name", options_list=["--hub-name", "-n"], arg_type=hub_name_type,
+            help="IoT Hub name. Required if --login is not provided.",
+            arg_group="IoT Hub Identifier"
+        )
         context.argument(
             "login",
             options_list=["--login", "-l"],
@@ -106,12 +105,6 @@ def load_arguments(self, _):
             'Use to avoid session login via "az login". '
             "If both an entity connection string and name are provided the connection string takes priority. "
             "Required if --hub-name is not provided.",
-            arg_group="IoT Hub Identifier"
-        )
-        context.argument("resource_group_name", arg_type=resource_group_name_type)
-        context.argument(
-            "hub_name", options_list=["--hub-name", "-n"], arg_type=hub_name_type,
-            help="IoT Hub name. Required if --login is not provided.",
             arg_group="IoT Hub Identifier"
         )
         context.argument(
@@ -306,7 +299,7 @@ def load_arguments(self, _):
         context.argument(
             "auth_type_dataplane",
             options_list=["--auth-type"],
-            arg_type=auth_type_dataplane_param_type,
+            arg_type=hub_auth_type_dataplane_param_type,
         )
 
     with self.argument_context("iot hub connection-string") as context:
@@ -416,6 +409,14 @@ def load_arguments(self, _):
             "status_reason",
             options_list=["--status-reason", "--star"],
             help="Description for device status.",
+        )
+        context.argument(
+            "device_scope",
+            options_list=["--device-scope"],
+            help="The scope of the device. "
+            "For edge devices, this is auto-generated and immutable. "
+            "For leaf devices, set this to create child/parent relationship.",
+            arg_group="Device Scope"
         )
 
     with self.argument_context("iot hub device-identity renew-key") as context:
@@ -563,7 +564,7 @@ def load_arguments(self, _):
         context.argument(
             "auth_type_dataplane",
             options_list=["--auth-type"],
-            arg_type=auth_type_dataplane_param_type,
+            arg_type=hub_auth_type_dataplane_param_type,
         )
         context.argument("data", options_list=["--data", "--da"], help="Message body.")
         context.argument(
@@ -596,13 +597,30 @@ def load_arguments(self, _):
             arg_type=get_enum_type(ProtocolType),
             help="Indicates device-to-cloud message protocol",
         )
-        context.argument("qos", arg_type=qos_type, deprecate_info=context.deprecate())
 
     with self.argument_context("iot device simulate") as context:
         context.argument(
             "properties",
             options_list=["--properties", "--props", "-p"],
             help=info_param_properties_device(include_http=True),
+        )
+        context.argument(
+            "method_response_code",
+            type=int,
+            options_list=["--method-response-code", "--mrc"],
+            help="Status code to be returned when direct method is executed on device. Optional param, only supported for mqtt.",
+        )
+        context.argument(
+            "method_response_payload",
+            options_list=["--method-response-payload", "--mrp"],
+            help="Payload to be returned when direct method is executed on device. Provide file path or raw json. "
+            "Optional param, only supported for mqtt.",
+        )
+        context.argument(
+            "init_reported_properties",
+            options_list=["--init-reported-properties", "--irp"],
+            help="Initial state of twin reported properties for the target device when the simulator is run. "
+            "Optional param, only supported for mqtt.",
         )
 
     with self.argument_context("iot device c2d-message") as context:
@@ -713,7 +731,8 @@ def load_arguments(self, _):
         context.argument(
             "target_condition",
             options_list=["--target-condition", "--tc", "-t"],
-            help="Target condition in which a device configuration applies to.",
+            help="Target condition in which a device or module configuration applies to. "
+            "Configurations with no target condition will target no device or module.",
         )
         context.argument(
             "priority",
@@ -752,7 +771,8 @@ def load_arguments(self, _):
         context.argument(
             "target_condition",
             options_list=["--target-condition", "--tc", "-t"],
-            help="Target condition in which an Edge deployment applies to.",
+            help="Target condition in which an edge deployment applies to. Deployments with no target condition "
+            "will target no device.",
         )
         context.argument(
             "priority",
@@ -799,105 +819,161 @@ def load_arguments(self, _):
         context.argument(
             "auth_type_dataplane",
             options_list=["--auth-type"],
-            arg_type=auth_type_dataplane_param_type,
+            arg_type=hub_auth_type_dataplane_param_type,
         )
 
     with self.argument_context("iot dps") as context:
         context.argument(
-            "dps_name", help="Name of the Azure IoT Hub device provisioning service"
+            "login",
+            options_list=["--login", "-l"],
+            validator=mode2_iot_login_handler,
+            help="This command supports an entity connection string with rights to perform action. "
+            'Use to avoid session login via "az login". '
+            "If both an entity connection string and name are provided the connection string takes priority. "
+            "Required if --dps-name is not provided.",
+            arg_group="Device Provisioning Service Identifier"
+        )
+        context.argument(
+            "dps_name",
+            options_list=["--dps-name", "-n"],
+            help="Name of the Azure IoT Hub Device Provisioning Service. Required if --login is not provided.",
+            arg_group="Device Provisioning Service Identifier"
         )
         context.argument(
             "initial_twin_properties",
             options_list=["--initial-twin-properties", "--props"],
-            help="Initial twin properties",
+            help="Initial device twin properties.",
         )
         context.argument(
             "initial_twin_tags",
             options_list=["--initial-twin-tags", "--tags"],
-            help="Initial twin tags",
+            help="Initial device twin tags.",
         )
         context.argument(
             "iot_hub_host_name",
             options_list=["--iot-hub-host-name", "--hn"],
-            help="Host name of target IoT Hub",
+            deprecate_info=context.deprecate(redirect="--iot-hubs", hide=True),
+            help="Host name of target IoT Hub. Allocation policy defaults to static if this parameter is provided.",
         )
         context.argument(
             "provisioning_status",
             options_list=["--provisioning-status", "--ps"],
             arg_type=get_enum_type(EntityStatusType),
-            help="Enable or disable enrollment entry",
+            help="Enable or disable enrollment entry.",
         )
         context.argument(
             "certificate_path",
             options_list=["--certificate-path", "--cp"],
             help="The path to the file containing the primary certificate.",
+            arg_group="Authentication"
         )
         context.argument(
             "secondary_certificate_path",
             options_list=["--secondary-certificate-path", "--scp"],
-            help="The path to the file containing the secondary certificate",
+            help="The path to the file containing the secondary certificate.",
+            arg_group="Authentication"
         )
         context.argument(
             "remove_certificate",
             options_list=["--remove-certificate", "--rc"],
-            help="Remove current primary certificate",
+            help="Flag to remove current primary certificate.",
             arg_type=get_three_state_flag(),
+            arg_group="Authentication"
         )
         context.argument(
             "remove_secondary_certificate",
             options_list=["--remove-secondary-certificate", "--rsc"],
-            help="Remove current secondary certificate",
+            help="Flag to remove current secondary certificate.",
             arg_type=get_three_state_flag(),
+            arg_group="Authentication"
         )
         context.argument(
             "reprovision_policy",
             options_list=["--reprovision-policy", "--rp"],
             arg_type=get_enum_type(ReprovisionType),
-            help="Device data to be handled on re-provision to different Iot Hub.",
+            help="Policy to determine how device data should be handled on re-provision to a different IoT Hub.",
         )
         context.argument(
             "allocation_policy",
             options_list=["--allocation-policy", "--ap"],
             arg_type=get_enum_type(AllocationType),
-            help="Type of allocation for device assigned to the Hub.",
+            help="Type of allocation policy to determine how a device is assigned to an IoT Hub. If not "
+            "provided, the allocation policy will be the current allocation policy default set for the "
+            "Device Provisioning Service instance.",
+            arg_group="Allocation Policy"
         )
         context.argument(
             "iot_hubs",
             options_list=["--iot-hubs", "--ih"],
-            help="Host name of target IoT Hub. Use space-separated list for multiple IoT Hubs.",
+            help="Host name of target IoT Hub associated with the allocation policy. Use space-separated "
+            "list for multiple IoT Hubs.",
+            arg_group="Allocation Policy"
         )
         context.argument(
             "webhook_url",
             options_list=["--webhook-url", "--wh"],
-            help="The webhook URL used for custom allocation requests.",
+            help="The Azure Function webhook URL used for custom allocation requests.",
+            arg_group="Allocation Policy"
         )
         context.argument(
             "api_version",
             options_list=["--api-version", "--av"],
             help="The API version of the provisioning service types sent in the custom allocation"
             " request. Minimum supported version: 2018-09-01-preview.",
+            arg_group="Allocation Policy"
+        )
+        context.argument(
+            "auth_type_dataplane",
+            options_list=["--auth-type"],
+            arg_type=dps_auth_type_dataplane_param_type,
         )
 
     with self.argument_context("iot dps compute-device-key") as context:
         context.argument(
+            "enrollment_id",
+            options_list=["--enrollment-id", "--eid", "--group-id", "--gid"],
+            help="Enrollment group ID."
+        )
+        context.argument(
             "symmetric_key",
             options_list=["--symmetric-key", "--key"],
-            help="The symmetric shared access key for the enrollment group. ",
+            help="The symmetric shared access key for the enrollment group. This bypasses the "
+            "Device Provisioning Service registry and generates the SAS token directly "
+            "from the supplied symmetric key without further validation. All other command "
+            "parameters aside from registration ID will be ignored.",
         )
         context.argument("registration_id", help="ID of device registration. ")
 
+    with self.argument_context("iot dps connection-string") as context:
+        context.argument(
+            "show_all",
+            options_list=["--show-all", "--all"],
+            help="Show all shared access policies for the respective DPS.",
+        )
+
     with self.argument_context("iot dps enrollment") as context:
-        context.argument("enrollment_id", help="ID of device enrollment record")
-        context.argument("device_id", help="IoT Hub Device ID")
+        context.argument(
+            "enrollment_id",
+            options_list=["--enrollment-id", "--eid"],
+            help="Individual device enrollment ID."
+        )
+        context.argument("device_id", help="Device ID registered in the IoT Hub.")
         context.argument(
             "primary_key",
             options_list=["--primary-key", "--pk"],
             help="The primary symmetric shared access key stored in base64 format. ",
+            arg_group="Authentication"
         )
         context.argument(
             "secondary_key",
             options_list=["--secondary-key", "--sk"],
             help="The secondary symmetric shared access key stored in base64 format. ",
+            arg_group="Authentication"
+        )
+        context.argument(
+            "device_information",
+            options_list=["--device-information", "--info"],
+            help="Optional device information.",
         )
 
     with self.argument_context("iot dps enrollment create") as context:
@@ -905,27 +981,31 @@ def load_arguments(self, _):
             "attestation_type",
             options_list=["--attestation-type", "--at"],
             arg_type=get_enum_type(AttestationType),
-            help="Attestation Mechanism",
+            help="Attestation Mechanism used for authentication to the DPS.",
+            arg_group="Authentication"
         )
         context.argument(
             "certificate_path",
             options_list=["--certificate-path", "--cp"],
             help="The path to the file containing the primary certificate. "
-            "When choosing x509 as attestation type, "
-            "one of the certificate path is required.",
+            "Required when choosing x509 as attestation type and the secondary"
+            " certificate path is not provided.",
+            arg_group="Authentication"
         )
         context.argument(
             "secondary_certificate_path",
             options_list=["--secondary-certificate-path", "--scp"],
             help="The path to the file containing the secondary certificate. "
-            "When choosing x509 as attestation type, "
-            "one of the certificate path is required.",
+            "Required when choosing x509 as attestation type and the primary"
+            " certificate path is not provided.",
+            arg_group="Authentication"
         )
         context.argument(
             "endorsement_key",
             options_list=["--endorsement-key", "--ek"],
             help="TPM endorsement key for a TPM device. "
             "When choosing tpm as attestation type, endorsement key is required.",
+            arg_group="Authentication"
         )
 
     with self.argument_context("iot dps enrollment show") as context:
@@ -933,7 +1013,7 @@ def load_arguments(self, _):
             "show_keys",
             options_list=["--show-keys", "--keys"],
             arg_type=get_three_state_flag(),
-            help="Include attestation keys and information in enrollment results",
+            help="Include attestation keys and information in enrollment results.",
         )
 
     with self.argument_context("iot dps enrollment update") as context:
@@ -944,40 +1024,50 @@ def load_arguments(self, _):
         )
 
     with self.argument_context("iot dps enrollment-group") as context:
-        context.argument("enrollment_id", help="ID of enrollment group")
+        context.argument(
+            "enrollment_id",
+            options_list=["--enrollment-id", "--eid", "--group-id", "--gid"],
+            help="Enrollment group ID."
+        )
         context.argument(
             "primary_key",
             options_list=["--primary-key", "--pk"],
             help="The primary symmetric shared access key stored in base64 format. ",
+            arg_group="Authentication"
         )
         context.argument(
             "secondary_key",
             options_list=["--secondary-key", "--sk"],
             help="The secondary symmetric shared access key stored in base64 format. ",
+            arg_group="Authentication"
         )
         context.argument(
             "certificate_path",
             options_list=["--certificate-path", "--cp"],
             help="The path to the file containing the primary certificate. "
             "If attestation with an intermediate certificate is desired then a certificate path must be provided.",
+            arg_group="Authentication"
         )
         context.argument(
             "secondary_certificate_path",
             options_list=["--secondary-certificate-path", "--scp"],
             help="The path to the file containing the secondary certificate. "
             "If attestation with an intermediate certificate is desired then a certificate path must be provided.",
+            arg_group="Authentication"
         )
         context.argument(
             "root_ca_name",
             options_list=["--root-ca-name", "--ca-name", "--cn"],
             help="The name of the primary root CA certificate. "
             "If attestation with a root CA certificate is desired then a root ca name must be provided.",
+            arg_group="Authentication"
         )
         context.argument(
             "secondary_root_ca_name",
             options_list=["--secondary-root-ca-name", "--secondary-ca-name", "--scn"],
             help="The name of the secondary root CA certificate. "
             "If attestation with a root CA certificate is desired then a root ca name must be provided.",
+            arg_group="Authentication"
         )
 
     with self.argument_context("iot dps enrollment-group show") as context:
@@ -985,11 +1075,15 @@ def load_arguments(self, _):
             "show_keys",
             options_list=["--show-keys", "--keys"],
             arg_type=get_three_state_flag(),
-            help="Include attestation keys and information in enrollment group results",
+            help="Include attestation keys and information in enrollment group results.",
         )
 
     with self.argument_context("iot dps registration") as context:
-        context.argument("registration_id", help="ID of device registration")
+        context.argument("registration_id", help="ID of device registration.")
 
     with self.argument_context("iot dps registration list") as context:
-        context.argument("enrollment_id", help="ID of enrollment group")
+        context.argument(
+            "enrollment_id",
+            options_list=["--enrollment-id", "--eid", "--group-id", "--gid"],
+            help="Enrollment group ID."
+        )

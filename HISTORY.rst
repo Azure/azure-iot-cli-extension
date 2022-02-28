@@ -3,6 +3,138 @@
 Release History
 ===============
 
+
+0.14.0
++++++++++++++++
+
+**Digital Twin updates**
+
+* Added optional `--telemetry-source-time` parameter to `az dt twin telemetry send` to allow users to
+  add a custom timestamp to the sent telemetry.
+
+* Updated both controlplane and dataplane SDKs to now use the newer 2021-06-30-preview API version.
+
+
+0.13.0
++++++++++++++++
+
+**IoT Central updates**
+
+* Added missing "update" sub-commands for all commands supporting it:
+
+  - az iot central device update
+  - az iot central device-template update
+  - az iot central file-upload-config update
+  - az iot central organization update
+  - az iot central user update
+
+* Added "compact" mode for "az iot central device-template list" command:
+  When "-c" flag is passed, only Ids, display names and model types will be shown for the templates in the application.
+
+* Added `az iot central device c2d-message purge` to purge cloud-to-device message queue
+
+**IoT DPS updates**
+
+* Added RBAC support for DPS dataplane commands, similar to the RBAC support for IoT Hub.
+  The type of auth used to execute commands can be controlled with the "--auth-type" parameter
+  which accepts the values "key" or "login". The value of "key" is set by default.
+
+  * When "--auth-type" has the value of "key", like before the CLI will auto-discover
+    a suitable policy when interacting with DPS.
+  * When "--auth-type" has the value "login", an access token from the Azure CLI logged in principal
+    will be used for the operation.
+
+  * The following commands currently support `--auth-type`:
+
+    * az iot dps enrollment
+    * az iot dps enrollment-group
+    * az iot dps registration
+
+* Update DPS dataplane SDK to use the newer 2021-10-01 API version. Most command
+  functionality has not changed. Updated commands include:
+
+  - `az iot dps enrollment create` and `az iot dps enrollment update` support
+    optional device information via `--device-info`
+
+
+0.12.1
++++++++++++++++
+
+**IoT DPS updates**
+
+* Resolves issue where usage of `--login` with connection string still required `az login`.
+
+
+0.12.0
++++++++++++++++
+
+**IoT Central updates**
+
+* Fixed iot hub token leak for device twin show
+
+* Adds new preview commands (v1.1-preview)
+
+  - Query (az iot central query)
+  - Destination (az iot central export destination)
+  - Export (az iot central export)
+
+**General Updates**
+
+* The IoT extension officially supports Python 3.10.
+
+**IoT DPS updates**
+
+* Added `az iot dps connection-string show` to show the DPS connection string with
+  similar support as the IoT Hub connection string show.
+
+* DPS support DPS connection string as a resource identifier with the --login or -l
+  parameter, similar to IoT Hub Identifier Arguments.
+
+* DPS now supports auto resource and policy discovery. Resource group is no longer a
+  required parameter for az iot dps dataplane commands. Auto policy discovery ensures
+  that a policy with all the correct permissions is available and is used by the IoT
+  extension for all DPS operations.
+
+* `az iot dps compute-device-key` now supports enrollment group identifiers in addition to
+  enrollment group symmetric key. Please take a look at the `--help` docs for functionality
+  and usage highlights.
+
+* Improvement to help documentation for DPS functions.
+
+**IoT Hub updates**
+
+* `az iot hub device-identity create` supports a device scope argument via `--device-scope` parameter.
+
+0.11.0
++++++++++++++++
+
+**IoT Central updates**
+
+* Adds preview commands (v1.1-preview):
+
+  - Organizations (az iot central organization)
+  - File Upload Configuration (az iot central file-upload-config)
+  - Jobs (az iot central job)
+* Adds x-ms-client-request-id header for each request
+
+**Breaking Changes**
+
+* List commands like `az iot central device list` and others,
+  now return list of items instead of a main dict with item ids as keys and items as values.
+
+  Involved commands:
+   - az iot central device list
+   - az iot central device-template list
+   - az iot central api-token list
+   - az iot central user list
+
+0.10.17
++++++++++++++++
+
+**IoT Hub updates**
+
+* Fixed an issue in 0.10.16 causing IoT Hub command failure in Windows MSI environment.
+
 0.10.16
 +++++++++++++++
 
@@ -13,6 +145,8 @@ Release History
 
 **IoT Hub updates**
 
+* Device simulation overhaul ("az iot device simulate"). Device simulation is experimental and subject to change.
+  Please take a look at the --help docs for functionality and usage highlights.
 * Device and module identity creation support usage of custom symmetric keys.
 
 0.10.15

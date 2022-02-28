@@ -1,21 +1,56 @@
-pr: none
+# Copyright (c) Microsoft Corporation. All rights reserved.
 
+pr: none
 trigger: none
 
 parameters:
-- name: vmImage
+- name: variableGroup
+  type: string
+  default: 'aziotcli_test_primary'
+- name: buildAgentPoolVar
+  type: string
+  default: 'BuildAgentPool'
+- name: buildAgentVmImageVar
+  type: string
+  default: 'BuildAgentVmImage'
+- name: testAgentVmImage
   type: string
   default: 'ubuntu-18.04'
   values:
-  - 'ubuntu-16.04'
   - 'ubuntu-18.04'
   - 'ubuntu-latest'
 - name: pythonVersion
+  displayName: 'Python version for building wheel, KPIs'
   type: string
-  default: '3.6.x'
+  default: '3.8.x'
   values:
-  - 3.6.x
-  - 3.9.x
+  - '3.6.x'
+  - '3.8.x'
+  - '3.9.x'
+- name: pythonVersionsTestingMatrix
+  type: object
+  default: >
+    {
+      Python36:
+      {
+        python: '3.6.x'
+      },
+      Python38:
+      {
+        python: '3.8.x'
+      },
+      Python39:
+      {
+        python: '3.9.x'
+      },
+      Python310:
+      {
+        python: '3.10.x'
+      }
+    }
+- name: stageForPublish
+  type: boolean
+  default: false
 - name: architecture
   type: string
   default: 'x64'
@@ -32,6 +67,13 @@ parameters:
   type: boolean
   default: true
 
+variables:
+  - group: ${{ parameters.variableGroup }}
+  - name: vmImage
+    value: $[variables.${{ parameters.buildAgentVmImageVar }}]
+  - name: buildPool
+    value: $[variables.${{ parameters.buildAgentPoolVar }}]
+
 stages:
   - stage: 'build'
     displayName: 'Build and Publish Artifacts'
@@ -39,8 +81,10 @@ stages:
 
     - job: 'Build_Publish_Azure_IoT_CLI_Extension'
       pool:
-        vmImage: ${{ parameters.vmImage }}
-
+        name: $(buildPool)
+        vmImage: $(vmImage)
+        demands:
+        - ImageOverride -equals $(vmImage)
       steps:
       - task: UsePythonVersion@0
         inputs:
@@ -53,7 +97,7 @@ stages:
 
     - job: 'Build_Publish_Azure_CLI_Test_SDK'
       pool:
-        vmImage: ${{ parameters.vmImage }}
+        vmImage: ${{ parameters.testAgentVmImage }}
 
       steps:
       - task: UsePythonVersion@0
@@ -78,53 +122,39 @@ stages:
 
   - stage: 'test'
     displayName: 'Run tests'
-    pool:
-      vmImage: ${{ parameters.vmImage }}
     dependsOn: build
+    variables:
+      pythonVersions: ${{ parameters.pythonVersionsTestingMatrix }}
+    condition: succeeded()
+    pool:
+      vmImage: ${{ parameters.testAgentVmImage }}
     jobs:
-    - job: 'testCentral'
-      displayName: 'Test IoT Central'
-      condition: eq('${{ parameters.testCentral }}', true)
+    - template: templates/trigger-tests.yml
+      parameters:
+        testADT: ${{ parameters.testADT }}
+        testCentral: ${{ parameters.testCentral }}
+        testDPS: ${{ parameters.testDPS }}
+        testHub: ${{ parameters.testHub }}
+        maxParallelADT: 2
+        maxParallelDPS: 2
+        maxParallelHub: 2
+    - job: 'evaluateCmdTable'
+      displayName: 'Evaluate Command Table'
       steps:
-      - template: templates/run-tests.yml
-        parameters:
-          path: 'azext_iot/tests/central'
-          name: 'iot-central'
-    
-    - job: 'testADT'
-      displayName: 'Test Azure DigitalTwins'
-      condition: eq('${{ parameters.testADT }}', true)
-      steps:
-      - template: templates/run-tests.yml
-        parameters:
-          path: 'azext_iot/tests/digitaltwins'
-          name: 'azure-digitaltwins'
+      - template: templates/evaluate-command-table.yml
 
-    - job: 'testDPS'
-      displayName: 'Test DPS'
-      condition: eq('${{ parameters.testDPS }}', true)
-      steps:
-      - template: templates/run-tests.yml
-        parameters:
-          path: 'azext_iot/tests/dps'
-          name: 'device-provisioning-service'
-    
-    - job: 'testHub'
-      displayName: 'Test IoT Hub'
-      condition: eq('${{ parameters.testHub }}', true)
-      steps:
-      - template: templates/run-tests.yml
-        parameters:
-          path: 'azext_iot/tests/iothub'
-          name: 'iot-hub'
-
-    - job: 'unitTests'
-      displayName: 'Unit tests and code coverage'
-      steps:
-      - template: templates/run-tests.yml
-        parameters:
-          runIntTests: 'false'
-          runUnitTests: 'true'
+  - stage: 'smokeTest'
+    displayName: 'Run smoke tests'
+    dependsOn: test
+    variables:
+      pythonVersions: ${{ parameters.pythonVersionsTestingMatrix }}
+    condition: succeeded()
+    pool:
+      vmImage: ${{ parameters.testAgentVmImage }}
+    jobs:
+    - template: templates/smoke-tests.yml
+      parameters:
+        azureCLIVersion: released
 
   - stage: 'kpi'
     displayName: 'Build KPIs'
@@ -140,15 +170,20 @@ stages:
 
   - stage: 'release'
     displayName: 'Stage GitHub release'
-    dependsOn: [build, test]
+    dependsOn: build
+    condition: and(succeeded(), eq(${{ parameters.stageForPublish }}, 'true'))
     jobs:
     - deployment: 'StageGitHub'
       displayName: 'Stage CLI extension on GitHub'
       environment: 'production'
 
     - job: 'Calculate_Sha_And_Create_Release'
+      displayName: 'Calculate package hash and publish'
       pool:
-        vmImage: 'vs2017-win2016'
+        name: $(buildPool)
+        vmImage: $(vmImage)
+        demands:
+        - ImageOverride -equals $(vmImage)
       variables:
         CLIVersion: $[ stageDependencies.build.recordVersion.outputs['setupVersion.CLIVersion'] ]
         ReleaseTitle: $[ stageDependencies.build.recordVersion.outputs['setupVersion.ReleaseTitle'] ]
@@ -170,7 +205,7 @@ stages:
             $extensions = Get-ChildItem -Filter "*.whl" -Recurse | Select-Object FullName
             Foreach ($extension in $extensions)
             {
-                Write-Host "calculating sha256 for " $extension.FullName   
+                Write-Host "calculating sha256 for " $extension.FullName
                 (Get-Filehash -Path $extension.Fullname -Algorithm SHA256).Hash.ToLower()
             }
             Write-Host "done"
@@ -185,7 +220,7 @@ stages:
           tagSource: userSpecifiedTag
           tag: 'v$(CLIVersion)'
           title: $(ReleaseTitle)
-          assets: '$(System.ArtifactsDirectory)/extension/**/*.whl' 
+          assets: '$(System.ArtifactsDirectory)/extension/**/*.whl'
           assetUploadMode: 'replace'
           isDraft: true
           isPreRelease: false

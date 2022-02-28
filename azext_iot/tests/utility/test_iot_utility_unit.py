@@ -18,6 +18,7 @@ from azext_iot.common.utility import (
     read_file_content,
     logger,
     ensure_iothub_sdk_min_version,
+    ensure_iotdps_sdk_min_version,
 )
 from azext_iot.common.deps import ensure_uamqp
 from azext_iot.constants import EVENT_LIB, EXTENSION_NAME
@@ -288,15 +289,33 @@ class TestVersionComparison(object):
         ],
     )
     def test_ensure_iothub_sdk_min_version(self, mocker, current, minimum, expected):
-        def get_version(package):
-            return current
-
         try:
-            mocker.patch("importlib.metadata.version", get_version)
-        except ModuleNotFoundError:
-            mocker.patch("importlib_metadata.version", get_version)
+            mocker.patch("azure.mgmt.iothub.__version__", current)
+        except Exception:
+            mocker.patch("azure.mgmt.iothub._version.VERSION", current)
 
         assert ensure_iothub_sdk_min_version(minimum) == expected
+
+    @pytest.mark.parametrize(
+        "current, minimum, expected",
+        [
+            ("1.0", "2.0", False),
+            ("1.8.7", "1.8.6.4", True),
+            ("1.0+a", "1.0", True),
+            ("1.0+a", "1.0+b", False),
+            ("1.0", "1.0", True),
+            ("2.0.1.9", "2.0.6", False),
+        ],
+    )
+    def test_ensure_iotdps_sdk_min_version(self, mocker, current, minimum, expected):
+        try:
+            mocker.patch("azure.mgmt.iothubprovisioningservices.__version__", current)
+        except Exception:
+            mocker.patch(
+                "azure.mgmt.iothubprovisioningservices._version.VERSION", current
+            )
+
+        assert ensure_iotdps_sdk_min_version(minimum) == expected
 
 
 class TestEmbeddedCli(object):

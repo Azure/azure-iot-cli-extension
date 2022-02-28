@@ -16,6 +16,7 @@ from azure.cli.core.mock import DummyCli
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.common.shared import DeviceAuthApiType
 
+path_get_device = "azext_iot.operations.hub._iot_device_show"
 path_iot_hub_service_factory = "azext_iot._factory.iot_hub_service_factory"
 path_service_client = "msrest.service_client.ServiceClient.send"
 path_ghcs = "azext_iot.iothub.providers.discovery.IotHubDiscovery.get_target"
@@ -23,11 +24,14 @@ path_discovery_init = (
     "azext_iot.iothub.providers.discovery.IotHubDiscovery._initialize_client"
 )
 path_sas = "azext_iot._factory.SasTokenAuthentication"
-path_mqtt_client = "azext_iot.operations._mqtt.mqtt.Client"
+path_mqtt_device_client = (
+    "azure.iot.device.IoTHubDeviceClient.create_from_connection_string"
+)
 path_iot_hub_monitor_events_entrypoint = (
     "azext_iot.operations.hub._iot_hub_monitor_events"
 )
 path_iot_device_show = "azext_iot.operations.hub._iot_device_show"
+path_update_device_twin = "azext_iot.operations.hub._iot_device_twin_update"
 hub_entity = "myhub.azure-devices.net"
 
 instance_name = generate_generic_id()
@@ -76,6 +80,31 @@ def fixture_cmd(mocker):
 
 
 @pytest.fixture()
+def fixture_device(mocker):
+    get_device = mocker.patch(path_get_device)
+    get_device.return_value = {
+        "deviceId": "Test_Device_1",
+        "generationId": "637534345627501371",
+        "etag": "ODgxNTgwOA==",
+        "connectionState": "Connected",
+        "status": "enabled",
+        "statusReason": None,
+        "connectionStateUpdatedTime": "2021-05-12T08:48:08.7205939Z",
+        "statusUpdatedTime": "0001-01-01T00:00:00Z",
+        "lastActivityTime": "2021-05-12T08:48:07.6903807Z",
+        "cloudToDeviceMessageCount": 0,
+        "authentication": {
+            "symmetricKey": {"primaryKey": "TestKey1", "secondaryKey": "TestKey2"},
+            "x509Thumbprint": {"primaryThumbprint": None, "secondaryThumbprint": None},
+            "type": "sas",
+        },
+        "capabilities": {"iotEdge": False},
+        "hub": "test-iot-hub.azure-devices.net",
+    }
+    return get_device
+
+
+@pytest.fixture()
 def fixture_service_client_generic(mocker, fixture_ghcs, fixture_sas):
     service_client = mocker.patch(path_service_client)
     return service_client
@@ -121,15 +150,13 @@ def serviceclient_generic_invalid_or_missing_etag(
 
 @pytest.fixture()
 def mqttclient(mocker, fixture_ghcs, fixture_sas):
-    client = mocker.patch(path_mqtt_client)
-    mock_conn = mocker.patch("azext_iot.operations._mqtt.mqtt_client_wrap.is_connected")
-    mock_conn.return_value = True
+    client = mocker.patch(path_mqtt_device_client)
     return client
 
 
 @pytest.fixture()
 def mqttclient_generic_error(mocker, fixture_ghcs, fixture_sas):
-    mqtt_client = mocker.patch(path_mqtt_client)
+    mqtt_client = mocker.patch(path_mqtt_device_client)
     mqtt_client().connect.side_effect = Exception("something happened")
     return mqtt_client
 
@@ -140,23 +167,20 @@ def fixture_monitor_events_entrypoint(mocker):
 
 
 @pytest.fixture()
+def fixture_update_device_twin(mocker):
+    return mocker.patch(path_update_device_twin)
+
+
+@pytest.fixture()
 def fixture_iot_device_show_sas(mocker):
     device = mocker.patch(path_iot_device_show)
     device.return_value = {
         "authentication": {
-            "symmetricKey": {
-                "primaryKey": "test_pk",
-                "secondaryKey": "test_sk"
-            },
+            "symmetricKey": {"primaryKey": "test_pk", "secondaryKey": "test_sk"},
             "type": DeviceAuthApiType.sas.value,
-            "x509Thumbprint": {
-                "primaryThumbprint": None,
-                "secondaryThumbprint": None
-            }
+            "x509Thumbprint": {"primaryThumbprint": None, "secondaryThumbprint": None},
         },
-        "capabilities": {
-            "iotEdge": False
-        },
+        "capabilities": {"iotEdge": False},
         "cloudToDeviceMessageCount": 0,
         "connectionState": "Disconnected",
         "connectionStateUpdatedTime": "2021-05-27T00:36:11.2861732Z",
@@ -167,7 +191,7 @@ def fixture_iot_device_show_sas(mocker):
         "lastActivityTime": "2021-05-27T00:18:16.3154299Z",
         "status": "enabled",
         "statusReason": None,
-        "statusUpdatedTime": "0001-01-01T00:00:00Z"
+        "statusUpdatedTime": "0001-01-01T00:00:00Z",
     }
     return device
 
@@ -177,19 +201,11 @@ def fixture_self_signed_device_show_self_signed(mocker):
     device = mocker.patch(path_iot_device_show)
     device.return_value = {
         "authentication": {
-            "symmetricKey": {
-                "primaryKey": "test_pk",
-                "secondaryKey": "test_sk"
-            },
+            "symmetricKey": {"primaryKey": "test_pk", "secondaryKey": "test_sk"},
             "type": DeviceAuthApiType.selfSigned.value,
-            "x509Thumbprint": {
-                "primaryThumbprint": None,
-                "secondaryThumbprint": None
-            }
+            "x509Thumbprint": {"primaryThumbprint": None, "secondaryThumbprint": None},
         },
-        "capabilities": {
-            "iotEdge": False
-        },
+        "capabilities": {"iotEdge": False},
         "cloudToDeviceMessageCount": 0,
         "connectionState": "Disconnected",
         "connectionStateUpdatedTime": "2021-05-27T00:36:11.2861732Z",
@@ -200,7 +216,7 @@ def fixture_self_signed_device_show_self_signed(mocker):
         "lastActivityTime": "2021-05-27T00:18:16.3154299Z",
         "status": "enabled",
         "statusReason": None,
-        "statusUpdatedTime": "0001-01-01T00:00:00Z"
+        "statusUpdatedTime": "0001-01-01T00:00:00Z",
     }
     return device
 
@@ -211,7 +227,7 @@ def build_mock_response(
 ):
     try:
         from unittest.mock import MagicMock
-    except:
+    except ImportError:
         from mock import MagicMock
 
     response = (
@@ -251,7 +267,7 @@ def get_context_path(base_path, *paths):
     return base_path
 
 
-''' TODO: Possibly expand for future use
+""" TODO: Possibly expand for future use
 fake_oauth_response = responses.Response(
     method=responses.POST,
     url=re.compile("https://login.microsoftonline.com/(.+)/oauth2/token"),
@@ -270,7 +286,7 @@ fake_oauth_response = responses.Response(
     status=200,
     content_type="application/json",
 )
-'''
+"""
 
 
 @pytest.fixture
@@ -323,7 +339,9 @@ def fixture_mock_aics_token(mocker):
 
 @pytest.fixture
 def fixture_dt_client(mocker, fixture_cmd):
-    from azext_iot.sdk.digitaltwins.controlplane import AzureDigitalTwinsManagementClient
+    from azext_iot.sdk.digitaltwins.controlplane import (
+        AzureDigitalTwinsManagementClient,
+    )
     from azext_iot.sdk.digitaltwins.dataplane import AzureDigitalTwinsAPI
     from azext_iot.digitaltwins.providers.auth import DigitalTwinAuthentication
 
@@ -354,7 +372,11 @@ def fixture_dt_client(mocker, fixture_cmd):
         credentials=DigitalTwinAuthentication(
             fixture_cmd, "00000000-0000-0000-0000-000000000000"
         ),
-        base_url="https://{}/".format(hostname)
+        base_url="https://{}/".format(hostname),
     )
 
     return control_plane_patch, data_plane_patch
+
+
+def pytest_addoption(parser):
+    parser.addoption("--api-version", action="store", default=None)

@@ -37,11 +37,13 @@ class AzureDigitalTwinsAPIConfiguration(AzureConfiguration):
         if credentials is None:
             raise ValueError("Parameter 'credentials' must not be None.")
         if not base_url:
-            base_url = 'http://localhost'
+            base_url = 'https://digitaltwins-hostname'
 
         super(AzureDigitalTwinsAPIConfiguration, self).__init__(base_url)
 
         self.add_user_agent('azuredigitaltwinsapi/{}'.format(VERSION))
+        self.add_user_agent('Azure-SDK-For-Python')
+
         self.credentials = credentials
 
 
@@ -52,13 +54,13 @@ class AzureDigitalTwinsAPI(SDKClient):
     :vartype config: AzureDigitalTwinsAPIConfiguration
 
     :ivar digital_twin_models: DigitalTwinModels operations
-    :vartype digital_twin_models: digitaltwins.operations.DigitalTwinModelsOperations
+    :vartype digital_twin_models: dataplane.operations.DigitalTwinModelsOperations
     :ivar query: Query operations
-    :vartype query: digitaltwins.operations.QueryOperations
+    :vartype query: dataplane.operations.QueryOperations
     :ivar digital_twins: DigitalTwins operations
-    :vartype digital_twins: digitaltwins.operations.DigitalTwinsOperations
+    :vartype digital_twins: dataplane.operations.DigitalTwinsOperations
     :ivar event_routes: EventRoutes operations
-    :vartype event_routes: digitaltwins.operations.EventRoutesOperations
+    :vartype event_routes: dataplane.operations.EventRoutesOperations
 
     :param credentials: Credentials needed for the client to connect to Azure.
     :type credentials: :mod:`A msrestazure Credentials
@@ -73,7 +75,7 @@ class AzureDigitalTwinsAPI(SDKClient):
         super(AzureDigitalTwinsAPI, self).__init__(self.config.credentials, self.config)
 
         client_models = {k: v for k, v in models.__dict__.items() if isinstance(v, type)}
-        self.api_version = '2020-10-31'
+        self.api_version = '2021-06-30-preview'
         self._serialize = Serializer(client_models)
         self._deserialize = Deserializer(client_models)
 

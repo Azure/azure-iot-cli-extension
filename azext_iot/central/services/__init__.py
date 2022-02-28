@@ -11,7 +11,26 @@ from azext_iot.central.services import (
     api_token,
     device_group,
     role,
+    organization,
+    job,
+    file_upload,
+    query,
+    destination,
+    export,
 )
 
 
-__all__ = ["device", "device_template", "user", "api_token", "device_group", "role"]
+__all__ = [
+    "device",
+    "device_template",
+    "user",
+    "api_token",
+    "device_group",
+    "role",
+    "organization",
+    "job",
+    "file_upload",
+    "query",
+    "destination",
+    "export",
+]

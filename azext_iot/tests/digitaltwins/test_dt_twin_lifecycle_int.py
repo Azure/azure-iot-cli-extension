@@ -36,7 +36,6 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
             "dt create -n {} -g {} -l {}".format(instance_name, self.rg, self.region)
         ).get_output_in_json()
         self.track_instance(create_output)
-        self.wait_for_hostname(create_output)
 
         self.cmd(
             "dt role-assignment create -n {} -g {} --assignee {} --role '{}'".format(
@@ -541,7 +540,6 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
             "dt create -n {} -g {} -l {}".format(instance_name, self.rg, self.region)
         ).get_output_in_json()
         self.track_instance(create_output)
-        self.wait_for_hostname(create_output)
 
         self.cmd(
             "dt role-assignment create -n {} -g {} --assignee {} --role '{}'".format(
@@ -713,8 +711,8 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
             )
         )
 
-        # dt reset can return too early at times
-        sleep(5)
+        # Wait for API to catch up
+        sleep(10)
 
         model_query_result = self.cmd(
             "dt model list -n {} -g {}".format(instance_name, self.rg)

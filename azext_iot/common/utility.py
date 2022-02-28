@@ -27,7 +27,6 @@ from azure.cli.core.azclierror import (
     FileOperationError,
     InvalidArgumentValueError,
 )
-from azext_iot.constants import IOTHUB_MGMT_SDK_PACKAGE_NAME
 
 logger = get_logger(__name__)
 
@@ -184,7 +183,7 @@ def read_file_content(file_path, allow_binary=False):
 
     if allow_binary:
         try:
-            with open(file_path, "rb", encoding="utf-8") as input_file:
+            with open(file_path, "rb") as input_file:
                 logger.debug("Attempting to read file %s as binary", file_path)
                 return base64.b64encode(input_file.read()).decode("utf-8")
         except Exception:  # pylint: disable=broad-except
@@ -382,7 +381,7 @@ def handle_service_exception(e):
         # Otherwise, fail with generic error
         raise AzureResponseError(err)
 
-    except:
+    except Exception:
         raise AzureResponseError(err)
 
 
@@ -480,7 +479,27 @@ class ISO8601Validator:
 
 
 def ensure_iothub_sdk_min_version(min_ver):
-    return test_import_and_version(IOTHUB_MGMT_SDK_PACKAGE_NAME, min_ver)
+    from packaging import version
+
+    try:
+        from azure.mgmt.iothub import __version__ as iot_sdk_version
+    except ImportError:
+        from azure.mgmt.iothub._version import VERSION as iot_sdk_version
+
+    return version.parse(iot_sdk_version) >= version.parse(min_ver)
+
+
+def ensure_iotdps_sdk_min_version(min_ver):
+    from packaging import version
+
+    try:
+        from azure.mgmt.iothubprovisioningservices import __version__ as iot_sdk_version
+    except ImportError:
+        from azure.mgmt.iothubprovisioningservices._version import (
+            VERSION as iot_sdk_version,
+        )
+
+    return version.parse(iot_sdk_version) >= version.parse(min_ver)
 
 
 def scantree(path):

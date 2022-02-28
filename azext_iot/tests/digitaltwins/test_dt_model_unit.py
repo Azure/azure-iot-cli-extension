@@ -30,7 +30,7 @@ class TestAddModels(object):
             url="https://{}/models".format(
                 hostname
             ),
-            body=generic_result,
+            body=('[' + generic_result + ']'),
             status=request.param,
             content_type="application/json",
             match_querystring=False,
@@ -124,7 +124,7 @@ class TestAddModels(object):
 
         request_body = json.loads(service_client.calls[0].request.body)
         assert request_body == expected_payload
-        assert result == json.loads(generic_result)
+        assert result == json.loads('[' + generic_result + ']')
 
     def test_add_model_no_models_directory(self, fixture_cmd):
         with pytest.raises(CLIError):

@@ -8,17 +8,15 @@ import re
 
 from uamqp.message import Message
 
-from azext_iot.central.providers.v1 import (
-    CentralDeviceProviderV1,
-    CentralDeviceTemplateProviderV1,
-)
-from azext_iot.central import models as central_models
+from azext_iot.central.providers import CentralDeviceProvider
+from azext_iot.central.providers import CentralDeviceTemplateProvider
 from azext_iot.monitor.parsers import strings
 from azext_iot.monitor.central_validator import validate, extract_schema_type
 from azext_iot.monitor.models.arguments import CommonParserArguments
 from azext_iot.monitor.models.enum import Severity
 from azext_iot.monitor.parsers.common_parser import CommonParser
 from azext_iot.constants import CENTRAL_ENDPOINT
+from azext_iot.central.models.v1 import TemplateV1
 
 
 class CentralParser(CommonParser):
@@ -26,9 +24,9 @@ class CentralParser(CommonParser):
         self,
         message: Message,
         common_parser_args: CommonParserArguments,
-        central_device_provider: CentralDeviceProviderV1,
-        central_template_provider: CentralDeviceTemplateProviderV1,
-        central_dns_suffix=CENTRAL_ENDPOINT
+        central_device_provider: CentralDeviceProvider,
+        central_template_provider: CentralDeviceTemplateProvider,
+        central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         super(CentralParser, self).__init__(
             message=message, common_parser_args=common_parser_args
@@ -92,7 +90,7 @@ class CentralParser(CommonParser):
 
         template = self._get_template()
 
-        if not isinstance(template, central_models.TemplateV1):
+        if not isinstance(template, TemplateV1):
             return
 
         # if component name is not defined then data should be mapped to root/inherited interfaces
@@ -121,7 +119,9 @@ class CentralParser(CommonParser):
 
     def _get_template(self):
         try:
-            device = self._central_device_provider.get_device(self.device_id, central_dns_suffix=self._central_dns_suffix)
+            device = self._central_device_provider.get_device(
+                self.device_id, central_dns_suffix=self._central_dns_suffix
+            )
             template = self._central_template_provider.get_device_template(
                 device.template, central_dns_suffix=self._central_dns_suffix
             )
@@ -135,7 +135,7 @@ class CentralParser(CommonParser):
     # 1) primitive types match (e.g. boolean is indeed bool etc)
     # 2) names match (i.e. Humidity vs humidity etc)
     def _validate_payload(
-        self, payload: dict, template: central_models.TemplateV1, is_component: bool
+        self, payload: dict, template: TemplateV1, is_component: bool
     ):
         name_miss = []
         for telemetry_name, telemetry in payload.items():
@@ -156,7 +156,8 @@ class CentralParser(CommonParser):
                 )
             else:
                 details = strings.invalid_field_name_mismatch_template(
-                    name_miss, template.schema_names,
+                    name_miss,
+                    template.schema_names,
                 )
             self._add_central_issue(severity=Severity.warning, details=details)
 

@@ -28,7 +28,6 @@ class TestDTPrivateLinksLifecycle(DTLiveScenarioTest):
             )
         ).get_output_in_json()
         self.track_instance(create_output)
-        create_output = self.wait_for_hostname(create_output)
 
         # Fail test if hostName missing
         assert create_output.get(
@@ -67,15 +66,31 @@ class TestDTPrivateLinksLifecycle(DTLiveScenarioTest):
         connection_name = generate_generic_id()
         endpoint_name = generate_generic_id()
         dt_instance_id = create_output["id"]
+        nsg_name = generate_generic_id()
         vnet_name = generate_generic_id()
         subnet_name = generate_generic_id()
 
-        # Create VNET
+        # Create NSG and VNET
         self.cmd(
-            "network vnet create -n {} -g {} --subnet-name {}".format(
-                vnet_name, self.rg, subnet_name
+            "network nsg create -n {} -g {}".format(
+                nsg_name, self.rg
             ),
-            checks=self.check("length(newVNet.subnets)", 1),
+            checks=self.check("NewNSG.name", nsg_name),
+        )
+        self.cmd(
+            "network vnet create -n {} -g {} --subnet-name {} --nsg {}".format(
+                vnet_name, self.rg, subnet_name, nsg_name
+            ),
+            checks=[
+                self.check("length(newVNet.subnets)", 1),
+                self.check("newVNet.subnets[0].networkSecurityGroup != null", "True")
+            ],
+        )
+        self.cmd(
+            "network nsg show -n {} -g {}".format(
+                nsg_name, self.rg
+            ),
+            checks=self.check("length(subnets)", 1),
         )
         self.cmd(
             "network vnet subnet update -n {} --vnet-name {} -g {} "
@@ -211,3 +226,4 @@ class TestDTPrivateLinksLifecycle(DTLiveScenarioTest):
 
         self.cmd("network private-endpoint delete -n {} -g {} ".format(endpoint_name, self.rg))
         self.cmd("network vnet delete -n {} -g {} ".format(vnet_name, self.rg))
+        self.cmd("network nsg delete -n {} -g {} ".format(nsg_name, self.rg))

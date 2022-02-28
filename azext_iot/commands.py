@@ -151,7 +151,7 @@ def load_command_table(self, _):
 
     with self.command_group("iot device", command_type=iothub_ops) as cmd_group:
         cmd_group.command("send-d2c-message", "iot_device_send_message")
-        cmd_group.command("simulate", "iot_simulate_device")
+        cmd_group.command("simulate", "iot_simulate_device", is_experimental=True)
         cmd_group.command("upload-file", "iot_device_upload_file")
 
     with self.command_group(
@@ -191,3 +191,8 @@ def load_command_table(self, _):
         cmd_group.command("list", "iot_dps_registration_list")
         cmd_group.show_command("show", "iot_dps_registration_get")
         cmd_group.command("delete", "iot_dps_registration_delete")
+
+    with self.command_group(
+        "iot dps connection-string", command_type=iotdps_ops
+    ) as cmd_group:
+        cmd_group.show_command("show", "iot_dps_connection_string_show")

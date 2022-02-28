@@ -22,7 +22,7 @@ class EventRoutesOperations(object):
     :param config: Configuration of service client.
     :param serializer: An object model serializer.
     :param deserializer: An object model deserializer.
-    :ivar api_version: The API version to use for the request. Constant value: "2020-10-31".
+    :ivar api_version: The requested API version. Constant value: "2021-06-30-preview".
     """
 
     models = models
@@ -32,7 +32,7 @@ class EventRoutesOperations(object):
         self._client = client
         self._serialize = serializer
         self._deserialize = deserializer
-        self.api_version = "2020-10-31"
+        self.api_version = "2021-06-30-preview"
 
         self.config = config
 
@@ -45,7 +45,7 @@ class EventRoutesOperations(object):
         :param event_routes_list_options: Additional parameters for the
          operation
         :type event_routes_list_options:
-         ~digitaltwins.models.EventRoutesListOptions
+         ~dataplane.models.EventRoutesListOptions
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
          deserialized response
@@ -53,19 +53,19 @@ class EventRoutesOperations(object):
          overrides<msrest:optionsforoperations>`.
         :return: An iterator like instance of EventRoute
         :rtype:
-         ~digitaltwins.models.EventRoutePaged[~digitaltwins.models.EventRoute]
+         ~dataplane.models.EventRoutePaged[~dataplane.models.EventRoute]
         :raises:
-         :class:`ErrorResponseException<digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<dataplane.models.ErrorResponseException>`
         """
+        max_items_per_page = None
+        if event_routes_list_options is not None:
+            max_items_per_page = event_routes_list_options.max_items_per_page
         traceparent = None
         if event_routes_list_options is not None:
             traceparent = event_routes_list_options.traceparent
         tracestate = None
         if event_routes_list_options is not None:
             tracestate = event_routes_list_options.tracestate
-        max_items_per_page = None
-        if event_routes_list_options is not None:
-            max_items_per_page = event_routes_list_options.max_items_per_page
 
         def internal_paging(next_link=None, raw=False):
 
@@ -83,23 +83,24 @@ class EventRoutesOperations(object):
 
             # Construct headers
             header_parameters = {}
-            header_parameters['Accept'] = 'application/json'
+            header_parameters['Content-Type'] = 'application/json; charset=utf-8'
             if self.config.generate_client_request_id:
                 header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
             if custom_headers:
                 header_parameters.update(custom_headers)
             if self.config.accept_language is not None:
                 header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
+            if max_items_per_page is not None:
+                header_parameters['max-items-per-page'] = self._serialize.header("max_items_per_page", max_items_per_page, 'int')
             if traceparent is not None:
                 header_parameters['traceparent'] = self._serialize.header("traceparent", traceparent, 'str')
             if tracestate is not None:
                 header_parameters['tracestate'] = self._serialize.header("tracestate", tracestate, 'str')
-            if max_items_per_page is not None:
-                header_parameters['max-items-per-page'] = self._serialize.header("max_items_per_page", max_items_per_page, 'int')
 
             # Construct and send request
-            request = self._client.get(url, query_parameters, header_parameters)
-            response = self._client.send(request, stream=False, **operation_config)
+            request = self._client.get(url, query_parameters)
+            response = self._client.send(
+                request, header_parameters, stream=False, **operation_config)
 
             if response.status_code not in [200]:
                 raise models.ErrorResponseException(self._deserialize, response)
@@ -131,17 +132,17 @@ class EventRoutesOperations(object):
         :param event_routes_get_by_id_options: Additional parameters for the
          operation
         :type event_routes_get_by_id_options:
-         ~digitaltwins.models.EventRoutesGetByIdOptions
+         ~dataplane.models.EventRoutesGetByIdOptions
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
          deserialized response
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
         :return: EventRoute or ClientRawResponse if raw=true
-        :rtype: ~digitaltwins.models.EventRoute or
+        :rtype: ~dataplane.models.EventRoute or
          ~msrest.pipeline.ClientRawResponse
         :raises:
-         :class:`ErrorResponseException<digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<dataplane.models.ErrorResponseException>`
         """
         traceparent = None
         if event_routes_get_by_id_options is not None:
@@ -163,7 +164,7 @@ class EventRoutesOperations(object):
 
         # Construct headers
         header_parameters = {}
-        header_parameters['Accept'] = 'application/json'
+        header_parameters['Content-Type'] = 'application/json; charset=utf-8'
         if self.config.generate_client_request_id:
             header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
         if custom_headers:
@@ -176,8 +177,8 @@ class EventRoutesOperations(object):
             header_parameters['tracestate'] = self._serialize.header("tracestate", tracestate, 'str')
 
         # Construct and send request
-        request = self._client.get(url, query_parameters, header_parameters)
-        response = self._client.send(request, stream=False, **operation_config)
+        request = self._client.get(url, query_parameters)
+        response = self._client.send(request, header_parameters, stream=False, **operation_config)
 
         if response.status_code not in [200]:
             raise models.ErrorResponseException(self._deserialize, response)
@@ -219,7 +220,7 @@ class EventRoutesOperations(object):
         :param event_routes_add_options: Additional parameters for the
          operation
         :type event_routes_add_options:
-         ~digitaltwins.models.EventRoutesAddOptions
+         ~dataplane.models.EventRoutesAddOptions
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
          deserialized response
@@ -228,7 +229,7 @@ class EventRoutesOperations(object):
         :return: None or ClientRawResponse if raw=true
         :rtype: None or ~msrest.pipeline.ClientRawResponse
         :raises:
-         :class:`ErrorResponseException<digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<dataplane.models.ErrorResponseException>`
         """
         traceparent = None
         if event_routes_add_options is not None:
@@ -272,8 +273,9 @@ class EventRoutesOperations(object):
             body_content = None
 
         # Construct and send request
-        request = self._client.put(url, query_parameters, header_parameters, body_content)
-        response = self._client.send(request, stream=False, **operation_config)
+        request = self._client.put(url, query_parameters)
+        response = self._client.send(
+            request, header_parameters, body_content, stream=False, **operation_config)
 
         if response.status_code not in [204]:
             raise models.ErrorResponseException(self._deserialize, response)
@@ -297,7 +299,7 @@ class EventRoutesOperations(object):
         :param event_routes_delete_options: Additional parameters for the
          operation
         :type event_routes_delete_options:
-         ~digitaltwins.models.EventRoutesDeleteOptions
+         ~dataplane.models.EventRoutesDeleteOptions
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
          deserialized response
@@ -306,7 +308,7 @@ class EventRoutesOperations(object):
         :return: None or ClientRawResponse if raw=true
         :rtype: None or ~msrest.pipeline.ClientRawResponse
         :raises:
-         :class:`ErrorResponseException<digitaltwins.models.ErrorResponseException>`
+         :class:`ErrorResponseException<dataplane.models.ErrorResponseException>`
         """
         traceparent = None
         if event_routes_delete_options is not None:
@@ -328,6 +330,7 @@ class EventRoutesOperations(object):
 
         # Construct headers
         header_parameters = {}
+        header_parameters['Content-Type'] = 'application/json; charset=utf-8'
         if self.config.generate_client_request_id:
             header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
         if custom_headers:
@@ -340,8 +343,8 @@ class EventRoutesOperations(object):
             header_parameters['tracestate'] = self._serialize.header("tracestate", tracestate, 'str')
 
         # Construct and send request
-        request = self._client.delete(url, query_parameters, header_parameters)
-        response = self._client.send(request, stream=False, **operation_config)
+        request = self._client.delete(url, query_parameters)
+        response = self._client.send(request, header_parameters, stream=False, **operation_config)
 
         if response.status_code not in [204]:
             raise models.ErrorResponseException(self._deserialize, response)
