@@ -7,9 +7,12 @@
 from knack.log import get_logger
 from azure.cli.core.azclierror import (
     ArgumentUsageError,
+    AzureResponseError,
+    BadRequestError,
     InvalidArgumentValueError,
     MutuallyExclusiveArgumentError,
-    RequiredArgumentMissingError
+    RequiredArgumentMissingError,
+    ResourceNotFoundError
 )
 from azext_iot.common._azure import IOT_SERVICE_CS_TEMPLATE
 from azext_iot.common.shared import (
@@ -676,7 +679,7 @@ def iot_dps_compute_device_key(
 ):
     if symmetric_key is None:
         if not all([dps_name, resource_group_name, enrollment_id]):
-            raise CLIError(
+            raise RequiredArgumentMissingError(
                 "Please provide DPS enrollment group identifiers (Device Provisioning Service name via "
                 "--dps-name, Enrollment ID via --enrollment-id, and resource group via --resource-group "
                 "or -g) or the enrollment group symmetric key via --symmetric-key or --key."
@@ -696,7 +699,7 @@ def iot_dps_compute_device_key(
                 enrollment_id, raw=True
             ).response.json()
             if attestation.get("type") != AttestationType.symmetricKey.value:
-                raise CLIError(
+                raise BadRequestError(
                     "Requested enrollment group has an attestation type of '{}'. Currently, compute-device-key "
                     "is only supported for enrollment groups with symmetric key attestation type.".format(
                         attestation.get("type")
@@ -704,7 +707,7 @@ def iot_dps_compute_device_key(
                 )
             symmetric_key = attestation["symmetricKey"]["primaryKey"]
         except ProvisioningServiceErrorDetailsException as e:
-            raise CLIError(e)
+            raise AzureResponseError(e)
 
     return compute_device_key(
         primary_key=symmetric_key, registration_id=registration_id
@@ -727,7 +730,7 @@ def iot_dps_connection_string_show(
     if dps_name is None:
         dps = discovery.get_resources(resource_group_name)
         if dps is None:
-            raise CLIError("No Device Provisioning Service found.")
+            raise ResourceNotFoundError("No Device Provisioning Service found.")
 
         def conn_str_getter(dps):
             return _get_dps_connection_string(
