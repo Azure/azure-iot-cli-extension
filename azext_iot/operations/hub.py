@@ -2586,11 +2586,14 @@ def iot_simulate_device(
 
     if protocol_type != ProtocolType.mqtt.name:
         if method_response_code:
-            raise ArgumentUsageError("'method-response-code' not supported, {} doesn't allow direct methods.".format(protocol_type))
+            raise ArgumentUsageError("'method-response-code' not supported, {} doesn't allow direct methods."
+                                     .format(protocol_type))
         if method_response_payload:
-            raise ArgumentUsageError("'method-response-payload' not supported, {} doesn't allow direct methods.".format(protocol_type))
+            raise ArgumentUsageError("'method-response-payload' not supported, {} doesn't allow direct methods."
+                                     .format(protocol_type))
         if init_reported_properties:
-            raise ArgumentUsageError("'init-reported-properties' not supported, {} doesn't allow setting twin props".format(protocol_type))
+            raise ArgumentUsageError("'init-reported-properties' not supported, {} doesn't allow setting twin props"
+                                     .format(protocol_type))
 
     properties_to_send = _iot_simulate_get_default_properties(protocol_type)
     user_properties = validate_key_value_pairs(properties) or {}

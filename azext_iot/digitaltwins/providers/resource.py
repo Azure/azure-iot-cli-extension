@@ -489,7 +489,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
                 private_endpoint_connection_name=conn_name
             )
         except ErrorResponseException as e:
-             handle_service_exception(e)
+            handle_service_exception(e)
 
     def create_adx_data_connection(
         self,
