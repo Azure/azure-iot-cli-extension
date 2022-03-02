@@ -5,12 +5,11 @@
 # --------------------------------------------------------------------------------------------
 # This is largely derived from https://docs.microsoft.com/en-us/rest/api/iotcentral/jobs
 
-from typing import List, Union
 import requests
-
-from knack.util import CLIError
+from typing import List, Union
 from knack.log import get_logger
 
+from azure.cli.core.azclierror import CLIInternalError
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
 from azure.cli.core.util import should_disable_connection_verify
@@ -106,7 +105,7 @@ def _list_job(
         result = _utility.try_extract_result(response)
 
         if "value" not in result:
-            raise CLIError("Value is not present in body: {}".format(result))
+            raise CLIInternalError("Value is not present in body: {}".format(result))
 
         values.extend(result["value"])
 

@@ -5,12 +5,11 @@
 # --------------------------------------------------------------------------------------------
 # This is largely derived from https://docs.microsoft.com/en-us/rest/api/iotcentral/roles
 
-from typing import List, Union
 import requests
-
-from knack.util import CLIError
 from knack.log import get_logger
+from typing import List, Union
 
+from azure.cli.core.azclierror import CLIInternalError
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
 from azext_iot.central.models.v1_1_preview import OrganizationV1_1_preview
@@ -135,7 +134,7 @@ def list_orgs(
         )
 
         if "value" not in result:
-            raise CLIError("Value is not present in body: {}".format(result))
+            raise CLIInternalError("Value is not present in body: {}".format(result))
 
         orgs.extend(
             [_utility.get_object(org, MODEL, api_version) for org in result["value"]]

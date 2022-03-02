@@ -5,11 +5,10 @@
 # --------------------------------------------------------------------------------------------
 # This is largely derived from https://docs.microsoft.com/en-us/rest/api/iotcentral/1.1-previewdataplane/destinations
 from typing import List, Union
-
 from knack.log import get_logger
-from knack.util import CLIError
-from azext_iot.central.models.enum import ApiVersion
 
+from azure.cli.core.azclierror import CLIInternalError
+from azext_iot.central.models.enum import ApiVersion
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.models.v1_1_preview import (
     DestinationV1_1_preview,
@@ -154,7 +153,7 @@ def list_destinations(
         )
 
         if "value" not in result:
-            raise CLIError("Value is not present in body: {}".format(result))
+            raise CLIInternalError("Value is not present in body: {}".format(result))
 
         destinations.extend(result.get("value", []))
 

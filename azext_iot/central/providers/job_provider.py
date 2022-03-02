@@ -6,8 +6,8 @@
 
 
 from typing import List, Union
-from knack.util import CLIError
 from knack.log import get_logger
+from azure.cli.core.azclierror import AzureResponseError, BadRequestError, ResourceNotFoundError
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.preview import JobPreview
@@ -71,7 +71,7 @@ class CentralJobProvider:
             self._jobs[job_id] = job
 
         if not job:
-            raise CLIError("No job found with id: '{}'.".format(job_id))
+            raise ResourceNotFoundError("No job found with id: '{}'.".format(job_id))
 
         return job
 
@@ -90,7 +90,7 @@ class CentralJobProvider:
             api_version=self._api_version,
         )
         if not job:
-            raise CLIError("Failed to stop job with id: '{}'.".format(job_id))
+            raise AzureResponseError("Failed to stop job with id: '{}'.".format(job_id))
 
         return job
 
@@ -110,7 +110,7 @@ class CentralJobProvider:
         )
 
         if not job:
-            raise CLIError("Failed to resume job with id: '{}'.".format(job_id))
+            raise AzureResponseError("Failed to resume job with id: '{}'.".format(job_id))
 
         return job
 
@@ -132,7 +132,7 @@ class CentralJobProvider:
         )
 
         if not job:
-            raise CLIError("Failed to re-run job with id: '{}'.".format(job_id))
+            raise AzureResponseError("Failed to re-run job with id: '{}'.".format(job_id))
 
         return job
 
@@ -164,7 +164,7 @@ class CentralJobProvider:
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         if job_id in self._jobs:
-            raise CLIError("Job already exists")
+            raise BadRequestError("Job already exists")
         job = central_services.job.create_job(
             self._cmd,
             self._app_id,
@@ -184,7 +184,7 @@ class CentralJobProvider:
         )
 
         if not job:
-            raise CLIError("Failed to create job with id: '{}'.".format(job_id))
+            raise AzureResponseError("Failed to create job with id: '{}'.".format(job_id))
 
         # add to cache
         self._jobs[job.id] = job

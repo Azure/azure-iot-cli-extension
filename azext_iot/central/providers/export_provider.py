@@ -5,10 +5,9 @@
 # --------------------------------------------------------------------------------------------
 
 from typing import List, Union
-
 from knack.log import get_logger
-from knack.util import CLIError
 
+from azure.cli.core.azclierror import AzureResponseError, BadRequestError, ResourceNotFoundError
 from azext_iot.central.providers.central_provider import CentralProvider
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
@@ -43,7 +42,7 @@ class CentralExportProvider(CentralProvider):
         self, export_id, payload, central_dnx_suffix=CENTRAL_ENDPOINT
     ) -> Union[dict, ExportV1_1_preview]:
         if export_id in self._exports:
-            raise CLIError("Destination already exists")
+            raise BadRequestError("Destination already exists")
 
         export = central_services.export.add_export(
             self._cmd,
@@ -56,7 +55,7 @@ class CentralExportProvider(CentralProvider):
         )
 
         if not export:
-            raise CLIError("Failed to create export with id: '{}'.".format(export_id))
+            raise AzureResponseError("Failed to create export with id: '{}'.".format(export_id))
 
         # add to cache
         self._exports[export["id"]] = export
@@ -77,7 +76,7 @@ class CentralExportProvider(CentralProvider):
         )
 
         if not export:
-            raise CLIError("Failed to create export with id: '{}'.".format(export_id))
+            raise AzureResponseError("Failed to create export with id: '{}'.".format(export_id))
 
         # add to cache
         self._exports[export_id] = export
@@ -100,7 +99,7 @@ class CentralExportProvider(CentralProvider):
             )
 
         if not export:
-            raise CLIError("No export found with id: '{}'.".format(export_id))
+            raise ResourceNotFoundError("No export found with id: '{}'.".format(export_id))
         else:
             self._exports[export_id] = export
 

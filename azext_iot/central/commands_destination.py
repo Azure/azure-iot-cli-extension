@@ -6,7 +6,7 @@
 # Dev note - think of this as a controller
 
 from typing import List, Union
-from knack.util import CLIError
+from azure.cli.core.azclierror import RequiredArgumentMissingError
 from azext_iot.central.common import DestinationType
 from azext_iot.common import utility
 from azext_iot.constants import CENTRAL_ENDPOINT
@@ -101,7 +101,7 @@ def add_destination(
 
     if type == DestinationType.Webhook.value:
         if not url:
-            raise CLIError(
+            raise RequiredArgumentMissingError(
                 "Parameter url is required when creating webhook destination."
             )
         destination.update({"url": url})
@@ -116,15 +116,15 @@ def add_destination(
 
     if type == DestinationType.AzureDataExplorer.value:
         if not cluster_url:
-            raise CLIError(
+            raise RequiredArgumentMissingError(
                 "Parameter cluster-url is required when creating an azure data explorer destination."
             )
         if not database:
-            raise CLIError(
+            raise RequiredArgumentMissingError(
                 "Parameter database is required when creating an azure data explorer destination."
             )
         if not table:
-            raise CLIError(
+            raise RequiredArgumentMissingError(
                 "Parameter table is required when creating an azure data explorer destination."
             )
         destination.update(
@@ -141,7 +141,7 @@ def add_destination(
         )
     else:
         if type != DestinationType.Webhook.value:
-            raise CLIError(
+            raise RequiredArgumentMissingError(
                 "Parameter authorization is required when creating a non-webhook destination."
             )
 
