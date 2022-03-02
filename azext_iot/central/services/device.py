@@ -7,6 +7,7 @@
 
 from typing import List, Union
 import requests
+from azext_iot.central.common import EDGE_ONLY
 from azext_iot.central.models.edge import EdgeModule
 from azext_iot.common.auth import get_aad_token
 
@@ -18,8 +19,11 @@ from azext_iot.central.services import _utility
 from azext_iot.central.models.devicetwin import DeviceTwin
 from azext_iot.central.models.preview import DevicePreview
 from azext_iot.central.models.v1 import DeviceV1
-from azext_iot.central.models.v1_1_preview import DeviceV1_1_preview
-from azext_iot.central.models.enum import DeviceStatus
+from azext_iot.central.models.v1_1_preview import (
+    DeviceV1_1_preview,
+    RelationshipV1_1_preview,
+)
+from azext_iot.central.models.enum import ApiVersion, DeviceStatus
 from azure.cli.core.util import should_disable_connection_verify
 from azext_iot.common.utility import dict_clean, parse_entity
 
@@ -27,6 +31,7 @@ logger = get_logger(__name__)
 
 BASE_PATH = "api/devices"
 MODEL = "Device"
+REL_MODEL = "Relationship"
 
 
 def get_device(
@@ -73,6 +78,7 @@ def get_device(
 def list_devices(
     cmd,
     app_id: str,
+    filter: str,
     token: str,
     api_version: str,
     max_pages=0,
@@ -84,6 +90,7 @@ def list_devices(
     Args:
         cmd: command passed into az
         app_id: name of app (used for forming request URL)
+        filter: only show filtered devices
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
         central_dns_suffix: {centralDnsSuffixInPath} as found in docs
@@ -98,12 +105,18 @@ def list_devices(
     headers = _utility.get_headers(token, cmd)
 
     # Construct parameters
-    query_parameters = {}
+    query_parameters = (
+        {"$filter": filter} if api_version == ApiVersion.v1_1_preview.value else {}
+    )
     query_parameters["api-version"] = api_version
 
-    logger.warning(
-        "This command may take a long time to complete if your app contains a lot of devices"
-    )
+    warning = "This command may take a long time to complete if your app contains a lot of devices."
+    if filter and filter == EDGE_ONLY and api_version != ApiVersion.v1_1_preview.value:
+        warning += (
+            "\nAlso consider using Api Version 1.1-preview when listing edge devices "
+            "as it supports server filtering speeding up the process."
+        )
+    logger.warning(warning)
 
     pages_processed = 0
     while (max_pages == 0 or pages_processed < max_pages) and url:
@@ -353,6 +366,160 @@ def delete_device(
 
     response = requests.delete(url, headers=headers, params=query_parameters)
     return _utility.try_extract_result(response)
+
+
+def list_relationships(
+    cmd,
+    app_id: str,
+    device_id: str,
+    token: str,
+    api_version: str,
+    max_pages=0,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+) -> List[RelationshipV1_1_preview]:
+
+    url = "https://{}.{}/{}/{}/relationships".format(
+        app_id, central_dns_suffix, BASE_PATH, device_id
+    )
+    headers = _utility.get_headers(token, cmd, has_json_payload=True)
+
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
+    relationships = []
+    pages_processed = 0
+    while (max_pages == 0 or pages_processed < max_pages) and url:
+        response = requests.get(
+            url,
+            headers=headers,
+            params=query_parameters if pages_processed == 0 else None,
+        )
+        result = _utility.try_extract_result(response)
+
+        if "value" not in result:
+            raise CLIError("Value is not present in body: {}".format(result))
+
+        relationships.extend(
+            [
+                _utility.get_object(relationship, REL_MODEL, api_version)
+                for relationship in result["value"]
+            ]
+        )
+
+        url = result.get("nextLink", None)
+        pages_processed = pages_processed + 1
+
+    return relationships
+
+
+def create_relationship(
+    cmd,
+    app_id: str,
+    device_id: str,
+    target_id: str,
+    rel_id: str,
+    rel_name: str,
+    token: str,
+    api_version: str,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+):
+
+    payload = {"id": rel_id, "name": rel_name, "source": device_id, "target": target_id}
+    response = _utility.make_api_call(
+        cmd,
+        app_id=app_id,
+        method="PUT",
+        url=f"https://{app_id}.{central_dns_suffix}/api/devices/{device_id}/relationships/{rel_id}",
+        payload=payload,
+        token=token,
+        api_version=api_version,
+        central_dnx_suffix=central_dns_suffix,
+    )
+
+    return _utility.get_object(response, REL_MODEL, api_version)
+
+
+def update_relationship(
+    cmd,
+    app_id: str,
+    device_id: str,
+    rel_id: str,
+    target_id: str,
+    token: str,
+    api_version: str,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+) -> RelationshipV1_1_preview:
+
+    """
+    Update a relationship in IoTC
+
+    Args:
+        cmd: command passed into az
+        app_id: name of app (used for forming request URL)
+        device_id: unique case-sensitive device id
+        rel_id: unique case-sensitive relationship id
+        target_id: (optional) unique case-sensitive device id
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        device: dict
+    """
+
+    payload = {"target": target_id}
+
+    response = _utility.make_api_call(
+        cmd,
+        app_id=app_id,
+        method="PATCH",
+        url=f"https://{app_id}.{central_dns_suffix}/api/devices/{device_id}/relationships/{rel_id}",
+        payload=payload,
+        token=token,
+        api_version=api_version,
+        central_dnx_suffix=central_dns_suffix,
+    )
+
+    return _utility.get_object(response, REL_MODEL, api_version)
+
+
+def delete_relationship(
+    cmd,
+    app_id: str,
+    device_id: str,
+    rel_id: str,
+    token: str,
+    api_version: str,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+) -> dict:
+    """
+    Delete a relationship from IoTC
+
+    Args:
+        cmd: command passed into az
+        app_id: name of app (used for forming request URL)
+        device_id: unique case-sensitive device id,
+        rel_id: unique case-sensitive relationship id,
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        {"result": "success"} on success
+        Raises error on failure
+    """
+
+    return _utility.make_api_call(
+        cmd,
+        app_id=app_id,
+        method="DELETE",
+        url=f"https://{app_id}.{central_dns_suffix}/api/devices/{device_id}/relationships/{rel_id}",
+        payload=None,
+        token=token,
+        api_version=api_version,
+        central_dnx_suffix=central_dns_suffix,
+    )
 
 
 def get_device_credentials(

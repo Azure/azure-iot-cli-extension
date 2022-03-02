@@ -13,7 +13,10 @@ from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.enum import DeviceStatus, ApiVersion
 from azext_iot.central.models.v1 import DeviceV1
-from azext_iot.central.models.v1_1_preview import DeviceV1_1_preview
+from azext_iot.central.models.v1_1_preview import (
+    DeviceV1_1_preview,
+    RelationshipV1_1_preview,
+)
 from azext_iot.central.models.preview import DevicePreview
 from azext_iot.dps.services import global_service as dps_global_service
 
@@ -71,12 +74,14 @@ class CentralDeviceProvider:
 
     def list_devices(
         self,
+        filter=None,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> List[Union[DeviceV1, DeviceV1_1_preview, DevicePreview]]:
         devices = central_services.device.list_devices(
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
+            filter=filter,
             central_dns_suffix=central_dns_suffix,
             api_version=self._api_version,
         )
@@ -182,6 +187,102 @@ class CentralDeviceProvider:
         # pop "miss" raises a KeyError if None is not provided
         self._devices.pop(device_id, None)
         self._device_credentials.pop(device_id, None)
+
+        return result
+
+    def list_relationships(
+        self,
+        device_id,
+        rel_name=None,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ) -> List[RelationshipV1_1_preview]:
+        relationships = central_services.device.list_relationships(
+            self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+        if relationships is None:
+            raise CLIError(
+                "No relationships found for device with id: '{}'.".format(device_id)
+            )
+
+        if rel_name:
+            relationships = [rel for rel in relationships if rel.name == rel_name]
+
+        return relationships
+
+    def add_relationship(
+        self,
+        device_id,
+        target_id,
+        rel_id,
+        rel_name,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ) -> dict:
+        relationship = central_services.device.create_relationship(
+            self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            rel_id=rel_id,
+            rel_name=rel_name,
+            target_id=target_id,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+        if not relationship:
+            raise CLIError("No relationship found with id: '{}'.".format(rel_id))
+
+        return relationship
+
+    def update_relationship(
+        self,
+        device_id,
+        target_id,
+        rel_id,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ) -> dict:
+        relationship = central_services.device.update_relationship(
+            self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            rel_id=rel_id,
+            target_id=target_id,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+        if not relationship:
+            raise CLIError("No relationship found with id: '{}'.".format(rel_id))
+
+        return relationship
+
+    def delete_relationship(
+        self,
+        device_id,
+        rel_id,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ) -> dict:
+
+        if not device_id or not rel_id:
+            raise CLIError("Device id and relationship id must be specified.")
+
+        # get or add to cache
+        result = central_services.device.delete_relationship(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            rel_id=rel_id,
+            token=self._token,
+            central_dns_suffix=central_dns_suffix,
+            api_version=self._api_version,
+        )
 
         return result
 

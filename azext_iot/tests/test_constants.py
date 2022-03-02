@@ -12,6 +12,8 @@ class FileNames:
         "central/json/deeply_nested_template.json"
     )
     central_device_file = "central/json/device.json"
+    central_edge_devices_file = "central/json/edge_devices.json"
+    central_edge_children_file = "central/json/edge_children.json"
     central_device_group_file = "central/json/device_group.json"
     central_organization_file = "central/json/organization.json"
     central_role_file = "central/json/role.json"

@@ -1314,48 +1314,17 @@ def _load_central_edge_help():
     """
 
     helps[
-        "iot central device edge list"
-    ] = """
-        type: command
-        short-summary: Get the list of edge devices for an IoT Central application.
-        examples:
-        - name: List all edge devices in an application, sorted by device Id (default)
-          text: >
-            az iot central device edge list
-            --app-id {appid}
-    """
-
-    helps[
-        "iot central device edge show"
-    ] = """
-        type: command
-        short-summary: Get an IoT Edge device for an IoT Central application.
-        examples:
-        - name: Get an IoT Edge device in an application.
-          text: >
-            az iot central device edge show
-            --app-id {appid}
-            --device-id {deviceId}
-    """
-
-    helps[
-        "iot central device edge get-children"
-    ] = """
-        type: command
-        short-summary: Get the list of children devices for an IoT Edge device in an IoT Central application.
-        examples:
-        - name: List all children devices for an edge in an application.
-          text: >
-            az iot central device edge get-children
-            --app-id {appid}
-            --device-id {deviceId}
-    """
-
-    helps[
         "iot central device edge module"
     ] = """
         type: group
         short-summary: Manage IoT Edge device modules.
+    """
+
+    helps[
+        "iot central device edge children"
+    ] = """
+        type: group
+        short-summary: Manage IoT Edge device children devices.
     """
 
     helps[
@@ -1417,4 +1386,45 @@ def _load_central_edge_help():
             az iot central device edge manifest show
             --app-id {appid}
             --device-id {deviceId}
+    """
+
+    helps[
+        "iot central device edge children list"
+    ] = """
+        type: command
+        short-summary: Get the list of children of an IoT Edge device.
+        examples:
+        - name: List all children of a device.
+          text: >
+            az iot central device edge children list
+            --app-id {appid}
+            --device-id {deviceId}
+    """
+
+    helps[
+        "iot central device edge children add"
+    ] = """
+        type: command
+        short-summary: Add devices as children to a target edge device.
+        examples:
+        - name: Add comma-separated list of device Ids as children to the target edge device.
+          text: >
+            az iot central device edge children add
+            --app-id {appid}
+            --device-id {deviceId}
+            --children-ids {child_1},{child_2}
+    """
+
+    helps[
+        "iot central device edge children remove"
+    ] = """
+        type: command
+        short-summary: Remove child devices from a target edge device.
+        examples:
+        - name: Remove children.
+          text: >
+            az iot central device edge children remove
+            --app-id {appid}
+            --device-id {deviceId}
+            --children-ids {child_1},{child_2}
     """

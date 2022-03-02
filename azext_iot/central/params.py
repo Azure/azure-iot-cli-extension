@@ -125,6 +125,13 @@ def load_central_arguments(self, _):
             help="The primary symmetric shared access key stored in base64 format. ",
         )
 
+    with self.argument_context("iot central device list") as context:
+        context.argument(
+            "edge_only",
+            options_list=["--edge-only", "-e"],
+            help="Only list IoT Edge devices.",
+        )
+
     with self.argument_context("iot central device") as context:
         context.argument(
             "template",
@@ -600,17 +607,16 @@ def load_central_arguments(self, _):
             " The request body must contain partial content of Destination.",
         )
 
-    with self.argument_context("iot central edge show") as context:
-        context.argument(
-            "device_id",
-            options_list=["--device-id", "-d"],
-            help="The device ID of the target device."
-            "You can find the device ID by, clicking on the Connect button on the Device Details page.",
-        )
-
-    with self.argument_context("iot central edge module") as context:
+    with self.argument_context("iot central device edge module") as context:
         context.argument(
             "module_id",
             options_list=["--module-id", "-m"],
             help="The module ID of the target module.",
+        )
+
+    with self.argument_context("iot central device edge children") as context:
+        context.argument(
+            "children_ids",
+            options_list=["--children-ids"],
+            help="Comma separated list of children device ids.",
         )

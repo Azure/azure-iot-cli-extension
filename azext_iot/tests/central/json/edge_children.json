@@ -1,0 +1,22 @@
+[
+    {
+        "displayName": "dev01",
+        "enabled": true,
+        "etag": "eyJoZWFkZXIiOiJcImM3MDFjNWYxLTAwMDAtMGQwMC0wMDAwLTYxYWE1Y2M3MDAwMFwiIn0",
+        "id": "dev01",
+        "organizations": null,
+        "provisioned": true,
+        "simulated": false,
+        "template": "dtmi:modelDefinition:dkngh8n7:zxjfczjpc"
+    },
+    {
+        "displayName": "dev02",
+        "enabled": true,
+        "etag": "eyJoZWFkZXIiOiJcIjA3MDBlYThhLTAwMDAtMGQwMC0wMDAwLTYyMWNhYmE4MDAwMFwiIn0",
+        "id": "dev02",
+        "organizations": null,
+        "provisioned": false,
+        "simulated": false,
+        "template": "dtmi:modelDefinition:dkngh8n7:zxjfczjpc"
+    }
+]

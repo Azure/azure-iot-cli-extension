@@ -17,14 +17,16 @@ Release History
 **IoT Central updates**
 
 * Added commands for Edge devices and modules:
-  - az iot central device edge list
-  - az iot central device edge list
-  - az iot central device edge get-children
-  - az iot central device edge manifest show
-
-  - az iot central device edge module list
-  - az iot central device edge module show
-  - az iot central device edge module restart
+  - az iot central device edge module
+    - az iot central device edge module list
+    - az iot central device edge module restart
+    - az iot central device edge module show
+  - az iot central device edge manifest
+    - az iot central device edge manifest show
+  - az iot central device edge children
+    - az iot central device edge children list
+    - az iot central device edge children add
+    - az iot central device edge children remove
 
 0.13.0
 +++++++++++++++

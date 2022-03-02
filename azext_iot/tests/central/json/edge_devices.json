@@ -1,0 +1,42 @@
+[
+    {
+        "displayName": "Edge - edge0",
+        "enabled": true,
+        "etag": "eyJoZWFkZXIiOiJcImM3MDE4MWIxLTAwMDAtMGQwMC0wMDAwLTYxYWE1OTZiMDAwMFwiIn0",
+        "id": "edge0",
+        "organizations": null,
+        "provisioned": true,
+        "simulated": false,
+        "template": "dtmi:modelDefinition:h8pzhzxn66:eezqod"
+    },
+    {
+        "displayName": "testedge",
+        "enabled": true,
+        "etag": "eyJoZWFkZXIiOiJcImJjMDAwZjM0LTAwMDAtMGQwMC0wMDAwLTYyMGE2MjkyMDAwMFwiIn0",
+        "id": "testedge",
+        "organizations": null,
+        "provisioned": true,
+        "simulated": false,
+        "template": "dtmi:maapd66su:g4joykxupn"
+    },
+    {
+        "displayName": "15xei5pig53",
+        "enabled": true,
+        "etag": "eyJoZWFkZXIiOiJcIjAxMDBjM2E4LTAwMDAtMGQwMC0wMDAwLTYyMTkwNzQyMDAwMFwiIn0",
+        "id": "15xei5pig53",
+        "organizations": null,
+        "provisioned": false,
+        "simulated": false,
+        "template": "dtmi:modelDefinition:gpr9qizj:rsmzkhys7f"
+    },
+    {
+        "displayName": "Edge - edge1",
+        "enabled": true,
+        "etag": "eyJoZWFkZXIiOiJcIjA3MDBlMGFjLTAwMDAtMGQwMC0wMDAwLTYyMWNlNDcyMDAwMFwiIn0",
+        "id": "edge1",
+        "organizations": null,
+        "provisioned": false,
+        "simulated": false,
+        "template": "dtmi:modelDefinition:h8pzhzxn66:eezqod"
+    }
+]

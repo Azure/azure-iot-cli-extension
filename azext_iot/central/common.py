@@ -5,11 +5,13 @@
 # --------------------------------------------------------------------------------------------
 
 """
-shared: Define shared data types(enums)
+shared: Define shared data types
 
 """
 
 from enum import Enum
+
+EDGE_ONLY = "type eq 'GatewayDevice' or type eq 'EdgeDevice'"
 
 
 class DestinationType(Enum):

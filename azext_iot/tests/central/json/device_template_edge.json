@@ -2,7 +2,8 @@
   "@type": [
     "ModelDefinition",
     "DeviceModel",
-    "EdgeModel"
+    "EdgeModel",
+    "GatewayModel"
   ],
   "displayName": "dtmi:TestEdgeDeviceTemplate",
   "capabilityModel": {
@@ -162,6 +163,19 @@
         "displayName": "Test Cloud Property",
         "name": "testCloudProperty",
         "schema": "dateTime"
+      },
+      {
+        "@type": [
+          "Relationship",
+          "GatewayDevice"
+        ],
+        "displayName": {
+          "en": "Device"
+        },
+        "name": "device",
+        "target": [
+          "dtmi:sampleApp:modelOnebz;3"
+        ]
       }
     ]
   },
