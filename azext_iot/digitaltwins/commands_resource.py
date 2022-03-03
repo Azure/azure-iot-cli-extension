@@ -12,6 +12,7 @@ from azext_iot.digitaltwins.common import (
     ADTEndpointAuthType,
     ADTPublicNetworkAccessType,
 )
+from azure.cli.core.azclierror import MutuallyExclusiveArgumentError
 from knack.log import get_logger
 
 logger = get_logger(__name__)
@@ -27,7 +28,12 @@ def create_instance(
     scopes=None,
     role_type="Contributor",
     public_network_access=ADTPublicNetworkAccessType.enabled.value,
+    no_wait=False,
 ):
+    if no_wait and scopes:
+        raise MutuallyExclusiveArgumentError(
+            "Cannot assign scopes in a no wait operation. Please run the command without --no-wait."
+        )
     rp = ResourceProvider(cmd)
     return rp.create(
         name=name,
