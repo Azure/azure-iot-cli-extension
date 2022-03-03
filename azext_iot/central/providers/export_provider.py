@@ -7,7 +7,7 @@
 from typing import List, Union
 from knack.log import get_logger
 
-from azure.cli.core.azclierror import AzureResponseError, BadRequestError, ResourceNotFoundError
+from azure.cli.core.azclierror import AzureResponseError, ClientRequestError, ResourceNotFoundError
 from azext_iot.central.providers.central_provider import CentralProvider
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
@@ -42,7 +42,7 @@ class CentralExportProvider(CentralProvider):
         self, export_id, payload, central_dnx_suffix=CENTRAL_ENDPOINT
     ) -> Union[dict, ExportV1_1_preview]:
         if export_id in self._exports:
-            raise BadRequestError("Destination already exists")
+            raise ClientRequestError("Destination already exists")
 
         export = central_services.export.add_export(
             self._cmd,

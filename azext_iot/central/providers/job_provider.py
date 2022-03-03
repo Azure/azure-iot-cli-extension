@@ -7,7 +7,7 @@
 
 from typing import List, Union
 from knack.log import get_logger
-from azure.cli.core.azclierror import AzureResponseError, BadRequestError, ResourceNotFoundError
+from azure.cli.core.azclierror import AzureResponseError, ClientRequestError, ResourceNotFoundError
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.preview import JobPreview
@@ -164,7 +164,7 @@ class CentralJobProvider:
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         if job_id in self._jobs:
-            raise BadRequestError("Job already exists")
+            raise ClientRequestError("Job already exists")
         job = central_services.job.create_job(
             self._cmd,
             self._app_id,

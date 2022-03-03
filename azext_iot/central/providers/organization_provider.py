@@ -7,7 +7,7 @@
 
 from typing import List
 from knack.log import get_logger
-from azure.cli.core.azclierror import AzureResponseError, BadRequestError, ResourceNotFoundError
+from azure.cli.core.azclierror import AzureResponseError, ClientRequestError, ResourceNotFoundError
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.v1_1_preview import OrganizationV1_1_preview
@@ -100,7 +100,7 @@ class CentralOrganizationProvider:
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         if org_id in self._orgs:
-            raise BadRequestError("Organization already exists")
+            raise ClientRequestError("Organization already exists")
         org = central_services.organization.create_or_update_org(
             self._cmd,
             self._app_id,

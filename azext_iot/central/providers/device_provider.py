@@ -6,7 +6,8 @@
 
 from typing import List, Union
 from azure.cli.core.azclierror import (
-    BadRequestError,
+    AzureResponseError,
+    ClientRequestError,
     CLIInternalError,
     RequiredArgumentMissingError,
     ResourceNotFoundError,
@@ -103,7 +104,7 @@ class CentralDeviceProvider:
             raise RequiredArgumentMissingError("Device id must be specified.")
 
         if device_id in self._devices:
-            raise BadRequestError("Device already exists.")
+            raise ClientRequestError("Device already exists.")
 
         device = central_services.device.create_device(
             cmd=self._cmd,
@@ -119,7 +120,7 @@ class CentralDeviceProvider:
         )
 
         if not device:
-            raise ResourceNotFoundError("No device found with id: '{}'.".format(device_id))
+            raise AzureResponseError("Failed to create device with id: '{}'.".format(device_id))
 
         # add to cache
         self._devices[device.id] = device
@@ -140,7 +141,7 @@ class CentralDeviceProvider:
             raise RequiredArgumentMissingError("Device id must be specified.")
 
         if device_id in self._devices:
-            raise BadRequestError("Device already exists.")
+            raise ClientRequestError("Device already exists.")
 
         device = central_services.device.update_device(
             cmd=self._cmd,

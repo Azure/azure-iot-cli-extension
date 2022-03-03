@@ -163,7 +163,7 @@ def iot_dps_device_enrollment_create(
 
         if attestation_type == AttestationType.tpm.value:
             if not endorsement_key:
-                raise RequiredArgumentMissingError("Endorsement key is requried")
+                raise RequiredArgumentMissingError("Endorsement key [--endorsement-key] is required")
             attestation = AttestationMechanism(
                 type=AttestationType.tpm.value,
                 tpm=TpmAttestation(endorsement_key=endorsement_key),

@@ -140,10 +140,10 @@ class JobProvider(IoTHubProvider):
             )
 
         if poll_duration < 1:
-            raise InvalidArgumentValueError("--poll-duration must be greater than 0!")
+            raise InvalidArgumentValueError("--poll-duration must be greater than 0.")
 
         if poll_interval < 1:
-            raise InvalidArgumentValueError("--poll-interval must be greater than 0!")
+            raise InvalidArgumentValueError("--poll-interval must be greater than 0.")
 
         if job_type == JobType.scheduleUpdateTwin.value:
             if not twin_patch:

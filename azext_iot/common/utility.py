@@ -356,6 +356,12 @@ def unpack_msrest_error(e):
 
 
 def handle_service_exception(e):
+    """
+    Used to unpack service error messages and status codes,
+    and raise the correct azclierror class.
+    For more info on CLI error handling guidelines, see
+    https://github.com/Azure/azure-cli/blob/dev/doc/error_handling_guidelines.md
+    """
     from azure.cli.core.azclierror import (
         AzureInternalError,
         AzureResponseError,
@@ -364,25 +370,25 @@ def handle_service_exception(e):
         ResourceNotFoundError,
         UnauthorizedError,
     )
-    op_status = None
     err = unpack_msrest_error(e)
-    try:
-        op_status = getattr(e.response, 'status_code', None)
-        if op_status in [400, 409]:
-            raise BadRequestError(err)
-        if op_status == 401:
-            raise UnauthorizedError(err)
-        if op_status == 403:
-            raise ForbiddenError(err)
-        if op_status == 404:
-            raise ResourceNotFoundError(err)
-        if op_status in [500, 503, 504]:
-            raise AzureInternalError(err)
-        # Otherwise, fail with generic error
-        raise AzureResponseError(err)
+    op_status = getattr(e.response, 'status_code', -1)
 
-    except Exception:
+    # Generic error if the status_code is explicitly None
+    if not op_status:
         raise AzureResponseError(err)
+    if op_status == 400:
+        raise BadRequestError(err)
+    if op_status == 401:
+        raise UnauthorizedError(err)
+    if op_status == 403:
+        raise ForbiddenError(err)
+    if op_status == 404:
+        raise ResourceNotFoundError(err)
+    # Any 5xx error should throw an AzureInternalError
+    if 500 <= op_status < 600:
+        raise AzureInternalError(err)
+    # Otherwise, fail with generic service error
+    raise AzureResponseError(err)
 
 
 def dict_transform_lower_case_key(d):

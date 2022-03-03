@@ -141,9 +141,6 @@ class ResourceProvider(DigitalTwinsResourceManager):
                 resource_name=name, resource_group_name=resource_group_name
             )
         except ErrorResponseException as e:
-            if wait:
-                e.status_code = e.response.status_code
-                raise e
             handle_service_exception(e)
 
     def find_instance(self, name, resource_group_name=None, wait=False):
