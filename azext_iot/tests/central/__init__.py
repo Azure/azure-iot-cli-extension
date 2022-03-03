@@ -188,6 +188,11 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         )
 
     def _create_device_template(self, api_version, edge=False):
+        if edge and api_version != ApiVersion.v1_1_preview.value:
+            raise CLIError(
+                "Edge template creation is only available for api version >= 1.1-preview."
+            )
+
         if edge:
             template_path = edge_template_path_preview
         elif api_version == ApiVersion.preview.value:
