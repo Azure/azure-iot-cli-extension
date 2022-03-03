@@ -398,7 +398,6 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         )
 
         servicebus_endpoint = "myservicebusendpoint"
-        servicebus_endpoint_msi = "{}identity".format(servicebus_endpoint)
 
         logger.debug("Adding key based servicebus topic endpoint...")
         self.cmd(
@@ -420,51 +419,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             )
         )
 
-        logger.debug("Adding identity based servicebus topic endpoint...")
-        self.cmd(
-            "dt endpoint create servicebus -n {} --sbg {} --sbn {} --sbt {} --en {} --du {} "
-            "--auth-type IdentityBased --no-wait".format(
-                endpoints_instance_name,
-                EP_RG,
-                EP_SERVICEBUS_NAMESPACE,
-                EP_SERVICEBUS_TOPIC,
-                servicebus_endpoint_msi,
-                MOCK_DEAD_LETTER_ENDPOINT,
-            )
-        )
-        endpoint_tuple_collection.append(
-            EndpointTuple(
-                servicebus_endpoint_msi,
-                ADTEndpointType.servicebus,
-                ADTEndpointAuthType.identitybased,
-            )
-        )
-
-        eventhub_endpoint = "myeventhubendpoint"
-        eventhub_endpoint_msi = "{}identity".format(eventhub_endpoint)
-
-        logger.debug("Adding key based eventhub endpoint...")
-        self.cmd(
-            "dt endpoint create eventhub -n {} --ehg {} --ehn {} --ehp {} --eh {} --ehs {} --en {} "
-            "--dsu '{}' --no-wait".format(
-                endpoints_instance_name,
-                EP_RG,
-                EP_EVENTHUB_NAMESPACE,
-                EP_EVENTHUB_POLICY,
-                EP_EVENTHUB_TOPIC,
-                self.current_subscription,
-                eventhub_endpoint,
-                MOCK_DEAD_LETTER_SECRET,
-            )
-        )
-
-        endpoint_tuple_collection.append(
-            EndpointTuple(
-                eventhub_endpoint,
-                ADTEndpointType.eventhub,
-                ADTEndpointAuthType.keybased,
-            )
-        )
+        eventhub_endpoint_msi = "myeventhubendpointidentity"
 
         logger.debug("Adding identity based eventhub endpoint...")
         self.cmd(
@@ -496,29 +451,12 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             )
         )
 
-        for ep in endpoint_tuple_collection:
-            is_last = ep.endpoint_name == endpoint_tuple_collection[-1].endpoint_name
-            show_ep_output = self.cmd(
-                "dt endpoint show -n {} --en {} {}".format(
-                    endpoints_instance_name,
-                    ep.endpoint_name,
-                    "-g {}".format(self.rg) if is_last else "",
-                )
-            ).get_output_in_json()
-
-            assert_common_endpoint_attributes(
-                show_ep_output,
-                ep.endpoint_name,
-                endpoint_type=ep.endpoint_type,
-                auth_type=ep.auth_type,
-            )
-
         list_ep_output = self.cmd(
             "dt endpoint list -n {} -g {}".format(endpoints_instance_name, self.rg)
         ).get_output_in_json()
-        assert len(list_ep_output) == 5
+        assert len(list_ep_output) == 3
 
-        endpoint_names = [eventgrid_endpoint, servicebus_endpoint, eventhub_endpoint]
+        endpoint_names = [eventgrid_endpoint, servicebus_endpoint, eventhub_endpoint_msi]
         filter_values = ["", "false", "type = Microsoft.DigitalTwins.Twin.Create"]
 
         # Test Routes
@@ -577,32 +515,6 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             "dt route list -n {} -g {}".format(endpoints_instance_name, self.rg)
         ).get_output_in_json()
         assert len(list_routes_output) == 0
-
-        for ep in endpoint_tuple_collection:
-            logger.debug("Deleting endpoint {}...".format(ep.endpoint_name))
-            is_last = ep.endpoint_name == endpoint_tuple_collection[-1].endpoint_name
-            self.cmd(
-                "dt endpoint delete -y -n {} --en {} --no-wait {}".format(
-                    endpoints_instance_name,
-                    ep.endpoint_name,
-                    "-g {}".format(self.rg) if is_last else "",
-                )
-            )
-
-        list_endpoint_output = self.cmd(
-            "dt endpoint list -n {} -g {}".format(endpoints_instance_name, self.rg)
-        ).get_output_in_json()
-        assert (
-            len(list_endpoint_output) == 0
-            or len(
-                [
-                    ep
-                    for ep in list_endpoint_output
-                    if ep["properties"]["provisioningState"].lower() != "deleting"
-                ]
-            )
-            == 0
-        )
 
     def test_dt_endpoints(self):
         self.wait_for_capacity()
