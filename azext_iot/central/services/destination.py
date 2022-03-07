@@ -7,7 +7,7 @@
 from typing import List, Union
 from knack.log import get_logger
 
-from azure.cli.core.azclierror import CLIInternalError
+from azure.cli.core.azclierror import AzureResponseError
 from azext_iot.central.models.enum import ApiVersion
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.models.v1_1_preview import (
@@ -153,7 +153,7 @@ def list_destinations(
         )
 
         if "value" not in result:
-            raise CLIInternalError("Value is not present in body: {}".format(result))
+            raise AzureResponseError("Value is not present in body: {}".format(result))
 
         destinations.extend(result.get("value", []))
 

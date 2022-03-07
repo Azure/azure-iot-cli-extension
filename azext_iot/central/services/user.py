@@ -8,7 +8,7 @@ import requests
 from typing import Union, List
 from knack.log import get_logger
 
-from azure.cli.core.azclierror import BadRequestError, CLIInternalError
+from azure.cli.core.azclierror import AzureResponseError, BadRequestError
 from azure.cli.core.util import should_disable_connection_verify
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
@@ -248,7 +248,7 @@ def get_user_list(
         )
 
         if "value" not in result:
-            raise CLIInternalError("Value is not present in body: {}".format(result))
+            raise AzureResponseError("Value is not present in body: {}".format(result))
 
         users.extend(
             [_utility.get_object(user, MODEL, api_version) for user in result["value"]]
