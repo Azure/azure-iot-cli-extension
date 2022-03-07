@@ -388,14 +388,12 @@ def add_children(
     cmd,
     app_id: str,
     device_id: str,
-    children_ids: str,
+    children_ids: List[str],
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
 ):
     from uuid import uuid4
-
-    children_ids = children_ids.split(",")
 
     if api_version != ApiVersion.v1_1_preview.value:
         raise CLIError(
@@ -417,7 +415,6 @@ def add_children(
         central_dns_suffix=central_dns_suffix,
         api_version=api_version,
     )
-    print(rel_name)
 
     if not rel_name:
         raise CLIError(
@@ -439,13 +436,11 @@ def remove_children(
     cmd,
     app_id: str,
     device_id: str,
-    children_ids: str,
+    children_ids: List[str],
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
 ):
-
-    children_ids = children_ids.split(",")
 
     provider = CentralDeviceProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version

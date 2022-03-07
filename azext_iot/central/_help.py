@@ -1407,12 +1407,12 @@ def _load_central_edge_help():
         type: command
         short-summary: Add devices as children to a target edge device.
         examples:
-        - name: Add comma-separated list of device Ids as children to the target edge device.
+        - name: Add space-separated list of device Ids as children to the target edge device.
           text: >
             az iot central device edge children add
             --app-id {appid}
             --device-id {deviceId}
-            --children-ids {child_1},{child_2}
+            --children-ids {child_1} {child_2}
     """
 
     helps[
@@ -1426,5 +1426,5 @@ def _load_central_edge_help():
             az iot central device edge children remove
             --app-id {appid}
             --device-id {deviceId}
-            --children-ids {child_1},{child_2}
+            --children-ids {child_1} {child_2}
     """

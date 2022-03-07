@@ -617,6 +617,7 @@ def load_central_arguments(self, _):
     with self.argument_context("iot central device edge children") as context:
         context.argument(
             "children_ids",
+            nargs="+",
             options_list=["--children-ids"],
-            help="Comma separated list of children device ids.",
+            help="Space-separated list of children device ids.",
         )
