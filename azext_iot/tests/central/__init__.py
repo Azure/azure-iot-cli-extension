@@ -310,9 +310,6 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
     def _delete_device_template(self, api_version, template_id):
         attempts = range(0, 10)
-        command = "iot central device-template delete --app-id {} --device-template-id {}".format(
-            self.app_id, template_id
-        )
 
         # retry logic to delete the template
         error = None
@@ -320,7 +317,9 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             try:
                 error = None
                 self.cmd(
-                    command,
+                    command="iot central device-template delete --app-id {} --device-template-id {}".format(
+                        self.app_id, template_id
+                    ),
                     api_version=api_version,
                     checks=[self.check("result", "success")],
                 )
@@ -328,9 +327,9 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             except Exception as e:
                 error = e
                 # delete associated devices if any.
-                command = "iot central device list --app-id {}".format(self.app_id)
                 devices = self.cmd(
-                    command, api_version=api_version
+                    command="iot central device list --app-id {}".format(self.app_id),
+                    api_version=api_version
                 ).get_output_in_json()
 
                 if devices:
