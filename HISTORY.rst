@@ -21,12 +21,21 @@ Release History
     - az iot central device edge module list
     - az iot central device edge module restart
     - az iot central device edge module show
+
   - az iot central device edge manifest
     - az iot central device edge manifest show
+  
   - az iot central device edge children
     - az iot central device edge children list
     - az iot central device edge children add
     - az iot central device edge children remove
+    
+* Added `--no-wait` parameter to the following functions:
+
+  - az dt create
+  - az dt endpoint create
+  - az dt private-endpoint create
+
 
 0.13.0
 +++++++++++++++

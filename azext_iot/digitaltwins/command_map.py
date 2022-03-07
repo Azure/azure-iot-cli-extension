@@ -42,7 +42,7 @@ def load_digitaltwins_commands(self, _):
         "dt",
         command_type=digitaltwins_resource_ops,
     ) as cmd_group:
-        cmd_group.command("create", "create_instance")
+        cmd_group.command("create", "create_instance", supports_no_wait=True)
         cmd_group.show_command("show", "show_instance")
         cmd_group.command("list", "list_instances")
         cmd_group.command("delete", "delete_instance", confirmation=True, supports_no_wait=True)
@@ -102,9 +102,9 @@ def load_digitaltwins_commands(self, _):
     with self.command_group(
         "dt endpoint create", command_type=digitaltwins_resource_ops
     ) as cmd_group:
-        cmd_group.command("eventgrid", "add_endpoint_eventgrid")
-        cmd_group.command("servicebus", "add_endpoint_servicebus")
-        cmd_group.command("eventhub", "add_endpoint_eventhub")
+        cmd_group.command("eventgrid", "add_endpoint_eventgrid", supports_no_wait=True)
+        cmd_group.command("servicebus", "add_endpoint_servicebus", supports_no_wait=True)
+        cmd_group.command("eventhub", "add_endpoint_eventhub", supports_no_wait=True)
 
     with self.command_group(
         "dt route", command_type=digitaltwins_route_ops
@@ -199,7 +199,7 @@ def load_digitaltwins_commands(self, _):
         "dt network private-endpoint connection",
         command_type=digitaltwins_resource_ops,
     ) as cmd_group:
-        cmd_group.command("set", "set_private_endpoint_conn")
+        cmd_group.command("set", "set_private_endpoint_conn", supports_no_wait=True)
         cmd_group.show_command("show", "show_private_endpoint_conn")
         cmd_group.command("list", "list_private_endpoint_conns")
         cmd_group.command("delete", "delete_private_endpoint_conn", confirmation=True, supports_no_wait=True)

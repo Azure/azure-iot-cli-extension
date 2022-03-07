@@ -133,7 +133,7 @@ def load_digitaltwins_arguments(self, _):
             arg_group="Managed Service Identity",
             nargs="+",
             options_list=["--scopes"],
-            help="Space-seperated scopes the system assigned identity can access.",
+            help="Space-separated scopes the system assigned identity can access. Cannot be used with --no-wait.",
         )
         context.argument(
             "role_type",
