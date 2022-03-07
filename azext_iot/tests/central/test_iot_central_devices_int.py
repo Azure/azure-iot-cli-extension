@@ -233,19 +233,15 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         # wait about a few seconds for simulator to kick in so that provisioning completes
         time.sleep(60)
 
-        if api_version == ApiVersion.v1_1_preview:
-            # check if device appears as edge
-            command = "iot central device list --app-id {} --edge-only"
-            devs_list = self.cmd(command).get_output_in_json()
-            assert device_id in [dev.id for dev in devs_list]
-        else:
-            # check twin to evaluate the iotedge flag
-            command = "iot central device twin show --app-id {} -d {}".format(
-                APP_ID, device_id
-            )
-            twin = self.cmd(command).get_output_in_json()
+        command = "iot central device list --app-id {}".format(APP_ID)
+        total_devs_list = self.cmd(command).get_output_in_json()
 
-            assert twin["capabilities"]["iotEdge"] is True
+        # check if device appears as edge
+        command = "iot central device list --app-id {} --edge-only".format(APP_ID)
+        edge_list = self.cmd(command).get_output_in_json()
+        assert device_id in [dev["id"] for dev in edge_list]
+        # check edge device appears in general list
+        assert all(x in total_devs_list for x in edge_list)
 
         # MODULES
         command = "iot central device edge module list --app-id {} -d {}".format(
@@ -254,13 +250,20 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         modules = self.cmd(command).get_output_in_json()
 
         assert len(modules) == 4  # edge runtime + custom modules
-        custom_modules = [
-            module["moduleId"]
-            for module in modules
-            if module["moduleId"] not in ["$edgeHub", "$edgeAgent"]
-        ]
-
-        assert set(custom_modules) == set(["testModule", "SimulatedTemperatureSensor"])
+        assert all(
+            (
+                cond is True
+                for cond in [
+                    a in [module["moduleId"] for module in modules]
+                    for a in [
+                        "$edgeHub",
+                        "$edgeAgent",
+                        "testModule",
+                        "SimulatedTemperatureSensor",
+                    ]
+                ]
+            )
+        )
 
     def test_central_edge_children_methods(self):
         # force API Version 1.1-preview as we want deployment manifest to be included
@@ -303,28 +306,6 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
             twin = self.cmd(command).get_output_in_json()
 
             assert twin["capabilities"]["iotEdge"] is True
-
-        # MODULES
-        command = "iot central device edge module list --app-id {} -d {}".format(
-            APP_ID, device_id
-        )
-        modules = self.cmd(command).get_output_in_json()
-
-        assert len(modules) == 4  # edge runtime + custom modules
-        assert all(
-            (
-                cond is True
-                for cond in [
-                    a in [module["moduleId"] for module in modules]
-                    for a in [
-                        "$edgeHub",
-                        "$edgeAgent",
-                        "testModule",
-                        "SimulatedTemperatureSensor",
-                    ]
-                ]
-            )
-        )
 
         # CHILDREN
         command = "iot central device edge children add --app-id {} -d {} --children-ids {}".format(

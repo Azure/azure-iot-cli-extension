@@ -932,7 +932,7 @@ def list_device_modules(
     response_data = _utility.try_extract_result(response).get("modules")
 
     if not response_data:
-        raise CLIError(f"No modules available on device {device_id}")
+        raise CLIError(f"Device '{device_id}' is not an IoT Edge device.")
     return [EdgeModule(dict_clean(module)) for module in response_data]
 
 
