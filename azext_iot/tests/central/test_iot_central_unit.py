@@ -219,7 +219,7 @@ class TestCentralDeviceProvider:
         ]
         mock_device_svc.list_devices.return_value = children
 
-        joined = "' or id eq '".join(children)
+        joined = "' or id eq '".join([child.id for child in children])
         filter = f"id eq '{joined}'"
 
         # act
