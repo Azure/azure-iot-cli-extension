@@ -5,12 +5,14 @@
 # --------------------------------------------------------------------------------------------
 # This is largely derived from https://docs.microsoft.com/en-us/rest/api/iotcentral/devicetemplates
 
-from typing import Union
 import requests
-from typing import List
-
-from knack.util import CLIError
+from typing import (
+    Union,
+    List,
+)
 from knack.log import get_logger
+
+from azure.cli.core.azclierror import AzureResponseError
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
 from azext_iot.central.models.preview import TemplatePreview
@@ -104,7 +106,7 @@ def list_device_templates(
         result = _utility.try_extract_result(response)
 
         if "value" not in result:
-            raise CLIError("Value is not present in body: {}".format(result))
+            raise AzureResponseError("Value is not present in body: {}".format(result))
 
         device_templates.extend(
             [

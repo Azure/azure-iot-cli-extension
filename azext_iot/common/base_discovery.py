@@ -5,8 +5,8 @@
 # --------------------------------------------------------------------------------------------
 
 from abc import ABC, abstractmethod
+from azure.cli.core.azclierror import ResourceNotFoundError
 from azure.core.exceptions import HttpResponseError
-from knack.util import CLIError
 from knack.log import get_logger
 from azext_iot.common.shared import AuthenticationTypeDataplane
 from typing import Any, Dict, List
@@ -150,7 +150,7 @@ class BaseDiscovery(ABC):
         subscription and return first match. This functionality will only work for
         resource types that require unique names within the subscription.
 
-        Raises CLIError if no resource is found.
+        Raises ResourceNotFoundError if no resource is found.
 
         :param resource_name: Resource Name
         :type resource_name: str
@@ -170,7 +170,7 @@ class BaseDiscovery(ABC):
                     )
                 )
             except Exception:
-                raise CLIError(
+                raise ResourceNotFoundError(
                     "Unable to find {}: {} in resource group: {}".format(
                         self.resource_type, resource_name, rg
                     )
@@ -186,7 +186,7 @@ class BaseDiscovery(ABC):
             if target:
                 return target
 
-        raise CLIError(
+        raise ResourceNotFoundError(
             "Unable to find {}: {} in current subscription {}.".format(
                 self.resource_type, resource_name, self.sub_id
             )
@@ -200,7 +200,7 @@ class BaseDiscovery(ABC):
         resource and return the first usable policy (the first policy that the IoT
         extension can use).
 
-        Raises CLIError if no usable policy is found.
+        Raises ResourceNotFoundError if no usable policy is found.
 
         :param resource_name: Resource Name
         :type resource_name: str
@@ -233,7 +233,7 @@ class BaseDiscovery(ABC):
                 )
                 return policy
 
-        raise CLIError(
+        raise ResourceNotFoundError(
             POLICY_ERROR_TEMPLATE.format(
                 self.resource_type,
                 resource_name,
@@ -268,7 +268,7 @@ class BaseDiscovery(ABC):
         resource and return the first usable policy (the first policy that the IoT
         extension can use).
 
-        Raises CLIError if no resource is found.
+        Raises ResourceNotFoundError if no resource is found.
 
         :param resource_name: Resource Name
         :type resource_name: str
@@ -347,7 +347,7 @@ class BaseDiscovery(ABC):
                             **kwargs
                         )
                     )
-                except (HttpResponseError, CLIError) as e:
+                except (HttpResponseError, ResourceNotFoundError) as e:
                     logger.warning("Could not access %s. %s", resource.name, e)
 
         return targets

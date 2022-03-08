@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 # Dev note - think of this as a controller
 
-from knack.cli import CLIError
+from azure.cli.core.azclierror import RequiredArgumentMissingError
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.providers import CentralFileUploadProvider
 from azext_iot.central.models.enum import ApiVersion
@@ -80,7 +80,7 @@ def update_fileupload(
     )
 
     if not connection_string and not container and not account and not sasTtl:
-        raise CLIError('You must specify at least one parameter to update.')
+        raise RequiredArgumentMissingError('You must specify at least one parameter to update.')
 
     return provider.update_fileupload(
         connection_string=connection_string,

@@ -5,7 +5,15 @@
 # --------------------------------------------------------------------------------------------
 
 from knack.log import get_logger
-from knack.util import CLIError
+from azure.cli.core.azclierror import (
+    ArgumentUsageError,
+    AzureResponseError,
+    BadRequestError,
+    InvalidArgumentValueError,
+    MutuallyExclusiveArgumentError,
+    RequiredArgumentMissingError,
+    ResourceNotFoundError
+)
 from azext_iot.common._azure import IOT_SERVICE_CS_TEMPLATE
 from azext_iot.common.shared import (
     SdkType,
@@ -15,9 +23,8 @@ from azext_iot.common.shared import (
     KeyType,
     IoTDPSStateType
 )
-from azext_iot.common.utility import shell_safe_json_parse
+from azext_iot.common.utility import compute_device_key, handle_service_exception, shell_safe_json_parse
 from azext_iot.common.certops import open_certificate
-from azext_iot.common.utility import compute_device_key
 from azext_iot.dps.providers.discovery import DPSDiscovery
 from azext_iot.operations.generic import _execute_query
 from azext_iot._factory import SdkResolver
@@ -72,7 +79,7 @@ def iot_dps_device_enrollment_list(
         query = [QuerySpecification(query=query_command)]
         return _execute_query(query, sdk.individual_enrollment.query, top)
     except ProvisioningServiceErrorDetailsException as e:
-        raise CLIError(e)
+        handle_service_exception(e)
 
 
 def iot_dps_device_enrollment_get(
@@ -114,7 +121,7 @@ def iot_dps_device_enrollment_get(
                 )
         return enrollment
     except ProvisioningServiceErrorDetailsException as e:
-        raise CLIError(e)
+        handle_service_exception(e)
 
 
 def iot_dps_device_enrollment_create(
@@ -156,7 +163,7 @@ def iot_dps_device_enrollment_create(
 
         if attestation_type == AttestationType.tpm.value:
             if not endorsement_key:
-                raise CLIError("Endorsement key is requried")
+                raise RequiredArgumentMissingError("Endorsement key [--endorsement-key] is required")
             attestation = AttestationMechanism(
                 type=AttestationType.tpm.value,
                 tpm=TpmAttestation(endorsement_key=endorsement_key),
@@ -203,7 +210,7 @@ def iot_dps_device_enrollment_create(
         )
         return sdk.individual_enrollment.create_or_update(enrollment_id, enrollment)
     except ProvisioningServiceErrorDetailsException as e:
-        raise CLIError(e)
+        handle_service_exception(e)
 
 
 def iot_dps_device_enrollment_update(
@@ -317,7 +324,7 @@ def iot_dps_device_enrollment_update(
             enrollment_id, enrollment_record, if_match=(etag if etag else "*")
         )
     except ProvisioningServiceErrorDetailsException as e:
-        raise CLIError(e)
+        handle_service_exception(e)
 
 
 def iot_dps_device_enrollment_delete(
@@ -342,7 +349,7 @@ def iot_dps_device_enrollment_delete(
 
         return sdk.individual_enrollment.delete(enrollment_id, if_match=(etag if etag else "*"))
     except ProvisioningServiceErrorDetailsException as e:
-        raise CLIError(e)
+        handle_service_exception(e)
 
 
 # DPS Enrollments Group
@@ -368,7 +375,7 @@ def iot_dps_device_enrollment_group_list(
         query1 = [QuerySpecification(query=query_command)]
         return _execute_query(query1, sdk.enrollment_group.query, top)
     except ProvisioningServiceErrorDetailsException as e:
-        raise CLIError(e)
+        handle_service_exception(e)
 
 
 def iot_dps_device_enrollment_group_get(
@@ -410,7 +417,7 @@ def iot_dps_device_enrollment_group_get(
                 )
         return enrollment_group
     except ProvisioningServiceErrorDetailsException as e:
-        raise CLIError(e)
+        handle_service_exception(e)
 
 
 def iot_dps_device_enrollment_group_create(
@@ -458,7 +465,7 @@ def iot_dps_device_enrollment_group_create(
                 )
         if certificate_path or secondary_certificate_path:
             if root_ca_name or secondary_root_ca_name:
-                raise CLIError(
+                raise MutuallyExclusiveArgumentError(
                     "Please provide either certificate path or certficate name"
                 )
             attestation = _get_attestation_with_x509_signing_cert(
@@ -466,7 +473,7 @@ def iot_dps_device_enrollment_group_create(
             )
         if root_ca_name or secondary_root_ca_name:
             if certificate_path or secondary_certificate_path:
-                raise CLIError(
+                raise MutuallyExclusiveArgumentError(
                     "Please provide either certificate path or certficate name"
                 )
             attestation = _get_attestation_with_x509_ca_cert(
@@ -502,7 +509,7 @@ def iot_dps_device_enrollment_group_create(
         )
         return sdk.enrollment_group.create_or_update(enrollment_id, group_enrollment)
     except ProvisioningServiceErrorDetailsException as e:
-        raise CLIError(e)
+        handle_service_exception(e)
 
 
 def iot_dps_device_enrollment_group_update(
@@ -561,25 +568,25 @@ def iot_dps_device_enrollment_group_update(
                 if not root_ca_name and not secondary_root_ca_name:
                     # Check if certificate can be safely removed while no new certificate has been provided
                     if remove_certificate and remove_secondary_certificate:
-                        raise CLIError("Please provide at least one certificate")
+                        raise RequiredArgumentMissingError("Please provide at least one certificate")
 
                     if not _can_remove_primary_certificate(
                         remove_certificate, enrollment_record.attestation
                     ):
-                        raise CLIError(
+                        raise RequiredArgumentMissingError(
                             "Please provide at least one certificate while removing the only primary certificate"
                         )
 
                     if not _can_remove_secondary_certificate(
                         remove_secondary_certificate, enrollment_record.attestation
                     ):
-                        raise CLIError(
+                        raise RequiredArgumentMissingError(
                             "Please provide at least one certificate while removing the only secondary certificate"
                         )
 
             if certificate_path or secondary_certificate_path:
                 if root_ca_name or secondary_root_ca_name:
-                    raise CLIError(
+                    raise MutuallyExclusiveArgumentError(
                         "Please provide either certificate path or certficate name"
                     )
                 enrollment_record.attestation = _get_updated_attestation_with_x509_signing_cert(
@@ -591,7 +598,7 @@ def iot_dps_device_enrollment_group_update(
                 )
             if root_ca_name or secondary_root_ca_name:
                 if certificate_path or secondary_certificate_path:
-                    raise CLIError(
+                    raise MutuallyExclusiveArgumentError(
                         "Please provide either certificate path or certficate name"
                     )
                 enrollment_record.attestation = _get_updated_attestation_with_x509_ca_cert(
@@ -632,7 +639,7 @@ def iot_dps_device_enrollment_group_update(
             enrollment_id, enrollment_record, if_match=(etag if etag else "*")
         )
     except ProvisioningServiceErrorDetailsException as e:
-        raise CLIError(e)
+        handle_service_exception(e)
 
 
 def iot_dps_device_enrollment_group_delete(
@@ -657,7 +664,7 @@ def iot_dps_device_enrollment_group_delete(
 
         return sdk.enrollment_group.delete(enrollment_id, if_match=(etag if etag else "*"))
     except ProvisioningServiceErrorDetailsException as e:
-        raise CLIError(e)
+        handle_service_exception(e)
 
 
 def iot_dps_compute_device_key(
@@ -672,7 +679,7 @@ def iot_dps_compute_device_key(
 ):
     if symmetric_key is None:
         if not all([dps_name, resource_group_name, enrollment_id]):
-            raise CLIError(
+            raise RequiredArgumentMissingError(
                 "Please provide DPS enrollment group identifiers (Device Provisioning Service name via "
                 "--dps-name, Enrollment ID via --enrollment-id, and resource group via --resource-group "
                 "or -g) or the enrollment group symmetric key via --symmetric-key or --key."
@@ -692,7 +699,7 @@ def iot_dps_compute_device_key(
                 enrollment_id, raw=True
             ).response.json()
             if attestation.get("type") != AttestationType.symmetricKey.value:
-                raise CLIError(
+                raise BadRequestError(
                     "Requested enrollment group has an attestation type of '{}'. Currently, compute-device-key "
                     "is only supported for enrollment groups with symmetric key attestation type.".format(
                         attestation.get("type")
@@ -700,7 +707,7 @@ def iot_dps_compute_device_key(
                 )
             symmetric_key = attestation["symmetricKey"]["primaryKey"]
         except ProvisioningServiceErrorDetailsException as e:
-            raise CLIError(e)
+            raise AzureResponseError(e)
 
     return compute_device_key(
         primary_key=symmetric_key, registration_id=registration_id
@@ -723,7 +730,7 @@ def iot_dps_connection_string_show(
     if dps_name is None:
         dps = discovery.get_resources(resource_group_name)
         if dps is None:
-            raise CLIError("No Device Provisioning Service found.")
+            raise ResourceNotFoundError("No Device Provisioning Service found.")
 
         def conn_str_getter(dps):
             return _get_dps_connection_string(
@@ -811,7 +818,7 @@ def iot_dps_registration_list(
             enrollment_id, raw=True
         ).response.json()
     except ProvisioningServiceErrorDetailsException as e:
-        raise CLIError(e)
+        handle_service_exception(e)
 
 
 def iot_dps_registration_get(
@@ -832,7 +839,7 @@ def iot_dps_registration_get(
             registration_id, raw=True
         ).response.json()
     except ProvisioningServiceErrorDetailsException as e:
-        raise CLIError(e)
+        handle_service_exception(e)
 
 
 def iot_dps_registration_delete(
@@ -857,7 +864,7 @@ def iot_dps_registration_delete(
 
         return sdk.device_registration_state.delete(registration_id, if_match=(etag if etag else "*"))
     except ProvisioningServiceErrorDetailsException as e:
-        raise CLIError(e)
+        handle_service_exception(e)
 
 
 def _get_twin_collection(properties):
@@ -919,7 +926,7 @@ def _get_attestation_with_x509_client_cert(
     primary_certificate_path, secondary_certificate_path
 ):
     if not primary_certificate_path and not secondary_certificate_path:
-        raise CLIError("Please provide at least one certificate path")
+        raise RequiredArgumentMissingError("Please provide at least one certificate path")
     certificate = _get_x509_certificate(
         primary_certificate_path, secondary_certificate_path
     )
@@ -1074,7 +1081,7 @@ def _get_reprovision_policy(reprovision_policy):
                 update_hub_assignment=False, migrate_device_data=False
             )
         else:
-            raise CLIError("Invalid Reprovision Policy.")
+            raise InvalidArgumentValueError("Invalid Reprovision Policy.")
     else:
         reprovision = ReprovisionPolicy(
             update_hub_assignment=True, migrate_device_data=True
@@ -1094,37 +1101,37 @@ def _validate_arguments_for_attestation_mechanism(
 ):
     if attestation_type == AttestationType.tpm.value:
         if certificate_path or secondary_certificate_path:
-            raise CLIError(
+            raise ArgumentUsageError(
                 "Cannot update certificate while enrollment is using tpm attestation mechanism"
             )
         if remove_certificate or remove_secondary_certificate:
-            raise CLIError(
+            raise ArgumentUsageError(
                 "Cannot remove certificate while enrollment is using tpm attestation mechanism"
             )
         if primary_key or secondary_key:
-            raise CLIError(
+            raise ArgumentUsageError(
                 "Cannot update primary or secondary key while enrollment is using tpm attestation mechanism"
             )
     elif attestation_type == AttestationType.x509.value:
         if endorsement_key:
-            raise CLIError(
+            raise ArgumentUsageError(
                 "Cannot update endorsement key while enrollment is using x509 attestation mechanism"
             )
         if primary_key or secondary_key:
-            raise CLIError(
+            raise ArgumentUsageError(
                 "Cannot update primary or secondary key while enrollment is using x509 attestation mechanism"
             )
     else:
         if certificate_path or secondary_certificate_path:
-            raise CLIError(
+            raise ArgumentUsageError(
                 "Cannot update certificate while enrollment is using symmetric key attestation mechanism"
             )
         if remove_certificate or remove_secondary_certificate:
-            raise CLIError(
+            raise ArgumentUsageError(
                 "Cannot remove certificate while enrollment is using symmetric key attestation mechanism"
             )
         if endorsement_key:
-            raise CLIError(
+            raise ArgumentUsageError(
                 "Cannot update endorsement key while enrollment is using symmetric key attestation mechanism"
             )
 
@@ -1134,25 +1141,25 @@ def _validate_allocation_policy_for_enrollment(
 ):
     if allocation_policy:
         if iot_hub_host_name is not None:
-            raise CLIError(
+            raise MutuallyExclusiveArgumentError(
                 "'iot_hub_host_name' is not required when allocation-policy is defined."
             )
         # Code to ensure geolatency still works after the enum fix.
         if not any(
             allocation_policy == allocation.value for allocation in AllocationType
         ):
-            raise CLIError("Please provide valid allocation policy.")
+            raise RequiredArgumentMissingError("Please provide valid allocation policy.")
         if allocation_policy == AllocationType.static.value:
             if iot_hub_list is None:
-                raise CLIError("Please provide a hub to be assigned with device.")
+                raise RequiredArgumentMissingError("Please provide a hub to be assigned with device.")
             if iot_hub_list and len(iot_hub_list) > 1:
-                raise CLIError("Only one hub is required in static allocation policy.")
+                raise InvalidArgumentValueError("Only one hub is required in static allocation policy.")
         if allocation_policy == AllocationType.custom.value:
             if webhook_url is None or api_version is None:
-                raise CLIError(
+                raise RequiredArgumentMissingError(
                     "Please provide both the Azure function webhook url and provisioning"
                     " service api-version when the allocation-policy is defined as Custom."
                 )
     else:
         if iot_hub_list:
-            raise CLIError("Please provide allocation policy.")
+            raise RequiredArgumentMissingError("Please provide allocation policy.")

@@ -5,9 +5,13 @@
 # --------------------------------------------------------------------------------------------
 
 from time import sleep
+from azure.cli.core.azclierror import (
+    CLIInternalError,
+    RequiredArgumentMissingError,
+    ClientRequestError,
+)
 from azext_iot.product.shared import TaskType, DeviceTestTaskStatus as Status
 from azext_iot.product.providers.aics import AICSProvider
-from knack.util import CLIError
 
 
 def create(
@@ -23,13 +27,13 @@ def create(
         test_id=test_id, task_type=task_type, wait=wait, poll_interval=poll_interval
     )
     if not response:
-        raise CLIError(
+        raise ClientRequestError(
             "Failed to create device test task - please ensure a device test exists with Id {}".format(
                 test_id
             )
         )
     if isinstance(response, dict):
-        raise CLIError(response)
+        raise CLIInternalError(response)
 
     status = response.status
     task_id = response.id
@@ -64,6 +68,6 @@ def show(cmd, test_id, task_id=None, running=False, base_url=None):
         return ap.show_test_task(test_id=test_id, task_id=task_id)
     elif running:
         return ap.show_running_test_task(test_id=test_id)
-    raise CLIError(
+    raise RequiredArgumentMissingError(
         "Please provide a task-id for individual task details, or use the --running argument to list all running tasks"
     )

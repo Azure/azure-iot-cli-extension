@@ -5,8 +5,8 @@
 # --------------------------------------------------------------------------------------------
 
 
-from knack.util import CLIError
 from knack.log import get_logger
+from azure.cli.core.azclierror import ResourceNotFoundError
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.v1_1_preview import FileUploadV1_1_preview
@@ -49,7 +49,7 @@ class CentralFileUploadProvider:
             )
 
             if not fileupload:
-                raise CLIError("No file upload account found")
+                raise ResourceNotFoundError("No file upload account found")
 
             self._fileupload = fileupload
 

@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from knack.util import CLIError
+from azure.cli.core.azclierror import InvalidArgumentValueError
 from azext_iot.assets.user_messages import error_param_top_out_of_bounds
 
 
@@ -42,5 +42,5 @@ def _process_top(top, upper_limit=None):
     if top == -1 and not upper_limit:
         return None
     if top <= 0 or (upper_limit and top > upper_limit):
-        raise CLIError(error_param_top_out_of_bounds(upper_limit))
+        raise InvalidArgumentValueError(error_param_top_out_of_bounds(upper_limit))
     return int(top)
