@@ -264,6 +264,10 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
                 ]
             )
         )
+        self._delete_device(device_id=device_id, api_version=self._api_version)
+        self._delete_device_template(
+            template_id=template_id, api_version=self._api_version
+        )
 
     def test_central_edge_children_methods(self):
         # force API Version 1.1-preview as we want deployment manifest to be included
@@ -316,11 +320,22 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         command = "iot central device edge children list --app-id {} -d {}".format(
             APP_ID, device_id
         )
+        # Use api-version 1.0 to also test interoperability
         children = self.cmd(
-            command, api_version=ApiVersion.v1_1_preview.value
+            command, api_version=ApiVersion.v1.value
         ).get_output_in_json()
         assert len(children) == 1
         assert children[0]["id"] == child_id
+
+        # cleanup
+        self._delete_device(device_id=child_id, api_version=self._api_version)
+        self._delete_device(device_id=device_id, api_version=self._api_version)
+        self._delete_device_template(
+            template_id=template_id, api_version=self._api_version
+        )
+        self._delete_device_template(
+            template_id=child_template_id, api_version=self._api_version
+        )
 
     def test_central_device_template_methods_CRUD(self):
         # currently: create, show, list, delete

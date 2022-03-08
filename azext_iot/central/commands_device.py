@@ -294,29 +294,6 @@ def get_command_history(
     )
 
 
-# def list_edge_devices(
-#     cmd,
-#     app_id: str,
-#     token=None,
-#     central_dns_suffix=CENTRAL_ENDPOINT,
-#     api_version=ApiVersion.v1.value,
-# ) -> List[DeviceType]:
-#     edge_devices = []
-#     provider = CentralDeviceProvider(
-#         cmd=cmd, app_id=app_id, token=token, api_version=api_version
-#     )
-#     devices = provider.list_devices(central_dns_suffix=central_dns_suffix)
-#     for device in devices:
-#         if device.provisioned:
-#             twin = provider.get_device_twin(
-#                 device.id, central_dns_suffix=central_dns_suffix
-#             )
-#             if twin.device_twin["capabilities"]["iotEdge"]:
-#                 edge_devices.append(device)
-
-#     return edge_devices
-
-
 def list_children(
     cmd,
     app_id: str,

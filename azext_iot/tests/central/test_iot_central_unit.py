@@ -219,17 +219,14 @@ class TestCentralDeviceProvider:
         ]
         mock_device_svc.list_devices.return_value = children
 
-        for idx, child in enumerate(children):
-            if idx == 0:
-                filter = f"id eq '{child.id}'"
-            else:
-                filter += f" or id eq '{child.id}'"
+        joined = "' or id eq '".join(children)
+        filter = f"id eq '{joined}'"
 
         # act
-        childre_devices = [todict(dev) for dev in provider.list_devices(filter=filter)]
+        children_devices = [todict(dev) for dev in provider.list_devices(filter=filter)]
         # verify
         assert mock_device_svc.list_devices.call_count == 1
-        assert childre_devices == self._edge_children
+        assert children_devices == self._edge_children
 
     @mock.patch("azext_iot.central.services.device.requests")
     @mock.patch("azext_iot.central.services.device.get_aad_token")
