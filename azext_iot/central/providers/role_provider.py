@@ -6,8 +6,8 @@
 
 
 from typing import List, Union
-from knack.util import CLIError
 from knack.log import get_logger
+from azure.cli.core.azclierror import ResourceNotFoundError
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.v1 import RoleV1
@@ -72,6 +72,6 @@ class CentralRoleProvider:
             self._roles[role_id] = role
 
         if not role:
-            raise CLIError("No role found with id: '{}'.".format(role_id))
+            raise ResourceNotFoundError("No role found with id: '{}'.".format(role_id))
 
         return role

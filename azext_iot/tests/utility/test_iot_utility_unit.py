@@ -13,6 +13,7 @@ from unittest import mock
 from knack.util import CLIError
 from azure.cli.core.extension import get_extension_path
 from azext_iot.common.utility import (
+    handle_service_exception,
     validate_min_python_version,
     process_json_arg,
     read_file_content,
@@ -421,3 +422,39 @@ class TestCliInit(object):
         original_sys_path.insert(0, ext_path)
         assert set(original_sys_path) == set(modified_sys_path)
         assert modified_sys_path[0] == ext_path
+
+
+class TestHandleServiceException(object):
+    from azure.cli.core.azclierror import (
+        AzureInternalError,
+        AzureResponseError,
+        BadRequestError,
+        ForbiddenError,
+        ResourceNotFoundError,
+        UnauthorizedError,
+    )
+
+    @pytest.mark.parametrize(
+        "status_code, expected_error",
+        [
+            (400, BadRequestError),
+            (401, UnauthorizedError),
+            (402, AzureResponseError),
+            (403, ForbiddenError),
+            (404, ResourceNotFoundError),
+            (409, AzureResponseError),
+            (500, AzureInternalError),
+            (501, AzureInternalError),
+            (502, AzureInternalError),
+            (503, AzureInternalError),
+            (504, AzureInternalError),
+            (None, AzureResponseError)
+        ],
+    )
+    def test_handle_service_exception(self, mocker, status_code, expected_error):
+        error = mocker.MagicMock(name="mock error")
+        error.response = mocker.MagicMock(name="mock response")
+        error.response.status_code = status_code
+
+        with pytest.raises(expected_error):
+            handle_service_exception(error)

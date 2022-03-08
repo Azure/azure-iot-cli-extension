@@ -4,12 +4,16 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import os
+from knack.log import get_logger
+from azure.cli.core.azclierror import (
+    ArgumentUsageError,
+    FileOperationError,
+    RequiredArgumentMissingError,
+)
 from azext_iot.product.providers.aics import AICSProvider
 from azext_iot.sdk.product.models import DeviceTestSearchOptions
 from azext_iot.product.shared import BadgeType, AttestationType, ValidationType
-from knack.log import get_logger
-from knack.util import CLIError
-import os
 
 logger = get_logger(__name__)
 
@@ -30,25 +34,25 @@ def create(
     base_url=None,
 ):
     if attestation_type == AttestationType.x509.value and not certificate_path:
-        raise CLIError("If attestation type is x509, certificate path is required")
+        raise RequiredArgumentMissingError("If attestation type is x509, certificate path is required")
     if attestation_type == AttestationType.tpm.value and not endorsement_key:
-        raise CLIError("If attestation type is TPM, endorsement key is required")
+        raise RequiredArgumentMissingError("If attestation type is TPM, endorsement key is required")
     if badge_type == BadgeType.Pnp.value and not models:
-        raise CLIError("If badge type is Pnp, models is required")
+        raise RequiredArgumentMissingError("If badge type is Pnp, models is required")
     if badge_type == BadgeType.IotEdgeCompatible.value and not all(
         [connection_string, attestation_type == AttestationType.connectionString.value]
     ):
-        raise CLIError(
+        raise RequiredArgumentMissingError(
             "Connection string is required for Edge Compatible modules testing"
         )
     if badge_type != BadgeType.IotEdgeCompatible.value and (
         connection_string or attestation_type == AttestationType.connectionString.value
     ):
-        raise CLIError(
+        raise ArgumentUsageError(
             "Connection string is only available for Edge Compatible modules testing"
         )
     if validation_type != ValidationType.test.value and not product_id:
-        raise CLIError(
+        raise RequiredArgumentMissingError(
             "Product Id is required for validation type {}".format(validation_type)
         )
     if not any(
@@ -57,7 +61,7 @@ def create(
             all([device_type, attestation_type, badge_type]),
         ]
     ):
-        raise CLIError(
+        raise RequiredArgumentMissingError(
             "If configuration file is not specified, attestation and device definition parameters must be specified"
         )
     test_configuration = (
@@ -106,21 +110,21 @@ def update(
     provisioning = False
     # verify required parameters for various options
     if attestation_type == AttestationType.x509.value and not certificate_path:
-        raise CLIError("If attestation type is x509, certificate path is required")
+        raise RequiredArgumentMissingError("If attestation type is x509, certificate path is required")
     if attestation_type == AttestationType.tpm.value and not endorsement_key:
-        raise CLIError("If attestation type is tpm, endorsement key is required")
+        raise RequiredArgumentMissingError("If attestation type is tpm, endorsement key is required")
     if badge_type == BadgeType.Pnp.value and not models:
-        raise CLIError("If badge type is Pnp, models is required")
+        raise RequiredArgumentMissingError("If badge type is Pnp, models is required")
     if badge_type == BadgeType.IotEdgeCompatible.value and not all(
         [connection_string, attestation_type == AttestationType.connectionString.value]
     ):
-        raise CLIError(
+        raise RequiredArgumentMissingError(
             "Connection string is required for Edge Compatible modules testing"
         )
     if badge_type != BadgeType.IotEdgeCompatible.value and (
         connection_string or attestation_type == AttestationType.connectionString.value
     ):
-        raise CLIError(
+        raise ArgumentUsageError(
             "Connection string is only available for Edge Compatible modules testing"
         )
     ap = AICSProvider(cmd, base_url)
@@ -133,7 +137,7 @@ def update(
         )
 
     if not any([attestation_type, badge_type, models]):
-        raise CLIError(
+        raise RequiredArgumentMissingError(
             "Configuration file, attestation information, or device configuration must be specified"
         )
 
@@ -196,7 +200,7 @@ def search(
     cmd, product_id=None, registration_id=None, certificate_name=None, base_url=None
 ):
     if not any([product_id or registration_id or certificate_name]):
-        raise CLIError("At least one search criteria must be specified")
+        raise RequiredArgumentMissingError("At least one search criteria must be specified")
 
     ap = AICSProvider(cmd, base_url)
     searchOptions = DeviceTestSearchOptions(
@@ -284,7 +288,7 @@ def _read_certificate_from_file(certificate_path):
 
 def _create_from_file(configuration_file):
     if not (os.path.exists(configuration_file)):
-        raise CLIError("Specified configuration file does not exist")
+        raise FileOperationError("Specified configuration file does not exist")
 
     # read the json file and POST /deviceTests
     with open(file=configuration_file, encoding="utf-8") as f:

@@ -5,8 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from typing import List, Union
-
-from knack.util import CLIError
+from azure.cli.core.azclierror import AzureResponseError, ClientRequestError, ResourceNotFoundError
 from knack.log import get_logger
 
 from azext_iot.central.providers.central_provider import CentralProvider
@@ -57,7 +56,7 @@ class CentralDestinationProvider(CentralProvider):
         AdxDestinationV1_1_preview,
     ]:
         if destination_id in self._destinations:
-            raise CLIError("Destination already exists")
+            raise ClientRequestError("Destination already exists")
 
         destination = central_services.destination.add_destination(
             self._cmd,
@@ -70,7 +69,7 @@ class CentralDestinationProvider(CentralProvider):
         )
 
         if not destination:
-            raise CLIError(
+            raise AzureResponseError(
                 "Failed to create destination with id: '{}'.".format(destination_id)
             )
 
@@ -97,8 +96,8 @@ class CentralDestinationProvider(CentralProvider):
         )
 
         if not destination:
-            raise CLIError(
-                "Failed to create destination with id: '{}'.".format(destination_id)
+            raise AzureResponseError(
+                "Failed to update destination with id: '{}'.".format(destination_id)
             )
 
         # add to cache
@@ -126,7 +125,7 @@ class CentralDestinationProvider(CentralProvider):
             )
 
         if not destination:
-            raise CLIError("No destination found with id: '{}'.".format(destination_id))
+            raise ResourceNotFoundError("No destination found with id: '{}'.".format(destination_id))
         else:
             self._destinations[destination_id] = destination
 

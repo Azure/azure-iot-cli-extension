@@ -4,11 +4,12 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from azure.cli.core.util import should_disable_connection_verify
-from knack.util import CLIError
 import requests
 from typing import Union, List
 from knack.log import get_logger
+
+from azure.cli.core.azclierror import AzureResponseError, BadRequestError
+from azure.cli.core.util import should_disable_connection_verify
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
 from azext_iot.central.models.enum import (
@@ -76,7 +77,7 @@ def create_roles(roles: str, api_version: str):
         if match and len(match.groups()) == 2:
             # role is an org role
             if api_version != ApiVersion.v1_1_preview.value:
-                raise CLIError(
+                raise BadRequestError(
                     f"Api Version {ApiVersion[api_version].value} does not support organizations."
                     " Please use version >= 1.1-preview."
                 )
@@ -247,7 +248,7 @@ def get_user_list(
         )
 
         if "value" not in result:
-            raise CLIError("Value is not present in body: {}".format(result))
+            raise AzureResponseError("Value is not present in body: {}".format(result))
 
         users.extend(
             [_utility.get_object(user, MODEL, api_version) for user in result["value"]]
