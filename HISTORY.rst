@@ -7,6 +7,10 @@ Release History
 0.14.0
 +++++++++++++++
 
+**General updates**
+
+* The generic `CLIError`'s raised across the extension have been changed to more specific semantically correct exceptions aligning with CLI core. 
+
 **Digital Twin updates**
 
 * Added optional `--telemetry-source-time` parameter to `az dt twin telemetry send` to allow users to
