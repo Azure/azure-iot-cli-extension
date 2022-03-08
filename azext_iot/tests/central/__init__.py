@@ -103,6 +103,8 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 include_opt_args=False
             )
             self.app_primary_key = None
+            self._scope_id = None
+
         # Get Central App rg if needed (for storage account creation)
         elif not APP_RG:
             self.app_rg = self.cmd(
