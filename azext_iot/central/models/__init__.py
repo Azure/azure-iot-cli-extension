@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from knack.util import CLIError
+from azure.cli.core.azclierror import CLIInternalError
 from abc import abstractmethod, ABCMeta
 
 
@@ -22,7 +22,7 @@ class BaseTemplate(metaclass=ABCMeta):
                 )
 
         except Exception:
-            raise CLIError("Could not parse iot central device template.")
+            raise CLIInternalError("Could not parse iot central device template.")
 
     def _get_schema_name(self, schema) -> str:
         return "name" if "name" in schema else "@id"
@@ -82,7 +82,7 @@ class BaseTemplate(metaclass=ABCMeta):
                     self.id
                 )
             )
-            raise CLIError(details)
+            raise CLIInternalError(details)
 
     @abstractmethod
     def get_id_key(self):

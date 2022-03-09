@@ -11,9 +11,9 @@ from azext_iot.central.common import EDGE_ONLY
 from azext_iot.central.models.edge import EdgeModule
 from azext_iot.common.auth import get_aad_token
 
-from knack.util import CLIError
 from knack.log import get_logger
 
+from azure.cli.core.azclierror import AzureResponseError
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
 from azext_iot.central.models.devicetwin import DeviceTwin
@@ -128,7 +128,7 @@ def list_devices(
         result = _utility.try_extract_result(response)
 
         if "value" not in result:
-            raise CLIError("Value is not present in body: {}".format(result))
+            raise AzureResponseError("Value is not present in body: {}".format(result))
 
         devices.extend(
             [
@@ -182,7 +182,7 @@ def get_device_registration_summary(
         result = _utility.try_extract_result(response)
 
         if "value" not in result:
-            raise CLIError("Value is not present in body: {}".format(result))
+            raise AzureResponseError("Value is not present in body: {}".format(result))
 
         for device in result["value"]:
             registration_summary[

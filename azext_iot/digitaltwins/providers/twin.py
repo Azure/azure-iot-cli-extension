@@ -5,14 +5,14 @@
 # --------------------------------------------------------------------------------------------
 
 import json
+from azure.cli.core.azclierror import InvalidArgumentValueError
 from azext_iot.digitaltwins.providers.base import (
     DigitalTwinsProvider,
     ErrorResponseException,
 )
 from azext_iot.digitaltwins.providers.model import ModelProvider
-from azext_iot.common.utility import process_json_arg, unpack_msrest_error
+from azext_iot.common.utility import handle_service_exception, process_json_arg
 from knack.log import get_logger
-from knack.util import CLIError
 
 logger = get_logger(__name__)
 
@@ -48,7 +48,7 @@ class TwinProvider(DigitalTwinsProvider):
                 query=query,
             )
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
         query_result = {}
         query_result["result"] = accumulated_result
@@ -75,13 +75,13 @@ class TwinProvider(DigitalTwinsProvider):
             options = TwinOptions(if_none_match=("*" if if_none_match else None))
             return self.twins_sdk.add(id=twin_id, twin=twin_request, digital_twins_add_options=options)
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     def get(self, twin_id):
         try:
             return self.twins_sdk.get_by_id(id=twin_id, raw=True).response.json()
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     def update(self, twin_id, json_patch, etag=None):
         json_patch = process_json_arg(content=json_patch, argument_name="json-patch")
@@ -92,7 +92,9 @@ class TwinProvider(DigitalTwinsProvider):
         elif isinstance(json_patch, list):
             json_patch_collection.extend(json_patch)
         else:
-            raise CLIError(f"--json-patch content must be an object or array. Actual type was: {type(json_patch).__name__}")
+            raise InvalidArgumentValueError(
+                f"--json-patch content must be an object or array. Actual type was: {type(json_patch).__name__}"
+            )
 
         logger.info("Patch payload %s", json.dumps(json_patch_collection))
 
@@ -103,14 +105,14 @@ class TwinProvider(DigitalTwinsProvider):
             )
             return self.get(twin_id=twin_id)
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     def delete(self, twin_id, etag=None):
         try:
             options = TwinOptions(if_match=(etag if etag else "*"))
             self.twins_sdk.delete(id=twin_id, digital_twins_delete_options=options, raw=True)
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     def delete_all(self, only_relationships=False):
         # need to get all twins
@@ -126,7 +128,7 @@ class TwinProvider(DigitalTwinsProvider):
                 )
                 if not only_relationships:
                     self.delete(twin_id=twin["$dtId"])
-            except CLIError as e:
+            except Exception as e:
                 logger.warning(f"Could not delete twin {twin['$dtId']}. The error is {e}")
 
     def add_relationship(
@@ -160,7 +162,7 @@ class TwinProvider(DigitalTwinsProvider):
                 raw=True,
             ).response.json()
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     def get_relationship(self, twin_id, relationship_id):
         try:
@@ -168,7 +170,7 @@ class TwinProvider(DigitalTwinsProvider):
                 id=twin_id, relationship_id=relationship_id, raw=True
             ).response.json()
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     def list_relationships(
         self, twin_id, incoming_relationships=False, relationship=None
@@ -187,7 +189,7 @@ class TwinProvider(DigitalTwinsProvider):
         except StopIteration:
             pass
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
         if relationship:
             incoming_result = [
@@ -207,7 +209,9 @@ class TwinProvider(DigitalTwinsProvider):
         elif isinstance(json_patch, list):
             json_patch_collection.extend(json_patch)
         else:
-            raise CLIError(f"--json-patch content must be an object or array. Actual type was: {type(json_patch).__name__}")
+            raise InvalidArgumentValueError(
+                f"--json-patch content must be an object or array. Actual type was: {type(json_patch).__name__}"
+            )
 
         logger.info("Patch payload %s", json.dumps(json_patch_collection))
 
@@ -223,7 +227,7 @@ class TwinProvider(DigitalTwinsProvider):
                 twin_id=twin_id, relationship_id=relationship_id
             )
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     def delete_relationship(self, twin_id, relationship_id, etag=None):
         try:
@@ -232,7 +236,7 @@ class TwinProvider(DigitalTwinsProvider):
                 id=twin_id, relationship_id=relationship_id, digital_twins_delete_relationship_options=options
             )
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     def delete_all_relationship(self, twin_id):
         relationships = self.list_relationships(twin_id, incoming_relationships=True)
@@ -259,7 +263,7 @@ class TwinProvider(DigitalTwinsProvider):
                         twin_id=relationship.source_id,
                         relationship_id=relationship.relationship_id
                     )
-            except CLIError as e:
+            except Exception as e:
                 logger.warning(f"Could not delete relationship {relationship}. The error is {e}.")
 
     def get_component(self, twin_id, component_path):
@@ -268,7 +272,7 @@ class TwinProvider(DigitalTwinsProvider):
                 id=twin_id, component_path=component_path, raw=True
             ).response.json()
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     def update_component(self, twin_id, component_path, json_patch, etag=None):
         json_patch = process_json_arg(content=json_patch, argument_name="json-patch")
@@ -279,7 +283,9 @@ class TwinProvider(DigitalTwinsProvider):
         elif isinstance(json_patch, list):
             json_patch_collection.extend(json_patch)
         else:
-            raise CLIError(f"--json-patch content must be an object or array. Actual type was: {type(json_patch).__name__}")
+            raise InvalidArgumentValueError(
+                f"--json-patch content must be an object or array. Actual type was: {type(json_patch).__name__}"
+            )
 
         logger.info("Patch payload %s", json.dumps(json_patch_collection))
 
@@ -293,7 +299,7 @@ class TwinProvider(DigitalTwinsProvider):
             )
             return self.get_component(twin_id=twin_id, component_path=component_path)
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     def send_telemetry(
         self, twin_id, telemetry=None, dt_id=None, component_path=None, telemetry_source_time=None
@@ -336,4 +342,4 @@ class TwinProvider(DigitalTwinsProvider):
                 telemetry_source_time=telemetry_source_time
             )
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)

@@ -5,9 +5,10 @@
 # --------------------------------------------------------------------------------------------
 
 import json
+
+from azure.cli.core.azclierror import BadRequestError, CLIInternalError, ManualInterrupt
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.sdk.digitaltwins.controlplane.models import AzureDataExplorerConnectionProperties
-from knack.util import CLIError
 from knack.log import get_logger
 from knack.prompting import prompt_y_n
 from azext_iot.digitaltwins.common import (
@@ -48,7 +49,7 @@ class AdxConnectionValidator(object):
         self.yes = yes
         self.dt = dt_instance
         if self.dt.identity is None:
-            raise CLIError(DT_IDENTITY_ERROR)
+            raise BadRequestError(DT_IDENTITY_ERROR)
 
         # Populate adx_cluster_uri, adx_location, adx_resource_id and perform checks
         self.validate_adx(
@@ -97,7 +98,7 @@ class AdxConnectionValidator(object):
             subscription=eh_subscription,
         )
         if not eh_consumer_group_op.success():
-            raise CLIError("{} retrieve Event Hub Consumer Group.".format(ERROR_PREFIX))
+            raise CLIInternalError("{} retrieve Event Hub Consumer Group.".format(ERROR_PREFIX))
 
         self.eh_namespace_resource_id = (
             "/subscriptions/{}/resourceGroups/{}/providers/Microsoft.EventHub/namespaces/{}".format(
@@ -136,7 +137,7 @@ class AdxConnectionValidator(object):
             )
         )
         if not adx_cluster_op.success():
-            raise CLIError("{} retrieve Cluster.".format(ERROR_PREFIX))
+            raise CLIInternalError("{} retrieve Cluster.".format(ERROR_PREFIX))
 
         adx_cluster_meta = adx_cluster_op.as_json()
         self.adx_cluster_uri = adx_cluster_meta["properties"]["uri"]
@@ -150,7 +151,7 @@ class AdxConnectionValidator(object):
             )
         )
         if not adx_database_op.success():
-            raise CLIError("{} retrieve Database.".format(ERROR_PREFIX))
+            raise CLIInternalError("{} retrieve Database.".format(ERROR_PREFIX))
 
         logger.debug(FINISHED_CHECK_RESOURCE_LOG_MSG.format("Azure Data Explorer"))
 
@@ -179,7 +180,7 @@ class AdxConnectionValidator(object):
         if not role_op.success():
             print(FAIL_RBAC_MSG.format(role_str, role_command))
             if not prompt_y_n(msg=CONT_INPUT_MSG, default="n"):
-                raise CLIError(ABORT_MSG)
+                raise ManualInterrupt(ABORT_MSG)
 
         logger.debug(FINISHED_ADD_ROLE_LOG_MSG.format(role_str))
 
@@ -208,7 +209,7 @@ class AdxConnectionValidator(object):
         if not database_admin_op.success():
             print(FAIL_GENERIC_MSG.format(role_str))
             if not prompt_y_n(msg=CONT_INPUT_MSG, default="n"):
-                raise CLIError(ABORT_MSG)
+                raise ManualInterrupt(ABORT_MSG)
             return
 
         logger.debug(FINISHED_ADD_ROLE_LOG_MSG.format(role_str))

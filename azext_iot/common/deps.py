@@ -6,7 +6,8 @@
 
 import sys
 from os import linesep
-from knack.util import CLIError
+
+from azure.cli.core.azclierror import CLIInternalError
 from azext_iot.constants import EVENT_LIB, VERSION
 from azext_iot.common.utility import test_import_and_version
 from azext_iot.common.pip import install
@@ -30,4 +31,4 @@ def ensure_uamqp(config, yes=False, repair=False):
                 print('Update complete. Executing command...')
             except RuntimeError as e:
                 print('Failure updating {}. Aborting...'.format(EVENT_LIB[0]))
-                raise CLIError(e)
+                raise CLIInternalError(e)

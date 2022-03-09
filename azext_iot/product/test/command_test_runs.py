@@ -5,9 +5,9 @@
 # --------------------------------------------------------------------------------------------
 
 from time import sleep
+from azure.cli.core.azclierror import ResourceNotFoundError
 from azext_iot.product.providers.aics import AICSProvider
 from azext_iot.product.shared import DeviceTestTaskStatus as Status
-from knack.util import CLIError
 
 
 def show(cmd, test_id, run_id=None, wait=False, poll_interval=3, base_url=None):
@@ -26,7 +26,7 @@ def show(cmd, test_id, run_id=None, wait=False, poll_interval=3, base_url=None):
         error = "No test run found for test ID '{}'".format(test_id)
         if run_id:
             error = error + " with run ID '{}'".format(run_id)
-        raise CLIError(error)
+        raise ResourceNotFoundError(error)
     status = response.status
     run_id = response.id
     while all([wait, status, run_id]) and status not in final_statuses:

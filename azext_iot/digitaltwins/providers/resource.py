@@ -3,6 +3,12 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
+from azure.cli.core.azclierror import (
+    ArgumentUsageError,
+    InvalidArgumentValueError,
+    RequiredArgumentMissingError,
+    ResourceNotFoundError,
+)
 from azext_iot.digitaltwins.common import (
     MAX_ADT_DH_CREATE_RETRIES,
     ADTEndpointAuthType,
@@ -19,8 +25,9 @@ from azext_iot.digitaltwins.providers.rbac import RbacProvider
 from azext_iot.sdk.digitaltwins.controlplane.models import (
     DigitalTwinsDescription,
 )
-from azext_iot.common.utility import unpack_msrest_error
-from knack.util import CLIError
+from azext_iot.common.utility import (
+    handle_service_exception
+)
 from knack.log import get_logger
 
 logger = get_logger(__name__)
@@ -57,7 +64,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
         try:
             if assign_identity:
                 if scopes and not role_type:
-                    raise CLIError(
+                    raise RequiredArgumentMissingError(
                         "Both --scopes and --role values are required when assigning the instance identity."
                     )
 
@@ -112,13 +119,13 @@ class ResourceProvider(DigitalTwinsResourceManager):
         except CloudError as e:
             raise e
         except ErrorResponseException as err:
-            raise CLIError(unpack_msrest_error(err))
+            handle_service_exception(err)
 
     def list(self):
         try:
             return self.mgmt_sdk.digital_twins.list()
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     def list_by_resouce_group(self, resource_group_name):
         try:
@@ -126,7 +133,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
                 resource_group_name=resource_group_name
             )
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     def get(self, name, resource_group_name, wait=False):
         try:
@@ -134,10 +141,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
                 resource_name=name, resource_group_name=resource_group_name
             )
         except ErrorResponseException as e:
-            if wait:
-                e.status_code = e.response.status_code
-                raise e
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     def find_instance(self, name, resource_group_name=None, wait=False):
         if resource_group_name:
@@ -162,12 +166,12 @@ class ResourceProvider(DigitalTwinsResourceManager):
 
         if filter_result:
             if len(filter_result) > 1:
-                raise CLIError(
+                raise ArgumentUsageError(
                     "Ambiguous DT instance name. Please include the DT instance resource group."
                 )
             return filter_result[0]
 
-        raise CLIError(
+        raise ResourceNotFoundError(
             "DT instance: '{}' not found by auto-discovery. "
             "Provide resource group via -g for direct lookup.".format(name)
         )
@@ -191,7 +195,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
                 resource_group_name=resource_group_name,
             )
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     # RBAC
 
@@ -245,7 +249,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
             if wait:
                 e.status_code = e.response.status_code
                 raise e
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     def list_endpoints(self, name, resource_group_name=None):
         target_instance = self.find_instance(
@@ -260,7 +264,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
                 resource_group_name=resource_group_name,
             )
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     # TODO: Polling issue related to mismatched status codes.
     def delete_endpoint(self, name, endpoint_name, resource_group_name=None):
@@ -277,7 +281,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
                 resource_group_name=resource_group_name,
             )
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     def add_endpoint(
         self,
@@ -303,7 +307,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
         ]
         if endpoint_resource_type in requires_namespace:
             if not endpoint_resource_namespace:
-                raise CLIError(
+                raise RequiredArgumentMissingError(
                     "Endpoint resources of type {} require a namespace.".format(
                         " or ".join(map(str, requires_namespace))
                     )
@@ -313,19 +317,19 @@ class ResourceProvider(DigitalTwinsResourceManager):
                 auth_type == ADTEndpointAuthType.keybased.value
                 and not endpoint_resource_policy
             ):
-                raise CLIError(
+                raise RequiredArgumentMissingError(
                     "Endpoint resources of type {} require a policy name when using Key based integration.".format(
                         " or ".join(map(str, requires_namespace))
                     )
                 )
 
         if dead_letter_uri and auth_type == ADTEndpointAuthType.keybased.value:
-            raise CLIError(
+            raise RequiredArgumentMissingError(
                 "Use --deadletter-sas-uri to support deadletter for a Key based endpoint."
             )
 
         if dead_letter_secret and auth_type == ADTEndpointAuthType.identitybased.value:
-            raise CLIError(
+            raise RequiredArgumentMissingError(
                 "Use --deadletter-uri to support deadletter for an Identity based endpoint."
             )
 
@@ -358,7 +362,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
                 long_running_operation_timeout=timeout,
             )
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     def get_private_link(self, name, link_name, resource_group_name=None):
         target_instance = self.find_instance(
@@ -375,7 +379,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
                 raw=True,
             ).response.json()
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     def list_private_links(self, name, resource_group_name=None):
         target_instance = self.find_instance(
@@ -391,7 +395,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
             ).response.json()
             return link_collection.get("value", [])
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     def set_private_endpoint_conn(
         self,
@@ -425,7 +429,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
             )
 
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     def get_private_endpoint_conn(
         self,
@@ -450,7 +454,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
             if wait:
                 e.status_code = e.response.status_code
                 raise e
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     def list_private_endpoint_conns(self, name, resource_group_name=None):
         target_instance = self.find_instance(
@@ -466,7 +470,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
             ).response.json()
             return endpoint_collection.get("value", [])
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     def delete_private_endpoint_conn(self, name, conn_name, resource_group_name=None):
         target_instance = self.find_instance(
@@ -482,7 +486,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
                 private_endpoint_connection_name=conn_name
             )
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     def create_adx_data_connection(
         self,
@@ -509,7 +513,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
         subscription = target_instance.id.split("/")[2]
 
         if len(conn_name) <= 2:
-            raise CLIError(
+            raise InvalidArgumentValueError(
                 "The connection name must have a length greater than 2"
             )
 
@@ -553,7 +557,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
             create_or_update.add_done_callback(check_state)
             return create_or_update
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     def get_data_connection(self, name, conn_name, resource_group_name=None, wait=False):
         target_instance = self.find_instance(
@@ -572,7 +576,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
             if wait:
                 e.status_code = e.response.status_code
                 raise e
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     def list_data_connection(self, name, resource_group_name=None):
         target_instance = self.find_instance(
@@ -587,7 +591,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
                 resource_name=name,
             )
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     def delete_data_connection(self, name, conn_name, resource_group_name=None):
         target_instance = self.find_instance(
@@ -603,4 +607,4 @@ class ResourceProvider(DigitalTwinsResourceManager):
                 time_series_database_connection_name=conn_name,
             )
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)

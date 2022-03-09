@@ -8,9 +8,9 @@
 from typing import List, Union
 import requests
 
-from knack.util import CLIError
 from knack.log import get_logger
 
+from azure.cli.core.azclierror import AzureResponseError
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
 from azext_iot.central.models.v1 import RoleV1
@@ -107,7 +107,7 @@ def list_roles(
         result = _utility.try_extract_result(response)
 
         if "value" not in result:
-            raise CLIError("Value is not present in body: {}".format(result))
+            raise AzureResponseError("Value is not present in body: {}".format(result))
 
         roles.extend(
             [_utility.get_object(role, "Role", api_version) for role in result["value"]]

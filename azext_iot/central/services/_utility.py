@@ -5,10 +5,14 @@
 # --------------------------------------------------------------------------------------------
 # Nothing in this file should be used outside of service/central
 
-from knack.util import CLIError, to_snake_case, to_camel_case
+from knack.util import to_snake_case, to_camel_case
 from requests import Response
 from knack.log import logging
 
+from azure.cli.core.azclierror import (
+    AzureResponseError,
+    CLIInternalError,
+)
 from azext_iot import constants
 from azext_iot.common import auth
 
@@ -74,10 +78,10 @@ def try_extract_result(response: Response):
     try:
         body = response.json()
     except Exception:
-        raise CLIError("Error parsing response body")
+        raise CLIInternalError("Error parsing response body")
 
     if "error" in body:
-        raise CLIError(body["error"])
+        raise AzureResponseError(body["error"])
 
     return body
 
@@ -118,7 +122,7 @@ def get_object(data: dict, model: str, api_version) -> object:
             )
             return module(data)
     except Exception:
-        raise CLIError(
+        raise CLIInternalError(
             "{} is not available for api version == {}".format(model, api_version)
         )
 

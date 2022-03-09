@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 # Dev note - think of this as a controller
 
-from knack.util import CLIError
+from azure.cli.core.azclierror import InvalidArgumentValueError
 from typing import Union, List, Any
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.models.enum import ApiVersion
@@ -130,7 +130,7 @@ def create_job(
 ) -> JobType:
 
     if not isinstance(content, str):
-        raise CLIError("content must be a string: {}".format(content))
+        raise InvalidArgumentValueError("content must be a string: {}".format(content))
 
     payload = utility.process_json_arg(content, argument_name="content")
 

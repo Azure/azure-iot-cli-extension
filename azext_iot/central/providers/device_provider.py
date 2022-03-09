@@ -5,7 +5,13 @@
 # --------------------------------------------------------------------------------------------
 
 from typing import List, Union
-from knack.util import CLIError
+from azure.cli.core.azclierror import (
+    AzureResponseError,
+    ClientRequestError,
+    CLIInternalError,
+    RequiredArgumentMissingError,
+    ResourceNotFoundError,
+)
 from knack.log import get_logger
 from azext_iot.central.models.devicetwin import DeviceTwin
 from azext_iot.central.models.edge import EdgeModule
@@ -68,7 +74,7 @@ class CentralDeviceProvider:
             self._devices[device_id] = device
 
         if not device:
-            raise CLIError("No device found with id: '{}'.".format(device_id))
+            raise ResourceNotFoundError("No device found with id: '{}'.".format(device_id))
 
         return self._devices[device_id]
 
@@ -101,10 +107,10 @@ class CentralDeviceProvider:
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> Union[DeviceV1, DeviceV1_1_preview, DevicePreview]:
         if not device_id:
-            raise CLIError("Device id must be specified.")
+            raise RequiredArgumentMissingError("Device id must be specified.")
 
         if device_id in self._devices:
-            raise CLIError("Device already exists.")
+            raise ClientRequestError("Device already exists.")
 
         device = central_services.device.create_device(
             cmd=self._cmd,
@@ -120,7 +126,7 @@ class CentralDeviceProvider:
         )
 
         if not device:
-            raise CLIError("No device found with id: '{}'.".format(device_id))
+            raise AzureResponseError("Failed to create device with id: '{}'.".format(device_id))
 
         # add to cache
         self._devices[device.id] = device
@@ -138,10 +144,10 @@ class CentralDeviceProvider:
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> Union[DeviceV1, DeviceV1_1_preview, DevicePreview]:
         if not device_id:
-            raise CLIError("Device id must be specified.")
+            raise RequiredArgumentMissingError("Device id must be specified.")
 
         if device_id in self._devices:
-            raise CLIError("Device already exists.")
+            raise ClientRequestError("Device already exists.")
 
         device = central_services.device.update_device(
             cmd=self._cmd,
@@ -158,7 +164,7 @@ class CentralDeviceProvider:
         )
 
         if not device:
-            raise CLIError("No device found with id: '{}'.".format(device_id))
+            raise ResourceNotFoundError("No device found with id: '{}'.".format(device_id))
 
         # add to cache
         self._devices[device.id] = device
@@ -171,7 +177,7 @@ class CentralDeviceProvider:
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> dict:
         if not device_id:
-            raise CLIError("Device id must be specified.")
+            raise RequiredArgumentMissingError("Device id must be specified.")
 
         # get or add to cache
         result = central_services.device.delete_device(
@@ -304,7 +310,7 @@ class CentralDeviceProvider:
             )
 
         if not credentials:
-            raise CLIError(
+            raise CLIInternalError(
                 "Could not find device credentials for device '{}'.".format(device_id)
             )
 
@@ -487,7 +493,7 @@ class CentralDeviceProvider:
         )
 
         if not twin:
-            raise CLIError("No twin found for device with id: '{}'.".format(device_id))
+            raise ResourceNotFoundError("No twin found for device with id: '{}'.".format(device_id))
 
         return twin
 

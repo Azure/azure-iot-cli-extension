@@ -11,9 +11,8 @@ from azext_iot.product.shared import (
     BadgeType,
 )
 from msrestazure.azure_exceptions import CloudError
-from azext_iot.common.utility import unpack_msrest_error
+from azext_iot.common.utility import handle_service_exception
 from knack.log import get_logger
-from knack.util import CLIError
 
 logger = get_logger(__name__)
 
@@ -25,7 +24,7 @@ def process_cloud_error(func):
         try:
             return func(*args, **kwargs)
         except CloudError as e:
-            return CLIError(unpack_msrest_error(e))
+            return handle_service_exception(e)
 
     return catch_unpack_clouderror
 

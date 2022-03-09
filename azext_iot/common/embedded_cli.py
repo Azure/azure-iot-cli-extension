@@ -7,8 +7,8 @@
 import json
 import shlex
 from azure.cli.core import get_default_cli
+from azure.cli.core.azclierror import CLIInternalError
 from knack.log import get_logger
-from knack.util import CLIError
 from io import StringIO
 
 logger = get_logger(__name__)
@@ -53,7 +53,7 @@ class EmbeddedCLI(object):
         try:
             return json.loads(self.output)
         except Exception:
-            raise CLIError(
+            raise CLIInternalError(
                 "Issue parsing received payload '{}' as json. Please try again or check resource status.".format(
                     self.output
                 )

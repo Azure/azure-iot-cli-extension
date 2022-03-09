@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from knack.util import CLIError
+from azure.cli.core.azclierror import AzureResponseError, CLIInternalError
 from azext_iot.common.utility import validate_key_value_pairs
 from azext_iot.common.auth import get_aad_token
 
@@ -73,12 +73,12 @@ def get_iot_central_tokens(cmd, app_id, token, central_dns_suffix):
         if tokens["error"]["code"].startswith("403.043.004."):
             error_message = "{} {}".format(error_message, additional_help)
 
-        raise CLIError(
+        raise AzureResponseError(
             "Error {} getting tokens. {}".format(tokens["error"]["code"], error_message)
         )
 
     if tokens.get("message"):
         error_message = "{} {}".format(tokens["message"], additional_help)
-        raise CLIError(error_message)
+        raise CLIInternalError(error_message)
 
     return tokens
