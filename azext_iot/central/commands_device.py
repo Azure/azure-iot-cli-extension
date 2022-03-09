@@ -12,13 +12,14 @@ from azext_iot.central.providers import (
     CentralDeviceProvider,
     CentralDeviceTemplateProvider,
 )
-from knack.util import CLIError
+
 from typing import Union, List, Any
 from azure.cli.core.azclierror import (
     InvalidArgumentValueError,
     RequiredArgumentMissingError,
+    ResourceNotFoundError,
+    ForbiddenError,
 )
-from typing import Union, List
 from azext_iot.central.models.v1 import DeviceV1
 from azext_iot.central.models.preview import DevicePreview
 from azext_iot.central.models.v1_1_preview import DeviceV1_1_preview
@@ -380,7 +381,7 @@ def add_children(
     from uuid import uuid4
 
     if api_version != ApiVersion.v1_1_preview.value:
-        raise CLIError(
+        raise InvalidArgumentValueError(
             (
                 "Adding children devices to IoT Edge is still in preview "
                 "and only available for Api version >= 1.1-preview. "
@@ -401,7 +402,7 @@ def add_children(
     )
 
     if not rel_name:
-        raise CLIError(
+        raise ResourceNotFoundError(
             f'Relationship name cannot be found in the template for device with id "{device_id}"'
         )
 
@@ -439,7 +440,7 @@ def remove_children(
     )
 
     if not rel_name:
-        raise CLIError(
+        raise ResourceNotFoundError(
             f'Relationship name cannot be found in the template for device with id "{device_id}"'
         )
 
@@ -458,7 +459,7 @@ def remove_children(
             )
 
     if not deleted:
-        raise CLIError(f"Childs {children_ids} cannot be removed.")
+        raise ForbiddenError(f"Childs {children_ids} cannot be removed.")
 
     return deleted
 
@@ -476,7 +477,9 @@ def get_edge_device(
     )
 
     def raise_error():
-        raise CLIError("The specified device Id does not identify an IoT Edge device.")
+        raise InvalidArgumentValueError(
+            "The specified device Id does not identify an IoT Edge device."
+        )
 
     # check if device is edge
     try:
@@ -536,7 +539,7 @@ def get_device_module(
         if module.module_id == module_id:
             return module
 
-    raise CLIError(
+    raise ResourceNotFoundError(
         f"A module named '{module_id}' does not exist on device {device_id} or is not currently available"
     )
 
@@ -647,14 +650,16 @@ def get_downstream_rel_name(
     )
 
     if not device:
-        raise CLIError(f'Device with id "{device_id}" cannot be found.')
+        raise ResourceNotFoundError(f'Device with id "{device_id}" cannot be found.')
 
     template = template_provider.get_device_template(
         get_template_id(device, api_version=api_version)
     )
 
     if not template:
-        raise CLIError(f'Template for device with id "{device_id}" cannot be found.')
+        raise ResourceNotFoundError(
+            f'Template for device with id "{device_id}" cannot be found.'
+        )
 
     # Get Gateway relationship name
     for _, interface in template.interfaces.items():

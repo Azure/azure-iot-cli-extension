@@ -74,7 +74,9 @@ class CentralDeviceProvider:
             self._devices[device_id] = device
 
         if not device:
-            raise ResourceNotFoundError("No device found with id: '{}'.".format(device_id))
+            raise ResourceNotFoundError(
+                "No device found with id: '{}'.".format(device_id)
+            )
 
         return self._devices[device_id]
 
@@ -126,7 +128,9 @@ class CentralDeviceProvider:
         )
 
         if not device:
-            raise AzureResponseError("Failed to create device with id: '{}'.".format(device_id))
+            raise AzureResponseError(
+                "Failed to create device with id: '{}'.".format(device_id)
+            )
 
         # add to cache
         self._devices[device.id] = device
@@ -164,7 +168,9 @@ class CentralDeviceProvider:
         )
 
         if not device:
-            raise ResourceNotFoundError("No device found with id: '{}'.".format(device_id))
+            raise ResourceNotFoundError(
+                "No device found with id: '{}'.".format(device_id)
+            )
 
         # add to cache
         self._devices[device.id] = device
@@ -212,7 +218,7 @@ class CentralDeviceProvider:
         )
 
         if relationships is None:
-            raise CLIError(
+            raise ResourceNotFoundError(
                 "No relationships found for device with id: '{}'.".format(device_id)
             )
 
@@ -242,7 +248,9 @@ class CentralDeviceProvider:
         )
 
         if not relationship:
-            raise CLIError("No relationship found with id: '{}'.".format(rel_id))
+            raise ResourceNotFoundError(
+                "No relationship found with id: '{}'.".format(rel_id)
+            )
 
         return relationship
 
@@ -265,7 +273,9 @@ class CentralDeviceProvider:
         )
 
         if not relationship:
-            raise CLIError("No relationship found with id: '{}'.".format(rel_id))
+            raise ResourceNotFoundError(
+                "No relationship found with id: '{}'.".format(rel_id)
+            )
 
         return relationship
 
@@ -277,7 +287,9 @@ class CentralDeviceProvider:
     ) -> dict:
 
         if not device_id or not rel_id:
-            raise CLIError("Device id and relationship id must be specified.")
+            raise RequiredArgumentMissingError(
+                "Device id and relationship id must be specified."
+            )
 
         # get or add to cache
         result = central_services.device.delete_relationship(
@@ -447,7 +459,7 @@ class CentralDeviceProvider:
         )
 
         if not modules:
-            raise CLIError(
+            raise ResourceNotFoundError(
                 "No modules found for device with id: '{}'.".format(device_id)
             )
 
@@ -470,7 +482,7 @@ class CentralDeviceProvider:
         )
 
         if not status or status != 200:
-            raise CLIError(
+            raise ResourceNotFoundError(
                 "No module found for device {} with id: '{}'.".format(
                     device_id, module_id
                 )
@@ -493,7 +505,9 @@ class CentralDeviceProvider:
         )
 
         if not twin:
-            raise ResourceNotFoundError("No twin found for device with id: '{}'.".format(device_id))
+            raise ResourceNotFoundError(
+                "No twin found for device with id: '{}'.".format(device_id)
+            )
 
         return twin
 

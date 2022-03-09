@@ -9,7 +9,7 @@ import os
 import time
 from typing import Tuple
 
-from azure.cli.core.azclierror import CLIInternalError
+from azure.cli.core.azclierror import CLIInternalError, InvalidArgumentValueError
 from azext_iot.tests import CaptureOutputLiveScenarioTest
 from azext_iot.tests.conftest import get_context_path
 from azext_iot.common import utility
@@ -190,7 +190,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
     def _create_device_template(self, api_version, edge=False):
         if edge and api_version != ApiVersion.v1_1_preview.value:
-            raise CLIError(
+            raise InvalidArgumentValueError(
                 "Edge template creation is only available for api version >= 1.1-preview."
             )
 

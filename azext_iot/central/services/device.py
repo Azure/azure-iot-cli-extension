@@ -13,7 +13,11 @@ from azext_iot.common.auth import get_aad_token
 
 from knack.log import get_logger
 
-from azure.cli.core.azclierror import AzureResponseError
+from azure.cli.core.azclierror import (
+    AzureResponseError,
+    ResourceNotFoundError,
+    BadRequestError,
+)
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
 from azext_iot.central.models.devicetwin import DeviceTwin
@@ -398,7 +402,7 @@ def list_relationships(
         result = _utility.try_extract_result(response)
 
         if "value" not in result:
-            raise CLIError("Value is not present in body: {}".format(result))
+            raise AzureResponseError("Value is not present in body: {}".format(result))
 
         relationships.extend(
             [
@@ -774,7 +778,7 @@ def get_device_twin(
         message == f"Twin for device {device_id} was not found"
         or response_data.get("code") is not None
     ):  # there is an error
-        raise CLIError(f"Twin for device '{device_id}' was not found")
+        raise ResourceNotFoundError(f"Twin for device '{device_id}' was not found")
     else:
         return DeviceTwin(response_data)
 
@@ -932,7 +936,7 @@ def list_device_modules(
     response_data = _utility.try_extract_result(response).get("modules")
 
     if not response_data:
-        raise CLIError(f"Device '{device_id}' is not an IoT Edge device.")
+        raise BadRequestError(f"Device '{device_id}' is not an IoT Edge device.")
     return [EdgeModule(dict_clean(module)) for module in response_data]
 
 
