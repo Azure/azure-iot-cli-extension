@@ -9,7 +9,6 @@ import time
 from typing import Tuple
 
 from azure.cli.core.azclierror import CLIInternalError
-from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.tests import CaptureOutputLiveScenarioTest
 from azext_iot.tests.conftest import get_context_path
 from azext_iot.tests.generators import generate_generic_id
@@ -45,14 +44,6 @@ device_template_path_preview = get_context_path(
 sync_command_params = get_context_path(__file__, "json/sync_command_args.json")
 DEFAULT_FILE_UPLOAD_TTL = "PT1H"
 
-# Tokens
-DATAPLANE_AUTH_USE_TOKEN = [bool(settings.env.azext_iot_central_token)]
-if (
-    not settings.env.azext_iot_central_token and
-    settings.env.azext_iot_central_dns_suffix in [None, CENTRAL_ENDPOINT]
-):
-    DATAPLANE_AUTH_USE_TOKEN.append(True)
-
 
 class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def __init__(self, test_scenario):
@@ -63,7 +54,6 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         self.storage_account_name = STORAGE_NAME
         self.token = None
         self.dns_suffix = None
-        self.use_token = False
 
     def cmd(
         self,
@@ -90,12 +80,12 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         """
         self.app_id = settings.env.azext_iot_central_app_id or "test-app-" + generate_generic_id()
         self.app_rg = APP_RG
-        self.token = settings.env.azext_iot_central_token
         self._scope_id = settings.env.azext_iot_central_scope_id
 
         # only populate these if given in the test configuration variables
         self.app_primary_key = settings.env.azext_iot_central_primarykey
         self.dns_suffix = settings.env.azext_iot_central_dns_suffix
+        self.token = settings.env.azext_iot_central_token
 
         # Create Central App if it does not exist. Note that app_primary_key will be nullified since
         # there is no current way to get the app_primary_key and not all tests can be executed.
@@ -123,16 +113,6 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     self.app_id,
                 )
             ).get_output_in_json()["resourceGroup"]
-
-        # If there is no token and the DNS suffix is the default suffix (or not set), retrieve the
-        # general access token for testing.
-        if len(DATAPLANE_AUTH_USE_TOKEN) > 1:
-            self.token = self.cmd(
-                "account get-access-token --resource https://apps.{}".format(
-                    CENTRAL_ENDPOINT
-                ),
-                include_opt_args=False
-            ).get_output_in_json()["accessToken"]
 
     def _create_device(self, api_version, **kwargs) -> Tuple[str, str]:
         """
@@ -622,7 +602,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def _appendOptionalArgsToCommand(
         self, command: str, api_version: str
     ):
-        if self.use_token and self.token:
+        if self.token:
             command += ' --token "{}"'.format(self.token)
         if self.dns_suffix:
             command += ' --central-dns-suffix "{}"'.format(self.dns_suffix)

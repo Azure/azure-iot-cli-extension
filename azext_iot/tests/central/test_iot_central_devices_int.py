@@ -12,7 +12,6 @@ from azext_iot.central.models.enum import DeviceStatus, ApiVersion
 from azext_iot.tests import helpers
 from azext_iot.tests.central import (
     CentralLiveScenarioTest,
-    DATAPLANE_AUTH_USE_TOKEN
 )
 
 
@@ -32,517 +31,495 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         super(TestIotCentralDevices, self).__init__(test_scenario=test_scenario)
 
     def test_central_device_twin_show_fail(self):
-        for use_token in DATAPLANE_AUTH_USE_TOKEN:
-            self.use_token = use_token
-            (device_id, _) = self._create_device(api_version=self._api_version)
+        (device_id, _) = self._create_device(api_version=self._api_version)
 
-            # Verify incorrect app-id throws error
-            command = (
-                "iot central device twin show --app-id incorrect-app --device-id {}".format(
-                    device_id
-                )
+        # Verify incorrect app-id throws error
+        command = (
+            "iot central device twin show --app-id incorrect-app --device-id {}".format(
+                device_id
             )
+        )
 
-            self.cmd(command, expect_failure=True)
+        self.cmd(command, expect_failure=True)
 
-            # Verify incorrect device-id throws error
-            command = "iot central device twin show --app-id {} --device-id incorrect-device".format(
-                self.app_id
-            )
+        # Verify incorrect device-id throws error
+        command = "iot central device twin show --app-id {} --device-id incorrect-device".format(
+            self.app_id
+        )
 
-            self.cmd(command, expect_failure=True)
+        self.cmd(command, expect_failure=True)
 
-            self._delete_device(device_id=device_id, api_version=self._api_version)
+        self._delete_device(device_id=device_id, api_version=self._api_version)
 
     def test_central_device_c2d_purge_success(self):
-        for use_token in DATAPLANE_AUTH_USE_TOKEN:
-            self.use_token = use_token
-            (template_id, _) = self._create_device_template(api_version=self._api_version)
-            (device_id, _) = self._create_device(
-                template=template_id, api_version=self._api_version, simulated=True
+        (template_id, _) = self._create_device_template(api_version=self._api_version)
+        (device_id, _) = self._create_device(
+            template=template_id, api_version=self._api_version, simulated=True
+        )
+
+        # wait about a few seconds for simulator to kick in so that provisioning completes
+        time.sleep(60)
+
+        command = (
+            "iot central device c2d-message purge --app-id {} --device-id {}".format(
+                self.app_id, device_id
             )
+        )
 
-            # wait about a few seconds for simulator to kick in so that provisioning completes
-            time.sleep(60)
+        cmd_output = self.cmd(command).get_output_in_json()
 
-            command = (
-                "iot central device c2d-message purge --app-id {} --device-id {}".format(
-                    self.app_id, device_id
-                )
-            )
+        self._delete_device(device_id=device_id, api_version=self._api_version)
+        self._delete_device_template(
+            template_id=template_id, api_version=self._api_version
+        )
 
-            cmd_output = self.cmd(command).get_output_in_json()
-
-            self._delete_device(device_id=device_id, api_version=self._api_version)
-            self._delete_device_template(
-                template_id=template_id, api_version=self._api_version
-            )
-
-            assert device_id in cmd_output["message"]
-            assert "Total messages purged:" in cmd_output["message"]
+        assert device_id in cmd_output["message"]
+        assert "Total messages purged:" in cmd_output["message"]
 
     def test_central_device_twin_show_success(self):
-        for use_token in DATAPLANE_AUTH_USE_TOKEN:
-            self.use_token = use_token
-            (template_id, _) = self._create_device_template(api_version=self._api_version)
-            (device_id, _) = self._create_device(
-                template=template_id, api_version=self._api_version, simulated=True
-            )
+        (template_id, _) = self._create_device_template(api_version=self._api_version)
+        (device_id, _) = self._create_device(
+            template=template_id, api_version=self._api_version, simulated=True
+        )
 
-            # wait about a few seconds for simulator to kick in so that provisioning completes
-            time.sleep(60)
+        # wait about a few seconds for simulator to kick in so that provisioning completes
+        time.sleep(60)
 
-            command = "iot central device twin show --app-id {} --device-id {}".format(
-                self.app_id, device_id
-            )
+        command = "iot central device twin show --app-id {} --device-id {}".format(
+            self.app_id, device_id
+        )
 
-            self.cmd(
-                command,
-                checks=[
-                    self.check("deviceId", device_id),
-                    self.check("tags", {}),
-                    self.check("_links", None),
-                ],
-            )
+        self.cmd(
+            command,
+            checks=[
+                self.check("deviceId", device_id),
+                self.check("tags", {}),
+                self.check("_links", None),
+            ],
+        )
 
-            self._delete_device(device_id=device_id, api_version=self._api_version)
-            self._delete_device_template(
-                template_id=template_id, api_version=self._api_version
-            )
+        self._delete_device(device_id=device_id, api_version=self._api_version)
+        self._delete_device_template(
+            template_id=template_id, api_version=self._api_version
+        )
 
     def test_device_connect(self):
-        for use_token in DATAPLANE_AUTH_USE_TOKEN:
-            self.use_token = use_token
-            if self.app_primary_key is None:
-                pytest.skip(
-                    "Cannot test without primary key. Currently there is no way of retrieving the app "
-                    "primary key from the IoT Central App."
-                )
-            app_scope_id = self.get_app_scope_id(api_version=self._api_version)
-            device_id = "testDevice"
-
-            command = "iot central device compute-device-key --pk {} -d {}".format(
-                self.app_primary_key, device_id
+        if self.app_primary_key is None:
+            pytest.skip(
+                "Cannot test without primary key. Currently there is no way of retrieving the app "
+                "primary key from the IoT Central App."
             )
-            device_primary_key = self.cmd(command, include_opt_args=False).get_output_in_json()
+        app_scope_id = self.get_app_scope_id(api_version=self._api_version)
+        device_id = "testDevice"
 
-            credentials = {
-                "idScope": app_scope_id,
-                "symmetricKey": {"primaryKey": device_primary_key},
-            }
-            device_client = helpers.dps_connect_device(device_id, credentials)
+        command = "iot central device compute-device-key --pk {} -d {}".format(
+            self.app_primary_key, device_id
+        )
+        device_primary_key = self.cmd(command, include_opt_args=False).get_output_in_json()
 
-            command = "iot central device show --app-id {} -d {}".format(self.app_id, device_id)
+        credentials = {
+            "idScope": app_scope_id,
+            "symmetricKey": {"primaryKey": device_primary_key},
+        }
+        device_client = helpers.dps_connect_device(device_id, credentials)
 
-            self.cmd(
-                command,
-                api_version=self._api_version,
-                checks=[self.check("id", device_id)],
-            )
+        command = "iot central device show --app-id {} -d {}".format(self.app_id, device_id)
 
-            self._delete_device(device_id=device_id, api_version=self._api_version)
+        self.cmd(
+            command,
+            api_version=self._api_version,
+            checks=[self.check("id", device_id)],
+        )
 
-            assert device_client.connected
+        self._delete_device(device_id=device_id, api_version=self._api_version)
+
+        assert device_client.connected
 
     def test_central_device_methods_CRUD(self):
-        for use_token in DATAPLANE_AUTH_USE_TOKEN:
-            self.use_token = use_token
-            # list devices and get count
-            start_device_list = self.cmd(
-                "iot central device list --app-id {}".format(self.app_id),
-                api_version=self._api_version,
-            ).get_output_in_json()
+        # list devices and get count
+        start_device_list = self.cmd(
+            "iot central device list --app-id {}".format(self.app_id),
+            api_version=self._api_version,
+        ).get_output_in_json()
 
-            start_dev_count = len(start_device_list)
-            (device_id, device_name) = self._create_device(api_version=self._api_version)
+        start_dev_count = len(start_device_list)
+        (device_id, device_name) = self._create_device(api_version=self._api_version)
 
-            command = "iot central device show --app-id {} -d {}".format(self.app_id, device_id)
-            checks = [
-                self.check("displayName", device_name),
-                self.check("id", device_id),
-                self.check("simulated", False),
-            ]
-            if self._api_version == ApiVersion.preview.value:
-                checks.append(self.check("approved", True))
-            else:
-                checks.append(self.check("enabled", True))
+        command = "iot central device show --app-id {} -d {}".format(self.app_id, device_id)
+        checks = [
+            self.check("displayName", device_name),
+            self.check("id", device_id),
+            self.check("simulated", False),
+        ]
+        if self._api_version == ApiVersion.preview.value:
+            checks.append(self.check("approved", True))
+        else:
+            checks.append(self.check("enabled", True))
 
-            self.cmd(command, api_version=self._api_version, checks=checks)
+        self.cmd(command, api_version=self._api_version, checks=checks)
 
-            created_device_list = self.cmd(
-                "iot central device list --app-id {}".format(self.app_id),
-                api_version=self._api_version,
-            ).get_output_in_json()
+        created_device_list = self.cmd(
+            "iot central device list --app-id {}".format(self.app_id),
+            api_version=self._api_version,
+        ).get_output_in_json()
 
-            created_dev_count = len(created_device_list)
-            assert created_dev_count == (start_dev_count + 1)
-            # assert device with id "device_id" is in created list
-            assert (
-                next(
-                    (device for device in created_device_list if device["id"] == device_id),
-                    None,
-                )
-                is not None
+        created_dev_count = len(created_device_list)
+        assert created_dev_count == (start_dev_count + 1)
+        # assert device with id "device_id" is in created list
+        assert (
+            next(
+                (device for device in created_device_list if device["id"] == device_id),
+                None,
             )
+            is not None
+        )
 
-            # UPDATES
+        # UPDATES
 
-            new_device_name = f"{device_name}_new"
-            command = "iot central device update --app-id {} -d {} --device-name {}".format(
-                self.app_id,
-                device_id,
-                new_device_name,
+        new_device_name = f"{device_name}_new"
+        command = "iot central device update --app-id {} -d {} --device-name {}".format(
+            self.app_id,
+            device_id,
+            new_device_name,
+        )
+        checks = [
+            self.check("displayName", new_device_name),
+            self.check("id", device_id),
+        ]
+        self.cmd(command, api_version=self._api_version, checks=checks)
+
+        # DELETE
+        self._delete_device(device_id=device_id, api_version=self._api_version)
+
+        deleted_device_list = self.cmd(
+            "iot central device list --app-id {}".format(self.app_id),
+            api_version=self._api_version,
+        ).get_output_in_json()
+
+        deleted_dev_count = len(deleted_device_list)
+        assert deleted_dev_count == start_dev_count
+        # assert device with id "device_id" has been removed from list
+        assert (
+            next(
+                (device for device in deleted_device_list if device["id"] == device_id),
+                None,
             )
-            checks = [
-                self.check("displayName", new_device_name),
-                self.check("id", device_id),
-            ]
-            self.cmd(command, api_version=self._api_version, checks=checks)
-
-            # DELETE
-            self._delete_device(device_id=device_id, api_version=self._api_version)
-
-            deleted_device_list = self.cmd(
-                "iot central device list --app-id {}".format(self.app_id),
-                api_version=self._api_version,
-            ).get_output_in_json()
-
-            deleted_dev_count = len(deleted_device_list)
-            assert deleted_dev_count == start_dev_count
-            # assert device with id "device_id" has been removed from list
-            assert (
-                next(
-                    (device for device in deleted_device_list if device["id"] == device_id),
-                    None,
-                )
-                is None
-            )
+            is None
+        )
 
     def test_central_device_template_methods_CRUD(self):
-        for use_token in DATAPLANE_AUTH_USE_TOKEN:
-            self.use_token = use_token
-            # currently: create, show, list, delete
+        # currently: create, show, list, delete
 
-            # list device templates and get count
-            start_device_template_list = self.cmd(
-                "iot central device-template list --app-id {}".format(self.app_id),
-                api_version=self._api_version,
-            ).get_output_in_json()
+        # list device templates and get count
+        start_device_template_list = self.cmd(
+            "iot central device-template list --app-id {}".format(self.app_id),
+            api_version=self._api_version,
+        ).get_output_in_json()
 
-            start_dev_temp_count = len(start_device_template_list)
+        start_dev_temp_count = len(start_device_template_list)
 
-            (template_id, template_name) = self._create_device_template(
-                api_version=self._api_version
+        (template_id, template_name) = self._create_device_template(
+            api_version=self._api_version
+        )
+
+        command = "iot central device-template show --app-id {} --device-template-id {}".format(
+            self.app_id, template_id
+        )
+
+        result = self.cmd(
+            command,
+            api_version=self._api_version,
+            checks=[self.check("displayName", template_name)],
+        )
+
+        json_result = result.get_output_in_json()
+
+        assert self._get_template_id(json_result) == template_id
+
+        created_device_template_list = self.cmd(
+            "iot central device-template list --app-id {}".format(self.app_id),
+            api_version=self._api_version,
+        ).get_output_in_json()
+
+        created_dev_temp_count = len(created_device_template_list)
+        # assert number of device templates changed by 1 or none in case template was already present in the application
+        assert (created_dev_temp_count == (start_dev_temp_count + 1)) or (
+            created_dev_temp_count == start_dev_temp_count
+        )
+        # assert template with id "template_id" is in created list
+        assert (
+            next(
+                (
+                    template
+                    for template in created_device_template_list
+                    if self._get_template_id(template) == template_id
+                ),
+                None,
             )
+            is not None
+        )
 
-            command = "iot central device-template show --app-id {} --device-template-id {}".format(
-                self.app_id, template_id
+        # UPDATE
+        new_template_name = f"{template_name}_new"
+        del json_result[self._get_template_id_key()]  # remove id
+        del json_result["@context"]
+        del json_result["etag"]
+
+        json_result["displayName"] = new_template_name
+        json_result["capabilityModel"]["contents"].append(
+            {
+                "@id": "dtmi:newcap;1",
+                "@type": "Telemetry",
+                "displayName": "testNewCapability",
+                "name": "testNewCapability",
+                "schema": "double",
+            }
+        )
+        updated_contents = json_result["capabilityModel"]["contents"]
+        command = (
+            "iot central device-template update --app-id {} --dtid {} -k '{}'".format(
+                self.app_id,
+                template_id,
+                json.dumps(json_result)
+                .replace("{", "{{")
+                .replace(
+                    "}", "}}"
+                ),  # replace is mandatory here as processing involve string formatting
             )
+        )
 
-            result = self.cmd(
-                command,
-                api_version=self._api_version,
-                checks=[self.check("displayName", template_name)],
+        checks = [self.check("displayName", new_template_name)]
+        updated = self.cmd(
+            command, api_version=self._api_version, checks=checks
+        ).get_output_in_json()
+        assert updated["capabilityModel"]["contents"] == updated_contents
+
+        # DELETE
+        self._delete_device_template(
+            template_id=template_id, api_version=self._api_version
+        )
+
+        deleted_device_template_list = self.cmd(
+            "iot central device-template list --app-id {}".format(self.app_id),
+            api_version=self._api_version,
+        ).get_output_in_json()
+
+        deleted_dev_temp_count = len(deleted_device_template_list)
+
+        # if template existed before this run then a successfull deletion reduces the number of templates
+        assert (
+            deleted_dev_temp_count == start_dev_temp_count
+            or deleted_dev_temp_count == (start_dev_temp_count - 1)
+        )
+
+        if (
+            next(
+                (
+                    template
+                    for template in start_device_template_list
+                    if self._get_template_id(template) == template_id
+                ),
+                None,
             )
-
-            json_result = result.get_output_in_json()
-
-            assert self._get_template_id(json_result) == template_id
-
-            created_device_template_list = self.cmd(
-                "iot central device-template list --app-id {}".format(self.app_id),
-                api_version=self._api_version,
-            ).get_output_in_json()
-
-            created_dev_temp_count = len(created_device_template_list)
-            # assert number of device templates changed by 1 or none in case template was already present in the application
-            assert (created_dev_temp_count == (start_dev_temp_count + 1)) or (
-                created_dev_temp_count == start_dev_temp_count
-            )
-            # assert template with id "template_id" is in created list
+            is None
+        ):
+            # template has been created during test so deletion succeeds
+            # otherwise it might fail because existing devices can exist
             assert (
                 next(
                     (
                         template
-                        for template in created_device_template_list
-                        if self._get_template_id(template) == template_id
-                    ),
-                    None,
-                )
-                is not None
-            )
-
-            # UPDATE
-            new_template_name = f"{template_name}_new"
-            del json_result[self._get_template_id_key()]  # remove id
-            del json_result["@context"]
-            del json_result["etag"]
-
-            json_result["displayName"] = new_template_name
-            json_result["capabilityModel"]["contents"].append(
-                {
-                    "@id": "dtmi:newcap;1",
-                    "@type": "Telemetry",
-                    "displayName": "testNewCapability",
-                    "name": "testNewCapability",
-                    "schema": "double",
-                }
-            )
-            updated_contents = json_result["capabilityModel"]["contents"]
-            command = (
-                "iot central device-template update --app-id {} --dtid {} -k '{}'".format(
-                    self.app_id,
-                    template_id,
-                    json.dumps(json_result)
-                    .replace("{", "{{")
-                    .replace(
-                        "}", "}}"
-                    ),  # replace is mandatory here as processing involve string formatting
-                )
-            )
-
-            checks = [self.check("displayName", new_template_name)]
-            updated = self.cmd(
-                command, api_version=self._api_version, checks=checks
-            ).get_output_in_json()
-            assert updated["capabilityModel"]["contents"] == updated_contents
-
-            # DELETE
-            self._delete_device_template(
-                template_id=template_id, api_version=self._api_version
-            )
-
-            deleted_device_template_list = self.cmd(
-                "iot central device-template list --app-id {}".format(self.app_id),
-                api_version=self._api_version,
-            ).get_output_in_json()
-
-            deleted_dev_temp_count = len(deleted_device_template_list)
-
-            # if template existed before this run then a successfull deletion reduces the number of templates
-            assert (
-                deleted_dev_temp_count == start_dev_temp_count
-                or deleted_dev_temp_count == (start_dev_temp_count - 1)
-            )
-
-            if (
-                next(
-                    (
-                        template
-                        for template in start_device_template_list
+                        for template in deleted_device_template_list
                         if self._get_template_id(template) == template_id
                     ),
                     None,
                 )
                 is None
-            ):
-                # template has been created during test so deletion succeeds
-                # otherwise it might fail because existing devices can exist
-                assert (
-                    next(
-                        (
-                            template
-                            for template in deleted_device_template_list
-                            if self._get_template_id(template) == template_id
-                        ),
-                        None,
-                    )
-                    is None
-                )
+            )
 
     def test_central_device_groups_list(self):
-        for use_token in DATAPLANE_AUTH_USE_TOKEN:
-            self.use_token = use_token
-            result = self._list_device_groups()
-            # assert object is empty or populated but not null
-            assert result is not None and (result == [] or bool(result) is True)
+        result = self._list_device_groups()
+        # assert object is empty or populated but not null
+        assert result is not None and (result == [] or bool(result) is True)
 
     def test_central_device_registration_info_registered(self):
-        for use_token in DATAPLANE_AUTH_USE_TOKEN:
-            self.use_token = use_token
-            (template_id, _) = self._create_device_template(api_version=self._api_version)
-            (device_id, device_name) = self._create_device(
-                template=template_id, api_version=self._api_version, simulated=False
+        (template_id, _) = self._create_device_template(api_version=self._api_version)
+        (device_id, device_name) = self._create_device(
+            template=template_id, api_version=self._api_version, simulated=False
+        )
+
+        command = "iot central device registration-info --app-id {} -d {}".format(
+            self.app_id, device_id
+        )
+
+        result = self.cmd(command, api_version=self._api_version)
+
+        self._delete_device(device_id=device_id, api_version=self._api_version)
+
+        self._delete_device_template(
+            template_id=template_id, api_version=self._api_version
+        )
+
+        json_result = result.get_output_in_json()
+
+        assert json_result["@device_id"] == device_id
+
+        # since time taken for provisioning to complete is not known
+        # we can only assert that the payload is populated, not anything specific beyond that
+        assert json_result["device_registration_info"] is not None
+        assert json_result["dps_state"] is not None
+
+        # Validation - device registration.
+        device_registration_info = json_result["device_registration_info"]
+        assert len(device_registration_info) == 5
+        assert device_registration_info.get("device_status") == "registered"
+        assert device_registration_info.get("id") == device_id
+        assert device_registration_info.get("display_name") == device_name
+        assert (
+            device_registration_info.get(
+                "instance_of"
+                if self._api_version == ApiVersion.preview.value
+                else "template"
             )
+            == template_id
+        )
+        assert not device_registration_info.get("simulated")
 
-            command = "iot central device registration-info --app-id {} -d {}".format(
-                self.app_id, device_id
-            )
-
-            result = self.cmd(command, api_version=self._api_version)
-
-            self._delete_device(device_id=device_id, api_version=self._api_version)
-
-            self._delete_device_template(
-                template_id=template_id, api_version=self._api_version
-            )
-
-            json_result = result.get_output_in_json()
-
-            assert json_result["@device_id"] == device_id
-
-            # since time taken for provisioning to complete is not known
-            # we can only assert that the payload is populated, not anything specific beyond that
-            assert json_result["device_registration_info"] is not None
-            assert json_result["dps_state"] is not None
-
-            # Validation - device registration.
-            device_registration_info = json_result["device_registration_info"]
-            assert len(device_registration_info) == 5
-            assert device_registration_info.get("device_status") == "registered"
-            assert device_registration_info.get("id") == device_id
-            assert device_registration_info.get("display_name") == device_name
-            assert (
-                device_registration_info.get(
-                    "instance_of"
-                    if self._api_version == ApiVersion.preview.value
-                    else "template"
-                )
-                == template_id
-            )
-            assert not device_registration_info.get("simulated")
-
-            # Validation - dps state
-            dps_state = json_result["dps_state"]
-            assert len(dps_state) == 2
-            assert device_registration_info.get("status") is None
-            assert dps_state.get("error") == "Device is not yet provisioned."
+        # Validation - dps state
+        dps_state = json_result["dps_state"]
+        assert len(dps_state) == 2
+        assert device_registration_info.get("status") is None
+        assert dps_state.get("error") == "Device is not yet provisioned."
 
     def test_central_device_registration_info_unassociated(self):
-        for use_token in DATAPLANE_AUTH_USE_TOKEN:
-            self.use_token = use_token
-            (device_id, device_name) = self._create_device(api_version=self._api_version)
+        (device_id, device_name) = self._create_device(api_version=self._api_version)
 
-            command = "iot central device registration-info --app-id {} -d {}".format(
-                self.app_id, device_id
+        command = "iot central device registration-info --app-id {} -d {}".format(
+            self.app_id, device_id
+        )
+
+        result = self.cmd(command, api_version=self._api_version)
+
+        self._delete_device(device_id=device_id, api_version=self._api_version)
+
+        json_result = result.get_output_in_json()
+
+        assert json_result["@device_id"] == device_id
+
+        # since time taken for provisioning to complete is not known
+        # we can only assert that the payload is populated, not anything specific beyond that
+        assert json_result["device_registration_info"] is not None
+        assert json_result["dps_state"] is not None
+
+        # Validation - device registration.
+        device_registration_info = json_result["device_registration_info"]
+        assert len(device_registration_info) == 5
+        assert device_registration_info.get("device_status") == "unassociated"
+        assert device_registration_info.get("id") == device_id
+        assert device_registration_info.get("display_name") == device_name
+        assert (
+            device_registration_info.get(
+                "instance_of"
+                if self._api_version == ApiVersion.preview.value
+                else "template"
             )
+            is None
+        )
+        assert not device_registration_info.get("simulated")
 
-            result = self.cmd(command, api_version=self._api_version)
-
-            self._delete_device(device_id=device_id, api_version=self._api_version)
-
-            json_result = result.get_output_in_json()
-
-            assert json_result["@device_id"] == device_id
-
-            # since time taken for provisioning to complete is not known
-            # we can only assert that the payload is populated, not anything specific beyond that
-            assert json_result["device_registration_info"] is not None
-            assert json_result["dps_state"] is not None
-
-            # Validation - device registration.
-            device_registration_info = json_result["device_registration_info"]
-            assert len(device_registration_info) == 5
-            assert device_registration_info.get("device_status") == "unassociated"
-            assert device_registration_info.get("id") == device_id
-            assert device_registration_info.get("display_name") == device_name
-            assert (
-                device_registration_info.get(
-                    "instance_of"
-                    if self._api_version == ApiVersion.preview.value
-                    else "template"
-                )
-                is None
-            )
-            assert not device_registration_info.get("simulated")
-
-            # Validation - dps state
-            dps_state = json_result["dps_state"]
-            assert len(dps_state) == 2
-            assert device_registration_info.get("status") is None
-            assert (
-                dps_state.get("error")
-                == "Device does not have a valid template associated with it."
-            )
+        # Validation - dps state
+        dps_state = json_result["dps_state"]
+        assert len(dps_state) == 2
+        assert device_registration_info.get("status") is None
+        assert (
+            dps_state.get("error")
+            == "Device does not have a valid template associated with it."
+        )
 
     def test_central_device_registration_summary(self):
-        for use_token in DATAPLANE_AUTH_USE_TOKEN:
-            self.use_token = use_token
-            command = "iot central diagnostics registration-summary --app-id {}".format(
-                self.app_id
-            )
+        command = "iot central diagnostics registration-summary --app-id {}".format(
+            self.app_id
+        )
 
-            result = self.cmd(command, api_version=self._api_version)
+        result = self.cmd(command, api_version=self._api_version)
 
-            json_result = result.get_output_in_json()
-            assert json_result[DeviceStatus.provisioned.value] is not None
-            assert json_result[DeviceStatus.registered.value] is not None
-            assert json_result[DeviceStatus.unassociated.value] is not None
-            assert json_result[DeviceStatus.blocked.value] is not None
-            assert len(json_result) == 4
+        json_result = result.get_output_in_json()
+        assert json_result[DeviceStatus.provisioned.value] is not None
+        assert json_result[DeviceStatus.registered.value] is not None
+        assert json_result[DeviceStatus.unassociated.value] is not None
+        assert json_result[DeviceStatus.blocked.value] is not None
+        assert len(json_result) == 4
 
     def test_central_device_should_start_failover_and_failback(self):
-        for use_token in DATAPLANE_AUTH_USE_TOKEN:
-            self.use_token = use_token
-            # created device template & device
-            (template_id, _) = self._create_device_template(api_version=self._api_version)
-            (device_id, _) = self._create_device(
-                instance_of=template_id, api_version=self._api_version, simulated=False
+        # created device template & device
+        (template_id, _) = self._create_device_template(api_version=self._api_version)
+        (device_id, _) = self._create_device(
+            instance_of=template_id, api_version=self._api_version, simulated=False
+        )
+
+        command = (
+            "iot central device show-credentials --device-id {} --app-id {}".format(
+                device_id, self.app_id
             )
+        )
 
-            command = (
-                "iot central device show-credentials --device-id {} --app-id {}".format(
-                    device_id, self.app_id
-                )
+        credentials = self.cmd(
+            command, api_version=self._api_version
+        ).get_output_in_json()
+
+        # connect & disconnect device & wait to be provisioned
+        self._connect_gettwin_disconnect_wait_tobeprovisioned(device_id, credentials)
+        command = "iot central device manual-failover --app-id {} --device-id {} --ttl {}".format(
+            self.app_id, device_id, 5
+        )
+
+        # initiating failover
+        result = self.cmd(command, api_version=self._api_version)
+        json_result = result.get_output_in_json()
+
+        # check if failover started and getting original hub identifier
+        hubIdentifierOriginal = json_result["hubIdentifier"]
+
+        # connect & disconnect device & wait to be provisioned
+        self._connect_gettwin_disconnect_wait_tobeprovisioned(device_id, credentials)
+
+        command = (
+            "iot central device manual-failback --app-id {} --device-id {}".format(
+                self.app_id, device_id
             )
+        )
 
-            credentials = self.cmd(
-                command, api_version=self._api_version
-            ).get_output_in_json()
+        # Initiating failback
+        fb_result = self.cmd(command, api_version=self._api_version)
 
-            # connect & disconnect device & wait to be provisioned
-            self._connect_gettwin_disconnect_wait_tobeprovisioned(device_id, credentials)
-            command = "iot central device manual-failover --app-id {} --device-id {} --ttl {}".format(
-                self.app_id, device_id, 5
-            )
+        # checking if failover has been done by comparing original hub identifier with hub identifier after failover is done
+        fb_json_result = fb_result.get_output_in_json()
+        hubIdentifierFailOver = fb_json_result["hubIdentifier"]
+        # connect & disconnect device & wait to be provisioned
+        self._connect_gettwin_disconnect_wait_tobeprovisioned(device_id, credentials)
 
-            # initiating failover
-            result = self.cmd(command, api_version=self._api_version)
-            json_result = result.get_output_in_json()
+        # initiating failover again to see if hub identifier after failbackreturned to original state
+        command = "iot central device manual-failover --app-id {} --device-id {} --ttl {}".format(
+            self.app_id, device_id, 5
+        )
 
-            # check if failover started and getting original hub identifier
-            hubIdentifierOriginal = json_result["hubIdentifier"]
+        result = self.cmd(command, api_version=self._api_version)
 
-            # connect & disconnect device & wait to be provisioned
-            self._connect_gettwin_disconnect_wait_tobeprovisioned(device_id, credentials)
+        json_result = result.get_output_in_json()
+        hubIdentifierFinal = json_result["hubIdentifier"]
 
-            command = (
-                "iot central device manual-failback --app-id {} --device-id {}".format(
-                    self.app_id, device_id
-                )
-            )
+        # Cleanup
+        self._delete_device(device_id=device_id, api_version=self._api_version)
 
-            # Initiating failback
-            fb_result = self.cmd(command, api_version=self._api_version)
+        self._delete_device_template(
+            template_id=template_id, api_version=self._api_version
+        )
 
-            # checking if failover has been done by comparing original hub identifier with hub identifier after failover is done
-            fb_json_result = fb_result.get_output_in_json()
-            hubIdentifierFailOver = fb_json_result["hubIdentifier"]
-            # connect & disconnect device & wait to be provisioned
-            self._connect_gettwin_disconnect_wait_tobeprovisioned(device_id, credentials)
-
-            # initiating failover again to see if hub identifier after failbackreturned to original state
-            command = "iot central device manual-failover --app-id {} --device-id {} --ttl {}".format(
-                self.app_id, device_id, 5
-            )
-
-            result = self.cmd(command, api_version=self._api_version)
-
-            json_result = result.get_output_in_json()
-            hubIdentifierFinal = json_result["hubIdentifier"]
-
-            # Cleanup
-            self._delete_device(device_id=device_id, api_version=self._api_version)
-
-            self._delete_device_template(
-                template_id=template_id, api_version=self._api_version
-            )
-
-            assert len(hubIdentifierOriginal) > 0
-            assert len(hubIdentifierFailOver) > 0
-            assert hubIdentifierOriginal != hubIdentifierFailOver
-            assert len(hubIdentifierFinal) > 0
-            assert hubIdentifierOriginal == hubIdentifierFinal
+        assert len(hubIdentifierOriginal) > 0
+        assert len(hubIdentifierFailOver) > 0
+        assert hubIdentifierOriginal != hubIdentifierFailOver
+        assert len(hubIdentifierFinal) > 0
+        assert hubIdentifierOriginal == hubIdentifierFinal
 
     def _list_device_groups(self):
         return self.cmd(
