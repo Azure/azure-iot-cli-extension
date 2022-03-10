@@ -6,9 +6,8 @@
 
 import json
 from knack.log import get_logger
-from knack.util import CLIError
 from azext_iot.common.shared import SdkType
-from azext_iot.common.utility import unpack_msrest_error, process_json_arg
+from azext_iot.common.utility import handle_service_exception, process_json_arg
 from azext_iot.iothub.providers.base import (
     IoTHubProvider,
     CloudError,
@@ -75,7 +74,7 @@ class PnPRuntimeProvider(IoTHubProvider):
             }
 
         except CloudError as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     def get_digital_twin(self, device_id):
         return self.runtime_sdk.get_digital_twin(id=device_id, raw=True).response.json()
@@ -102,4 +101,4 @@ class PnPRuntimeProvider(IoTHubProvider):
 
             return self.get_digital_twin(device_id=device_id)
         except CloudError as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)

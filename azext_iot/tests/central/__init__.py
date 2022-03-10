@@ -7,7 +7,8 @@
 import json
 import time
 from typing import Tuple
-from knack.util import CLIError
+
+from azure.cli.core.azclierror import CLIInternalError
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.tests import CaptureOutputLiveScenarioTest
 from azext_iot.tests.conftest import get_context_path
@@ -367,7 +368,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                             )
                 time.sleep(10)
 
-        raise CLIError(
+        raise CLIInternalError(
             f"Device template {template_id} cannot be deleted."
             + (f" Error: {error}" if error is not None else "")
         )
@@ -602,7 +603,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         while True:
             try:
                 result = self.cmd(command, api_version=api_version)
-            except CLIError as e:
+            except Exception as e:
                 if e.args[0] and "code" in e.args[0]:
                     err = dict(e.args[0])
                     if err["code"] == "NotFound":

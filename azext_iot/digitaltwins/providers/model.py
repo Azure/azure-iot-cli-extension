@@ -5,11 +5,11 @@
 # --------------------------------------------------------------------------------------------
 
 import json
-from azext_iot.common.utility import process_json_arg, scantree, unpack_msrest_error
+from knack.log import get_logger
+from azure.cli.core.azclierror import ForbiddenError, RequiredArgumentMissingError
+from azext_iot.common.utility import process_json_arg, handle_service_exception, scantree
 from azext_iot.digitaltwins.providers.base import DigitalTwinsProvider
 from azext_iot.sdk.digitaltwins.dataplane.models import ErrorResponseException
-from knack.log import get_logger
-from knack.util import CLIError
 
 logger = get_logger(__name__)
 
@@ -59,7 +59,7 @@ class ModelProvider(DigitalTwinsProvider):
 
     def add(self, models=None, from_directory=None):
         if not any([models, from_directory]):
-            raise CLIError("Provide either --models or --from-directory.")
+            raise RequiredArgumentMissingError("Provide either --models or --from-directory.")
 
         # If both arguments are provided. --models wins.
         payload = []
@@ -80,10 +80,10 @@ class ModelProvider(DigitalTwinsProvider):
         try:
             return self.model_sdk.add(payload, raw=True).response.json()
         except ErrorResponseException as e:
-            error_text = unpack_msrest_error(e)
             if e.response.status_code == 403:
                 error_text = "Current principal access is forbidden. Please validate rbac role assignments."
-            raise CLIError(error_text)
+                raise ForbiddenError(error_text)
+            handle_service_exception(e)
 
     def _process_directory(self, from_directory):
         logger.debug(
@@ -111,7 +111,7 @@ class ModelProvider(DigitalTwinsProvider):
                 id=id, include_model_definition=get_definition, raw=True
             ).response.json()
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     def list(
         self, get_definition=False, dependencies_for=None, top=None
@@ -135,7 +135,7 @@ class ModelProvider(DigitalTwinsProvider):
         try:
             self.model_sdk.update(id=id, update_model=patched_model)
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
         return self.get(id=id)
 
@@ -143,7 +143,7 @@ class ModelProvider(DigitalTwinsProvider):
         try:
             self.model_sdk.delete(id=id)
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
     def delete_all(self):
         # Get all models
@@ -155,7 +155,7 @@ class ModelProvider(DigitalTwinsProvider):
         except StopIteration:
             pass
         except ErrorResponseException as e:
-            raise CLIError(unpack_msrest_error(e))
+            handle_service_exception(e)
 
         # Build dict of model_id : set of parent_ids
         parsed_models = {model.id: set() for model in incoming_result}
@@ -179,7 +179,7 @@ class ModelProvider(DigitalTwinsProvider):
             del model_dict[model_id]
             try:
                 self.delete(model_id)
-            except CLIError as e:
+            except Exception as e:
                 logger.warning(f"Could not delete model {model_id}; error is {e}")
 
         while len(parsed_models) > 0:

@@ -416,7 +416,7 @@ class TestJobCreate:
                 randint(30, 90),
                 0,
                 1,
-                "--poll-interval must be greater than 0!",
+                "--poll-interval must be greater than 0.",
             ),
             (
                 generate_job_id(),
@@ -431,7 +431,7 @@ class TestJobCreate:
                 randint(30, 90),
                 1,
                 0,
-                "--poll-duration must be greater than 0!",
+                "--poll-duration must be greater than 0.",
             ),
             (
                 generate_job_id(),

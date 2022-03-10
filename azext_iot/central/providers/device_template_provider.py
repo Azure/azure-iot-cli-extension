@@ -5,7 +5,10 @@
 # --------------------------------------------------------------------------------------------
 
 from typing import List, Union
-from knack.util import CLIError
+from azure.cli.core.azclierror import (
+    RequiredArgumentMissingError,
+    ResourceNotFoundError,
+)
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.v1 import TemplateV1
@@ -52,7 +55,7 @@ class CentralDeviceTemplateProvider:
             self._device_templates[device_template_id] = device_template
 
         if not device_template:
-            raise CLIError(
+            raise ResourceNotFoundError(
                 "No device template for device template with id: '{}'.".format(
                     device_template_id
                 )
@@ -155,7 +158,7 @@ class CentralDeviceTemplateProvider:
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         if not device_template_id:
-            raise CLIError("Device template id must be specified.")
+            raise RequiredArgumentMissingError("Device template id must be specified.")
 
         result = central_services.device_template.delete_device_template(
             cmd=self._cmd,

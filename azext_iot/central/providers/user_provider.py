@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from knack.log import get_logger
-from knack.util import CLIError
+from azure.cli.core.azclierror import RequiredArgumentMissingError
 from typing import List
 from azext_iot.central.models.enum import ApiVersion
 from azext_iot.constants import CENTRAL_ENDPOINT
@@ -44,10 +44,10 @@ class CentralUserProvider:
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> central_services.user.User:
         if not tenant_id:
-            raise CLIError("Must specify --tenant-id when adding a service principal")
+            raise RequiredArgumentMissingError("Must specify --tenant-id when adding a service principal")
 
         if not object_id:
-            raise CLIError("Must specify --object-id when adding a service principal")
+            raise RequiredArgumentMissingError("Must specify --object-id when adding a service principal")
 
         if org_id and self._api_version == ApiVersion.v1_1_preview.value:
             roles = rf"{org_id}\{role}"
@@ -75,10 +75,10 @@ class CentralUserProvider:
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> central_services.user.User:
         if not tenant_id:
-            raise CLIError("Must specify --tenant-id when adding a service principal")
+            raise RequiredArgumentMissingError("Must specify --tenant-id when adding a service principal")
 
         if not object_id:
-            raise CLIError("Must specify --object-id when adding a service principal")
+            raise RequiredArgumentMissingError("Must specify --object-id when adding a service principal")
 
         return central_services.user.add_or_update_service_principal_user(
             cmd=self._cmd,
@@ -142,7 +142,7 @@ class CentralUserProvider:
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> central_services.user.User:
         if not email:
-            raise CLIError("Must specify --email when adding a user by email")
+            raise RequiredArgumentMissingError("Must specify --email when adding a user by email")
 
         if org_id and self._api_version == ApiVersion.v1_1_preview.value:
             roles = rf"{org_id}\{role}"
@@ -168,7 +168,7 @@ class CentralUserProvider:
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> central_services.user.User:
         if not email:
-            raise CLIError("Must specify --email when adding a user by email")
+            raise RequiredArgumentMissingError("Must specify --email when adding a user by email")
 
         return central_services.user.add_or_update_email_user(
             cmd=self._cmd,

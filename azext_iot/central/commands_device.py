@@ -7,7 +7,7 @@
 
 from azext_iot.central.models.devicetwin import DeviceTwin
 from azext_iot.central.providers import CentralDeviceProvider
-from knack.util import CLIError
+from azure.cli.core.azclierror import InvalidArgumentValueError, RequiredArgumentMissingError
 from typing import Union, List
 from azext_iot.central.models.v1 import DeviceV1
 from azext_iot.central.models.preview import DevicePreview
@@ -77,7 +77,7 @@ def create_device(
     api_version=ApiVersion.v1.value,
 ) -> DeviceType:
     if simulated and not template:
-        raise CLIError(
+        raise RequiredArgumentMissingError(
             "Error: if you supply --simulated you must also specify --template"
         )
 
@@ -170,7 +170,7 @@ def run_command(
     api_version=ApiVersion.v1.value,
 ) -> dict:
     if not isinstance(content, str):
-        raise CLIError("content must be a string: {}".format(content))
+        raise InvalidArgumentValueError("content must be a string: {}".format(content))
 
     payload = utility.process_json_arg(content, argument_name="content")
 
@@ -197,7 +197,7 @@ def run_manual_failover(
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> dict:
     if ttl_minutes and ttl_minutes < 1:
-        raise CLIError("TTL value should be a positive integer: {}".format(ttl_minutes))
+        raise InvalidArgumentValueError("TTL value should be a positive integer: {}".format(ttl_minutes))
 
     provider = CentralDeviceProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
