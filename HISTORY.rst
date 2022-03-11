@@ -9,8 +9,8 @@ Release History
 
 **General updates**
 
-* The generic `CLIError`s raised across the extension have been changed to more specific semantically correct exceptions aligning with CLI core. 
-* Fix for issue #475 resolving `sys.excepthook` upon terminating monitor-events process in Py 3.9+ environments.
+* The generic CLIErrors raised across the extension have been changed to more specific semantically correct exceptions aligning with CLI core. 
+* Fix for issue #475 resolving `sys.excepthook` upon terminating monitor-events process in Py 3.9+ environments [IoT Hub, IoT Central].
 
 **Digital Twin updates**
 
