@@ -13,17 +13,11 @@ from azext_iot.monitor.parsers import strings
 from azext_iot.tests import helpers
 from azext_iot.tests.central import (
     CentralLiveScenarioTest,
-    APP_ID,
-    STORAGE_CSTRING,
-    STORAGE_CONTAINER,
     DEFAULT_FILE_UPLOAD_TTL,
     sync_command_params,
 )
 import pytest
 
-
-if not all([APP_ID]):
-    raise ValueError("Set azext_iot_central_app_id to run central integration tests.")
 
 IS_1_1_PREVIEW = True
 
@@ -39,6 +33,16 @@ class TestIotCentral(CentralLiveScenarioTest):
         if IS_1_1_PREVIEW:
             print("Testing 1.1-preview")
         yield
+
+    @pytest.fixture(scope='class', autouse=True)
+    def setUpSuite(self):
+        self._create_storage_account()
+
+    @pytest.fixture(scope='class', autouse=True)
+    def tearDownSuite(self):
+        yield
+        if self.storage_account_name:
+            self._delete_storage_account()
 
     def __init__(self, test_scenario):
         super(TestIotCentral, self).__init__(test_scenario=test_scenario)
@@ -66,7 +70,7 @@ class TestIotCentral(CentralLiveScenarioTest):
 
         # Test with invalid app-id
         command = "iot central diagnostics monitor-events --app-id {} -y".format(
-            APP_ID + "zzz"
+            self.app_id + "zzz"
         )
         self.cmd(command, api_version=self._api_version, expect_failure=True)
 
@@ -210,11 +214,11 @@ class TestIotCentral(CentralLiveScenarioTest):
         users = self._create_users(api_version=self._api_version)
 
         command = "iot central user show --app-id {} --user-id {}".format(
-            APP_ID, users[0].get("id")
+            self.app_id, users[0].get("id")
         )
         self.cmd(command, api_version=self._api_version)
 
-        command = "iot central user list --app-id {}".format(APP_ID)
+        command = "iot central user list --app-id {}".format(self.app_id)
         result = self.cmd(command, api_version=self._api_version).get_output_in_json()
 
         for user in users:
@@ -224,7 +228,7 @@ class TestIotCentral(CentralLiveScenarioTest):
             current_role = user["roles"][0]["role"]
             new_role = [x for x in get_enum_values(Role) if x != current_role][0]
             command = "iot central user update --app-id {} --email {} --role {} --user-id {}".format(
-                APP_ID, user["email"], new_role, user["id"]
+                self.app_id, user["email"], new_role, user["id"]
             )
             checks = [self.check("roles[0].role", new_role)]
             self.cmd(command, api_version=self._api_version, checks=checks)
@@ -236,12 +240,12 @@ class TestIotCentral(CentralLiveScenarioTest):
     def test_central_api_token_methods_CRD(self):
         tokens = self._create_api_tokens(api_version=self._api_version)
         command = "iot central api-token show --app-id {} --token-id {}".format(
-            APP_ID, tokens[0].get("id")
+            self.app_id, tokens[0].get("id")
         )
         self.cmd(command, api_version=self._api_version)
 
         command = "iot central api-token list --app-id {}".format(
-            APP_ID,
+            self.app_id,
         )
         result = self.cmd(command, api_version=self._api_version).get_output_in_json()
 
@@ -275,13 +279,13 @@ class TestIotCentral(CentralLiveScenarioTest):
         self._wait_for_provisioned(device_id=device_id, api_version=self._api_version)
 
         command = "iot central device command run -n {} -d {} --cn {} -k '{}'".format(
-            APP_ID, device_id, command_name, sync_command_params
+            self.app_id, device_id, command_name, sync_command_params
         )
 
         run_command_result = self.cmd(command, api_version=self._api_version)
 
         command = "iot central device command history -n {} -d {} --cn {}".format(
-            APP_ID, device_id, command_name
+            self.app_id, device_id, command_name
         )
 
         show_command_result = self.cmd(command, api_version=self._api_version)
@@ -313,13 +317,13 @@ class TestIotCentral(CentralLiveScenarioTest):
 
         command = (
             "iot central device command run -n {} -d {} -i {} --cn {} -k '{}'".format(
-                APP_ID, device_id, interface_id, command_name, sync_command_params
+                self.app_id, device_id, interface_id, command_name, sync_command_params
             )
         )
         run_command_result = self.cmd(command, api_version=self._api_version)
 
         command = "iot central device command history -n {} -d {} -i {} --cn {}".format(
-            APP_ID, device_id, interface_id, command_name
+            self.app_id, device_id, interface_id, command_name
         )
         show_command_result = self.cmd(command, api_version=self._api_version)
 
@@ -339,10 +343,6 @@ class TestIotCentral(CentralLiveScenarioTest):
         # check that run result and show result indeed match
         assert run_result["response"] == show_result["value"][0]["response"]
 
-    @pytest.mark.skipif(
-        not STORAGE_CSTRING or not STORAGE_CONTAINER,
-        reason="empty azext_iot_central_storage_cstring or azext_iot_central_storage_container env var",
-    )
     @pytest.mark.xfail(
         condition=not IS_1_1_PREVIEW,
         reason="Api version not supported",
@@ -363,7 +363,7 @@ class TestIotCentral(CentralLiveScenarioTest):
         # UPDATE
         command = (
             "iot central file-upload-config update --app-id {} --sas-ttl {}".format(
-                APP_ID, "PT4H"
+                self.app_id, "PT4H"
             )
         )
         self.cmd(command, api_version=self._api_version)
@@ -374,15 +374,11 @@ class TestIotCentral(CentralLiveScenarioTest):
         # DELETE
         self._delete_fileupload(api_version=self._api_version)
         # check deleting state
-        command = "iot central file-upload-config show -n {}".format(APP_ID)
+        command = "iot central file-upload-config show -n {}".format(self.app_id)
         result = self.cmd(command, api_version=self._api_version).get_output_in_json()
         assert result["state"] == "deleting"
         self._wait_for_storage_configured(api_version=self._api_version)
 
-    @pytest.mark.skipif(
-        not STORAGE_CSTRING or not STORAGE_CONTAINER,
-        reason="empty azext_iot_central_storage_cstring or azext_iot_central_storage_container env var",
-    )
     def test_central_fileupload_methods_CRUD_optional(self):
         ACCOUNT_NAME = "account"
         SAS_TTL = "PT2H"
@@ -400,7 +396,7 @@ class TestIotCentral(CentralLiveScenarioTest):
         # UPDATE
         command = (
             "iot central file-upload-config update --app-id {} --sas-ttl {}".format(
-                APP_ID, "PT4H"
+                self.app_id, "PT4H"
             )
         )
         self.cmd(command, api_version=self._api_version)
@@ -411,7 +407,7 @@ class TestIotCentral(CentralLiveScenarioTest):
         self._delete_fileupload(api_version=self._api_version)
 
         # check deleting state
-        command = "iot central file-upload-config show -n {}".format(APP_ID)
+        command = "iot central file-upload-config show -n {}".format(self.app_id)
         result = self.cmd(command, api_version=self._api_version).get_output_in_json()
         assert result["state"] == "deleting"
         self._wait_for_storage_configured(api_version=self._api_version)
@@ -423,24 +419,20 @@ class TestIotCentral(CentralLiveScenarioTest):
     def test_central_organization_methods_CRUD(self):
         org = self._create_organization(api_version=self._api_version)
         command = "iot central organization show -n {} --org-id {}".format(
-            APP_ID, org["id"]
+            self.app_id, org["id"]
         )
         result = self.cmd(command, api_version=self._api_version).get_output_in_json()
         assert result["id"] == org["id"]
 
         # UPDATE
         command = "iot central organization update --app-id {} --org-id {} --org-name {}".format(
-            APP_ID, org["id"], "new_name"
+            self.app_id, org["id"], "new_name"
         )
         checks = [self.check("displayName", "new_name")]
         self.cmd(command, api_version=self._api_version, checks=checks)
         # DELETE
         self._delete_organization(org_id=org["id"], api_version=self._api_version)
 
-    @pytest.mark.skipif(
-        not STORAGE_CSTRING or not STORAGE_CONTAINER,
-        reason="empty azext_iot_central_storage_cstring or azext_iot_central_storage_container env var",
-    )
     @pytest.mark.xfail(
         condition=not IS_1_1_PREVIEW,
         reason="Api version not supported",
@@ -450,7 +442,7 @@ class TestIotCentral(CentralLiveScenarioTest):
         export_id = "aztestexport001"
         dest = self._create_destination(api_version=self._api_version, dest_id=dest_id)
         command = "iot central export destination show -n {} --dest-id {}".format(
-            APP_ID, dest["id"]
+            self.app_id, dest["id"]
         )
         result = self.cmd(command, api_version=self._api_version).get_output_in_json()
         assert result["id"] == dest["id"]
@@ -459,7 +451,7 @@ class TestIotCentral(CentralLiveScenarioTest):
             api_version=self._api_version, export_id=export_id, dest_id=dest_id
         )
         command = "iot central export show -n {} --export-id {}".format(
-            APP_ID, export["id"]
+            self.app_id, export["id"]
         )
         export_result = self.cmd(
             command, api_version=self._api_version
@@ -480,7 +472,7 @@ class TestIotCentral(CentralLiveScenarioTest):
         )
 
         command = 'iot central query -n {} --query-string "{}"'.format(
-            APP_ID,
+            self.app_id,
             "SELECT TOP 1 testDefaultCapability FROM dtmi:intTestDeviceTemplateid WHERE WITHIN_WINDOW(PT1H)",
         )
         response = self.cmd(command, api_version=self._api_version).get_output_in_json()

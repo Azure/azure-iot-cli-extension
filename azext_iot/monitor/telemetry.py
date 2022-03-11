@@ -77,9 +77,9 @@ def start_multiple_monitors(
             # TODO: remove when deprecating
             # pylint: disable=no-member
             tasks = (
-                asyncio.Task.all_tasks()
-                if sys.version_info < (3, 9)
-                else asyncio.all_tasks()
+                asyncio.Task.all_tasks(loop)
+                if sys.version_info < (3, 7)
+                else asyncio.all_tasks(loop)
             )
             for t in tasks:  # pylint: disable=no-member
                 t.cancel()
