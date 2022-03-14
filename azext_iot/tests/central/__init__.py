@@ -615,7 +615,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         if self.storage_account_name:
             self.cmd(
                 "storage account delete -n {} -g {} -y".format(
-                    self.storage_account_name, APP_RG
+                    self.storage_account_name, self.app_rg
                 ),
                 include_opt_args=False,
             )

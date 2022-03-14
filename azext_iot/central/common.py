@@ -11,7 +11,7 @@ shared: Define shared data types
 
 from enum import Enum
 
-EDGE_ONLY = "type eq 'GatewayDevice' or type eq 'EdgeDevice'"
+EDGE_ONLY_FILTER = "type eq 'GatewayDevice' or type eq 'EdgeDevice'"
 
 
 class DestinationType(Enum):

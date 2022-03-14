@@ -7,7 +7,7 @@
 
 from typing import List, Union
 import requests
-from azext_iot.central.common import EDGE_ONLY
+from azext_iot.central.common import EDGE_ONLY_FILTER
 from azext_iot.central.models.edge import EdgeModule
 from azext_iot.common.auth import get_aad_token
 
@@ -115,7 +115,11 @@ def list_devices(
     query_parameters["api-version"] = api_version
 
     warning = "This command may take a long time to complete if your app contains a lot of devices."
-    if filter and filter == EDGE_ONLY and api_version != ApiVersion.v1_1_preview.value:
+    if (
+        filter
+        and filter == EDGE_ONLY_FILTER
+        and api_version != ApiVersion.v1_1_preview.value
+    ):
         warning += (
             "\nAlso consider using Api Version 1.1-preview when listing edge devices "
             "as it supports server filtering speeding up the process."

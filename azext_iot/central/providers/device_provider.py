@@ -218,9 +218,7 @@ class CentralDeviceProvider:
         )
 
         if relationships is None:
-            raise ResourceNotFoundError(
-                "No relationships found for device with id: '{}'.".format(device_id)
-            )
+            return []
 
         if rel_name:
             relationships = [rel for rel in relationships if rel.name == rel_name]
@@ -459,9 +457,7 @@ class CentralDeviceProvider:
         )
 
         if not modules:
-            raise ResourceNotFoundError(
-                "No modules found for device with id: '{}'.".format(device_id)
-            )
+            return []
 
         return modules
 

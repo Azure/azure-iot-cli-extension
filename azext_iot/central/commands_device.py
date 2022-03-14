@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 # Dev note - think of this as a controller
 
-from azext_iot.central.common import EDGE_ONLY
+from azext_iot.central.common import EDGE_ONLY_FILTER
 from azext_iot.central.models.devicetwin import DeviceTwin
 from azext_iot.central.models.edge import EdgeModule
 from azext_iot.central.providers import (
@@ -45,7 +45,8 @@ def list_devices(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
     devices = provider.list_devices(
-        filter=EDGE_ONLY, central_dns_suffix=central_dns_suffix
+        filter=EDGE_ONLY_FILTER if edge_only else None,
+        central_dns_suffix=central_dns_suffix,
     )
 
     if edge_only and api_version != ApiVersion.v1_1_preview.value:
@@ -478,7 +479,7 @@ def get_edge_device(
 
     def raise_error():
         raise InvalidArgumentValueError(
-            "The specified device Id does not identify an IoT Edge device."
+            "The specified device Id does not identify as an IoT Edge device."
         )
 
     # check if device is edge

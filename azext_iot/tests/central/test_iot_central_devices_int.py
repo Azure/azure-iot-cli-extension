@@ -116,7 +116,9 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         command = "iot central device compute-device-key --pk {} -d {}".format(
             self.app_primary_key, device_id
         )
-        device_primary_key = self.cmd(command, include_opt_args=False).get_output_in_json()
+        device_primary_key = self.cmd(
+            command, include_opt_args=False
+        ).get_output_in_json()
 
         credentials = {
             "idScope": app_scope_id,
@@ -124,7 +126,9 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         }
         device_client = helpers.dps_connect_device(device_id, credentials)
 
-        command = "iot central device show --app-id {} -d {}".format(self.app_id, device_id)
+        command = "iot central device show --app-id {} -d {}".format(
+            self.app_id, device_id
+        )
 
         self.cmd(
             command,
@@ -146,7 +150,9 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         start_dev_count = len(start_device_list)
         (device_id, device_name) = self._create_device(api_version=self._api_version)
 
-        command = "iot central device show --app-id {} -d {}".format(self.app_id, device_id)
+        command = "iot central device show --app-id {} -d {}".format(
+            self.app_id, device_id
+        )
         checks = [
             self.check("displayName", device_name),
             self.check("id", device_id),
@@ -225,11 +231,11 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         # wait about a few seconds for simulator to kick in so that provisioning completes
         time.sleep(60)
 
-        command = "iot central device list --app-id {}".format(APP_ID)
+        command = "iot central device list --app-id {}".format(self.app_id)
         total_devs_list = self.cmd(command).get_output_in_json()
 
         # check if device appears as edge
-        command = "iot central device list --app-id {} --edge-only".format(APP_ID)
+        command = "iot central device list --app-id {} --edge-only".format(self.app_id)
         edge_list = self.cmd(command).get_output_in_json()
         assert device_id in [dev["id"] for dev in edge_list]
         # check edge device appears in general list
@@ -237,7 +243,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
 
         # MODULES
         command = "iot central device edge module list --app-id {} -d {}".format(
-            APP_ID, device_id
+            self.app_id, device_id
         )
         modules = self.cmd(command).get_output_in_json()
 
@@ -297,7 +303,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         else:
             # check twin to evaluate the iotedge flag
             command = "iot central device twin show --app-id {} -d {}".format(
-                APP_ID, device_id
+                self.app_id, device_id
             )
             twin = self.cmd(command).get_output_in_json()
 
@@ -305,12 +311,12 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
 
         # CHILDREN
         command = "iot central device edge children add --app-id {} -d {} --children-ids {}".format(
-            APP_ID, device_id, child_id
+            self.app_id, device_id, child_id
         )
         self.cmd(command, api_version=ApiVersion.v1_1_preview.value)
 
         command = "iot central device edge children list --app-id {} -d {}".format(
-            APP_ID, device_id
+            self.app_id, device_id
         )
         # Use api-version 1.0 to also test interoperability
         children = self.cmd(
