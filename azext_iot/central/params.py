@@ -65,7 +65,7 @@ def load_central_arguments(self, _):
         context.argument(
             "central_dns_suffix",
             options_list=["--central-dns-suffix", "--central-api-uri"],
-            help="The IoT Central DNS suffix associated with your application. Default value is: azureiotcentral.com",
+            help="The IoT Central DNS suffix associated with your application.",
         )
         context.argument(
             "device_id",
@@ -331,7 +331,7 @@ def load_central_arguments(self, _):
             "sasTtl",
             options_list=["--sas-ttl"],
             help="The amount of time the device’s request to upload a file is valid before it expires."
-            " ISO 8601 duration standard. Default 1h.",
+            " ISO 8601 duration standard. Default: 1h.",
         )
 
     with self.argument_context("iot central file-upload-config update") as context:
@@ -354,7 +354,7 @@ def load_central_arguments(self, _):
             "sasTtl",
             options_list=["--sas-ttl"],
             help="The amount of time the device’s request to upload a file is valid before it expires."
-            " ISO 8601 duration standard. Default 1h.",
+            " ISO 8601 duration standard. Default: 1h.",
         )
 
     with self.argument_context("iot central organization") as context:
@@ -440,7 +440,7 @@ def load_central_arguments(self, _):
             "batch_type",
             options_list=["--batch-type", "--bt"],
             default=False,
-            help="Specify if batching is done on a number of devices or a percentage of the total. Default: False",
+            help="Specify if batching is done on a number of devices or a percentage of the total.",
         )
         context.argument(
             "batch",
@@ -518,7 +518,7 @@ def load_central_arguments(self, _):
             "filter",
             options_list=["--filter", "-f"],
             default=None,
-            help="IoT Central Query Language based filter, more details from: ",
+            help="IoT Central Query Language based filter, more details from: aka.ms/iotcquery",
         )
         context.argument(
             "source",
