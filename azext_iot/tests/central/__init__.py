@@ -325,11 +325,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 pass
 
         command = "iot central device-template create --app-id {} --device-template-id {} -k '{}'".format(
-            self.app_id,
-            template_id,
-            device_template_path_preview
-            if api_version == ApiVersion.preview.value
-            else device_template_path,
+            self.app_id, template_id, template_path
         )
 
         result = self.cmd(

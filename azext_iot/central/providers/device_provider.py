@@ -284,11 +284,6 @@ class CentralDeviceProvider:
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> dict:
 
-        if not device_id or not rel_id:
-            raise RequiredArgumentMissingError(
-                "Device id and relationship id must be specified."
-            )
-
         # get or add to cache
         result = central_services.device.delete_relationship(
             cmd=self._cmd,
