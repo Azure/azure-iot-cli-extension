@@ -1,0 +1,87 @@
+{
+    "modules": [
+        {
+            "deviceId": "edge0",
+            "moduleId": "$edgeAgent",
+            "isSystemModule": true,
+            "runtimeStatus": "running",
+            "statusDescription": "running",
+            "restartPolicy": "always",
+            "settings": {
+                "image": "mcr.microsoft.com/azureiotedge-agent:1.0",
+                "imageHash": "sha256:2e4579e4cddb747faf7b454fe7b4fd6d14dfcc9106ba49b9a467ec36979fb118",
+                "createOptions": "{\"Labels\":{\"net.azure-devices.edge.create-options\":\"{}\",\"net.azure-devices.edge.env\":\"{}\",\"net.azure-devices.edge.original-image\":\"mcr.microsoft.com/azureiotedge-agent:1.0\",\"net.azure-devices.edge.owner\":\"Microsoft.Azure.Devices.Edge.Agent\"}}"
+            },
+            "etag": "AAAAAAAAAAI=",
+            "deviceEtag": "ODc3ODUwMzk4",
+            "twinStatus": "enabled",
+            "statusUpdateTime": "0001-01-01T00:00:00Z",
+            "connectionState": "Disconnected",
+            "lastActivityTime": "0001-01-01T00:00:00Z",
+            "cloudToDeviceMessageCount": 0,
+            "type": "docker",
+            "startupOrder": 0,
+            "exitCode": 0,
+            "lastStartTimeUtc": "2022-01-18T09:45:22.7359646",
+            "lastExitTimeUtc": "0001-01-01T00:00:00",
+            "imagePullPolicy": "on-create"
+        },
+        {
+            "deviceId": "edge0",
+            "moduleId": "$edgeHub",
+            "isSystemModule": true,
+            "runtimeStatus": "running",
+            "statusDescription": "running",
+            "restartPolicy": "always",
+            "settings": {
+                "image": "mcr.microsoft.com/azureiotedge-hub:1.0",
+                "imageHash": "sha256:8361ca7a02fa3211950718280f70d5055e01c98f129e35227387460e67faa0ea",
+                "createOptions": "{}"
+            },
+            "etag": "AAAAAAAAAAI=",
+            "deviceEtag": "ODc3ODUwMzk5",
+            "twinStatus": "enabled",
+            "statusUpdateTime": "0001-01-01T00:00:00Z",
+            "connectionState": "Connected",
+            "lastActivityTime": "0001-01-01T00:00:00Z",
+            "cloudToDeviceMessageCount": 0,
+            "type": "docker",
+            "status": "running",
+            "imagePullPolicy": "on-create",
+            "exitCode": 0,
+            "env": {},
+            "lastStartTimeUtc": "2022-01-18T09:45:30.1468476",
+            "lastExitTimeUtc": "0001-01-01T00:00:00",
+            "restartCount": 0
+        },
+        {
+            "deviceId": "edge0",
+            "moduleId": "SimulatedTemperatureSensor",
+            "isSystemModule": false,
+            "runtimeStatus": "running",
+            "statusDescription": "running",
+            "restartPolicy": "always",
+            "version": "1.0",
+            "settings": {
+                "image": "mcr.microsoft.com/azureiotedge-simulated-temperature-sensor:1.0",
+                "imageHash": "sha256:85fdb1e9675c837c18b75f103be6f156587d1058eced1fc508cdb84a722e4f82",
+                "createOptions": "{}"
+            },
+            "etag": "AAAAAAAAAAE=",
+            "deviceEtag": "MTQ4NjM2MzAz",
+            "twinStatus": "enabled",
+            "statusUpdateTime": "0001-01-01T00:00:00Z",
+            "connectionState": "Connected",
+            "lastActivityTime": "2022-01-18T10:27:25.3827508Z",
+            "cloudToDeviceMessageCount": 0,
+            "exitCode": 0,
+            "lastStartTimeUtc": "2022-01-18T09:45:29.2322424",
+            "lastExitTimeUtc": "0001-01-01T00:00:00",
+            "restartCount": 0,
+            "status": "running",
+            "imagePullPolicy": "on-create",
+            "type": "docker",
+            "env": {}
+        }
+    ]
+}

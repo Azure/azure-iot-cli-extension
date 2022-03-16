@@ -8,7 +8,7 @@ import json
 import time
 from typing import Tuple
 
-from azure.cli.core.azclierror import CLIInternalError
+from azure.cli.core.azclierror import CLIInternalError, InvalidArgumentValueError
 from azext_iot.tests import CaptureOutputLiveScenarioTest
 from azext_iot.tests.conftest import get_context_path
 from azext_iot.tests.generators import generate_generic_id
@@ -25,21 +25,30 @@ CENTRAL_SETTINGS = [
     "azext_iot_central_token",
     "azext_iot_central_dns_suffix",
     "azext_iot_central_storage_cstring",
-    "azext_iot_central_storage_container"
+    "azext_iot_central_storage_container",
 ]
 settings = DynamoSettings(opt_env_set=CENTRAL_SETTINGS)
 APP_RG = settings.env.azext_iot_testrg
 
 # Storage Account
 DEFAULT_CONTAINER = "central"
-STORAGE_CONTAINER = settings.env.azext_iot_central_storage_container or DEFAULT_CONTAINER
+STORAGE_CONTAINER = (
+    settings.env.azext_iot_central_storage_container or DEFAULT_CONTAINER
+)
 STORAGE_CSTRING = settings.env.azext_iot_central_storage_cstring
-STORAGE_NAME = None if settings.env.azext_iot_central_storage_cstring else "iotstore" + generate_generic_id()[:4]
+STORAGE_NAME = (
+    None
+    if settings.env.azext_iot_central_storage_cstring
+    else "iotstore" + generate_generic_id()[:4]
+)
 
 # Device templates
 device_template_path = get_context_path(__file__, "json/device_template_int_test.json")
 device_template_path_preview = get_context_path(
     __file__, "json/device_template_int_test_preview.json"
+)
+edge_template_path_preview = get_context_path(
+    __file__, "json/device_template_edge.json"
 )
 sync_command_params = get_context_path(__file__, "json/sync_command_args.json")
 DEFAULT_FILE_UPLOAD_TTL = "PT1H"
@@ -61,7 +70,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         api_version=None,
         checks=None,
         expect_failure=False,
-        include_opt_args=True
+        include_opt_args=True,
     ):
         if include_opt_args:
             command = self._appendOptionalArgsToCommand(
@@ -78,7 +87,9 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
           - token
           - dns_suffix
         """
-        self.app_id = settings.env.azext_iot_central_app_id or "test-app-" + generate_generic_id()
+        self.app_id = (
+            settings.env.azext_iot_central_app_id or "test-app-" + generate_generic_id()
+        )
         self.app_rg = APP_RG
         self._scope_id = settings.env.azext_iot_central_scope_id
 
@@ -95,12 +106,9 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
             self.cmd(
                 "iot central app create -n {} -g {} -s {} --mi-system-assigned -l {}".format(
-                    self.app_id,
-                    self.app_rg,
-                    self.app_id,
-                    "westus"
+                    self.app_id, self.app_rg, self.app_id, "westus"
                 ),
-                include_opt_args=False
+                include_opt_args=False,
             )
             self.app_primary_key = None
             # Will be repopulated with get_app_scope_id for tests that need it
@@ -210,7 +218,9 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
     def _delete_user(self, api_version, user_id) -> None:
         self.cmd(
-            "iot central user delete --app-id {} --user-id {}".format(self.app_id, user_id),
+            "iot central user delete --app-id {} --user-id {}".format(
+                self.app_id, user_id
+            ),
             api_version=api_version,
             checks=[self.check("result", "success")],
         )
@@ -249,7 +259,9 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         )
 
     def _wait_for_provisioned(self, api_version, device_id):
-        command = "iot central device show --app-id {} -d {}".format(self.app_id, device_id)
+        command = "iot central device show --app-id {} -d {}".format(
+            self.app_id, device_id
+        )
 
         while True:
             result = self.cmd(command, api_version=api_version)
@@ -272,25 +284,48 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             command, api_version=api_version, checks=[self.check("result", "success")]
         )
 
-    def _create_device_template(self, api_version):
-        if api_version == ApiVersion.preview.value:
-            template = utility.process_json_arg(
-                device_template_path_preview,
-                argument_name="device_template_path_preview",
+    def _create_device_template(self, api_version, edge=False):
+        if edge and api_version != ApiVersion.v1_1_preview.value:
+            raise InvalidArgumentValueError(
+                "Edge template creation is only available for api version >= 1.1-preview."
             )
+
+        if edge:
+            template_path = edge_template_path_preview
+        elif api_version == ApiVersion.preview.value:
+            template_path = device_template_path_preview
         else:
-            template = utility.process_json_arg(
-                device_template_path, argument_name="device_template_path"
-            )
+            template_path = device_template_path
+
+        template = utility.process_json_arg(
+            template_path,
+            argument_name="template_path",
+        )
+
         template_name = template["displayName"]
-        template_id = template_name + "id"
+        template_id = template_name + "id;1"
+
+        if (
+            edge
+        ):  # check if template already exists as a create call does not work for edge templates
+            # since deployment manifest cannot be changed
+            try:
+                command = "iot central device-template show --app-id {} --device-template-id {}".format(
+                    self.app_id, template_id
+                )
+                result = self.cmd(command, api_version=api_version).get_output_in_json()
+
+                if (
+                    result
+                    and result.get(self._get_template_id_key(api_version=api_version))
+                    == template_id
+                ):
+                    return (template_id, template_name)
+            except Exception:
+                pass
 
         command = "iot central device-template create --app-id {} --device-template-id {} -k '{}'".format(
-            self.app_id,
-            template_id,
-            device_template_path_preview
-            if api_version == ApiVersion.preview.value
-            else device_template_path,
+            self.app_id, template_id, template_path
         )
 
         result = self.cmd(
@@ -302,10 +337,11 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         )
         json_result = result.get_output_in_json()
 
-        if api_version == ApiVersion.preview.value:
-            assert json_result["id"] == template_id
-        else:
-            assert json_result["@id"] == template_id
+        assert (
+            json_result[self._get_template_id_key(api_version=api_version)]
+            == template_id
+        )
+
         return (template_id, template_name)
 
     def _delete_device_template(self, api_version, template_id):
@@ -329,7 +365,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 # delete associated devices if any.
                 devices = self.cmd(
                     command="iot central device list --app-id {}".format(self.app_id),
-                    api_version=api_version
+                    api_version=api_version,
                 ).get_output_in_json()
 
                 if devices:
@@ -359,7 +395,8 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
     def _list_roles(self, api_version):
         return self.cmd(
-            "iot central role list --app-id {}".format(self.app_id), api_version=api_version
+            "iot central role list --app-id {}".format(self.app_id),
+            api_version=api_version,
         ).get_output_in_json()
 
     def _get_credentials(self, api_version, device_id):
@@ -439,7 +476,9 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         ).get_output_in_json()
 
     def _delete_fileupload(self, api_version):
-        command = "iot central file-upload-config delete --app-id {}".format(self.app_id)
+        command = "iot central file-upload-config delete --app-id {}".format(
+            self.app_id
+        )
         self.cmd(
             command,
             api_version=api_version,
@@ -542,14 +581,14 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 "storage account create -n {} -g {}".format(
                     self.storage_account_name, self.app_rg
                 ),
-                include_opt_args=False
+                include_opt_args=False,
             )
             self._populate_storage_cstring()
             self.cmd(
                 "storage container create -n {} --connection-string '{}'".format(
                     self.storage_container, self.storage_cstring
                 ),
-                include_opt_args=False
+                include_opt_args=False,
             )
 
     def _populate_storage_cstring(self):
@@ -561,7 +600,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 "storage account show-connection-string -n {} -g {}".format(
                     self.storage_account_name, self.app_rg
                 ),
-                include_opt_args=False
+                include_opt_args=False,
             ).get_output_in_json()["connectionString"]
 
     def _delete_storage_account(self):
@@ -572,9 +611,9 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         if self.storage_account_name:
             self.cmd(
                 "storage account delete -n {} -g {} -y".format(
-                    self.storage_account_name, APP_RG
+                    self.storage_account_name, self.app_rg
                 ),
-                include_opt_args=False
+                include_opt_args=False,
             )
 
     def _wait_for_storage_configured(self, api_version):
@@ -599,9 +638,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             # wait 10 seconds for provisioning to complete
             time.sleep(10)
 
-    def _appendOptionalArgsToCommand(
-        self, command: str, api_version: str
-    ):
+    def _appendOptionalArgsToCommand(self, command: str, api_version: str):
         if self.token:
             command += ' --token "{}"'.format(self.token)
         if self.dns_suffix:
@@ -611,10 +648,18 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
         return command
 
+    def _get_template_id(self, api_version, template):
+        if api_version == ApiVersion.preview.value:
+            return template["id"]
+        return template["@id"]
+
+    def _get_template_id_key(self, api_version):
+        if api_version == ApiVersion.preview.value:
+            return "id"
+        return "@id"
+
     def tearDown(self):
         if not settings.env.azext_iot_central_app_id:
             self.cmd(
-                "iot central app delete -n {} -g {} -y".format(
-                    self.app_id, self.app_rg
-                )
+                "iot central app delete -n {} -g {} -y".format(self.app_id, self.app_rg)
             )

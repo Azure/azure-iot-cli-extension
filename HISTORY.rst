@@ -19,6 +19,22 @@ Release History
 
 * Updated both controlplane and dataplane SDKs to now use the newer 2021-06-30-preview API version.
 
+**IoT Central updates**
+
+* Added commands for Edge devices and modules:
+  - az iot central device edge module
+    - az iot central device edge module list
+    - az iot central device edge module restart
+    - az iot central device edge module show
+
+  - az iot central device edge manifest
+    - az iot central device edge manifest show
+  
+  - az iot central device edge children
+    - az iot central device edge children list
+    - az iot central device edge children add
+    - az iot central device edge children remove
+    
 * Added `--no-wait` parameter to the following functions:
 
   - az dt create

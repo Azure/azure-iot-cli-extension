@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from azext_iot.central.models.edge import EdgeModule
 from azext_iot.central.providers import (
     CentralFileUploadProvider,
     CentralOrganizationProvider,
@@ -148,8 +149,12 @@ class TestMonitorEvents:
 
 class TestCentralDeviceProvider:
     _device = load_json(FileNames.central_device_file)
+    _edge_devices = list(load_json(FileNames.central_edge_devices_file))
+    _edge_children = list(load_json(FileNames.central_edge_children_file))
     _device_template = load_json(FileNames.central_device_template_file)
+    _edge_template = load_json(FileNames.central_edge_template_file)
     _device_twin = load_json(FileNames.central_device_twin_file)
+    _edge_modules = load_json(FileNames.central_edge_modules_file)
 
     @mock.patch("azext_iot.central.services.device_template")
     @mock.patch("azext_iot.central.services.device")
@@ -176,6 +181,77 @@ class TestCentralDeviceProvider:
         assert mock_device_svc.get_device_template.call_count == 0
 
         assert todict(device) == todict(self._device)
+
+    @mock.patch("azext_iot.central.services.device")
+    def test_should_return_list_edge(self, mock_device_svc):
+        # setup
+        provider = CentralDeviceProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+        )
+
+        devices = [
+            get_object(device, "Device", api_version=ApiVersion.v1_1_preview.value)
+            for device in self._edge_devices
+        ]
+        mock_device_svc.list_devices.return_value = devices
+
+        # act
+        edge_devices = [
+            todict(dev)
+            for dev in provider.list_devices(
+                filter="type eq 'GatewayDevice' or type eq 'EdgeDevice'"
+            )
+        ]
+        # verify
+        assert mock_device_svc.list_devices.call_count == 1
+        assert edge_devices == self._edge_devices
+
+    @mock.patch("azext_iot.central.services.device")
+    def test_should_return_list_children(self, mock_device_svc):
+        # setup
+        provider = CentralDeviceProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+        )
+
+        children = [
+            get_object(device, "Device", api_version=ApiVersion.v1_1_preview.value)
+            for device in self._edge_children
+        ]
+        mock_device_svc.list_devices.return_value = children
+
+        joined = "' or id eq '".join([child.id for child in children])
+        filter = f"id eq '{joined}'"
+
+        # act
+        children_devices = [todict(dev) for dev in provider.list_devices(filter=filter)]
+        # verify
+        assert mock_device_svc.list_devices.call_count == 1
+        assert children_devices == self._edge_children
+
+    @mock.patch("azext_iot.central.services.device.requests")
+    @mock.patch("azext_iot.central.services.device.get_aad_token")
+    def test_should_list_device_modules(self, get_aad_token_svc, req_svc):
+        # setup
+        provider = CentralDeviceProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1.value
+        )
+        response = mock.MagicMock()
+        response.status_code = 200
+        response.json.return_value = self._edge_modules
+        req_svc.get.return_value = response
+
+        # act
+        modules = [
+            todict(computed) for computed in provider.list_device_modules("edge0")
+        ]
+
+        # verify
+        # call counts should be at most 1
+        assert req_svc.get.call_count == 1
+        parsed_modules = [
+            todict(EdgeModule(_module)) for _module in self._edge_modules.get("modules")
+        ]
+        assert parsed_modules == modules
 
     @mock.patch("azext_iot.central.services.device_template")
     @mock.patch("azext_iot.central.services.device")

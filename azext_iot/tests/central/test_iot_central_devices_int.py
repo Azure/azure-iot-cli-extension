@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 
+from sys import api_version
 import time
 import pytest
 import json
@@ -115,7 +116,9 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         command = "iot central device compute-device-key --pk {} -d {}".format(
             self.app_primary_key, device_id
         )
-        device_primary_key = self.cmd(command, include_opt_args=False).get_output_in_json()
+        device_primary_key = self.cmd(
+            command, include_opt_args=False
+        ).get_output_in_json()
 
         credentials = {
             "idScope": app_scope_id,
@@ -123,7 +126,9 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         }
         device_client = helpers.dps_connect_device(device_id, credentials)
 
-        command = "iot central device show --app-id {} -d {}".format(self.app_id, device_id)
+        command = "iot central device show --app-id {} -d {}".format(
+            self.app_id, device_id
+        )
 
         self.cmd(
             command,
@@ -145,7 +150,9 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         start_dev_count = len(start_device_list)
         (device_id, device_name) = self._create_device(api_version=self._api_version)
 
-        command = "iot central device show --app-id {} -d {}".format(self.app_id, device_id)
+        command = "iot central device show --app-id {} -d {}".format(
+            self.app_id, device_id
+        )
         checks = [
             self.check("displayName", device_name),
             self.check("id", device_id),
@@ -207,6 +214,127 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
             is None
         )
 
+    def test_central_edge_device_methods(self):
+        # force API Version 1.1-preview as we want deployment manifest to be included
+
+        # create edge template
+        (template_id, _) = self._create_device_template(
+            api_version=ApiVersion.v1_1_preview.value, edge=True
+        )
+
+        (device_id, _) = self._create_device(
+            template=template_id,
+            api_version=ApiVersion.v1_1_preview.value,
+            simulated=True,
+        )
+
+        # wait about a few seconds for simulator to kick in so that provisioning completes
+        time.sleep(60)
+
+        command = "iot central device list --app-id {}".format(self.app_id)
+        total_devs_list = self.cmd(command).get_output_in_json()
+
+        # check if device appears as edge
+        command = "iot central device list --app-id {} --edge-only".format(self.app_id)
+        edge_list = self.cmd(command).get_output_in_json()
+        assert device_id in [dev["id"] for dev in edge_list]
+        # check edge device appears in general list
+        assert all(x in total_devs_list for x in edge_list)
+
+        # MODULES
+        command = "iot central device edge module list --app-id {} -d {}".format(
+            self.app_id, device_id
+        )
+        modules = self.cmd(command).get_output_in_json()
+
+        assert len(modules) == 4  # edge runtime + custom modules
+        assert all(
+            (
+                cond is True
+                for cond in [
+                    a in [module["moduleId"] for module in modules]
+                    for a in [
+                        "$edgeHub",
+                        "$edgeAgent",
+                        "testModule",
+                        "SimulatedTemperatureSensor",
+                    ]
+                ]
+            )
+        )
+        self._delete_device(device_id=device_id, api_version=self._api_version)
+        self._delete_device_template(
+            template_id=template_id, api_version=self._api_version
+        )
+
+    def test_central_edge_children_methods(self):
+        # force API Version 1.1-preview as we want deployment manifest to be included
+
+        # create child template
+        (child_template_id, _) = self._create_device_template(
+            api_version=ApiVersion.v1_1_preview.value
+        )
+
+        # create edge template
+        (template_id, _) = self._create_device_template(
+            api_version=ApiVersion.v1_1_preview.value, edge=True
+        )
+
+        (device_id, _) = self._create_device(
+            template=template_id,
+            api_version=ApiVersion.v1_1_preview.value,
+            simulated=True,
+        )
+
+        (child_id, _) = self._create_device(
+            template=child_template_id,
+            api_version=ApiVersion.v1_1_preview.value,
+            simulated=True,
+        )
+
+        # wait about a few seconds for simulator to kick in so that provisioning completes
+        time.sleep(60)
+
+        if api_version == ApiVersion.v1_1_preview.value:
+            # check if device appears as edge
+            command = "iot central device list --app-id {} --edge-only"
+            devs_list = self.cmd(command).get_output_in_json()
+            assert device_id in [dev.id for dev in devs_list]
+        else:
+            # check twin to evaluate the iotedge flag
+            command = "iot central device twin show --app-id {} -d {}".format(
+                self.app_id, device_id
+            )
+            twin = self.cmd(command).get_output_in_json()
+
+            assert twin["capabilities"]["iotEdge"] is True
+
+        # CHILDREN
+        command = "iot central device edge children add --app-id {} -d {} --children-ids {}".format(
+            self.app_id, device_id, child_id
+        )
+        self.cmd(command, api_version=ApiVersion.v1_1_preview.value)
+
+        command = "iot central device edge children list --app-id {} -d {}".format(
+            self.app_id, device_id
+        )
+        # Use api-version 1.0 to also test interoperability
+        children = self.cmd(
+            command, api_version=ApiVersion.v1.value
+        ).get_output_in_json()
+        assert len(children) == 1
+        assert children[0]["id"] == child_id
+
+        # cleanup
+        self._delete_device(device_id=child_id, api_version=self._api_version)
+        self._delete_device(device_id=device_id, api_version=self._api_version)
+        self._delete_device_template(
+            template_id=template_id, api_version=self._api_version
+        )
+        self._delete_device_template(
+            template_id=child_template_id, api_version=self._api_version
+        )
+
     def test_central_device_template_methods_CRUD(self):
         # currently: create, show, list, delete
 
@@ -234,7 +362,10 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
 
         json_result = result.get_output_in_json()
 
-        assert self._get_template_id(json_result) == template_id
+        assert (
+            self._get_template_id(api_version=self._api_version, template=json_result)
+            == template_id
+        )
 
         created_device_template_list = self.cmd(
             "iot central device-template list --app-id {}".format(self.app_id),
@@ -252,7 +383,10 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
                 (
                     template
                     for template in created_device_template_list
-                    if self._get_template_id(template) == template_id
+                    if self._get_template_id(
+                        template=template, api_version=self._api_version
+                    )
+                    == template_id
                 ),
                 None,
             )
@@ -261,7 +395,9 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
 
         # UPDATE
         new_template_name = f"{template_name}_new"
-        del json_result[self._get_template_id_key()]  # remove id
+        del json_result[
+            self._get_template_id_key(api_version=self._api_version)
+        ]  # remove id
         del json_result["@context"]
         del json_result["etag"]
 
@@ -317,7 +453,10 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
                 (
                     template
                     for template in start_device_template_list
-                    if self._get_template_id(template) == template_id
+                    if self._get_template_id(
+                        template=template, api_version=self._api_version
+                    )
+                    == template_id
                 ),
                 None,
             )
@@ -330,7 +469,10 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
                     (
                         template
                         for template in deleted_device_template_list
-                        if self._get_template_id(template) == template_id
+                        if self._get_template_id(
+                            template=template, api_version=self._api_version
+                        )
+                        == template_id
                     ),
                     None,
                 )
@@ -533,13 +675,3 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         device_client.disconnect()
         device_client.shutdown()
         self._wait_for_provisioned(device_id=device_id, api_version=self._api_version)
-
-    def _get_template_id(self, template):
-        if self._api_version == ApiVersion.preview.value:
-            return template["id"]
-        return template["@id"]
-
-    def _get_template_id_key(self):
-        if self._api_version == ApiVersion.preview.value:
-            return "id"
-        return "@id"

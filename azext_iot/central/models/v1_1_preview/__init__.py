@@ -23,6 +23,9 @@ from azext_iot.central.models.v1_1_preview.destination import (
     AdxDestination as AdxDestinationV1_1_preview,
 )
 from azext_iot.central.models.v1_1_preview.export import Export as ExportV1_1_preview
+from azext_iot.central.models.v1_1_preview.relationship import (
+    Relationship as RelationshipV1_1_preview,
+)
 
 __all__ = [
     "DeviceV1_1_preview",
@@ -38,4 +41,5 @@ __all__ = [
     "WebhookDestinationV1_1_preview",
     "AdxDestinationV1_1_preview",
     "ExportV1_1_preview",
+    "RelationshipV1_1_preview",
 ]

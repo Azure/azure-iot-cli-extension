@@ -36,6 +36,6 @@ class Property:
     ):
         self.name = name
         self.props = props
-        self.metadata = props.get("$metadata")
-        self.version = props.get("$version")
+        self.metadata = props.get("$metadata") if props else None
+        self.version = props.get("$version") if props else None
         self.device_id = device_id

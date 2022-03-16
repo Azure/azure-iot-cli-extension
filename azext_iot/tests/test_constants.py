@@ -7,10 +7,13 @@
 
 class FileNames:
     central_device_template_file = "central/json/device_template.json"
+    central_edge_template_file = "central/json/device_template_edge.json"
     central_deeply_nested_device_template_file = (
         "central/json/deeply_nested_template.json"
     )
     central_device_file = "central/json/device.json"
+    central_edge_devices_file = "central/json/edge_devices.json"
+    central_edge_children_file = "central/json/edge_children.json"
     central_device_group_file = "central/json/device_group.json"
     central_organization_file = "central/json/organization.json"
     central_role_file = "central/json/role.json"
@@ -18,6 +21,7 @@ class FileNames:
     central_job_file = "central/json/job.json"
     central_fileupload_file = "central/json/fileupload.json"
     central_device_twin_file = "central/json/device_twin.json"
+    central_edge_modules_file = "central/json/edge_modules.json"
     central_property_validation_template_file = (
         "central/json/property_validation_template.json"
     )

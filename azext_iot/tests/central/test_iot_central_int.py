@@ -34,11 +34,11 @@ class TestIotCentral(CentralLiveScenarioTest):
             print("Testing 1.1-preview")
         yield
 
-    @pytest.fixture(scope='class', autouse=True)
+    @pytest.fixture(scope="class", autouse=True)
     def setUpSuite(self):
         self._create_storage_account()
 
-    @pytest.fixture(scope='class', autouse=True)
+    @pytest.fixture(scope="class", autouse=True)
     def tearDownSuite(self):
         yield
         if self.storage_account_name:
@@ -473,7 +473,7 @@ class TestIotCentral(CentralLiveScenarioTest):
 
         command = 'iot central query -n {} --query-string "{}"'.format(
             self.app_id,
-            "SELECT TOP 1 testDefaultCapability FROM dtmi:intTestDeviceTemplateid WHERE WITHIN_WINDOW(PT1H)",
+            f"SELECT TOP 1 testDefaultCapability FROM {template_id} WHERE WITHIN_WINDOW(PT1H)",
         )
         response = self.cmd(command, api_version=self._api_version).get_output_in_json()
 

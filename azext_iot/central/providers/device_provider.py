@@ -14,11 +14,15 @@ from azure.cli.core.azclierror import (
 )
 from knack.log import get_logger
 from azext_iot.central.models.devicetwin import DeviceTwin
+from azext_iot.central.models.edge import EdgeModule
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.enum import DeviceStatus, ApiVersion
 from azext_iot.central.models.v1 import DeviceV1
-from azext_iot.central.models.v1_1_preview import DeviceV1_1_preview
+from azext_iot.central.models.v1_1_preview import (
+    DeviceV1_1_preview,
+    RelationshipV1_1_preview,
+)
 from azext_iot.central.models.preview import DevicePreview
 from azext_iot.dps.services import global_service as dps_global_service
 
@@ -70,18 +74,22 @@ class CentralDeviceProvider:
             self._devices[device_id] = device
 
         if not device:
-            raise ResourceNotFoundError("No device found with id: '{}'.".format(device_id))
+            raise ResourceNotFoundError(
+                "No device found with id: '{}'.".format(device_id)
+            )
 
         return self._devices[device_id]
 
     def list_devices(
         self,
+        filter=None,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> List[Union[DeviceV1, DeviceV1_1_preview, DevicePreview]]:
         devices = central_services.device.list_devices(
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
+            filter=filter,
             central_dns_suffix=central_dns_suffix,
             api_version=self._api_version,
         )
@@ -120,7 +128,9 @@ class CentralDeviceProvider:
         )
 
         if not device:
-            raise AzureResponseError("Failed to create device with id: '{}'.".format(device_id))
+            raise AzureResponseError(
+                "Failed to create device with id: '{}'.".format(device_id)
+            )
 
         # add to cache
         self._devices[device.id] = device
@@ -158,7 +168,9 @@ class CentralDeviceProvider:
         )
 
         if not device:
-            raise ResourceNotFoundError("No device found with id: '{}'.".format(device_id))
+            raise ResourceNotFoundError(
+                "No device found with id: '{}'.".format(device_id)
+            )
 
         # add to cache
         self._devices[device.id] = device
@@ -187,6 +199,101 @@ class CentralDeviceProvider:
         # pop "miss" raises a KeyError if None is not provided
         self._devices.pop(device_id, None)
         self._device_credentials.pop(device_id, None)
+
+        return result
+
+    def list_relationships(
+        self,
+        device_id,
+        rel_name=None,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ) -> List[RelationshipV1_1_preview]:
+        relationships = central_services.device.list_relationships(
+            self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+        if relationships is None:
+            return []
+
+        if rel_name:
+            relationships = [rel for rel in relationships if rel.name == rel_name]
+
+        return relationships
+
+    def add_relationship(
+        self,
+        device_id,
+        target_id,
+        rel_id,
+        rel_name,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ) -> dict:
+        relationship = central_services.device.create_relationship(
+            self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            rel_id=rel_id,
+            rel_name=rel_name,
+            target_id=target_id,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+        if not relationship:
+            raise ResourceNotFoundError(
+                "No relationship found with id: '{}'.".format(rel_id)
+            )
+
+        return relationship
+
+    def update_relationship(
+        self,
+        device_id,
+        target_id,
+        rel_id,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ) -> dict:
+        relationship = central_services.device.update_relationship(
+            self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            rel_id=rel_id,
+            target_id=target_id,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+        if not relationship:
+            raise ResourceNotFoundError(
+                "No relationship found with id: '{}'.".format(rel_id)
+            )
+
+        return relationship
+
+    def delete_relationship(
+        self,
+        device_id,
+        rel_id,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ) -> dict:
+
+        # get or add to cache
+        result = central_services.device.delete_relationship(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            rel_id=rel_id,
+            token=self._token,
+            central_dns_suffix=central_dns_suffix,
+            api_version=self._api_version,
+        )
 
         return result
 
@@ -330,6 +437,50 @@ class CentralDeviceProvider:
             api_version=self._api_version,
         )
 
+    def list_device_modules(
+        self,
+        device_id,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ) -> List[EdgeModule]:
+
+        modules = central_services.device.list_device_modules(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            token=self._token,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+        if not modules:
+            return []
+
+        return modules
+
+    def restart_device_module(
+        self,
+        device_id,
+        module_id,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ) -> List[EdgeModule]:
+
+        status = central_services.device.restart_device_module(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            module_id=module_id,
+            token=self._token,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+        if not status or status != 200:
+            raise ResourceNotFoundError(
+                "No module found for device {} with id: '{}'.".format(
+                    device_id, module_id
+                )
+            )
+
+        return status
+
     def get_device_twin(
         self,
         device_id,
@@ -345,7 +496,9 @@ class CentralDeviceProvider:
         )
 
         if not twin:
-            raise ResourceNotFoundError("No twin found for device with id: '{}'.".format(device_id))
+            raise ResourceNotFoundError(
+                "No twin found for device with id: '{}'.".format(device_id)
+            )
 
         return twin
 
@@ -387,7 +540,7 @@ class CentralDeviceProvider:
             app_id=self._app_id,
             device_id=device_id,
             token=self._token,
-            central_dns_suffix=central_dns_suffix
+            central_dns_suffix=central_dns_suffix,
         )
 
     def _dps_populate_essential_info(self, dps_info, device_status: DeviceStatus):

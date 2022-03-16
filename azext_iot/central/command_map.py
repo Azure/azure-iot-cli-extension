@@ -219,3 +219,26 @@ def load_central_commands(self, _):
         cmd_group.command("resume", "resume_job")
         cmd_group.command("get-devices", "get_job_devices")
         cmd_group.command("rerun", "rerun_job")
+
+    with self.command_group(
+        "iot central device edge children", command_type=central_device_ops
+    ) as cmd_group:
+        cmd_group.command("list", "list_children")
+        cmd_group.command("add", "add_children", is_preview=True)
+        cmd_group.command("remove", "remove_children", is_preview=True)
+
+    with self.command_group(
+        "iot central device edge module",
+        command_type=central_device_ops,
+        is_preview=True,
+    ) as cmd_group:
+        cmd_group.command("list", "list_device_modules")
+        cmd_group.show_command("show", "get_device_module")
+        cmd_group.command("restart", "restart_device_module")
+
+    with self.command_group(
+        "iot central device edge manifest",
+        command_type=central_device_ops,
+        is_preview=True,
+    ) as cmd_group:
+        cmd_group.show_command("show", "get_edge_manifest")

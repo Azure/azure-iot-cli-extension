@@ -125,6 +125,13 @@ def load_central_arguments(self, _):
             help="The primary symmetric shared access key stored in base64 format. ",
         )
 
+    with self.argument_context("iot central device list") as context:
+        context.argument(
+            "edge_only",
+            options_list=["--edge-only", "-e"],
+            help="Only list IoT Edge devices.",
+        )
+
     with self.argument_context("iot central device") as context:
         context.argument(
             "template",
@@ -598,4 +605,19 @@ def load_central_arguments(self, _):
             " [File Path Example:./path/to/file.json]"
             " [Example of stringified JSON:{<Destination Data JSON>}]."
             " The request body must contain partial content of Destination.",
+        )
+
+    with self.argument_context("iot central device edge module") as context:
+        context.argument(
+            "module_id",
+            options_list=["--module-id", "-m"],
+            help="The module ID of the target module.",
+        )
+
+    with self.argument_context("iot central device edge children") as context:
+        context.argument(
+            "children_ids",
+            nargs="+",
+            options_list=["--children-ids"],
+            help="Space-separated list of children device ids.",
         )
