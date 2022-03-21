@@ -36,6 +36,14 @@ PREFIX_INDIVIDUAL_ENROLLMENT = "test-enrollment-"
 PREFIX_GROUP_ENROLLMENT = "test-groupenroll-"
 USER_ROLE = "Device Provisioning Service Data Contributor"
 
+TEST_ENDORSEMENT_KEY = (
+    "AToAAQALAAMAsgAgg3GXZ0SEs/gakMyNRqXXJP1S124GUgtk8qHaGzMUaaoABgCAAEMAEAgAAAAAAAEAibym9HQP9vxCGF5dVc1Q"
+    "QsAGe021aUGJzNol1/gycBx3jFsTpwmWbISRwnFvflWd0w2Mc44FAAZNaJOAAxwZvG8GvyLlHh6fGKdh+mSBL4iLH2bZ4Ry22cB3"
+    "CJVjXmdGoz9Y/j3/NwLndBxQC+baNvzvyVQZ4/A2YL7vzIIj2ik4y+ve9ir7U0GbNdnxskqK1KFIITVVtkTIYyyFTIR0BySjPrRI"
+    "Dj7r7Mh5uF9HBppGKQCBoVSVV8dI91lNazmSdpGWyqCkO7iM4VvUMv2HT/ym53aYlUrau+Qq87Tu+uQipWYgRdF11KDfcpMHqqzB"
+    "QQ1NpOJVhrsTrhyJzO7KNw=="
+)
+
 # Test Environment Variables
 settings = DynamoSettings(
     req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED,

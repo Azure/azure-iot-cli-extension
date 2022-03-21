@@ -1069,6 +1069,11 @@ def load_arguments(self, _):
             "If attestation with a root CA certificate is desired then a root ca name must be provided.",
             arg_group="Authentication"
         )
+        context.argument(
+            "registration_id",
+            options_list=["--registration-id", "--rid"],
+            help="ID of device registration."
+        )
 
     with self.argument_context("iot dps enrollment-group show") as context:
         context.argument(
@@ -1076,6 +1081,16 @@ def load_arguments(self, _):
             options_list=["--show-keys", "--keys"],
             arg_type=get_three_state_flag(),
             help="Include attestation keys and information in enrollment group results.",
+        )
+
+    with self.argument_context("iot dps enrollment-group compute-device-key") as context:
+        context.argument(
+            "symmetric_key",
+            options_list=["--symmetric-key", "--key"],
+            help="The symmetric shared access key for the enrollment group. This bypasses the "
+            "Device Provisioning Service registry and generates the SAS token directly "
+            "from the supplied symmetric key without further validation. All other command "
+            "parameters aside from registration ID will be ignored.",
         )
 
     with self.argument_context("iot dps registration") as context:
