@@ -24,7 +24,8 @@ from azext_iot.digitaltwins.common import (
     FAIL_GENERIC_MSG,
     ABORT_MSG,
     ADD_ROLE_INPUT_MSG,
-    CONT_INPUT_MSG
+    CONT_INPUT_MSG,
+    DEFAULT_CONSUMER_GROUP
 )
 
 logger = get_logger(__name__)
@@ -42,7 +43,7 @@ class AdxConnectionValidator(object):
         eh_entity_path: str,
         eh_resource_group: str,
         eh_subscription: str,
-        eh_consumer_group: str = '$Default',
+        eh_consumer_group: str = DEFAULT_CONSUMER_GROUP,
         yes: bool = False,
     ):
         self.cli = EmbeddedCLI()
@@ -88,17 +89,19 @@ class AdxConnectionValidator(object):
         eh_endpoint.error_prefix = ERROR_PREFIX + " find"
         self.eh_endpoint_uri = eh_endpoint.build_identity_based().endpoint_uri
 
-        eh_consumer_group_op = self.cli.invoke(
-            "eventhubs eventhub consumer-group show -n {} --eventhub-name {} --namespace-name {} -g {}".format(
-                eh_consumer_group,
-                eh_entity_path,
-                eh_namespace,
-                eh_resource_group,
-            ),
-            subscription=eh_subscription,
-        )
-        if not eh_consumer_group_op.success():
-            raise CLIInternalError("{} retrieve Event Hub Consumer Group.".format(ERROR_PREFIX))
+        # Run check only if the consumer group is not the default. Default consumer group will always be present.
+        if eh_consumer_group.lower() != DEFAULT_CONSUMER_GROUP.lower():
+            eh_consumer_group_op = self.cli.invoke(
+                "eventhubs eventhub consumer-group show -n {} --eventhub-name {} --namespace-name {} -g {}".format(
+                    eh_consumer_group,
+                    eh_entity_path,
+                    eh_namespace,
+                    eh_resource_group,
+                ),
+                subscription=eh_subscription,
+            )
+            if not eh_consumer_group_op.success():
+                raise CLIInternalError("{} retrieve Event Hub Consumer Group.".format(ERROR_PREFIX))
 
         self.eh_namespace_resource_id = (
             "/subscriptions/{}/resourceGroups/{}/providers/Microsoft.EventHub/namespaces/{}".format(
@@ -226,7 +229,7 @@ def build_adx_connection_properties(
     adx_subscription: str = None,
     eh_resource_group: str = None,
     eh_subscription: str = None,
-    eh_consumer_group: str = "$Default",
+    eh_consumer_group: str = DEFAULT_CONSUMER_GROUP,
     yes: bool = False,
 ):
     validator = AdxConnectionValidator(
