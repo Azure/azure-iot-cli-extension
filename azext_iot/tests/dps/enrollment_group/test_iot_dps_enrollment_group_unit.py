@@ -10,16 +10,13 @@ import json
 import responses
 from azext_iot.operations import dps as subject
 from knack.util import CLIError
-from azext_iot.tests.dps.dps_helpers import (
-    enrollment_id,
-    resource_group,
-    registration_id,
-    etag,
-    mock_target,
-    mock_symmetric_key_attestation,
-    fixture_gdcs,
-    fixture_sas
-)
+from azext_iot.tests.conftest import mock_dps_target, mock_symmetric_key_attestation
+
+
+enrollment_id = 'myenrollment'
+resource_group = 'myrg'
+registration_id = 'myregistration'
+etag = 'AAAA=='
 
 
 def generate_enrollment_group_create_req(iot_hub_host_name=None,
@@ -41,7 +38,7 @@ def generate_enrollment_group_create_req(iot_hub_host_name=None,
     return {'client': None,
             'enrollment_id': enrollment_id,
             'rg': resource_group,
-            'dps_name': mock_target['entity'],
+            'dps_name': mock_dps_target['entity'],
             'certificate_path': certificate_path,
             'secondary_certificate_path': secondary_certificate_path,
             'root_ca_name': root_ca_name,
@@ -62,10 +59,10 @@ def generate_enrollment_group_create_req(iot_hub_host_name=None,
 
 class TestEnrollmentGroupCreate():
     @pytest.fixture(params=[200])
-    def serviceclient(self, mocked_response, fixture_gdcs, fixture_sas, request):
+    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, request):
         mocked_response.add(
             method=responses.PUT,
-            url="https://{}/enrollmentGroups/{}".format(mock_target['entity'], enrollment_id),
+            url="https://{}/enrollmentGroups/{}".format(mock_dps_target['entity'], enrollment_id),
             body='{}',
             status=200,
             content_type="application/json",
@@ -141,7 +138,7 @@ class TestEnrollmentGroupCreate():
         )
         request = serviceclient.calls[0].request
         url = request.url
-        assert "{}/enrollmentGroups/{}?".format(mock_target['entity'], enrollment_id) in url
+        assert "{}/enrollmentGroups/{}?".format(mock_dps_target['entity'], enrollment_id) in url
         assert request.method == 'PUT'
 
         body = json.loads(request.body)
@@ -301,7 +298,7 @@ def generate_enrollment_group_update_req(iot_hub_host_name=None,
     return {'client': None,
             'enrollment_id': enrollment_id,
             'rg': resource_group,
-            'dps_name': mock_target['entity'],
+            'dps_name': mock_dps_target['entity'],
             'certificate_path': certificate_path,
             'secondary_certificate_path': secondary_certificate_path,
             'root_ca_name': root_ca_name,
@@ -325,11 +322,11 @@ def generate_enrollment_group_update_req(iot_hub_host_name=None,
 
 class TestEnrollmentGroupUpdate():
     @pytest.fixture(params=[(200, generate_enrollment_group_show(), 200)])
-    def serviceclient(self, mocked_response, fixture_gdcs, fixture_sas, request):
+    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, request):
         # Initial GET
         mocked_response.add(
             method=responses.GET,
-            url="https://{}/enrollmentGroups/{}".format(mock_target['entity'], enrollment_id),
+            url="https://{}/enrollmentGroups/{}".format(mock_dps_target['entity'], enrollment_id),
             body=json.dumps(generate_enrollment_group_show()),
             status=200,
             content_type="application/json",
@@ -338,7 +335,7 @@ class TestEnrollmentGroupUpdate():
         # Update PUT
         mocked_response.add(
             method=responses.PUT,
-            url="https://{}/enrollmentGroups/{}".format(mock_target['entity'], enrollment_id),
+            url="https://{}/enrollmentGroups/{}".format(mock_dps_target['entity'], enrollment_id),
             body=json.dumps(generate_enrollment_group_show()),
             status=200,
             content_type="application/json",
@@ -398,13 +395,13 @@ class TestEnrollmentGroupUpdate():
         # test initial GET
         request = serviceclient.calls[0].request
         url = request.url
-        assert "{}/enrollmentGroups/{}?".format(mock_target['entity'], enrollment_id) in url
+        assert "{}/enrollmentGroups/{}?".format(mock_dps_target['entity'], enrollment_id) in url
         assert request.method == 'GET'
 
         request = serviceclient.calls[1].request
         url = request.url
 
-        assert "{}/enrollmentGroups/{}?".format(mock_target['entity'], enrollment_id) in url
+        assert "{}/enrollmentGroups/{}?".format(mock_dps_target['entity'], enrollment_id) in url
         assert request.method == 'PUT'
         assert request.headers["If-Match"] == req['etag'] if req['etag'] else "*"
 
@@ -501,10 +498,10 @@ class TestEnrollmentGroupUpdate():
 
 class TestEnrollmentGroupShow():
     @pytest.fixture(params=[200])
-    def serviceclient(self, mocked_response, fixture_gdcs, fixture_sas, request):
+    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, request):
         mocked_response.add(
             method=responses.GET,
-            url="https://{}/enrollmentGroups/{}".format(mock_target['entity'], enrollment_id),
+            url="https://{}/enrollmentGroups/{}".format(mock_dps_target['entity'], enrollment_id),
             body=json.dumps(generate_enrollment_group_show()),
             status=200,
             content_type="application/json",
@@ -513,10 +510,10 @@ class TestEnrollmentGroupShow():
         yield mocked_response
 
     @pytest.fixture()
-    def serviceclient_attestation(self, mocked_response, fixture_gdcs, fixture_sas):
+    def serviceclient_attestation(self, mocked_response, fixture_gdcs, fixture_dps_sas):
         mocked_response.add(
             method=responses.GET,
-            url="https://{}/enrollmentGroups/{}".format(mock_target['entity'], enrollment_id),
+            url="https://{}/enrollmentGroups/{}".format(mock_dps_target['entity'], enrollment_id),
             body=json.dumps(generate_enrollment_group_show(attestation=mock_symmetric_key_attestation)),
             status=200,
             content_type="application/json",
@@ -525,7 +522,7 @@ class TestEnrollmentGroupShow():
 
         mocked_response.add(
             method=responses.POST,
-            url="https://{}/enrollmentGroups/{}/attestationmechanism".format(mock_target['entity'], enrollment_id),
+            url="https://{}/enrollmentGroups/{}/attestationmechanism".format(mock_dps_target['entity'], enrollment_id),
             body=json.dumps(mock_symmetric_key_attestation),
             status=200,
             content_type="application/json",
@@ -536,7 +533,7 @@ class TestEnrollmentGroupShow():
     def test_enrollment_group_show(self, serviceclient, fixture_cmd):
         result = subject.iot_dps_device_enrollment_group_get(
             cmd=fixture_cmd,
-            dps_name=mock_target['entity'],
+            dps_name=mock_dps_target['entity'],
             enrollment_id=enrollment_id,
             resource_group_name=resource_group
         )
@@ -546,13 +543,13 @@ class TestEnrollmentGroupShow():
         url = request.url
         method = request.method
 
-        assert "{}/enrollmentGroups/{}?".format(mock_target['entity'], enrollment_id) in url
+        assert "{}/enrollmentGroups/{}?".format(mock_dps_target['entity'], enrollment_id) in url
         assert method == 'GET'
 
     def test_enrollment_group_show_with_keys(self, fixture_cmd, serviceclient_attestation):
         result = subject.iot_dps_device_enrollment_group_get(
             cmd=fixture_cmd,
-            dps_name=mock_target['entity'],
+            dps_name=mock_dps_target['entity'],
             enrollment_id=enrollment_id,
             resource_group_name=resource_group,
             show_keys=True
@@ -564,21 +561,21 @@ class TestEnrollmentGroupShow():
         url = request.url
         method = request.method
 
-        assert "{}/enrollmentGroups/{}?".format(mock_target['entity'], enrollment_id) in url
+        assert "{}/enrollmentGroups/{}?".format(mock_dps_target['entity'], enrollment_id) in url
         assert method == 'GET'
 
         request = serviceclient_attestation.calls[1].request
         url = request.url
         method = request.method
 
-        assert "{}/enrollmentGroups/{}/attestationmechanism?".format(mock_target['entity'], enrollment_id) in url
+        assert "{}/enrollmentGroups/{}/attestationmechanism?".format(mock_dps_target['entity'], enrollment_id) in url
         assert method == 'POST'
 
     def test_enrollment_group_show_error(self, fixture_cmd, serviceclient_generic_error):
         with pytest.raises(CLIError):
             subject.iot_dps_device_enrollment_group_get(
                 cmd=fixture_cmd,
-                dps_name=mock_target['entity'],
+                dps_name=mock_dps_target['entity'],
                 enrollment_id=enrollment_id,
                 resource_group_name=resource_group
             )
@@ -586,10 +583,10 @@ class TestEnrollmentGroupShow():
 
 class TestEnrollmentGroupList():
     @pytest.fixture(params=[200])
-    def serviceclient(self, mocked_response, fixture_gdcs, fixture_sas, request):
+    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, request):
         mocked_response.add(
             method=responses.POST,
-            url="https://{}/enrollmentGroups/query?".format(mock_target['entity']),
+            url="https://{}/enrollmentGroups/query?".format(mock_dps_target['entity']),
             body=json.dumps([generate_enrollment_group_show()]),
             status=200,
             content_type="application/json",
@@ -601,7 +598,7 @@ class TestEnrollmentGroupList():
     def test_enrollment_group_list(self, serviceclient, fixture_cmd, top):
         result = subject.iot_dps_device_enrollment_group_list(
             cmd=fixture_cmd,
-            dps_name=mock_target['entity'],
+            dps_name=mock_dps_target['entity'],
             resource_group_name=resource_group,
             top=top
         )
@@ -609,7 +606,7 @@ class TestEnrollmentGroupList():
         headers = request.headers
         url = request.url
         method = request.method
-        assert "{}/enrollmentGroups/query?".format(mock_target['entity']) in url
+        assert "{}/enrollmentGroups/query?".format(mock_dps_target['entity']) in url
         assert method == 'POST'
         assert json.dumps(result)
         assert str(headers.get("x-ms-max-item-count")) == str(top)
@@ -618,17 +615,17 @@ class TestEnrollmentGroupList():
         with pytest.raises(CLIError):
             subject.iot_dps_device_enrollment_group_list(
                 cmd=fixture_cmd,
-                dps_name=mock_target['entity'],
+                dps_name=mock_dps_target['entity'],
                 resource_group_name=resource_group
             )
 
 
 class TestEnrollmentGroupDelete():
     @pytest.fixture(params=[204])
-    def serviceclient(self, mocked_response, fixture_gdcs, fixture_sas, request):
+    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, request):
         mocked_response.add(
             method=responses.DELETE,
-            url="https://{}/enrollmentGroups/{}".format(mock_target['entity'], enrollment_id),
+            url="https://{}/enrollmentGroups/{}".format(mock_dps_target['entity'], enrollment_id),
             body='{}',
             status=request.param,
             content_type="application/json",
@@ -643,7 +640,7 @@ class TestEnrollmentGroupDelete():
     def test_enrollment_group_delete(self, serviceclient, fixture_cmd, etag):
         subject.iot_dps_device_enrollment_group_delete(
             cmd=fixture_cmd,
-            dps_name=mock_target['entity'],
+            dps_name=mock_dps_target['entity'],
             enrollment_id=enrollment_id,
             resource_group_name=resource_group,
             etag=etag,
@@ -651,7 +648,7 @@ class TestEnrollmentGroupDelete():
         request = serviceclient.calls[0].request
         url = request.url
         method = request.method
-        assert "{}/enrollmentGroups/{}?".format(mock_target['entity'], enrollment_id) in url
+        assert "{}/enrollmentGroups/{}?".format(mock_dps_target['entity'], enrollment_id) in url
         assert method == 'DELETE'
         assert request.headers["If-Match"] == etag if etag else "*"
 
@@ -659,7 +656,7 @@ class TestEnrollmentGroupDelete():
         with pytest.raises(CLIError):
             subject.iot_dps_device_enrollment_group_delete(
                 cmd=fixture_cmd,
-                dps_name=mock_target['entity'],
+                dps_name=mock_dps_target['entity'],
                 enrollment_id=enrollment_id,
                 resource_group_name=resource_group,
             )
@@ -673,10 +670,10 @@ def generate_registration_state_show():
 
 class TestRegistrationShow():
     @pytest.fixture(params=[200])
-    def serviceclient(self, mocked_response, fixture_gdcs, fixture_sas, request):
+    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, request):
         mocked_response.add(
             method=responses.GET,
-            url="https://{}/registrations/{}?".format(mock_target['entity'], registration_id),
+            url="https://{}/registrations/{}?".format(mock_dps_target['entity'], registration_id),
             body=json.dumps(generate_registration_state_show()),
             status=request.param,
             content_type="application/json",
@@ -687,7 +684,7 @@ class TestRegistrationShow():
     def test_registration_show(self, fixture_cmd, serviceclient):
         result = subject.iot_dps_registration_get(
             cmd=fixture_cmd,
-            dps_name=mock_target['entity'],
+            dps_name=mock_dps_target['entity'],
             registration_id=registration_id,
             resource_group_name=resource_group,
         )
@@ -695,14 +692,14 @@ class TestRegistrationShow():
         request = serviceclient.calls[0].request
         url = request.url
         method = request.method
-        assert "{}/registrations/{}?".format(mock_target['entity'], registration_id) in url
+        assert "{}/registrations/{}?".format(mock_dps_target['entity'], registration_id) in url
         assert method == 'GET'
 
     def test_registration_show_error(self, fixture_cmd):
         with pytest.raises(CLIError):
             subject.iot_dps_registration_get(
                 cmd=fixture_cmd,
-                dps_name=mock_target['entity'],
+                dps_name=mock_dps_target['entity'],
                 registration_id=registration_id,
                 resource_group_name=resource_group,
             )
@@ -710,10 +707,10 @@ class TestRegistrationShow():
 
 class TestRegistrationList():
     @pytest.fixture(params=[200])
-    def serviceclient(self, mocked_response, fixture_gdcs, fixture_sas, request):
+    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, request):
         mocked_response.add(
             method=responses.POST,
-            url="https://{}/registrations/{}/query?".format(mock_target['entity'], enrollment_id),
+            url="https://{}/registrations/{}/query?".format(mock_dps_target['entity'], enrollment_id),
             body=json.dumps([generate_registration_state_show()]),
             status=request.param,
             content_type="application/json",
@@ -724,21 +721,21 @@ class TestRegistrationList():
     def test_registration_list(self, serviceclient, fixture_cmd):
         subject.iot_dps_registration_list(
             cmd=fixture_cmd,
-            dps_name=mock_target['entity'],
+            dps_name=mock_dps_target['entity'],
             enrollment_id=enrollment_id,
             resource_group_name=resource_group,
         )
         request = serviceclient.calls[0].request
         url = request.url
         method = request.method
-        assert "{}/registrations/{}/query?".format(mock_target['entity'], enrollment_id) in url
+        assert "{}/registrations/{}/query?".format(mock_dps_target['entity'], enrollment_id) in url
         assert method == 'POST'
 
     def test_registration_list_error(self, fixture_cmd):
         with pytest.raises(CLIError):
             subject.iot_dps_registration_list(
                 cmd=fixture_cmd,
-                dps_name=mock_target['entity'],
+                dps_name=mock_dps_target['entity'],
                 enrollment_id=enrollment_id,
                 resource_group_name=resource_group,
             )
@@ -746,10 +743,10 @@ class TestRegistrationList():
 
 class TestRegistrationDelete():
     @pytest.fixture(params=[204])
-    def serviceclient(self, mocked_response, fixture_gdcs, fixture_sas, request):
+    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, request):
         mocked_response.add(
             method=responses.DELETE,
-            url="https://{}/registrations/{}".format(mock_target['entity'], registration_id),
+            url="https://{}/registrations/{}".format(mock_dps_target['entity'], registration_id),
             body='{}',
             status=request.param,
             content_type="application/json",
@@ -764,7 +761,7 @@ class TestRegistrationDelete():
     def test_registration_delete(self, serviceclient, fixture_cmd, etag):
         subject.iot_dps_registration_delete(
             cmd=fixture_cmd,
-            dps_name=mock_target['entity'],
+            dps_name=mock_dps_target['entity'],
             registration_id=registration_id,
             resource_group_name=resource_group,
             etag=etag
@@ -772,7 +769,7 @@ class TestRegistrationDelete():
         request = serviceclient.calls[0].request
         url = request.url
         method = request.method
-        assert "{}/registrations/{}?".format(mock_target['entity'], registration_id) in url
+        assert "{}/registrations/{}?".format(mock_dps_target['entity'], registration_id) in url
         assert method == 'DELETE'
         assert request.headers["If-Match"] == etag if etag else "*"
 
@@ -780,7 +777,7 @@ class TestRegistrationDelete():
         with pytest.raises(CLIError):
             subject.iot_dps_registration_delete(
                 cmd=fixture_cmd,
-                dps_name=mock_target['entity'],
+                dps_name=mock_dps_target['entity'],
                 registration_id=registration_id,
                 resource_group_name=resource_group,
             )
