@@ -16,9 +16,9 @@ from azext_iot.tests.dps import (
 )
 
 
-class TestDPSEnrollments(IoTDPSLiveScenarioTest):
+class TestDPSEnrollmentGroups(IoTDPSLiveScenarioTest):
     def __init__(self, test_method):
-        super(TestDPSEnrollments, self).__init__(test_method)
+        super(TestDPSEnrollmentGroups, self).__init__(test_method)
 
     def test_dps_compute_device_key(self):
         offline_device_key = self.cmd(

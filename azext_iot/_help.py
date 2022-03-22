@@ -1375,8 +1375,7 @@ helps[
     "iot dps enrollment-group compute-device-key"
 ] = """
     type: command
-    short-summary: Generate a derived device SAS key.
-    long-summary: Generate a derived device key for a DPS enrollment group.
+    short-summary: Generate a derived device SAS key for a DPS enrollment group.
     examples:
     - name: Compute the device key with the given symmetric key.
       text: >
