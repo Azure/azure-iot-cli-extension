@@ -1368,14 +1368,16 @@ helps[
     "iot dps enrollment-group registration delete"
 ] = """
     type: command
-    short-summary: Delete a device registration in an Azure IoT Hub Device Provisioning Service.
+    short-summary: Delete a device registration for an enrollment group in an Azure IoT Hub Device
+        Provisioning Service.
 """
 
 helps[
     "iot dps enrollment-group compute-device-key"
 ] = """
     type: command
-    short-summary: Generate a derived device SAS key for a DPS enrollment group.
+    short-summary: Generate a derived device SAS key for an enrollment group in an Azure IoT Hub Device
+        Provisioning Service.
     examples:
     - name: Compute the device key with the given symmetric key.
       text: >
