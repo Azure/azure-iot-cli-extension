@@ -36,6 +36,10 @@ ADD_ROLE_INPUT_MSG = "Add the {0}?"
 SKIP_ADD_ROLE_MSG = "Skipping addition of the {0}. This may prevent creation of the data history connection."
 
 
+# Default Event Hub Consumer Group
+DEFAULT_CONSUMER_GROUP = "$Default"
+
+
 # Enums
 class ADTEndpointType(Enum):
     """

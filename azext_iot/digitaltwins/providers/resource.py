@@ -10,6 +10,7 @@ from azure.cli.core.azclierror import (
     ResourceNotFoundError,
 )
 from azext_iot.digitaltwins.common import (
+    DEFAULT_CONSUMER_GROUP,
     MAX_ADT_DH_CREATE_RETRIES,
     ADTEndpointAuthType,
     ADTPublicNetworkAccessType,
@@ -499,7 +500,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
         adx_table_name=None,
         adx_resource_group=None,
         adx_subscription=None,
-        eh_consumer_group="$Default",
+        eh_consumer_group=DEFAULT_CONSUMER_GROUP,
         eh_resource_group=None,
         eh_subscription=None,
         resource_group_name=None,
