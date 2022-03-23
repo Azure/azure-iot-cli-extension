@@ -25,6 +25,10 @@ Release History
   - az dt endpoint create
   - az dt private-endpoint create
 
+* Added `az dt data-history` command group, which will allow users to configure a data history connection
+  for a Digital Twins instance using an Event Hub and Azure Data Explorer database. Once configured,
+  changes to the Digital Twins instance can be seen in the Azure Data Explorer database.
+
 **IoT Central updates**
 
 * Added commands for Edge devices and modules:
