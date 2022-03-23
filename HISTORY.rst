@@ -9,7 +9,7 @@ Release History
 
 **General updates**
 
-* The generic CLIErrors raised across the extension have been changed to more specific semantically correct exceptions aligning with CLI core. 
+* The generic CLIErrors raised across the extension have been changed to more specific semantically correct exceptions aligning with CLI core.
 * Fix for issue #475 resolving `sys.excepthook` upon terminating monitor-events process in Py 3.9+ environments [IoT Hub, IoT Central].
 
 **Digital Twin updates**
@@ -18,6 +18,12 @@ Release History
   add a custom timestamp to the sent telemetry.
 
 * Updated both controlplane and dataplane SDKs to now use the newer 2021-06-30-preview API version.
+
+* Added `--no-wait` parameter to the following functions:
+
+  - az dt create
+  - az dt endpoint create
+  - az dt private-endpoint create
 
 **IoT Central updates**
 
@@ -29,17 +35,20 @@ Release History
 
   - az iot central device edge manifest
     - az iot central device edge manifest show
-  
+
   - az iot central device edge children
     - az iot central device edge children list
     - az iot central device edge children add
     - az iot central device edge children remove
-    
-* Added `--no-wait` parameter to the following functions:
 
-  - az dt create
-  - az dt endpoint create
-  - az dt private-endpoint create
+**IoT DPS updates**
+
+* Reorganizing command structure for enrollment-group commands:
+  - 'az iot dps compute-device-key' is deprecated use 'az iot dps enrollment-group compute-device-key' instead.
+  - 'az iot dps registration' is deprecated use 'az iot dps enrollment-group registration' instead.
+  - 'az iot dps registration delete' is deprecated use 'az iot dps enrollment-group registration delete' instead.
+  - 'az iot dps registration list' is deprecated use 'az iot dps enrollment-group registration list' instead.
+  - 'az iot dps registration show' is deprecated use 'az iot dps enrollment-group registration show' instead.
 
 
 0.13.0

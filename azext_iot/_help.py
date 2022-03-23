@@ -1341,6 +1341,54 @@ helps[
 """
 
 helps[
+    "iot dps enrollment-group registration"
+] = """
+    type: group
+    short-summary: Manage device registrations for an enrollment group in an Azure IoT Hub Device
+        Provisioning Service.
+"""
+
+helps[
+    "iot dps enrollment-group registration list"
+] = """
+    type: command
+    short-summary: List device registrations for an enrollment group in an Azure IoT Hub Device
+        Provisioning Service.
+"""
+
+helps[
+    "iot dps enrollment-group registration show"
+] = """
+    type: command
+    short-summary: Get a device registration for an enrollment group in an Azure IoT Hub Device
+        Provisioning Service.
+"""
+
+helps[
+    "iot dps enrollment-group registration delete"
+] = """
+    type: command
+    short-summary: Delete a device registration for an enrollment group in an Azure IoT Hub Device
+        Provisioning Service.
+"""
+
+helps[
+    "iot dps enrollment-group compute-device-key"
+] = """
+    type: command
+    short-summary: Generate a derived device SAS key for an enrollment group in an Azure IoT Hub Device
+        Provisioning Service.
+    examples:
+    - name: Compute the device key with the given symmetric key.
+      text: >
+        az iot dps enrollment-group compute-device-key --key {enrollement_group_symmetric_key} --registration-id {registration_id}
+    - name: Compute the device key with the given enrollment group.
+      text: >
+        az iot dps enrollment-group compute-device-key -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id} --registration-id {registration_id}
+"""
+
+helps[
     "iot dps registration"
 ] = """
     type: group

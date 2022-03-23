@@ -16,6 +16,7 @@ from azure.cli.core.mock import DummyCli
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.common.shared import DeviceAuthApiType
 
+# Patch paths
 path_get_device = "azext_iot.operations.hub._iot_device_show"
 path_iot_hub_service_factory = "azext_iot._factory.iot_hub_service_factory"
 path_service_client = "msrest.service_client.ServiceClient.send"
@@ -33,10 +34,16 @@ path_iot_hub_monitor_events_entrypoint = (
 path_iot_device_show = "azext_iot.operations.hub._iot_device_show"
 path_update_device_twin = "azext_iot.operations.hub._iot_device_twin_update"
 hub_entity = "myhub.azure-devices.net"
+path_iot_service_provisioning_factory = "azext_iot._factory.iot_service_provisioning_factory"
+path_gdcs = "azext_iot.dps.providers.discovery.DPSDiscovery.get_target"
+path_discovery_dps_init = (
+    "azext_iot.dps.providers.discovery.DPSDiscovery._initialize_client"
+)
 
 instance_name = generate_generic_id()
 hostname = "{}.subdomain.domain".format(instance_name)
 
+# Mock Iot Hub Target
 mock_target = {}
 mock_target["entity"] = hub_entity
 mock_target["primarykey"] = "rJx/6rJ6rmG4ak890+eW5MYGH+A0uzRvjGNjg3Ve8sfo="
@@ -47,6 +54,22 @@ mock_target["location"] = "westus2"
 mock_target["sku_tier"] = "Standard"
 mock_target["resourcegroup"] = "myresourcegroup"
 
+# Mock Iot DPS Target
+mock_dps_target = {}
+mock_dps_target['cs'] = 'HostName=mydps;SharedAccessKeyName=name;SharedAccessKey=value'
+mock_dps_target['entity'] = 'mydps'
+mock_dps_target['primarykey'] = 'rJx/6rJ6rmG4ak890+eW5MYGH+A0uzRvjGNjg3Ve8sfo='
+mock_dps_target['secondarykey'] = 'aCd/6rJ6rmG4ak890+eW5MYGH+A0uzRvjGNjg3Ve8sfo='
+mock_dps_target['policy'] = 'provisioningserviceowner'
+mock_dps_target['subscription'] = "5952cff8-bcd1-4235-9554-af2c0348bf23"
+
+mock_symmetric_key_attestation = {
+    "type": "symmetricKey",
+    "symmetricKey": {
+        "primaryKey": "primary_key",
+        "secondaryKey": "secondary_key"
+    },
+}
 
 generic_cs_template = "HostName={};SharedAccessKeyName={};SharedAccessKey={}"
 
@@ -380,3 +403,23 @@ def fixture_dt_client(mocker, fixture_cmd):
 
 def pytest_addoption(parser):
     parser.addoption("--api-version", action="store", default=None)
+
+
+# DPS Fixtures
+@pytest.fixture()
+def fixture_gdcs(mocker):
+    gdcs = mocker.patch(path_gdcs)
+    gdcs.return_value = mock_dps_target
+    mocker.patch(path_iot_service_provisioning_factory)
+    mocker.patch(path_discovery_dps_init)
+
+    return gdcs
+
+
+@pytest.fixture()
+def fixture_dps_sas(mocker):
+    r = SasTokenAuthentication(mock_dps_target['entity'],
+                               mock_dps_target['policy'],
+                               mock_dps_target['primarykey'])
+    sas = mocker.patch(path_sas)
+    sas.return_value = r
