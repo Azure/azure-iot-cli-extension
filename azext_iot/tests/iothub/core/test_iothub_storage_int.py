@@ -92,7 +92,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
         if assignee not in role_assignment_principal_ids:
             if self.user["type"] == UserTypes.user.value:
                 self.cmd(
-                    'role assignment create --assignee"{}" --role "{}" --scope "{}"'.format(
+                    'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
                         assignee, STORAGE_ROLE, self.live_storage_id
                     )
                 )
