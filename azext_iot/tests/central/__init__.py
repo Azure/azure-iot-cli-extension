@@ -24,7 +24,7 @@ CENTRAL_SETTINGS = [
     "azext_iot_central_scope_id",
     "azext_iot_central_token",
     "azext_iot_central_dns_suffix",
-    "azext_iot_central_storage_cstring",
+    "azext_iot_teststorageaccount",
     "azext_iot_central_storage_container",
 ]
 settings = DynamoSettings(opt_env_set=CENTRAL_SETTINGS)
@@ -33,14 +33,9 @@ APP_RG = settings.env.azext_iot_testrg
 # Storage Account
 DEFAULT_CONTAINER = "central"
 STORAGE_CONTAINER = (
-    settings.env.azext_iot_central_storage_container or DEFAULT_CONTAINER
+    settings.env.azext_iot_teststoragecontainer or DEFAULT_CONTAINER
 )
-STORAGE_CSTRING = settings.env.azext_iot_central_storage_cstring
-STORAGE_NAME = (
-    None
-    if settings.env.azext_iot_central_storage_cstring
-    else "iotstore" + generate_generic_id()[:4]
-)
+STORAGE_NAME = settings.env.azext_iot_teststorageaccount or "iotstore" + generate_generic_id()[:4]
 
 # Device templates
 device_template_path = get_context_path(__file__, "json/device_template_int_test.json")
@@ -59,7 +54,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         super(CentralLiveScenarioTest, self).__init__(test_scenario)
         self._create_app()
         self.storage_container = STORAGE_CONTAINER
-        self.storage_cstring = STORAGE_CSTRING
+        self.storage_cstring = None
         self.storage_account_name = STORAGE_NAME
         self.token = None
         self.dns_suffix = None
@@ -570,13 +565,13 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
     def _create_storage_account(self):
         """
-        Create a storage account and container if the storage connection string was not provided and
-        a storage account was not created yet. Populate the following variables if needed:
+        Create a storage account and container if the a storage account was not created yet.
+        Populate the following variables if needed:
           - storage_account_name
           - storage_container
           - storage_cstring
         """
-        if not self.storage_cstring:
+        if not settings.env.azext_iot_teststorageaccount:
             self.cmd(
                 "storage account create -n {} -g {}".format(
                     self.storage_account_name, self.app_rg
@@ -584,12 +579,14 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 include_opt_args=False,
             )
             self._populate_storage_cstring()
-            self.cmd(
-                "storage container create -n {} --connection-string '{}'".format(
-                    self.storage_container, self.storage_cstring
-                ),
-                include_opt_args=False,
-            )
+
+        # This won't overwrite or error if container is already created.
+        self.cmd(
+            "storage container create -n {} --connection-string '{}'".format(
+                self.storage_container, self.storage_cstring
+            ),
+            include_opt_args=False,
+        )
 
     def _populate_storage_cstring(self):
         """
@@ -605,15 +602,20 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
     def _delete_storage_account(self):
         """
-        Delete the storage account if it was created. The variable storage_account_name will only
-        be populated if a storage account was created and thus must be deleted at the end of the test.
+        Delete the storage account if it was created.
         """
-        if self.storage_account_name:
+        if settings.env.azext_iot_teststorageaccount:
             self.cmd(
                 "storage account delete -n {} -g {} -y".format(
                     self.storage_account_name, self.app_rg
                 ),
                 include_opt_args=False,
+            )
+        elif settings.env.azext_iot_teststorageaccount:
+            self.cmd(
+                "storage container delete -n {} --connection-string '{}'".format(
+                    self.storage_account_name, self.storage_cstring
+                ),
             )
 
     def _wait_for_storage_configured(self, api_version):

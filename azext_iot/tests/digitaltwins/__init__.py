@@ -20,7 +20,7 @@ MOCK_RESOURCE_TAGS = "a=b c=d"
 MOCK_RESOURCE_TAGS_DICT = {"a": "b", "c": "d"}
 MOCK_DEAD_LETTER_ENDPOINT = "https://accountname.blob.core.windows.net/containerName"
 MOCK_DEAD_LETTER_SECRET = "{}?sasToken".format(MOCK_DEAD_LETTER_ENDPOINT)
-REGION_RESOURCE_LIMIT = 10
+REGION_RESOURCE_LIMIT = 9 # Actual value is 10 but this is to limit race conditions
 REGION_LIST = ["westus2", "westcentralus", "eastus2", "eastus", "eastus2euap"]
 MAX_ADX_RETRIES = 5
 

@@ -101,7 +101,7 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def create_dps(self):
         """Create a device provisioning service for testing purposes."""
         dps_list = self.cmd(
-            '''iot dps list -g "{}"'''.format(self.entity_rg)
+            'iot dps list -g "{}"'.format(self.entity_rg)
         ).get_output_in_json()
 
         # Check if the generated name is already used
@@ -155,7 +155,7 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def create_hub(self):
         """Create an IoT hub for DPS testing purposes."""
         hubs_list = self.cmd(
-            '''iot hub list -g "{}"'''.format(self.entity_rg)
+            'iot hub list -g "{}"'.format(self.entity_rg)
         ).get_output_in_json()
 
         # Check if the generated name is already used
