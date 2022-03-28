@@ -33,7 +33,7 @@ APP_RG = settings.env.azext_iot_testrg
 # Storage Account
 DEFAULT_CONTAINER = "central"
 STORAGE_CONTAINER = (
-    settings.env.azext_iot_teststoragecontainer or DEFAULT_CONTAINER
+    settings.env.azext_iot_central_storage_container or DEFAULT_CONTAINER
 )
 STORAGE_NAME = settings.env.azext_iot_teststorageaccount or "iotstore" + generate_generic_id()[:4]
 
