@@ -255,7 +255,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
         ).get_output_in_json()["tags"]
 
         if tags.get(test_tag):
-            tags[test_tag] = int(tags["test_tag"]) + 1
+            tags[test_tag] = int(tags[test_tag]) + 1
         else:
             tags[test_tag] = 1
         new_tags = " ".join(f"{k}={v}" for k, v in tags.items())
