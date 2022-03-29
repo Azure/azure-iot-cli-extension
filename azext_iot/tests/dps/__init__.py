@@ -193,7 +193,7 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
     def _add_test_tags(self, test_tag):
         tags = self.cmd(
-            "iot dps show --dps-name {} -g {}".format(self.entity_dps_name, self.entity_rg)
+            "iot dps show -n {} -g {}".format(self.entity_dps_name, self.entity_rg)
         ).get_output_in_json()["tags"]
 
         tests = ""
@@ -203,7 +203,7 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
             tests = test_tag
 
         self.cmd(
-            "iot dps update --dps-name {} -g {} --tags {}".format(
+            "iot dps update -n {} -g {} --tags {}".format(
                 self.entity_dps_name,
                 self.entity_rg,
                 f"tests={tests}"
@@ -211,7 +211,7 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
         ).get_output_in_json()
 
         self.cmd(
-            "iot hub update --dps-name {} -g {} --tags {}".format(
+            "iot hub update -n {} -g {} --tags {}".format(
                 self.entity_dps_name,
                 self.entity_rg,
                 f"tests={tests}"
