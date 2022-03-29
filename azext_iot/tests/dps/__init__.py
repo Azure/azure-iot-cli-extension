@@ -212,7 +212,7 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
         self.cmd(
             "iot hub update -n {} -g {} --tags {}".format(
-                self.entity_dps_name,
+                self.entity_hub_name,
                 self.entity_rg,
                 f"tests={tests}"
             )
