@@ -50,8 +50,8 @@ settings = DynamoSettings(
     opt_env_set=list(set(ENV_SET_TEST_IOTHUB_OPTIONAL + ENV_SET_TEST_IOTDPS_OPTIONAL))
 )
 ENTITY_RG = settings.env.azext_iot_testrg
-ENTITY_DPS_NAME = settings.env.azext_iot_testdps if settings.env.azext_iot_testdps else "t-dps-" + generate_generic_id()
-ENTITY_HUB_NAME = settings.env.azext_iot_testhub if settings.env.azext_iot_testhub else "t-dps-hub-" + generate_generic_id()
+ENTITY_DPS_NAME = settings.env.azext_iot_testdps if settings.env.azext_iot_testdps else "test-dps-" + generate_generic_id()
+ENTITY_HUB_NAME = settings.env.azext_iot_testhub if settings.env.azext_iot_testhub else "test-dps-hub-" + generate_generic_id()
 MAX_RBAC_ASSIGNMENT_TRIES = settings.env.azext_iot_rbac_max_tries if settings.env.azext_iot_rbac_max_tries else 10
 
 
@@ -196,17 +196,17 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
             "iot dps show -n {} -g {}".format(self.entity_dps_name, self.entity_rg)
         ).get_output_in_json()["tags"]
 
-        tests = ""
-        if tags.get("tests"):
-            tests = tags["tests"] + "," + test_tag
+        if tags.get(test_tag):
+            tags[test_tag] = int(tags["test_tag"]) + 1
         else:
-            tests = test_tag
+            tags[test_tag] = 1
+        new_tags = " ".join(f"{k}={v}" for k, v in tags.items())
 
         self.cmd(
             "iot dps update -n {} -g {} --tags {}".format(
                 self.entity_dps_name,
                 self.entity_rg,
-                f"tests={tests}"
+                new_tags
             )
         ).get_output_in_json()
 
@@ -214,7 +214,7 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
             "iot hub update -n {} -g {} --tags {}".format(
                 self.entity_hub_name,
                 self.entity_rg,
-                f"tests={tests}"
+                new_tags
             )
         ).get_output_in_json()
 

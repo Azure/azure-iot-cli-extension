@@ -116,6 +116,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
         self.region = self.get_region()
         self.connection_string = self.get_hub_cstring()
+        self._add_test_tags(test_tag=test_scenario)
 
     def clean_up(self, device_ids: List[str] = None, config_ids: List[str] = None):
         if device_ids:
@@ -247,6 +248,25 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     self.storage_account_name, self.storage_cstring
                 ),
             )
+
+    def _add_test_tags(self, test_tag):
+        tags = self.cmd(
+            "iot hub show -n {} -g {}".format(self.entity_name, self.entity_rg)
+        ).get_output_in_json()["tags"]
+
+        if tags.get(test_tag):
+            tags[test_tag] = int(tags["test_tag"]) + 1
+        else:
+            tags[test_tag] = 1
+        new_tags = " ".join(f"{k}={v}" for k, v in tags.items())
+
+        self.cmd(
+            "iot hub update -n {} -g {} --tags {}".format(
+                self.entity_name,
+                self.entity_rg,
+                new_tags
+            )
+        ).get_output_in_json()
 
     def tearDown(self):
         device_list = []
