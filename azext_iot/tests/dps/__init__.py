@@ -59,8 +59,8 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def __init__(self, test_scenario):
         assert test_scenario
         self.entity_rg = ENTITY_RG
-        self.entity_dps_name = test_scenario + ENTITY_DPS_NAME[len(test_scenario):]
-        self.entity_hub_name = test_scenario + ENTITY_HUB_NAME[len(test_scenario):]
+        self.entity_dps_name = ENTITY_DPS_NAME
+        self.entity_hub_name = ENTITY_HUB_NAME
         super(IoTDPSLiveScenarioTest, self).__init__(test_scenario)
 
         # Create resources if needed
@@ -70,6 +70,7 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
             self.create_hub()
 
         # Prep the DPS for testing
+        self._add_test_tags(test_tag=test_scenario)
         self._ensure_dps_hub_link()
         self._cleanup_enrollments()
         self.dps_cstring = self.get_dps_cstring()
@@ -190,6 +191,33 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 )
             )
 
+    def _add_test_tags(self, test_tag):
+        tags = self.cmd(
+            "iot dps show --dps-name {} -g {}".format(self.entity_dps_name, self.entity_rg)
+        ).get_output_in_json()["tags"]
+
+        tests = ""
+        if tags.get("tests"):
+            tests = tags["tests"] + "," + test_tag
+        else:
+            tests = test_tag
+
+        self.cmd(
+            "iot dps update --dps-name {} -g {} --tags {}".format(
+                self.entity_dps_name,
+                self.entity_rg,
+                f"tests={tests}"
+            )
+        ).get_output_in_json()
+
+        self.cmd(
+            "iot hub update --dps-name {} -g {} --tags {}".format(
+                self.entity_dps_name,
+                self.entity_rg,
+                f"tests={tests}"
+            )
+        ).get_output_in_json()
+
     def _cleanup_enrollments(self):
         """Delete all individual and group enrollments from the DPS."""
         enrollments = self.cmd(
@@ -273,7 +301,6 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
         return f"{command} --auth-type {auth_type}"
 
     def get_role_assignments(self, scope, role):
-
         role_assignments = self.cmd(
             'role assignment list --scope "{}" --role "{}"'.format(
                 scope, role
