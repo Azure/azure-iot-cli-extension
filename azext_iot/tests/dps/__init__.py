@@ -59,8 +59,8 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def __init__(self, test_scenario):
         assert test_scenario
         self.entity_rg = ENTITY_RG
-        self.entity_dps_name = ENTITY_DPS_NAME
-        self.entity_hub_name = ENTITY_HUB_NAME
+        self.entity_dps_name = test_scenario + ENTITY_DPS_NAME[len(test_scenario):]
+        self.entity_hub_name = test_scenario + ENTITY_HUB_NAME[len(test_scenario):]
         super(IoTDPSLiveScenarioTest, self).__init__(test_scenario)
 
         # Create resources if needed
