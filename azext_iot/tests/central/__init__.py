@@ -572,12 +572,24 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
           - storage_cstring
         """
         if not settings.env.azext_iot_teststorageaccount:
-            self.cmd(
-                "storage account create -n {} -g {}".format(
-                    self.storage_account_name, self.app_rg
-                ),
-                include_opt_args=False,
-            )
+            storage_list = self.cmd(
+                'storage account list -g "{}"'.format(self.app_rg)
+            ).get_output_in_json()
+
+            target_storage = None
+            for storage in storage_list:
+                if storage["name"] == self.storage_account_name:
+                    target_storage = storage
+                    break
+
+            if not target_storage:
+                self.cmd(
+                    "storage account create -n {} -g {}".format(
+                        self.storage_account_name, self.app_rg
+                    ),
+                    include_opt_args=False,
+                )
+
             self._populate_storage_cstring()
 
         # This won't overwrite or error if container is already created.
@@ -604,14 +616,14 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         """
         Delete the storage account if it was created.
         """
-        if settings.env.azext_iot_teststorageaccount:
+        if not settings.env.azext_iot_teststorageaccount:
             self.cmd(
                 "storage account delete -n {} -g {} -y".format(
                     self.storage_account_name, self.app_rg
                 ),
                 include_opt_args=False,
             )
-        elif settings.env.azext_iot_teststorageaccount:
+        elif not settings.env.azext_iot_teststorageaccount:
             self.cmd(
                 "storage container delete -n {} --connection-string '{}'".format(
                     self.storage_account_name, self.storage_cstring

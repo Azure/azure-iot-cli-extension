@@ -200,7 +200,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
             target_storage = None
             for storage in storage_list:
-                if storage["name"] == self.entity_name:
+                if storage["name"] == self.storage_account_name:
                     target_storage = storage
                     break
 
@@ -234,14 +234,14 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
         """
         Delete the storage account if it was created.
         """
-        if settings.env.azext_iot_teststorageaccount:
+        if not settings.env.azext_iot_teststorageaccount:
             self.cmd(
                 "storage account delete -n {} -g {} -y".format(
                     self.storage_account_name, self.entity_rg
                 ),
             )
 
-        elif settings.env.azext_iot_teststorageaccount:
+        elif not settings.env.azext_iot_teststorageaccount:
             self.cmd(
                 "storage container delete -n {} --connection-string '{}'".format(
                     self.storage_account_name, self.storage_cstring
