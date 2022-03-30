@@ -53,6 +53,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def __init__(self, test_scenario):
         super(CentralLiveScenarioTest, self).__init__(test_scenario)
         self._create_app()
+        self._add_test_tag(test_tag=test_scenario)
         self.storage_container = STORAGE_CONTAINER
         self.storage_cstring = None
         self.storage_account_name = STORAGE_NAME
@@ -116,6 +117,25 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     self.app_id,
                 )
             ).get_output_in_json()["resourceGroup"]
+
+    def _add_test_tag(self, test_tag):
+        tags = self.cmd(
+            "iot central app show -n {} -g {}".format(self.app_id, self.app_rg)
+        ).get_output_in_json()["tags"]
+
+        if tags.get(test_tag):
+            tags[test_tag] = int(tags[test_tag]) + 1
+        else:
+            tags[test_tag] = 1
+        new_tags = " ".join(f"tags.{k}={v}" for k, v in tags.items())
+
+        self.cmd(
+            "iot central app update -n {} -g {} --set {}".format(
+                self.app_id,
+                self.app_rg,
+                new_tags
+            )
+        ).get_output_in_json()
 
     def _create_device(self, api_version, **kwargs) -> Tuple[str, str]:
         """

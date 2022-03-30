@@ -116,7 +116,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
         self.region = self.get_region()
         self.connection_string = self.get_hub_cstring()
-        self._add_test_tags(test_tag=test_scenario)
+        self._add_test_tag(test_tag=test_scenario)
 
     def clean_up(self, device_ids: List[str] = None, config_ids: List[str] = None):
         if device_ids:
@@ -249,7 +249,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 ),
             )
 
-    def _add_test_tags(self, test_tag):
+    def _add_test_tag(self, test_tag):
         tags = self.cmd(
             "iot hub show -n {} -g {}".format(self.entity_name, self.entity_rg)
         ).get_output_in_json()["tags"]

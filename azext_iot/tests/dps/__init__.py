@@ -70,7 +70,7 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
             self.create_hub()
 
         # Prep the DPS for testing
-        self._add_test_tags(test_tag=test_scenario)
+        self._add_test_tag(test_tag=test_scenario)
         self._ensure_dps_hub_link()
         self._cleanup_enrollments()
         self.dps_cstring = self.get_dps_cstring()
@@ -191,7 +191,7 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 )
             )
 
-    def _add_test_tags(self, test_tag):
+    def _add_test_tag(self, test_tag):
         tags = self.cmd(
             "iot dps show -n {} -g {}".format(self.entity_dps_name, self.entity_rg)
         ).get_output_in_json()["tags"]
@@ -208,7 +208,7 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 self.entity_rg,
                 new_tags
             )
-        ).get_output_in_json()
+        )
 
         self.cmd(
             "iot hub update -n {} -g {} --tags {}".format(
@@ -216,7 +216,7 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 self.entity_rg,
                 new_tags
             )
-        ).get_output_in_json()
+        )
 
     def _cleanup_enrollments(self):
         """Delete all individual and group enrollments from the DPS."""

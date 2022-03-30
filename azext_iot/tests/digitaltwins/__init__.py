@@ -73,6 +73,7 @@ class DTLiveScenarioTest(LiveScenarioTest):
         assert test_scenario
 
         super(DTLiveScenarioTest, self).__init__(test_scenario)
+        self.test_scenario = test_scenario
         self.embedded_cli = EmbeddedCLI()
         self._bootup_scenario()
 
@@ -111,6 +112,25 @@ class DTLiveScenarioTest(LiveScenarioTest):
         self.rg_region = self.embedded_cli.invoke(
             "group show --name {}".format(self.rg)
         ).as_json()["location"]
+
+    def _add_test_tag(self, instance):
+        tags = self.cmd(
+            "dt show -n {} -g {}".format(instance["name"], instance["resourceGroup"])
+        ).get_output_in_json()["tags"]
+
+        if isinstance(tags, dict) and tags.get(self.test_scenario):
+            tags[self.test_scenario] = int(tags[self.test_scenario]) + 1
+        else:
+            tags = {self.test_scenario: 1}
+        new_tags = " ".join(f"{k}={v}" for k, v in tags.items())
+
+        self.cmd(
+            "dt create -n {} -g {} --tags {}".format(
+                instance["name"],
+                instance["resourceGroup"],
+                new_tags
+            )
+        )
 
     @property
     def current_user(self):
@@ -451,6 +471,7 @@ class DTLiveScenarioTest(LiveScenarioTest):
         ).get_output_in_json()
 
     def track_instance(self, instance: dict):
+        self._add_test_tag(instance)
         self.tracked_instances.append((instance["name"], instance["resourceGroup"]))
 
     def tearDown(self):
