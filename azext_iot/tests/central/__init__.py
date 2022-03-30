@@ -86,7 +86,6 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         self.app_id = (
             settings.env.azext_iot_central_app_id or "test-app-" + generate_generic_id()
         )
-        self.app_rg = APP_RG
         self._scope_id = settings.env.azext_iot_central_scope_id
 
         # only populate these if given in the test configuration variables
@@ -102,7 +101,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
             self.cmd(
                 "iot central app create -n {} -g {} -s {} --mi-system-assigned -l {}".format(
-                    self.app_id, self.app_rg, self.app_id, "westus"
+                    self.app_id, APP_RG, self.app_id, "westus"
                 ),
                 include_opt_args=False,
             )
@@ -110,13 +109,12 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             # Will be repopulated with get_app_scope_id for tests that need it
             self._scope_id = None
 
-        # Get Central App RG if needed (for storage account creation)
-        elif not APP_RG:
-            self.app_rg = self.cmd(
-                "iot central app show -n {}".format(
-                    self.app_id,
-                )
-            ).get_output_in_json()["resourceGroup"]
+        # Get Central App RG
+        self.app_rg = self.cmd(
+            "iot central app show -n {}".format(
+                self.app_id,
+            )
+        ).get_output_in_json()["resourceGroup"]
 
     def _add_test_tag(self, test_tag):
         tags = self.cmd(
