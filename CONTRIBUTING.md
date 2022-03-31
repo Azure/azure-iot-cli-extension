@@ -124,16 +124,6 @@ If specified in the pytest.ini configuration file, those resources will be used.
 
 Note that if you stop the code with ctrl + C, the resources may not be deleted properly.
 
-1. Create IoT Hub
-
-    > IMPORTANT: Your IoT Hub must be created specifically for integration tests and must not contain any devices when the tests are run.
-
-2. Create Files Storage - In IoT Hub, click Files, create a new Storage Account and link to an empty Container.
-
-3. Create IoT Hub Device Provisioning Service (DPS)
-
-4. Link IoT Hub to DPS - From DPS, click "Linked IoT Hub" and link the IoT Hub you just created.
-
 #### Integration Test Environment Variables
 
 You can either manually set the environment variables or use the `pytest.ini.example` file in the root of the extension repo. To use that file, rename it to `pytest.ini`, open it and set the variables as indicated below.

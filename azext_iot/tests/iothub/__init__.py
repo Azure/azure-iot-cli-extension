@@ -207,8 +207,8 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
             if not target_storage:
                 self.cmd(
-                    "storage account create -n {} -g {}".format(
-                        self.storage_account_name, self.entity_rg
+                    "storage account create -n {} -g {} --tags iothub={}".format(
+                        self.storage_account_name, self.entity_rg, self.entity_name
                     )
                 )
             self._populate_storage_cstring()

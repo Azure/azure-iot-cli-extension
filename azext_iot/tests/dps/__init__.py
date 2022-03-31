@@ -169,8 +169,8 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
         # Create the min version hub and assign the correct roles
         if not target_hub:
             self.cmd(
-                "iot hub create --name {} --resource-group {} --sku S1 ".format(
-                    self.entity_hub_name, self.entity_rg
+                "iot hub create --name {} --resource-group {} --sku S1 --tags dpsname={}".format(
+                    self.entity_hub_name, self.entity_rg, self.entity_dps_name
                 )
             )
 
@@ -211,10 +211,11 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
         )
 
         self.cmd(
-            "iot hub update -n {} -g {} --tags {}".format(
+            "iot hub update -n {} -g {} --tags {} dpsname={}".format(
                 self.entity_hub_name,
                 self.entity_rg,
-                new_tags
+                new_tags,
+                self.entity_dps_name
             )
         )
 

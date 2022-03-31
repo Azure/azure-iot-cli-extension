@@ -602,8 +602,8 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
             if not target_storage:
                 self.cmd(
-                    "storage account create -n {} -g {}".format(
-                        self.storage_account_name, self.app_rg
+                    "storage account create -n {} -g {} --tags iotcentral={}".format(
+                        self.storage_account_name, self.app_rg, self.app_id
                     ),
                     include_opt_args=False,
                 )
