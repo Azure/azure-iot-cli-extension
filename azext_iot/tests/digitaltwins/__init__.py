@@ -60,7 +60,7 @@ ADX_RG = settings.env.azext_dt_adx_rg or settings.env.azext_iot_testrg
 
 
 def generate_resource_id():
-    return "dtcli-{}".format(generate_generic_id())
+    return "dt-{}".format(generate_generic_id())
 
 
 class DTLiveScenarioTest(LiveScenarioTest):
