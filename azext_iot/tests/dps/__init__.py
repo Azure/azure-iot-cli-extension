@@ -178,13 +178,8 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
         hubs = self.cmd(
             "iot dps linked-hub list --dps-name {} -g {}".format(self.entity_dps_name, self.entity_rg)
         ).get_output_in_json()
-        if not hubs or not list(
-            filter(
-                lambda linked_hub: linked_hub["name"]
-                == "{}.azure-devices.net".format(self.entity_hub_name),
-                hubs,
-            )
-        ):
+        hub_names = [hub["name"] for hub in hubs]
+        if "{}.azure-devices.net".format(self.entity_hub_name) not in hub_names:
             self.cmd(
                 "iot dps linked-hub create --dps-name {} -g {} --connection-string {} --location {}".format(
                     self.entity_dps_name, self.entity_rg, self.get_hub_cstring(), self.get_hub_region()
@@ -315,11 +310,6 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
         yield None
         if os.path.exists(CERT_PATH):
             os.remove(CERT_PATH)
-        self.cmd(
-            "iot dps linked-hub delete --dps-name {} --linked-hub {} --resource-group {}".format(
-                ENTITY_DPS_NAME, self.hub_host_name, ENTITY_RG
-            )
-        )
         if not settings.env.azext_iot_testhub:
             self.cmd(
                 "iot hub delete --name {} --resource-group {}".format(

@@ -109,8 +109,7 @@ class TestIoTHubDeviceTwin(IoTLiveScenarioTest):
             assert d0_twin["properties"]["desired"]["$version"] == 3
 
             # Prepare removal of all twin tag properties
-            for key in patch_tags:
-                patch_tags[key] = None
+            patch_tags = {key: None for key in patch_tags}
             self.kwargs["patch_tags"] = json.dumps(patch_tags)
 
             # Remove all twin tag properties
