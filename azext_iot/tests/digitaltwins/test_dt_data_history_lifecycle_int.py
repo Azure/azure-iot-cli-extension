@@ -363,7 +363,7 @@ class TestDTConnections(DTLiveScenarioTest):
             "consumer_group": consumer_group,
             "location": create_output["location"],
             "table_name": "adt_dh_{}_{}".format(
-                instance_name,
+                instance_name.replace("-", "_"),
                 create_output["location"]
             )
         }
