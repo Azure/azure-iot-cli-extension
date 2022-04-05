@@ -182,9 +182,9 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 "iot hub show --name {} --resource-group {}".format(
                     self.entity_hub_name, self.entity_rg,
                 )
-            ).get_output_in_json()["provisioningState"]
+            ).get_output_in_json()["properties"]["provisioningState"]
             if hub_state.lower() != "succeeded":
-                # Hub is in bad state
+                # Hub is in bad state, need to recreate
                 self.entity_hub_name = "test-dps-hub-" + generate_generic_id()
                 retries += 1
                 self.cmd(
