@@ -35,6 +35,7 @@ PREFIX_EDGE_DEVICE = "test-edge-device-"
 PREFIX_INDIVIDUAL_ENROLLMENT = "test-enrollment-"
 PREFIX_GROUP_ENROLLMENT = "test-groupenroll-"
 USER_ROLE = "Device Provisioning Service Data Contributor"
+MAX_HUB_RETRIES = 3
 
 TEST_ENDORSEMENT_KEY = (
     "AToAAQALAAMAsgAgg3GXZ0SEs/gakMyNRqXXJP1S124GUgtk8qHaGzMUaaoABgCAAEMAEAgAAAAAAAEAibym9HQP9vxCGF5dVc1Q"
@@ -155,24 +156,44 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
     def create_hub(self):
         """Create an IoT hub for DPS testing purposes."""
-        hubs_list = self.cmd(
-            'iot hub list -g "{}"'.format(self.entity_rg)
-        ).get_output_in_json()
+        hub_state = None
+        retries = 0
+        while (not hub_state or hub_state.lower() != "succeeded") and retries < MAX_HUB_RETRIES:
+            hubs_list = self.cmd(
+                'iot hub list -g "{}"'.format(self.entity_rg)
+            ).get_output_in_json()
 
-        # Check if the generated name is already used
-        target_hub = None
-        for hub in hubs_list:
-            if hub["name"] == self.entity_hub_name:
-                target_hub = hub
-                break
+            # Check if the generated name is already used
+            target_hub = None
+            for hub in hubs_list:
+                if hub["name"] == self.entity_hub_name:
+                    target_hub = hub
+                    break
 
-        # Create the min version hub and assign the correct roles
-        if not target_hub:
-            self.cmd(
-                "iot hub create --name {} --resource-group {} --sku S1 --tags dpsname={}".format(
-                    self.entity_hub_name, self.entity_rg, self.entity_dps_name
+            # Create the min version hub and assign the correct roles
+            if not target_hub:
+                self.cmd(
+                    "iot hub create --name {} --resource-group {} --sku S1 --tags dpsname={}".format(
+                        self.entity_hub_name, self.entity_rg, self.entity_dps_name
+                    )
                 )
-            )
+
+            hub_state = self.cmd(
+                "iot hub show --name {} --resource-group {}".format(
+                    self.entity_hub_name, self.entity_rg,
+                )
+            ).get_output_in_json()["provisioningState"]
+            if hub_state.lower() != "succeeded":
+                # Hub is in bad state
+                self.entity_hub_name = "test-dps-hub-" + generate_generic_id()
+                retries += 1
+                self.cmd(
+                    "iot hub delete --name {} --resource-group {}".format(
+                        self.entity_hub_name, self.entity_rg
+                    )
+                )
+
+
 
     def _ensure_dps_hub_link(self):
         hubs = self.cmd(
