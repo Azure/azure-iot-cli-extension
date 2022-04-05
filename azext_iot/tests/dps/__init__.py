@@ -193,8 +193,6 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     )
                 )
 
-
-
     def _ensure_dps_hub_link(self):
         hubs = self.cmd(
             "iot dps linked-hub list --dps-name {} -g {}".format(self.entity_dps_name, self.entity_rg)
