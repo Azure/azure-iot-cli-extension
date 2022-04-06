@@ -22,6 +22,7 @@ from . import (
 
 logger = get_logger(__name__)
 
+
 @pytest.mark.skip(reason="Waiting on service team")
 class TestDTConnections(DTLiveScenarioTest):
     def __init__(self, test_case):

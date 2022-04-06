@@ -79,6 +79,14 @@ If this works, then you should now be able to make changes to the extension and 
 
 ## Unit and Integration Testing
 
+Tests are organized into folders by resource in `azext_iot\tests\`:
+- Central
+- Digital Twins
+- Device Provisioning Service
+- IoT Hub
+- Product
+- Utility
+
 ### Unit Tests
 
 You may need to install the dev_requirements for this
@@ -95,16 +103,31 @@ _Hub:_
 _DPS:_
 `pytest azext_iot/tests/dps/core/test_dps_discovery_unit.py`
 
-Unit tests end in "_unit" so execute the following command to run all unit tests,
-`pytest -k "_unit"`
+Unit tests end in "_unit.py" so execute the following command to run all unit tests,
+`pytest -k "_unit.py"`
 
 Execute the following command to run the IoT Hub unit tests:
 
-`pytest azext_iot/tests/iothub/ -k "_unit"`
+`pytest azext_iot/tests/iothub/ -k "_unit.py"`
 
 ### Integration Tests
 
 Integration tests are run against Azure resources and depend on environment variables.
+
+Example int tests runs:
+
+_Hub:_
+`pytest azext_iot/tests/iothub/core/test_iothub_storage_int.py`
+
+_DPS:_
+`pytest azext_iot/tests/dps/core/test_dps_discovery_int.py`
+
+Integration tests end in "_int_.py" so execute the following command to run all integration tests,
+`pytest -k "_int_.py"`
+
+Execute the following command to run the IoT Hub integration tests:
+
+`pytest azext_iot/tests/iothub/ -k "_int_.py"`
 
 #### Azure Resource Setup
 
@@ -112,7 +135,7 @@ The following resources will be needed for the integration tests.
 
 - IoT Hub
 - IoT Device Provisioning Service
-- IoT Digital Twin
+- Azure Digital Twins instance
 - IoT Central App
 - Storage Account (with an empty Container)
 - Event Grid Topic
@@ -122,7 +145,7 @@ The following resources will be needed for the integration tests.
 
 If specified in the pytest.ini configuration file, those resources will be used. Please ensure that the resources are in a clean, new state (ex: Iot Hub should not have any devices). Otherwise, new resources will be generated during the test startup and deleted during the test teardown.
 
-Note that if you stop the code with ctrl + C, the resources may not be deleted properly.
+> Note: If you interrupt test execution (for example via ctrl + C), the teardown or clean up processes may not run leaving resources in an indeterminant state.
 
 #### Integration Test Environment Variables
 
@@ -161,78 +184,37 @@ To run all tests, `azext_iot_testrg`, `azext_iot_central_app_id`, and `azext_iot
 
 For all resources, if the environmental variable is not provided, a new instance will be created for the test run and deleted at the end of the test run.
 
-##### General Variables
+| Variable name 	| Tests Used for 	| Description 	|
+|---------------	|----------------	|-------------	|
+| `az_iot_testrg`  	|    All          	| The resource group that contains the IoT Hub and DPS instances or where all test resources are created. It will be the default resource group if any other resource group variables are not provided.	|
+| `azext_iot_teststorageaccount`	| Iot Hub and Central Storage Tests	| The storage account used for running IoT Hub and Central storage tests. During these tests, your hub will be assigned a System-Assigned AAD identity, and will be granted the role of "Storage Blob Data Contributor" on the storage account you provide. Both the hub's identity and the RBAC role will be removed once the test completes. No role assignments are made for the IoT Central App.	|
+| `azext_iot_teststoragecontainer`	| Iot Hub Storage Tests	| The name of blob container belonging to the `azext_iot_teststorageaccount` storage account. Defaults to 'devices' when not specified.	|
+| `azext_iot_testhub` 	| Iot Hub and DPS Tests	| The name of the Iot Hub instance. 	|
+| `azext_iot_testdps`	| Iot DPS Tests	| The name of the Iot DPS instance.	|
+| `azext_iot_central_app_id`	| Iot Central Tests	| The IoT Central Application Id or name.	|
+| `azext_iot_central_scope_id`	| Iot Central Tests	| The ID scope for the DPS associated with the IoT Central Application.	|
+| `azext_iot_central_token`	| Iot Central Tests	| The api token to use for the IoT Central Application. This is only used to populate --token argument in IoT Central commands.	|
+| `azext_iot_central_dns_suffix`	| Iot Central Tests	| The DNS Suffix to use for the IoT Central Application. This is only used to populate --central-dns-suffix argument in IoT Central commands.	|
+| `azext_iot_central_primarykey`	| Iot Central Tests	| The IoT Central Application Id or name. Cannot be currently retrieved through the CLI.	|
+| `azext_iot_central_storage_container`	| Iot Central Storage Tests	| The name of blob container belonging to the `azext_iot_teststorageaccount` storage account. Defaults to 'central' when not specified.	|
+| `azext_dt_region`	| Digital Twin Tests	| The region to restrict Digital Twins creation. If not specified, will create the Digital Twins in a supported region.	|
+| `azext_dt_adx_cluster`	| Digital Twin Data History Tests	| The name of the Azure Data Explorer Cluster to use. Azure Data Explorer Cluster creation time can take up to 20 minutes, so having a cluster is recommended.	|
+| `azext_dt_adx_database`	| Digital Twin Data History Tests	| The name of the database in the Azure Data Explorer Cluster to use.	|
+| `azext_dt_adx_rg`	| Digital Twin Data History Tests	| The resource group that contains the Azure Data Explorer Cluster. If not provided, `az_iot_testrg` will be used as the resource group. 	|
+| `azext_dt_ep_eventgrid_topic`	| Digital Twin Endpoint Tests	| The Event Grid Topic to use.	|
+| `azext_dt_ep_servicebus_namespace`	| Digital Twin Endpoint Tests	| The Service Bus Namespace to use.	|
+| `azext_dt_ep_servicebus_policy`	| Digital Twin Endpoint Tests	| The policy for the topic in the Service Bus Namespace to use.	|
+| `azext_dt_ep_servicebus_topic`	| Digital Twin Endpoint Tests	| The topic in the Service Bus Namespace to use.	|
+| `azext_dt_ep_eventhub_namespace`	| Digital Twin Data History and Endpoint Tests	| The Event Hub Namespace to use.	|
+| `azext_dt_ep_eventhub_policy`	| Digital Twin Endpoint Tests	| The policy for the Event Hub instance in the Event Hub Namespace to use.	|
+| `azext_dt_ep_eventhub_topic`	| Digital Twin Data History and Endpoint Tests	| The Event Hub instance in the Event Hub Namespace to use.	|
+| `azext_dt_ep_eventhub_topic_consumer_group`	| Digital Twin Data History Tests	| The Event Hub consumer group name to use. Defaults to "$Default".	|
+| `azext_dt_ep_rg`	| Digital Twin Data History and Endpoint Tests	| The resource group that contains the endpoint (Event Hub, Event Grid, Service Bus) variables. If not provided, `az_iot_testrg` will be used as the resource group.	|
 
-`az_iot_testrg` is the resource group that contains the IoT Hub and DPS instances or where all test resources are created. This is required, as it will be the default resource group if any other resource group variables are not provided.
-
-`azext_iot_testhub` is the test IoT Hub name. Optional variable, used for IoT Hub and DPS tests. If not provided, a new IoT Hub will be created for the test run (and deleted at the end of the test).
-
-`azext_iot_testdps` is the test DPS name. Optional variable used for IoT DPS tests. If not provided, a new DPS instance will be created for the test run (and deleted at the end of the test).
-
-`azext_iot_teststorageaccount` is the storage account used for running IoT Hub and Central storage tests. Optional variable, specify only when you want to run storage tests. During these tests, your hub will be assigned a System-Assigned AAD identity, and will be granted the role of "Storage Blob Data Contributor" on the storage account you provide. Both the hub's identity and the RBAC role will be removed once the test completes. No role assignments are made for the IoT Central App.
-
-`azext_iot_teststoragecontainer` is the name of blob container belonging to the above mentioned storage account. Optional environment variable, defaults to 'devices' when not specified.
-
-##### IoT Central Test variables
-
-`azext_iot_central_app_id` is the IoT Central Application Id or name. Optional variable, used for IoT Central tests.
-
-`azext_iot_central_scope_id` is the ID scope for the DPS associated with the IoT Central Application. Optional variable, used for IoT Central tests.
-
-`azext_iot_central_token` is the api token to use for the IoT Central Application. Optional variable, only used to populate --token argument in IoT Central commands.
-
-`azext_iot_central_dns_suffix` is the DNS Suffix to use for the IoT Central Application. Optional variable, only used to populate --central-dns-suffix argument in IoT Central commands.
-
-`azext_iot_central_primarykey` is the IoT Central Application Id or name. Optional variable, used for IoT Central tests. Cannot be currently retrieved through the CLI.
-
-`azext_iot_central_storage_container` is the name of blob container belonging to the `azext_iot_teststorageaccount` storage account. Optional environment variable, defaults to 'central' when not specified.
-
-##### Digital Twin Test variables
-
-`azext_dt_region` is the region to restrict Digital Twins creation. Optional variable, if not specified, will create the Digital Twins in a supported region.
-
-`azext_dt_adx_cluster` is the name of the Azure Data Explorer Cluster to use. Optional variable, used for Digital Twin data history tests. Azure Data Explorer Cluster creation time can take up to 20 minutes, so having a cluster is recommended.
-
-`azext_dt_adx_database` is the name of the database in the Azure Data Explorer Cluster to use. Optional variable, used for Digital Twin data history tests.
-
-`azext_dt_adx_rg` is the resource group that contains the Azure Data Explorer Cluster. If not provided, `az_iot_testrg` will be used as the resource group.
-
-`azext_dt_ep_eventgrid_topic` is the Event Grid Topic to use. Optional variable, used for Digital Twin endpoint tests.
-
-`azext_dt_ep_servicebus_namespace` is the Service Bus Namespace to use. Optional variable, used for Digital Twin endpoint tests.
-
-`azext_dt_ep_servicebus_policy` is the policy for the topic in the Service Bus Namespace to use. Optional variable, used for Digital Twin endpoint tests.
-
-`azext_dt_ep_servicebus_topic` is the topic in the Service Bus Namespace to use. Optional variable, used for Digital Twin endpoint tests.
-
-`azext_dt_ep_eventhub_namespace` is the Event Hub Namespace to use. Optional variable, used for Digital Twin endpoint and data history tests.
-
-`azext_dt_ep_eventhub_policy` is the policy for the Event Hub instance in the Event Hub Namespace to use. Optional variable, used for Digital Twin endpoint and data history tests.
-
-`azext_dt_ep_eventhub_topic` is the Event Hub instance in the Event Hub Namespace to use. Optional variable, used for Digital Twin endpoint and data history tests.
-
-`azext_dt_ep_eventhub_topic_consumer_group` is the Service Bus Namespace to use. Optional variable, used for Digital Twin data history tests.
-
-`azext_dt_ep_rg` is the resource group that contains the endpoint (Event Hub, Event Grid, Service Bus) variables. Optional variable, if not provided, `az_iot_testrg` will be used as the resource group.
-
-##### IoT Hub
-
-Execute the following command to run the IoT Hub integration tests:
-
-`pytest azext_iot/tests/iothub/ -k "_int.py"`
-
-##### Device Provisioning Service
-
-Execute the following command to run the IoT Hub DPS integration tests:
-
-`pytest azext_iot/tests/dps/ -k "_int.py"`
 
 ##### IoT Central
-Execute the following command to run the IoT Central integration tests:
 
-`pytest azext_iot/tests/central/ -k "_int.py"`
-
-IoT Central integration tests can be run against all available api versions using command line argument "--api-version"
+IoT Central integration tests can be run against a specific available api versions using command line argument "--api-version"
 
 e.g. run tests against v 1.0
 
@@ -247,21 +229,21 @@ Execute the following command to run both Unit and Integration tests and output 
 
 #### Formatting and Linting
 
-The repo uses the linter in `azdev`.
-
-To install the required version of azdev, run this command:
-
-```powershell
-pip install -e "git+https://github.com/Azure/azure-cli@dev#egg=azure-cli-dev-tools&subdirectory=tools"
-```
-
-To run the linter, run this command:
-
-```powershell
-azdev cli-lint --ci --extensions azure-iot
-```
+The repo uses the linter in `azdev`. For more information, see here: https://github.com/Azure/azure-cli-dev-tools#style-linter-check-and-testing
 
 We use our flake8 and pylint rules. We recommend you set up your IDE as per the VSCode setup below for best compliance.
+
+To manually run pylint with our rules, run this command:
+
+```powershell
+pylint azext_iot/ --rcfile=.pylintrc
+```
+
+To manually run flake8 with our rules, run this command:
+
+```powershell
+flake8 azext_iot/ --statistics --config=setup.cfg
+```
 
 We are also starting to use `python black`. To set this up on VSCode, see the following blog post.
 
