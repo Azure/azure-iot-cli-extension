@@ -225,20 +225,20 @@ Execute the following command to run the IoT Hub integration tests:
 
 Execute the following command to run the IoT Hub DPS integration tests:
 
-`pytest azext_iot/tests/dps/ -k "_int"`
+`pytest azext_iot/tests/dps/ -k "_int.py"`
 
 ##### IoT Central
 Execute the following command to run the IoT Central integration tests:
 
-`pytest azext_iot/tests/central/ -k "_int"`
+`pytest azext_iot/tests/central/ -k "_int.py"`
 
 IoT Central integration tests can be run against all available api versions using command line argument "--api-version"
 
 e.g. run tests against v 1.0
 
-`pytest azext_iot/tests/central/ -k "_int" --api-version "1.0"`
+`pytest azext_iot/tests/central/ -k "_int.py" --api-version "1.0"`
 
-If argument is not specified, all runs act against default api version for each tested command.
+If the "--api-version" argument is not specified, all runs act against default api version for each tested command.
 #### Unit and Integration Tests Single Command
 
 Execute the following command to run both Unit and Integration tests and output a code coverage report to the console and to a `.coverage` file.  You can configure code coverage with the `.coveragerc` file.
