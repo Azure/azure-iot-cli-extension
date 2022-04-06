@@ -245,7 +245,8 @@ class DTLiveScenarioTest(LiveScenarioTest):
                 retries += 1
 
             if retries == MAX_ADX_RETRIES:
-                logger.error("Waited 25 minutes for ADX cluster creation and cluster has not been created yet.")
+                cluster_msg = f"Waited 25 minutes for ADX cluster creation and cluster {ADX_CLUSTER} has not been created yet."
+                logger.error(cluster_msg)
 
         if not settings.env.azext_dt_adx_database:
             self.kwargs["database_body"] = json.dumps(
@@ -284,7 +285,8 @@ class DTLiveScenarioTest(LiveScenarioTest):
                 retries += 1
 
             if retries == MAX_ADX_RETRIES:
-                logger.error("Waited 2.5 minutes for database creation and database has not been created yet.")
+                database_msg = f"Waited 2.5 minutes for database creation and database {ADX_DATABASE} has not been created yet."
+                logger.error(database_msg)
 
     def ensure_eventhub_resource(self):
         """Ensure that the test has all Event hub resources."""
