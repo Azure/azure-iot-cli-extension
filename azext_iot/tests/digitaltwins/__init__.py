@@ -186,11 +186,25 @@ class DTLiveScenarioTest(LiveScenarioTest):
 
     def ensure_adx_resource(self):
         """Ensure that the test has all ADX resources."""
-        # Once the az kusto is no longer private, enable just in time resource generation
+        # Once the az kusto is no longer experimental, fix this to use az kusto
+        adx_location = "eastus"
+        # Update the location if need to create a database in existing cluster
+        if settings.env.azext_dt_adx_cluster and not settings.env.azext_dt_adx_database:
+            cluster_uri = self.embedded_cli.invoke(
+                "rest --method GET --url '/subscriptions/{}/resourceGroups/"
+                "{}/providers/Microsoft.Kusto/clusters/{}?api-version=2021-08-27'".format(
+                    self.get_subscription_id(),
+                    ADX_RG,
+                    ADX_CLUSTER,
+                )
+            ).as_json().get("properties").get("uri")
+            # parse the location from the uri - https://cluster.location.kusto.windows.net
+            adx_location = cluster_uri.split(".")[1]
+
         if not settings.env.azext_dt_adx_cluster:
             self.kwargs["cluster_body"] = json.dumps(
                 {
-                    "location": "eastus",
+                    "location": adx_location,
                     "sku": {
                         "name": "Dev(No SLA)_Standard_E2a_v4",
                         "capacity": 1,
@@ -236,7 +250,7 @@ class DTLiveScenarioTest(LiveScenarioTest):
         if not settings.env.azext_dt_adx_database:
             self.kwargs["database_body"] = json.dumps(
                 {
-                    "location": "eastus",
+                    "location": adx_location,
                     "kind": "ReadWrite",
                     "properties": {
                         "softDeletePeriod": "P1D"
