@@ -312,14 +312,6 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
         if os.path.exists(CERT_PATH):
             os.remove(CERT_PATH)
         if not settings.env.azext_iot_testhub:
-            # temporary check hub state
-            hub_state = self.cmd(
-                "iot hub show --name {} --resource-group {}".format(
-                    ENTITY_HUB_NAME, ENTITY_RG
-                )
-            ).get_output_in_json()["properties"]["provisioningState"]
-            if hub_state.lower() != "succeeded":
-                return
             self.cmd(
                 "iot hub delete --name {} --resource-group {}".format(
                     ENTITY_HUB_NAME, ENTITY_RG
