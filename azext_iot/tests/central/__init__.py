@@ -12,9 +12,11 @@ from azure.cli.core.azclierror import CLIInternalError, InvalidArgumentValueErro
 from azext_iot.tests import CaptureOutputLiveScenarioTest
 from azext_iot.tests.conftest import get_context_path
 from azext_iot.tests.generators import generate_generic_id
+from azext_iot.tests.helpers import add_test_tag
 from azext_iot.tests.settings import DynamoSettings
 from azext_iot.common import utility
 from azext_iot.central.models.enum import Role, UserTypePreview, UserTypeV1, ApiVersion
+from azext_iot.tests.test_constants import ResourceTypes
 
 DEFAULT_CONTAINER = "devices"
 CENTRAL_SETTINGS = [
@@ -53,7 +55,13 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def __init__(self, test_scenario):
         super(CentralLiveScenarioTest, self).__init__(test_scenario)
         self._create_app()
-        self._add_test_tag(test_tag=test_scenario)
+        add_test_tag(
+            cmd=self.cmd,
+            name=self.app_id,
+            rg=self.app_rg,
+            rtype=ResourceTypes.central.value,
+            test_tag=test_scenario
+        )
         self.storage_container = STORAGE_CONTAINER
         self.storage_cstring = None
         self.storage_account_name = STORAGE_NAME
@@ -99,12 +107,25 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             if not APP_RG:
                 raise Exception("Tests need either app name or resource group.")
 
-            self.cmd(
-                "iot central app create -n {} -g {} -s {} --mi-system-assigned -l {}".format(
-                    self.app_id, APP_RG, self.app_id, "westus"
-                ),
-                include_opt_args=False,
-            )
+            app_list = self.cmd(
+                'iot central app list -g "{}"'.format(APP_RG)
+            ).get_output_in_json()
+
+            # Check if the generated name is already used
+            target_app = None
+            for app in app_list:
+                if app["name"] == self.app_id:
+                    target_app = app
+                    break
+
+            # Create the min version app and assign the correct roles
+            if not target_app:
+                self.cmd(
+                    "iot central app create -n {} -g {} -s {} --mi-system-assigned -l {}".format(
+                        self.app_id, APP_RG, self.app_id, "westus"
+                    ),
+                    include_opt_args=False,
+                )
             self.app_primary_key = None
             # Will be repopulated with get_app_scope_id for tests that need it
             self._scope_id = None
@@ -115,25 +136,6 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 self.app_id,
             )
         ).get_output_in_json()["resourceGroup"]
-
-    def _add_test_tag(self, test_tag):
-        tags = self.cmd(
-            "iot central app show -n {} -g {}".format(self.app_id, self.app_rg)
-        ).get_output_in_json()["tags"]
-
-        if tags.get(test_tag):
-            tags[test_tag] = int(tags[test_tag]) + 1
-        else:
-            tags[test_tag] = 1
-        new_tags = " ".join(f"tags.{k}={v}" for k, v in tags.items())
-
-        self.cmd(
-            "iot central app update -n {} -g {} --set {}".format(
-                self.app_id,
-                self.app_rg,
-                new_tags
-            )
-        ).get_output_in_json()
 
     def _create_device(self, api_version, **kwargs) -> Tuple[str, str]:
         """

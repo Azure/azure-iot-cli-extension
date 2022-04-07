@@ -42,6 +42,20 @@ def dps_connect_device(device_id: str, credentials: dict) -> IoTHubDeviceClient:
         return device_client
 
 
+def add_test_tag(cmd, name: str, rg: str, rtype: str, test_tag: str):
+    current_tags = cmd(
+        f"resource show -n {name} -g {rg} --resource-type {rtype}"
+    ).get_output_in_json()["tags"]
+
+    if current_tags.get(test_tag):
+        current_tags[test_tag] = int(current_tags[test_tag]) + 1
+    else:
+        current_tags[test_tag] = 1
+    new_tags = " ".join(f"{k}={v}" for k, v in current_tags.items())
+
+    cmd(f"resource tag -n {name} -g {rg} --resource-type {rtype} --tags {new_tags}")
+
+
 class MockLogger:
     def info(self, msg):
         print(msg)

@@ -8,12 +8,14 @@ import pytest
 
 from time import sleep
 from typing import List
+from azext_iot.tests.helpers import add_test_tag
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests import CaptureOutputLiveScenarioTest
 
 from azext_iot.common.certops import create_self_signed_certificate
 from azext_iot.common.shared import AuthenticationTypeDataplane
+from azext_iot.tests.test_constants import ResourceTypes
 
 DATAPLANE_AUTH_TYPES = [
     AuthenticationTypeDataplane.key.value,
@@ -84,7 +86,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     )
                 sleep(ROLE_ASSIGNMENT_REFRESH_TIME)
 
-                new_hub = self.cmd(
+                target_hub = self.cmd(
                     "iot hub show -n {} -g {}".format(self.entity_name, self.entity_rg)
                 ).get_output_in_json()
 
@@ -96,14 +98,14 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
                 tries = 0
                 while tries < MAX_RBAC_ASSIGNMENT_TRIES:
-                    role_assignments = self.get_role_assignments(new_hub["id"], USER_ROLE)
+                    role_assignments = self.get_role_assignments(target_hub["id"], USER_ROLE)
                     role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
                     if user["name"] in role_assignment_principal_names:
                         break
                     # else assign IoT Hub Data Contributor role to current user and check again
                     self.cmd(
                         'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
-                            user["name"], USER_ROLE, new_hub["id"]
+                            user["name"], USER_ROLE, target_hub["id"]
                         )
                     )
                     sleep(10)
@@ -116,7 +118,13 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
         self.region = self.get_region()
         self.connection_string = self.get_hub_cstring()
-        self._add_test_tag(test_tag=test_scenario)
+        add_test_tag(
+            cmd=self.cmd,
+            name=self.entity_name,
+            rg=self.entity_rg,
+            rtype=ResourceTypes.hub.value,
+            test_tag=test_scenario
+        )
 
     def clean_up(self, device_ids: List[str] = None, config_ids: List[str] = None):
         if device_ids:
@@ -248,25 +256,6 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     self.storage_account_name, self.storage_cstring
                 ),
             )
-
-    def _add_test_tag(self, test_tag):
-        tags = self.cmd(
-            "iot hub show -n {} -g {}".format(self.entity_name, self.entity_rg)
-        ).get_output_in_json()["tags"]
-
-        if tags.get(test_tag):
-            tags[test_tag] = int(tags[test_tag]) + 1
-        else:
-            tags[test_tag] = 1
-        new_tags = " ".join(f"{k}={v}" for k, v in tags.items())
-
-        self.cmd(
-            "iot hub update -n {} -g {} --tags {}".format(
-                self.entity_name,
-                self.entity_rg,
-                new_tags
-            )
-        ).get_output_in_json()
 
     def tearDown(self):
         device_list = []

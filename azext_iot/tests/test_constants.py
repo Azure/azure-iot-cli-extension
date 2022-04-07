@@ -4,6 +4,17 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from enum import Enum
+
+
+class ResourceTypes(Enum):
+    """
+    Resource types to use with az resource
+    """
+    central = "Microsoft.IoTCentral/IoTApps"
+    hub = "Microsoft.Devices/IotHubs"
+    dps = "Microsoft.Devices/provisioningServices"
+
 
 class FileNames:
     central_device_template_file = "central/json/device_template.json"

@@ -7,6 +7,7 @@
 import pytest
 import os
 from time import sleep
+from azext_iot.tests.helpers import add_test_tag
 
 from azext_iot.tests.settings import (
     DynamoSettings,
@@ -18,6 +19,7 @@ from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests import CaptureOutputLiveScenarioTest
 from azext_iot.common.certops import create_self_signed_certificate
 from azext_iot.common.shared import AuthenticationTypeDataplane
+from azext_iot.tests.test_constants import ResourceTypes
 
 DATAPLANE_AUTH_TYPES = [
     AuthenticationTypeDataplane.key.value,
@@ -71,7 +73,20 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
             self.create_hub()
 
         # Prep the DPS for testing
-        self._add_test_tag(test_tag=test_scenario)
+        add_test_tag(
+            cmd=self.cmd,
+            name=self.entity_dps_name,
+            rg=self.entity_rg,
+            rtype=ResourceTypes.dps.value,
+            test_tag=test_scenario
+        )
+        add_test_tag(
+            cmd=self.cmd,
+            name=self.entity_hub_name,
+            rg=self.entity_rg,
+            rtype=ResourceTypes.hub.value,
+            test_tag=test_scenario
+        )
         self._ensure_dps_hub_link()
         self._cleanup_enrollments()
         self.dps_cstring = self.get_dps_cstring()
@@ -115,34 +130,27 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
         # Create the min version dps and assign the correct roles
         if not target_dps:
-            self.cmd(
+            target_dps = self.cmd(
                 "iot dps create --name {} --resource-group {} ".format(
                     self.entity_dps_name, self.entity_rg
                 )
-            )
-
-        new_dps = self.cmd(
-            "iot dps show --name {} --resource-group {} ".format(
-                self.entity_dps_name, self.entity_rg
-            )
-        ).get_output_in_json()
+            ).get_output_in_json()
 
         account = self.cmd("account show").get_output_in_json()
         user = account["user"]
-
         if user["name"] is None:
             raise Exception("User not found")
 
         tries = 0
         while tries < MAX_RBAC_ASSIGNMENT_TRIES:
-            role_assignments = self.get_role_assignments(new_dps["id"], USER_ROLE)
+            role_assignments = self.get_role_assignments(target_dps["id"], USER_ROLE)
             role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
             if user["name"] in role_assignment_principal_names:
                 break
             # else assign DPS Data Contributor role to current user and check again
             self.cmd(
                 '''role assignment create --assignee "{}" --role "{}" --scope "{}"'''.format(
-                    user["name"], USER_ROLE, new_dps["id"]
+                    user["name"], USER_ROLE, target_dps["id"]
                 )
             )
             sleep(10)
@@ -169,11 +177,11 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
         # Create the min version hub and assign the correct roles
         if not target_hub:
-            self.cmd(
+            target_hub = self.cmd(
                 "iot hub create --name {} --resource-group {} --sku S1 --tags dpsname={}".format(
                     self.entity_hub_name, self.entity_rg, self.entity_dps_name
                 )
-            )
+            ).get_output_in_json()
 
     def _ensure_dps_hub_link(self):
         hubs = self.cmd(
@@ -186,34 +194,6 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     self.entity_dps_name, self.entity_rg, self.get_hub_cstring(), self.get_hub_region()
                 )
             )
-
-    def _add_test_tag(self, test_tag):
-        tags = self.cmd(
-            "iot dps show -n {} -g {}".format(self.entity_dps_name, self.entity_rg)
-        ).get_output_in_json()["tags"]
-
-        if tags.get(test_tag):
-            tags[test_tag] = int(tags[test_tag]) + 1
-        else:
-            tags[test_tag] = 1
-        new_tags = " ".join(f"{k}={v}" for k, v in tags.items())
-
-        self.cmd(
-            "iot dps update -n {} -g {} --tags {}".format(
-                self.entity_dps_name,
-                self.entity_rg,
-                new_tags
-            )
-        )
-
-        self.cmd(
-            "iot hub update -n {} -g {} --tags {} dpsname={}".format(
-                self.entity_hub_name,
-                self.entity_rg,
-                new_tags,
-                self.entity_dps_name
-            )
-        )
 
     def _cleanup_enrollments(self):
         """Delete all individual and group enrollments from the DPS."""
