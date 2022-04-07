@@ -8,7 +8,7 @@ import pytest
 
 from time import sleep
 from typing import List
-from azext_iot.tests.helpers import add_test_tag
+from azext_iot.tests.helpers import add_test_tag, create_storage_account
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests import CaptureOutputLiveScenarioTest
@@ -43,7 +43,7 @@ DEFAULT_CONTAINER = "devices"
 settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED, opt_env_set=ENV_SET_TEST_IOTHUB_OPTIONAL)
 ENTITY_RG = settings.env.azext_iot_testrg
 ENTITY_NAME = settings.env.azext_iot_testhub or "test-hub-" + generate_generic_id()
-STORAGE_ACCOUNT_NAME = settings.env.azext_iot_teststorageaccount or "hubstore" + generate_generic_id()[:4]
+STORAGE_ACCOUNT = settings.env.azext_iot_teststorageaccount or "hubstore" + generate_generic_id()[:4]
 STORAGE_CONTAINER = settings.env.azext_iot_teststoragecontainer or DEFAULT_CONTAINER
 MAX_RBAC_ASSIGNMENT_TRIES = settings.env.azext_iot_rbac_max_tries or 10
 ROLE_ASSIGNMENT_REFRESH_TIME = 120
@@ -198,46 +198,17 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
           - storage_container
           - storage_cstring
         """
-        self.entity_rg = ENTITY_RG
-        self.storage_account_name = STORAGE_ACCOUNT_NAME
+        self.storage_account_name = STORAGE_ACCOUNT
         self.storage_container = STORAGE_CONTAINER
-        self.storage_cstring = None
-        if not settings.env.azext_iot_teststorageaccount:
-            storage_list = self.cmd(
-                'storage account list -g "{}"'.format(self.entity_rg)
-            ).get_output_in_json()
 
-            target_storage = None
-            for storage in storage_list:
-                if storage["name"] == self.storage_account_name:
-                    target_storage = storage
-                    break
-
-            if not target_storage:
-                self.cmd(
-                    "storage account create -n {} -g {} --tags iothub={}".format(
-                        self.storage_account_name, self.entity_rg, self.entity_name
-                    )
-                )
-            self._populate_storage_cstring()
-
-        # This won't overwrite or error if container is already created.
-        self.cmd(
-            "storage container create -n {} --connection-string '{}'".format(
-                self.storage_container, self.storage_cstring
-            ),
+        self.storage_cstring = create_storage_account(
+            cmd=self.cmd,
+            account_name=self.storage_account_name,
+            container_name=self.storage_container,
+            rg=self.entity_rg,
+            resource_name=self.entity_name,
+            create_account=(settings.env.azext_iot_teststorageaccount is None)
         )
-
-    def _populate_storage_cstring(self):
-        """
-        Method to populate storage_cstring
-        """
-        if not self.storage_cstring:
-            self.storage_cstring = self.cmd(
-                "storage account show-connection-string -n {} -g {}".format(
-                    self.storage_account_name, self.entity_rg
-                )
-            ).get_output_in_json()["connectionString"]
 
     def _delete_storage_account(self):
         """
@@ -250,7 +221,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 ),
             )
 
-        elif not settings.env.azext_iot_teststorageaccount:
+        elif not settings.env.azext_iot_teststoragecontainer:
             self.cmd(
                 "storage container delete -n {} --connection-string '{}'".format(
                     self.storage_account_name, self.storage_cstring

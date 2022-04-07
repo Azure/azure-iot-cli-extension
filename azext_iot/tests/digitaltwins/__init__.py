@@ -232,8 +232,9 @@ class DTLiveScenarioTest(LiveScenarioTest):
                 )
             ).as_json().get("properties").get("state")
             retries = 0
+            wait_time = 300
             while cluster_create_state not in ProvisioningStateType.FINISHED.value and retries < MAX_ADX_RETRIES:
-                sleep(300)
+                sleep(wait_time)
                 cluster_create_state = self.embedded_cli.invoke(
                     "rest --method GET --url '/subscriptions/{}/resourceGroups/"
                     "{}/providers/Microsoft.Kusto/clusters/{}?api-version=2021-08-27'".format(
@@ -245,7 +246,8 @@ class DTLiveScenarioTest(LiveScenarioTest):
                 retries += 1
 
             if retries == MAX_ADX_RETRIES:
-                cluster_msg = f"Waited 25 minutes for ADX cluster creation and cluster {ADX_CLUSTER} has not been created yet."
+                waited_min = retries * wait_time // 60
+                cluster_msg = f"Waited {waited_min} minutes and ADX cluster {ADX_CLUSTER} has not been created yet."
                 logger.error(cluster_msg)
 
         if not settings.env.azext_dt_adx_database:
@@ -271,8 +273,9 @@ class DTLiveScenarioTest(LiveScenarioTest):
 
             database_creation_state = database_creation_op.as_json().get("properties").get("state")
             retries = 0
+            wait_time = 30
             while database_creation_state not in ProvisioningStateType.FINISHED.value and retries < MAX_ADX_RETRIES:
-                sleep(30)
+                sleep(wait_time)
                 database_creation_state = self.embedded_cli.invoke(
                     "rest --method GET --url '/subscriptions/{}/resourceGroups/"
                     "{}/providers/Microsoft.Kusto/clusters/{}/databases/{}?api-version=2021-08-27'".format(
@@ -285,7 +288,8 @@ class DTLiveScenarioTest(LiveScenarioTest):
                 retries += 1
 
             if retries == MAX_ADX_RETRIES:
-                database_msg = f"Waited 2.5 minutes for database creation and database {ADX_DATABASE} has not been created yet."
+                waited_min = retries * wait_time // 60
+                database_msg = f"Waited {waited_min} minutes and ADX database {ADX_DATABASE} has not been created yet."
                 logger.error(database_msg)
 
     def ensure_eventhub_resource(self):

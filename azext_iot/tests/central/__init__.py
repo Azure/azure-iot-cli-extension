@@ -12,7 +12,7 @@ from azure.cli.core.azclierror import CLIInternalError, InvalidArgumentValueErro
 from azext_iot.tests import CaptureOutputLiveScenarioTest
 from azext_iot.tests.conftest import get_context_path
 from azext_iot.tests.generators import generate_generic_id
-from azext_iot.tests.helpers import add_test_tag
+from azext_iot.tests.helpers import add_test_tag, create_storage_account
 from azext_iot.tests.settings import DynamoSettings
 from azext_iot.common import utility
 from azext_iot.central.models.enum import Role, UserTypePreview, UserTypeV1, ApiVersion
@@ -37,7 +37,7 @@ DEFAULT_CONTAINER = "central"
 STORAGE_CONTAINER = (
     settings.env.azext_iot_central_storage_container or DEFAULT_CONTAINER
 )
-STORAGE_NAME = settings.env.azext_iot_teststorageaccount or "iotstore" + generate_generic_id()[:4]
+STORAGE_ACCOUNT = settings.env.azext_iot_teststorageaccount or "iotstore" + generate_generic_id()[:4]
 
 # Device templates
 device_template_path = get_context_path(__file__, "json/device_template_int_test.json")
@@ -62,9 +62,6 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             rtype=ResourceTypes.central.value,
             test_tag=test_scenario
         )
-        self.storage_container = STORAGE_CONTAINER
-        self.storage_cstring = None
-        self.storage_account_name = STORAGE_NAME
         self.token = None
         self.dns_suffix = None
 
@@ -464,7 +461,6 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         return output
 
     def _create_fileupload(self, api_version, account_name=None, sasttl=None):
-        self._populate_storage_cstring()
         command = (
             'iot central file-upload-config create --app-id {} -s "{}" -c "{}"'.format(
                 self.app_id, self.storage_cstring, self.storage_container
@@ -529,7 +525,6 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         )
 
     def _create_destination(self, api_version, dest_id):
-        self._populate_storage_cstring()
         self.kwargs["authorization"] = json.dumps(
             {
                 "type": "connectionString",
@@ -585,52 +580,23 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
     def _create_storage_account(self):
         """
-        Create a storage account and container if the a storage account was not created yet.
+        Create a storage account and container if a storage account was not created yet.
         Populate the following variables if needed:
           - storage_account_name
           - storage_container
           - storage_cstring
         """
-        if not settings.env.azext_iot_teststorageaccount:
-            storage_list = self.cmd(
-                'storage account list -g "{}"'.format(self.app_rg)
-            ).get_output_in_json()
+        self.storage_account_name = STORAGE_ACCOUNT
+        self.storage_container = STORAGE_CONTAINER
 
-            target_storage = None
-            for storage in storage_list:
-                if storage["name"] == self.storage_account_name:
-                    target_storage = storage
-                    break
-
-            if not target_storage:
-                self.cmd(
-                    "storage account create -n {} -g {} --tags iotcentral={}".format(
-                        self.storage_account_name, self.app_rg, self.app_id
-                    ),
-                    include_opt_args=False,
-                )
-
-            self._populate_storage_cstring()
-
-        # This won't overwrite or error if container is already created.
-        self.cmd(
-            "storage container create -n {} --connection-string '{}'".format(
-                self.storage_container, self.storage_cstring
-            ),
-            include_opt_args=False,
+        self.storage_cstring = create_storage_account(
+            cmd=self.cmd,
+            account_name=self.storage_account_name,
+            container_name=self.storage_container,
+            rg=self.app_rg,
+            resource_name=self.app_id,
+            create_account=(settings.env.azext_iot_teststorageaccount is None)
         )
-
-    def _populate_storage_cstring(self):
-        """
-        Method to populate storage_cstring
-        """
-        if not self.storage_cstring:
-            self.storage_cstring = self.cmd(
-                "storage account show-connection-string -n {} -g {}".format(
-                    self.storage_account_name, self.app_rg
-                ),
-                include_opt_args=False,
-            ).get_output_in_json()["connectionString"]
 
     def _delete_storage_account(self):
         """

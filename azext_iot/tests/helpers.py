@@ -56,6 +56,50 @@ def add_test_tag(cmd, name: str, rg: str, rtype: str, test_tag: str):
     cmd(f"resource tag -n {name} -g {rg} --resource-type {rtype} --tags {new_tags}")
 
 
+def create_storage_account(
+    cmd,
+    account_name: str,
+    container_name: str,
+    rg: str,
+    resource_name: str,
+    create_account: bool = True,
+) -> str:
+    """
+    Create a storage account (if needed) and container and return storage connection string.
+    """
+    if create_account:
+        storage_list = cmd(
+            'storage account list -g "{}"'.format(rg)
+        ).get_output_in_json()
+
+        target_storage = None
+        for storage in storage_list:
+            if storage["name"] == account_name:
+                target_storage = storage
+                break
+
+        if not target_storage:
+            cmd(
+                "storage account create -n {} -g {} --tags iot_resource={}".format(
+                    account_name, rg, resource_name
+                )
+            )
+    storage_cstring = cmd(
+        "storage account show-connection-string -n {} -g {}".format(
+            account_name, rg
+        )
+    ).get_output_in_json()["connectionString"]
+
+    # Will not do anything if container exists.
+    cmd(
+        "storage container create -n {} --connection-string '{}'".format(
+            container_name, storage_cstring
+        ),
+    )
+
+    return storage_cstring
+
+
 class MockLogger:
     def info(self, msg):
         print(msg)
