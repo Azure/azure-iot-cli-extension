@@ -35,10 +35,6 @@ class TestIotCentral(CentralLiveScenarioTest):
         yield
 
     @pytest.fixture(scope="class", autouse=True)
-    def setUpSuite(self):
-        self._create_storage_account()
-
-    @pytest.fixture(scope="class", autouse=True)
     def tearDownSuite(self):
         yield
         if self.storage_account_name:
@@ -46,6 +42,7 @@ class TestIotCentral(CentralLiveScenarioTest):
 
     def __init__(self, test_scenario):
         super(TestIotCentral, self).__init__(test_scenario=test_scenario)
+        self._create_storage_account()
 
     def test_central_monitor_events(self):
         (template_id, _) = self._create_device_template(api_version=self._api_version)
