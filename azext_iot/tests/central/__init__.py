@@ -595,7 +595,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             container_name=self.storage_container,
             rg=self.app_rg,
             resource_name=self.app_id,
-            create_account=(settings.env.azext_iot_teststorageaccount is None)
+            create_account=(not settings.env.azext_iot_teststorageaccount)
         )
 
     def _delete_storage_account(self):

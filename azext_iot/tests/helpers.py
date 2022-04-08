@@ -11,8 +11,22 @@ from inspect import getsourcefile
 from azure.iot.device import ProvisioningDeviceClient, IoTHubDeviceClient
 
 from azext_iot.common.utility import read_file_content
+from azext_iot.tests.settings import DynamoSettings
 
 GLOBAL_PROVISIONING_HOST = "global.azure-devices-provisioning.net"
+TAG_ENV_VAR = [
+    "definition_id",
+    "job_display_name",
+    "job_id"
+]
+
+settings = DynamoSettings(opt_env_set=TAG_ENV_VAR)
+# Make sure that TEST_PIPELINE_ID is only populated if correct variables are present
+TEST_PIPELINE_ID = "{}_{}_{}".format(
+    settings.env.definition_id,
+    settings.env.job_display_name,
+    settings.env.job_id
+).strip("_")
 
 
 def load_json(filename):
@@ -51,8 +65,11 @@ def add_test_tag(cmd, name: str, rg: str, rtype: str, test_tag: str):
         current_tags[test_tag] = int(current_tags[test_tag]) + 1
     else:
         current_tags[test_tag] = 1
-    new_tags = " ".join(f"{k}={v}" for k, v in current_tags.items())
 
+    if TEST_PIPELINE_ID:
+        current_tags["pipeline_id"] = TEST_PIPELINE_ID
+
+    new_tags = " ".join(f"{k}={v}" for k, v in current_tags.items())
     cmd(f"resource tag -n {name} -g {rg} --resource-type {rtype} --tags {new_tags}")
 
 
@@ -84,6 +101,7 @@ def create_storage_account(
                     account_name, rg, resource_name
                 )
             )
+
     storage_cstring = cmd(
         "storage account show-connection-string -n {} -g {}".format(
             account_name, rg
