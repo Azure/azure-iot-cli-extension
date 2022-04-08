@@ -15,18 +15,18 @@ from azext_iot.tests.settings import DynamoSettings
 
 GLOBAL_PROVISIONING_HOST = "global.azure-devices-provisioning.net"
 TAG_ENV_VAR = [
-    "definition_id",
+    "definition_name",
     "job_display_name",
     "job_id"
 ]
 
 settings = DynamoSettings(opt_env_set=TAG_ENV_VAR)
 # Make sure that TEST_PIPELINE_ID is only populated if correct variables are present
-TEST_PIPELINE_ID = "{}_{}_{}".format(
-    settings.env.definition_id,
+TEST_PIPELINE_ID = "{} {} {}".format(
+    settings.env.definition_name,
     settings.env.job_display_name,
     settings.env.job_id
-).strip("_")
+).strip()
 
 
 def load_json(filename):
