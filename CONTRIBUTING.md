@@ -221,6 +221,23 @@ e.g. run tests against v 1.0
 `pytest azext_iot/tests/central/ -k "_int.py" --api-version "1.0"`
 
 If the "--api-version" argument is not specified, all runs act against default api version for each tested command.
+
+##### Test Resource Tagging
+
+There are 4 more test variables used for tagging the test resources:
+- `use_tags`
+- `definition_id`
+- `job_display_name`
+- `job_id`
+
+If `use_tags` is set to "True", then the resources created and used in Iot Central, DPS, and Hub tests will be tagged. The tested resources (IoT Hub, DPS, and Central App instances) will have two types of tags:
+- number of test method runs (ex: `test_central_device_c2d_purge_success : 1` means that the test "test_central_device_c2d_purge_success" was run once)
+- a pipeline name or id (ex: `pipeline_id : 00 Test IoT Central Python310 00000000-0000-0000-0000-000000000` generated from internal pipeline runs) which can be manually set with `definition_id`, `job_display_name` and `job_id`.
+
+Other resources created for these tests (ex: Storage Accounts for IoT Hub and Central tests) will have tags showing which test resource is associated (ex: `iot_resource : test-app-xxx` shows that the tagged storage account was created to be tested with the IoT Central App `test-app-xxx`).
+
+These are mainly used for test pipeline debugging and differentiating what resources were created for what runs.
+
 #### Unit and Integration Tests Single Command
 
 Execute the following command to run both Unit and Integration tests and output a code coverage report to the console and to a `.coverage` file.  You can configure code coverage with the `.coveragerc` file.

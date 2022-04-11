@@ -15,18 +15,20 @@ from azext_iot.tests.settings import DynamoSettings
 
 GLOBAL_PROVISIONING_HOST = "global.azure-devices-provisioning.net"
 TAG_ENV_VAR = [
-    "definition_name",
+    "definition_id",
     "job_display_name",
-    "job_id"
+    "job_id",
+    "use_tags"
 ]
 
 settings = DynamoSettings(opt_env_set=TAG_ENV_VAR)
 # Make sure that TEST_PIPELINE_ID is only populated if correct variables are present
 TEST_PIPELINE_ID = "{} {} {}".format(
-    settings.env.definition_name,
+    settings.env.definition_id,
     settings.env.job_display_name,
     settings.env.job_id
 ).strip()
+USE_TAGS = str(settings.env.use_tags).lower() == "true"
 
 
 def load_json(filename):
@@ -57,20 +59,21 @@ def dps_connect_device(device_id: str, credentials: dict) -> IoTHubDeviceClient:
 
 
 def add_test_tag(cmd, name: str, rg: str, rtype: str, test_tag: str):
-    current_tags = cmd(
-        f"resource show -n {name} -g {rg} --resource-type {rtype}"
-    ).get_output_in_json()["tags"]
+    if USE_TAGS:
+        current_tags = cmd(
+            f"resource show -n {name} -g {rg} --resource-type {rtype}"
+        ).get_output_in_json()["tags"]
 
-    if current_tags.get(test_tag):
-        current_tags[test_tag] = int(current_tags[test_tag]) + 1
-    else:
-        current_tags[test_tag] = 1
+        if current_tags.get(test_tag):
+            current_tags[test_tag] = int(current_tags[test_tag]) + 1
+        else:
+            current_tags[test_tag] = 1
 
-    if TEST_PIPELINE_ID:
-        current_tags["pipeline_id"] = f"'{TEST_PIPELINE_ID}'"
+        if TEST_PIPELINE_ID:
+            current_tags["pipeline_id"] = f"'{TEST_PIPELINE_ID}'"
 
-    new_tags = " ".join(f"{k}={v}" for k, v in current_tags.items())
-    cmd(f"resource tag -n {name} -g {rg} --resource-type {rtype} --tags {new_tags}")
+        new_tags = " ".join(f"{k}={v}" for k, v in current_tags.items())
+        cmd(f"resource tag -n {name} -g {rg} --resource-type {rtype} --tags {new_tags}")
 
 
 def create_storage_account(
