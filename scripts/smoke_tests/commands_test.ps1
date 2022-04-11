@@ -19,7 +19,7 @@ if ($args[1]) {
 else {
     Write-Host "`r`nCreating IoT Central App for running smoke tests..."
     $central_app_id = "smoketest-app-$run_id"
-    az iot central app create -g $resource_group_name --name $central_app_id --subdomain $central_app_id
+    az iot central app create -g $resource_group_name --name $central_app_id --subdomain $central_app_id -l eastus2
 }
 
 if ($args[2]) {
