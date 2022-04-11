@@ -14,12 +14,12 @@ $resource_group_name = $args[0]
 $run_id = $(New-Guid)
 
 if ($args[1]) {
-    $central_app_id = $args[2]
+    $central_app_id = $args[1]
 }
 else {
     Write-Host "`r`nCreating IoT Central App for running smoke tests..."
     $central_app_id = "smoketest-app-$run_id"
-    az iot central app create -g $resource_group_name --name $iothub_name
+    az iot central app create -g $resource_group_name --name $central_app_id --subdomain $central_app_id
 }
 
 if ($args[2]) {
