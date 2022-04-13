@@ -17,7 +17,10 @@ from azext_iot.tests.settings import DynamoSettings
 from azext_iot.common import utility
 from azext_iot.central.models.enum import Role, UserTypePreview, UserTypeV1, ApiVersion
 from azext_iot.tests.test_constants import ResourceTypes
+from knack.log import get_logger
 
+
+logger = get_logger(__name__)
 DEFAULT_CONTAINER = "devices"
 CENTRAL_SETTINGS = [
     "azext_iot_testrg",
@@ -55,13 +58,15 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def __init__(self, test_scenario):
         super(CentralLiveScenarioTest, self).__init__(test_scenario)
         self._create_app()
-        add_test_tag(
-            cmd=self.cmd,
-            name=self.app_id,
-            rg=self.app_rg,
-            rtype=ResourceTypes.central.value,
-            test_tag=test_scenario
-        )
+        # Do not add tagging to non-prod central apps
+        if not settings.env.azext_iot_central_dns_suffix and not settings.env.azext_iot_central_token:
+            add_test_tag(
+                cmd=self.cmd,
+                name=self.app_id,
+                rg=self.app_rg,
+                rtype=ResourceTypes.central.value,
+                test_tag=test_scenario
+            )
 
     def cmd(
         self,
@@ -101,6 +106,11 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         if not settings.env.azext_iot_central_app_id:
             if not APP_RG:
                 raise Exception("Tests need either app name or resource group.")
+            if settings.env.azext_iot_central_dns_suffix or settings.env.azext_iot_central_token:
+                raise Exception(
+                    "Create an IoT Central App with a valid API token and populate the azext_iot_central_app_id, "
+                    "azext_iot_central_dns_suffix, and azext_iot_central_token variables for testing in non-prod environments."
+                )
 
             app_list = self.cmd(
                 'iot central app list -g "{}"'.format(APP_RG)
@@ -125,12 +135,20 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             # Will be repopulated with get_app_scope_id for tests that need it
             self._scope_id = None
 
-        # Get Central App RG
-        self.app_rg = self.cmd(
-            "iot central app show -n {}".format(
-                self.app_id,
-            )
-        ).get_output_in_json()["resourceGroup"]
+        # Get Central App RG if possible
+        if settings.env.azext_iot_central_dns_suffix or settings.env.azext_iot_central_token:
+            if not APP_RG:
+                logger.info(
+                    "Tests will not have the resource group populated. If a storage account is not"
+                    " specified, it will not be created and the respective tests will not run."
+                )
+            self.app_rg = APP_RG
+        else:
+            self.app_rg = self.cmd(
+                "iot central app show -n {}".format(
+                    self.app_id,
+                )
+            ).get_output_in_json()["resourceGroup"]
 
     def _create_device(self, api_version, **kwargs) -> Tuple[str, str]:
         """
@@ -578,23 +596,25 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
     def _create_storage_account(self):
         """
-        Create a storage account and container if a storage account was not created yet.
+        Create a storage account and container if a storage account was not created yet and
+        a resource group for the storage account is defined.
         Populate the following variables if needed:
           - storage_account_name
           - storage_container
           - storage_cstring
         """
-        self.storage_account_name = STORAGE_ACCOUNT
-        self.storage_container = STORAGE_CONTAINER
+        if self.app_rg:
+            self.storage_account_name = STORAGE_ACCOUNT
+            self.storage_container = STORAGE_CONTAINER
 
-        self.storage_cstring = create_storage_account(
-            cmd=self.cmd,
-            account_name=self.storage_account_name,
-            container_name=self.storage_container,
-            rg=self.app_rg,
-            resource_name=self.app_id,
-            create_account=(not settings.env.azext_iot_teststorageaccount)
-        )
+            self.storage_cstring = create_storage_account(
+                cmd=self.cmd,
+                account_name=self.storage_account_name,
+                container_name=self.storage_container,
+                rg=self.app_rg,
+                resource_name=self.app_id,
+                create_account=(not settings.env.azext_iot_teststorageaccount)
+            )
 
     def _delete_storage_account(self):
         """
@@ -643,7 +663,6 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             command += ' --central-dns-suffix "{}"'.format(self.dns_suffix)
         if api_version:
             command += " --api-version {}".format(api_version)
-
         return command
 
     def _get_template_id(self, api_version, template):

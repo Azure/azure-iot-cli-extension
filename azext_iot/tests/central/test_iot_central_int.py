@@ -17,6 +17,10 @@ from azext_iot.tests.central import (
     sync_command_params,
 )
 import pytest
+from knack.log import get_logger
+
+
+logger = get_logger(__name__)
 
 
 IS_1_1_PREVIEW = True
@@ -31,7 +35,7 @@ class TestIotCentral(CentralLiveScenarioTest):
             or self._api_version is None
         )  # either explicitely selected or omitted
         if IS_1_1_PREVIEW:
-            print("Testing 1.1-preview")
+            logger.info("Testing 1.1-preview")
         yield
 
     @pytest.fixture(scope="class", autouse=True)
