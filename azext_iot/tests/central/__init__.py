@@ -608,7 +608,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             self.storage_container = STORAGE_CONTAINER
 
             self.storage_cstring = create_storage_account(
-                cmd=self.cmd,
+                cmd=super().cmd,
                 account_name=self.storage_account_name,
                 container_name=self.storage_container,
                 rg=self.app_rg,
