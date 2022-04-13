@@ -62,8 +62,6 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             rtype=ResourceTypes.central.value,
             test_tag=test_scenario
         )
-        self.token = None
-        self.dns_suffix = None
 
     def cmd(
         self,
