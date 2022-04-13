@@ -122,12 +122,12 @@ _Hub:_
 _DPS:_
 `pytest azext_iot/tests/dps/core/test_dps_discovery_int.py`
 
-Integration tests end in "_int_.py" so execute the following command to run all integration tests,
-`pytest -k "_int_.py"`
+Integration tests end in "_int.py" so execute the following command to run all integration tests,
+`pytest -k "_int.py"`
 
 Execute the following command to run the IoT Hub integration tests:
 
-`pytest azext_iot/tests/iothub/ -k "_int_.py"`
+`pytest azext_iot/tests/iothub/ -k "_int.py"`
 
 #### Azure Resource Setup
 

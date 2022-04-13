@@ -87,7 +87,10 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         Create an Iot Central Application if a name is not given in the pytest configuration.
 
         Will populate the following variables based on given pytest configuration:
+          - app_id
+          - app_rg
           - app_primary_key
+          - _scope_id
           - token
           - dns_suffix
         """
