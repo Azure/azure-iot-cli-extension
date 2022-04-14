@@ -218,7 +218,7 @@ For all resources, if the environmental variable is not provided, a new instance
 
 ##### IoT Central
 
-IoT Central integration tests can be run against a specific available api versions using command line argument "--api-version"
+IoT Central integration tests can be run against a specific available api version using command line argument "--api-version"
 
 e.g. run tests against v 1.0
 
