@@ -250,7 +250,7 @@ foreach ($command in $commands) {
 # IoT Central App needs to be deleted if it was created for running smoke tests
 if (!$args[1]) {
     Write-Host "`r`nDeleting the temporarily created IoT Central App..."
-    az iot central app delete -g $resource_group_name --name $central_app_id
+    az iot central app delete -g $resource_group_name --name $central_app_id -y
 }
 
 # IoT Hub needs to be deleted if it was created for running smoke tests
