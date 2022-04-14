@@ -630,7 +630,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 ),
                 include_opt_args=False,
             )
-        elif not settings.env.azext_iot_teststorageaccount:
+        elif not settings.env.azext_iot_central_storage_container:
             self.cmd(
                 "storage container delete -n {} --connection-string '{}'".format(
                     self.storage_account_name, self.storage_cstring
