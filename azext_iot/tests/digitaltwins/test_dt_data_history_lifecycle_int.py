@@ -9,7 +9,7 @@ from knack.log import get_logger
 import pytest
 from azext_iot.common.utility import unpack_msrest_error
 from azext_iot.tests.digitaltwins.dt_helpers import assert_system_data_attributes
-from . import DTLiveScenarioTest
+from . import DTLiveScenarioTest, generate_resource_id
 from . import (
     ADX_RG,
     ADX_CLUSTER,
@@ -71,7 +71,7 @@ class TestDTConnections(DTLiveScenarioTest):
 
     def test_dt_data_history_adx(self):
         self.wait_for_capacity()
-        instance_name = f"dt{generate_generic_id()}"
+        instance_name = generate_resource_id()
         connection_name = f"cn-{generate_generic_id()}"
         table_name = f"tb_{generate_generic_id()}"
         consumer_group = f"cg-{generate_generic_id()}"
@@ -107,7 +107,7 @@ class TestDTConnections(DTLiveScenarioTest):
             "consumer_group": "$Default",
             "location": create_output["location"],
             "table_name": "adt_dh_{}_{}".format(
-                instance_name,
+                instance_name.replace("-", "_"),
                 create_output["location"]
             )
         }
@@ -212,7 +212,7 @@ class TestDTConnections(DTLiveScenarioTest):
 
     def test_dt_data_history_adx_create_incorrect_resource(self):
         self.wait_for_capacity()
-        instance_name = f"dt{generate_generic_id()}"
+        instance_name = generate_resource_id()
         connection_name = f"cn-{generate_generic_id()}"
 
         create_output = self.cmd(
@@ -328,7 +328,7 @@ class TestDTConnections(DTLiveScenarioTest):
 
     def test_dt_data_history_adx_wait(self):
         self.wait_for_capacity()
-        instance_name = f"dt{generate_generic_id()}"
+        instance_name = generate_resource_id()
         connection_name = f"cn-{generate_generic_id()}"
         consumer_group = f"cg-{generate_generic_id()}"
         self.add_eventhub_consumer_group(consumer_group=consumer_group)
@@ -363,7 +363,7 @@ class TestDTConnections(DTLiveScenarioTest):
             "consumer_group": consumer_group,
             "location": create_output["location"],
             "table_name": "adt_dh_{}_{}".format(
-                instance_name,
+                instance_name.replace("-", "_"),
                 create_output["location"]
             )
         }

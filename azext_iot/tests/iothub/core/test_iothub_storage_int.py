@@ -11,20 +11,15 @@ from knack.util import CLIError
 from pathlib import Path
 
 from azext_iot.tests.iothub import IoTLiveScenarioTest
-from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL, UserTypes
+from azext_iot.tests.settings import UserTypes
 from azext_iot.common.utility import ensure_iothub_sdk_min_version, ensure_azure_namespace_path
 
 from azext_iot.tests.generators import generate_generic_id
 # TODO: assert DEVICE_DEVICESCOPE_PREFIX format in parent device twin.
 from azext_iot.constants import IOTHUB_TRACK_2_SDK_MIN_VERSION
-from azext_iot.tests.iothub import DEFAULT_CONTAINER
 from azure.cli.core._profile import Profile
 from azure.cli.core.mock import DummyCli
 
-settings = DynamoSettings(
-    req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED, opt_env_set=ENV_SET_TEST_IOTHUB_OPTIONAL
-)
-LIVE_STORAGE_ACCOUNT = settings.env.azext_iot_teststorageaccount
 STORAGE_ROLE = "Storage Blob Data Contributor"
 CWD = os.path.dirname(os.path.abspath(__file__))
 user_managed_identity_name = generate_generic_id()
@@ -33,7 +28,7 @@ USER_IDENTITY_SETUP_MAX_ATTEMPTS = 5
 
 class TestIoTStorage(IoTLiveScenarioTest):
     def __init__(self, test_case):
-
+        self.storage_cstring = None
         super(TestIoTStorage, self).__init__(test_case)
         self.managed_identity = None
 
@@ -41,27 +36,20 @@ class TestIoTStorage(IoTLiveScenarioTest):
         subscription = self.profile.get_subscription()
         self.user = subscription["user"]
 
-        if LIVE_STORAGE_ACCOUNT:
-            self.live_storage_uri = self.get_container_sas_url()
+        self.live_storage_uri = self.get_container_sas_url()
 
-            storage_account = self.cmd(
-                "storage account show --name {}".format(LIVE_STORAGE_ACCOUNT)
-            ).get_output_in_json()
+        storage_account = self.cmd(
+            "storage account show --name {}".format(self.storage_account_name)
+        ).get_output_in_json()
 
-            self.live_storage_id = storage_account["id"]
+        self.live_storage_id = storage_account["id"]
 
     def get_container_sas_url(self):
         from datetime import datetime, timedelta
         ensure_azure_namespace_path()
         from azure.storage.blob import ResourceTypes, AccountSasPermissions, generate_account_sas, BlobServiceClient
 
-        storage_account_connenction = self.cmd(
-            "storage account show-connection-string --name {}".format(
-                LIVE_STORAGE_ACCOUNT
-            )
-        ).get_output_in_json()
-
-        blob_service_client = BlobServiceClient.from_connection_string(conn_str=storage_account_connenction["connectionString"])
+        blob_service_client = BlobServiceClient.from_connection_string(conn_str=self.storage_cstring)
 
         sas_token = generate_account_sas(
             blob_service_client.account_name,
@@ -73,11 +61,9 @@ class TestIoTStorage(IoTLiveScenarioTest):
             expiry=datetime.utcnow() + timedelta(hours=1)
         )
 
-        container_name = (
-            settings.env.azext_iot_teststoragecontainer if settings.env.azext_iot_teststoragecontainer else DEFAULT_CONTAINER
+        container_sas_url = (
+            "https://" + self.storage_account_name + ".blob.core.windows.net" + "/" + self.storage_container + "?" + sas_token
         )
-
-        container_sas_url = "https://" + LIVE_STORAGE_ACCOUNT + ".blob.core.windows.net" + "/" + container_name + "?" + sas_token
 
         return container_sas_url
 
@@ -106,7 +92,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
         if assignee not in role_assignment_principal_ids:
             if self.user["type"] == UserTypes.user.value:
                 self.cmd(
-                    'role assignment create --assignee"{}" --role "{}" --scope "{}"'.format(
+                    'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
                         assignee, STORAGE_ROLE, self.live_storage_id
                     )
                 )
@@ -135,9 +121,6 @@ class TestIoTStorage(IoTLiveScenarioTest):
             ))
         return super().tearDown()
 
-    @pytest.mark.skipif(
-        not LIVE_STORAGE_ACCOUNT, reason="empty azext_iot_teststorageaccount env var"
-    )
     def test_storage(self):
         device_count = 1
 
@@ -212,9 +195,6 @@ class TestIoTStorage(IoTLiveScenarioTest):
             ],
         )
 
-    @pytest.mark.skipif(
-        not LIVE_STORAGE_ACCOUNT, reason="azext_iot_teststorageaccount env var not set",
-    )
     @pytest.mark.skipif(
         not ensure_iothub_sdk_min_version(IOTHUB_TRACK_2_SDK_MIN_VERSION),
         reason="Skipping track 2 tests because SDK is track 1")
@@ -293,9 +273,6 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 )
             )
 
-    @pytest.mark.skipif(
-        not LIVE_STORAGE_ACCOUNT, reason="azext_iot_teststorageaccount env var not set",
-    )
     @pytest.mark.skipif(
         not ensure_iothub_sdk_min_version(IOTHUB_TRACK_2_SDK_MIN_VERSION),
         reason="Skipping track 2 tests because SDK is track 1")

@@ -413,6 +413,7 @@ def add_children(
             target_id=child_id,
             rel_id=str(uuid4()),
             rel_name=rel_name,
+            central_dns_suffix=central_dns_suffix,
         )
         for child_id in children_ids
     ]
@@ -654,7 +655,8 @@ def get_downstream_rel_name(
         raise ResourceNotFoundError(f'Device with id "{device_id}" cannot be found.')
 
     template = template_provider.get_device_template(
-        get_template_id(device, api_version=api_version)
+        get_template_id(device, api_version=api_version),
+        central_dns_suffix=central_dns_suffix,
     )
 
     if not template:

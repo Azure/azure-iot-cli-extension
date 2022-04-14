@@ -7,6 +7,7 @@
 import pytest
 import os
 from time import sleep
+from azext_iot.tests.helpers import add_test_tag
 
 from azext_iot.tests.settings import (
     DynamoSettings,
@@ -18,6 +19,7 @@ from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests import CaptureOutputLiveScenarioTest
 from azext_iot.common.certops import create_self_signed_certificate
 from azext_iot.common.shared import AuthenticationTypeDataplane
+from azext_iot.tests.test_constants import ResourceTypes
 
 DATAPLANE_AUTH_TYPES = [
     AuthenticationTypeDataplane.key.value,
@@ -35,6 +37,7 @@ PREFIX_EDGE_DEVICE = "test-edge-device-"
 PREFIX_INDIVIDUAL_ENROLLMENT = "test-enrollment-"
 PREFIX_GROUP_ENROLLMENT = "test-groupenroll-"
 USER_ROLE = "Device Provisioning Service Data Contributor"
+MAX_HUB_RETRIES = 3
 
 TEST_ENDORSEMENT_KEY = (
     "AToAAQALAAMAsgAgg3GXZ0SEs/gakMyNRqXXJP1S124GUgtk8qHaGzMUaaoABgCAAEMAEAgAAAAAAAEAibym9HQP9vxCGF5dVc1Q"
@@ -51,7 +54,7 @@ settings = DynamoSettings(
 )
 ENTITY_RG = settings.env.azext_iot_testrg
 ENTITY_DPS_NAME = settings.env.azext_iot_testdps if settings.env.azext_iot_testdps else "test-dps-" + generate_generic_id()
-ENTITY_HUB_NAME = settings.env.azext_iot_testhub if settings.env.azext_iot_testhub else "test-hub-" + generate_generic_id()
+ENTITY_HUB_NAME = settings.env.azext_iot_testhub if settings.env.azext_iot_testhub else "test-dps-hub-" + generate_generic_id()
 MAX_RBAC_ASSIGNMENT_TRIES = settings.env.azext_iot_rbac_max_tries if settings.env.azext_iot_rbac_max_tries else 10
 
 
@@ -70,6 +73,20 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
             self.create_hub()
 
         # Prep the DPS for testing
+        add_test_tag(
+            cmd=self.cmd,
+            name=self.entity_dps_name,
+            rg=self.entity_rg,
+            rtype=ResourceTypes.dps.value,
+            test_tag=test_scenario
+        )
+        add_test_tag(
+            cmd=self.cmd,
+            name=self.entity_hub_name,
+            rg=self.entity_rg,
+            rtype=ResourceTypes.hub.value,
+            test_tag=test_scenario
+        )
         self._ensure_dps_hub_link()
         self._cleanup_enrollments()
         self.dps_cstring = self.get_dps_cstring()
@@ -101,7 +118,7 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def create_dps(self):
         """Create a device provisioning service for testing purposes."""
         dps_list = self.cmd(
-            '''iot dps list -g "{}"'''.format(self.entity_rg)
+            'iot dps list -g "{}"'.format(self.entity_rg)
         ).get_output_in_json()
 
         # Check if the generated name is already used
@@ -113,34 +130,27 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
         # Create the min version dps and assign the correct roles
         if not target_dps:
-            self.cmd(
+            target_dps = self.cmd(
                 "iot dps create --name {} --resource-group {} ".format(
                     self.entity_dps_name, self.entity_rg
                 )
-            )
-
-        new_dps = self.cmd(
-            "iot dps show --name {} --resource-group {} ".format(
-                self.entity_dps_name, self.entity_rg
-            )
-        ).get_output_in_json()
+            ).get_output_in_json()
 
         account = self.cmd("account show").get_output_in_json()
         user = account["user"]
-
         if user["name"] is None:
             raise Exception("User not found")
 
         tries = 0
         while tries < MAX_RBAC_ASSIGNMENT_TRIES:
-            role_assignments = self.get_role_assignments(new_dps["id"], USER_ROLE)
+            role_assignments = self.get_role_assignments(target_dps["id"], USER_ROLE)
             role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
             if user["name"] in role_assignment_principal_names:
                 break
             # else assign DPS Data Contributor role to current user and check again
             self.cmd(
                 '''role assignment create --assignee "{}" --role "{}" --scope "{}"'''.format(
-                    user["name"], USER_ROLE, new_dps["id"]
+                    user["name"], USER_ROLE, target_dps["id"]
                 )
             )
             sleep(10)
@@ -155,7 +165,7 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def create_hub(self):
         """Create an IoT hub for DPS testing purposes."""
         hubs_list = self.cmd(
-            '''iot hub list -g "{}"'''.format(self.entity_rg)
+            'iot hub list -g "{}"'.format(self.entity_rg)
         ).get_output_in_json()
 
         # Check if the generated name is already used
@@ -167,23 +177,18 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
         # Create the min version hub and assign the correct roles
         if not target_hub:
-            self.cmd(
-                "iot hub create --name {} --resource-group {} --sku S1 ".format(
-                    self.entity_hub_name, self.entity_rg
+            target_hub = self.cmd(
+                "iot hub create --name {} --resource-group {} --sku S1 --tags dpsname={}".format(
+                    self.entity_hub_name, self.entity_rg, self.entity_dps_name
                 )
-            )
+            ).get_output_in_json()
 
     def _ensure_dps_hub_link(self):
         hubs = self.cmd(
             "iot dps linked-hub list --dps-name {} -g {}".format(self.entity_dps_name, self.entity_rg)
         ).get_output_in_json()
-        if not hubs or not list(
-            filter(
-                lambda linked_hub: linked_hub["name"]
-                == "{}.azure-devices.net".format(self.entity_hub_name),
-                hubs,
-            )
-        ):
+        hub_names = [hub["name"] for hub in hubs]
+        if "{}.azure-devices.net".format(self.entity_hub_name) not in hub_names:
             self.cmd(
                 "iot dps linked-hub create --dps-name {} -g {} --connection-string {} --location {}".format(
                     self.entity_dps_name, self.entity_rg, self.get_hub_cstring(), self.get_hub_region()
@@ -273,7 +278,6 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
         return f"{command} --auth-type {auth_type}"
 
     def get_role_assignments(self, scope, role):
-
         role_assignments = self.cmd(
             'role assignment list --scope "{}" --role "{}"'.format(
                 scope, role
@@ -287,11 +291,6 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
         yield None
         if os.path.exists(CERT_PATH):
             os.remove(CERT_PATH)
-        self.cmd(
-            "iot dps linked-hub delete --dps-name {} --linked-hub {} --resource-group {}".format(
-                ENTITY_DPS_NAME, self.hub_host_name, ENTITY_RG
-            )
-        )
         if not settings.env.azext_iot_testhub:
             self.cmd(
                 "iot hub delete --name {} --resource-group {}".format(

@@ -8,12 +8,14 @@ import pytest
 
 from time import sleep
 from typing import List
+from azext_iot.tests.helpers import add_test_tag, create_storage_account
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests import CaptureOutputLiveScenarioTest
 
 from azext_iot.common.certops import create_self_signed_certificate
 from azext_iot.common.shared import AuthenticationTypeDataplane
+from azext_iot.tests.test_constants import ResourceTypes
 
 DATAPLANE_AUTH_TYPES = [
     AuthenticationTypeDataplane.key.value,
@@ -40,11 +42,10 @@ DEFAULT_CONTAINER = "devices"
 
 settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED, opt_env_set=ENV_SET_TEST_IOTHUB_OPTIONAL)
 ENTITY_RG = settings.env.azext_iot_testrg
-ENTITY_NAME = settings.env.azext_iot_testhub if settings.env.azext_iot_testhub else "test-hub-" + generate_generic_id()
-STORAGE_CONTAINER = (
-    settings.env.azext_iot_teststoragecontainer if settings.env.azext_iot_teststoragecontainer else DEFAULT_CONTAINER
-)
-MAX_RBAC_ASSIGNMENT_TRIES = settings.env.azext_iot_rbac_max_tries if settings.env.azext_iot_rbac_max_tries else 10
+ENTITY_NAME = settings.env.azext_iot_testhub or "test-hub-" + generate_generic_id()
+STORAGE_ACCOUNT = settings.env.azext_iot_teststorageaccount or "hubstore" + generate_generic_id()[:4]
+STORAGE_CONTAINER = settings.env.azext_iot_teststoragecontainer or DEFAULT_CONTAINER
+MAX_RBAC_ASSIGNMENT_TRIES = settings.env.azext_iot_rbac_max_tries or 10
 ROLE_ASSIGNMENT_REFRESH_TIME = 120
 
 
@@ -55,9 +56,12 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
         self.entity_name = ENTITY_NAME
         super(IoTLiveScenarioTest, self).__init__(test_scenario)
 
+        if hasattr(self, 'storage_cstring'):
+            self._create_storage_account()
+
         if not settings.env.azext_iot_testhub:
             hubs_list = self.cmd(
-                '''iot hub list -g "{}"'''.format(self.entity_rg)
+                'iot hub list -g "{}"'.format(self.entity_rg)
             ).get_output_in_json()
 
             target_hub = None
@@ -67,17 +71,11 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     break
 
             if not target_hub:
-                if settings.env.azext_iot_teststorageaccount:
-                    storage_account_connenction = self.cmd(
-                        "storage account show-connection-string --name {}".format(
-                            settings.env.azext_iot_teststorageaccount
-                        )
-                    ).get_output_in_json()
-
+                if hasattr(self, 'storage_cstring'):
                     self.cmd(
                         "iot hub create --name {} --resource-group {} --fc {} --fcs {} --sku S1 ".format(
                             self.entity_name, self.entity_rg,
-                            STORAGE_CONTAINER, storage_account_connenction["connectionString"]
+                            self.storage_container, self.storage_cstring
                         )
                     )
                 else:
@@ -86,10 +84,9 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                             self.entity_name, self.entity_rg
                         )
                     )
-
                 sleep(ROLE_ASSIGNMENT_REFRESH_TIME)
 
-                new_hub = self.cmd(
+                target_hub = self.cmd(
                     "iot hub show -n {} -g {}".format(self.entity_name, self.entity_rg)
                 ).get_output_in_json()
 
@@ -101,14 +98,14 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
                 tries = 0
                 while tries < MAX_RBAC_ASSIGNMENT_TRIES:
-                    role_assignments = self.get_role_assignments(new_hub["id"], USER_ROLE)
+                    role_assignments = self.get_role_assignments(target_hub["id"], USER_ROLE)
                     role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
                     if user["name"] in role_assignment_principal_names:
                         break
                     # else assign IoT Hub Data Contributor role to current user and check again
                     self.cmd(
-                        '''role assignment create --assignee "{}" --role "{}" --scope "{}"'''.format(
-                            user["name"], USER_ROLE, new_hub["id"]
+                        'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
+                            user["name"], USER_ROLE, target_hub["id"]
                         )
                     )
                     sleep(10)
@@ -121,6 +118,13 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
         self.region = self.get_region()
         self.connection_string = self.get_hub_cstring()
+        add_test_tag(
+            cmd=self.cmd,
+            name=self.entity_name,
+            rg=self.entity_rg,
+            rtype=ResourceTypes.hub.value,
+            test_tag=test_scenario
+        )
 
     def clean_up(self, device_ids: List[str] = None, config_ids: List[str] = None):
         if device_ids:
@@ -186,6 +190,44 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             self.create_random_name(prefix=PREFIX_JOB, length=32) for i in range(count)
         ]
 
+    def _create_storage_account(self):
+        """
+        Create a storage account and container if a storage account was not created yet.
+        Populate the following variables if needed:
+          - storage_account_name
+          - storage_container
+          - storage_cstring
+        """
+        self.storage_account_name = STORAGE_ACCOUNT
+        self.storage_container = STORAGE_CONTAINER
+
+        self.storage_cstring = create_storage_account(
+            cmd=self.cmd,
+            account_name=self.storage_account_name,
+            container_name=self.storage_container,
+            rg=self.entity_rg,
+            resource_name=self.entity_name,
+            create_account=(not settings.env.azext_iot_teststorageaccount)
+        )
+
+    def _delete_storage_account(self):
+        """
+        Delete the storage account if it was created.
+        """
+        if not settings.env.azext_iot_teststorageaccount:
+            self.cmd(
+                "storage account delete -n {} -g {} -y".format(
+                    self.storage_account_name, self.entity_rg
+                ),
+            )
+
+        elif not settings.env.azext_iot_teststoragecontainer:
+            self.cmd(
+                "storage container delete -n {} --connection-string '{}'".format(
+                    self.storage_account_name, self.storage_cstring
+                ),
+            )
+
     def tearDown(self):
         device_list = []
         device_list.extend(d["deviceId"] for d in self.cmd(
@@ -248,3 +290,5 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     ENTITY_NAME, ENTITY_RG
                 )
             )
+        if hasattr(self, "storage_cstring"):
+            self._delete_storage_account()

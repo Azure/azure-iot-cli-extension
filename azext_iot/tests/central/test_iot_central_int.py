@@ -17,6 +17,10 @@ from azext_iot.tests.central import (
     sync_command_params,
 )
 import pytest
+from knack.log import get_logger
+
+
+logger = get_logger(__name__)
 
 
 IS_1_1_PREVIEW = True
@@ -31,12 +35,8 @@ class TestIotCentral(CentralLiveScenarioTest):
             or self._api_version is None
         )  # either explicitely selected or omitted
         if IS_1_1_PREVIEW:
-            print("Testing 1.1-preview")
+            logger.info("Testing 1.1-preview")
         yield
-
-    @pytest.fixture(scope="class", autouse=True)
-    def setUpSuite(self):
-        self._create_storage_account()
 
     @pytest.fixture(scope="class", autouse=True)
     def tearDownSuite(self):
@@ -46,6 +46,7 @@ class TestIotCentral(CentralLiveScenarioTest):
 
     def __init__(self, test_scenario):
         super(TestIotCentral, self).__init__(test_scenario=test_scenario)
+        self._create_storage_account()
 
     def test_central_monitor_events(self):
         (template_id, _) = self._create_device_template(api_version=self._api_version)

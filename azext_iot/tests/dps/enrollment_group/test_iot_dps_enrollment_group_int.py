@@ -17,8 +17,8 @@ from azext_iot.tests.dps import (
 
 
 class TestDPSEnrollmentGroups(IoTDPSLiveScenarioTest):
-    def __init__(self, test_method):
-        super(TestDPSEnrollmentGroups, self).__init__(test_method)
+    def __init__(self, test_case):
+        super(TestDPSEnrollmentGroups, self).__init__(test_case)
 
     def test_dps_compute_device_key(self):
         offline_device_key = self.cmd(
@@ -136,7 +136,7 @@ class TestDPSEnrollmentGroups(IoTDPSLiveScenarioTest):
 
             self.cmd(
                 self.set_cmd_auth_type(
-                    "iot dps registration list -g {} --dps-name {} --enrollment-id {}".format(
+                    "iot dps enrollment-group registration list -g {} --dps-name {} --enrollment-id {}".format(
                         self.entity_rg, self.entity_dps_name, enrollment_id
                     ),
                     auth_type=auth_phase

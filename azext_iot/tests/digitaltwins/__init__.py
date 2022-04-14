@@ -20,7 +20,7 @@ MOCK_RESOURCE_TAGS = "a=b c=d"
 MOCK_RESOURCE_TAGS_DICT = {"a": "b", "c": "d"}
 MOCK_DEAD_LETTER_ENDPOINT = "https://accountname.blob.core.windows.net/containerName"
 MOCK_DEAD_LETTER_SECRET = "{}?sasToken".format(MOCK_DEAD_LETTER_ENDPOINT)
-REGION_RESOURCE_LIMIT = 10
+REGION_RESOURCE_LIMIT = 9  # Actual value is 10 but this is to limit race condition
 REGION_LIST = ["westus2", "westcentralus", "eastus2", "eastus", "eastus2euap"]
 MAX_ADX_RETRIES = 5
 
@@ -60,7 +60,7 @@ ADX_RG = settings.env.azext_dt_adx_rg or settings.env.azext_iot_testrg
 
 
 def generate_resource_id():
-    return "dtcli-{}".format(generate_generic_id())
+    return "test-dt-{}".format(generate_generic_id())
 
 
 class DTLiveScenarioTest(LiveScenarioTest):
@@ -73,6 +73,7 @@ class DTLiveScenarioTest(LiveScenarioTest):
         assert test_scenario
 
         super(DTLiveScenarioTest, self).__init__(test_scenario)
+        self.test_scenario = test_scenario
         self.embedded_cli = EmbeddedCLI()
         self._bootup_scenario()
 
@@ -185,11 +186,25 @@ class DTLiveScenarioTest(LiveScenarioTest):
 
     def ensure_adx_resource(self):
         """Ensure that the test has all ADX resources."""
-        # Once the az kusto is no longer private, enable just in time resource generation
+        # Once the az kusto is no longer experimental, fix this to use az kusto
+        adx_location = "eastus"
+        # Update the location if need to create a database in existing cluster
+        if settings.env.azext_dt_adx_cluster and not settings.env.azext_dt_adx_database:
+            cluster_uri = self.embedded_cli.invoke(
+                "rest --method GET --url '/subscriptions/{}/resourceGroups/"
+                "{}/providers/Microsoft.Kusto/clusters/{}?api-version=2021-08-27'".format(
+                    self.get_subscription_id(),
+                    ADX_RG,
+                    ADX_CLUSTER,
+                )
+            ).as_json().get("properties").get("uri")
+            # parse the location from the uri - https://cluster.location.kusto.windows.net
+            adx_location = cluster_uri.split(".")[1]
+
         if not settings.env.azext_dt_adx_cluster:
             self.kwargs["cluster_body"] = json.dumps(
                 {
-                    "location": "eastus",
+                    "location": adx_location,
                     "sku": {
                         "name": "Dev(No SLA)_Standard_E2a_v4",
                         "capacity": 1,
@@ -217,8 +232,9 @@ class DTLiveScenarioTest(LiveScenarioTest):
                 )
             ).as_json().get("properties").get("state")
             retries = 0
+            wait_time = 300
             while cluster_create_state not in ProvisioningStateType.FINISHED.value and retries < MAX_ADX_RETRIES:
-                sleep(300)
+                sleep(wait_time)
                 cluster_create_state = self.embedded_cli.invoke(
                     "rest --method GET --url '/subscriptions/{}/resourceGroups/"
                     "{}/providers/Microsoft.Kusto/clusters/{}?api-version=2021-08-27'".format(
@@ -230,12 +246,14 @@ class DTLiveScenarioTest(LiveScenarioTest):
                 retries += 1
 
             if retries == MAX_ADX_RETRIES:
-                logger.error("Waited 25 minutes for ADX cluster creation and cluster has not been created yet.")
+                waited_min = retries * wait_time // 60
+                cluster_msg = f"Waited {waited_min} minutes and ADX cluster {ADX_CLUSTER} has not been created yet."
+                logger.error(cluster_msg)
 
         if not settings.env.azext_dt_adx_database:
             self.kwargs["database_body"] = json.dumps(
                 {
-                    "location": "eastus",
+                    "location": adx_location,
                     "kind": "ReadWrite",
                     "properties": {
                         "softDeletePeriod": "P1D"
@@ -255,8 +273,9 @@ class DTLiveScenarioTest(LiveScenarioTest):
 
             database_creation_state = database_creation_op.as_json().get("properties").get("state")
             retries = 0
+            wait_time = 30
             while database_creation_state not in ProvisioningStateType.FINISHED.value and retries < MAX_ADX_RETRIES:
-                sleep(30)
+                sleep(wait_time)
                 database_creation_state = self.embedded_cli.invoke(
                     "rest --method GET --url '/subscriptions/{}/resourceGroups/"
                     "{}/providers/Microsoft.Kusto/clusters/{}/databases/{}?api-version=2021-08-27'".format(
@@ -269,7 +288,9 @@ class DTLiveScenarioTest(LiveScenarioTest):
                 retries += 1
 
             if retries == MAX_ADX_RETRIES:
-                logger.error("Waited 2.5 minutes for database creation and database has not been created yet.")
+                waited_min = retries * wait_time // 60
+                database_msg = f"Waited {waited_min} minutes and ADX database {ADX_DATABASE} has not been created yet."
+                logger.error(database_msg)
 
     def ensure_eventhub_resource(self):
         """Ensure that the test has all Event hub resources."""

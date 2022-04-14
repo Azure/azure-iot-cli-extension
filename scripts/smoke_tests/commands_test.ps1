@@ -6,13 +6,21 @@
 # --------------------------------------------------------------------------------------------
 
 # Setup
-if (!$args[0] -Or !$args[1]) {
-    Write-Error -Message "Error: Both resource group and central app id arguments are mandatory to run the script." -Category InvalidArgument
+if (!$args[0]) {
+    Write-Error -Message "Error: Resource group argument is mandatory to run the script." -Category InvalidArgument
     exit 1
 }
 $resource_group_name = $args[0]
-$central_app_id = $args[1]
 $run_id = $(New-Guid)
+
+if ($args[1]) {
+    $central_app_id = $args[1]
+}
+else {
+    Write-Host "`r`nCreating IoT Central App for running smoke tests..."
+    $central_app_id = "smoketest-app-$run_id"
+    az iot central app create -g $resource_group_name --name $central_app_id --subdomain $central_app_id -l eastus2
+}
 
 if ($args[2]) {
     $iothub_name = $args[2]
@@ -41,7 +49,7 @@ $desired_twin_properties = "`"{'conditions':{'temperature':{'warning':70, 'criti
 
 $edge_deployment_name = "smoke-deploy-$run_id"
 $edge_deployment_content = "scripts/smoke_tests/edge_deployment_content.json"
-$edge_deployment_metrics = "`"{'queries':{'mymetric':'SELECT deviceId from devices where properties.reported.lastDesiredStatus.code = 200'}}`"" 
+$edge_deployment_metrics = "`"{'queries':{'mymetric':'SELECT deviceId from devices where properties.reported.lastDesiredStatus.code = 200'}}`""
 $edge_deployment_condition = "`"tags.environment='dev'`""
 $edge_module_content = "scripts/smoke_tests/edge_module_content.json"
 
@@ -114,7 +122,7 @@ $commands += "az iot edge set-modules -g $resource_group_name --hub-name $iothub
 $commands += "az iot edge deployment create -g $resource_group_name -d $edge_deployment_name -n $iothub_name --content $edge_deployment_content --target-condition $edge_deployment_condition --priority 10 --metrics $edge_deployment_metrics --layered"
 $commands += "az iot edge deployment show -g $resource_group_name -d $edge_deployment_name -n $iothub_name"
 
-# Hub Resource Cleanup 
+# Hub Resource Cleanup
 $commands += "az iot hub module-identity delete -g $resource_group_name -m $hub_module_id -d $device_id -n $iothub_name"
 $commands += "az iot hub configuration delete -g $resource_group_name -c $hub_config_name -n $iothub_name"
 $commands += "az iot hub device-identity delete -g $resource_group_name -n $iothub_name -d $device_id"
@@ -237,6 +245,12 @@ foreach ($command in $commands) {
         $command += " --only-show-errors"
     }
     Invoke-Expression $command
+}
+
+# IoT Central App needs to be deleted if it was created for running smoke tests
+if (!$args[1]) {
+    Write-Host "`r`nDeleting the temporarily created IoT Central App..."
+    az iot central app delete -g $resource_group_name --name $central_app_id -y
 }
 
 # IoT Hub needs to be deleted if it was created for running smoke tests
