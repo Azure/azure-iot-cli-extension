@@ -8,9 +8,14 @@
 certops: Functions for working with certificates.
 """
 
+import datetime
 from os.path import exists, join
 import base64
-from OpenSSL import crypto
+from cryptography import x509
+from cryptography.x509.oid import NameOID
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 
 def create_self_signed_certificate(subject, valid_days, cert_output_dir, cert_only=False):
@@ -28,21 +33,34 @@ def create_self_signed_certificate(subject, valid_days, cert_output_dir, cert_on
         result (dict): dict with certificate value, private key and thumbprint.
     """
     # create a key pair
-    key = crypto.PKey()
-    key.generate_key(crypto.TYPE_RSA, 2048)
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
     # create a self-signed cert
-    cert = crypto.X509()
-    cert.get_subject().CN = subject
-    cert.gmtime_adj_notBefore(0)
-    cert.gmtime_adj_notAfter(valid_days * 24 * 60 * 60)
-    cert.set_issuer(cert.get_subject())
-    cert.set_pubkey(key)
-    cert.sign(key, 'sha256')
+    subject_name = x509.Name([
+        x509.NameAttribute(NameOID.COMMON_NAME, subject),
+    ])
+    cert = x509.CertificateBuilder().subject_name(
+        subject_name
+    ).issuer_name(
+        subject_name
+    ).public_key(
+        key.public_key()
+    ).serial_number(
+        x509.random_serial_number()
+    ).not_valid_before(
+        datetime.datetime.utcnow()
+    ).not_valid_after(
+        datetime.datetime.utcnow() + datetime.timedelta(days=valid_days)
+    ).sign(key, hashes.SHA256())
 
-    cert_dump = crypto.dump_certificate(crypto.FILETYPE_PEM, cert).decode('utf-8')
-    key_dump = crypto.dump_privatekey(crypto.FILETYPE_PEM, key).decode('utf-8')
-    thumbprint = cert.digest('sha1').replace(b':', b'').decode('utf-8')
+    cert_dump = key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.TraditionalOpenSSL,
+        encryption_algorithm=serialization.NoEncryption(),
+    ).decode('utf-8')
+    key_dump = cert.public_bytes(serialization.Encoding.PEM).decode('utf-8')
+    thumbprint_bytes = cert.fingerprint(hashes.SHA1())
+    thumbprint = ':'.join(f'{b:02X}' for b in thumbprint_bytes)
 
     if cert_output_dir and exists(cert_output_dir):
         cert_file = subject + '-cert.pem'
