@@ -60,7 +60,7 @@ def create_self_signed_certificate(subject, valid_days, cert_output_dir, cert_on
     ).decode('utf-8')
     key_dump = cert.public_bytes(serialization.Encoding.PEM).decode('utf-8')
     thumbprint_bytes = cert.fingerprint(hashes.SHA1())
-    thumbprint = ':'.join(f'{b:02X}' for b in thumbprint_bytes)
+    thumbprint = ''.join(f'{b:02X}' for b in thumbprint_bytes)
 
     if cert_output_dir and exists(cert_output_dir):
         cert_file = subject + '-cert.pem'
