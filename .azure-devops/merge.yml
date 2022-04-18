@@ -97,8 +97,6 @@ jobs:
       runUnitTests: true
       runIntTests: false
 
-  - template: templates/calculate-code-coverage.yml
-
 - job: 'run_unit_tests_windows'
   dependsOn : [ 'build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']
   pool:
