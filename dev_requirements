@@ -13,3 +13,4 @@ azure-storage-blob
 pytest-xdist
 pytest-rerunfailures
 tox
+typing-extensions
