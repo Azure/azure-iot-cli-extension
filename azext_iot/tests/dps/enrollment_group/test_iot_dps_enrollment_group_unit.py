@@ -59,7 +59,7 @@ def generate_enrollment_group_create_req(iot_hub_host_name=None,
 
 class TestEnrollmentGroupCreate():
     @pytest.fixture(params=[200])
-    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, request):
+    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, patch_certificate_open, request):
         mocked_response.add(
             method=responses.PUT,
             url="https://{}/enrollmentGroups/{}".format(mock_dps_target['entity'], enrollment_id),
@@ -322,7 +322,7 @@ def generate_enrollment_group_update_req(iot_hub_host_name=None,
 
 class TestEnrollmentGroupUpdate():
     @pytest.fixture(params=[(200, generate_enrollment_group_show(), 200)])
-    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, request):
+    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, patch_certificate_open, request):
         # Initial GET
         mocked_response.add(
             method=responses.GET,
@@ -498,7 +498,7 @@ class TestEnrollmentGroupUpdate():
 
 class TestEnrollmentGroupShow():
     @pytest.fixture(params=[200])
-    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, request):
+    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, patch_certificate_open, request):
         mocked_response.add(
             method=responses.GET,
             url="https://{}/enrollmentGroups/{}".format(mock_dps_target['entity'], enrollment_id),
@@ -510,7 +510,7 @@ class TestEnrollmentGroupShow():
         yield mocked_response
 
     @pytest.fixture()
-    def serviceclient_attestation(self, mocked_response, fixture_gdcs, fixture_dps_sas):
+    def serviceclient_attestation(self, mocked_response, fixture_gdcs, fixture_dps_sas, patch_certificate_open):
         mocked_response.add(
             method=responses.GET,
             url="https://{}/enrollmentGroups/{}".format(mock_dps_target['entity'], enrollment_id),
@@ -583,7 +583,7 @@ class TestEnrollmentGroupShow():
 
 class TestEnrollmentGroupList():
     @pytest.fixture(params=[200])
-    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, request):
+    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, patch_certificate_open, request):
         mocked_response.add(
             method=responses.POST,
             url="https://{}/enrollmentGroups/query?".format(mock_dps_target['entity']),
@@ -622,7 +622,7 @@ class TestEnrollmentGroupList():
 
 class TestEnrollmentGroupDelete():
     @pytest.fixture(params=[204])
-    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, request):
+    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, patch_certificate_open, request):
         mocked_response.add(
             method=responses.DELETE,
             url="https://{}/enrollmentGroups/{}".format(mock_dps_target['entity'], enrollment_id),
@@ -670,7 +670,7 @@ def generate_registration_state_show():
 
 class TestRegistrationShow():
     @pytest.fixture(params=[200])
-    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, request):
+    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, patch_certificate_open, request):
         mocked_response.add(
             method=responses.GET,
             url="https://{}/registrations/{}?".format(mock_dps_target['entity'], registration_id),
@@ -707,7 +707,7 @@ class TestRegistrationShow():
 
 class TestRegistrationList():
     @pytest.fixture(params=[200])
-    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, request):
+    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, patch_certificate_open, request):
         mocked_response.add(
             method=responses.POST,
             url="https://{}/registrations/{}/query?".format(mock_dps_target['entity'], enrollment_id),
@@ -743,7 +743,7 @@ class TestRegistrationList():
 
 class TestRegistrationDelete():
     @pytest.fixture(params=[204])
-    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, request):
+    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, patch_certificate_open, request):
         mocked_response.add(
             method=responses.DELETE,
             url="https://{}/registrations/{}".format(mock_dps_target['entity'], registration_id),

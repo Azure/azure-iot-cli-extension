@@ -49,7 +49,7 @@ def generate_enrollment_create_req(attestation_type=None, endorsement_key=None,
 
 class TestEnrollmentCreate():
     @pytest.fixture()
-    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas):
+    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, patch_certificate_open):
         mocked_response.add(
             method=responses.PUT,
             url="https://{}/enrollments/{}".format(mock_dps_target['entity'], enrollment_id),
@@ -61,7 +61,7 @@ class TestEnrollmentCreate():
         yield mocked_response
 
     @pytest.fixture(params=[400, 401, 500])
-    def serviceclient_generic_error(self, mocked_response, fixture_gdcs, fixture_dps_sas, request):
+    def serviceclient_generic_error(self, mocked_response, fixture_gdcs, fixture_dps_sas, patch_certificate_open, request):
         mocked_response.add(
             method=responses.PUT,
             url="https://{}/enrollments/{}".format(mock_dps_target['entity'], enrollment_id),
@@ -340,7 +340,7 @@ def generate_enrollment_update_req(certificate_path=None, iot_hub_host_name=None
 
 class TestEnrollmentUpdate():
     @pytest.fixture()
-    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, request):
+    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, patch_certificate_open, request):
         # Initial GET
         mocked_response.add(
             method=responses.GET,
@@ -464,7 +464,7 @@ class TestEnrollmentUpdate():
 
 class TestEnrollmentShow():
     @pytest.fixture(params=[200])
-    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, request):
+    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, patch_certificate_open, request):
         mocked_response.add(
             method=responses.GET,
             url="https://{}/enrollments/{}".format(mock_dps_target['entity'], enrollment_id),
@@ -477,7 +477,7 @@ class TestEnrollmentShow():
         yield mocked_response
 
     @pytest.fixture()
-    def serviceclient_attestation(self, mocked_response, fixture_gdcs, fixture_dps_sas):
+    def serviceclient_attestation(self, mocked_response, fixture_gdcs, fixture_dps_sas, patch_certificate_open):
         mocked_response.add(
             method=responses.GET,
             url="https://{}/enrollments/{}".format(mock_dps_target['entity'], enrollment_id),
@@ -552,7 +552,7 @@ class TestEnrollmentShow():
 
 class TestEnrollmentList():
     @pytest.fixture(params=[200])
-    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, request):
+    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, patch_certificate_open, request):
         mocked_response.add(
             method=responses.POST,
             url="https://{}/enrollments/query?".format(mock_dps_target['entity']),
@@ -592,7 +592,7 @@ class TestEnrollmentList():
 
 class TestEnrollmentDelete():
     @pytest.fixture(params=[204])
-    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, request):
+    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, patch_certificate_open, request):
         mocked_response.add(
             method=responses.DELETE,
             url="https://{}/enrollments/{}".format(mock_dps_target['entity'], enrollment_id),
