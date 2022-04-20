@@ -690,7 +690,7 @@ ignored-classes=optparse.Values,thread._local,_thread._local,Setting
 # in the environment of the CLI
 ignored-modules=
       azure,azure.cli,azure.cli.core,azure.cli.core.extension,azure.cli.core.commands,
-      knack,six,msrest,msrestazure,OpenSSL,requests,uamqp,yaml,jmespath
+      knack,six,msrest,msrestazure,requests,uamqp,yaml,jmespath
 
 # Show a hint with possible names when a member name was not found. The aspect
 # of finding the hint is based on edit distance.

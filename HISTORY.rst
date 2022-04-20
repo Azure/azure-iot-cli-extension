@@ -4,6 +4,13 @@ Release History
 ===============
 
 
+0.14.1
++++++++++++++++
+
+**IoT Hub updates**
+
+* Updated creation for self-signed certificates to use the Cryptography library instead of the PyOpenSSL library.
+
 0.14.0
 +++++++++++++++
 
