@@ -20,7 +20,7 @@ steps:
             python --version
             az --version
             Write-Host "running pip install"
-            pip install $wheel.FullName
+            python -m pip install $wheel.FullName
         }
         Write-Host "done"
       workingDirectory: '$(System.ArtifactsDirectory)/wheels'
