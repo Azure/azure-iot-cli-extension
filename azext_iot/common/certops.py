@@ -55,12 +55,12 @@ def create_self_signed_certificate(
         .sign(key, hashes.SHA256())
     )
 
-    cert_dump = key.private_bytes(
+    key_dump = key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.TraditionalOpenSSL,
         encryption_algorithm=serialization.NoEncryption(),
     ).decode("utf-8")
-    key_dump = cert.public_bytes(serialization.Encoding.PEM).decode("utf-8")
+    cert_dump = cert.public_bytes(serialization.Encoding.PEM).decode("utf-8")
     thumbprint = cert.fingerprint(hashes.SHA1()).hex().upper()
 
     if cert_output_dir and exists(cert_output_dir):
