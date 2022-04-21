@@ -324,7 +324,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         command = "iot central device edge children list --app-id {} -d {}".format(
             self.app_id, device_id
         )
-        
+
         children = self.cmd(
             command, api_version=ApiVersion.v1_1_preview.value
         ).get_output_in_json()
