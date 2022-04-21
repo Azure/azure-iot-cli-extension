@@ -297,7 +297,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         )
 
         # wait about a few seconds for simulator to kick in so that provisioning completes
-        time.sleep(30)
+        time.sleep(60)
 
         if api_version == ApiVersion.v1_1_preview.value:
             # check if device appears as edge
