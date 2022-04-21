@@ -16,10 +16,6 @@ steps:
         Foreach ($wheel in $wheels)
         {
             Write-Host "installing" $wheel.FullName
-            pip --version
-            python --version
-            az --version
-            Write-Host "running pip install"
             python -m pip install $wheel.FullName
         }
         Write-Host "done"
