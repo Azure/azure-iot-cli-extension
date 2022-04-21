@@ -318,25 +318,29 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
             self.app_id, device_id, child_id
         )
         self.cmd(command, api_version=ApiVersion.v1_1_preview.value)
+        # wait for relationship to be established
+        time.sleep(10)
 
         command = "iot central device edge children list --app-id {} -d {}".format(
             self.app_id, device_id
         )
-        # Use api-version 1.0 to also test interoperability
+
         children = self.cmd(
-            command, api_version=ApiVersion.v1.value
+            command, api_version=ApiVersion.v1_1_preview.value
         ).get_output_in_json()
         assert len(children) == 1
         assert children[0]["id"] == child_id
 
         # cleanup
         self._delete_device(device_id=child_id, api_version=self._api_version)
+        # give some time to backend as device must still be on db
+        time.sleep(10)
         self._delete_device(device_id=device_id, api_version=self._api_version)
         self._delete_device_template(
-            template_id=template_id, api_version=self._api_version
+            template_id=child_template_id, api_version=self._api_version
         )
         self._delete_device_template(
-            template_id=child_template_id, api_version=self._api_version
+            template_id=template_id, api_version=self._api_version
         )
 
     def test_central_device_template_methods_CRUD(self):
