@@ -16,7 +16,7 @@ steps:
         Foreach ($wheel in $wheels)
         {
             Write-Host "installing" $wheel.FullName
-            pip install $wheel.FullName
+            python -m pip install $wheel.FullName
         }
         Write-Host "done"
       workingDirectory: '$(System.ArtifactsDirectory)/wheels'
