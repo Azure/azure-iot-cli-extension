@@ -1233,6 +1233,30 @@ helps[
 """
 
 helps[
+    "iot dps enrollment registration"
+] = """
+    type: group
+    short-summary: Manage device registrations for an individual enrollment in an Azure IoT Hub Device
+        Provisioning Service.
+"""
+
+helps[
+    "iot dps enrollment registration show"
+] = """
+    type: command
+    short-summary: Get a device registration for an individual enrollment in an Azure IoT Hub Device
+        Provisioning Service.
+"""
+
+helps[
+    "iot dps enrollment registration delete"
+] = """
+    type: command
+    short-summary: Delete a device registration for an individual enrollment in an Azure IoT Hub Device
+        Provisioning Service.
+"""
+
+helps[
     "iot dps enrollment-group"
 ] = """
     type: group

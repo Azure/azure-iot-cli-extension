@@ -181,6 +181,12 @@ def load_command_table(self, _):
         cmd_group.command("delete", "iot_dps_device_enrollment_delete")
 
     with self.command_group(
+        "iot dps enrollment registration", command_type=iotdps_ops
+    ) as cmd_group:
+        cmd_group.show_command("show", "iot_dps_registration_get")
+        cmd_group.command("delete", "iot_dps_registration_delete")
+
+    with self.command_group(
         "iot dps enrollment-group", command_type=iotdps_ops
     ) as cmd_group:
         cmd_group.command("create", "iot_dps_device_enrollment_group_create")

@@ -1023,6 +1023,13 @@ def load_arguments(self, _):
             help="TPM endorsement key for a TPM device.",
         )
 
+    with self.argument_context("iot dps enrollment registration") as context:
+        context.argument(
+            "registration_id",
+            options_list=["--enrollment-id", "--eid"],
+            help="Individual device enrollment ID."
+        )
+
     with self.argument_context("iot dps enrollment-group") as context:
         context.argument(
             "enrollment_id",
