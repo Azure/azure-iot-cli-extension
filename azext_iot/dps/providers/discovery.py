@@ -75,5 +75,6 @@ class DPSDiscovery(BaseDiscovery):
         result["secondarykey"] = policy.secondary_key
         result["subscription"] = self.sub_id
         result["cmd"] = self.cmd
+        result["idscope"] = resource.properties.id_scope
 
         return result

@@ -92,6 +92,7 @@ class SdkResolver(object):
             SdkType.service_sdk: self._get_iothub_service_sdk,  # Don't need to call here
             SdkType.device_sdk: self._get_iothub_device_sdk,
             SdkType.dps_sdk: self._get_dps_service_sdk,
+            SdkType.dps_device_sdk: self._get_dps_device_sdk,
         }
 
     def _get_iothub_device_sdk(self):
@@ -125,6 +126,17 @@ class SdkResolver(object):
             )
 
         return IotHubGatewayServiceAPIs(credentials=credentials, base_url=self.endpoint)
+
+    def _get_dps_device_sdk(self):
+        from azext_iot.sdk.dps.device import ProvisioningDeviceClient
+
+        credentials = SasTokenAuthentication(
+            uri=self.sas_uri,
+            shared_access_policy_name=self.target["policy"],
+            shared_access_key=self.target["primarykey"],
+        )
+
+        return ProvisioningDeviceClient(credentials=credentials, base_url=self.endpoint)
 
     def _get_dps_service_sdk(self):
         from azext_iot.sdk.dps.service import ProvisioningServiceClient

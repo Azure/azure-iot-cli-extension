@@ -164,6 +164,13 @@ def load_command_table(self, _):
         cmd_group.command("send", "iot_c2d_message_send")
         cmd_group.command("purge", "iot_c2d_message_purge")
 
+    with self.command_group("iot device registration", command_type=iotdps_ops) as cmd_group:
+        cmd_group.command("create", "iot_device_registration_create")
+        cmd_group.command("show", "iot_device_registration_show")
+
+    with self.command_group("iot device registration operation", command_type=iotdps_ops) as cmd_group:
+        cmd_group.command("create", "iot_device_registration_operation_create")
+
     with self.command_group("iot dps", command_type=iotdps_ops) as cmd_group:
         cmd_group.command(
             "compute-device-key",

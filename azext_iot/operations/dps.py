@@ -867,6 +867,93 @@ def iot_dps_registration_delete(
         handle_service_exception(e)
 
 
+### Device commands
+
+
+def iot_device_registration_create(
+    cmd,
+    device_id,
+    dps_name=None,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
+):
+    discovery = DPSDiscovery(cmd)
+    target = discovery.get_target(
+        dps_name,
+        resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
+    try:
+        resolver = SdkResolver(target=target)
+        sdk = resolver.get_sdk(SdkType.dps_device_sdk)
+
+        device_registration = {}
+        #registration_id, device_registration, id_scope,
+        return sdk.runtime_registration.register_device(
+            registration_id=device_id,
+            device_registration=device_registration,
+            id_scope=target["idscope"]
+        )
+    except ProvisioningServiceErrorDetailsException as e:
+        handle_service_exception(e)
+
+
+def iot_device_registration_show(
+    cmd,
+    device_id,
+    dps_name=None,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
+):
+    discovery = DPSDiscovery(cmd)
+    target = discovery.get_target(
+        dps_name,
+        resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
+    try:
+        resolver = SdkResolver(target=target)
+        sdk = resolver.get_sdk(SdkType.dps_device_sdk)
+        import pdb; pdb.set_trace()
+        device_registration = {}
+        #registration_id, device_registration, id_scope,
+        return sdk.runtime_registration.device_registration_status_lookup(
+            registration_id=device_id,
+            device_registration=device_registration,
+            id_scope=target["idscope"]
+        )
+    except ProvisioningServiceErrorDetailsException as e:
+        handle_service_exception(e)
+
+
+def iot_device_registration_operation_show(
+    cmd,
+    device_id,
+    dps_name=None,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
+):
+    discovery = DPSDiscovery(cmd)
+    target = discovery.get_target(
+        dps_name,
+        resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
+    try:
+        resolver = SdkResolver(target=target)
+        sdk = resolver.get_sdk(SdkType.dps_device_sdk)
+        #registration_id, operation_id, id_scope,
+        return sdk.runtime_registration.operation_status_lookup(device_id)
+    except ProvisioningServiceErrorDetailsException as e:
+        handle_service_exception(e)
+
+
 def _get_twin_collection(properties):
     """Convert a json into TwinCollection for use with the API."""
     from azext_iot.common.utility import dict_clean
