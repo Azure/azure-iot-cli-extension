@@ -630,3 +630,88 @@ class TestEnrollmentDelete():
                 dps_name=mock_dps_target['entity'],
                 resource_group_name=resource_group,
             )
+
+
+def generate_registration_state_show():
+    payload = {'registrationId': enrollment_id, 'status': 'assigned', 'etag': etag, 'assignedHub': 'myHub',
+               'deviceId': 'myDevice'}
+    return payload
+
+
+class TestRegistrationShow():
+    @pytest.fixture(params=[200])
+    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, patch_certificate_open, request):
+        mocked_response.add(
+            method=responses.GET,
+            url="https://{}/registrations/{}?".format(mock_dps_target['entity'], enrollment_id),
+            body=json.dumps(generate_registration_state_show()),
+            status=request.param,
+            content_type="application/json",
+            match_querystring=False
+        )
+        yield mocked_response
+
+    def test_registration_show(self, fixture_cmd, serviceclient):
+        result = subject.iot_dps_registration_get(
+            cmd=fixture_cmd,
+            dps_name=mock_dps_target['entity'],
+            registration_id=enrollment_id,
+            resource_group_name=resource_group,
+        )
+        assert result['registrationId'] == enrollment_id
+        request = serviceclient.calls[0].request
+        url = request.url
+        method = request.method
+        assert "{}/registrations/{}?".format(mock_dps_target['entity'], enrollment_id) in url
+        assert method == 'GET'
+
+    def test_registration_show_error(self, fixture_cmd):
+        with pytest.raises(CLIError):
+            subject.iot_dps_registration_get(
+                cmd=fixture_cmd,
+                dps_name=mock_dps_target['entity'],
+                registration_id=enrollment_id,
+                resource_group_name=resource_group,
+            )
+
+
+class TestRegistrationDelete():
+    @pytest.fixture(params=[204])
+    def serviceclient(self, mocked_response, fixture_gdcs, fixture_dps_sas, patch_certificate_open, request):
+        mocked_response.add(
+            method=responses.DELETE,
+            url="https://{}/registrations/{}".format(mock_dps_target['entity'], enrollment_id),
+            body='{}',
+            status=request.param,
+            content_type="application/json",
+            match_querystring=False
+        )
+        yield mocked_response
+
+    @pytest.mark.parametrize(
+        "etag",
+        [None, etag]
+    )
+    def test_registration_delete(self, serviceclient, fixture_cmd, etag):
+        subject.iot_dps_registration_delete(
+            cmd=fixture_cmd,
+            dps_name=mock_dps_target['entity'],
+            registration_id=enrollment_id,
+            resource_group_name=resource_group,
+            etag=etag
+        )
+        request = serviceclient.calls[0].request
+        url = request.url
+        method = request.method
+        assert "{}/registrations/{}?".format(mock_dps_target['entity'], enrollment_id) in url
+        assert method == 'DELETE'
+        assert request.headers["If-Match"] == etag if etag else "*"
+
+    def test_registration_delete_error(self, fixture_cmd):
+        with pytest.raises(CLIError):
+            subject.iot_dps_registration_delete(
+                cmd=fixture_cmd,
+                dps_name=mock_dps_target['entity'],
+                registration_id=enrollment_id,
+                resource_group_name=resource_group,
+            )

@@ -11,6 +11,13 @@ Release History
 
 * Updated creation for self-signed certificates to use the Cryptography library instead of the PyOpenSSL library.
 
+**IoT DPS updates**
+
+* Added registration commands for individual enrollment groups:
+    - az iot dps enrollment registration show
+    - az iot dps enrollment registration delete
+
+
 0.14.0
 +++++++++++++++
 
