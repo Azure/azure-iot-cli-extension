@@ -44,4 +44,4 @@ class ValidationType(Enum):
     certification = "Certification"
 
 
-BASE_URL = "https://prod.certsvc.trafficmanager.net"
+BASE_URL = "https://api.certify.azure.com"

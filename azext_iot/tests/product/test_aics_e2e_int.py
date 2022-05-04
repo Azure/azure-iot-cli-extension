@@ -56,6 +56,7 @@ class TestProductDeviceTestTasks(AICSLiveScenarioTest):
 
         self.kwargs.update({"device_test_id": test["id"]})
 
+        sleep(1)
         test = self.cmd(
             "iot product test show -t {device_test_id} --base-url {BASE_URL}"
         ).get_output_in_json()
@@ -82,7 +83,9 @@ class TestProductDeviceTestTasks(AICSLiveScenarioTest):
         ).get_output_in_json()[0]
 
         assert json.dumps(test_task)
-        assert test_task.get("status") == DeviceTestTaskStatus.queued.value
+
+        # Ensure test task is queued (or started, depending on timing)
+        assert test_task.get("status") in [DeviceTestTaskStatus.queued.value, DeviceTestTaskStatus.started.value]
         assert test_task.get("error") is None
         assert test_task.get("type") == TaskType.GenerateTestCases.value
 
