@@ -29,6 +29,15 @@ class TestProductDeviceTestTasks(AICSLiveScenarioTest):
 
     def test_product_device_test_tasks(self):
 
+        # see if existing task is created
+        exists = self.cmd("iot product test task show --running -t {device_test_id} --base-url {BASE_URL}")
+        if(exists.output):
+            # delete it before attempting to create a new one
+            id = exists.get_output_in_json()[0]['id']
+            self.cmd("iot product test task delete -t {} --task-id {} --base-url {}"
+                     .format(self.kwargs['device_test_id'], id, self.kwargs['BASE_URL']))
+            sleep(5)
+
         # create task for GenerateTestCases
         created = self.cmd(
             "iot product test task create -t {device_test_id} --type {generate_task} --wait --base-url {BASE_URL}"
@@ -65,7 +74,7 @@ class TestProductDeviceTestTasks(AICSLiveScenarioTest):
         assert queue_task["type"] == TaskType.QueueTestRun.value
         assert queue_task["status"] != DeviceTestTaskStatus.queued.value
 
-        if queue_task["status"] == DeviceTestTaskStatus.running:
+        if queue_task["status"] == DeviceTestTaskStatus.running.value:
             # Cancel running test task
             self.cmd(
                 "iot product test task delete -t {device_test_id} --task-id {queue_task_id} --base-url {BASE_URL}"
