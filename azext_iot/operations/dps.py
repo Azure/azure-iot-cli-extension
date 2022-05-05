@@ -12,9 +12,11 @@ from azure.cli.core.azclierror import (
     InvalidArgumentValueError,
     MutuallyExclusiveArgumentError,
     RequiredArgumentMissingError,
-    ResourceNotFoundError
+    ResourceNotFoundError,
+    UnauthorizedError
 )
 from azext_iot.common._azure import IOT_SERVICE_CS_TEMPLATE
+from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import (
     SdkType,
     AttestationType,
@@ -48,6 +50,7 @@ from azext_iot.sdk.dps.service.models import (
 )
 
 logger = get_logger(__name__)
+GLOBAL_PROVISIONING_HOST = "global.azure-devices-provisioning.net"
 
 
 # DPS Enrollments
@@ -678,11 +681,11 @@ def iot_dps_compute_device_key(
     auth_type_dataplane=None,
 ):
     if symmetric_key is None:
-        if not all([dps_name, resource_group_name, enrollment_id]):
+        if not all([dps_name, enrollment_id]):
             raise RequiredArgumentMissingError(
                 "Please provide DPS enrollment group identifiers (Device Provisioning Service name via "
-                "--dps-name, Enrollment ID via --enrollment-id, and resource group via --resource-group "
-                "or -g) or the enrollment group symmetric key via --symmetric-key or --key."
+                "--dps-name and Enrollment ID via --enrollment-id) or the enrollment group symmetric key "
+                "via --symmetric-key or --key."
             )
 
         discovery = DPSDiscovery(cmd)
@@ -872,7 +875,10 @@ def iot_dps_registration_delete(
 
 def iot_device_registration_create(
     cmd,
-    device_id,
+    registration_id,
+    group_id=None,
+    device_symmetric_key=None,
+    group_symmetric_key=None,
     dps_name=None,
     resource_group_name=None,
     login=None,
@@ -886,15 +892,32 @@ def iot_device_registration_create(
         auth_type=auth_type_dataplane,
     )
     try:
-        resolver = SdkResolver(target=target)
-        sdk = resolver.get_sdk(SdkType.dps_device_sdk)
-
-        device_registration = {}
-        #registration_id, device_registration, id_scope,
-        return sdk.runtime_registration.register_device(
-            registration_id=device_id,
-            device_registration=device_registration,
-            id_scope=target["idscope"]
+        if not device_symmetric_key and not group_id:
+            enrollment = iot_dps_device_enrollment_get(
+                cmd=cmd,
+                enrollment_id=registration_id,
+                dps_name=dps_name,
+                resource_group_name=resource_group_name,
+                show_keys=True,
+                login=login,
+                auth_type_dataplane=auth_type_dataplane,
+            )
+            device_symmetric_key = enrollment["attestation"]["symmetricKey"]["primaryKey"]
+        elif group_id:
+            device_symmetric_key = iot_dps_compute_device_key(
+                cmd=cmd,
+                registration_id=registration_id,
+                enrollment_id=group_id,
+                dps_name=dps_name,
+                resource_group_name=resource_group_name,
+                symmetric_key=group_symmetric_key,
+                login=login,
+                auth_type_dataplane=auth_type_dataplane,
+            )
+        return _dps_connect_device(
+            device_id=registration_id,
+            id_scope=target['idscope'],
+            key=device_symmetric_key
         )
     except ProvisioningServiceErrorDetailsException as e:
         handle_service_exception(e)
@@ -902,7 +925,10 @@ def iot_device_registration_create(
 
 def iot_device_registration_show(
     cmd,
-    device_id,
+    registration_id,
+    group_id=None,
+    device_symmetric_key=None,
+    group_symmetric_key=None,
     dps_name=None,
     resource_group_name=None,
     login=None,
@@ -916,14 +942,41 @@ def iot_device_registration_show(
         auth_type=auth_type_dataplane,
     )
     try:
-        resolver = SdkResolver(target=target)
+        if not device_symmetric_key and not group_id:
+            enrollment = iot_dps_device_enrollment_get(
+                cmd=cmd,
+                enrollment_id=registration_id,
+                dps_name=dps_name,
+                resource_group_name=resource_group_name,
+                show_keys=True,
+                login=login,
+                auth_type_dataplane=auth_type_dataplane,
+            )
+            device_symmetric_key = enrollment["attestation"]["symmetricKey"]["primaryKey"]
+        elif group_id:
+            device_symmetric_key = iot_dps_compute_device_key(
+                cmd=cmd,
+                registration_id=registration_id,
+                enrollment_id=group_id,
+                dps_name=dps_name,
+                resource_group_name=resource_group_name,
+                symmetric_key=group_symmetric_key,
+                login=login,
+                auth_type_dataplane=auth_type_dataplane,
+            )
+
+        credentials = SasTokenAuthentication(
+            uri=f"{target['idscope']}/registrations/{registration_id}",
+            shared_access_policy_name=None,
+            shared_access_key=device_symmetric_key,
+        )
+
+        resolver = SdkResolver(target=target, auth_override=credentials)
         sdk = resolver.get_sdk(SdkType.dps_device_sdk)
-        import pdb; pdb.set_trace()
-        device_registration = {}
-        #registration_id, device_registration, id_scope,
+
         return sdk.runtime_registration.device_registration_status_lookup(
-            registration_id=device_id,
-            device_registration=device_registration,
+            registration_id=registration_id,
+            device_registration={},
             id_scope=target["idscope"]
         )
     except ProvisioningServiceErrorDetailsException as e:
@@ -932,7 +985,11 @@ def iot_device_registration_show(
 
 def iot_device_registration_operation_show(
     cmd,
-    device_id,
+    registration_id,
+    operation_id,
+    group_id=None,
+    device_symmetric_key=None,
+    group_symmetric_key=None,
     dps_name=None,
     resource_group_name=None,
     login=None,
@@ -946,12 +1003,84 @@ def iot_device_registration_operation_show(
         auth_type=auth_type_dataplane,
     )
     try:
-        resolver = SdkResolver(target=target)
+        if not device_symmetric_key and not group_id:
+            enrollment = iot_dps_device_enrollment_get(
+                cmd=cmd,
+                enrollment_id=registration_id,
+                dps_name=dps_name,
+                resource_group_name=resource_group_name,
+                show_keys=True,
+                login=login,
+                auth_type_dataplane=auth_type_dataplane,
+            )
+            device_symmetric_key = enrollment["attestation"]["symmetricKey"]["primaryKey"]
+        elif group_id:
+            device_symmetric_key = iot_dps_compute_device_key(
+                cmd=cmd,
+                registration_id=registration_id,
+                enrollment_id=group_id,
+                dps_name=dps_name,
+                resource_group_name=resource_group_name,
+                symmetric_key=group_symmetric_key,
+                login=login,
+                auth_type_dataplane=auth_type_dataplane,
+            )
+
+        credentials = SasTokenAuthentication(
+            uri=f"{target['idscope']}/registrations/{registration_id}",
+            shared_access_policy_name=None,
+            shared_access_key=device_symmetric_key,
+        )
+
+        resolver = SdkResolver(target=target, auth_override=credentials)
         sdk = resolver.get_sdk(SdkType.dps_device_sdk)
         #registration_id, operation_id, id_scope,
-        return sdk.runtime_registration.operation_status_lookup(device_id)
+        return sdk.runtime_registration.operation_status_lookup(
+            registration_id=registration_id,
+            operation_id=operation_id,
+            id_scope=target["idscope"]
+        )
     except ProvisioningServiceErrorDetailsException as e:
         handle_service_exception(e)
+
+
+def _dps_connect_device(device_id: str, id_scope: str, key: str):
+    from azure.iot.device import ProvisioningDeviceClient
+    from azure.iot.device.exceptions import ClientError
+
+    provisioning_device_client = ProvisioningDeviceClient.create_from_symmetric_key(
+        provisioning_host=GLOBAL_PROVISIONING_HOST,
+        registration_id=device_id,
+        id_scope=id_scope,
+        symmetric_key=key,
+    )
+    try:
+        registration_state = provisioning_device_client.register()
+    except ClientError as e:
+        error_msg = str(e.__cause__)
+        if error_msg.endswith('200'):
+            raise AzureResponseError(
+                "Created registration but device was not assigned to an IoT Hub. Please ensure that "
+                "there is at least one avaliable linked IoT Hub and try again."
+            )
+        elif error_msg.endswith('401'):
+            raise UnauthorizedError("Could not create registration. Please check provided credentials.")
+    # note: vars can be used but will need to have the _ parsed out
+    # device sdk uses getattr instead
+    return {
+        "operation_id": registration_state.operation_id,
+        "status": registration_state.status,
+        "registration_state": {
+            "device_id": registration_state.registration_state.device_id,
+            "assigned_hub": registration_state.registration_state.assigned_hub,
+            "sub_status": registration_state.registration_state.sub_status,
+            "created_date_time": registration_state.registration_state.created_date_time,
+            "last_update_date_time": registration_state.registration_state.last_update_date_time,
+            "etag": registration_state.registration_state.etag,
+            "response_payload": registration_state.registration_state.response_payload,
+
+        },
+    }
 
 
 def _get_twin_collection(properties):

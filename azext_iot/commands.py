@@ -169,7 +169,7 @@ def load_command_table(self, _):
         cmd_group.command("show", "iot_device_registration_show")
 
     with self.command_group("iot device registration operation", command_type=iotdps_ops) as cmd_group:
-        cmd_group.command("create", "iot_device_registration_operation_create")
+        cmd_group.command("show", "iot_device_registration_operation_show")
 
     with self.command_group("iot dps", command_type=iotdps_ops) as cmd_group:
         cmd_group.command(

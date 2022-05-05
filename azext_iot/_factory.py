@@ -130,26 +130,22 @@ class SdkResolver(object):
     def _get_dps_device_sdk(self):
         from azext_iot.sdk.dps.device import ProvisioningDeviceClient
 
-        credentials = SasTokenAuthentication(
-            uri=self.sas_uri,
-            shared_access_policy_name=self.target["policy"],
-            shared_access_key=self.target["primarykey"],
-        )
+        if self.auth_override:
+            credentials = self.auth_override
+        else:
+            credentials = SasTokenAuthentication(
+                uri=self.sas_uri,
+                shared_access_policy_name=self.target["policy"],
+                shared_access_key=self.target["primarykey"],
+            )
 
         return ProvisioningDeviceClient(credentials=credentials, base_url=self.endpoint)
 
     def _get_dps_service_sdk(self):
         from azext_iot.sdk.dps.service import ProvisioningServiceClient
 
-        credentials = None
-
         if self.auth_override:
             credentials = self.auth_override
-        elif self.target["policy"] == AuthenticationTypeDataplane.login.value:
-            credentials = IoTOAuth(
-                cmd=self.target["cmd"],
-                resource_id=IOTDPS_RESOURCE_ID
-            )
         else:
             credentials = SasTokenAuthentication(
                 uri=self.sas_uri,
