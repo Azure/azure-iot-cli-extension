@@ -39,6 +39,7 @@ USER_AGENT = "IoTPlatformCliExtension/{}".format(VERSION)
 IOTHUB_RESOURCE_ID = "https://iothubs.azure.net"
 IOTDPS_RESOURCE_ID = "https://azure-devices-provisioning.net"
 DIGITALTWINS_RESOURCE_ID = "https://digitaltwins.azure.net"
+IOTDPS_PROVISIONING_HOST = "global.azure-devices-provisioning.net"
 DEVICETWIN_POLLING_INTERVAL_SEC = 10
 DEVICETWIN_MONITOR_TIME_SEC = 15
 # (Lib name, minimum version (including), maximum version (excluding))

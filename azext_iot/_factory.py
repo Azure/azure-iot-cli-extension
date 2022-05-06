@@ -13,6 +13,7 @@ from azext_iot.common.utility import ensure_iotdps_sdk_min_version
 from azext_iot.common.auth import IoTOAuth
 from azext_iot.common.shared import SdkType, AuthenticationTypeDataplane
 from azext_iot.constants import (
+    IOTDPS_PROVISIONING_HOST,
     IOTDPS_TRACK_2_SDK_MIN_VERSION,
     USER_AGENT,
     IOTHUB_RESOURCE_ID,
@@ -75,9 +76,13 @@ class SdkResolver(object):
         self.auth_override = auth_override
 
         # This initialization will likely need to change to support more variation of SDK
-        self.sas_uri = self.target["entity"]
+        self.sas_uri = self.target.get("entity", IOTDPS_PROVISIONING_HOST)
         self.endpoint = "https://{}".format(self.sas_uri)
-        if self.device_id:  # IoT Hub base endpoint stays the same
+
+        # Base endpoints stay the same
+        if self.device_id and self.target.get("idscope"):
+            self.sas_uri = "{}/registrations/{}".format(self.target["idscope"], self.device_id)
+        elif self.device_id:
             self.sas_uri = "{}/devices/{}".format(self.sas_uri, self.device_id)
 
     def get_sdk(self, sdk_type):
@@ -135,7 +140,7 @@ class SdkResolver(object):
         else:
             credentials = SasTokenAuthentication(
                 uri=self.sas_uri,
-                shared_access_policy_name=self.target["policy"],
+                shared_access_policy_name=self.target.get("policy"),
                 shared_access_key=self.target["primarykey"],
             )
 
@@ -144,8 +149,15 @@ class SdkResolver(object):
     def _get_dps_service_sdk(self):
         from azext_iot.sdk.dps.service import ProvisioningServiceClient
 
+        credentials = None
+
         if self.auth_override:
             credentials = self.auth_override
+        elif self.target["policy"] == AuthenticationTypeDataplane.login.value:
+            credentials = IoTOAuth(
+                cmd=self.target["cmd"],
+                resource_id=IOTDPS_RESOURCE_ID
+            )
         else:
             credentials = SasTokenAuthentication(
                 uri=self.sas_uri,
