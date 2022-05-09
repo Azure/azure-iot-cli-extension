@@ -40,16 +40,16 @@ class DeviceRegistrationProvider():
         self,
         registration_id: str,
         device_symmetric_key: str,
-        endpoint: str = None,
     ):
         from azext_iot.sdk.dps.device import ProvisioningDeviceClient
+
         credentials = SasTokenAuthentication(
             uri=f"{self.target['idscope']}/registrations/{registration_id}",
             shared_access_policy_name=None,
             shared_access_key=device_symmetric_key,
         )
 
-        return ProvisioningDeviceClient(credentials=credentials, base_url=endpoint)
+        return ProvisioningDeviceClient(credentials=credentials)
 
     def get_sdk(self, endpoint: str = None):
         from azure.cli.core.commands.client_factory import get_mgmt_service_client
@@ -142,7 +142,6 @@ class DeviceRegistrationProvider():
             sdk = self._get_dps_device_sdk(
                 registration_id=registration_id,
                 device_symmetric_key=device_symmetric_key,
-                endpoint=self.target["entity"]
             )
             return sdk.runtime_registration.operation_status_lookup(
                 registration_id=registration_id,
@@ -169,6 +168,7 @@ class DeviceRegistrationProvider():
                 auth_type_dataplane=self.auth_type_dataplane,
             )
             return enrollment["attestation"]["symmetricKey"]["primaryKey"]
+
         return iot_dps_compute_device_key(
             cmd=self.cmd,
             registration_id=registration_id,
