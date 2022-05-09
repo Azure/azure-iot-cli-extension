@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from ._help import load_deviceprovisioningservice_help
+"""
+shared: Define shared data types(enums) and constant strings.
 
-load_deviceprovisioningservice_help()
+"""

@@ -99,6 +99,7 @@ def iot_dps_device_enrollment_get(
         login=login,
         auth_type=auth_type_dataplane,
     )
+    print(target)
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
