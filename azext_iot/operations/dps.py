@@ -48,7 +48,6 @@ from azext_iot.sdk.dps.service.models import (
 )
 
 logger = get_logger(__name__)
-GLOBAL_PROVISIONING_HOST = "global.azure-devices-provisioning.net"
 
 
 # DPS Enrollments

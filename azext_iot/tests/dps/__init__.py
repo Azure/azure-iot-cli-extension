@@ -37,6 +37,7 @@ PREFIX_EDGE_DEVICE = "test-edge-device-"
 PREFIX_INDIVIDUAL_ENROLLMENT = "test-enrollment-"
 PREFIX_GROUP_ENROLLMENT = "test-groupenroll-"
 USER_ROLE = "Device Provisioning Service Data Contributor"
+HUB_USER_ROLE = "IoT Hub Data Contributor"
 MAX_HUB_RETRIES = 3
 
 TEST_ENDORSEMENT_KEY = (
@@ -183,6 +184,38 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 )
             ).get_output_in_json()
 
+    def add_hub_perimssions(self):
+        """Add IoT Hub permission for dataplane operations."""
+        target_hub = self.cmd(
+            "iot hub show -n {} -g {}".format(self.entity_hub_name, self.entity_rg)
+        ).get_output_in_json()
+
+        account = self.cmd("account show").get_output_in_json()
+        user = account["user"]
+
+        if user["name"] is None:
+            raise Exception("User not found")
+
+        tries = 0
+        while tries < MAX_RBAC_ASSIGNMENT_TRIES:
+            role_assignments = self.get_role_assignments(target_hub["id"], HUB_USER_ROLE)
+            role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
+            if user["name"] in role_assignment_principal_names:
+                break
+            # else assign IoT Hub Data Contributor role to current user and check again
+            self.cmd(
+                'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
+                    user["name"], USER_ROLE, target_hub["id"]
+                )
+            )
+            sleep(10)
+
+        if tries == MAX_RBAC_ASSIGNMENT_TRIES:
+            raise Exception(
+                "Reached max ({}) number of tries to assign RBAC role. Please re-run the test later "
+                "or with more max number of tries.".format(MAX_RBAC_ASSIGNMENT_TRIES)
+            )
+
     def _ensure_dps_hub_link(self):
         hubs = self.cmd(
             "iot dps linked-hub list --dps-name {} -g {}".format(self.entity_dps_name, self.entity_rg)
@@ -221,14 +254,18 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     )
                 )
 
-        self.cmd(
-            "iot dps enrollment list --dps-name {} -g  {}".format(self.entity_dps_name, self.entity_rg),
-            checks=self.is_empty(),
-        )
-        self.cmd(
-            "iot dps enrollment-group list --dps-name {} -g  {}".format(self.entity_dps_name, self.entity_rg),
-            checks=self.is_empty(),
-        )
+        # Check again only if needed
+        if enrollments:
+            self.cmd(
+                "iot dps enrollment list --dps-name {} -g  {}".format(self.entity_dps_name, self.entity_rg),
+                checks=self.is_empty(),
+            )
+
+        if enrollment_groups:
+            self.cmd(
+                "iot dps enrollment-group list --dps-name {} -g  {}".format(self.entity_dps_name, self.entity_rg),
+                checks=self.is_empty(),
+            )
 
     def generate_device_names(self, count=1, edge=False):
         names = [

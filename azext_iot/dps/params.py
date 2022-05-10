@@ -52,7 +52,8 @@ def load_dps_arguments(self, _):
             "group_symmetric_key",
             options_list=["--group-symmetric-key", "--group-key"],
             help="The symmetric shared access key for the enrollment group. If provided, the device symmetric "
-            "key will be generated directly from the supplied symmetric key without further validation.",
+            "key will be generated directly from the supplied symmetric key without further validation. Only "
+            "used for registrations part of an enrollment group.",
         )
 
     with self.argument_context("iot device registration operation") as context:

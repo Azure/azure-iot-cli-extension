@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-
+from logging import getLogger
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.utility import handle_service_exception
 from azext_iot.constants import IOTDPS_RESOURCE_ID, USER_AGENT
@@ -12,6 +12,9 @@ from azext_iot.dps.providers.discovery import DPSDiscovery
 from azext_iot.operations.dps import iot_dps_compute_device_key, iot_dps_device_enrollment_get
 from azext_iot.sdk.dps.device.provisioning_device_client import ProvisioningDeviceClient
 from azext_iot.sdk.dps.service.models.provisioning_service_error_details_py3 import ProvisioningServiceErrorDetailsException
+from azure.cli.core.azclierror import ArgumentUsageError
+
+logger = getLogger(__name__)
 
 
 class DeviceRegistrationProvider():
@@ -31,10 +34,21 @@ class DeviceRegistrationProvider():
             login=login,
             auth_type=auth_type_dataplane,
         )
+        # Todo: figure out if this should be done
+        # issue is that cstring does not have idscope - will need to get with
+        # az iot dps show -n dps-name which may not be what we want to do
+        if self.target.get("idscope") is None:
+            self.target["idscope"] = self._get_idscope()
         self.dps_name = dps_name
         self.resource_group_name = resource_group_name
         self.login = login
         self.auth_type_dataplane = auth_type_dataplane
+
+    def _get_idscope(self):
+        dps_name = self.target['entity'].split(".")[0]
+        return self.cmd(
+            f"iot dps show -n {dps_name}"
+        ).get_output_in_json()["properties"]["idScope"]
 
     def _get_dps_device_sdk(
         self,
@@ -68,6 +82,37 @@ class DeviceRegistrationProvider():
         return client
 
     def create(
+        self,
+        registration_id: str,
+        enrollment_group_id: str = None,
+        device_symmetric_key: str = None,
+        group_symmetric_key: str = None,
+    ):
+        try:
+            if not device_symmetric_key:
+                device_symmetric_key = self._get_device_symmetric_key(
+                    registration_id=registration_id,
+                    enrollment_group_id=enrollment_group_id,
+                    group_symmetric_key=group_symmetric_key,
+                )
+            sdk = self._get_dps_device_sdk(
+                registration_id=registration_id,
+                device_symmetric_key=device_symmetric_key
+            )
+
+            return sdk.runtime_registration.register_device(
+                registration_id=registration_id,
+                device_registration={
+                    "registration_id": registration_id,
+                    "tpm": None,
+                    "payload": None,
+                },
+                id_scope=self.target["idscope"]
+            )
+        except ProvisioningServiceErrorDetailsException as e:
+            handle_service_exception(e)
+
+    def create_with_x509(
         self,
         registration_id: str,
         enrollment_group_id: str = None,
@@ -134,14 +179,16 @@ class DeviceRegistrationProvider():
         group_symmetric_key: str = None,
     ):
         try:
-            device_symmetric_key = self._get_device_symmetric_key(
-                registration_id=registration_id,
-                enrollment_group_id=enrollment_group_id,
-                group_symmetric_key=group_symmetric_key,
-            )
+            if not device_symmetric_key:
+                device_symmetric_key = self._get_device_symmetric_key(
+                    registration_id=registration_id,
+                    enrollment_group_id=enrollment_group_id,
+                    group_symmetric_key=group_symmetric_key,
+                )
             sdk = self._get_dps_device_sdk(
                 registration_id=registration_id,
                 device_symmetric_key=device_symmetric_key,
+
             )
             return sdk.runtime_registration.operation_status_lookup(
                 registration_id=registration_id,
@@ -157,7 +204,9 @@ class DeviceRegistrationProvider():
         enrollment_group_id: str = None,
         group_symmetric_key: str = None,
     ) -> str:
-        if not enrollment_group_id:
+        if group_symmetric_key and not enrollment_group_id:
+            raise ArgumentUsageError("Individual enrollments do not have enrollment group keys.")
+        elif not enrollment_group_id:
             enrollment = iot_dps_device_enrollment_get(
                 cmd=self.cmd,
                 enrollment_id=registration_id,
