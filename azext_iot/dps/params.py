@@ -33,6 +33,11 @@ def load_dps_arguments(self, _):
             arg_group="Device Provisioning Service Identifier"
         )
         context.argument(
+            "id_scope",
+            options_list=["--id-scope", "--scope"],
+            help="Id Scope of the Azure IoT Hub Device Provisioning Service.",
+        )
+        context.argument(
             "registration_id",
             options_list=["--registration-id", "--rid"],
             help="Device registration ID or individual enrollment ID."
@@ -54,6 +59,12 @@ def load_dps_arguments(self, _):
             help="The symmetric shared access key for the enrollment group. If provided, the device symmetric "
             "key will be generated directly from the supplied symmetric key without further validation. Only "
             "used for registrations part of an enrollment group.",
+        )
+        context.argument(
+            "payload",
+            options_list=["--payload"],
+            help="Custom allocation payload as JSON. Specifically for use with custom allocation policies "
+            "using Azure Functions."
         )
 
     with self.argument_context("iot device registration operation") as context:

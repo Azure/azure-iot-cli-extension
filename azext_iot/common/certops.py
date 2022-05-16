@@ -15,6 +15,7 @@ from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.serialization.pkcs12 import load_key_and_certificates
 
 
 def create_self_signed_certificate(
@@ -100,6 +101,22 @@ def open_certificate(certificate_path):
             certificate = cert_file.read()
             try:
                 certificate = certificate.decode("utf-8")
+            except UnicodeError:
+                certificate = base64.b64encode(certificate).decode("utf-8")
+    elif certificate_path.endswith(".pfx"):
+        with open(certificate_path, "rb") as cert_file:
+            certificate = cert_file.read()
+            try:
+                # print(x509.load_der_x509_certificate(certificate))
+                private_key, certificate, _ = load_key_and_certificates(certificate, password=None)
+                # key_dump = private_key.private_bytes(
+                #     encoding=serialization.Encoding.PEM,
+                #     format=serialization.PrivateFormat.TraditionalOpenSSL,
+                #     encryption_algorithm=serialization.NoEncryption(),
+                # ).decode("utf-8")
+                cert_dump = certificate.public_bytes(serialization.Encoding.PEM).decode("utf-8")
+                # thumbprint = certificate.fingerprint(hashes.SHA1()).hex().upper()
+                certificate = cert_dump.replace("\n", "").split("-----")[2]
             except UnicodeError:
                 certificate = base64.b64encode(certificate).decode("utf-8")
     else:
