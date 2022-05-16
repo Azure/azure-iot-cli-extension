@@ -108,7 +108,7 @@ def open_certificate(certificate_path):
             certificate = cert_file.read()
             try:
                 # print(x509.load_der_x509_certificate(certificate))
-                private_key, certificate, _ = load_key_and_certificates(certificate, password=None)
+                _, certificate, _ = load_key_and_certificates(certificate, password=None)
                 # key_dump = private_key.private_bytes(
                 #     encoding=serialization.Encoding.PEM,
                 #     format=serialization.PrivateFormat.TraditionalOpenSSL,

@@ -5,19 +5,20 @@
 # --------------------------------------------------------------------------------------------
 
 from logging import getLogger
-from azext_iot.common.certops import open_certificate
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import AttestationType
 from azext_iot.common.utility import handle_service_exception
 from azext_iot.common.x509_auth import X509Authentication
 from azext_iot.constants import IOTDPS_RESOURCE_ID, USER_AGENT
 from azext_iot.dps.providers.discovery import DPSDiscovery
-from azext_iot.operations.dps import iot_dps_compute_device_key, iot_dps_device_enrollment_get, iot_dps_device_enrollment_group_get
+from azext_iot.operations.dps import (
+    iot_dps_compute_device_key,
+    iot_dps_device_enrollment_get,
+    iot_dps_device_enrollment_group_get
+)
 from azext_iot.sdk.dps.device.provisioning_device_client import ProvisioningDeviceClient
 from azext_iot.sdk.dps.service.models.provisioning_service_error_details_py3 import ProvisioningServiceErrorDetailsException
-from azure.cli.core.azclierror import ArgumentUsageError, InvalidArgumentValueError, RequiredArgumentMissingError
-
-from azext_iot.sdk.dps.service.models.tpm_attestation_py3 import TpmAttestation
+from azure.cli.core.azclierror import ArgumentUsageError, InvalidArgumentValueError
 
 logger = getLogger(__name__)
 
