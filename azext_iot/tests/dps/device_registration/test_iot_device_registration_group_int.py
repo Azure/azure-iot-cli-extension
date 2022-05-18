@@ -7,40 +7,29 @@
 from time import sleep
 from typing import Dict
 from azext_iot.common.shared import EntityStatusType
+from azext_iot.dps.common import MAX_REGISTRATION_ASSIGNMENT_RETRIES
 from azext_iot.tests.dps import (
     DATAPLANE_AUTH_TYPES,
     IoTDPSLiveScenarioTest
 )
 
-# Todo: test ideas
-# regular test pattern -
-# regular test pattern with enrollment key -
-# cannot use group key here -
-# delete registration and see what happens -
-# device id effects -
-# bad enrollment (doesnt exist) -
-# no linked hub -
-# disabled enrollment -
-MAX_REGISTRATION_ASSIGNMENT_RETRIES = 5
-
 
 class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
     def __init__(self, test_case):
         super(TestDPSDeviceRegistrationsGroup, self).__init__(test_case)
+        self.id_scope = self.get_dps_id_scope()
 
     def test_dps_device_registration_symmetrickey_lifecycle(self):
-        # Add IoT Hub role so we can check if the device ends up provisioned to the IoT Hub
-        # self.add_hub_perimssions()
         hub_host_name = f"{self.entity_hub_name}.azure-devices.net"
         for auth_phase in DATAPLANE_AUTH_TYPES:
-            group_id1 = self.generate_enrollment_names(count=1, group=True)[0]
+            group_id = self.generate_enrollment_names(count=1, group=True)[0]
             device_id1, device_id2, device_id3 = self.generate_device_names(count=3)
 
             # Enrollment needs to be created
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot device registration create --dps-name {} -g {} --group-id {} --registration-id {}".format(
-                        self.entity_dps_name, self.entity_rg, group_id1, device_id1
+                        self.entity_dps_name, self.entity_rg, group_id, device_id1
                     ),
                     auth_type=auth_phase
                 ),
@@ -51,7 +40,7 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
             symmetric_keys = self.cmd(
                 self.set_cmd_auth_type(
                     "iot dps enrollment-group create --group-id {} -g {} --dps-name {}".format(
-                        group_id1,
+                        group_id,
                         self.entity_rg,
                         self.entity_dps_name,
                     ),
@@ -64,7 +53,7 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
             operation_id = self.cmd(
                 self.set_cmd_auth_type(
                     "iot device registration create --dps-name {} -g {} --group-id {} --registration-id {}".format(
-                        self.entity_dps_name, self.entity_rg, group_id1, device_id1
+                        self.entity_dps_name, self.entity_rg, group_id, device_id1
                     ),
                     auth_type=auth_phase
                 ),
@@ -74,13 +63,13 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
                     self.check("status", "assigning"),
                 ],
             ).get_output_in_json()["operationId"]
-            self._wait_for_assignment(group_id1, device_id1, auth_phase)
+            self._wait_for_assignment(group_id, device_id1, auth_phase)
 
             registration = self.cmd(
                 self.set_cmd_auth_type(
                     "iot device registration operation show --dps-name {} -g {} --group-id {} --registration-id {} "
                     "--operation-id {}".format(
-                        self.entity_dps_name, self.entity_rg, group_id1, device_id1, operation_id
+                        self.entity_dps_name, self.entity_rg, group_id, device_id1, operation_id
                     ),
                     auth_type=auth_phase
                 ),
@@ -98,7 +87,7 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot device registration show --dps-name {} -g {} --group-id {} --registration-id {}".format(
-                        self.entity_dps_name, self.entity_rg, group_id1, device_id1
+                        self.entity_dps_name, self.entity_rg, group_id, device_id1
                     ),
                     auth_type=auth_phase
                 ),
@@ -106,46 +95,27 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
                     self.check("assignedHub", registration["assignedHub"]),
                     self.check("createdDateTimeUtc", registration["createdDateTimeUtc"]),
                     self.check("deviceId", registration["deviceId"]),
-                    # self.check("errorCode", registration["errorCode"]),
-                    # self.check("errorMessage", registration["errorMessage"]),
                     self.check("etag", registration["etag"]),
                     self.check("lastUpdatedDateTimeUtc", registration["lastUpdatedDateTimeUtc"]),
                     self.check("payload", registration["payload"]),
                     self.check("registrationId", registration["registrationId"]),
                     self.check("status", registration["status"]),
                     self.check("substatus", registration["substatus"]),
-                    # self.check("symmetricKey", registration["symmetricKey"]),
-                    # self.check("tpm", registration["tpm"]),
-                    # self.check("x509", registration["x509"]),
                 ],
             )
 
             # Recreate with group primary key, recreate yeilds different substatus
-            operation_id = self.cmd(
+            # Use of --wait in create will result in the same result as operation show
+            operation_result = self.cmd(
                 self.set_cmd_auth_type(
-                    "iot device registration create --dps-name {} -g {} --group-id {} --registration-id {} --group-key {}".format(
-                        self.entity_dps_name, self.entity_rg, group_id1, device_id1, primary_key
+                    "iot device registration create --dps-name {} -g {} --group-id {} --registration-id {} --key {} "
+                    "--ck --wait".format(
+                        self.entity_dps_name, self.entity_rg, group_id, device_id1, primary_key
                     ),
                     auth_type=auth_phase
                 ),
                 checks=[
                     self.exists("operationId"),
-                    self.check("registrationState", None),
-                    self.check("status", "assigning"),
-                ],
-            ).get_output_in_json()["operationId"]
-            self._wait_for_assignment(group_id1, device_id1, auth_phase)
-
-            registration = self.cmd(
-                self.set_cmd_auth_type(
-                    "iot device registration operation show --dps-name {} -g {} --group-id {} --registration-id {} "
-                    "--operation-id {} --group-key {}".format(
-                        self.entity_dps_name, self.entity_rg, group_id1, device_id1, operation_id, primary_key
-                    ),
-                    auth_type=auth_phase
-                ),
-                checks=[
-                    self.check("operationId", operation_id),
                     self.check("registrationState.assignedHub", hub_host_name),
                     self.check("registrationState.deviceId", device_id1),
                     self.check("registrationState.registrationId", device_id1),
@@ -153,38 +123,28 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
                     self.check("registrationState.substatus", "reprovisionedToInitialAssignment"),
                     self.check("status", "assigned"),
                 ],
-            ).get_output_in_json()["registrationState"]
+            ).get_output_in_json()
 
             self.cmd(
                 self.set_cmd_auth_type(
-                    "iot device registration show --dps-name {} -g {} --group-id {} --registration-id {} --group-key {}".format(
-                        self.entity_dps_name, self.entity_rg, group_id1, device_id1, primary_key
+                    "iot device registration operation show --dps-name {} -g {} --group-id {} --registration-id {} "
+                    "--operation-id {} --key {} --ck".format(
+                        self.entity_dps_name, self.entity_rg, group_id, device_id1, operation_result["operationId"], primary_key
                     ),
                     auth_type=auth_phase
                 ),
                 checks=[
-                    self.check("assignedHub", registration["assignedHub"]),
-                    self.check("createdDateTimeUtc", registration["createdDateTimeUtc"]),
-                    self.check("deviceId", registration["deviceId"]),
-                    # self.check("errorCode", registration["errorCode"]),
-                    # self.check("errorMessage", registration["errorMessage"]),
-                    self.check("etag", registration["etag"]),
-                    self.check("lastUpdatedDateTimeUtc", registration["lastUpdatedDateTimeUtc"]),
-                    self.check("payload", registration["payload"]),
-                    self.check("registrationId", registration["registrationId"]),
-                    self.check("status", registration["status"]),
-                    self.check("substatus", registration["substatus"]),
-                    # self.check("symmetricKey", registration["symmetricKey"]),
-                    # self.check("tpm", registration["tpm"]),
-                    # self.check("x509", registration["x509"]),
+                    self.check("operationId", operation_result["operationId"]),
+                    self.check("registrationState", operation_result["registrationState"]),
+                    self.check("status", operation_result["status"]),
                 ],
             )
 
-            # Recreate with computed device key
+            # Recreate with computed device key (and id scope)
             device_key = self.cmd(
                 self.set_cmd_auth_type(
                     "iot dps enrollment-group compute-device-key --dps-name {} -g {} --group-id {} --registration-id {}".format(
-                        self.entity_dps_name, self.entity_rg, group_id1, device_id1
+                        self.entity_dps_name, self.entity_rg, group_id, device_id1
                     ),
                     auth_type=auth_phase
                 )
@@ -192,8 +152,8 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
 
             operation_id = self.cmd(
                 self.set_cmd_auth_type(
-                    "iot device registration create --dps-name {} -g {} --group-id {} --registration-id {} --key {}".format(
-                        self.entity_dps_name, self.entity_rg, group_id1, device_id1, device_key
+                    "iot device registration create --id-scope {} --group-id {} --registration-id {} --key {}".format(
+                        self.id_scope, group_id, device_id1, device_key
                     ),
                     auth_type=auth_phase
                 ),
@@ -203,13 +163,13 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
                     self.check("status", "assigning"),
                 ],
             ).get_output_in_json()["operationId"]
-            self._wait_for_assignment(group_id1, device_id1, auth_phase)
+            self._wait_for_assignment(group_id, device_id1, auth_phase)
 
             registration = self.cmd(
                 self.set_cmd_auth_type(
-                    "iot device registration operation show --dps-name {} -g {} --group-id {} --registration-id {} "
+                    "iot device registration operation show --id-scope {} --group-id {} --registration-id {} "
                     "--operation-id {} --key {}".format(
-                        self.entity_dps_name, self.entity_rg, group_id1, device_id1, operation_id, device_key
+                        self.id_scope, group_id, device_id1, operation_id, device_key
                     ),
                     auth_type=auth_phase
                 ),
@@ -226,8 +186,8 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
 
             self.cmd(
                 self.set_cmd_auth_type(
-                    "iot device registration show --dps-name {} -g {} --group-id {} --registration-id {} --key {}".format(
-                        self.entity_dps_name, self.entity_rg, group_id1, device_id1, device_key
+                    "iot device registration show --id-scope {} --group-id {} --registration-id {} --key {}".format(
+                        self.id_scope, group_id, device_id1, device_key
                     ),
                     auth_type=auth_phase
                 ),
@@ -235,17 +195,12 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
                     self.check("assignedHub", registration["assignedHub"]),
                     self.check("createdDateTimeUtc", registration["createdDateTimeUtc"]),
                     self.check("deviceId", registration["deviceId"]),
-                    # self.check("errorCode", registration["errorCode"]),
-                    # self.check("errorMessage", registration["errorMessage"]),
                     self.check("etag", registration["etag"]),
                     self.check("lastUpdatedDateTimeUtc", registration["lastUpdatedDateTimeUtc"]),
                     self.check("payload", registration["payload"]),
                     self.check("registrationId", registration["registrationId"]),
                     self.check("status", registration["status"]),
                     self.check("substatus", registration["substatus"]),
-                    # self.check("symmetricKey", registration["symmetricKey"]),
-                    # self.check("tpm", registration["tpm"]),
-                    # self.check("x509", registration["x509"]),
                 ],
             )
 
@@ -253,7 +208,7 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
             operation_id = self.cmd(
                 self.set_cmd_auth_type(
                     "iot device registration create --dps-name {} -g {} --group-id {} --registration-id {}".format(
-                        self.entity_dps_name, self.entity_rg, group_id1, device_id2
+                        self.entity_dps_name, self.entity_rg, group_id, device_id2
                     ),
                     auth_type=auth_phase
                 ),
@@ -263,13 +218,13 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
                     self.check("status", "assigning"),
                 ],
             ).get_output_in_json()["operationId"]
-            self._wait_for_assignment(group_id1, device_id2, auth_phase)
+            self._wait_for_assignment(group_id, device_id2, auth_phase)
 
             registration = self.cmd(
                 self.set_cmd_auth_type(
                     "iot device registration operation show --dps-name {} -g {} --group-id {} --registration-id {} "
                     "--operation-id {}".format(
-                        self.entity_dps_name, self.entity_rg, group_id1, device_id2, operation_id
+                        self.entity_dps_name, self.entity_rg, group_id, device_id2, operation_id
                     ),
                     auth_type=auth_phase
                 ),
@@ -287,7 +242,7 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot device registration show --dps-name {} -g {} --group-id {} --registration-id {}".format(
-                        self.entity_dps_name, self.entity_rg, group_id1, device_id2
+                        self.entity_dps_name, self.entity_rg, group_id, device_id2
                     ),
                     auth_type=auth_phase
                 ),
@@ -295,25 +250,20 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
                     self.check("assignedHub", registration["assignedHub"]),
                     self.check("createdDateTimeUtc", registration["createdDateTimeUtc"]),
                     self.check("deviceId", registration["deviceId"]),
-                    # self.check("errorCode", registration["errorCode"]),
-                    # self.check("errorMessage", registration["errorMessage"]),
                     self.check("etag", registration["etag"]),
                     self.check("lastUpdatedDateTimeUtc", registration["lastUpdatedDateTimeUtc"]),
                     self.check("payload", registration["payload"]),
                     self.check("registrationId", registration["registrationId"]),
                     self.check("status", registration["status"]),
                     self.check("substatus", registration["substatus"]),
-                    # self.check("symmetricKey", registration["symmetricKey"]),
-                    # self.check("tpm", registration["tpm"]),
-                    # self.check("x509", registration["x509"]),
                 ],
             )
 
             # Can register a third device within the same enrollment group using a different key
             operation_id = self.cmd(
                 self.set_cmd_auth_type(
-                    "iot device registration create --dps-name {} -g {} --group-id {} --registration-id {} --group-key {}".format(
-                        self.entity_dps_name, self.entity_rg, group_id1, device_id3, secondary_key
+                    "iot device registration create --dps-name {} -g {} --group-id {} --registration-id {} --key {} --ck".format(
+                        self.entity_dps_name, self.entity_rg, group_id, device_id3, secondary_key
                     ),
                     auth_type=auth_phase
                 ),
@@ -323,13 +273,13 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
                     self.check("status", "assigning"),
                 ],
             ).get_output_in_json()["operationId"]
-            self._wait_for_assignment(group_id1, device_id3, auth_phase, key=secondary_key)
+            self._wait_for_assignment(group_id, device_id3, auth_phase, key=secondary_key)
 
             registration = self.cmd(
                 self.set_cmd_auth_type(
                     "iot device registration operation show --dps-name {} -g {} --group-id {} --registration-id {} "
-                    "--operation-id {} --group-key {}".format(
-                        self.entity_dps_name, self.entity_rg, group_id1, device_id3, operation_id, secondary_key
+                    "--operation-id {} --key {} --ck".format(
+                        self.entity_dps_name, self.entity_rg, group_id, device_id3, operation_id, secondary_key
                     ),
                     auth_type=auth_phase
                 ),
@@ -346,8 +296,8 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
 
             self.cmd(
                 self.set_cmd_auth_type(
-                    "iot device registration show --dps-name {} -g {} --group-id {} --registration-id {} --group-key {}".format(
-                        self.entity_dps_name, self.entity_rg, group_id1, device_id3, secondary_key
+                    "iot device registration show --dps-name {} -g {} --group-id {} --registration-id {} --key {} --ck".format(
+                        self.entity_dps_name, self.entity_rg, group_id, device_id3, secondary_key
                     ),
                     auth_type=auth_phase
                 ),
@@ -355,25 +305,20 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
                     self.check("assignedHub", registration["assignedHub"]),
                     self.check("createdDateTimeUtc", registration["createdDateTimeUtc"]),
                     self.check("deviceId", registration["deviceId"]),
-                    # self.check("errorCode", registration["errorCode"]),
-                    # self.check("errorMessage", registration["errorMessage"]),
                     self.check("etag", registration["etag"]),
                     self.check("lastUpdatedDateTimeUtc", registration["lastUpdatedDateTimeUtc"]),
                     self.check("payload", registration["payload"]),
                     self.check("registrationId", registration["registrationId"]),
                     self.check("status", registration["status"]),
                     self.check("substatus", registration["substatus"]),
-                    # self.check("symmetricKey", registration["symmetricKey"]),
-                    # self.check("tpm", registration["tpm"]),
-                    # self.check("x509", registration["x509"]),
                 ],
             )
 
             # Cannot use primary key for third device
             self.cmd(
                 self.set_cmd_auth_type(
-                    "iot device registration create --dps-name {} -g {} --group-id {} --registration-id {} --group-key {}".format(
-                        self.entity_dps_name, self.entity_rg, group_id1, device_id3, primary_key
+                    "iot device registration create --dps-name {} -g {} --group-id {} --registration-id {} --key {} --ck".format(
+                        self.entity_dps_name, self.entity_rg, group_id, device_id3, primary_key
                     ),
                     auth_type=auth_phase
                 ),
@@ -382,8 +327,8 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
 
             self.cmd(
                 self.set_cmd_auth_type(
-                    "iot device registration show --dps-name {} -g {} --group-id {} --registration-id {} --group-key {}".format(
-                        self.entity_dps_name, self.entity_rg, group_id1, device_id3, primary_key
+                    "iot device registration show --dps-name {} -g {} --group-id {} --registration-id {} --key {} --ck".format(
+                        self.entity_dps_name, self.entity_rg, group_id, device_id3, primary_key
                     ),
                     auth_type=auth_phase
                 ),
@@ -394,7 +339,7 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
             service_side_registrations = self.cmd(
                 self.set_cmd_auth_type(
                     "iot dps enrollment-group registration list --dps-name {} -g {} --group-id {}".format(
-                        self.entity_dps_name, self.entity_rg, group_id1
+                        self.entity_dps_name, self.entity_rg, group_id
                     ),
                     auth_type=auth_phase
                 ),
@@ -403,10 +348,10 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
 
             for device_id in [device_id1, device_id2, device_id3]:
                 show_command = "iot device registration show --dps-name {} -g {} --group-id {} --registration-id {}".format(
-                    self.entity_dps_name, self.entity_rg, group_id1, device_id
+                    self.entity_dps_name, self.entity_rg, group_id, device_id
                 )
                 if device_id == device_id3:
-                    show_command += f" --group-key {secondary_key}"
+                    show_command += f" --key {secondary_key} --ck"
                 device_side = self.cmd(
                     self.set_cmd_auth_type(
                         show_command,
@@ -424,42 +369,11 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
                 ).get_output_in_json()
                 self._compare_registrations(device_side, service_side)
 
-            # Disabled enrollment
-            self.cmd(
-                self.set_cmd_auth_type(
-                    "iot dps enrollment-group update --group-id {} -g {} --dps-name {} --provisioning-status {}".format(
-                        group_id1,
-                        self.entity_rg,
-                        self.entity_dps_name,
-                        EntityStatusType.disabled.value
-                    ),
-                    auth_type=auth_phase
-                ),
-            )
-
-            self.cmd(
-                self.set_cmd_auth_type(
-                    "iot device registration create --dps-name {} -g {} --group-id {} --registration-id {}".format(
-                        self.entity_dps_name, self.entity_rg, group_id1, device_id1
-                    ),
-                    auth_type=auth_phase
-                ),
-                checks=[
-                    self.check("operationId", ""),
-                    self.check("registrationState.deviceId", None),
-                    self.exists("registrationState.etag"),
-                    self.exists("registrationState.lastUpdatedDateTimeUtc"),
-                    self.check("registrationState.registrationId", device_id1),
-                    self.check("registrationState.status", "disabled"),
-                    self.check("status", "disabled"),
-                ],
-            )
-
             # Cannot use group key as device key
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot device registration create --dps-name {} -g {} --group-id {} --registration-id {} --key {}".format(
-                        self.entity_dps_name, self.entity_rg, group_id1, device_id1, primary_key
+                        self.entity_dps_name, self.entity_rg, group_id, device_id1, primary_key
                     ),
                     auth_type=auth_phase
                 ),
@@ -479,7 +393,7 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot device registration show --dps-name {} -g {} --group-id {} --registration-id {}".format(
-                        self.entity_dps_name, self.entity_rg, group_id1, device_id2
+                        self.entity_dps_name, self.entity_rg, group_id, device_id2
                     ),
                     auth_type=auth_phase
                 ),
@@ -552,20 +466,68 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
                     auth_type=auth_phase
                 ),
                 checks=[
-                    # self.check("assignedHub", registration["assignedHub"]),
                     self.check("createdDateTimeUtc", registration["createdDateTimeUtc"]),
-                    # self.check("deviceId", registration["deviceId"]),
                     self.check("errorCode", registration["errorCode"]),
                     self.check("errorMessage", registration["errorMessage"]),
                     self.check("etag", registration["etag"]),
                     self.check("lastUpdatedDateTimeUtc", registration["lastUpdatedDateTimeUtc"]),
-                    # self.check("payload", registration["payload"]),
                     self.check("registrationId", registration["registrationId"]),
                     self.check("status", registration["status"]),
-                    # self.check("substatus", registration["substatus"]),
-                    # self.check("symmetricKey", registration["symmetricKey"]),
-                    # self.check("tpm", registration["tpm"]),
-                    # self.check("x509", registration["x509"]),
+                ],
+            )
+
+    def test_dps_device_registration_disabled_enrollment(self):
+        for auth_phase in DATAPLANE_AUTH_TYPES:
+            group_id = self.generate_enrollment_names(count=1, group=True)[0]
+            device_id = self.generate_device_names()[0]
+
+            self.cmd(
+                self.set_cmd_auth_type(
+                    "iot dps enrollment-group create --group-id {} -g {} --dps-name {} --provisioning-status {}".format(
+                        group_id,
+                        self.entity_rg,
+                        self.entity_dps_name,
+                        EntityStatusType.disabled.value
+                    ),
+                    auth_type=auth_phase
+                ),
+            )
+
+            registration = self.cmd(
+                self.set_cmd_auth_type(
+                    "iot device registration create --dps-name {} -g {} --group-id {} --registration-id {}".format(
+                        self.entity_dps_name, self.entity_rg, group_id, device_id
+                    ),
+                    auth_type=auth_phase
+                ),
+                checks=[
+                    self.check("operationId", ""),
+                    self.check("registrationState.deviceId", None),
+                    self.exists("registrationState.etag"),
+                    self.exists("registrationState.lastUpdatedDateTimeUtc"),
+                    self.check("registrationState.registrationId", device_id),
+                    self.check("registrationState.status", "disabled"),
+                    self.check("status", "disabled"),
+                ],
+            ).get_output_in_json()["registrationState"]
+
+            self.cmd(
+                self.set_cmd_auth_type(
+                    "iot device registration show --dps-name {} -g {} --group-id {} --registration-id {}".format(
+                        self.entity_dps_name, self.entity_rg, group_id, device_id
+                    ),
+                    auth_type=auth_phase
+                ),
+                checks=[
+                    self.check("assignedHub", registration["assignedHub"]),
+                    self.check("createdDateTimeUtc", registration["createdDateTimeUtc"]),
+                    self.check("deviceId", registration["deviceId"]),
+                    self.check("etag", registration["etag"]),
+                    self.check("lastUpdatedDateTimeUtc", registration["lastUpdatedDateTimeUtc"]),
+                    self.check("payload", registration["payload"]),
+                    self.check("registrationId", registration["registrationId"]),
+                    self.check("status", registration["status"]),
+                    self.check("substatus", registration["substatus"]),
                 ],
             )
 
@@ -579,7 +541,7 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
             self.entity_dps_name, self.entity_rg, group_id, registration_id
         )
         if key:
-            command += f" --group-key {key}"
+            command += f" --key {key} --ck"
         retries = 0
         while status == "assigning" and retries < MAX_REGISTRATION_ASSIGNMENT_RETRIES:
             status = self.cmd(

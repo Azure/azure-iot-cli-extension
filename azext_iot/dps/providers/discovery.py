@@ -78,3 +78,9 @@ class DPSDiscovery(BaseDiscovery):
         result["idscope"] = resource.properties.id_scope
 
         return result
+
+    def get_id_scope(self, resource_name: str) -> str:
+        """Get the ID scope. Only needed for certain DPS operations."""
+        return self.find_resource(
+            resource_name=resource_name,
+        ).properties.id_scope

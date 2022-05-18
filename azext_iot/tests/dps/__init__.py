@@ -304,6 +304,13 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
             )
         ).get_output_in_json()["connectionString"]
 
+    def get_dps_id_scope(self):
+        return self.cmd(
+            "iot dps show -n {} -g {}".format(
+                self.entity_dps_name, self.entity_rg
+            )
+        ).get_output_in_json()["properties"]["idScope"]
+
     def set_cmd_auth_type(self, command: str, auth_type: str) -> str:
         if auth_type not in DATAPLANE_AUTH_TYPES:
             raise RuntimeError(f"auth_type of: {auth_type} is unsupported.")

@@ -5,11 +5,12 @@
 # --------------------------------------------------------------------------------------------
 
 from logging import getLogger
+from time import sleep
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import AttestationType
 from azext_iot.common.utility import handle_service_exception
-from azext_iot.common.x509_auth import X509Authentication
 from azext_iot.constants import IOTDPS_RESOURCE_ID, USER_AGENT
+from azext_iot.dps.common import MAX_REGISTRATION_ASSIGNMENT_RETRIES, DeviceRegistrationStatus
 from azext_iot.dps.providers.discovery import DPSDiscovery
 from azext_iot.operations.dps import (
     iot_dps_compute_device_key,
@@ -17,8 +18,8 @@ from azext_iot.operations.dps import (
     iot_dps_device_enrollment_group_get
 )
 from azext_iot.sdk.dps.device.provisioning_device_client import ProvisioningDeviceClient
-from azext_iot.sdk.dps.service.models.provisioning_service_error_details_py3 import ProvisioningServiceErrorDetailsException
-from azure.cli.core.azclierror import ArgumentUsageError, InvalidArgumentValueError
+from azext_iot.sdk.dps.device.models import ProvisioningServiceErrorDetailsException
+from azure.cli.core.azclierror import InvalidArgumentValueError, RequiredArgumentMissingError
 
 logger = getLogger(__name__)
 
@@ -27,6 +28,10 @@ class DeviceRegistrationProvider():
     def __init__(
         self,
         cmd,
+        registration_id: str,
+        enrollment_group_id: str = None,
+        symmetric_key: str = None,
+        compute_key: bool = False,
         id_scope: str = None,
         dps_name: str = None,
         resource_group_name: str = None,
@@ -34,53 +39,73 @@ class DeviceRegistrationProvider():
         auth_type_dataplane: str = None,
     ):
         self.cmd = cmd
-        self.id_scope = id_scope
         self.dps_name = dps_name
         self.resource_group_name = resource_group_name
         self.login = login
         self.auth_type_dataplane = auth_type_dataplane
+        self.registration_id = registration_id
+        self.id_scope = id_scope or self._get_idscope()
 
-        # Use discovery to get id_scope if not provided
-        if not id_scope:
-            discovery = DPSDiscovery(cmd)
-            self.target = discovery.get_target(
-                dps_name,
-                resource_group_name,
-                login=login,
-                auth_type=auth_type_dataplane,
-            )
-            self.id_scope = self.target.get("idscope")
-            # Todo: figure out if this should be done
-            # issue is that cstring does not have idscope - will need to get with
-            # az iot dps show -n dps-name which may not be what we want to do
-            if self.target.get("idscope") is None:
-                self.id_scope = self._get_idscope()
+        self._validate_attestation_params(
+            enrollment_group_id=enrollment_group_id,
+            symmetric_key=symmetric_key,
+            compute_key=compute_key
+        )
 
-    def _get_idscope(self):
-        dps_name = self.target['entity'].split(".")[0]
-        return self.cmd(
-            f"iot dps show -n {dps_name}"
-        ).get_output_in_json()["properties"]["idScope"]
+        # Retrieve sdk.runtime_registration
+        self.runtime_registration = self._get_dps_device_sdk().runtime_registration
+
+    def _validate_attestation_params(
+        self,
+        enrollment_group_id: str = None,
+        symmetric_key: str = None,
+        compute_key: bool = False,
+    ):
+        if compute_key and not enrollment_group_id:
+            raise RequiredArgumentMissingError("Enrollment group id via --group-id is required if --derive-key is used.")
+
+        self.symmetric_key = None
+        # Retrieve the attestation if nothing is provided.
+        if not symmetric_key:
+            self._get_attestation_params(enrollment_group_id=enrollment_group_id)
+        # user provided attestation mechanisms; TODO: support other mechanisms in the future
+        else:
+            if not compute_key:
+                self.symmetric_key = symmetric_key
+            else:
+                self.symmetric_key = iot_dps_compute_device_key(
+                    cmd=self.cmd,
+                    registration_id=self.registration_id,
+                    enrollment_id=enrollment_group_id,
+                    symmetric_key=symmetric_key,
+                    dps_name=self.dps_name,
+                    resource_group_name=self.resource_group_name,
+                    login=self.login,
+                    auth_type_dataplane=self.auth_type_dataplane,
+                )
+
+    def _get_idscope(self) -> str:
+        discovery = DPSDiscovery(self.cmd)
+        target = discovery.get_target(
+            self.dps_name,
+            self.resource_group_name,
+            login=self.login,
+            auth_type=self.auth_type_dataplane,
+        )
+        if target.get("idscope"):
+            return target["idscope"]
+        # If cstring is used, will need to retrieve the id scope manually
+        dps_name = target['entity'].split(".")[0]
+        return discovery.get_id_scope(resource_name=dps_name)
 
     def _get_dps_device_sdk(
-        self,
-        registration_id: str,
-        device_symmetric_key: str = None,
-        certificate: str = None,
-    ):
-        from azext_iot.sdk.dps.device import ProvisioningDeviceClient
-
-        credentials = certificate
-        if device_symmetric_key:
-            credentials = SasTokenAuthentication(
-                uri=f"{self.id_scope}/registrations/{registration_id}",
-                shared_access_policy_name=None,
-                shared_access_key=device_symmetric_key,
-            )
-        else:
-            credentials = X509Authentication(
-                certificate_info=certificate
-            )
+        self
+    ) -> ProvisioningDeviceClient:
+        credentials = SasTokenAuthentication(
+            uri=f"{self.id_scope}/registrations/{self.registration_id}",
+            shared_access_policy_name=None,
+            shared_access_key=self.symmetric_key,
+        )
 
         return ProvisioningDeviceClient(credentials=credentials)
 
@@ -102,108 +127,47 @@ class DeviceRegistrationProvider():
 
     def create(
         self,
-        registration_id: str,
-        attestation_mechanism: str = AttestationType.symmetricKey.value,
-        enrollment_group_id: str = None,
-        device_symmetric_key: str = None,
-        group_symmetric_key: str = None,
-        # endorsement_key: str = None,
-        # storage_root_key: str = None,
-        # certificate_path: str = None,
         payload: str = None,
+        wait: bool = False,
+        poll_interval: int = 5,
     ):
         try:
-            sdk = None
-            tpm = None
-            if attestation_mechanism == AttestationType.tpm.value:
-                raise NotImplementedError("Device registration with TPM attestation is not supported yet.")
-                # if not endorsement_key:
-                #     endorsement_key = self._get_endorsement_key(
-                #         registration_id=registration_id,
-                #         enrollment_group_id=enrollment_group_id,
-                #     )
-                # tpm = TpmAttestation(
-                #     endorsement_key=endorsement_key,
-                #     storage_root_key=storage_root_key
-                # )
-                # sdk = self._get_dps_device_sdk(
-                #     registration_id=registration_id,
-
-                # )
-            elif attestation_mechanism == AttestationType.x509.value:
-                raise NotImplementedError("Device registration with x509 attestation is not supported yet.")
-                # if not certificate_path:
-                #     raise RequiredArgumentMissingError("Certificate file required for device registration.")
-                # certificate = open_certificate(
-                #     certificate_path=certificate_path
-                # )
-                # sdk = self._get_dps_device_sdk(
-                #     registration_id=registration_id,
-                #     certificate=certificate
-                # )
-            elif attestation_mechanism == AttestationType.symmetricKey.value:
-                # symmetric key
-                if not device_symmetric_key:
-                    device_symmetric_key = self._get_device_symmetric_key(
-                        registration_id=registration_id,
-                        enrollment_group_id=enrollment_group_id,
-                        group_symmetric_key=group_symmetric_key,
-                    )
-                sdk = self._get_dps_device_sdk(
-                    registration_id=registration_id,
-                    device_symmetric_key=device_symmetric_key
-                )
-            else:
-                raise InvalidArgumentValueError("Given attestation type is not supported.")
-
-            return sdk.runtime_registration.register_device(
-                registration_id=registration_id,
+            registration_result = self.runtime_registration.register_device(
+                registration_id=self.registration_id,
                 device_registration={
-                    "registration_id": registration_id,
-                    "tpm": tpm,
+                    "registration_id": self.registration_id,
+                    "tpm": None,
                     "payload": payload,
                 },
                 id_scope=self.id_scope
             )
+            if wait:
+                retries = 0
+                while (
+                    registration_result.status == DeviceRegistrationStatus.assigning.value
+                    and retries < MAX_REGISTRATION_ASSIGNMENT_RETRIES
+                ):
+                    retries += 1
+                    sleep(poll_interval)
+                    registration_result = self.runtime_registration.operation_status_lookup(
+                        registration_id=self.registration_id,
+                        operation_id=registration_result.operation_id,
+                        id_scope=self.id_scope
+                    )
+            return registration_result
         except ProvisioningServiceErrorDetailsException as e:
             handle_service_exception(e)
 
     def get(
         self,
-        registration_id: str,
-        attestation_mechanism: str = AttestationType.symmetricKey.value,
-        enrollment_group_id: str = None,
-        device_symmetric_key: str = None,
-        group_symmetric_key: str = None,
         payload: str = None,
     ):
         try:
-            sdk = None
-            tpm = None
-            if attestation_mechanism == AttestationType.tpm.value:
-                raise NotImplementedError("Device registration with TPM attestation is not supported yet.")
-            elif attestation_mechanism == AttestationType.x509.value:
-                raise NotImplementedError("Device registration with x509 attestation is not supported yet.")
-            elif attestation_mechanism == AttestationType.symmetricKey.value:
-                # symmetric key
-                if not device_symmetric_key:
-                    device_symmetric_key = self._get_device_symmetric_key(
-                        registration_id=registration_id,
-                        enrollment_group_id=enrollment_group_id,
-                        group_symmetric_key=group_symmetric_key,
-                    )
-                sdk = self._get_dps_device_sdk(
-                    registration_id=registration_id,
-                    device_symmetric_key=device_symmetric_key
-                )
-            else:
-                raise InvalidArgumentValueError("Given attestation type is not supported.")
-
-            return sdk.runtime_registration.device_registration_status_lookup(
-                registration_id=registration_id,
+            return self.runtime_registration.device_registration_status_lookup(
+                registration_id=self.registration_id,
                 device_registration={
-                    "registration_id": registration_id,
-                    "tpm": tpm,
+                    "registration_id": self.registration_id,
+                    "tpm": None,
                     "payload": payload,
                 },
                 id_scope=self.id_scope
@@ -213,98 +177,64 @@ class DeviceRegistrationProvider():
 
     def operation_get(
         self,
-        registration_id: str,
         operation_id: str,
-        attestation_mechanism: str = AttestationType.symmetricKey.value,
-        enrollment_group_id: str = None,
-        device_symmetric_key: str = None,
-        group_symmetric_key: str = None,
     ):
         try:
-            sdk = None
-            if attestation_mechanism == AttestationType.tpm.value:
-                raise NotImplementedError("Device registration with TPM attestation is not supported yet.")
-            elif attestation_mechanism == AttestationType.x509.value:
-                raise NotImplementedError("Device registration with x509 attestation is not supported yet.")
-            elif attestation_mechanism == AttestationType.symmetricKey.value:
-                if not device_symmetric_key:
-                    device_symmetric_key = self._get_device_symmetric_key(
-                        registration_id=registration_id,
-                        enrollment_group_id=enrollment_group_id,
-                        group_symmetric_key=group_symmetric_key,
-                    )
-                sdk = self._get_dps_device_sdk(
-                    registration_id=registration_id,
-                    device_symmetric_key=device_symmetric_key
-                )
-            else:
-                raise InvalidArgumentValueError("Given attestation type is not supported.")
-
-            return sdk.runtime_registration.operation_status_lookup(
-                registration_id=registration_id,
+            return self.runtime_registration.operation_status_lookup(
+                registration_id=self.registration_id,
                 operation_id=operation_id,
                 id_scope=self.id_scope
             )
         except ProvisioningServiceErrorDetailsException as e:
             handle_service_exception(e)
 
-    def _get_device_symmetric_key(
+    def _get_attestation_params(
         self,
-        registration_id: str,
         enrollment_group_id: str = None,
-        group_symmetric_key: str = None,
-    ) -> str:
-        if group_symmetric_key and not enrollment_group_id:
-            raise ArgumentUsageError("Individual enrollments do not have enrollment group keys.")
-        elif not enrollment_group_id:
-            enrollment = iot_dps_device_enrollment_get(
-                cmd=self.cmd,
-                enrollment_id=registration_id,
-                dps_name=self.dps_name,
-                resource_group_name=self.resource_group_name,
-                show_keys=True,
-                login=self.login,
-                auth_type_dataplane=self.auth_type_dataplane,
-            )
-            return enrollment["attestation"]["symmetricKey"]["primaryKey"]
-
-        return iot_dps_compute_device_key(
-            cmd=self.cmd,
-            registration_id=registration_id,
-            enrollment_id=enrollment_group_id,
-            dps_name=self.dps_name,
-            resource_group_name=self.resource_group_name,
-            symmetric_key=group_symmetric_key,
-            login=self.login,
-            auth_type_dataplane=self.auth_type_dataplane,
-        )
-
-    def _get_endorsement_key(
-        self,
-        registration_id: str = None,
-        enrollment_group_id: str = None,
-    ) -> str:
-        enrollment = None
+    ):
         if enrollment_group_id:
-            enrollment = iot_dps_device_enrollment_group_get(
+            attestation = iot_dps_device_enrollment_group_get(
                 cmd=self.cmd,
                 enrollment_id=enrollment_group_id,
                 dps_name=self.dps_name,
                 resource_group_name=self.resource_group_name,
                 login=self.login,
                 auth_type_dataplane=self.auth_type_dataplane,
-            )
+            )["attestation"]
+            if attestation["type"] == AttestationType.symmetricKey.value:
+                self.symmetric_key = iot_dps_compute_device_key(
+                    cmd=self.cmd,
+                    registration_id=self.registration_id,
+                    enrollment_id=enrollment_group_id,
+                    dps_name=self.dps_name,
+                    resource_group_name=self.resource_group_name,
+                    login=self.login,
+                    auth_type_dataplane=self.auth_type_dataplane,
+                )
+            else:
+                raise InvalidArgumentValueError(
+                    f"Device registration with {attestation['type']} attestation is not supported yet."
+                )
         else:
-            enrollment = iot_dps_device_enrollment_get(
+            attestation = iot_dps_device_enrollment_get(
                 cmd=self.cmd,
-                enrollment_id=registration_id,
+                enrollment_id=self.registration_id,
                 dps_name=self.dps_name,
                 resource_group_name=self.resource_group_name,
                 login=self.login,
                 auth_type_dataplane=self.auth_type_dataplane,
-            )
-
-        if not enrollment["attestation"].get("tpm"):
-            raise InvalidArgumentValueError("Enrollment does not use TPM attestation.")
-
-        return enrollment["attestation"]["tpm"]["endorsementKey"]
+            )["attestation"]
+            if attestation["type"] == AttestationType.symmetricKey.value:
+                self.symmetric_key = iot_dps_device_enrollment_get(
+                    cmd=self.cmd,
+                    enrollment_id=self.registration_id,
+                    show_keys=True,
+                    dps_name=self.dps_name,
+                    resource_group_name=self.resource_group_name,
+                    login=self.login,
+                    auth_type_dataplane=self.auth_type_dataplane,
+                )["attestation"]["symmetricKey"]["primaryKey"]
+            else:
+                raise InvalidArgumentValueError(
+                    f"Device registration with {attestation['type']} attestation is not supported yet."
+                )
