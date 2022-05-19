@@ -84,10 +84,10 @@ def create_self_signed_certificate(
     return result
 
 
-def open_certificate(certificate_path):
+def open_certificate(certificate_path: str) -> str:
     """
     Opens certificate file (as read binary) from the file system and
-    retruns the value read.
+    returns the value read.
 
     Args:
         certificate_path (str): the path the the certificate file.
@@ -103,23 +103,42 @@ def open_certificate(certificate_path):
                 certificate = certificate.decode("utf-8")
             except UnicodeError:
                 certificate = base64.b64encode(certificate).decode("utf-8")
-    elif certificate_path.endswith(".pfx"):
-        with open(certificate_path, "rb") as cert_file:
-            certificate = cert_file.read()
-            try:
-                # print(x509.load_der_x509_certificate(certificate))
-                _, certificate, _ = load_key_and_certificates(certificate, password=None)
-                # key_dump = private_key.private_bytes(
-                #     encoding=serialization.Encoding.PEM,
-                #     format=serialization.PrivateFormat.TraditionalOpenSSL,
-                #     encryption_algorithm=serialization.NoEncryption(),
-                # ).decode("utf-8")
-                cert_dump = certificate.public_bytes(serialization.Encoding.PEM).decode("utf-8")
-                # thumbprint = certificate.fingerprint(hashes.SHA1()).hex().upper()
-                certificate = cert_dump.replace("\n", "").split("-----")[2]
-            except UnicodeError:
-                certificate = base64.b64encode(certificate).decode("utf-8")
     else:
         raise ValueError("Certificate file type must be either '.pem' or '.cer'.")
     # Remove trailing white space from the certificate content
     return certificate.rstrip()
+
+
+def generate_certificate_and_key_files(certificate_path: str, cert_output_dir: str):
+    """
+    Opens pfx certificate file (as read binary) from the file system and
+    generates the certificate and key pem files.
+
+    Args:
+        certificate_path (str): the path the the certificate file.
+    """
+    if certificate_path.endswith(".pfx"):
+        with open(certificate_path, "rb") as cert_file:
+            certificate = cert_file.read()
+            private_key, certificate, _ = load_key_and_certificates(certificate, password=None)
+            key_dump = private_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption(),
+            ).decode("utf-8")
+            cert_dump = certificate.public_bytes(serialization.Encoding.PEM).decode("utf-8")
+            # thumbprint = certificate.fingerprint(hashes.SHA1()).hex().upper()
+            if cert_output_dir and exists(cert_output_dir):
+                certificate_name = certificate_path[:-4]
+                cert_file = certificate_name + "-cert.pem"
+                key_file = certificate_name + "-key.pem"
+
+                with open(join(cert_output_dir, cert_file), "wt", encoding="utf-8") as f:
+                    f.write(cert_dump)
+
+                with open(join(cert_output_dir, key_file), "wt", encoding="utf-8") as f:
+                    f.write(key_dump)
+
+    else:
+        raise ValueError("Certificate file type must be either '.pfx'.")
+

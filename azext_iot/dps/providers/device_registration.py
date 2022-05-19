@@ -9,7 +9,7 @@ from time import sleep
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import AttestationType
 from azext_iot.common.utility import handle_service_exception
-from azext_iot.constants import IOTDPS_RESOURCE_ID, USER_AGENT
+from azext_iot.constants import IOTDPS_PROVISIONING_HOST
 from azext_iot.dps.common import MAX_REGISTRATION_ASSIGNMENT_RETRIES, DeviceRegistrationStatus
 from azext_iot.dps.providers.discovery import DPSDiscovery
 from azext_iot.operations.dps import (
@@ -17,7 +17,7 @@ from azext_iot.operations.dps import (
     iot_dps_device_enrollment_get,
     iot_dps_device_enrollment_group_get
 )
-from azext_iot.sdk.dps.device.provisioning_device_client import ProvisioningDeviceClient
+from azure.iot.device import ProvisioningDeviceClient, X509
 from azext_iot.sdk.dps.device.models import ProvisioningServiceErrorDetailsException
 from azure.cli.core.azclierror import InvalidArgumentValueError, RequiredArgumentMissingError
 
@@ -32,6 +32,9 @@ class DeviceRegistrationProvider():
         enrollment_group_id: str = None,
         symmetric_key: str = None,
         compute_key: bool = False,
+        certificate_file: str = None,
+        key_file: str = None,
+        passphrase: str = None,
         id_scope: str = None,
         dps_name: str = None,
         resource_group_name: str = None,
@@ -49,27 +52,30 @@ class DeviceRegistrationProvider():
         self._validate_attestation_params(
             enrollment_group_id=enrollment_group_id,
             symmetric_key=symmetric_key,
-            compute_key=compute_key
+            compute_key=compute_key,
+            certificate_file=certificate_file,
+            key_file=key_file,
+            passphrase=passphrase
         )
 
         # Retrieve sdk.runtime_registration
-        self.runtime_registration = self._get_dps_device_sdk().runtime_registration
+        self.sdk = self._get_dps_device_sdk()
 
     def _validate_attestation_params(
         self,
         enrollment_group_id: str = None,
         symmetric_key: str = None,
         compute_key: bool = False,
+        certificate_file: str = None,
+        key_file: str = None,
+        passphrase: str = None,
     ):
         if compute_key and not enrollment_group_id:
             raise RequiredArgumentMissingError("Enrollment group id via --group-id is required if --compute-key is used.")
 
         self.symmetric_key = None
-        # Retrieve the attestation if nothing is provided.
-        if not symmetric_key:
-            self._get_attestation_params(enrollment_group_id=enrollment_group_id)
-        # user provided attestation mechanisms; TODO: support other mechanisms in the future
-        else:
+        self.certificate = None
+        if symmetric_key:
             if not compute_key:
                 self.symmetric_key = symmetric_key
             else:
@@ -83,6 +89,17 @@ class DeviceRegistrationProvider():
                     login=self.login,
                     auth_type_dataplane=self.auth_type_dataplane,
                 )
+        elif certificate_file and key_file:
+            self.certificate = X509(
+                cert_file=certificate_file,
+                key_file=key_file,
+                pass_phrase=passphrase or ""
+            )
+        elif certificate_file or key_file:
+            raise RequiredArgumentMissingError("Both certificate and key files are required for registration with x509.")
+        # Retrieve the attestation if nothing is provided.
+        else:
+            self._get_attestation_params(enrollment_group_id=enrollment_group_id)
 
     def _get_idscope(self) -> str:
         discovery = DPSDiscovery(self.cmd)
@@ -101,90 +118,41 @@ class DeviceRegistrationProvider():
     def _get_dps_device_sdk(
         self
     ) -> ProvisioningDeviceClient:
-        credentials = SasTokenAuthentication(
-            uri=f"{self.id_scope}/registrations/{self.registration_id}",
-            shared_access_policy_name=None,
-            shared_access_key=self.symmetric_key,
-        )
-
-        return ProvisioningDeviceClient(credentials=credentials)
-
-    def get_sdk(self, endpoint: str = None):
-        from azure.cli.core.commands.client_factory import get_mgmt_service_client
-        # TODO: figure out if this can be used with the device sym key.
-
-        client = get_mgmt_service_client(
-            cli_ctx=self.cmd.cli_ctx,
-            client_or_resource_type=ProvisioningDeviceClient,
-            base_url=endpoint,
-            resource=IOTDPS_RESOURCE_ID,
-            subscription_bound=False,
-            base_url_bound=False,
-        )
-
-        client.config.add_user_agent(USER_AGENT)
-        return client
+        if self.symmetric_key:
+            return ProvisioningDeviceClient.create_from_symmetric_key(
+                provisioning_host=IOTDPS_PROVISIONING_HOST,
+                registration_id=self.registration_id,
+                id_scope=self.id_scope,
+                symmetric_key=self.symmetric_key,
+            )
+        elif self.certificate:
+            return ProvisioningDeviceClient.create_from_x509(
+                provisioning_host=IOTDPS_PROVISIONING_HOST,
+                registration_id=self.registration_id,
+                id_scope=self.id_scope,
+                x509=self.certificate,
+            )
 
     def create(
         self,
         payload: str = None,
-        wait: bool = False,
-        poll_interval: int = 5,
     ):
         try:
-            registration_result = self.runtime_registration.register_device(
-                registration_id=self.registration_id,
-                device_registration={
-                    "registration_id": self.registration_id,
-                    "tpm": None,
-                    "payload": payload,
-                },
-                id_scope=self.id_scope
-            )
-            if wait:
-                retries = 0
-                while (
-                    registration_result.status == DeviceRegistrationStatus.assigning.value
-                    and retries < MAX_REGISTRATION_ASSIGNMENT_RETRIES
-                ):
-                    retries += 1
-                    sleep(poll_interval)
-                    registration_result = self.runtime_registration.operation_status_lookup(
-                        registration_id=self.registration_id,
-                        operation_id=registration_result.operation_id,
-                        id_scope=self.id_scope
-                    )
-            return registration_result
-        except ProvisioningServiceErrorDetailsException as e:
-            handle_service_exception(e)
-
-    def get(
-        self,
-        payload: str = None,
-    ):
-        try:
-            return self.runtime_registration.device_registration_status_lookup(
-                registration_id=self.registration_id,
-                device_registration={
-                    "registration_id": self.registration_id,
-                    "tpm": None,
-                    "payload": payload,
-                },
-                id_scope=self.id_scope
-            )
-        except ProvisioningServiceErrorDetailsException as e:
-            handle_service_exception(e)
-
-    def operation_get(
-        self,
-        operation_id: str,
-    ):
-        try:
-            return self.runtime_registration.operation_status_lookup(
-                registration_id=self.registration_id,
-                operation_id=operation_id,
-                id_scope=self.id_scope
-            )
+            self.sdk.provisioning_payload = payload
+            registration_result = self.sdk.register()
+            return {
+                "operation_id": registration_result.operation_id,
+                "status:": registration_result.status,
+                "registration_state": {
+                    "device_id": registration_result.registration_state.device_id,
+                    "assigned_hub": registration_result.registration_state.assigned_hub,
+                    "sub_status": registration_result.registration_state.sub_status,
+                    "created_date_time": registration_result.registration_state.created_date_time,
+                    "last_update_date_time": registration_result.registration_state.last_update_date_time,
+                    "etag": registration_result.registration_state.etag,
+                    "response_payload": registration_result.registration_state.response_payload,
+                }
+            }
         except ProvisioningServiceErrorDetailsException as e:
             handle_service_exception(e)
 
@@ -211,6 +179,10 @@ class DeviceRegistrationProvider():
                     login=self.login,
                     auth_type_dataplane=self.auth_type_dataplane,
                 )
+            elif attestation["type"] == AttestationType.symmetricKey.value:
+                raise InvalidArgumentValueError(
+                    "Please provide the certificate and key files via --certificate-file and --key-file."
+                )
             else:
                 raise InvalidArgumentValueError(
                     f"Device registration with {attestation['type']} attestation is not supported yet."
@@ -234,6 +206,10 @@ class DeviceRegistrationProvider():
                     login=self.login,
                     auth_type_dataplane=self.auth_type_dataplane,
                 )["attestation"]["symmetricKey"]["primaryKey"]
+            elif attestation["type"] == AttestationType.symmetricKey.value:
+                raise InvalidArgumentValueError(
+                    "Please provide the certificate and key files via --certificate-file and --key-file."
+                )
             else:
                 raise InvalidArgumentValueError(
                     f"Device registration with {attestation['type']} attestation is not supported yet."
