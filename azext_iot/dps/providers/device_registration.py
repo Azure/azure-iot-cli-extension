@@ -62,7 +62,7 @@ class DeviceRegistrationProvider():
         compute_key: bool = False,
     ):
         if compute_key and not enrollment_group_id:
-            raise RequiredArgumentMissingError("Enrollment group id via --group-id is required if --derive-key is used.")
+            raise RequiredArgumentMissingError("Enrollment group id via --group-id is required if --compute-key is used.")
 
         self.symmetric_key = None
         # Retrieve the attestation if nothing is provided.
