@@ -30,4 +30,4 @@ steps:
           az extension add --source $i -y --debug
         done
         cp ./linter_exclusions.yml $AZURE_EXTENSION_DIR/azure-iot/
-        azdev linter --include-whl-extensions azure-iot --min-severity medium
+        azdev linter --include-whl-extensions azure-iot azure-iot-device --min-severity medium
