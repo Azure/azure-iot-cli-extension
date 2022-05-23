@@ -29,6 +29,10 @@ DATAPLANE_AUTH_TYPES = [
 
 CERT_NAME = "aziotcli"
 CERT_PATH = "aziotcli-cert.pem"
+KEY_PATH = "aziotcli-key.pem"
+SECONDARY_CERT_NAME = "aziotcli2"
+SECONDARY_CERT_PATH = "aziotcli2-cert.pem"
+SECONDARY_KEY_PATH = "aziotcli2-key.pem"
 WEBHOOK_URL = "https://www.test.test"
 API_VERSION = "2019-03-31"
 
@@ -60,7 +64,7 @@ MAX_RBAC_ASSIGNMENT_TRIES = settings.env.azext_iot_rbac_max_tries if settings.en
 
 
 class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
-    def __init__(self, test_scenario):
+    def __init__(self, test_scenario, cert_only: bool = True):
         assert test_scenario
         self.entity_rg = ENTITY_RG
         self.entity_dps_name = ENTITY_DPS_NAME
@@ -93,10 +97,7 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
         self.dps_cstring = self.get_dps_cstring()
 
         # Create the test certificate
-        output_dir = os.getcwd()
-        create_self_signed_certificate(
-            subject=CERT_NAME, valid_days=1, cert_output_dir=output_dir, cert_only=True
-        )
+        self.create_test_cert(cert_only=cert_only)
 
         # Kwargs
         base_enrollment_props = {
@@ -115,6 +116,12 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
         # Other variables for DPS testing
         self.hub_host_name = "{}.azure-devices.net".format(ENTITY_HUB_NAME)
+
+    def create_test_cert(self, subject=CERT_NAME, cert_only=True, alt_name=None):
+        output_dir = os.getcwd()
+        create_self_signed_certificate(
+            subject=subject, valid_days=1, cert_output_dir=output_dir, cert_only=cert_only, alt_name=alt_name
+        )
 
     def create_dps(self):
         """Create a device provisioning service for testing purposes."""
@@ -335,6 +342,8 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
         yield None
         if os.path.exists(CERT_PATH):
             os.remove(CERT_PATH)
+        if os.path.exists(KEY_PATH):
+            os.remove(KEY_PATH)
         if not settings.env.azext_iot_testhub:
             self.cmd(
                 "iot hub delete --name {} --resource-group {}".format(

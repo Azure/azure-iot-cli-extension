@@ -51,17 +51,17 @@ def load_dps_arguments(self, _):
             help="Enrollment group ID."
         )
         context.argument(
-            "symmetric_key",
+            "device_symmetric_key",
             options_list=["--symmetric-key", "--key"],
             help="The symmetric shared access key for the device registration.",
-            arg_group="Authentication"
+            arg_group="Symmetric Key Authentication"
         )
         context.argument(
             "compute_key",
             options_list=["--compute-key", "--ck"],
             help="Flag to indicate that the symmetric key for the device registration should be computed from the "
             "given key with --symmetric-key.",
-            arg_group="Authentication"
+            arg_group="Symmetric Key Authentication"
         )
         context.argument(
             "payload",
@@ -69,23 +69,21 @@ def load_dps_arguments(self, _):
             help="Custom allocation payload as JSON. Specifically for use with custom allocation policies "
             "using Azure Functions."
         )
-
-    with self.argument_context("iot device registration create") as context:
         context.argument(
-            "wait",
-            options_list=["--wait", "-w"],
-            help="Block until the device registration assignment is completed or failed. Will regularly "
-            "poll on interval specified by --poll-interval."
+            "certificate_file",
+            options_list=["--certificate-file-path", "--cp"],
+            help="Path to certificate PEM file. Required for x509 registrations.",
+            arg_group="x509 Authentication"
         )
         context.argument(
-            "poll_interval",
-            options_list=["--poll-interval", "--interval"],
-            help="Interval in seconds that job status will be checked if --wait flag is passed in."
+            "key_file",
+            options_list=["--key-file-path", "--kp"],
+            help="Path to key PEM file. Required for x509 registrations.",
+            arg_group="x509 Authentication"
         )
-
-    with self.argument_context("iot device registration operation") as context:
         context.argument(
-            "operation_id",
-            options_list=["--operation-id", "--oid"],
-            help="Operation Id for the registration.",
+            "passphrase",
+            options_list=["--passphrase", "--pass"],
+            help="Passphrase for the certificate.",
+            arg_group="x509 Authentication"
         )
