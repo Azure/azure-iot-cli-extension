@@ -21,3 +21,4 @@ COMPUTE_KEY_ERROR = "Enrollment group id via --group-id is required if --compute
 CERTIFICATE_FILE_ERROR = "Both certificate and key files are required for registration with x509."
 CERTIFICATE_RETRIEVAL_ERROR = "Please provide the certificate and key files via --certificate-file and --key-file."
 TPM_SUPPORT_ERROR = "Device registration with TPM attestation is not supported yet."
+X509_SUPPORT_ERROR = "Device registration with x509 attestation for enrollment groups is not supported yet."

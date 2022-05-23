@@ -14,7 +14,8 @@ from azext_iot.dps.common import (
     COMPUTE_KEY_ERROR,
     CERTIFICATE_FILE_ERROR,
     CERTIFICATE_RETRIEVAL_ERROR,
-    TPM_SUPPORT_ERROR
+    TPM_SUPPORT_ERROR,
+    X509_SUPPORT_ERROR
 )
 from azext_iot.dps.providers.discovery import DPSDiscovery
 from azext_iot.operations.dps import (
@@ -109,6 +110,8 @@ class DeviceRegistrationProvider():
                     auth_type_dataplane=self.auth_type_dataplane,
                 )
         elif certificate_file or key_file:
+            if enrollment_group_id:
+                raise InvalidArgumentValueError(X509_SUPPORT_ERROR)
             self.certificate = X509(
                 cert_file=certificate_file,
                 key_file=key_file,
@@ -201,8 +204,8 @@ class DeviceRegistrationProvider():
                     login=self.login,
                     auth_type_dataplane=self.auth_type_dataplane,
                 )
-            elif attestation["type"] == AttestationType.symmetricKey.value:
-                raise InvalidArgumentValueError(CERTIFICATE_RETRIEVAL_ERROR)
+            elif attestation["type"] == AttestationType.x509.value:
+                raise InvalidArgumentValueError(X509_SUPPORT_ERROR)
             else:
                 raise InvalidArgumentValueError(TPM_SUPPORT_ERROR)
         else:
@@ -224,7 +227,7 @@ class DeviceRegistrationProvider():
                     login=self.login,
                     auth_type_dataplane=self.auth_type_dataplane,
                 )["attestation"]["symmetricKey"]["primaryKey"]
-            elif attestation["type"] == AttestationType.symmetricKey.value:
+            elif attestation["type"] == AttestationType.x509.value:
                 raise InvalidArgumentValueError(CERTIFICATE_RETRIEVAL_ERROR)
             else:
                 raise InvalidArgumentValueError(TPM_SUPPORT_ERROR)
