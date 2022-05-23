@@ -43,7 +43,7 @@ class TestRequirementList(AICSLiveScenarioTest):
         expected = [
             {
                 "badgeType": "IotEdgeCompatible",
-                "provisioningRequirement": {"provisioningTypes": ["ConnectionString"]},
+                "provisioningRequirement": {"provisioningTypes": ["ConnectionString", "TPM"]},
             }
         ]
         assert create_output == expected

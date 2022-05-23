@@ -14,8 +14,13 @@ Release History
 **IoT DPS updates**
 
 * Added registration commands for individual enrollment groups:
+
     - az iot dps enrollment registration show
     - az iot dps enrollment registration delete
+
+**IoT Device Certification**
+
+* Updated service API endpoint to vNext URL.
 
 
 0.14.0
