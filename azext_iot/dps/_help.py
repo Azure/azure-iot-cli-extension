@@ -22,9 +22,8 @@ def load_deviceprovisioningservice_help():
         short-summary: Register an IoT Device with IoT Device Provisioning Service.
         long-summary: |
           The following attestation mechanisms are supported:
-          - Symmetric key for individual enrollments
-          - x509 certificate for individual enrollments
-          - Symmetric key for group enrollments
+          - Symmetric key
+          - x509 certificate
           If using x509 authentication methods, the certificate and key files must be provided.
         examples:
         - name: Register an IoT Device using an individual enrollment.
@@ -41,10 +40,14 @@ def load_deviceprovisioningservice_help():
             computed from the given symmetric key.
           text: az iot device registration create --id-scope {id_scope} --rid {registration_id} --gid {group_enrollment_id} --key {symmetric_key} --ck
         - name: Register an IoT Device using a group enrollment, the Device Provisioning Service ID Scope,
-            and given symmetric key.  This will bypass retrieving the ID Scope.
-          text: az iot device registration create --id-scope {id_scope} --rid {registration_id} --gid {group_enrollment_id} --key {symmetric_key}
+            and given symmetric key. This will bypass retrieving the ID Scope. Note that since the symmetric key
+            should be the computed device key, the enrollment group id is not needed.
+          text: az iot device registration create --id-scope {id_scope} --rid {registration_id} --key {symmetric_key}
         - name: Register an IoT Device using an individual enrollment, the Device Provisioning Service
-            ID Scope, and given certificate and key files. This will bypass retrieving the ID Scope and individal
-            enrollment symmetric key.
+            ID Scope, and given certificate and key files. This will bypass retrieving the ID Scope.
+          text: az iot device registration create --id-scope {id_scope} --rid {registration_id} --cp {certificate_file} --kp {key_file}
+        - name: Register an IoT Device using a group enrollment, the Device Provisioning Service
+            ID Scope, and given certificate and key files. This will bypass retrieving the ID Scope.
+            Note that the group enrollment id is not needed for x509 attestations.
           text: az iot device registration create --id-scope {id_scope} --rid {registration_id} --cp {certificate_file} --kp {key_file}
     """
