@@ -34,13 +34,13 @@ parameters:
   type: object
   default: >
     {
-      Python36: 
-      {
-        python: '3.6.x'
-      },
       Python38: 
       {
         python: '3.8.x'
+      },
+      Python310:
+      {
+        python: '3.10.x'
       }
     }
 - name: architecture
@@ -58,6 +58,9 @@ parameters:
 - name: 'testHub'
   type: boolean
   default: true
+- name: 'testADU'
+  type: boolean
+  default: true
 
 variables:
   - group: ${{ parameters.variableGroup }}
@@ -70,7 +73,7 @@ variables:
       {
         PythonMSI: 
         {
-          python: '3.8.x'
+          python: '3.10.x'
         }
       }
 
@@ -129,6 +132,8 @@ stages:
         testCentral: ${{ parameters.testCentral }}
         testDPS: ${{ parameters.testDPS }}
         testHub: ${{ parameters.testHub }}
+        testADU: ${{ parameters.testADU }}
+        maxParallelADU: 2
 
   - stage: 'test_msi'
     displayName: 'Run all tests against Windows MSI install'
@@ -145,6 +150,7 @@ stages:
         testCentral: ${{ parameters.testCentral }}
         testDPS: ${{ parameters.testDPS }}
         testHub: ${{ parameters.testHub }}
+        testADU: ${{ parameters.testADU }}
   
   - stage: 'smokeTests_min'
     displayName: 'Run smoke tests with min CLI'

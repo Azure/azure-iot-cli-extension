@@ -188,7 +188,9 @@ def read_file_content(file_path, allow_binary=False):
                 return base64.b64encode(input_file.read()).decode("utf-8")
         except Exception:  # pylint: disable=broad-except
             pass
-    raise FileOperationError("Failed to decode file {} - unknown decoding".format(file_path))
+    raise FileOperationError(
+        "Failed to decode file {} - unknown decoding".format(file_path)
+    )
 
 
 def trim_from_start(s, substring):
@@ -344,12 +346,18 @@ def unpack_pnp_http_error(e):
 
 def unpack_msrest_error(e):
     """Obtains full response text from an msrest error"""
+    from typing import Callable
 
     op_err = None
     try:
-        op_err = json.loads(e.response.text)
+        err_txt = ""
+        if isinstance(e.response.text, Callable):
+            err_txt = e.response.text()
+        else:
+            err_txt = e.response.text
+        op_err = json.loads(err_txt)
     except (ValueError, TypeError):
-        op_err = e.response.text
+        op_err = err_txt
     if not op_err:
         return str(e)
     return op_err
@@ -370,8 +378,9 @@ def handle_service_exception(e):
         ResourceNotFoundError,
         UnauthorizedError,
     )
+
     err = unpack_msrest_error(e)
-    op_status = getattr(e.response, 'status_code', -1)
+    op_status = getattr(e.response, "status_code", -1)
 
     # Generic error if the status_code is explicitly None
     if not op_status:
@@ -408,7 +417,9 @@ def init_monitoring(cmd, timeout, properties, enqueued_time, repair, yes):
     validate_min_python_version(3, 5)
 
     if timeout < 0:
-        raise InvalidArgumentValueError("Monitoring timeout must be 0 (inf) or greater.")
+        raise InvalidArgumentValueError(
+            "Monitoring timeout must be 0 (inf) or greater."
+        )
     timeout = timeout * 1000
 
     config = cmd.cli_ctx.config
@@ -576,8 +587,13 @@ def ensure_azure_namespace_path():
     if os.path.isdir(ext_azure_dir):
         import azure
 
-        if getattr(azure, "__path__", None) and ext_azure_dir not in azure.__path__:
-            azure.__path__.append(ext_azure_dir)  # _NamespacePath /w PEP420
+        if (
+            getattr(azure, "__path__", None) and ext_azure_dir not in azure.__path__
+        ):  # _NamespacePath /w PEP420
+            if isinstance(azure.__path__, list):
+                azure.__path__.insert(0, ext_azure_dir)
+            else:
+                azure.__path__.append(ext_azure_dir)
 
     if sys.path and sys.path[0] != ext_path:
         sys.path.insert(0, ext_path)

@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 """
-Help definitions for IoT Hub commands.
+Help definitions for Digital Twins commands.
 """
 
 from knack.help_files import helps

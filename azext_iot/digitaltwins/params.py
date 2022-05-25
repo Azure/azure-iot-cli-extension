@@ -117,7 +117,7 @@ def load_digitaltwins_arguments(self, _):
             "public_network_access",
             options_list=["--public-network-access", "--pna"],
             help="Determines if the Digital Twins instance can be accessed from a public network.",
-            arg_group="Networking",
+            arg_group="Network",
             arg_type=get_enum_type(ADTPublicNetworkAccessType),
         )
 
@@ -406,13 +406,13 @@ def load_digitaltwins_arguments(self, _):
             "conn_name",
             options_list=["--conn-name", "--cn"],
             help="Private endpoint connection name.",
-            arg_group="Private-Endpoint",
+            arg_group="Private Endpoint",
         )
         context.argument(
             "group_ids",
             options_list=["--group-ids"],
             help="Space seperated list of group ids that the private endpoint should connect to.",
-            arg_group="Private-Endpoint",
+            arg_group="Private Endpoint",
             nargs="+",
         )
         context.argument(
@@ -420,19 +420,19 @@ def load_digitaltwins_arguments(self, _):
             options_list=["--status"],
             help="The status of a private endpoint connection.",
             arg_type=get_enum_type(ADTPrivateConnectionStatusType),
-            arg_group="Private-Endpoint",
+            arg_group="Private Endpoint",
         )
         context.argument(
             "description",
             options_list=["--description", "--desc"],
             help="Description for the private endpoint connection.",
-            arg_group="Private-Endpoint",
+            arg_group="Private Endpoint",
         )
         context.argument(
             "actions_required",
             options_list=["--actions-required", "--ar"],
             help="A message indicating if changes on the service provider require any updates on the consumer.",
-            arg_group="Private-Endpoint",
+            arg_group="Private Endpoint",
         )
 
     with self.argument_context("dt network private-endpoint connection wait") as context:

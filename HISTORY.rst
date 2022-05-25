@@ -3,6 +3,13 @@
 Release History
 ===============
 
+unreleased
++++++++++++++++
+
+* Introducing the Azure Device Update for IoT Hub command group `az iot device-update`.
+
+  - The Device Update command group supports all `account` and `instance` related functionality.
+
 
 0.14.1
 +++++++++++++++

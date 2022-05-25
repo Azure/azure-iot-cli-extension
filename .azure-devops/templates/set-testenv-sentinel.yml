@@ -40,6 +40,8 @@ steps:
         }
         f = open("./pytest.ini", "w+")
         f.write("[pytest]\n")
+        f.write("log_cli = 1\n")
+        f.write("log_cli_level = WARNING\n")
         f.write("junit_family = xunit1\n")
         f.write("env = \n")
         envvars_sentinel = ["  {}={}\n".format(key, val) for key, val in envvars.items()]

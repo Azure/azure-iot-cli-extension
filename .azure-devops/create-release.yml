@@ -66,6 +66,9 @@ parameters:
 - name: 'testHub'
   type: boolean
   default: true
+- name: 'testADU'
+  type: boolean
+  default: true
 
 variables:
   - group: ${{ parameters.variableGroup }}
@@ -135,9 +138,11 @@ stages:
         testCentral: ${{ parameters.testCentral }}
         testDPS: ${{ parameters.testDPS }}
         testHub: ${{ parameters.testHub }}
+        testADU: ${{ parameters.testADU }}
         maxParallelADT: 2
         maxParallelDPS: 2
         maxParallelHub: 2
+        maxParallelADU: 2
     - job: 'evaluateCmdTable'
       displayName: 'Evaluate Command Table'
       steps:
