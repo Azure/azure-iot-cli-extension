@@ -145,12 +145,16 @@ class DeviceRegistrationProvider():
                 symmetric_key=self.device_symmetric_key,
             )
         elif self.certificate:
-            return ProvisioningDeviceClient.create_from_x509_certificate(
-                provisioning_host=IOTDPS_PROVISIONING_HOST,
-                registration_id=self.registration_id,
-                id_scope=self.id_scope,
-                x509=self.certificate,
-            )
+            try:
+                return ProvisioningDeviceClient.create_from_x509_certificate(
+                    provisioning_host=IOTDPS_PROVISIONING_HOST,
+                    registration_id=self.registration_id,
+                    id_scope=self.id_scope,
+                    x509=self.certificate,
+                )
+            except Exception as e:
+                if hasattr(e, "reason"):
+                    raise InvalidArgumentValueError(f"Could not open certificate files: {e.reason}.")
 
     def create(
         self,
