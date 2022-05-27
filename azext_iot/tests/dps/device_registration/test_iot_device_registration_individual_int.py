@@ -410,7 +410,7 @@ class TestDPSDeviceRegistrationsIndividual(IoTDPSLiveScenarioTest):
                 checks=[
                     self.exists("operationId"),
                     self.check("registrationState.assignedHub", hub_host_name),
-                    self.check("registrationState.deviceId", CERT_NAME),
+                    self.check("registrationState.deviceId", device_id),
                     self.check("registrationState.registrationId", CERT_NAME),
                     self.check("registrationState.substatus", "initialAssignment"),
                     self.check("status", "assigned"),

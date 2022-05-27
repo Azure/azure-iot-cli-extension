@@ -9,10 +9,6 @@ from typing import Dict
 
 
 def compare_registrations(device_side: Dict[str, str], service_side: Dict[str, str]):
-    print("comparison")
-    print(device_side)
-    print(service_side)
-    print()
     """Compare the registration information from the device and the service clients."""
     assert device_side["assignedHub"] == service_side["assignedHub"]
     assert device_side["createdDateTimeUtc"].rstrip("+00:00") in service_side["createdDateTimeUtc"]
