@@ -47,7 +47,7 @@ DEPENDENCIES = [
     "msrestazure>=0.6.3,<2.0.0",
     "jsonschema~=3.2.0",
     "importlib_metadata;python_version<'3.8'",
-    "azure-iot-device~=2.5",
+    "azure-iot-device~=2.11",
     "tqdm~=4.62",
     "packaging"
 ]
