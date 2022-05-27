@@ -198,6 +198,8 @@ class TestDPSDeviceRegistrationsIndividual(IoTDPSLiveScenarioTest):
     def test_dps_device_registration_x509_lifecycle(self):
         # Create the second test cert - have the same subject but a different file name
         self.create_test_cert(subject=CERT_NAME, cert_only=False, alt_name=SECONDARY_CERT_NAME)
+        self.tracked_certs.append(SECONDARY_CERT_PATH)
+        self.tracked_certs.append(SECONDARY_KEY_PATH)
 
         attestation_type = AttestationType.x509.value
         hub_host_name = f"{self.entity_hub_name}.azure-devices.net"

@@ -69,6 +69,7 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
         self.entity_rg = ENTITY_RG
         self.entity_dps_name = ENTITY_DPS_NAME
         self.entity_hub_name = ENTITY_HUB_NAME
+        self.tracked_certs = []
         super(IoTDPSLiveScenarioTest, self).__init__(test_scenario)
 
         # Create resources if needed
@@ -122,6 +123,9 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
         create_self_signed_certificate(
             subject=subject, valid_days=1, cert_output_dir=output_dir, cert_only=cert_only, alt_name=alt_name
         )
+        self.tracked_certs.append(CERT_PATH)
+        if not cert_only:
+            self.tracked_certs.append(KEY_PATH)
 
     def create_dps(self):
         """Create a device provisioning service for testing purposes."""
@@ -340,10 +344,9 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
     @pytest.fixture(scope='class', autouse=True)
     def tearDownSuite(self):
         yield None
-        if os.path.exists(CERT_PATH):
-            os.remove(CERT_PATH)
-        if os.path.exists(KEY_PATH):
-            os.remove(KEY_PATH)
+        for cert in self.tracked_certs:
+            if os.path.exists(cert):
+                os.remove(cert)
         if not settings.env.azext_iot_testhub:
             self.cmd(
                 "iot hub delete --name {} --resource-group {}".format(

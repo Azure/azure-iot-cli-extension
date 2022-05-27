@@ -5,9 +5,16 @@
 # --------------------------------------------------------------------------------------------
 
 import json
+import os
 from azext_iot.common.shared import EntityStatusType
 from azext_iot.tests.dps import DATAPLANE_AUTH_TYPES, IoTDPSLiveScenarioTest
 from azext_iot.tests.dps.device_registration import compare_registrations
+from azext_iot.tests.dps.test_utils import create_certificate
+
+CERT_ENDING = "-cert.pem"
+KEY_ENDING = "-key.pem"
+ROOT_CERT_NAME = "aziotcli-root"
+DEVICE_CERT_NAME = "aziotcli-device"
 
 
 class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
@@ -228,6 +235,193 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
                 ],
             )
 
+    def test_dps_device_registration_x509_lifecycle(self):
+        self._prepare_x509_certificates_for_dps()
+        hub_host_name = f"{self.entity_hub_name}.azure-devices.net"
+
+        for auth_phase in DATAPLANE_AUTH_TYPES:
+            group_id = self.generate_enrollment_names(group=True)[0]
+
+            # Enrollment needs to be created
+            self.cmd(
+                self.set_cmd_auth_type(
+                    "iot device registration create --dps-name {} -g {} --registration-id {} "
+                    "--cp {} --kp {}".format(
+                        self.entity_dps_name,
+                        self.entity_rg,
+                        DEVICE_CERT_NAME,
+                        DEVICE_CERT_NAME + CERT_ENDING,
+                        DEVICE_CERT_NAME + KEY_ENDING
+                    ),
+                    auth_type=auth_phase
+                ),
+                expect_failure=True
+            )
+
+            # Create enrollment group
+            self.cmd(
+                self.set_cmd_auth_type(
+                    "iot dps enrollment-group create --group-id {} -g {} --dps-name {} --cp {}".format(
+                        group_id,
+                        self.entity_rg,
+                        self.entity_dps_name,
+                        ROOT_CERT_NAME + CERT_ENDING
+                    ),
+                    auth_type=auth_phase
+                ),
+            )
+
+            # Need to specify file - cannot retrieve need info from service
+            self.cmd(
+                self.set_cmd_auth_type(
+                    "iot device registration create --dps-name {} -g {} --registration-id {}".format(
+                        self.entity_dps_name, self.entity_rg, DEVICE_CERT_NAME
+                    ),
+                    auth_type=auth_phase
+                ),
+                expect_failure=True
+            )
+
+            # Need to specify both files
+            self.cmd(
+                self.set_cmd_auth_type(
+                    "iot device registration create --dps-name {} -g {} --registration-id {} "
+                    "--cp {}".format(
+                        self.entity_dps_name,
+                        self.entity_rg,
+                        DEVICE_CERT_NAME,
+                        DEVICE_CERT_NAME + CERT_ENDING
+                    ),
+                    auth_type=auth_phase
+                ),
+                expect_failure=True
+            )
+
+            self.cmd(
+                self.set_cmd_auth_type(
+                    "iot device registration create --dps-name {} -g {} --registration-id {} "
+                    "--kp {}".format(
+                        self.entity_dps_name,
+                        self.entity_rg,
+                        DEVICE_CERT_NAME,
+                        DEVICE_CERT_NAME + KEY_ENDING
+                    ),
+                    auth_type=auth_phase
+                ),
+                expect_failure=True
+            )
+
+            # Swap files
+            self.cmd(
+                self.set_cmd_auth_type(
+                    "iot device registration create --dps-name {} -g {} --registration-id {} "
+                    "--kp {} --cp {}".format(
+                        self.entity_dps_name,
+                        self.entity_rg,
+                        DEVICE_CERT_NAME,
+                        DEVICE_CERT_NAME + CERT_ENDING,
+                        DEVICE_CERT_NAME + KEY_ENDING
+                    ),
+                    auth_type=auth_phase
+                ),
+                expect_failure=True
+            )
+
+            # Normal registration
+            self.cmd(
+                self.set_cmd_auth_type(
+                    "iot device registration create --dps-name {} -g {} --registration-id {} "
+                    "--cp {} --kp {}".format(
+                        self.entity_dps_name,
+                        self.entity_rg,
+                        DEVICE_CERT_NAME,
+                        DEVICE_CERT_NAME + CERT_ENDING,
+                        DEVICE_CERT_NAME + KEY_ENDING
+                    ),
+                    auth_type=auth_phase
+                ),
+                checks=[
+                    self.exists("operationId"),
+                    self.check("registrationState.assignedHub", hub_host_name),
+                    self.check("registrationState.deviceId", DEVICE_CERT_NAME),
+                    self.check("registrationState.registrationId", DEVICE_CERT_NAME),
+                    self.check("registrationState.substatus", "initialAssignment"),
+                    self.check("status", "assigned"),
+                ],
+            )
+
+            # Use id scope
+            registration = self.cmd(
+                self.set_cmd_auth_type(
+                    "iot device registration create --id-scope {} --registration-id {} "
+                    "--cp {} --kp {}".format(
+                        self.id_scope,
+                        DEVICE_CERT_NAME,
+                        DEVICE_CERT_NAME + CERT_ENDING,
+                        DEVICE_CERT_NAME + KEY_ENDING
+                    ),
+                    auth_type=auth_phase
+                ),
+                checks=[
+                    self.exists("operationId"),
+                    self.check("registrationState.assignedHub", hub_host_name),
+                    self.check("registrationState.deviceId", DEVICE_CERT_NAME),
+                    self.check("registrationState.registrationId", DEVICE_CERT_NAME),
+                    self.check("registrationState.substatus", "initialAssignment"),
+                    self.check("status", "assigned"),
+                ],
+            ).get_output_in_json()["registrationState"]
+
+            # Check registration from service side
+            service_side = self.cmd(
+                self.set_cmd_auth_type(
+                    "iot dps enrollment-group registration show --dps-name {} -g {} --rid {}".format(
+                        self.entity_dps_name, self.entity_rg, DEVICE_CERT_NAME
+                    ),
+                    auth_type=auth_phase
+                ),
+            ).get_output_in_json()
+            compare_registrations(registration, service_side)
+
+            # Try with payload
+            self.kwargs["payload"] = json.dumps(
+                {"Thermostat": {"$metadata": {}}}
+            )
+
+            self.cmd(
+                self.set_cmd_auth_type(
+                    "iot device registration create --dps-name {} -g {} --registration-id {} "
+                    "--cp {} --kp {} --payload '{}'".format(
+                        self.entity_dps_name,
+                        self.entity_rg,
+                        DEVICE_CERT_NAME,
+                        DEVICE_CERT_NAME + CERT_ENDING,
+                        DEVICE_CERT_NAME + KEY_ENDING,
+                        "{payload}"
+                    ),
+                    auth_type=auth_phase
+                ),
+                checks=[
+                    self.exists("operationId"),
+                    self.check("registrationState.assignedHub", hub_host_name),
+                    self.check("registrationState.deviceId", DEVICE_CERT_NAME),
+                    self.check("registrationState.registrationId", DEVICE_CERT_NAME),
+                    self.check("registrationState.substatus", "initialAssignment"),
+                    self.check("status", "assigned"),
+                ],
+            )
+
+            self.cmd(
+                self.set_cmd_auth_type(
+                    "iot dps enrollment-group delete --group-id {} -g {} --dps-name {}".format(
+                        group_id,
+                        self.entity_rg,
+                        self.entity_dps_name,
+                    ),
+                    auth_type=auth_phase
+                ),
+            )
+
     def test_dps_device_registration_unlinked_hub(self):
         # Unlink hub
         self.cmd(
@@ -323,3 +517,56 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
                     self.check("status", "disabled"),
                 ],
             )
+
+    def _prepare_x509_certificates_for_dps(self):
+        # Create root and device certificates
+        output_dir = os.getcwd()
+        root_cert_obj = create_certificate(
+            subject=ROOT_CERT_NAME, valid_days=1, cert_output_dir=output_dir
+        )
+        create_certificate(
+            subject=DEVICE_CERT_NAME,
+            valid_days=1,
+            cert_output_dir=output_dir,
+            cert_object=root_cert_obj,
+            chain_cert=True
+        )
+        for cert_name in [ROOT_CERT_NAME, DEVICE_CERT_NAME]:
+            self.tracked_certs.append(cert_name + CERT_ENDING)
+            self.tracked_certs.append(cert_name + KEY_ENDING)
+
+        # Upload root certifcate and get verification code
+        self.cmd(
+            "iot dps certificate create --dps-name {} -g {} -n {} -p {}".format(
+                self.entity_dps_name,
+                self.entity_rg,
+                ROOT_CERT_NAME,
+                ROOT_CERT_NAME + CERT_ENDING
+            )
+        )
+
+        verification_code = self.cmd(
+            "iot dps certificate generate-verification-code --dps-name {} -g {} -n {} -e *".format(
+                self.entity_dps_name,
+                self.entity_rg,
+                ROOT_CERT_NAME
+            )
+        ).get_output_in_json()["properties"]["verificationCode"]
+
+        # Create verification certificate and upload
+        create_certificate(
+            subject=verification_code,
+            valid_days=1,
+            cert_output_dir=output_dir,
+            cert_object=root_cert_obj,
+        )
+        self.tracked_certs.append(verification_code + CERT_ENDING)
+        self.tracked_certs.append(verification_code + KEY_ENDING)
+        self.cmd(
+            "iot dps certificate verify --dps-name {} -g {} -n {} -p {} -e *".format(
+                self.entity_dps_name,
+                self.entity_rg,
+                ROOT_CERT_NAME,
+                verification_code + CERT_ENDING
+            )
+        )
