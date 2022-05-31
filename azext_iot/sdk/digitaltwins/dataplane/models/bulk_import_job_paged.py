@@ -14,7 +14,7 @@ from msrest.paging import Paged
 
 class BulkImportJobPaged(Paged):
     """
-    A paging container for iterating over a list of :class:`BulkImportJob <azure.mgmt.digitaltwins.models.BulkImportJob>` object
+    A paging container for iterating over a list of :class:`BulkImportJob <dataplane.models.BulkImportJob>` object
     """
 
     _attribute_map = {

@@ -29,7 +29,7 @@ class BulkImportJob(Model):
     :type output_blob_uri: str
     :ivar status: Status of the job. Possible values include: 'notstarted',
      'running', 'failed', 'succeeded'
-    :vartype status: str or ~azure.mgmt.digitaltwins.models.enum
+    :vartype status: str or ~dataplane.models.enum
     :ivar created_date_time: Start time of the job. The timestamp is in
      RFC3339 format: `yyyy-MM-ddTHH:mm:ssZ`.
     :vartype created_date_time: datetime
@@ -45,7 +45,7 @@ class BulkImportJob(Model):
     :vartype purge_date_time: datetime
     :param error: Details of the error(s) that occurred executing the bulk
      job.
-    :type error: ~azure.mgmt.digitaltwins.models.Error
+    :type error: ~dataplane.models.Error
     """
 
     _validation = {
