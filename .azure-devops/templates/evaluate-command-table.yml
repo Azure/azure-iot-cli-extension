@@ -29,5 +29,6 @@ steps:
         for i in $WHEELS; do
           az extension add --source $i -y --debug
         done
+        pip freeze azure-iot-device
         cp ./linter_exclusions.yml $AZURE_EXTENSION_DIR/azure-iot/
         azdev linter --include-whl-extensions azure-iot --min-severity medium
