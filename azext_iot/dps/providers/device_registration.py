@@ -22,14 +22,6 @@ from azext_iot.operations.dps import (
     iot_dps_device_enrollment_get,
     iot_dps_device_enrollment_group_get
 )
-from azure.iot.device import ProvisioningDeviceClient, X509
-from azure.iot.device.exceptions import (
-    ClientError,
-    CredentialError,
-    ConnectionFailedError,
-    ConnectionDroppedError,
-    OperationTimeout
-)
 from azure.cli.core.azclierror import (
     InvalidArgumentValueError,
     RequiredArgumentMissingError,
@@ -89,6 +81,7 @@ class DeviceRegistrationProvider():
         key_file: str = None,
         passphrase: str = None,
     ):
+        from azure.iot.device import X509
         if compute_key and not enrollment_group_id:
             raise RequiredArgumentMissingError(COMPUTE_KEY_ERROR)
 
@@ -136,7 +129,8 @@ class DeviceRegistrationProvider():
 
     def _get_dps_device_sdk(
         self
-    ) -> ProvisioningDeviceClient:
+    ):
+        from azure.iot.device import ProvisioningDeviceClient
         if self.device_symmetric_key:
             return ProvisioningDeviceClient.create_from_symmetric_key(
                 provisioning_host=IOTDPS_PROVISIONING_HOST,
@@ -232,6 +226,13 @@ class DeviceRegistrationProvider():
                 raise InvalidArgumentValueError(TPM_SUPPORT_ERROR)
 
     def _handle_exception(self, error: Exception) -> Exception:
+        from azure.iot.device.exceptions import (
+            ClientError,
+            CredentialError,
+            ConnectionFailedError,
+            ConnectionDroppedError,
+            OperationTimeout
+        )
         if isinstance(error, CredentialError):
             return UnauthorizedError("Unauthorized.")
         elif isinstance(error, ConnectionFailedError):
