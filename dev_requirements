@@ -3,7 +3,7 @@ pytest-mock
 pytest-cov
 pytest-env
 uamqp~=1.2
-responses
+responses<=0.20.0
 black
 wheel==0.30.0
 pre-commit
