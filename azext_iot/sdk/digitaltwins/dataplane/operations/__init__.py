@@ -9,14 +9,17 @@
 # regenerated.
 # --------------------------------------------------------------------------
 
+import imp
 from .digital_twin_models_operations import DigitalTwinModelsOperations
 from .query_operations import QueryOperations
 from .digital_twins_operations import DigitalTwinsOperations
 from .event_routes_operations import EventRoutesOperations
+from .import_jobs_operations import ImportJobsOperations
 
 __all__ = [
     'DigitalTwinModelsOperations',
     'QueryOperations',
     'DigitalTwinsOperations',
     'EventRoutesOperations',
+    'ImportJobsOperations'
 ]

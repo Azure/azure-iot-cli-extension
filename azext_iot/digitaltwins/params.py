@@ -525,3 +525,53 @@ def load_digitaltwins_arguments(self, _):
             options_list=['--yes', '-y'],
             help='Do not prompt for confirmation when assigning required roles.',
         )
+
+    with self.argument_context("dt jobs import") as context:
+        context.argument(
+            "job_id",
+            options_list=["--job-id", "--jid"],
+            help="ID of bulk import job",
+            arg_group="Bulk Import Job",
+        )
+
+        context.argument(
+            "data_file_name",
+            options_list=["--data-file-name", "--dfn"],
+            help="Name of data file input to the bulk import job. The file must be in 'ndjson' format.",
+            arg_group="Bulk Import Job",
+        )
+
+        context.argument(
+            "input_blob_container_name",
+            options_list=["--input-blob-container-name", "--ibcn"],
+            help="Name of Azure Storage blob container which stores the bulk import data file.",
+            arg_group="Bulk Import Job",
+        )
+
+        context.argument(
+            "input_storage_account_name",
+            options_list=["--input-storage-account-name", "--isan"],
+            help="Name of Azure Storage account containing blob container which stores the bulk import data file.",
+            arg_group="Bulk Import Job",
+        )
+
+        context.argument(
+            "output_file_name",
+            options_list=["--output-file-name", "--ofn"],
+            help="Name of the bulk import job's output file. This file will contains logs as well as error information.",
+            arg_group="Bulk Import Job",
+        )
+
+        context.argument(
+            "output_blob_container_name",
+            options_list=["--output-blob-container-name", "--obcn"],
+            help="Name of Azure Storage blob container where the bulk import job's output file will be created.",
+            arg_group="Bulk Import Job",
+        )
+
+        context.argument(
+            "output_storage_account_name",
+            options_list=["--output-storage-account-name", "--osan"],
+            help="Name of Azure Storage account containing blob container where bulk import job's output file will be created.",
+            arg_group="Bulk Import Job",
+        )

@@ -17,6 +17,7 @@ from .operations.digital_twin_models_operations import DigitalTwinModelsOperatio
 from .operations.query_operations import QueryOperations
 from .operations.digital_twins_operations import DigitalTwinsOperations
 from .operations.event_routes_operations import EventRoutesOperations
+from .operations.import_jobs_operations import ImportJobsOperations
 from . import models
 
 
@@ -41,7 +42,7 @@ class AzureDigitalTwinsAPIConfiguration(AzureConfiguration):
 
         super(AzureDigitalTwinsAPIConfiguration, self).__init__(base_url)
 
-        self.add_user_agent('azuredigitaltwinsapi/{}'.format(VERSION))
+        self.add_user_agent('azure.mgmt.digitaltwins/{}'.format(VERSION))
         self.add_user_agent('Azure-SDK-For-Python')
 
         self.credentials = credentials
@@ -54,13 +55,15 @@ class AzureDigitalTwinsAPI(SDKClient):
     :vartype config: AzureDigitalTwinsAPIConfiguration
 
     :ivar digital_twin_models: DigitalTwinModels operations
-    :vartype digital_twin_models: dataplane.operations.DigitalTwinModelsOperations
+    :vartype digital_twin_models: azure.mgmt.digitaltwins.operations.DigitalTwinModelsOperations
     :ivar query: Query operations
-    :vartype query: dataplane.operations.QueryOperations
+    :vartype query: azure.mgmt.digitaltwins.operations.QueryOperations
     :ivar digital_twins: DigitalTwins operations
-    :vartype digital_twins: dataplane.operations.DigitalTwinsOperations
+    :vartype digital_twins: azure.mgmt.digitaltwins.operations.DigitalTwinsOperations
     :ivar event_routes: EventRoutes operations
-    :vartype event_routes: dataplane.operations.EventRoutesOperations
+    :vartype event_routes: azure.mgmt.digitaltwins.operations.EventRoutesOperations
+    :ivar import_jobs: ImportJobs operations
+    :vartype import_jobs: azure.mgmt.digitaltwins.operations.ImportJobsOperations
 
     :param credentials: Credentials needed for the client to connect to Azure.
     :type credentials: :mod:`A msrestazure Credentials
@@ -86,4 +89,6 @@ class AzureDigitalTwinsAPI(SDKClient):
         self.digital_twins = DigitalTwinsOperations(
             self._client, self.config, self._serialize, self._deserialize)
         self.event_routes = EventRoutesOperations(
+            self._client, self.config, self._serialize, self._deserialize)
+        self.import_jobs = ImportJobsOperations(
             self._client, self.config, self._serialize, self._deserialize)
