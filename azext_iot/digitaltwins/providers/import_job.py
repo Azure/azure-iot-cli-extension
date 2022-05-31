@@ -13,12 +13,13 @@ from knack.log import get_logger
 
 logger = get_logger(__name__)
 
+
 class ImportJobProvider(DigitalTwinsProvider):
     def __init__(self, cmd, name, rg=None):
         super(ImportJobProvider, self).__init__(cmd=cmd, name=name, rg=rg)
         self.sdk = self.get_sdk().import_jobs
         self.cli = EmbeddedCLI()
-    
+
     def _get_blob_url(self, blob_name, blob_container, storage_account):
         storage_account_cstring_op = self.cli.invoke(
             "storage account show-connection-string -n '{}'".format(storage_account)
