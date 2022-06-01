@@ -34,9 +34,9 @@ parameters:
   type: object
   default: >
     {
-      Python38: 
+      Python37: 
       {
-        python: '3.8.x'
+        python: '3.7.x'
       },
       Python310:
       {
@@ -73,7 +73,7 @@ variables:
       {
         PythonMSI: 
         {
-          python: '3.10.x'
+          python: '3.8.x'
         }
       }
 
