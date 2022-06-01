@@ -73,7 +73,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 test_tag=test_scenario,
             )
 
-    def cmd(
+    def cmd(  # pylint: disable=arguments-renamed
         self,
         command,
         api_version=None,
