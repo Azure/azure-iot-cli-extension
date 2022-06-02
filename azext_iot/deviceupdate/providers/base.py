@@ -136,7 +136,7 @@ class DeviceUpdateAccountManager(DeviceUpdateClientHandler):
             f"--assignee-principal-type '{principal_type}'"
         )
         if not assign_op.success():
-            raise CLIInternalError(assign_op.output)
+            raise CLIInternalError(f"Failed to assign '{principal_id}' the role of '{role}' against scope '{scope}'.")
 
         return assign_op.as_json()
 
@@ -174,7 +174,7 @@ class DeviceUpdateInstanceManager(DeviceUpdateAccountManager):
             f"storage account show-connection-string --ids {storage_id}"
         )
         if not cstring_op.success():
-            raise CLIInternalError("")
+            raise CLIInternalError(f"Failed to fetch storage account connection string with resource id of '{storage_id}'.")
         diagnostic_storage.connection_string = cstring_op.as_json()["connectionString"]
 
         # @digimaun - the service appears to have a limitation handling the EndpointSuffix segment, it must be at the end.
