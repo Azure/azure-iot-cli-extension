@@ -3,11 +3,11 @@ pytest-mock
 pytest-cov
 pytest-env
 uamqp~=1.2
-responses
+responses<=0.20.0
 black
 wheel==0.30.0
 pre-commit
-pylint
+pylint<=2.13.8
 flake8
 azure-storage-blob
 pytest-xdist
