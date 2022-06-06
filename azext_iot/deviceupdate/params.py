@@ -55,13 +55,6 @@ def load_deviceupdate_arguments(self, _):
             arg_type=tags_type,
             help="Resource tags. Property bag in key-value pairs with the following format: a=b c=d",
         )
-        context.argument(
-            "public_network_access",
-            options_list=["--public-network-access", "--pna"],
-            help="Indicates if the Device Update account can be accessed from a public network.",
-            arg_group="Network",
-            arg_type=get_enum_type(ADUPublicNetworkAccessType),
-        )
 
     with self.argument_context("iot device-update account") as context:
         context.argument(

@@ -57,18 +57,16 @@ def test_instance_create_custom_storage_update_show_delete(provisioned_instances
         ).as_json()
         assert updated_instance["provisioningState"] == "Succeeded"
         assert updated_instance["tags"]["env1"] == random_tag1
-        updated_instance: dict = cli.invoke(
+        cli.invoke(
             f"iot device-update instance update -n {account_record} -i {instance_names[0]} "
-            f"-g {ACCOUNT_RG} --set tags.env2={random_tag2} enableDiagnostics=false "
-        ).as_json()
-        assert updated_instance["provisioningState"] == "Succeeded"
-        assert updated_instance["tags"]["env1"] == random_tag1
-        assert updated_instance["tags"]["env2"] == random_tag2
-        assert updated_instance["enableDiagnostics"] is False
-
-        shown_instance: dict = cli.invoke(
-            f"iot device-update instance show -n {account_record} -i {instance_names[0]}"
-        ).as_json()
+            f"-g {ACCOUNT_RG} --set tags.env2={random_tag2} enableDiagnostics=false --no-wait"
+        )
+        cli.invoke(f"iot device-update instance wait -n {account_record} -i {instance_names[0]} --updated")
+        shown_instance: dict = cli.invoke(f"iot device-update instance show -n {account_record} -i {instance_names[0]}").as_json()
+        assert shown_instance["provisioningState"] == "Succeeded"
+        assert shown_instance["tags"]["env1"] == random_tag1
+        assert shown_instance["tags"]["env2"] == random_tag2
+        assert shown_instance["enableDiagnostics"] is False
         assert shown_instance["id"] == provisioned_instances[account_record][instance_names[0]]["id"]
         assert shown_instance["accountName"] == account_record
         # delete synchronously

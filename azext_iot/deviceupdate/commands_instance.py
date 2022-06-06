@@ -10,11 +10,10 @@ from azext_iot.deviceupdate.providers.base import (
     DeviceUpdateMgmtModels,
     DeviceUpdateInstanceManager,
     parse_account_rg,
+    AzureError
 )
 
 logger = get_logger(__name__)
-
-# Instances
 
 
 def create_instance(
@@ -48,41 +47,44 @@ def create_instance(
             instance_name=instance_name,
             instance=instance,
         )
-    except Exception as e:
+    except AzureError as e:
         handle_service_exception(e)
 
 
 def update_instance(cmd, parameters: DeviceUpdateMgmtModels.Instance):
     instance_manager = DeviceUpdateInstanceManager(cmd=cmd)
+    storage_properties = parameters.diagnostic_storage_properties
 
+    if (
+        storage_properties
+        and storage_properties.authentication_type == "KeyBased"
+        and storage_properties.resource_id
+        and storage_properties.connection_string is None
+    ):
+        parameters.diagnostic_storage_properties = instance_manager.assemble_diagnostic_storage(
+            storage_properties.resource_id
+        )
     try:
-        storage_properties = parameters.diagnostic_storage_properties
-        if storage_properties:
-            if (
-                storage_properties.authentication_type == "KeyBased"
-                and storage_properties.resource_id
-                and storage_properties.connection_string is None
-            ):
-                parameters.diagnostic_storage_properties = instance_manager.assemble_diagnostic_storage(
-                    storage_properties.resource_id
-                )
         return instance_manager.mgmt_client.instances.begin_create(
             resource_group_name=parse_account_rg(parameters.id),
             account_name=parameters.account_name,
             instance_name=parameters.name,
             instance=parameters,
         )
-    except Exception as e:
+    except AzureError as e:
         handle_service_exception(e)
 
 
 def list_instances(cmd, name, resource_group_name=None):
     instance_manager = DeviceUpdateInstanceManager(cmd=cmd)
     target_container = instance_manager.find_account(target_name=name, target_rg=resource_group_name)
-    return instance_manager.mgmt_client.instances.list_by_account(
-        resource_group_name=target_container.resource_group,
-        account_name=target_container.account.name,
-    )
+    try:
+        return instance_manager.mgmt_client.instances.list_by_account(
+            resource_group_name=target_container.resource_group,
+            account_name=target_container.account.name,
+        )
+    except AzureError as e:
+        handle_service_exception(e)
 
 
 def show_instance(cmd, name, instance_name, resource_group_name=None):
@@ -94,7 +96,7 @@ def show_instance(cmd, name, instance_name, resource_group_name=None):
             account_name=target_container.account.name,
             instance_name=instance_name,
         )
-    except Exception as e:
+    except AzureError as e:
         handle_service_exception(e)
 
 
@@ -107,7 +109,7 @@ def delete_instance(cmd, name, instance_name, resource_group_name=None):
             account_name=target_container.account.name,
             instance_name=instance_name,
         )
-    except Exception as e:
+    except AzureError as e:
         handle_service_exception(e)
 
 

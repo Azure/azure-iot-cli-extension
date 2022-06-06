@@ -19,6 +19,8 @@ def load_deviceupdate_help():
           continue to be adopted at increasing rates. This makes it essential that the devices forming these solutions are built on a foundation
           of reliability and security and are easy to connect and manage at scale. Device Update for IoT Hub is an end-to-end platform that customers
           can use to publish, distribute, and manage over-the-air updates for everything from tiny sensors to gateway-level devices.
+
+          To learn more about the Device Update for IoT Hub service visit https://docs.microsoft.com/en-us/azure/iot-hub-device-update/
     """
 
     helps["iot device-update account"] = """
@@ -37,7 +39,7 @@ def load_deviceupdate_help():
           text: >
             az iot device-update account create -n {account_name} -g {resouce_group}
 
-        - name: Create a free sku Device Update account in target resource group with specified location and tags without polling.
+        - name: Create a free sku Device Update account in target resource group with specified location and tags without blocking.
           text: >
             az iot device-update account create -n {account_name} -g {resouce_group} -l westus --tags a=b c=d --sku Free --no-wait
 
@@ -46,17 +48,18 @@ def load_deviceupdate_help():
             az iot device-update account create -n {account_name} -g {resouce_group} --assign-identity [system]
 
         - name: Create a Device Update account in target resource group with a system managed identity then
-                assign the system identity to one or more scopes (space-separated) with the role of Contributor.
+                assign the system identity to a single scope with the role of Contributor.
           text: >
             az iot device-update account create -n {account_name} -g {resouce_group} --assign-identity [system]
-            --scopes "/subscriptions/a12345ea-bb21-994d-2263-c716348e32a1/resourceGroups/ProResourceGroup/providers/Microsoft.Storage/storageAccounts/myStorageAccount"
+            --scopes /subscriptions/a12345ea-bb21-994d-2263-c716348e32a1/resourceGroups/ProResourceGroup/providers/Microsoft.Storage/storageAccounts/myStorageAccount
 
-        - name: Create a Device Update account in target resource group with system managed and user-assigned managed identities then
-                assign the system identity to one or more scopes with a custom specified role.
+        - name: Create a Device Update account in target resource group with system and user-assigned managed identities then
+                assign the system identity to one or more scopes (space-seperated) with a custom specified role.
           text: >
             az iot device-update account create -n {account_name} -g {resouce_group}
-            --assign-identity [system] "/subscriptions/a12345ea-bb21-994d-2263-c716348e32a1/resourcegroups/ProResourceGroup/providers/Microsoft.ManagedIdentity/userAssignedIdentities/myIdentity"
-            --scopes "/subscriptions/a12345ea-bb21-994d-2263-c716348e32a1/resourceGroups/ProResourceGroup/providers/Microsoft.Storage/storageAccounts/myStorageAccount"
+            --assign-identity [system] /subscriptions/a12345ea-bb21-994d-2263-c716348e32a1/resourcegroups/ProResourceGroup/providers/Microsoft.ManagedIdentity/userAssignedIdentities/myIdentity
+            --scopes /subscriptions/a12345ea-bb21-994d-2263-c716348e32a1/resourceGroups/ProResourceGroup/providers/Microsoft.Storage/storageAccounts/myStorageAccount1
+              /subscriptions/a12345ea-bb21-994d-2263-c716348e32a1/resourceGroups/ProResourceGroup/providers/Microsoft.Storage/storageAccounts/myStorageAccount2
             --role "Storage Blob Data Contributor"
     """
 
@@ -111,7 +114,7 @@ def load_deviceupdate_help():
           text: >
             az iot device-update account delete -n {account_name}
 
-        - name: Delete a target account without confirmation or polling.
+        - name: Delete a target account without confirmation or blocking.
           text: >
             az iot device-update account delete -n {account_name} -y --no-wait
     """

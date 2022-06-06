@@ -63,7 +63,7 @@ def provisioned_accounts(request, provisioned_storage: dict) -> dict:
     desired_location = None
     desired_tags = None
     desired_count = None
-    desired_delete = None
+    desired_delete = True
     desired_public_network_access = None
     desired_identity = None
     desired_sku = None
@@ -74,7 +74,7 @@ def provisioned_accounts(request, provisioned_storage: dict) -> dict:
         desired_count = acct_marker.kwargs.get("count", 1)
         desired_delete = acct_marker.kwargs.get("delete", True)
         desired_public_network_access = acct_marker.kwargs.get(
-            "public_network_access", True
+            "public_network_access"
         )
         desired_identity = acct_marker.kwargs.get("identity")
         desired_role = acct_marker.kwargs.get("role")
@@ -86,8 +86,8 @@ def provisioned_accounts(request, provisioned_storage: dict) -> dict:
         base_create_command = base_create_command + f" -l {desired_location}"
     if desired_tags:
         base_create_command = base_create_command + f" --tags {desired_tags}"
-    if not desired_public_network_access:
-        base_create_command = base_create_command + " --pna disabled"
+    if desired_public_network_access:
+        base_create_command = base_create_command + f" --pna {desired_public_network_access}"
     if desired_sku:
         base_create_command = base_create_command + f" --sku {desired_sku}"
 
@@ -131,8 +131,8 @@ def provisioned_accounts(request, provisioned_storage: dict) -> dict:
             assert account["tags"] == tags_to_dict(desired_tags)
         else:
             assert account["tags"] is None
-        if not desired_public_network_access:
-            assert account["publicNetworkAccess"] == "Disabled"
+        if desired_public_network_access:
+            assert account["publicNetworkAccess"] == desired_public_network_access
         else:
             assert account["publicNetworkAccess"] == "Enabled"
         if user_identities:

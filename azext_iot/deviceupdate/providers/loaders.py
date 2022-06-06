@@ -14,6 +14,17 @@ logger = get_logger(__name__)
 
 
 def reload_modules() -> None:
+    """
+    Incremental fix for azure namespace package usage.
+
+    Use to ensure shared azure namespace packages are being loaded from the
+    azure-iot extension directory vs base Azure CLI. This is particularly important
+    when both Azure CLI and the azure-iot extension have the same namespace package
+    dependency but different version requirements.
+
+    This needs to be executed before azure.* modules are imported.
+    """
+
     from azure.cli.core.extension import get_extension_path
     from azext_iot.constants import EXTENSION_NAME
     import importlib

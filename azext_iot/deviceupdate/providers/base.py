@@ -16,9 +16,11 @@ from azext_iot.sdk.deviceupdate.controlplane import (
 
 from azext_iot.deviceupdate.common import SYSTEM_IDENTITY_ARG
 from azext_iot.common.embedded_cli import EmbeddedCLI
+from azext_iot.common.utility import handle_service_exception
 from azure.cli.core.commands.client_factory import get_mgmt_service_client
 from azure.cli.core.azclierror import ResourceNotFoundError, CLIInternalError
 from azure.mgmt.core.polling.arm_polling import ARMPolling
+from azure.core.exceptions import AzureError
 from typing import NamedTuple, Union, List
 
 
@@ -34,6 +36,7 @@ __all__ = [
     "parse_account_rg",
     "AccountContainer",
     "ARMPolling",
+    "AzureError",
 ]
 
 
@@ -72,14 +75,20 @@ class DeviceUpdateAccountManager(DeviceUpdateClientHandler):
             return id.split("/")[4]
 
         if target_rg:
-            account = self.mgmt_client.accounts.get(
-                resource_group_name=target_rg, account_name=target_name
-            )
-            return AccountContainer(account, find_account_rg(account.id))
-
-        for account in self.mgmt_client.accounts.list_by_subscription():
-            if account.name == target_name:
+            try:
+                account = self.mgmt_client.accounts.get(
+                    resource_group_name=target_rg, account_name=target_name
+                )
                 return AccountContainer(account, find_account_rg(account.id))
+            except AzureError as e:
+                handle_service_exception(e)
+
+        try:
+            for account in self.mgmt_client.accounts.list_by_subscription():
+                if account.name == target_name:
+                    return AccountContainer(account, find_account_rg(account.id))
+        except AzureError as e:
+            handle_service_exception(e)
 
         raise ResourceNotFoundError(
             f"DeviceUpdate account: '{target_name}' not found by auto-discovery. "

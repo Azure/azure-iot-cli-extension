@@ -6,7 +6,8 @@ Release History
 unreleased
 +++++++++++++++
 
-* Introducing the Azure Device Update for IoT Hub command group `az iot device-update`.
+* Introducing the Azure Device Update for IoT Hub root command group `az iot device-update`.
+  To learn more about the service visit https://docs.microsoft.com/en-us/azure/iot-hub-device-update/.
 
   - The Device Update command group supports all `account` and `instance` related functionality.
 

@@ -15,6 +15,7 @@ from azext_iot.deviceupdate.providers.base import (
     DeviceUpdateAccountManager,
     parse_account_rg,
     ARMPolling,
+    AzureError
 )
 
 logger = get_logger(__name__)
@@ -84,7 +85,7 @@ def create_account(
         )
         create_poller.add_done_callback(rbac_handler)
         return create_poller
-    except Exception as e:
+    except AzureError as e:
         handle_service_exception(e)
 
 
@@ -98,17 +99,20 @@ def update_account(cmd, parameters: DeviceUpdateMgmtModels.Account):
             account_name=parameters.name,
             account=parameters,
         )
-    except Exception as e:
+    except AzureError as e:
         handle_service_exception(e)
 
 
 def list_accounts(cmd, resource_group_name=None):
     account_manager = DeviceUpdateAccountManager(cmd=cmd)
-    if resource_group_name:
-        return account_manager.mgmt_client.accounts.list_by_resource_group(
-            resource_group_name=resource_group_name
-        )
-    return account_manager.mgmt_client.accounts.list_by_subscription()
+    try:
+        if resource_group_name:
+            return account_manager.mgmt_client.accounts.list_by_resource_group(
+                resource_group_name=resource_group_name
+            )
+        return account_manager.mgmt_client.accounts.list_by_subscription()
+    except AzureError as e:
+        handle_service_exception(e)
 
 
 def show_account(cmd, name, resource_group_name=None):
@@ -127,11 +131,12 @@ def delete_account(cmd, name, resource_group_name=None):
         return account_manager.mgmt_client.accounts.begin_delete(
             resource_group_name=account_container.resource_group, account_name=name
         )
-    except Exception as e:
+    except AzureError as e:
         handle_service_exception(e)
 
 
-# Account Networks - private connections
+def wait_on_account(cmd, name, resource_group_name=None):
+    return show_account(cmd=cmd, name=name, resource_group_name=resource_group_name)
 
 
 def show_account_private_connection(cmd, name, conn_name, resource_group_name=None):
@@ -145,7 +150,7 @@ def show_account_private_connection(cmd, name, conn_name, resource_group_name=No
             account_name=name,
             private_endpoint_connection_name=conn_name,
         )
-    except Exception as e:
+    except AzureError as e:
         handle_service_exception(e)
 
 
@@ -154,9 +159,12 @@ def list_account_private_connections(cmd, name, resource_group_name=None):
     account_container = account_manager.find_account(
         target_name=name, target_rg=resource_group_name
     )
-    return account_manager.mgmt_client.private_endpoint_connections.list_by_account(
-        resource_group_name=account_container.resource_group, account_name=name
-    )
+    try:
+        return account_manager.mgmt_client.private_endpoint_connections.list_by_account(
+            resource_group_name=account_container.resource_group, account_name=name
+        )
+    except AzureError as e:
+        handle_service_exception(e)
 
 
 def set_account_private_connection(
@@ -182,7 +190,7 @@ def set_account_private_connection(
                 )
             ),
         )
-    except Exception as e:
+    except AzureError as e:
         handle_service_exception(e)
 
 
@@ -202,11 +210,8 @@ def delete_account_private_connection(
             account_name=name,
             private_endpoint_connection_name=conn_name,
         )
-    except Exception as e:
+    except AzureError as e:
         handle_service_exception(e)
-
-
-# Account Networks - private links
 
 
 def list_account_private_links(cmd, name, resource_group_name=None):
@@ -214,10 +219,9 @@ def list_account_private_links(cmd, name, resource_group_name=None):
     account_container = account_manager.find_account(
         target_name=name, target_rg=resource_group_name
     )
-    return account_manager.mgmt_client.private_link_resources.list_by_account(
-        resource_group_name=account_container.resource_group, account_name=name
-    )
-
-
-def wait_on_account(cmd, name, resource_group_name=None):
-    return show_account(cmd=cmd, name=name, resource_group_name=resource_group_name)
+    try:
+        return account_manager.mgmt_client.private_link_resources.list_by_account(
+            resource_group_name=account_container.resource_group, account_name=name
+        )
+    except AzureError as e:
+        handle_service_exception(e)
