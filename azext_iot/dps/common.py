@@ -6,14 +6,18 @@
 
 """
 shared: Define shared data types(enums) and constant strings.
-
 """
 
 
+# Parameter Arg Groups
+DPS_IDENTIFIER = "Device Provisioning Service Identifier"
+SYM_KEY_AUTH = "Symmetric Key Authentication"
+CERT_AUTH = "x509 Authentication"
+
 # Error messages from Device SDK
-DISABLED_REGISTRATION_ERROR = "Query Status Operation encountered an invalid registration status disabled with a "\
+DISABLED_REGISTRATION_ERROR = "Query Status Operation encountered an invalid registration status 'disabled' with a "\
     "status code of 200"
-FAILED_REGISTRATION_ERROR = "Query Status operation returned a failed registration status with a status code of 200"
+FAILED_REGISTRATION_ERROR = "Query Status operation returned a failed registration status with a status code of '200'"
 UNAUTHORIZED_ERROR = "register request returned a service error status code 401"
 
 # Error messages for Client

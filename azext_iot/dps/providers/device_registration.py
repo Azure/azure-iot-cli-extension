@@ -147,8 +147,8 @@ class DeviceRegistrationProvider():
                     x509=self.certificate,
                 )
             except Exception as e:
-                if hasattr(e, "reason"):
-                    raise InvalidArgumentValueError(f"Could not open certificate files: {e.reason}.")
+                reason = getattr(e, "reason", "Unknown error occurred")
+                raise InvalidArgumentValueError(f"Could not open certificate files: {reason}.")
 
     def create(
         self,

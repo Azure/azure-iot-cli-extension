@@ -13,13 +13,13 @@ from knack.help_files import helps
 def load_deviceprovisioningservice_help():
     helps["iot device registration"] = """
         type: group
-        short-summary: Manage IoT Device registrations through IoT Device Provisioning Service.
+        short-summary: Manage IoT Device registrations through the IoT Device Provisioning Service.
         long-summary: Use `az iot dps enrollment registration` or `az iot dps enrollment-group registration` to view and delete registrations.
     """
 
     helps["iot device registration create"] = """
         type: command
-        short-summary: Register an IoT Device with IoT Device Provisioning Service.
+        short-summary: Register an IoT Device with the IoT Device Provisioning Service.
         long-summary: |
           The following attestation mechanisms are supported:
           - Symmetric key
@@ -48,6 +48,7 @@ def load_deviceprovisioningservice_help():
           text: az iot device registration create --id-scope {id_scope} --rid {registration_id} --cp {certificate_file} --kp {key_file}
         - name: Register an IoT Device using a group enrollment, the Device Provisioning Service
             ID Scope, and given certificate and key files. This will bypass retrieving the ID Scope.
-            Note that the group enrollment id is not needed for x509 attestations.
+            Note that the group enrollment id is not needed for x509 attestations and the subject of
+            the certificate file is the registration id.
           text: az iot device registration create --id-scope {id_scope} --rid {registration_id} --cp {certificate_file} --kp {key_file}
     """

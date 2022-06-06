@@ -20,7 +20,10 @@ from azext_iot.tests import CaptureOutputLiveScenarioTest
 from azext_iot.common.certops import create_self_signed_certificate
 from azext_iot.common.shared import AuthenticationTypeDataplane
 from azext_iot.tests.test_constants import ResourceTypes
+from knack.log import get_logger
 
+
+logger = get_logger(__name__)
 DATAPLANE_AUTH_TYPES = [
     AuthenticationTypeDataplane.key.value,
     AuthenticationTypeDataplane.login.value,
@@ -220,6 +223,7 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 )
             )
             sleep(10)
+            tries += 1
 
         if tries == MAX_RBAC_ASSIGNMENT_TRIES:
             raise Exception(
@@ -346,7 +350,10 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
         yield None
         for cert in self.tracked_certs:
             if os.path.exists(cert):
-                os.remove(cert)
+                try:
+                    os.remove(cert)
+                except OSError as e:
+                    logger.error(f"Failed to remove {cert}. {e}")
         if not settings.env.azext_iot_testhub:
             self.cmd(
                 "iot hub delete --name {} --resource-group {}".format(
