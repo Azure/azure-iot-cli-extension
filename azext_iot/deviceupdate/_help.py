@@ -31,8 +31,6 @@ def load_deviceupdate_help():
     helps["iot device-update account create"] = """
         type: command
         short-summary: Create a Device Update account.
-        long-summary: This command may also be used to update an existing account provided the generic update options
-          in the update command are not needed.
 
         examples:
         - name: Create a Device Update account in target resource group using the resource group location.
@@ -66,11 +64,16 @@ def load_deviceupdate_help():
     helps["iot device-update account update"] = """
         type: command
         short-summary: Update a Device Update account.
+        long-summary: Currently the following account properties can be updated - tags, identity, publicNetworkAccess.
 
         examples:
         - name: Set a specific account tag attribute.
           text: >
             az iot device-update account update -n {account_name} --set tags.env='test'
+
+        - name: Disable public network access.
+          text: >
+            az iot device-update account update -n {account_name} --set publicNetworkAccess='Disabled'
     """
 
     helps["iot device-update account show"] = """
@@ -197,13 +200,12 @@ def load_deviceupdate_help():
     helps["iot device-update instance create"] = """
         type: command
         short-summary: Create a Device Update instance.
-        long-summary: This command may also be used to update an existing instance provided the generic update options
-          in the update command are not needed.
     """
 
     helps["iot device-update instance update"] = """
         type: command
         short-summary: Update a Device Update instance.
+        long-summary: Currently the following instance properties can be updated - iotHubs, enableDiagnostics, diagnosticStorageProperties.
 
         examples:
         - name: Set a specific instance tag attribute.

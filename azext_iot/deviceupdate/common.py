@@ -40,4 +40,12 @@ class ADUAccountSKUType(Enum):
     FREE = "Free"
 
 
+class ADUInstanceDiagnosticStorageAuthType(Enum):
+    """
+    ADU instance diagnostic storage auth type.
+    """
+
+    KEYBASED = "KeyBased"
+
+
 SYSTEM_IDENTITY_ARG = "[system]"

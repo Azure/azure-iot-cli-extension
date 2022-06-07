@@ -119,12 +119,6 @@ def load_deviceupdate_arguments(self, _):
 
     with self.argument_context("iot device-update instance") as context:
         context.argument(
-            "location",
-            options_list=["-l", "--location"],
-            help="Device Update instance location. If no location is provided the encompassing account location is used. "
-            "You can configure the default location using `az configure --defaults location=<name>`.",
-        )
-        context.argument(
             "iothub_resource_ids",
             arg_group="IoT Hub",
             nargs="+",

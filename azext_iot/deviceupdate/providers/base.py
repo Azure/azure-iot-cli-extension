@@ -193,7 +193,6 @@ class DeviceUpdateInstanceManager(DeviceUpdateAccountManager):
             if "EndpointSuffix=" in split_cstring[i]:
                 endpoint_suffix = split_cstring.pop(i)
                 break
-        diagnostic_storage.connection_string = (
-            f'{";".join(split_cstring)};{endpoint_suffix}'
-        )
+        split_cstring.append(endpoint_suffix)
+        diagnostic_storage.connection_string = ";".join(split_cstring)
         return diagnostic_storage

@@ -23,14 +23,13 @@ def create_instance(
     iothub_resource_ids,
     diagnostics=None,
     storage_resource_id=None,
-    location=None,
     tags=None,
     resource_group_name=None,
 ):
     instance_manager = DeviceUpdateInstanceManager(cmd=cmd)
     target_container = instance_manager.find_account(target_name=name, target_rg=resource_group_name)
-    if not location:
-        location = target_container.account.location
+    # @digimaun - the location of an instance must be the same as the account container.
+    location = target_container.account.location
 
     instance = DeviceUpdateMgmtModels.Instance(
         location=location,
@@ -52,18 +51,20 @@ def create_instance(
 
 
 def update_instance(cmd, parameters: DeviceUpdateMgmtModels.Instance):
+    from azext_iot.deviceupdate.common import ADUInstanceDiagnosticStorageAuthType
     instance_manager = DeviceUpdateInstanceManager(cmd=cmd)
     storage_properties = parameters.diagnostic_storage_properties
 
     if (
         storage_properties
-        and storage_properties.authentication_type == "KeyBased"
+        and storage_properties.authentication_type == ADUInstanceDiagnosticStorageAuthType.KEYBASED.value
         and storage_properties.resource_id
         and storage_properties.connection_string is None
     ):
         parameters.diagnostic_storage_properties = instance_manager.assemble_diagnostic_storage(
             storage_properties.resource_id
         )
+
     try:
         return instance_manager.mgmt_client.instances.begin_create(
             resource_group_name=parse_account_rg(parameters.id),
