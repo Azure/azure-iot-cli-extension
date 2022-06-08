@@ -197,7 +197,7 @@ class TestDPSDeviceRegistrationsIndividual(IoTDPSLiveScenarioTest):
 
     def test_dps_device_registration_x509_lifecycle(self):
         # Create the second test cert - have the same subject but a different file name
-        self.create_test_cert(subject=CERT_NAME, cert_only=False, alt_name=SECONDARY_CERT_NAME)
+        self.create_test_cert(subject=CERT_NAME, cert_only=False, file_prefix=SECONDARY_CERT_NAME)
         self.tracked_certs.append(SECONDARY_CERT_PATH)
         self.tracked_certs.append(SECONDARY_KEY_PATH)
 

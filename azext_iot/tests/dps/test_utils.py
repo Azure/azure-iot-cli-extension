@@ -185,7 +185,7 @@ def create_certificate(
     subject: str,
     valid_days: int,
     cert_output_dir: str,
-    alt_name: str = None,
+    file_prefix: str = None,
     cert_path: str = None,
     key_path: str = None,
     cert_object: Dict[str, str] = None,
@@ -200,7 +200,7 @@ def create_certificate(
         valid_days (int): number of days certificate is valid for; used to calculate
             certificate expiry.
         cert_putput_dir (str): string value of output directory.
-        alt_name (str): Certificate and key file name if it needs to be different from the subject.
+        file_prefix (str): Certificate and key file name if it needs to be different from the subject.
         cert_path (str): Path to certificate pem file.
         key_path (str): Path to key pem file.
         cert_object (dict): dict with certificate value, private key and thumbprint, returned from
@@ -237,8 +237,8 @@ def create_certificate(
     thumbprint = cert.fingerprint(hashes.SHA1()).hex().upper()
 
     if cert_output_dir and exists(cert_output_dir):
-        cert_file = (alt_name or subject) + "-cert.pem"
-        key_file = (alt_name or subject) + "-key.pem"
+        cert_file = (file_prefix or subject) + "-cert.pem"
+        key_file = (file_prefix or subject) + "-key.pem"
 
         with open(join(cert_output_dir, cert_file), "wt", encoding="utf-8") as f:
             f.write(cert_dump)

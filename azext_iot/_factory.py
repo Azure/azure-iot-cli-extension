@@ -13,7 +13,6 @@ from azext_iot.common.utility import ensure_iotdps_sdk_min_version
 from azext_iot.common.auth import IoTOAuth
 from azext_iot.common.shared import SdkType, AuthenticationTypeDataplane
 from azext_iot.constants import (
-    IOTDPS_PROVISIONING_HOST,
     IOTDPS_TRACK_2_SDK_MIN_VERSION,
     USER_AGENT,
     IOTHUB_RESOURCE_ID,
@@ -76,13 +75,11 @@ class SdkResolver(object):
         self.auth_override = auth_override
 
         # This initialization will likely need to change to support more variation of SDK
-        self.sas_uri = self.target.get("entity", IOTDPS_PROVISIONING_HOST)
+        self.sas_uri = self.target["entity"]
         self.endpoint = "https://{}".format(self.sas_uri)
 
         # Base endpoints stay the same
-        if self.device_id and self.target.get("idscope"):
-            self.sas_uri = "{}/registrations/{}".format(self.target["idscope"], self.device_id)
-        elif self.device_id:
+        if self.device_id:
             self.sas_uri = "{}/devices/{}".format(self.sas_uri, self.device_id)
 
     def get_sdk(self, sdk_type):

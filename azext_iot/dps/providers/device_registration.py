@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from logging import getLogger
+from typing import TypeVar
 from azext_iot.common.shared import AttestationType
 from azext_iot.constants import IOTDPS_PROVISIONING_HOST
 from azext_iot.dps.common import (
@@ -31,6 +32,7 @@ from azure.cli.core.azclierror import (
 )
 
 logger = getLogger(__name__)
+ProvisioningDeviceClient = TypeVar('ProvisioningDeviceClient')
 
 
 class DeviceRegistrationProvider():
@@ -49,6 +51,7 @@ class DeviceRegistrationProvider():
         resource_group_name: str = None,
         login: str = None,
         auth_type_dataplane: str = None,
+        provisioning_host: str = IOTDPS_PROVISIONING_HOST,
     ):
         self.cmd = cmd
         self.dps_name = dps_name
@@ -70,7 +73,7 @@ class DeviceRegistrationProvider():
         )
 
         # Retrieve sdk.runtime_registration
-        self.sdk = self._get_dps_device_sdk()
+        self.sdk = self._get_dps_device_sdk(provisioning_host)
 
     def _validate_attestation_params(
         self,
@@ -125,15 +128,16 @@ class DeviceRegistrationProvider():
             return target["idscope"]
         # If cstring is used, will need to retrieve the id scope manually
         dps_name = target['entity'].split(".")[0]
-        return discovery.get_id_scope(resource_name=dps_name)
+        return discovery.get_id_scope(resource_name=dps_name, rg=self.resource_group_name)
 
     def _get_dps_device_sdk(
-        self
-    ):
+        self,
+        provisioning_host: str = IOTDPS_PROVISIONING_HOST
+    ) -> ProvisioningDeviceClient:
         from azure.iot.device import ProvisioningDeviceClient
         if self.device_symmetric_key:
             return ProvisioningDeviceClient.create_from_symmetric_key(
-                provisioning_host=IOTDPS_PROVISIONING_HOST,
+                provisioning_host=provisioning_host,
                 registration_id=self.registration_id,
                 id_scope=self.id_scope,
                 symmetric_key=self.device_symmetric_key,
@@ -141,7 +145,7 @@ class DeviceRegistrationProvider():
         elif self.certificate:
             try:
                 return ProvisioningDeviceClient.create_from_x509_certificate(
-                    provisioning_host=IOTDPS_PROVISIONING_HOST,
+                    provisioning_host=provisioning_host,
                     registration_id=self.registration_id,
                     id_scope=self.id_scope,
                     x509=self.certificate,
@@ -150,10 +154,16 @@ class DeviceRegistrationProvider():
                 reason = getattr(e, "reason", "Unknown error occurred")
                 raise InvalidArgumentValueError(f"Could not open certificate files: {reason}.")
 
+        raise InvalidArgumentValueError(TPM_SUPPORT_ERROR)
+
     def create(
         self,
         payload: str = None,
     ):
+        from azure.iot.device.exceptions import (
+            ClientError,
+            OperationTimeout
+        )
         try:
             self.sdk.provisioning_payload = payload
             registration_result = self.sdk.register()
@@ -171,7 +181,7 @@ class DeviceRegistrationProvider():
                     "responsePayload": registration_result.registration_state.response_payload,
                 }
             }
-        except Exception as e:
+        except (ClientError, OperationTimeout) as e:
             raise self._handle_exception(e)
 
     def _get_attestation_params(

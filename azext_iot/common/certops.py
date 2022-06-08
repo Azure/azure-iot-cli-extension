@@ -23,7 +23,7 @@ def create_self_signed_certificate(
     valid_days: int,
     cert_output_dir: str,
     cert_only: bool = False,
-    alt_name: str = None
+    file_prefix: str = None
 ) -> Dict[str, str]:
     """
     Function used to create a basic self-signed certificate with no extensions.
@@ -34,7 +34,7 @@ def create_self_signed_certificate(
             certificate expiry.
         cert_putput_dir (str): string value of output directory.
         cert_only (bool): generate certificate only; no private key or thumbprint.
-        alt_name (str): Certificate file name if it needs to be different from the subject.
+        file_prefix (str): Certificate file name if it needs to be different from the subject.
 
     Returns:
         result (dict): dict with certificate value, private key and thumbprint.
@@ -70,8 +70,8 @@ def create_self_signed_certificate(
     thumbprint = cert.fingerprint(hashes.SHA1()).hex().upper()
 
     if cert_output_dir and exists(cert_output_dir):
-        cert_file = (alt_name or subject) + "-cert.pem"
-        key_file = (alt_name or subject) + "-key.pem"
+        cert_file = (file_prefix or subject) + "-cert.pem"
+        key_file = (file_prefix or subject) + "-key.pem"
 
         with open(join(cert_output_dir, cert_file), "wt", encoding="utf-8") as f:
             f.write(cert_dump)

@@ -7,6 +7,7 @@
 
 from knack.log import get_logger
 
+from azext_iot.constants import IOTDPS_PROVISIONING_HOST
 from azext_iot.dps.providers.device_registration import DeviceRegistrationProvider
 
 logger = get_logger(__name__)
@@ -22,11 +23,12 @@ def create_device_registration(
     key_file: str = None,
     passphrase: str = None,
     payload: str = None,
-    dps_name: str = None,
     id_scope: str = None,
+    dps_name: str = None,
     resource_group_name: str = None,
     login: str = None,
     auth_type_dataplane: str = None,
+    provisioning_host: str = IOTDPS_PROVISIONING_HOST,
 ):
     device_provider = DeviceRegistrationProvider(
         cmd=cmd,
@@ -41,7 +43,8 @@ def create_device_registration(
         dps_name=dps_name,
         resource_group_name=resource_group_name,
         login=login,
-        auth_type_dataplane=auth_type_dataplane
+        auth_type_dataplane=auth_type_dataplane,
+        provisioning_host=provisioning_host
     )
     return device_provider.create(
         payload=payload,

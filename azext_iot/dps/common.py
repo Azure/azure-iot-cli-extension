@@ -10,7 +10,7 @@ shared: Define shared data types(enums) and constant strings.
 
 
 # Parameter Arg Groups
-DPS_IDENTIFIER = "Device Provisioning Service Identifier"
+DPS_IDENTIFIER = "DPS Identifier"
 SYM_KEY_AUTH = "Symmetric Key Authentication"
 CERT_AUTH = "x509 Authentication"
 

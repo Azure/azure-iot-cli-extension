@@ -121,10 +121,10 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
         # Other variables for DPS testing
         self.hub_host_name = "{}.azure-devices.net".format(ENTITY_HUB_NAME)
 
-    def create_test_cert(self, subject=CERT_NAME, cert_only=True, alt_name=None):
+    def create_test_cert(self, subject=CERT_NAME, cert_only=True, file_prefix=None):
         output_dir = os.getcwd()
         create_self_signed_certificate(
-            subject=subject, valid_days=1, cert_output_dir=output_dir, cert_only=cert_only, alt_name=alt_name
+            subject=subject, valid_days=1, cert_output_dir=output_dir, cert_only=cert_only, file_prefix=file_prefix
         )
         self.tracked_certs.append(CERT_PATH)
         if not cert_only:

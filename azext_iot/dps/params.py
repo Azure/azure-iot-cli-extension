@@ -47,6 +47,11 @@ def load_dps_arguments(self, _):
             help="Device registration ID or individual enrollment ID."
         )
         context.argument(
+            "provisioning_host",
+            options_list=["--provisioning-host", "--host"],
+            help="Endpoint pointing to the provisioning host to use."
+        )
+        context.argument(
             "enrollment_group_id",
             options_list=["--enrollment-group-id", "--group-id", "--gid"],
             help="Enrollment group ID."
