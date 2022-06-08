@@ -27,9 +27,9 @@ parameters:
   type: string
   default: '3.8.x'
   values:
-  - '3.6.x'
   - '3.8.x'
   - '3.9.x'
+  - '3.10.x'
 - name: pythonVersionsTestingMatrix
   type: object
   default: >

@@ -414,8 +414,6 @@ def calculate_millisec_since_unix_epoch_utc(offset_seconds: int = 0):
 def init_monitoring(cmd, timeout, properties, enqueued_time, repair, yes):
     from azext_iot.common.deps import ensure_uamqp
 
-    validate_min_python_version(3, 5)
-
     if timeout < 0:
         raise InvalidArgumentValueError(
             "Monitoring timeout must be 0 (inf) or greater."
