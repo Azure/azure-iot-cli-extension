@@ -98,6 +98,14 @@ iot central device-template update:
     central_dns_suffix:
       rule_exclusions:
       - no_parameter_defaults_for_update_commands
+iot central device-group update:
+  parameters:
+    api_version:
+      rule_exclusions:
+      - no_parameter_defaults_for_update_commands
+    central_dns_suffix:
+      rule_exclusions:
+      - no_parameter_defaults_for_update_commands
 iot central file-upload-config update:
   parameters:
     api_version:

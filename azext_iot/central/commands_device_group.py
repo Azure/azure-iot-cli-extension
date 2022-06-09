@@ -51,9 +51,6 @@ def create_device_group(
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1_1_preview.value,
 ):
-    if not isinstance(content, str):
-        raise InvalidArgumentValueError("content must be a string: {}".format(content))
-
     payload = utility.process_json_arg(content, argument_name="content")
 
     provider = CentralDeviceGroupProvider(
@@ -73,13 +70,10 @@ def update_device_group(
     app_id: str,
     device_group_id: str,
     content: str,
-    central_dns_suffix: str,
-    api_version: str,
     token=None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.v1_1_preview.value,
 ):
-    if not isinstance(content, str):
-        raise InvalidArgumentValueError("content must be a string: {}".format(content))
-
     payload = utility.process_json_arg(content, argument_name="content")
 
     provider = CentralDeviceGroupProvider(

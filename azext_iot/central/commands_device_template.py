@@ -76,9 +76,6 @@ def create_device_template(
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
 ):
-    if not isinstance(content, str):
-        raise InvalidArgumentValueError("content must be a string: {}".format(content))
-
     payload = utility.process_json_arg(content, argument_name="content")
 
     provider = CentralDeviceTemplateProvider(
@@ -102,9 +99,6 @@ def update_device_template(
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1.value,
 ):
-    if not isinstance(content, str):
-        raise InvalidArgumentValueError("content must be a string: {}".format(content))
-
     payload = utility.process_json_arg(content, argument_name="content")
 
     provider = CentralDeviceTemplateProvider(
