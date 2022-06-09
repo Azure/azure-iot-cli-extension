@@ -5,7 +5,6 @@
 # --------------------------------------------------------------------------------------------
 # Dev note - think of this as a controller
 
-from azure.cli.core.azclierror import InvalidArgumentValueError
 from typing import Union
 from azext_iot.central.models.preview import TemplatePreview
 from azext_iot.central.models.v1 import TemplateV1
