@@ -22,6 +22,14 @@ Release History
 
 * Updated service API endpoint to vNext URL.
 
+**IoT Central updates**
+
+* * Adds support for device groups CRUD:
+  - az iot central device-group create
+  - az iot central device-group show
+  - az iot central device-group update
+  - az iot central device-group delete
+
 
 0.14.0
 +++++++++++++++
