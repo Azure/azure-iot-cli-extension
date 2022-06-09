@@ -23,8 +23,10 @@ class TestDPSDeviceRegistrationsIndividual(IoTDPSLiveScenarioTest):
     def __init__(self, test_case):
         super(TestDPSDeviceRegistrationsIndividual, self).__init__(test_case, cert_only=False)
         self.id_scope = self.get_dps_id_scope()
+        self.add_hub_permissions()
 
     def test_dps_device_registration_symmetrickey_lifecycle(self):
+        self.add_hub_permissions()
         attestation_type = AttestationType.symmetricKey.value
         hub_host_name = f"{self.entity_hub_name}.azure-devices.net"
         for auth_phase in DATAPLANE_AUTH_TYPES:
@@ -73,6 +75,7 @@ class TestDPSDeviceRegistrationsIndividual(IoTDPSLiveScenarioTest):
                     self.check("status", "assigned"),
                 ],
             )
+            self.check_hub_device(enrollment_id, "sas")
 
             # Manually input primary key and id scope
             self.cmd(
@@ -172,6 +175,9 @@ class TestDPSDeviceRegistrationsIndividual(IoTDPSLiveScenarioTest):
                     self.check("status", "assigned"),
                 ],
             )
+            self.check_hub_device(device_id, "sas")
+            # Note that the old device registration still exists in hub
+            self.check_hub_device(enrollment_id, "sas")
 
             # Try with payload
             self.kwargs["payload"] = json.dumps(
@@ -196,8 +202,9 @@ class TestDPSDeviceRegistrationsIndividual(IoTDPSLiveScenarioTest):
             )
 
     def test_dps_device_registration_x509_lifecycle(self):
+        self.add_hub_permissions()
         # Create the second test cert - have the same subject but a different file name
-        self.create_test_cert(subject=CERT_NAME, cert_only=False, file_prefix=SECONDARY_CERT_NAME)
+        secondary_thumprint = self.create_test_cert(CERT_NAME, False, SECONDARY_CERT_NAME)
         self.tracked_certs.append(SECONDARY_CERT_PATH)
         self.tracked_certs.append(SECONDARY_KEY_PATH)
 
@@ -298,6 +305,7 @@ class TestDPSDeviceRegistrationsIndividual(IoTDPSLiveScenarioTest):
                     self.check("status", "assigned"),
                 ],
             )
+            self.check_hub_device(CERT_NAME, "selfSigned", thumbprint=self.thumbprint)
 
             # Use id scope
             registration = self.cmd(
@@ -369,6 +377,9 @@ class TestDPSDeviceRegistrationsIndividual(IoTDPSLiveScenarioTest):
                     self.check("status", "assigned"),
                 ],
             )
+            self.check_hub_device(device_id, "selfSigned", thumbprint=self.thumbprint)
+            # Note that the old registration will still exist in hub
+            self.check_hub_device(CERT_NAME, "selfSigned", thumbprint=self.thumbprint)
 
             # Try with payload
             self.kwargs["payload"] = json.dumps(
@@ -416,6 +427,7 @@ class TestDPSDeviceRegistrationsIndividual(IoTDPSLiveScenarioTest):
                     self.check("status", "assigned"),
                 ],
             )
+            self.check_hub_device(CERT_NAME, "selfSigned", thumbprint=secondary_thumprint)
 
             self.cmd(
                 self.set_cmd_auth_type(

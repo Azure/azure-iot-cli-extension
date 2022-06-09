@@ -85,7 +85,7 @@ class DeviceRegistrationProvider():
         passphrase: str = None,
     ):
         from azure.iot.device import X509
-        if compute_key and not enrollment_group_id:
+        if compute_key and not (enrollment_group_id or device_symmetric_key):
             raise RequiredArgumentMissingError(COMPUTE_KEY_ERROR)
 
         self.device_symmetric_key = None

@@ -23,6 +23,7 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
         self.id_scope = self.get_dps_id_scope()
 
     def test_dps_device_registration_symmetrickey_lifecycle(self):
+        self.add_hub_permissions()
         hub_host_name = f"{self.entity_hub_name}.azure-devices.net"
         for auth_phase in DATAPLANE_AUTH_TYPES:
             group_id = self.generate_enrollment_names(count=1, group=True)[0]
@@ -68,8 +69,9 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
                     self.check("status", "assigned"),
                 ],
             )
+            self.check_hub_device(device_id1, "sas")
 
-            # Recreate with group primary key, recreate yeilds different substatus
+            # Recreate with group primary key, recreate should yeild different substatus
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot device registration create --dps-name {} -g {} --group-id {} --registration-id {} --key {} "
@@ -88,12 +90,12 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
                 ],
             )
 
-            # Use id scope - compute_key should work without login
+            # Use id scope - compute_key should work without login; group id is not needed
             self.cmd(
                 self.set_cmd_auth_type(
-                    "iot device registration create --id-scope {} --group-id {} --registration-id {} --key {} "
+                    "iot device registration create --id-scope {} --registration-id {} --key {} "
                     "--ck".format(
-                        self.id_scope, group_id, device_id1, keys["primaryKey"]
+                        self.id_scope, device_id1, keys["primaryKey"]
                     ),
                     auth_type=auth_phase
                 ),
@@ -107,7 +109,7 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
                 ],
             )
 
-            # Recreate with computed device key (and id scope)
+            # Recreate with computed device key (and id scope); group id is not needed for the registration
             device_key = self.cmd(
                 self.set_cmd_auth_type(
                     "iot dps enrollment-group compute-device-key --dps-name {} -g {} --group-id {} --registration-id {}".format(
@@ -119,8 +121,8 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
 
             self.cmd(
                 self.set_cmd_auth_type(
-                    "iot device registration create --id-scope {} --group-id {} --registration-id {} --key {}".format(
-                        self.id_scope, group_id, device_id1, device_key
+                    "iot device registration create --id-scope {} --registration-id {} --key {}".format(
+                        self.id_scope, device_id1, device_key
                     ),
                     auth_type=auth_phase
                 ),
@@ -133,6 +135,7 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
                     self.check("status", "assigned"),
                 ],
             )
+            self.check_hub_device(device_id1, "sas", key=device_key)
 
             # Can register a second device within the same enrollment group
             device2_registration = self.cmd(
@@ -151,12 +154,13 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
                     self.check("status", "assigned"),
                 ],
             ).get_output_in_json()["registrationState"]
+            self.check_hub_device(device_id2, "sas")
 
             # Can re-register a first device within the same enrollment group using a different key
             device1_registration = self.cmd(
                 self.set_cmd_auth_type(
-                    "iot device registration create --dps-name {} -g {} --group-id {} --registration-id {} --key {} --ck".format(
-                        self.entity_dps_name, self.entity_rg, group_id, device_id1, keys["secondaryKey"]
+                    "iot device registration create --dps-name {} -g {} --registration-id {} --key {} --ck".format(
+                        self.entity_dps_name, self.entity_rg, device_id1, keys["secondaryKey"]
                     ),
                     auth_type=auth_phase
                 ),
@@ -204,8 +208,8 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
             # Cannot use group key as device key
             self.cmd(
                 self.set_cmd_auth_type(
-                    "iot device registration create --dps-name {} -g {} --group-id {} --registration-id {} --key {}".format(
-                        self.entity_dps_name, self.entity_rg, group_id, device_id1, keys["primaryKey"]
+                    "iot device registration create --dps-name {} -g {} --registration-id {} --key {}".format(
+                        self.entity_dps_name, self.entity_rg, device_id1, keys["primaryKey"]
                     ),
                     auth_type=auth_phase
                 ),
@@ -236,6 +240,7 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
             )
 
     def test_dps_device_registration_x509_lifecycle(self):
+        self.add_hub_permissions()
         self._prepare_x509_certificates_for_dps()
         hub_host_name = f"{self.entity_hub_name}.azure-devices.net"
 
@@ -349,6 +354,7 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
                     self.check("status", "assigned"),
                 ],
             )
+            self.check_hub_device(DEVICE_CERT_NAME, "selfSigned", thumbprint=self.thumbprint)
 
             # Use id scope
             registration = self.cmd(

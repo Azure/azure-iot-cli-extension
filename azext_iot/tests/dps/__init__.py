@@ -101,7 +101,7 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
         self.dps_cstring = self.get_dps_cstring()
 
         # Create the test certificate
-        self.create_test_cert(cert_only=cert_only)
+        self.thumbprint = self.create_test_cert(cert_only=cert_only)
 
         # Kwargs
         base_enrollment_props = {
@@ -123,12 +123,13 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
     def create_test_cert(self, subject=CERT_NAME, cert_only=True, file_prefix=None):
         output_dir = os.getcwd()
-        create_self_signed_certificate(
+        thumbprint = create_self_signed_certificate(
             subject=subject, valid_days=1, cert_output_dir=output_dir, cert_only=cert_only, file_prefix=file_prefix
-        )
+        )["thumbprint"]
         self.tracked_certs.append(CERT_PATH)
         if not cert_only:
             self.tracked_certs.append(KEY_PATH)
+        return thumbprint
 
     def create_dps(self):
         """Create a device provisioning service for testing purposes."""
@@ -198,7 +199,7 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 )
             ).get_output_in_json()
 
-    def add_hub_perimssions(self):
+    def add_hub_permissions(self):
         """Add IoT Hub permission for dataplane operations."""
         target_hub = self.cmd(
             "iot hub show -n {} -g {}".format(self.entity_hub_name, self.entity_rg)
@@ -219,7 +220,7 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
             # else assign IoT Hub Data Contributor role to current user and check again
             self.cmd(
                 'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
-                    user["name"], USER_ROLE, target_hub["id"]
+                    user["name"], HUB_USER_ROLE, target_hub["id"]
                 )
             )
             sleep(10)
@@ -282,6 +283,21 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 checks=self.is_empty(),
             )
 
+    def check_hub_device(self, device: str, auth_type: str, key: str = None, thumbprint: str = None):
+        """Helper method to check whether a device exists in a hub."""
+        device_auth = self.cmd(
+            "iot hub device-identity show -n {} -g {} -d {}".format(
+                self.entity_hub_name,
+                self.entity_rg,
+                device,
+            )
+        ).get_output_in_json()["authentication"]
+        assert auth_type == device_auth["type"]
+        if key:
+            assert key == device_auth["symmetricKey"]["primaryKey"]
+        if thumbprint:
+            assert thumbprint == device_auth["x509Thumbprint"]["primaryThumbprint"]
+
     def generate_device_names(self, count=1, edge=False):
         names = [
             self.create_random_name(
@@ -296,7 +312,7 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
             self.create_random_name(
                 prefix=PREFIX_INDIVIDUAL_ENROLLMENT if not group else PREFIX_GROUP_ENROLLMENT, length=48
             )
-            for i in range(count)
+            for _ in range(count)
         ]
         return names
 

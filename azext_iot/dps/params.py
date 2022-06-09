@@ -54,7 +54,7 @@ def load_dps_arguments(self, _):
         context.argument(
             "enrollment_group_id",
             options_list=["--enrollment-group-id", "--group-id", "--gid"],
-            help="Enrollment group ID."
+            help="Enrollment group ID. Only needed to retrieve authentication arguments."
         )
         context.argument(
             "device_symmetric_key",
