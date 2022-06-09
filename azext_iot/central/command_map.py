@@ -183,6 +183,10 @@ def load_central_commands(self, _):
         is_preview=True,
     ) as cmd_group:
         cmd_group.command("list", "list_device_groups")
+        cmd_group.show_command("show", "get_device_group")
+        cmd_group.command("create", "create_device_group")
+        cmd_group.command("update", "update_device_group")
+        cmd_group.command("delete", "delete_device_group")
 
     with self.command_group(
         "iot central role", command_type=central_roles_ops, is_preview=True

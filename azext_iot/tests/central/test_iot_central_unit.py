@@ -365,6 +365,7 @@ class TestCentralDeviceGroupProvider:
         DeviceGroupV1_1_preview(group)
         for group in load_json(FileNames.central_device_group_file)
     ]
+    _device_group = load_json(FileNames.central_device_group_file)[0]
 
     @mock.patch("azext_iot.central.services.device_group")
     def test_should_return_device_groups(self, mock_device_group_svc):
@@ -397,6 +398,33 @@ class TestCentralDeviceGroupProvider:
         # call counts should be at most 1 since the provider has a cache
         assert mock_device_group_svc.list_device_groups.call_count == 1
         assert set(device_groups) == set(self._device_groups)
+
+    @mock.patch("azext_iot.central.services.device_group")
+    def test_should_update_device_group_name(self, mock_device_group_svc):
+        # setup
+        provider = CentralDeviceGroupProvider(
+            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+        )
+        existing = get_object(
+            self._device_group, "DeviceGroup", api_version=ApiVersion.v1_1_preview.value
+        )
+        display_name = "NewDeviceGroupName"
+        mock_device_group_svc.get_device_group.return_value = existing
+        updated_device_group_dict = deepcopy(self._device_group)
+        updated_device_group_dict["displayName"] = display_name
+        mock_device_group_svc.update_device_group.return_value = get_object(
+            updated_device_group_dict, "DeviceGroup", api_version=ApiVersion.v1_1_preview.value
+        )
+
+        # act
+        device_group = provider.update_device_group(
+            device_group_id=existing.id, payload=updated_device_group_dict
+        )
+
+        # verify
+        # call counts should be at most 1 since the provider has a cache
+        assert mock_device_group_svc.update_device_group.call_count == 1
+        assert device_group.display_name == display_name
 
 
 class TestCentralRoleProvider:

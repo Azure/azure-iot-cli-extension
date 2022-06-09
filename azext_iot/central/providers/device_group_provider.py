@@ -6,6 +6,10 @@
 
 
 from typing import List, Union
+from azure.cli.core.azclierror import (
+    RequiredArgumentMissingError,
+    ResourceNotFoundError
+)
 from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
@@ -52,3 +56,92 @@ class CentralDeviceGroupProvider:
         )
 
         return device_groups
+
+    def get_device_group(
+        self, device_group_id, central_dns_suffix=CENTRAL_ENDPOINT
+    ) -> Union[DeviceGroupPreview, DeviceGroupV1_1_preview]:
+        # get or add to cache
+        device_group = self._device_groups.get(device_group_id)
+        if not device_group:
+            device_group = central_services.device_group.get_device_group(
+                cmd=self._cmd,
+                app_id=self._app_id,
+                device_group_id=device_group_id,
+                token=self._token,
+                central_dns_suffix=central_dns_suffix,
+                api_version=self._api_version,
+            )
+            # add to cache
+            self._device_groups[device_group_id] = device_group
+
+        if not device_group:
+            raise ResourceNotFoundError(
+                "No device group for device group with id: '{}'.".format(
+                    device_group_id
+                )
+            )
+
+        return device_group
+
+    def create_device_group(
+        self,
+        device_group_id,
+        payload: str,
+        central_dns_suffix=CENTRAL_ENDPOINT
+    ):
+        device_group = central_services.device_group.create_device_group(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_group_id=device_group_id,
+            payload=payload,
+            token=self._token,
+            central_dns_suffix=central_dns_suffix,
+            api_version=self._api_version,
+        )
+
+        self._device_groups[device_group.id] = device_group
+
+        return device_group
+
+    def update_device_group(
+        self,
+        device_group_id,
+        payload: str,
+        central_dns_suffix=CENTRAL_ENDPOINT
+    ):
+        device_group = central_services.device_group.update_device_group(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_group_id=device_group_id,
+            payload=payload,
+            token=self._token,
+            central_dns_suffix=central_dns_suffix,
+            api_version=self._api_version,
+        )
+
+        self._device_groups[device_group.id] = device_group
+
+        return device_group
+
+    def delete_device_group(
+        self,
+        device_group_id,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        if not device_group_id:
+            raise RequiredArgumentMissingError("Device group id must be specified.")
+
+        result = central_services.device_group.delete_device_group(
+            cmd=self._cmd,
+            token=self._token,
+            app_id=self._app_id,
+            device_group_id=device_group_id,
+            central_dns_suffix=central_dns_suffix,
+            api_version=self._api_version,
+        )
+
+        # remove from cache
+        # pop "miss" raises a KeyError if None is not provided
+        self._device_groups.pop(device_group_id, None)
+
+        return result

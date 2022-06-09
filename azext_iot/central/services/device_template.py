@@ -45,7 +45,7 @@ def get_device_template(
         central_dns_suffix: {centralDnsSuffixInPath} as found in docs
 
     Returns:
-        device: dict
+        device_template: dict
     """
     url = "https://{}.{}/{}/{}".format(
         app_id, central_dns_suffix, BASE_PATH, device_template_id
