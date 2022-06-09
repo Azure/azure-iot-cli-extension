@@ -427,7 +427,7 @@ class TestDPSDeviceRegistrationsIndividual(IoTDPSLiveScenarioTest):
                     self.check("status", "assigned"),
                 ],
             )
-            self.check_hub_device(CERT_NAME, "selfSigned", thumbprint=secondary_thumprint)
+            self.check_hub_device(device_id, "selfSigned", thumbprint=secondary_thumprint)
 
             self.cmd(
                 self.set_cmd_auth_type(

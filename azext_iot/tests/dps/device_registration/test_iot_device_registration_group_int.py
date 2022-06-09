@@ -241,7 +241,7 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
 
     def test_dps_device_registration_x509_lifecycle(self):
         self.add_hub_permissions()
-        self._prepare_x509_certificates_for_dps()
+        device_thumbprint = self._prepare_x509_certificates_for_dps()
         hub_host_name = f"{self.entity_hub_name}.azure-devices.net"
 
         for auth_phase in DATAPLANE_AUTH_TYPES:
@@ -354,7 +354,7 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
                     self.check("status", "assigned"),
                 ],
             )
-            self.check_hub_device(DEVICE_CERT_NAME, "selfSigned", thumbprint=self.thumbprint)
+            self.check_hub_device(DEVICE_CERT_NAME, "selfSigned", thumbprint=device_thumbprint)
 
             # Use id scope
             registration = self.cmd(
@@ -530,13 +530,13 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
         root_cert_obj = create_certificate(
             subject=ROOT_CERT_NAME, valid_days=1, cert_output_dir=output_dir
         )
-        create_certificate(
+        device_thumbprint = create_certificate(
             subject=DEVICE_CERT_NAME,
             valid_days=1,
             cert_output_dir=output_dir,
             cert_object=root_cert_obj,
             chain_cert=True
-        )
+        )['thumbprint']
         for cert_name in [ROOT_CERT_NAME, DEVICE_CERT_NAME]:
             self.tracked_certs.append(cert_name + CERT_ENDING)
             self.tracked_certs.append(cert_name + KEY_ENDING)
@@ -576,3 +576,4 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
                 verification_code + CERT_ENDING
             )
         )
+        return device_thumbprint
