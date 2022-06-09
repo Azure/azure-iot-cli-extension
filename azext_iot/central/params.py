@@ -223,6 +223,50 @@ def load_central_arguments(self, _):
             help="The API version for the requested operation.",
         )
 
+    with self.argument_context("iot central device-group show") as context:
+        context.argument(
+            "device_group_id",
+            options_list=["--device_group_id", "-d"],
+            help="Unique ID of the device group."
+            "Regex pattern: ^[a-zA-Z0-9_-]*$",
+        )
+
+    with self.argument_context("iot central device-group create") as context:
+        context.argument(
+            "device_group_id",
+            options_list=["--device_group_id", "-d"],
+            help="Unique ID of the device group."
+            "Regex pattern: ^[a-zA-Z0-9_-]*$",
+        )
+        context.argument(
+            "content",
+            options_list=["--content", "-k"],
+            help="The device group definition. Provide path to JSON file or raw stringified JSON."
+            " [File Path Example: ./path/to/file.json] [Example of stringified JSON: {<Device Group JSON>}]."
+        )
+
+    with self.argument_context("iot central device-group update") as context:
+        context.argument(
+            "device_group_id",
+            options_list=["--device_group_id", "-d"],
+            help="Unique ID of the device group."
+            "Regex pattern: ^[a-zA-Z0-9_-]*$",
+        )
+        context.argument(
+            "content",
+            options_list=["--content", "-k"],
+            help="The device group definition. Provide path to JSON file or raw stringified JSON."
+            " [File Path Example: ./path/to/file.json] [Example of stringified JSON: {<Device Group JSON>}]."
+        )
+
+    with self.argument_context("iot central device-group delete") as context:
+        context.argument(
+            "device_group_id",
+            options_list=["--device_group_id", "-d"],
+            help="Unique ID of the device group."
+            "Regex pattern: ^[a-zA-Z0-9_-]*$",
+        )
+
     with self.argument_context("iot central user") as context:
         context.argument(
             "tenant_id",
