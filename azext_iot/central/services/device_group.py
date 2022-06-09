@@ -84,7 +84,7 @@ def get_device_group(
     token: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> List[Union[DeviceGroupPreview, DeviceGroupV1_1_preview]]:
+) -> Union[DeviceGroupPreview, DeviceGroupV1_1_preview]:
     """
     Get a specific device group from IoTC
 

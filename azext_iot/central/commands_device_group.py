@@ -35,7 +35,7 @@ def get_device_group(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.v1_1_preview.value,
-) -> List[Union[DeviceGroupPreview, DeviceGroupV1_1_preview]]:
+) -> Union[DeviceGroupPreview, DeviceGroupV1_1_preview]:
     provider = CentralDeviceGroupProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
