@@ -418,7 +418,8 @@ class TestCentralDeviceGroupProvider:
 
         # act
         device_group = provider.update_device_group(
-            device_group_id=existing.id, payload=updated_device_group_dict
+            device_group_id=existing.id,
+            display_name=display_name,
         )
 
         # verify

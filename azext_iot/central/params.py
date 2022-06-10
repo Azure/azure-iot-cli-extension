@@ -237,9 +237,24 @@ def load_central_arguments(self, _):
             help="Unique ID of the device group."
         )
         context.argument(
-            "content",
-            options_list=["--content", "-k"],
-            help="The device group definition. Provide path to JSON file or raw stringified JSON."
+            "displayName",
+            options_list=["--displayName"],
+            help="Display name of the device group."
+        )
+        context.argument(
+            "filter",
+            options_list=["--filter"],
+            help="Query defining which devices should be in this group."
+        )
+        context.argument(
+            "description",
+            options_list=["--description"],
+            help="Short summary of device group."
+        )
+        context.argument(
+            "organizations",
+            options_list=["--organizations"],
+            help="List of organization IDs of the device group."
         )
 
     with self.argument_context("iot central device-group update") as context:
@@ -249,9 +264,24 @@ def load_central_arguments(self, _):
             help="Unique ID of the device group."
         )
         context.argument(
-            "content",
-            options_list=["--content", "-k"],
-            help="The device group definition. Provide path to JSON file or raw stringified JSON."
+            "displayName",
+            options_list=["--displayName"],
+            help="Display name of the device group."
+        )
+        context.argument(
+            "filter",
+            options_list=["--filter"],
+            help="Query defining which devices should be in this group."
+        )
+        context.argument(
+            "description",
+            options_list=["--description"],
+            help="Short summary of device group."
+        )
+        context.argument(
+            "organizations",
+            options_list=["--organizations"],
+            help="List of organization IDs of the device group."
         )
 
     with self.argument_context("iot central device-group delete") as context:

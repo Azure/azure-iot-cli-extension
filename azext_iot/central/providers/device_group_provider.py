@@ -86,14 +86,20 @@ class CentralDeviceGroupProvider:
     def create_device_group(
         self,
         device_group_id,
-        payload: str,
+        display_name: str,
+        filter: str,
+        description: str = None,
+        organizations: List[str] = None,
         central_dns_suffix=CENTRAL_ENDPOINT
     ):
         device_group = central_services.device_group.create_device_group(
             cmd=self._cmd,
             app_id=self._app_id,
             device_group_id=device_group_id,
-            payload=payload,
+            display_name=display_name,
+            filter=filter,
+            description=description,
+            organizations=organizations,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
             api_version=self._api_version,
@@ -106,14 +112,20 @@ class CentralDeviceGroupProvider:
     def update_device_group(
         self,
         device_group_id,
-        payload: str,
+        display_name: str = None,
+        filter: str = None,
+        description: str = None,
+        organizations: List[str] = None,
         central_dns_suffix=CENTRAL_ENDPOINT
     ):
         device_group = central_services.device_group.update_device_group(
             cmd=self._cmd,
             app_id=self._app_id,
             device_group_id=device_group_id,
-            payload=payload,
+            display_name=display_name,
+            filter=filter,
+            description=description,
+            organizations=organizations,
             token=self._token,
             central_dns_suffix=central_dns_suffix,
             api_version=self._api_version,

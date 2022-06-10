@@ -118,7 +118,10 @@ def create_device_group(
     cmd,
     app_id: str,
     device_group_id: str,
-    payload: dict,
+    display_name: str,
+    filter: str,
+    description: str,
+    organizations: List[str],
     token: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
@@ -129,11 +132,13 @@ def create_device_group(
     Args:
         cmd: command passed into az
         app_id: name of app (used for forming request URL)
-        device_group_id: case sensitive device group id,
-        payload: see example payload available in
-            <repo-root>/azext_iot/tests/central/json/device_group_int_test.json
+        device_group_id: case sensitive device group id
+        display_name: Display name of the device group
+        filter: Query defining which devices should be in this group,
             or check here for more information
-            https://docs.microsoft.com/en-us/rest/api/iotcentral/devicegroups
+            https://docs.microsoft.com/en-us/azure/iot-central/core/howto-query-with-rest-api
+        description: Short summary of device group
+        organizations: List of organization IDs of the device group
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
         central_dns_suffix: {centralDnsSuffixInPath} as found in docs
@@ -150,6 +155,8 @@ def create_device_group(
     # Construct parameters
     query_parameters = {}
     query_parameters["api-version"] = api_version
+
+    payload = {"displayName": display_name, "description": description, "filter": filter, "organizations": organizations}
 
     response = requests.put(url, headers=headers, json=payload, params=query_parameters)
     result = _utility.try_extract_result(response)
@@ -160,7 +167,10 @@ def update_device_group(
     cmd,
     app_id: str,
     device_group_id: str,
-    payload: dict,
+    display_name: str,
+    filter: str,
+    description: str,
+    organizations: List[str],
     token: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
@@ -169,13 +179,15 @@ def update_device_group(
     Updates a device group in IoTC
 
     Args:
-        cmd: command passed into az
+       cmd: command passed into az
         app_id: name of app (used for forming request URL)
-        device_group_id: case sensitive device group id,
-        payload: see example payload available in
-            <repo-root>/azext_iot/tests/central/json/device_group_int_test.json
+        device_group_id: case sensitive device group id
+        display_name: Display name of the device group
+        filter: Query defining which devices should be in this group,
             or check here for more information
-            https://docs.microsoft.com/en-us/rest/api/iotcentral/devicegroups
+            https://docs.microsoft.com/en-us/azure/iot-central/core/howto-query-with-rest-api
+        description: Short summary of device group
+        organizations: List of organization IDs of the device group
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
         central_dns_suffix: {centralDnsSuffixInPath} as found in docs
@@ -192,6 +204,8 @@ def update_device_group(
     # Construct parameters
     query_parameters = {}
     query_parameters["api-version"] = api_version
+
+    payload = {"displayName": display_name, "description": description, "filter": filter, "organizations": organizations}
 
     response = requests.patch(
         url, headers=headers, json=payload, params=query_parameters
