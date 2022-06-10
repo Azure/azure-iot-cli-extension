@@ -33,19 +33,19 @@ def create_device_registration(
     device_provider = DeviceRegistrationProvider(
         cmd=cmd,
         registration_id=registration_id,
+        id_scope=id_scope,
+        dps_name=dps_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type_dataplane=auth_type_dataplane,
+    )
+    return device_provider.create(
         enrollment_group_id=enrollment_group_id,
         device_symmetric_key=device_symmetric_key,
         compute_key=compute_key,
         certificate_file=certificate_file,
         key_file=key_file,
         passphrase=passphrase,
-        id_scope=id_scope,
-        dps_name=dps_name,
-        resource_group_name=resource_group_name,
-        login=login,
-        auth_type_dataplane=auth_type_dataplane,
-        provisioning_host=provisioning_host
-    )
-    return device_provider.create(
         payload=payload,
+        provisioning_host=provisioning_host
     )

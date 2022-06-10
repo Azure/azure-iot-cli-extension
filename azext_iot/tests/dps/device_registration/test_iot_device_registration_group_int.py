@@ -70,12 +70,18 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
             )
             self.check_hub_device(device_id1, "sas")
 
-            # Recreate with group primary key, recreate should yeild different substatus
+            # Recreate with group primary key, and use different provisioning host
+            provisioning_host = f"{self.entity_dps_name}.azure-devices-provisioning.net"
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot device registration create --dps-name {} -g {} --group-id {} --registration-id {} --key {} "
-                    "--ck".format(
-                        self.entity_dps_name, self.entity_rg, group_id, device_id1, keys["primaryKey"]
+                    "--ck --host {}".format(
+                        self.entity_dps_name,
+                        self.entity_rg,
+                        group_id,
+                        device_id1,
+                        keys["primaryKey"],
+                        provisioning_host
                     ),
                     auth_type=auth_phase
                 ),
@@ -354,15 +360,17 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
             )
             self.check_hub_device(DEVICE_CERT_NAME, "selfSigned", thumbprint=device_thumbprint)
 
-            # Use id scope
+            # Use id scope and host
+            provisioning_host = f"{self.entity_dps_name}.azure-devices-provisioning.net"
             registration = self.cmd(
                 self.set_cmd_auth_type(
                     "iot device registration create --id-scope {} --registration-id {} "
-                    "--cp {} --kp {}".format(
+                    "--cp {} --kp {} --host {}".format(
                         self.id_scope,
                         DEVICE_CERT_NAME,
                         DEVICE_CERT_NAME + CERT_ENDING,
-                        DEVICE_CERT_NAME + KEY_ENDING
+                        DEVICE_CERT_NAME + KEY_ENDING,
+                        provisioning_host
                     ),
                     auth_type=auth_phase
                 ),

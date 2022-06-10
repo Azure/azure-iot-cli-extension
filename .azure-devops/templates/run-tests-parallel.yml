@@ -89,10 +89,6 @@ steps:
           inlineScript: |
             export COVERAGE_FILE=.coverage.${{ parameters.name }}
             pytest -vv ${{ parameters.path }} -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --deselect=azext_iot/tests/iothub/core/test_iothub_discovery_int.py::TestIoTHubDiscovery::test_iothub_targets
-        ${{ if contains(parameters.path, 'azext_iot/tests/dps') }}:
-          inlineScript: |
-            export COVERAGE_FILE=.coverage.${{ parameters.name }}
-            pytest -vv ${{ parameters.path }} -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --deselect=azext_iot/tests/dps/core/test_dps_discovery_int.py::TestDPSDiscovery::test_dps_targets
 
   - task: PublishBuildArtifacts@1
     inputs:

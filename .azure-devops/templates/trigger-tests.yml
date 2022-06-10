@@ -75,8 +75,9 @@ jobs:
       pythonVersion: $(python)
       serviceConnection: $(AzureServiceConnection)
 
-- job: 'testDPS_job_1'
-  displayName: 'Test DPS - enrollment, enrollment group and core'
+- job: 'testDPS'
+  timeoutInMinutes: 60
+  displayName: 'Test DPS'
   condition: and(succeeded(), eq('${{ parameters.testDPS }}', true))
   strategy:
     matrix: $[ variables['pythonVersions'] ]
@@ -84,23 +85,8 @@ jobs:
   steps:
   - template: run-tests-parallel.yml
     parameters:
-      path: 'azext_iot/tests/dps/enrollment azext_iot/tests/dps/enrollment_group azext_iot/tests/dps/core'
-      name: 'device-provisioning-service-1'
-      azureCLIVersion: ${{ parameters.azureCLIVersion }}
-      pythonVersion: $(python)
-      serviceConnection: $(AzureServiceConnection)
-
-- job: 'testDPS_job_2'
-  displayName: 'Test DPS - device registration'
-  condition: and(succeeded(), eq('${{ parameters.testDPS }}', true))
-  strategy:
-    matrix: $[ variables['pythonVersions'] ]
-    maxParallel: ${{ parameters.maxParallelDPS }}
-  steps:
-  - template: run-tests-parallel.yml
-    parameters:
-      path: 'azext_iot/tests/dps/device_registration'
-      name: 'device-provisioning-service-2'
+      path: 'azext_iot/tests/dps'
+      name: 'device-provisioning-service'
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
       pythonVersion: $(python)
       serviceConnection: $(AzureServiceConnection)
