@@ -64,8 +64,6 @@ jobs:
     vmImage: ${{ parameters.linuxImage }}
   strategy:
     matrix:
-      Python36:
-        python.version: '3.6.x'
       Python37:
         python.version: '3.7.x'
       Python38:
@@ -74,7 +72,6 @@ jobs:
         python.version: '3.9.x'
       Python310:
         python.version: '3.10.x'
-    maxParallel: 3
 
   steps:
   - bash: sudo rm -R -f /usr/local/lib/azureExtensionDir

@@ -322,3 +322,5 @@ src/build
 
 # Shell scripts
 *.sh
+
+/extensions

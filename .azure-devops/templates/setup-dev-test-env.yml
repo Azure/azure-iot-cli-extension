@@ -1,7 +1,7 @@
 parameters:
 - name: pythonVersion
   type: string
-  default: '3.6.x'
+  default: '3.8.x'
 - name: architecture
   type: string
   default: 'x64'
@@ -19,6 +19,8 @@ steps:
       versionSpec: ${{ parameters.pythonVersion }}
       architecture: ${{ parameters.architecture }}
 
+  - template: setup-ci-machine.yml
+
   - ${{ if eq(parameters.azureCLIVersion, 'min') }}:
     - template: install-azure-cli-min.yml
 
@@ -27,8 +29,6 @@ steps:
 
   - ${{ if eq(parameters.azureCLIVersion, 'msi') }}:
     - template: install-azure-cli-msi.yml
-
-  - template: setup-ci-machine.yml
 
   - template: download-install-local-azure-test-sdk.yml
 
