@@ -85,7 +85,7 @@ jobs:
   - template: run-tests-parallel.yml
     parameters:
       path: 'azext_iot/tests/dps/enrollment azext_iot/tests/dps/enrollment_group azext_iot/tests/dps/core'
-      name: 'device-provisioning-service'
+      name: 'device-provisioning-service-1'
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
       pythonVersion: $(python)
       serviceConnection: $(AzureServiceConnection)
@@ -100,7 +100,7 @@ jobs:
   - template: run-tests-parallel.yml
     parameters:
       path: 'azext_iot/tests/dps/device_registration'
-      name: 'device-provisioning-service'
+      name: 'device-provisioning-service-2'
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
       pythonVersion: $(python)
       serviceConnection: $(AzureServiceConnection)
