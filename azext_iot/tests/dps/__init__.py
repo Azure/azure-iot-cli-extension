@@ -96,9 +96,10 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
             rtype=ResourceTypes.hub.value,
             test_tag=test_scenario
         )
+        self.dps_cstring = self.get_dps_cstring()
+        self.hub_cstring = self.get_hub_cstring()
         self._ensure_dps_hub_link()
         self._cleanup_enrollments()
-        self.dps_cstring = self.get_dps_cstring()
 
         # Create the test certificate
         self.thumbprint = self.create_test_cert(cert_only=cert_only)
@@ -240,7 +241,7 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
         if "{}.azure-devices.net".format(self.entity_hub_name) not in hub_names:
             self.cmd(
                 "iot dps linked-hub create --dps-name {} -g {} --connection-string {} --location {}".format(
-                    self.entity_dps_name, self.entity_rg, self.get_hub_cstring(), self.get_hub_region()
+                    self.entity_dps_name, self.entity_rg, self.hub_cstring, self.get_hub_region()
                 )
             )
 
@@ -285,10 +286,10 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
     def check_hub_device(self, device: str, auth_type: str, key: str = None, thumbprint: str = None):
         """Helper method to check whether a device exists in a hub."""
+
         device_auth = self.cmd(
-            "iot hub device-identity show -n {} -g {} -d {}".format(
-                self.entity_hub_name,
-                self.entity_rg,
+            "iot hub device-identity show -l {} -d {}".format(
+                self.hub_cstring,
                 device,
             )
         ).get_output_in_json()["authentication"]

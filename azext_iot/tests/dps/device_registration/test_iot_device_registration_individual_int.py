@@ -23,10 +23,8 @@ class TestDPSDeviceRegistrationsIndividual(IoTDPSLiveScenarioTest):
     def __init__(self, test_case):
         super(TestDPSDeviceRegistrationsIndividual, self).__init__(test_case, cert_only=False)
         self.id_scope = self.get_dps_id_scope()
-        self.add_hub_permissions()
 
     def test_dps_device_registration_symmetrickey_lifecycle(self):
-        self.add_hub_permissions()
         attestation_type = AttestationType.symmetricKey.value
         hub_host_name = f"{self.entity_hub_name}.azure-devices.net"
         for auth_phase in DATAPLANE_AUTH_TYPES:
@@ -202,7 +200,6 @@ class TestDPSDeviceRegistrationsIndividual(IoTDPSLiveScenarioTest):
             )
 
     def test_dps_device_registration_x509_lifecycle(self):
-        self.add_hub_permissions()
         # Create the second test cert - have the same subject but a different file name
         secondary_thumprint = self.create_test_cert(CERT_NAME, False, SECONDARY_CERT_NAME)
         self.tracked_certs.append(SECONDARY_CERT_PATH)

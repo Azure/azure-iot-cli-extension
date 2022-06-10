@@ -23,7 +23,6 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
         self.id_scope = self.get_dps_id_scope()
 
     def test_dps_device_registration_symmetrickey_lifecycle(self):
-        self.add_hub_permissions()
         hub_host_name = f"{self.entity_hub_name}.azure-devices.net"
         for auth_phase in DATAPLANE_AUTH_TYPES:
             group_id = self.generate_enrollment_names(count=1, group=True)[0]
@@ -240,7 +239,6 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
             )
 
     def test_dps_device_registration_x509_lifecycle(self):
-        self.add_hub_permissions()
         device_thumbprint = self._prepare_x509_certificates_for_dps()
         hub_host_name = f"{self.entity_hub_name}.azure-devices.net"
 
