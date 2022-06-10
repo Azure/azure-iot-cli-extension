@@ -152,7 +152,7 @@ class DeviceUpdateAccountManager(DeviceUpdateClientHandler):
     def get_rg_location(
         self,
         resource_group_name: str,
-    ):
+    ) -> str:
         resource_group_meta = self.cli.invoke(
             f"group show --name {resource_group_name}"
         ).as_json()
