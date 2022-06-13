@@ -12,8 +12,12 @@ from azext_iot.tests.deviceupdate.conftest import (
     generate_account_id
 )
 from typing import Dict
+import os
 
 cli = EmbeddedCLI()
+
+if not os.environ.get("IOT_CLI_ADU_ENABLED"):
+    pytest.skip("ADU behind feature flag.", allow_module_level=True)
 
 
 @pytest.mark.adu_infrastructure(location="eastus2euap", count=2, delete=False)

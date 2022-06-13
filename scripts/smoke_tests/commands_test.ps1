@@ -95,6 +95,7 @@ $adu_account_name = ("smoke-adu-" + (New-Guid).guid.replace("-","")).substring(0
 $commands += "az iot device-update account create -n $adu_account_name -g $resource_group_name -l eastus2euap"
 $commands += "az iot device-update account list"
 $commands += "az iot device-update account show -n $adu_account_name"
+$commands += "az iot device-update account delete -g $resource_group_name -n $adu_account_name --no-wait -y"
 
 # IoT Hub
 $commands += "az iot hub connection-string show -g $resource_group_name -n $iothub_name --all"
@@ -253,9 +254,6 @@ foreach ($command in $commands) {
     Invoke-Expression $command
 }
 
-# ADU account clean up
-Write-Host "`r`nDeleting the temporarily provisioned ADU account..."
-az iot device-update account delete -g $resource_group_name -n $adu_account_name --no-wait -y
 
 # IoT Central App needs to be deleted if it was created for running smoke tests
 if (!$args[1]) {
