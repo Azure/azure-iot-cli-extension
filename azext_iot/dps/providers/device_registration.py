@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from logging import getLogger
+from knack.log import get_logger
 from typing import TypeVar
 from azext_iot.common.shared import AttestationType
 from azext_iot.constants import IOTDPS_PROVISIONING_HOST
@@ -31,7 +31,7 @@ from azure.cli.core.azclierror import (
     UnauthorizedError
 )
 
-logger = getLogger(__name__)
+logger = get_logger(__name__)
 ProvisioningDeviceClient = TypeVar('ProvisioningDeviceClient')
 
 
