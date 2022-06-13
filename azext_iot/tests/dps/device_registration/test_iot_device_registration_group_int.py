@@ -291,51 +291,6 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
                 expect_failure=True
             )
 
-            # Need to specify both files
-            self.cmd(
-                self.set_cmd_auth_type(
-                    "iot device registration create --dps-name {} -g {} --registration-id {} "
-                    "--cp {}".format(
-                        self.entity_dps_name,
-                        self.entity_rg,
-                        DEVICE_CERT_NAME,
-                        DEVICE_CERT_NAME + CERT_ENDING
-                    ),
-                    auth_type=auth_phase
-                ),
-                expect_failure=True
-            )
-
-            self.cmd(
-                self.set_cmd_auth_type(
-                    "iot device registration create --dps-name {} -g {} --registration-id {} "
-                    "--kp {}".format(
-                        self.entity_dps_name,
-                        self.entity_rg,
-                        DEVICE_CERT_NAME,
-                        DEVICE_CERT_NAME + KEY_ENDING
-                    ),
-                    auth_type=auth_phase
-                ),
-                expect_failure=True
-            )
-
-            # Swap files
-            self.cmd(
-                self.set_cmd_auth_type(
-                    "iot device registration create --dps-name {} -g {} --registration-id {} "
-                    "--kp {} --cp {}".format(
-                        self.entity_dps_name,
-                        self.entity_rg,
-                        DEVICE_CERT_NAME,
-                        DEVICE_CERT_NAME + CERT_ENDING,
-                        DEVICE_CERT_NAME + KEY_ENDING
-                    ),
-                    auth_type=auth_phase
-                ),
-                expect_failure=True
-            )
-
             # Normal registration
             self.cmd(
                 self.set_cmd_auth_type(
