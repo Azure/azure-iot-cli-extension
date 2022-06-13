@@ -9,8 +9,13 @@ from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.deviceupdate.conftest import ACCOUNT_RG
 from azext_iot.tests.generators import generate_generic_id
 from typing import Dict
+import os
 
 cli = EmbeddedCLI()
+
+if not os.environ.get("IOT_CLI_ADU_ENABLED"):
+    pytest.skip("ADU behind feature flag.", allow_module_level=True)
+
 
 #  Instance creation and manipulation takes an extra long time overhead.
 #  Therefore we are aiming to provision instance resources conservatively.

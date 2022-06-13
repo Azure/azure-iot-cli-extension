@@ -8,6 +8,7 @@ import os
 import sys
 from azext_iot.common.utility import ensure_azure_namespace_path
 from knack.log import get_logger
+from typing import List
 
 
 logger = get_logger(__name__)
@@ -36,17 +37,35 @@ def reload_modules() -> None:
         return
 
     ensure_azure_namespace_path()
-    mods_for_reload = ["azure.core", "azure.core.utils", "azure.mgmt", "azure.mgmt.core"]
-    mods_for_del = ["azure.core.utils._utils"]
 
-    for mod in mods_for_del:
-        if mod in sys.modules:
-            del sys.modules[mod]
+    def needs_reload(module_name: str) -> bool:
+        if module_name in sys.modules:
+            target_module = sys.modules.get(module_name)
+            _reload = True
+            if hasattr(target_module, "__path__"):
+                for path in target_module.__path__:
+                    if path.startswith(ext_azure_dir):
+                        _reload = False
+                        break
+            return _reload
+        return False
 
-    # Reload modules with best attempt
+    def reload_module_state(module_name: str, remove_prereq: List[str] = None):
+        if remove_prereq:
+            for prereq in remove_prereq:
+                if prereq in sys.modules:
+                    del sys.modules[prereq]
+
+        if module_name in sys.modules:
+            importlib.reload(sys.modules[module_name])
+
+    # This structure defines the target module for reload, and any prereq removals for a succesful reload.
+    mods_for_reload = {"azure.core": [], "azure.core.utils": ["azure.core.utils._utils"], "azure.mgmt.core": []}
+
+    # Import modules with best attempt
     for mod in mods_for_reload:
         try:
-            if mod in sys.modules:
-                importlib.reload(sys.modules[mod])
+            if needs_reload(mod):
+                reload_module_state(mod, mods_for_reload[mod])
         except Exception as e:
             logger.warning("Failed to reload module: %s, error: %s", mod, str(e))
