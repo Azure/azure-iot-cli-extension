@@ -12,7 +12,7 @@ from azure.cli.core.azclierror import (
     InvalidArgumentValueError,
     MutuallyExclusiveArgumentError,
     RequiredArgumentMissingError,
-    ResourceNotFoundError
+    ResourceNotFoundError,
 )
 from azext_iot.common._azure import IOT_SERVICE_CS_TEMPLATE
 from azext_iot.common.shared import (
@@ -678,11 +678,11 @@ def iot_dps_compute_device_key(
     auth_type_dataplane=None,
 ):
     if symmetric_key is None:
-        if not all([dps_name, resource_group_name, enrollment_id]):
+        if not all([dps_name, enrollment_id]):
             raise RequiredArgumentMissingError(
                 "Please provide DPS enrollment group identifiers (Device Provisioning Service name via "
-                "--dps-name, Enrollment ID via --enrollment-id, and resource group via --resource-group "
-                "or -g) or the enrollment group symmetric key via --symmetric-key or --key."
+                "--dps-name and Enrollment ID via --enrollment-id) or the enrollment group symmetric key "
+                "via --symmetric-key or --key."
             )
 
         discovery = DPSDiscovery(cmd)
