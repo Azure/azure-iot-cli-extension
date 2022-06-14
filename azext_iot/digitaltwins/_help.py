@@ -1051,5 +1051,5 @@ def load_digitaltwins_help():
         examples:
         - name: Delete a data import job by job id.
           text: >
-            az dt job import show -n {instance_or_hostname} -j {job_id}
+            az dt job import delete -n {instance_or_hostname} -j {job_id}
     """
