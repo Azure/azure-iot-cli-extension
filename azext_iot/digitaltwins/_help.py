@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 """
-Help definitions for IoT Hub commands.
+Help definitions for Digital Twins commands.
 """
 
 from knack.help_files import helps
@@ -691,6 +691,9 @@ def load_digitaltwins_help():
     helps["dt twin query"] = """
         type: command
         short-summary: Query the digital twins of an instance. Allows traversing relationships and filtering by property values.
+        long-summary: In many twin queries, the `$` character is used to reference the `$dtId` property of a twin. In bash-like
+          shells or powershell the `$` character has functional meaning and must be escaped as part of the query input. Please review the
+          Digital Twins CLI concepts document https://docs.microsoft.com/en-us/azure/digital-twins/concepts-cli for more information.
 
         examples:
         - name: Query all digital twins in target instance and project all attributes. Also show cost in query units.
@@ -700,6 +703,14 @@ def load_digitaltwins_help():
         - name: Query by model and project all attributes.
           text: >
             az dt twin query -n {instance_or_hostname} -q "select * from digitaltwins T where IS_OF_MODEL(T, 'dtmi:com:example:Room;2')"
+
+        - name: Query leveraging `$dtId` with bash compatible syntax
+          text: >
+            az dt twin query -n {instance_or_hostname} --query-command "SELECT * FROM DigitalTwins T Where T.\\$dtId = 'room0'"
+
+        - name: Query leveraging `$dtId` with powershell compatible syntax
+          text: >
+            az dt twin query -n {instance_or_hostname} --query-command "SELECT * FROM DigitalTwins T Where T.`$dtId = 'room0'"
     """
 
     helps["dt twin delete"] = """

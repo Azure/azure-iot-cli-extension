@@ -743,7 +743,7 @@ class TestCentralDestinationProvider:
         # verify
         assert mock_destination_svc.add_destination.call_count == 1
         assert mock_destination_svc.delete_destination.call_count == 1
-        assert provider._destinations.__len__() == 0
+        assert len(provider._destinations) == 0
 
 
 class TestCentralExportProvider:
@@ -822,7 +822,7 @@ class TestCentralExportProvider:
         # verify
         assert mock_export_svc.add_export.call_count == 1
         assert mock_export_svc.delete_export.call_count == 1
-        assert provider._exports.__len__() == 0
+        assert len(provider._exports) == 0
 
 
 class TestCentralPropertyMonitor:

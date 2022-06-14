@@ -9,6 +9,7 @@ from azure.cli.core.commands import CliCommandType
 from azext_iot.constants import VERSION
 import azext_iot._help  # noqa: F401
 from azext_iot.product.command_map import load_product_commands
+import os
 
 
 iothub_ops = CliCommandType(operations_tmpl="azext_iot.operations.hub#{}")
@@ -25,6 +26,10 @@ class IoTExtCommandsLoader(AzCommandsLoader):
         from azext_iot.central.command_map import load_central_commands
         from azext_iot.digitaltwins.command_map import load_digitaltwins_commands
 
+        if os.environ.get("IOT_CLI_ADU_ENABLED"):
+            from azext_iot.deviceupdate.command_map import load_deviceupdate_commands
+            load_deviceupdate_commands(self, args)
+
         load_command_table(self, args)
         load_iothub_commands(self, args)
         load_central_commands(self, args)
@@ -39,12 +44,14 @@ class IoTExtCommandsLoader(AzCommandsLoader):
         from azext_iot.central.params import load_central_arguments
         from azext_iot.digitaltwins.params import load_digitaltwins_arguments
         from azext_iot.product.params import load_product_params
+        from azext_iot.deviceupdate.params import load_deviceupdate_arguments
 
         load_arguments(self, command)
         load_iothub_arguments(self, command)
         load_central_arguments(self, command)
         load_digitaltwins_arguments(self, command)
         load_product_params(self, command)
+        load_deviceupdate_arguments(self, command)
 
 
 COMMAND_LOADER_CLS = IoTExtCommandsLoader

@@ -90,6 +90,13 @@ az eventgrid topic create --name $dt_eventgrid_topic --resource-group $resource_
 
 $commands = @()
 
+# Device Update
+$adu_account_name = ("smoke-adu-" + (New-Guid).guid.replace("-","")).substring(0,23)
+$commands += "az iot device-update account create -n $adu_account_name -g $resource_group_name -l eastus2euap"
+$commands += "az iot device-update account list"
+$commands += "az iot device-update account show -n $adu_account_name"
+$commands += "az iot device-update account delete -g $resource_group_name -n $adu_account_name --no-wait -y"
+
 # IoT Hub
 $commands += "az iot hub connection-string show -g $resource_group_name -n $iothub_name --all"
 
@@ -246,6 +253,7 @@ foreach ($command in $commands) {
     }
     Invoke-Expression $command
 }
+
 
 # IoT Central App needs to be deleted if it was created for running smoke tests
 if (!$args[1]) {

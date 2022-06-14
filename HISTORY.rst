@@ -3,6 +3,21 @@
 Release History
 ===============
 
+unreleased
++++++++++++++++
+
+**General updates**
+
+* Dropped support for Python 3.6. The IoT extension is constrained to Python 3.7 or greater.
+  If for whatever reason you cannot upgrade from 3.6 you are able to use older extension versions.
+
+**Device Update**
+
+* Introducing the Azure Device Update for IoT Hub root command group `az iot device-update`.
+  To learn more about the service visit https://docs.microsoft.com/en-us/azure/iot-hub-device-update/.
+
+  - The Device Update command group supports all `account` and `instance` related functionality.
+
 
 0.14.1
 +++++++++++++++
