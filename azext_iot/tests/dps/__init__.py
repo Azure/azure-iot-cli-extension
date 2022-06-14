@@ -125,7 +125,12 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def create_test_cert(self, subject=CERT_NAME, cert_only=True, file_prefix=None):
         output_dir = os.getcwd()
         thumbprint = create_self_signed_certificate(
-            subject=subject, valid_days=1, cert_output_dir=output_dir, cert_only=cert_only, file_prefix=file_prefix
+            subject=subject,
+            valid_days=1,
+            cert_output_dir=output_dir,
+            cert_only=cert_only,
+            file_prefix=file_prefix,
+            sha_version=256
         )["thumbprint"]
         self.tracked_certs.append(CERT_PATH)
         if not cert_only:

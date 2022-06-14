@@ -16,6 +16,7 @@ from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import rsa
+from azext_iot.common.shared import SHAHashVersions
 
 
 def create_self_signed_certificate(
@@ -23,7 +24,8 @@ def create_self_signed_certificate(
     valid_days: int,
     cert_output_dir: str,
     cert_only: bool = False,
-    file_prefix: str = None
+    file_prefix: str = None,
+    sha_version: int = SHAHashVersions.SHA1.value,
 ) -> Dict[str, str]:
     """
     Function used to create a basic self-signed certificate with no extensions.
@@ -35,6 +37,8 @@ def create_self_signed_certificate(
         cert_putput_dir (str): string value of output directory.
         cert_only (bool): generate certificate only; no private key or thumbprint.
         file_prefix (str): Certificate file name if it needs to be different from the subject.
+        sha_version (int): The SHA version to use for generating the thumbprint. For
+            IoT Hub, SHA1 is currently used. For DPS, SHA256 has to be used.
 
     Returns:
         result (dict): dict with certificate value, private key and thumbprint.
@@ -67,7 +71,16 @@ def create_self_signed_certificate(
         encryption_algorithm=serialization.NoEncryption(),
     ).decode("utf-8")
     cert_dump = cert.public_bytes(serialization.Encoding.PEM).decode("utf-8")
-    thumbprint = cert.fingerprint(hashes.SHA1()).hex().upper()
+
+    hash = None
+    if sha_version == SHAHashVersions.SHA1.value:
+        hash = hashes.SHA1()
+    elif sha_version == SHAHashVersions.SHA256.value:
+        hash = hashes.SHA256()
+    else:
+        raise ValueError("Only SHA1 and SHA256 supported for now.")
+
+    thumbprint = cert.fingerprint(hash).hex().upper()
 
     if cert_output_dir and exists(cert_output_dir):
         cert_file = (file_prefix or subject) + "-cert.pem"
