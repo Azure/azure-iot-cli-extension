@@ -8,7 +8,7 @@ from azext_iot.common.utility import handle_service_exception
 from azext_iot.digitaltwins.providers.base import DigitalTwinsProvider
 from azext_iot.digitaltwins.providers import ErrorResponseException
 from azext_iot.common.embedded_cli import EmbeddedCLI
-from azure.cli.core.azclierror import CLIInternalError
+from azure.cli.core.azclierror import ResourceNotFoundError
 from knack.log import get_logger
 
 logger = get_logger(__name__)
@@ -25,7 +25,7 @@ class ImportJobProvider(DigitalTwinsProvider):
             "storage account show-connection-string -n '{}'".format(storage_account)
         )
         if not storage_account_cstring_op.success():
-            raise CLIInternalError(
+            raise ResourceNotFoundError(
                 "Unable to retrieve connection string for input storage account: {}".format(storage_account)
             )
         storage_account_cstring = storage_account_cstring_op.as_json()
@@ -35,7 +35,7 @@ class ImportJobProvider(DigitalTwinsProvider):
             )
         )
         if not blob_url_op.success():
-            raise CLIInternalError(
+            raise ResourceNotFoundError(
                 "Unable to retrieve blob url for import data file: {} in {} container under {} account".format(
                     blob_name, blob_container, storage_account
                 )
