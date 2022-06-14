@@ -29,7 +29,7 @@ digitaltwins_rbac_ops = CliCommandType(
     operations_tmpl="azext_iot.digitaltwins.commands_rbac#{}"
 )
 
-digitaltwins_jobs_ops = CliCommandType(
+digitaltwins_job_ops = CliCommandType(
     operations_tmpl="azext_iot.digitaltwins.commands_jobs#{}"
 )
 
@@ -206,10 +206,16 @@ def load_digitaltwins_commands(self, _):
         )
 
     with self.command_group(
-        "dt jobs import",
-        command_type=digitaltwins_jobs_ops,
+        "dt job",
+        command_type=digitaltwins_job_ops,
     ) as cmd_group:
-        cmd_group.command("create", "create_import_job", supports_no_wait=True)
+        pass
+
+    with self.command_group(
+        "dt job import",
+        command_type=digitaltwins_job_ops,
+    ) as cmd_group:
+        cmd_group.command("create", "create_import_job")
         cmd_group.show_command("show", "show_import_job")
         cmd_group.command("list", "list_import_jobs")
-        cmd_group.command("delete", "delete_import_job", confirmation=True, supports_no_wait=True)
+        cmd_group.command("delete", "delete_import_job", confirmation=True)

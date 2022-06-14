@@ -77,8 +77,6 @@ except (SyntaxError, ImportError):
     from .event_routes_get_by_id_options import EventRoutesGetByIdOptions
     from .event_routes_add_options import EventRoutesAddOptions
     from .event_routes_delete_options import EventRoutesDeleteOptions
-    from .bulk_import_job import BulkImportJob
-    from .import_jobs_list_options import ImportJobsListOptions
 from .digital_twins_model_data_paged import DigitalTwinsModelDataPaged
 from .object_paged import ObjectPaged
 from .incoming_relationship_paged import IncomingRelationshipPaged
