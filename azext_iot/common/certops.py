@@ -67,7 +67,7 @@ def create_self_signed_certificate(
         encryption_algorithm=serialization.NoEncryption(),
     ).decode("utf-8")
     cert_dump = cert.public_bytes(serialization.Encoding.PEM).decode("utf-8")
-    thumbprint = cert.fingerprint(hashes.SHA256()).hex().upper()
+    thumbprint = cert.fingerprint(hashes.SHA1()).hex().upper()
 
     if cert_output_dir and exists(cert_output_dir):
         cert_file = (file_prefix or subject) + "-cert.pem"
