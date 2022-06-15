@@ -4,17 +4,24 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import os
 import pytest
 import json
 
 from time import time
 from uuid import uuid4
+from azext_iot.tests.helpers import CERT_ENDING, KEY_ENDING
 from azext_iot.tests.iothub import IoTLiveScenarioTest, PREFIX_DEVICE
 from azext_iot.common.utility import (
     execute_onthread,
     calculate_millisec_since_unix_epoch_utc,
     validate_key_value_pairs
 )
+from azext_iot.tests.test_utils import create_certificate
+from knack.log import get_logger
+
+
+logger = get_logger(__name__)
 
 LIVE_CONSUMER_GROUPS = ["test1", "test2", "test3"]
 MQTT_CLIENT_SETUP_TIME = 15
@@ -25,6 +32,17 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         super(TestIoTHubMessaging, self).__init__(
             test_case
         )
+        self.tracked_certs = []
+
+    def tearDown(self):
+        for cert in self.tracked_certs:
+            if os.path.exists(cert):
+                try:
+                    os.remove(cert)
+                except OSError as e:
+                    logger.error(f"Failed to remove {cert}. {e}")
+
+        super(TestIoTHubMessaging, self).tearDown()
 
     def test_uamqp_device_messaging(self):
         device_count = 1
@@ -155,7 +173,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         )
 
         # Test waiting for ack from c2d send
-        from azext_iot.operations.hub import iot_simulate_device
+        from azext_iot.iothub.commands_device_messaging import iot_simulate_device
         from azext_iot._factory import iot_hub_service_factory
         from azure.cli.core.mock import DummyCli
 
@@ -279,6 +297,91 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         for key in twin_init_props:
             assert result["properties"]["reported"][key] == twin_init_props[key]
 
+    def test_mqtt_device_simulation_x509_thumbprint(self):
+        device_ids = self.generate_device_names(2)
+        output_dir = os.getcwd()
+
+        self.cmd(
+            "iot hub device-identity create -d {} -n {} -g {} --am x509_thumbprint --valid-days 10 --od '{}'".format(
+                device_ids[0], self.entity_name, self.entity_rg, output_dir
+            ),
+            checks=[self.check("deviceId", device_ids[0])],
+        )
+        self.tracked_certs.append(f"{device_ids[0]}-cert.pem")
+        self.tracked_certs.append(f"{device_ids[0]}-key.pem")
+
+        # TODO: figure out if there is a simple way to get the d2c messages and check contents
+        self.cmd(
+            "iot device simulate -d {} -n {} -g {} --da '{}' --mc 2 --mi 1 --cp {} --kp {}".format(
+                device_ids[0], self.entity_name, self.entity_rg, "Cert Connection Simulate",
+                f"{device_ids[0]}-cert.pem", f"{device_ids[0]}-key.pem"
+            )
+        )
+
+        self.cmd(
+            "iot device send-d2c-message -d {} -n {} -g {} --da '{}' --cp {} --kp {}".format(
+                device_ids[0], self.entity_name, self.entity_rg, "Cert Connection Message",
+                f"{device_ids[0]}-cert.pem", f"{device_ids[0]}-key.pem"
+            )
+        )
+
+        # Set up the CA signed cert - need to upload to hub and sign
+        root_cert = create_certificate(subject="root", valid_days=1, cert_output_dir=output_dir)
+        create_certificate(
+            subject=device_ids[1],
+            valid_days=1,
+            cert_output_dir=output_dir,
+            cert_object=root_cert,
+            chain_cert=True
+        )
+        for cert_name in ["root", device_ids[1]]:
+            self.tracked_certs.append(cert_name + CERT_ENDING)
+            self.tracked_certs.append(cert_name + KEY_ENDING)
+        self.cmd(
+            "iot hub certificate create --hub-name {} -g {} -n {} -p {}".format(
+                self.entity_name, self.entity_rg, "root", "root" + CERT_ENDING
+            )
+        )
+
+        verification_code = self.cmd(
+            "iot hub certificate generate-verification-code --hub-name {} -g {} -n {} -e *".format(
+                self.entity_name, self.entity_rg, "root",
+            )
+        ).get_output_in_json()["properties"]["verificationCode"]
+
+        create_certificate(
+            subject=verification_code, valid_days=1, cert_output_dir=output_dir, cert_object=root_cert
+        )
+
+        self.cmd(
+            "iot hub certificate verify --hub-name {} -g {} -n {} -p {} -e *".format(
+                self.entity_name, self.entity_rg, "root", verification_code + CERT_ENDING
+            )
+        )
+
+        # create x509 CA device
+        self.cmd(
+            "iot hub device-identity create -d {} -n {} -g {} --am x509_ca ".format(
+                device_ids[1], self.entity_name, self.entity_rg
+            ),
+            checks=[self.check("deviceId", device_ids[1])],
+        )
+
+        # TODO: figure out if there is a simple way to get the d2c messages and check contents
+        self.cmd(
+            "iot device simulate -d {} -n {} -g {} --da '{}' --mc 2 --mi 1 --cp {} --kp {}".format(
+                device_ids[1], self.entity_name, self.entity_rg, "Cert Connection Simulate",
+                f"{device_ids[1]}-cert.pem", f"{device_ids[1]}-key.pem"
+            )
+        )
+
+        self.cmd(
+            "iot device send-d2c-message -d {} -n {} -g {} --da '{}' --cp {} --kp {}".format(
+                device_ids[1], self.entity_name, self.entity_rg, "Cert Connection Message",
+                f"{device_ids[1]}-cert.pem", f"{device_ids[1]}-key.pem"
+            )
+        )
+
     def test_mqtt_device_direct_method_with_custom_response_status_payload(self):
         device_count = 1
         device_ids = self.generate_device_names(device_count)
@@ -290,7 +393,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             checks=[self.check("deviceId", device_ids[0])],
         )
 
-        from azext_iot.operations.hub import iot_simulate_device
+        from azext_iot.iothub.commands_device_messaging import iot_simulate_device
         from azext_iot._factory import iot_hub_service_factory
         from azure.cli.core.mock import DummyCli
         from time import sleep
@@ -351,7 +454,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         test_twin_props = {'twin_test_prop_1': 'twin_test_value_1'}
         self.kwargs["twin_desired_properties"] = json.dumps(test_twin_props)
 
-        from azext_iot.operations.hub import iot_simulate_device
+        from azext_iot.iothub.commands_device_messaging import iot_simulate_device
         from azext_iot._factory import iot_hub_service_factory
         from azure.cli.core.mock import DummyCli
         from time import sleep
@@ -568,7 +671,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 checks=[self.check("name", cg)],
             )
 
-        from azext_iot.operations.hub import iot_device_send_message
+        from azext_iot.iothub.commands_device_messaging import iot_device_send_message
         from azext_iot._factory import iot_hub_service_factory
         from azure.cli.core.mock import DummyCli
 

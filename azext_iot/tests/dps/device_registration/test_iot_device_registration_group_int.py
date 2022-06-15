@@ -9,11 +9,10 @@ import os
 from azext_iot.common.shared import EntityStatusType
 from azext_iot.tests.dps import DATAPLANE_AUTH_TYPES, IoTDPSLiveScenarioTest
 from azext_iot.tests.dps.device_registration import compare_registrations
-from azext_iot.tests.dps.test_utils import create_certificate
+from azext_iot.tests.helpers import CERT_ENDING, KEY_ENDING, ROOT_CERT_NAME
+from azext_iot.tests.test_utils import create_certificate
 
-CERT_ENDING = "-cert.pem"
-KEY_ENDING = "-key.pem"
-ROOT_CERT_NAME = "aziotcli-root"
+
 DEVICE_CERT_NAME = "aziotcli-device"
 
 

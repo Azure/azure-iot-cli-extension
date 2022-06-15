@@ -7,8 +7,8 @@
 import pprint
 from time import sleep
 
+from azext_iot.common.utility import check_connection_string, ensure_azure_namespace_path
 from azure.cli.core.azclierror import BadRequestError
-from azext_iot.common.utility import ensure_azure_namespace_path
 from azext_iot.common.shared import DeviceAuthApiType
 
 printer = pprint.PrettyPrinter(indent=2)
@@ -16,19 +16,39 @@ printer = pprint.PrettyPrinter(indent=2)
 
 class mqtt_client(object):
     def __init__(
-        self, target, device_conn_string, device_id, device_auth_api_type,
-        method_response_code=None, method_response_payload=None, init_reported_properties=None
+        self,
+        hub_hostname,
+        device_id,
+        x509_files=None,
+        device_conn_string: str = None,
+        method_response_code=None,
+        method_response_payload=None,
+        init_reported_properties=None
     ):
         ensure_azure_namespace_path()
         from azure.iot.device import IoTHubDeviceClient as mqtt_device_client
-
-        if device_auth_api_type != DeviceAuthApiType.sas.value:
-            raise BadRequestError('MQTT simulation is only supported for symmetric key auth (SAS) based devices')
+        from azure.iot.device import X509
 
         self.device_id = device_id
-        self.target = target
         # The client automatically connects when we send/receive a message or method invocation
-        self.device_client = mqtt_device_client.create_from_connection_string(device_conn_string, websockets=True)
+        if x509_files:
+            self.device_client = mqtt_device_client.create_from_x509_certificate(
+                x509=X509(
+                    cert_file=x509_files["certificateFile"],
+                    key_file=x509_files["keyFile"],
+                    pass_phrase=x509_files["passphrase"],
+                ),
+                hostname=hub_hostname,
+                device_id=self.device_id,
+                websockets=True
+            )
+        else:
+            # Make sure we do not try to connect a x509 device using the connection string
+            check_connection_string(device_conn_string)
+            self.device_client = mqtt_device_client.create_from_connection_string(
+                device_conn_string,
+                websockets=True
+            )
         self.device_client.on_message_received = self.message_handler
         self.device_client.on_method_request_received = self.method_request_handler
         self.method_response_code = method_response_code

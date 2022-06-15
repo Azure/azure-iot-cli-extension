@@ -146,3 +146,154 @@ def load_iothub_help():
             az iot hub digital-twin update -n {iothub_name} -d {device_id}
             --json-patch ./my/patch/document.json
     """
+
+    helps[
+        "iot device"
+    ] = """
+        type: group
+        short-summary: Leverage device-to-cloud and cloud-to-device messaging capabilities.
+    """
+
+    helps[
+        "iot device c2d-message"
+    ] = """
+        type: group
+        short-summary: Cloud-to-device messaging commands.
+    """
+
+    helps[
+        "iot device c2d-message abandon"
+    ] = """
+        type: command
+        short-summary: Abandon a cloud-to-device message.
+    """
+
+    helps[
+        "iot device c2d-message complete"
+    ] = """
+        type: command
+        short-summary: Complete a cloud-to-device message.
+    """
+
+    helps[
+        "iot device c2d-message receive"
+    ] = """
+        type: command
+        short-summary: Receive a cloud-to-device message.
+        long-summary: |
+          Note: Only one message ack argument [--complete, --reject, --abandon] will be accepted.
+        examples:
+        - name: Basic usage
+          text: >
+            az iot device c2d-message receive -d {device_id} -n {hub_name} -g {resource_group}
+        - name: Receive a message and set a lock timeout of 30 seconds for that message
+          text: >
+            az iot device c2d-message receive -d {device_id} -n {hub_name} -g {resource_group} --lt {30}
+        - name: Receive a message and ack it as 'complete' after it is received
+          text: >
+            az iot device c2d-message receive -d {device_id} -n {hub_name} -g {resource_group} --complete
+        - name: Receive a message and reject it after it is received
+          text: >
+            az iot device c2d-message receive -d {device_id} -n {hub_name} -g {resource_group} --reject
+    """
+
+    helps[
+        "iot device c2d-message reject"
+    ] = """
+        type: command
+        short-summary: Reject or deadletter a cloud-to-device message.
+    """
+
+    helps[
+        "iot device c2d-message purge"
+    ] = """
+        type: command
+        short-summary: Purge cloud-to-device message queue for a target device.
+    """
+
+    helps[
+        "iot device c2d-message send"
+    ] = """
+        type: command
+        short-summary: Send a cloud-to-device message.
+        long-summary: |
+                      EXPERIMENTAL requires Python 3.4+
+                      This command relies on and may install dependent Cython package (uamqp) upon first execution.
+                      https://github.com/Azure/azure-uamqp-python
+        examples:
+        - name: Basic usage with default message body
+          text: >
+            az iot device c2d-message send -d {device_id} -n {iothub_name}
+        - name: Send cloud-to-device message with custom data and properties.
+          text: >
+            az iot device c2d-message send -d {device_id} -n {iothub_name} --data 'Hello World' --props 'key0=value0;key1=value1'
+        - name: Send a C2D message and wait for device acknowledgement
+          text: >
+            az iot device c2d-message send -d {device_id} -n {iothub_name} --ack full --wait
+    """
+
+    helps[
+        "iot device send-d2c-message"
+    ] = """
+        type: command
+        short-summary: |
+                        Send an mqtt device-to-cloud message.
+                        The command supports sending messages with application and system properties.
+                        Note: The command only works for symmetric key auth (SAS) based devices
+        examples:
+        - name: Basic usage
+          text: az iot device send-d2c-message -n {iothub_name} -d {device_id}
+        - name: Basic usage with custom data
+          text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --data {message_body}
+        - name: Send application properties
+          text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --props 'key0=value0;key1=value1'
+        - name: Send system properties (Message Id and Correlation Id)
+          text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --props '$.mid=<id>;$.cid=<id>'
+    """
+
+    helps[
+        "iot device simulate"
+    ] = """
+        type: command
+        short-summary: |
+                      Simulate a device in an Azure IoT Hub.
+                      While the device simulation is running, the device will automatically receive
+                      and acknowledge cloud-to-device (c2d) messages. For mqtt simulation, all c2d messages will
+                      be acknowledged with completion. For http simulation c2d acknowledgement is based on user
+                      selection which can be complete, reject or abandon. The mqtt simulation also supports direct
+                      method invocation which can be acknowledged by a response status code and response payload.
+                      Note: MQTT simulation is only supported for symmetric key auth (SAS) based devices.
+                      Note: The command by default will set content-type to application/json and content-encoding
+                      to utf-8. This can be overriden.
+        examples:
+        - name: Basic usage (mqtt)
+          text: az iot device simulate -n {iothub_name} -d {device_id}
+        - name: Send mixed properties (mqtt)
+          text: az iot device simulate -n {iothub_name} -d {device_id} --properties "myprop=myvalue;$.ct=application/json"
+        - name: Send direct method response status code and direct method response payload as raw json (mqtt only)
+          text: az iot device simulate -n {iothub_name} -d {device_id} --method-response-code 201 --method-response-payload '{"result":"Direct method successful"}'
+        - name: Send direct method response status code and direct method response payload as path to local file (mqtt only)
+          text: az iot device simulate -n {iothub_name} -d {device_id} --method-response-code 201 --method-response-payload '../my_direct_method_payload.json'
+        - name: Send the initial state of device twin reported properties as raw json for the target device (mqtt only)
+          text: az iot device simulate -n {iothub_name} -d {device_id} --init-reported-properties '{"reported_prop_1":"val_1", "reported_prop_2":val_2}'
+        - name: Send the initial state of device twin reported properties as path to local file for the target device (mqtt only)
+          text: az iot device simulate -n {iothub_name} -d {device_id} --init-reported-properties '../my_device_twin_reported_properties.json'
+        - name: Basic usage (http)
+          text: az iot device simulate -n {iothub_name} -d {device_id} --protocol http
+        - name: Send mixed properties (http)
+          text: az iot device simulate -n {iothub_name} -d {device_id} --protocol http --properties
+                "iothub-app-myprop=myvalue;content-type=application/json;iothub-correlationid=12345"
+        - name: Choose total message count and interval between messages
+          text: az iot device simulate -n {iothub_name} -d {device_id} --msg-count 1000 --msg-interval 5
+        - name: Reject c2d messages (http only)
+          text: az iot device simulate -n {iothub_name} -d {device_id} --rs reject --protocol http
+        - name: Abandon c2d messages (http only)
+          text: az iot device simulate -n {iothub_name} -d {device_id} --rs abandon --protocol http
+    """
+
+    helps[
+        "iot device upload-file"
+    ] = """
+        type: command
+        short-summary: Upload a local file as a device to a pre-configured blob storage container.
+    """
