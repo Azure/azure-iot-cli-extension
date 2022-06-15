@@ -4,12 +4,28 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import os
+
 from knack.log import get_logger
 from . import DTLiveScenarioTest
 from . import generate_resource_id
 from time import sleep
+from pathlib import Path
 
 logger = get_logger(__name__)
+CWD = os.path.dirname(os.path.abspath(__file__))
+MAX_TRIES = 5
+RBAC_SLEEP_INTERVAL = 60
+POLL_SLEEP_INTERVAL = 30
+EXPECTED_MODEL_IDS = [
+    "dtmi:com:microsoft:azure:iot:model0;1", "dtmi:com:microsoft:azure:iot:model1;1", "dtmi:com:microsoft:azure:iot:model2;1",
+    "dtmi:com:microsoft:azure:iot:model3;1", "dtmi:com:microsoft:azure:iot:model4;1", "dtmi:com:microsoft:azure:iot:model5;1",
+    "dtmi:com:microsoft:azure:iot:model6;1", "dtmi:com:microsoft:azure:iot:model7;1", "dtmi:com:microsoft:azure:iot:model8;1",
+    "dtmi:com:microsoft:azure:iot:model9;1"
+]
+EXPECTED_TWIN_IDS = [
+    "twin0", "twin1", "twin2", "twin3", "twin4", "twin5", "twin6", "twin7", "twin8", "twin9"
+]
 
 
 class TestDTImportJobs(DTLiveScenarioTest):
@@ -24,13 +40,11 @@ class TestDTImportJobs(DTLiveScenarioTest):
             "storage account show -n '{}' -g '{}'".format(self.storage_account_name, self.rg)
         ).get_output_in_json()["id"]
         instance_name = generate_resource_id()
-        # @avagraw - New APIs are only supported in East US in private preview.
-        dt_region = "eastus"
         create_output = self.cmd(
             "dt create -n {} -g {} -l {} --assign-identity --scopes {} --role 'Storage Blob Data Contributor'".format(
                 instance_name,
                 self.rg,
-                dt_region,
+                self.region,
                 storage_account_id
             )
         ).get_output_in_json()
@@ -42,16 +56,16 @@ class TestDTImportJobs(DTLiveScenarioTest):
             )
         )
         # Wait for RBAC to catch-up
-        sleep(60)
+        sleep(RBAC_SLEEP_INTERVAL)
 
         # Upload import data files to storage account
-        valid_import_data_file = "./import_data/bulk-models-twins-relationships-valid.ndjson"
+        valid_import_data_file = os.path.join(Path(CWD), "import_data\\bulk-models-twins-relationships-valid.ndjson")
         self.cmd(
             "storage blob upload --connection-string '{}' --container-name '{}' --file '{}' --overwrite".format(
                 self.storage_cstring, self.storage_container, valid_import_data_file
             )
         )
-        invalid_import_data_file = "./import_data/bulk-models-twins-relationships-invalid.ndjson"
+        invalid_import_data_file = os.path.join(Path(CWD), "import_data\\bulk-models-twins-relationships-invalid.ndjson")
         self.cmd(
             "storage blob upload --connection-string '{}' --container-name '{}' --file '{}' --overwrite".format(
                 self.storage_cstring, self.storage_container, invalid_import_data_file
@@ -62,7 +76,7 @@ class TestDTImportJobs(DTLiveScenarioTest):
         valid_import_job_output_filename = "{}_valid_import_job_output.txt".format(instance_name)
         create_valid_import_job_output = self.cmd(
             "dt job import create -n '{}' -g '{}' --df '{}' --ibc '{}' --isa '{}' --of '{}'".format(
-                instance_name, self.rg, valid_import_data_file.rsplit('/', maxsplit=1)[-1],
+                instance_name, self.rg, os.path.basename(valid_import_data_file),
                 self.storage_container, self.storage_account_name, valid_import_job_output_filename
             )
         ).get_output_in_json()
@@ -80,7 +94,7 @@ class TestDTImportJobs(DTLiveScenarioTest):
         invalid_import_job_output_filename = "{}_invalid_import_job_output.txt".format(instance_name)
         create_invalid_import_job_output = self.cmd(
             "dt job import create -n '{}' -g '{}' --df '{}' --ibc '{}' --isa '{}' --of '{}'".format(
-                instance_name, self.rg, invalid_import_data_file.rsplit('/', maxsplit=1)[-1],
+                instance_name, self.rg, os.path.basename(invalid_import_data_file),
                 self.storage_container, self.storage_account_name, invalid_import_job_output_filename
             )
         ).get_output_in_json()
@@ -99,8 +113,7 @@ class TestDTImportJobs(DTLiveScenarioTest):
 
         # Poll to ensure desired status of import jobs
         num_tries = 0
-        max_tries = 5
-        while num_tries < max_tries:
+        while num_tries < MAX_TRIES:
             num_tries += 1
             show_valid_import_job_output = self.cmd(
                 "dt job import show -n '{}' -g '{}' -j '{}'".format(instance_name, self.rg, valid_import_job_id)
@@ -114,23 +127,30 @@ class TestDTImportJobs(DTLiveScenarioTest):
                 assert(show_invalid_import_job_output["error"]["error"]["code"] == "DTDLParsingError")
                 assert(show_valid_import_job_output["error"] is None)
                 break
-            sleep(30)
+            sleep(POLL_SLEEP_INTERVAL)
 
         list_models_output = self.cmd(
             "dt model list -n {} -g {} --definition".format(instance_name, self.rg)
         ).get_output_in_json()
-        assert len(list_models_output) == 10
+        model_ids = []
         for model in list_models_output:
             assert model["id"]
             assert model["model"]
+            model_ids.append(model["id"])
+        assert len(model_ids) == len(EXPECTED_MODEL_IDS)
+        assert set(model_ids) == set(EXPECTED_MODEL_IDS)
 
         twin_query_result = self.cmd(
             "dt twin query -n {} -q 'select * from digitaltwins'".format(instance_name)
         ).get_output_in_json()
-        assert len(twin_query_result["result"]) == 10
-
-        twin_ids = [twin["$dtId"] for twin in twin_query_result["result"]]
+        twin_ids = []
         relationship = "has"
+        for twin in twin_query_result["result"]:
+            assert twin["$dtId"]
+            assert twin["$metadata"]
+            twin_ids.append(twin["$dtId"])
+        assert len(twin_ids) == len(EXPECTED_TWIN_IDS)
+        assert set(twin_ids) == set(EXPECTED_TWIN_IDS)
         for twin_id in twin_ids:
             twin_relationship_list_result = self.cmd(
                 "dt twin relationship list -n {} -g {} --twin-id {} --relationship {}".format(

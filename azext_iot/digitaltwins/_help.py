@@ -1010,18 +1010,20 @@ def load_digitaltwins_help():
 
     helps["dt job import create"] = """
         type: command
-        short-summary: Create and execute a data import job on a digital twin instance.
+        short-summary: Create and execute a data import job on a digital twin instance. The command requires an input import data file (in .ndjson format) to be
+                       present in the input blob container. Additionally, the DT instance being used must have 'Storage Blob Data Contributor' role set on input
+                       storage account. Once the job completes, an output file containing job's logs and errors will be created.
 
         examples:
         - name: Creates a job for importing data file stored in an azure storage container. Import job's output file is created in the input file's blob container.
           text: >
-            az dt job import create -n {instance_or_hostname} --data-file-name {data_file_name} --input-blob-container-name {input_blob_container_name}
-            --input-storage-account-name {input_storage_account_name} --output-file-name {output_file_name}
+            az dt job import create -n {instance_or_hostname} --data-file {data_file_name} --input-blob-container {input_blob_container_name}
+            --input-storage-account {input_storage_account_name} --output-file {output_file_name}
         - name: Creates a job for importing data file stored in an azure storage container. Import job's output file is created in user-defined storage account and blob container.
           text: >
-            az dt job import create -n {instance_or_hostname} --data-file-name {data_file_name} --input-blob-container-name {input_blob_container_name}
-            --input-storage-account-name {input_storage_account_name} --output-file-name {output_file_name} --output-blob-container-name {output_blob_container_name}
-            --output-storage-account-name {output_storage_account_name}
+            az dt job import create -n {instance_or_hostname} --data-file {data_file_name} --input-blob-container {input_blob_container_name}
+            --input-storage-account {input_storage_account_name} --output-file {output_file_name} --output-blob-container {output_blob_container_name}
+            --output-storage-account {output_storage_account_name}
     """
 
     helps["dt job import show"] = """
