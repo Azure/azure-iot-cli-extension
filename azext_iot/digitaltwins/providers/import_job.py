@@ -15,7 +15,7 @@ logger = get_logger(__name__)
 
 
 class ImportJobProvider(DigitalTwinsProvider):
-    def __init__(self, cmd, name, rg=None):
+    def __init__(self, cmd, name: str, rg: str = None):
         super(ImportJobProvider, self).__init__(cmd=cmd, name=name, rg=rg)
         self.sdk = self.get_sdk().import_jobs
         self.cli = EmbeddedCLI()
