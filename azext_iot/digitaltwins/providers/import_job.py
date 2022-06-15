@@ -20,7 +20,7 @@ class ImportJobProvider(DigitalTwinsProvider):
         self.sdk = self.get_sdk().import_jobs
         self.cli = EmbeddedCLI()
 
-    def _get_blob_url(self, blob_name, blob_container, storage_account):
+    def _get_blob_url(self, blob_name: str, blob_container: str, storage_account: str):
         storage_account_cstring_op = self.cli.invoke(
             "storage account show-connection-string -n '{}'".format(storage_account)
         )
@@ -43,13 +43,13 @@ class ImportJobProvider(DigitalTwinsProvider):
         blob_url = blob_url_op.as_json()
         return blob_url
 
-    def get(self, job_id):
+    def get(self, job_id: str):
         try:
             return self.sdk.get_by_id(job_id)
         except ErrorResponseException as e:
             handle_service_exception(e)
 
-    def list(self, top=None):  # top is guarded for int() in arg def
+    def list(self, top: int = None):  # top is guarded for int() in arg def
         from azext_iot.sdk.digitaltwins.dataplane.models import ImportJobsListOptions
 
         list_options = ImportJobsListOptions(max_item_count=top)
@@ -60,8 +60,8 @@ class ImportJobProvider(DigitalTwinsProvider):
             handle_service_exception(e)
 
     def create(
-        self, job_id, input_blob_name, input_blob_container, input_storage_account,
-        output_blob_name, output_blob_container=None, output_storage_account=None
+        self, job_id: str, input_blob_name: str, input_blob_container: str, input_storage_account: str,
+        output_blob_name: str, output_blob_container: str = None, output_storage_account: str = None
     ):
         from azext_iot.sdk.digitaltwins.dataplane.models import BulkImportJob
 
@@ -80,7 +80,7 @@ class ImportJobProvider(DigitalTwinsProvider):
         except ErrorResponseException as e:
             handle_service_exception(e)
 
-    def delete(self, job_id):
+    def delete(self, job_id: str):
         try:
             return self.sdk.delete(id=job_id)
         except ErrorResponseException as e:
