@@ -73,33 +73,40 @@ class TestDTImportJobs(DTLiveScenarioTest):
         )
 
         # Create import job for valid import data
-        valid_import_job_output_filename = "{}_valid_import_job_output.txt".format(instance_name)
+        valid_import_job_id = "{}_valid_import_job".format(instance_name)
+        valid_import_data_filename = os.path.basename(valid_import_data_file)
         create_valid_import_job_output = self.cmd(
-            "dt job import create -n '{}' -g '{}' --df '{}' --ibc '{}' --isa '{}' --of '{}'".format(
-                instance_name, self.rg, os.path.basename(valid_import_data_file),
-                self.storage_container, self.storage_account_name, valid_import_job_output_filename
+            "dt job import create -n '{}' -g '{}' -j '{}' --df '{}' --ibc '{}' --isa '{}'".format(
+                instance_name, self.rg, valid_import_job_id,
+                valid_import_data_filename, self.storage_container, self.storage_account_name
             )
         ).get_output_in_json()
 
-        assert_import_job_creation(create_valid_import_job_output)
-        valid_import_job_id = create_valid_import_job_output["id"]
+        expected_import_job_output_filename = "{}_output.txt".format(valid_import_job_id)
+        assert_import_job_creation(
+            create_valid_import_job_output, valid_import_data_filename, expected_import_job_output_filename, valid_import_job_id
+        )
+        valid_import_job_output_filename = create_valid_import_job_output["outputBlobUri"].split("/")[-1]
 
         # Show import job
         show_import_job_output = self.cmd(
             "dt job import show -n '{}' -g '{}' -j '{}'".format(instance_name, self.rg, valid_import_job_id)
         ).get_output_in_json()
-        assert(show_import_job_output["id"] == valid_import_job_id)
+        assert show_import_job_output["id"] == valid_import_job_id
 
         # Create import job for invalid import data
         invalid_import_job_output_filename = "{}_invalid_import_job_output.txt".format(instance_name)
+        invalid_import_data_filename = os.path.basename(invalid_import_data_file)
         create_invalid_import_job_output = self.cmd(
             "dt job import create -n '{}' -g '{}' --df '{}' --ibc '{}' --isa '{}' --of '{}'".format(
-                instance_name, self.rg, os.path.basename(invalid_import_data_file),
+                instance_name, self.rg, invalid_import_data_filename,
                 self.storage_container, self.storage_account_name, invalid_import_job_output_filename
             )
         ).get_output_in_json()
 
-        assert_import_job_creation(create_invalid_import_job_output)
+        assert_import_job_creation(
+            create_invalid_import_job_output, invalid_import_data_filename, invalid_import_job_output_filename
+        )
         invalid_import_job_id = create_invalid_import_job_output["id"]
 
         # List import jobs
@@ -118,14 +125,14 @@ class TestDTImportJobs(DTLiveScenarioTest):
             show_valid_import_job_output = self.cmd(
                 "dt job import show -n '{}' -g '{}' -j '{}'".format(instance_name, self.rg, valid_import_job_id)
             ).get_output_in_json()
-            assert(show_valid_import_job_output["status"] != "failed")
+            assert show_valid_import_job_output["status"] != "failed"
             show_invalid_import_job_output = self.cmd(
                 "dt job import show -n '{}' -g '{}' -j '{}'".format(instance_name, self.rg, invalid_import_job_id)
             ).get_output_in_json()
-            assert(show_invalid_import_job_output["status"] != "succeeded")
+            assert show_invalid_import_job_output["status"] != "succeeded"
             if show_valid_import_job_output["status"] == "succeeded" and show_invalid_import_job_output["status"] == "failed":
-                assert(show_invalid_import_job_output["error"]["error"]["code"] == "DTDLParsingError")
-                assert(show_valid_import_job_output["error"] is None)
+                assert show_invalid_import_job_output["error"]["error"]["code"] == "DTDLParsingError"
+                assert show_valid_import_job_output["error"] is None
                 break
             sleep(POLL_SLEEP_INTERVAL)
 
@@ -191,7 +198,17 @@ class TestDTImportJobs(DTLiveScenarioTest):
             )
 
 
-def assert_import_job_creation(create_import_job_output):
-    assert(create_import_job_output is not None)
-    assert(create_import_job_output["error"] is None)
-    assert(create_import_job_output["status"] == "notstarted")
+def assert_import_job_creation(
+    create_import_job_output: dict, expected_input_blob_name: str, expected_output_blob_name: str, expected_job_id: str = None
+):
+    assert create_import_job_output is not None
+    assert create_import_job_output["error"] is None
+    assert create_import_job_output["status"] == "notstarted"
+    assert create_import_job_output["inputBlobUri"]
+    assert create_import_job_output["inputBlobUri"].split("/")[-1] == expected_input_blob_name
+    assert create_import_job_output["outputBlobUri"]
+    assert create_import_job_output["outputBlobUri"].split("/")[-1] == expected_output_blob_name
+    assert create_import_job_output["id"]
+    # We know the expected job id only when it is passed in as a param, else it is system generated
+    if expected_job_id is not None:
+        assert create_import_job_output["id"] == expected_job_id

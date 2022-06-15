@@ -10,6 +10,7 @@ from azext_iot.digitaltwins.providers import ErrorResponseException
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azure.cli.core.azclierror import ResourceNotFoundError
 from knack.log import get_logger
+from uuid import uuid4
 
 logger = get_logger(__name__)
 
@@ -60,16 +61,15 @@ class ImportJobProvider(DigitalTwinsProvider):
             handle_service_exception(e)
 
     def create(
-        self, job_id: str, input_blob_name: str, input_blob_container: str, input_storage_account: str,
-        output_blob_name: str, output_blob_container: str = None, output_storage_account: str = None
+        self, input_blob_name: str, input_blob_container: str, input_storage_account: str, output_blob_name: str = None,
+        output_blob_container: str = None, output_storage_account: str = None, job_id: str = None,
     ):
         from azext_iot.sdk.digitaltwins.dataplane.models import BulkImportJob
 
-        if output_storage_account is None:
-            output_storage_account = input_storage_account
-
-        if output_blob_container is None:
-            output_blob_container = input_blob_container
+        job_id = "bulk-import-job-{}".format(str(uuid4()).replace("-", "")) if job_id is None else job_id
+        output_blob_name = "{}_output.txt".format(job_id) if output_blob_name is None else output_blob_name
+        output_storage_account = input_storage_account if output_storage_account is None else output_storage_account
+        output_blob_container = input_blob_container if output_blob_container is None else output_blob_container
 
         input_blob_url = self._get_blob_url(input_blob_name, input_blob_container, input_storage_account)
         output_blob_url = self._get_blob_url(output_blob_name, output_blob_container, output_storage_account)
