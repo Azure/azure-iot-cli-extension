@@ -12,8 +12,8 @@ logger = get_logger(__name__)
 
 
 def create_import_job(
-    cmd, name_or_hostname: str, data_file_name: str, input_blob_container_name: str, 
-    input_storage_account_name: str, output_file_name: str, output_blob_container_name: str = None, 
+    cmd, name_or_hostname: str, data_file_name: str, input_blob_container_name: str,
+    input_storage_account_name: str, output_file_name: str, output_blob_container_name: str = None,
     output_storage_account_name: str = None, resource_group_name: str = None
 ):
     import_job_provider = ImportJobProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
