@@ -2491,9 +2491,6 @@ def iot_c2d_message_send(
     auth_type_dataplane=None,
 ):
     from azext_iot.common.deps import ensure_uamqp
-    from azext_iot.common.utility import validate_min_python_version
-
-    validate_min_python_version(3, 4)
 
     if wait_on_feedback and not ack:
         raise RequiredArgumentMissingError(
@@ -2988,9 +2985,6 @@ def iot_hub_monitor_feedback(
     auth_type_dataplane=None,
 ):
     from azext_iot.common.deps import ensure_uamqp
-    from azext_iot.common.utility import validate_min_python_version
-
-    validate_min_python_version(3, 4)
 
     config = cmd.cli_ctx.config
     ensure_uamqp(config, yes, repair)

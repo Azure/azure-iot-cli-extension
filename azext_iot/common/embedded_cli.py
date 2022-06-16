@@ -59,12 +59,12 @@ class EmbeddedCLI(object):
                 )
             )
 
-    def success(self):
+    def success(self) -> bool:
         logger.debug("Operation error code: %s", self.error_code)
         return self.error_code == 0
 
-    def _ensure_json_output(self, command: str):
+    def _ensure_json_output(self, command: str) -> str:
         return "{} -o json".format(command)
 
-    def _ensure_subscription(self, command: str, subscription: str):
+    def _ensure_subscription(self, command: str, subscription: str) -> str:
         return "{} --subscription '{}'".format(command, subscription)

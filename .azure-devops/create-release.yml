@@ -24,16 +24,16 @@ parameters:
   type: string
   default: '3.8.x'
   values:
-  - '3.6.x'
   - '3.8.x'
   - '3.9.x'
+  - '3.10.x'
 - name: pythonVersionsTestingMatrix
   type: object
   default: >
     {
-      Python36:
+      Python37:
       {
-        python: '3.6.x'
+        python: '3.7.x'
       },
       Python38:
       {
@@ -64,6 +64,9 @@ parameters:
   type: boolean
   default: true
 - name: 'testHub'
+  type: boolean
+  default: true
+- name: 'testADU'
   type: boolean
   default: true
 
@@ -135,9 +138,11 @@ stages:
         testCentral: ${{ parameters.testCentral }}
         testDPS: ${{ parameters.testDPS }}
         testHub: ${{ parameters.testHub }}
+        testADU: ${{ parameters.testADU }}
         maxParallelADT: 2
         maxParallelDPS: 2
         maxParallelHub: 2
+        maxParallelADU: 2
     - job: 'evaluateCmdTable'
       displayName: 'Evaluate Command Table'
       steps:
