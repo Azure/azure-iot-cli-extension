@@ -1,7 +1,4 @@
-dt endpoint:
-  rule_exclusions:
-    - require_wait_command_if_no_wait
-dt data-history:
+dt endpoint create:
   rule_exclusions:
     - require_wait_command_if_no_wait
 dt endpoint create servicebus:
@@ -20,6 +17,8 @@ dt endpoint create eventhub:
       rule_exclusions:
       - parameter_should_not_end_in_resource_group
 dt data-history connection create adx:
+  rule_exclusions:
+    - require_wait_command_if_no_wait
   parameters:
     adx_resource_group:
       rule_exclusions:

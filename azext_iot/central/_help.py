@@ -1804,7 +1804,7 @@ def _load_central_edge_help():
             examples:
             - name: Run a module command
               text: >
-                iot central device edge module command run
+                az iot central device edge module command run
                 --app-id {appid}
                 --device-id {deviceid}
                 --module-name {modulename}
@@ -1825,7 +1825,7 @@ def _load_central_edge_help():
             examples:
             - name: Run a module component command
               text: >
-                iot central device edge module command run-component-command
+                az iot central device edge module command run-component-command
                 --app-id {appid}
                 --device-id {deviceid}
                 --module-name {modulename}
@@ -1842,7 +1842,7 @@ def _load_central_edge_help():
             examples:
             - name: Get module command history
               text: >
-                iot central device edge module command history
+                az iot central device edge module command history
                 --app-id {appid}
                 --device-id {deviceid}
                 --module-name {modulename}
@@ -1857,7 +1857,7 @@ def _load_central_edge_help():
             examples:
             - name: Get module component command history
               text: >
-                iot central device edge module command component-history
+                az iot central device edge module command component-history
                 --app-id {appid}
                 --device-id {deviceid}
                 --module-name {modulename}

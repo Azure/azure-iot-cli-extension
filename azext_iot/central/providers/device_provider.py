@@ -19,6 +19,7 @@ from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.enum import DeviceStatus, ApiVersion
 from azext_iot.central.models.v1 import DeviceV1
+from azext_iot.central.models.ga_2022_05_31 import DeviceGa20220531
 from azext_iot.central.models.v1_1_preview import (
     DeviceV1_1_preview,
     RelationshipV1_1_preview,
@@ -58,7 +59,7 @@ class CentralDeviceProvider:
         self,
         device_id,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> Union[DeviceV1, DeviceV1_1_preview, DevicePreview]:
+    ) -> Union[DeviceGa20220531, DeviceV1, DeviceV1_1_preview, DevicePreview]:
 
         # get or add to cache
         device = self._devices.get(device_id)
@@ -84,7 +85,7 @@ class CentralDeviceProvider:
         self,
         filter=None,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> List[Union[DeviceV1, DeviceV1_1_preview, DevicePreview]]:
+    ) -> List[Union[DeviceGa20220531, DeviceV1, DeviceV1_1_preview, DevicePreview]]:
         devices = central_services.device.list_devices(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -107,7 +108,7 @@ class CentralDeviceProvider:
         simulated=False,
         organizations=None,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> Union[DeviceV1, DeviceV1_1_preview, DevicePreview]:
+    ) -> Union[DeviceGa20220531, DeviceV1, DeviceV1_1_preview, DevicePreview]:
         if not device_id:
             raise RequiredArgumentMissingError("Device id must be specified.")
 
@@ -146,7 +147,7 @@ class CentralDeviceProvider:
         enabled=None,
         organizations=None,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> Union[DeviceV1, DeviceV1_1_preview, DevicePreview]:
+    ) -> Union[DeviceGa20220531, DeviceV1, DeviceV1_1_preview, DevicePreview]:
         if not device_id:
             raise RequiredArgumentMissingError("Device id must be specified.")
 
