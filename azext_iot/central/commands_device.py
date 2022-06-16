@@ -228,7 +228,6 @@ def run_module_command(
     app_id: str,
     device_id: str,
     module_name: str,
-    component_name: str,
     command_name: str,
     content: str,
     token=None,
