@@ -13,8 +13,9 @@ from azure.cli.core.azclierror import (
 from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
-from azext_iot.central.models.v1_1_preview import DeviceGroupV1_1_preview
 from azext_iot.central.models.preview import DeviceGroupPreview
+from azext_iot.central.models.v1_1_preview import DeviceGroupV1_1_preview
+from azext_iot.central.models.ga_2022_05_31 import DeviceGroupGa20220531
 
 logger = get_logger(__name__)
 
@@ -59,7 +60,7 @@ class CentralDeviceGroupProvider:
 
     def get_device_group(
         self, device_group_id, central_dns_suffix=CENTRAL_ENDPOINT
-    ) -> Union[DeviceGroupPreview, DeviceGroupV1_1_preview]:
+    ) -> Union[DeviceGroupPreview, DeviceGroupV1_1_preview, DeviceGroupGa20220531]:
         # get or add to cache
         device_group = self._device_groups.get(device_group_id)
         if not device_group:
@@ -91,7 +92,7 @@ class CentralDeviceGroupProvider:
         description: str = None,
         organizations: List[str] = None,
         central_dns_suffix=CENTRAL_ENDPOINT
-    ):
+    ) -> Union[DeviceGroupPreview, DeviceGroupV1_1_preview, DeviceGroupGa20220531]:
         device_group = central_services.device_group.create_device_group(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -117,7 +118,7 @@ class CentralDeviceGroupProvider:
         description: str = None,
         organizations: List[str] = None,
         central_dns_suffix=CENTRAL_ENDPOINT
-    ):
+    ) -> Union[DeviceGroupPreview, DeviceGroupV1_1_preview, DeviceGroupGa20220531]:
         device_group = central_services.device_group.update_device_group(
             cmd=self._cmd,
             app_id=self._app_id,

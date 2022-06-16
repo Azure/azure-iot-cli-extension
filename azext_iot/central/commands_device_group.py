@@ -9,6 +9,7 @@ from typing import List, Union
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.models.preview import DeviceGroupPreview
 from azext_iot.central.models.v1_1_preview import DeviceGroupV1_1_preview
+from azext_iot.central.models.ga_2022_05_31 import DeviceGroupGa20220531
 from azext_iot.central.providers import CentralDeviceGroupProvider
 from azext_iot.central.models.enum import ApiVersion
 
@@ -19,7 +20,7 @@ def list_device_groups(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.ga_2022_05_31.value,
-) -> List[Union[DeviceGroupPreview, DeviceGroupV1_1_preview]]:
+) -> List[Union[DeviceGroupPreview, DeviceGroupV1_1_preview, DeviceGroupGa20220531]]:
     provider = CentralDeviceGroupProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
@@ -33,7 +34,7 @@ def get_device_group(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.ga_2022_05_31.value,
-) -> Union[DeviceGroupPreview, DeviceGroupV1_1_preview]:
+) -> Union[DeviceGroupPreview, DeviceGroupV1_1_preview, DeviceGroupGa20220531]:
     provider = CentralDeviceGroupProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
@@ -51,7 +52,7 @@ def create_device_group(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.ga_2022_05_31.value,
-):
+) -> Union[DeviceGroupPreview, DeviceGroupV1_1_preview, DeviceGroupGa20220531]:
     provider = CentralDeviceGroupProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
@@ -78,7 +79,7 @@ def update_device_group(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.ga_2022_05_31.value,
-):
+) -> Union[DeviceGroupPreview, DeviceGroupV1_1_preview, DeviceGroupGa20220531]:
     provider = CentralDeviceGroupProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )

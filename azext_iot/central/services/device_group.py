@@ -15,7 +15,7 @@ from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
 from azext_iot.central.models.preview import DeviceGroupPreview
 from azext_iot.central.models.v1_1_preview import DeviceGroupV1_1_preview
-from azext_iot.central.models.ga_2022_05_31 import DeviceGroup2022_05_31
+from azext_iot.central.models.ga_2022_05_31 import DeviceGroupGa20220531
 from azext_iot.central.models.enum import ApiVersion
 
 logger = get_logger(__name__)
@@ -31,7 +31,7 @@ def list_device_groups(
     api_version: str,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> List[Union[DeviceGroupPreview, DeviceGroupV1_1_preview, DeviceGroup2022_05_31]]:
+) -> List[Union[DeviceGroupPreview, DeviceGroupV1_1_preview, DeviceGroupGa20220531]]:
     """
     Get a list of all device groups.
 
@@ -67,7 +67,11 @@ def list_device_groups(
             [
                 DeviceGroupPreview(device_group)
                 if api_version == ApiVersion.preview.value
-                else DeviceGroupV1_1_preview(device_group)
+                else (
+                    DeviceGroupV1_1_preview(device_group)
+                    if api_version == ApiVersion.v1_1_preview.value
+                    else DeviceGroupGa20220531(device_group)
+                )
                 for device_group in result["value"]
             ]
         )
@@ -85,7 +89,7 @@ def get_device_group(
     token: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[DeviceGroupPreview, DeviceGroupV1_1_preview]:
+) -> Union[DeviceGroupPreview, DeviceGroupV1_1_preview, DeviceGroupGa20220531]:
     """
     Get a specific device group.
 
@@ -124,7 +128,7 @@ def create_device_group(
     token: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[DeviceGroupPreview, DeviceGroupV1_1_preview]:
+) -> Union[DeviceGroupPreview, DeviceGroupV1_1_preview, DeviceGroupGa20220531]:
     """
     Create a device group.
 
@@ -170,7 +174,7 @@ def update_device_group(
     token: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[DeviceGroupPreview, DeviceGroupV1_1_preview]:
+) -> Union[DeviceGroupPreview, DeviceGroupV1_1_preview, DeviceGroupGa20220531]:
     """
     Updates a device group.
 

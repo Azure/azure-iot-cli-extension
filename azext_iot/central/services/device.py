@@ -790,7 +790,6 @@ def get_component_command_history(
         api_version=api_version,
         central_dnx_suffix=central_dns_suffix,
     )
-    
 
 
 def get_module_command_history(
