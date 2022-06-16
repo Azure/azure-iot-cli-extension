@@ -18,6 +18,12 @@ unreleased
 
   - The Device Update command group supports all `account` and `instance` related functionality.
 
+**IoT DPS updates**
+
+* Added device registration commands, `az iot device registration create` to register a device to an individual
+  enrollment or an enrollment group. Currently, devices with symmetric key and x509 certificate authentication
+  are supported. Once registered, the device will show up in the linked IoT Hub and can be interacted with or
+  simulated using other `az iot device` commands.
 
 **IoT Central updates**
 
