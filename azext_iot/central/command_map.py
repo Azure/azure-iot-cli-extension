@@ -143,6 +143,19 @@ def load_central_commands(self, _):
         cmd_group.command("compute-device-key", "compute_device_key")
         cmd_group.command("manual-failover", "run_manual_failover")
         cmd_group.command("manual-failback", "run_manual_failback")
+        cmd_group.command("show-attestation", "get_attestation")
+        cmd_group.command("delete-attestation", "delete_attestation")
+        cmd_group.command("update-attestation", "update_attestation")
+        cmd_group.command("create-attestation", "create_attestation")
+        cmd_group.command("list-components", "list_components")
+        cmd_group.command("show-properties", "get_properties")
+        cmd_group.command("replace-properties", "replace_properties")
+        cmd_group.command("update-properties", "update_properties")
+        cmd_group.command("show-telemetry-value", "get_telemetry_value")
+        cmd_group.command("show-component-properties", "get_component_properties")
+        cmd_group.command("replace-component-properties", "replace_component_properties")
+        cmd_group.command("update-component-properties", "update_component_properties")
+        cmd_group.command("show-component-telemetry-value", "get_component_telemetry_value")
 
     with self.command_group(
         "iot central device twin",
@@ -239,6 +252,28 @@ def load_central_commands(self, _):
         cmd_group.command("list", "list_device_modules")
         cmd_group.show_command("show", "get_device_module")
         cmd_group.command("restart", "restart_device_module")
+        cmd_group.command("list-components", "list_module_components")
+        cmd_group.command("show-component-properties", "get_module_component_properties")
+        cmd_group.command("show-component-telemetry-value", "get_module_component_telemetry_value")
+        cmd_group.command("show-properties", "get_module_properties")
+        cmd_group.command("show-telemetry-value", "get_module_telemetry_value")
+
+    with self.command_group(
+        "iot central device edge module command",
+        command_type=central_device_ops,
+    ) as cmd_group:
+        cmd_group.command("run", "run_module_command")
+        cmd_group.command("run-component-command", "run_module_component_command")
+        cmd_group.command("history", "get_module_command_history")
+        cmd_group.command("component-history", "get_module_component_command_history")
+        cmd_group.command("show-properties", "get_module_properties")
+        cmd_group.command("update-properties", "update_module_properties")
+        cmd_group.command("replace-properties", "replace_module_properties")
+        cmd_group.command("show-telemetry-value", "get_module_telemetry_value")
+        cmd_group.command("show-component-properties", "get_module_component_properties")
+        cmd_group.command("update-component-properties", "update_module_component_properties")
+        cmd_group.command("replace-component-properties", "replace_module_component_properties")
+        cmd_group.command("show-component-telemetry-value", "get_module_component_telemetry_value")
 
     with self.command_group(
         "iot central device edge manifest",

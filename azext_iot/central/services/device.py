@@ -612,6 +612,64 @@ def run_command(
     return _utility.try_extract_result(response)
 
 
+def run_module_command(
+    cmd,
+    app_id: str,
+    token: str,
+    device_id: str,
+    module_name: str,
+    component_name: str,
+    command_name: str,
+    payload: dict,
+    api_version: str,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+):
+    """
+    Run a command on a module.
+
+    Args:
+        cmd: command passed into az
+        app_id: name of app (used for forming request URL)
+        device_id: unique case-sensitive device id
+        module_name: name of the device module
+        component_name: name of the device component
+        command_name: name of command to execute
+        payload: params for command
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        result (currently a 201)
+    """
+
+    url = "https://{}.{}/{}/{}/modules/{}/components/{}/commands/{}".format(
+        app_id, central_dns_suffix, BASE_PATH, device_id, module_name, component_name, command_name
+    )
+
+    if component_name is None:
+        url = "https://{}.{}/{}/{}/modules/{}/commands/{}".format(
+            app_id, central_dns_suffix, BASE_PATH, device_id, module_name, command_name
+        )
+
+    headers = _utility.get_headers(token, cmd)
+
+    # Construct parameters
+    query_parameters = {}
+    query_parameters["api-version"] = api_version
+
+    response = requests.post(
+        url, headers=headers, json=payload, params=query_parameters
+    )
+
+    # execute command response has caveats in it due to Async/Sync device methods
+    # return the response if we get 201, otherwise try to apply generic logic
+    if response.status_code == 201:
+        return response.json()
+
+    return _utility.try_extract_result(response)
+
+
 def run_component_command(
     cmd,
     app_id: str,
@@ -735,6 +793,52 @@ def get_component_command_history(
 
     response = requests.get(url, headers=headers, params=query_parameters)
     return _utility.try_extract_result(response)
+
+
+def get_module_command_history(
+    cmd,
+    app_id: str,
+    token: str,
+    device_id: str,
+    module_name: str,
+    component_name: str,
+    command_name: str,
+    api_version: str,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+):
+    """
+    Get module command history
+
+    Args:
+        cmd: command passed into az
+        app_id: name of app (used for forming request URL)
+        device_id: unique case-sensitive device id
+        module_name: name of the device module
+        component_name: name of the device component
+        command_name: name of command to view execution history
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        Module command history (List)
+    """
+    url = "https://{}.{}/{}/{}/modules/{}/components/{}/commands/{}".format(
+        app_id, central_dns_suffix, BASE_PATH, device_id, module_name, component_name, command_name
+    )
+    if component_name is None:
+        url = f"https://{app_id}.{central_dns_suffix}/api/devices/{device_id}/modules/{module_name}/commands/{command_name}"
+
+    return _utility.make_api_call(
+        cmd,
+        app_id=app_id,
+        method="GET",
+        url=url,
+        payload=None,
+        token=token,
+        api_version=api_version,
+        central_dnx_suffix=central_dns_suffix,
+    )
 
 
 def get_device_twin(
@@ -903,6 +1007,7 @@ def list_device_modules(
     app_id: str,
     device_id: str,
     token: str,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> List[EdgeModule]:
     """
@@ -919,25 +1024,16 @@ def list_device_modules(
     Returns:
         modules: list
     """
-
-    if not token:
-        aad_token = get_aad_token(cmd, resource="https://apps.azureiotcentral.com")[
-            "accessToken"
-        ]
-        token = "Bearer {}".format(aad_token)
-
-    url = f"https://{app_id}.{central_dns_suffix}/system/iotedge/devices/{device_id}/modules"
-    headers = _utility.get_headers(token, cmd)
-
-    # Construct parameters
-
-    response = requests.get(
-        url,
-        headers=headers,
-        verify=not should_disable_connection_verify(),
-    )
-
-    response_data = _utility.try_extract_result(response).get("modules")
+    response_data = _utility.make_api_call(
+        cmd,
+        app_id=app_id,
+        method="GET",
+        url=f"https://{app_id}.{central_dns_suffix}/api/devices/{device_id}/modules",
+        payload=None,
+        token=token,
+        api_version=api_version,
+        central_dnx_suffix=central_dns_suffix,
+    ).get("modules")
 
     if not response_data:
         raise BadRequestError(f"Device '{device_id}' is not an IoT Edge device.")
@@ -991,3 +1087,364 @@ def restart_device_module(
     )
 
     return response.json()
+
+
+def get_device_attestation(
+    cmd,
+    app_id: str,
+    device_id: str,
+    token: str,
+    api_version=ApiVersion.ga_2022_05_31.value,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+):
+    """
+    Gets the attestation for a device.
+
+    Args:
+        cmd: command passed into az
+        app_id: name of app (used for forming request URL)
+        device_id: unique case-sensitive device id
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        device_attestation: dict
+    """
+    return _utility.make_api_call(
+        cmd,
+        app_id=app_id,
+        method="DELETE",
+        url=f"https://{app_id}.{central_dns_suffix}/api/devices/{device_id}/attestation",
+        payload=None,
+        token=token,
+        api_version=api_version,
+        central_dnx_suffix=central_dns_suffix,
+    )
+
+
+def delete_device_attestation(
+    cmd,
+    app_id: str,
+    device_id: str,
+    token: str,
+    api_version=ApiVersion.ga_2022_05_31.value,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+):
+    """
+    Remove an individual device attestation.
+
+    Args:
+        cmd: command passed into az
+        app_id: name of app (used for forming request URL)
+        device_id: unique case-sensitive device id,
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        {"result": "success"} on success
+        Raises error on failure
+    """
+    return _utility.make_api_call(
+        cmd,
+        app_id=app_id,
+        method="DELETE",
+        url=f"https://{app_id}.{central_dns_suffix}/api/devices/{device_id}/attestation",
+        payload=None,
+        token=token,
+        api_version=api_version,
+        central_dnx_suffix=central_dns_suffix,
+    )
+
+
+def update_device_attestation(
+    cmd,
+    app_id: str,
+    device_id: str,
+    payload: str,
+    token: str,
+    api_version=ApiVersion.ga_2022_05_31.value,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+):
+    """
+    Update an individual device attestation via patch
+
+    Args:
+        cmd: command passed into az
+        app_id: name of app (used for forming request URL)
+        device_id: unique case-sensitive device id,
+        payload: attestation key definition in JSON
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        {"result": "success"} on success
+        Raises error on failure
+    """
+    return _utility.make_api_call(
+        cmd,
+        app_id=app_id,
+        method="PATCH",
+        url=f"https://{app_id}.{central_dns_suffix}/api/devices/{device_id}/attestation",
+        payload=payload,
+        token=token,
+        api_version=api_version,
+        central_dnx_suffix=central_dns_suffix,
+    )
+
+
+def create_device_attestation(
+    cmd,
+    app_id: str,
+    device_id: str,
+    payload: str,
+    token: str,
+    api_version=ApiVersion.ga_2022_05_31.value,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+):
+    """
+    Create an individual device attestation
+
+    Args:
+        cmd: command passed into az
+        app_id: name of app (used for forming request URL)
+        device_id: unique case-sensitive device id,
+        payload: attestation key definition in JSON
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        {"result": "success"} on success
+        Raises error on failure
+    """
+    return _utility.make_api_call(
+        cmd,
+        app_id=app_id,
+        method="PUT",
+        url=f"https://{app_id}.{central_dns_suffix}/api/devices/{device_id}/attestation",
+        payload=payload,
+        token=token,
+        api_version=api_version,
+        central_dnx_suffix=central_dns_suffix,
+    )
+
+
+def list_device_components(
+    cmd,
+    app_id: str,
+    device_id: str,
+    token: str,
+    api_version=ApiVersion.ga_2022_05_31.value,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+):
+    """
+    List the components present in a device.
+
+    Args:
+        cmd: command passed into az
+        app_id: name of app (used for forming request URL)
+        device_id: unique case-sensitive device id,
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        device_components: dict
+    """
+    return _utility.make_api_call(
+        cmd,
+        app_id=app_id,
+        method="GET",
+        url=f"https://{app_id}.{central_dns_suffix}/api/devices/{device_id}/components",
+        payload=None,
+        token=token,
+        api_version=api_version,
+        central_dnx_suffix=central_dns_suffix,
+    )
+
+
+def list_device_module_components(
+    cmd,
+    app_id: str,
+    device_id: str,
+    module_name: str,
+    token: str,
+    api_version=ApiVersion.ga_2022_05_31.value,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+):
+    """
+    List the components present in a module.
+
+    Args:
+        cmd: command passed into az
+        app_id: name of app (used for forming request URL)
+        device_id: unique case-sensitive device id,
+        module_name: name of the device module,
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        module_components: dict
+    """
+    return _utility.make_api_call(
+        cmd,
+        app_id=app_id,
+        method="GET",
+        url=f"https://{app_id}.{central_dns_suffix}/api/devices/{device_id}/modules/{module_name}/components",
+        payload=None,
+        token=token,
+        api_version=api_version,
+        central_dnx_suffix=central_dns_suffix,
+    )
+
+
+def get_device_properties_or_telemetry_value(
+    cmd,
+    app_id: str,
+    device_id: str,
+    module_name: str,
+    component_name: str,
+    telemetry_name: str,
+    token: str,
+    api_version=ApiVersion.ga_2022_05_31.value,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+):
+    """
+    Get device properties or telemetry value for device / component / module / module component
+
+    Args:
+        cmd: command passed into az
+        app_id: name of app (used for forming request URL)
+        device_id: unique case-sensitive device id,
+        moduleName: name of the device module,
+        component_name: name of the device component,
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        properties/telemetry value: dict
+    """
+    url = f"https://{app_id}.{central_dns_suffix}/api/devices/{device_id}"
+
+    if module_name is not None:
+        url += f"/modules/{module_name}"
+
+    if component_name is not None:
+        url += f"/components/{component_name}"
+
+    if telemetry_name is not None:
+        url += f"/telemetry/{telemetry_name}"
+    else:
+        url += "/properties"
+
+    return _utility.make_api_call(
+        cmd,
+        app_id=app_id,
+        method="GET",
+        url=url,
+        payload=None,
+        token=token,
+        api_version=api_version,
+        central_dnx_suffix=central_dns_suffix,
+    )
+
+
+def replace_properties(
+    cmd,
+    app_id: str,
+    device_id: str,
+    module_name: str,
+    component_name: str,
+    token: str,
+    api_version=ApiVersion.ga_2022_05_31.value,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+):
+    """
+    Replace properties for device / component / module / module component
+
+    Args:
+        cmd: command passed into az
+        app_id: name of app (used for forming request URL)
+        device_id: unique case-sensitive device id
+        moduleName: name of the device module
+        component_name: name of the device component
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        properties: dict
+    """
+    url = f"https://{app_id}.{central_dns_suffix}/api/devices/{device_id}"
+
+    if module_name is not None:
+        url += f"/modules/{module_name}"
+
+    if component_name is not None:
+        url += f"/components/{component_name}"
+
+    url += "/properties"
+
+    return _utility.make_api_call(
+        cmd,
+        app_id=app_id,
+        method="PUT",
+        url=url,
+        payload=None,
+        token=token,
+        api_version=api_version,
+        central_dnx_suffix=central_dns_suffix,
+    )
+
+
+def update_properties(
+    cmd,
+    app_id: str,
+    device_id: str,
+    module_name: str,
+    component_name: str,
+    token: str,
+    api_version=ApiVersion.ga_2022_05_31.value,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+):
+    """
+    Update properties for device / component / module / module component
+
+    Args:
+        cmd: command passed into az
+        app_id: name of app (used for forming request URL)
+        device_id: unique case-sensitive device id
+        moduleName: name of the device module
+        component_name: name of the device component
+        token: (OPTIONAL) authorization token to fetch device details from IoTC.
+            MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
+        central_dns_suffix: {centralDnsSuffixInPath} as found in docs
+
+    Returns:
+        properties: dict
+    """
+    url = f"https://{app_id}.{central_dns_suffix}/api/devices/{device_id}"
+
+    if module_name is not None:
+        url += f"/modules/{module_name}"
+
+    if component_name is not None:
+        url += f"/components/{component_name}"
+
+    url += "/properties"
+
+    return _utility.make_api_call(
+        cmd,
+        app_id=app_id,
+        method="PATCH",
+        url=url,
+        payload=None,
+        token=token,
+        api_version=api_version,
+        central_dnx_suffix=central_dns_suffix,
+    )

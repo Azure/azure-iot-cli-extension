@@ -18,7 +18,7 @@ def list_device_groups(
     app_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1_1_preview.value,
+    api_version=ApiVersion.ga_2022_05_31.value,
 ) -> List[Union[DeviceGroupPreview, DeviceGroupV1_1_preview]]:
     provider = CentralDeviceGroupProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
@@ -32,7 +32,7 @@ def get_device_group(
     device_group_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1_1_preview.value,
+    api_version=ApiVersion.ga_2022_05_31.value,
 ) -> Union[DeviceGroupPreview, DeviceGroupV1_1_preview]:
     provider = CentralDeviceGroupProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
@@ -50,7 +50,7 @@ def create_device_group(
     organizations: List[str] = None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1_1_preview.value,
+    api_version=ApiVersion.ga_2022_05_31.value,
 ):
     provider = CentralDeviceGroupProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
@@ -77,7 +77,7 @@ def update_device_group(
     organizations: List[str] = None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1_1_preview.value,
+    api_version=ApiVersion.ga_2022_05_31.value,
 ):
     provider = CentralDeviceGroupProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
@@ -100,7 +100,7 @@ def delete_device_group(
     device_group_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1_1_preview.value,
+    api_version=ApiVersion.ga_2022_05_31.value,
 ):
     provider = CentralDeviceGroupProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version

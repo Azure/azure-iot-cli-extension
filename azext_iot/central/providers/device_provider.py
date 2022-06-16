@@ -403,6 +403,28 @@ class CentralDeviceProvider:
             api_version=self._api_version,
         )
 
+    def run_module_command(
+        self,
+        device_id: str,
+        module_name: str,
+        component_name: str,
+        command_name: str,
+        payload: dict,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.run_module_command(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            token=self._token,
+            device_id=device_id,
+            module_name=module_name,
+            component_name=component_name,
+            command_name=command_name,
+            payload=payload,
+            central_dns_suffix=central_dns_suffix,
+            api_version=self._api_version,
+        )
+
     def get_command_history(
         self,
         device_id: str,
@@ -437,6 +459,26 @@ class CentralDeviceProvider:
             api_version=self._api_version,
         )
 
+    def get_module_command_history(
+        self,
+        device_id: str,
+        module_name: str,
+        component_name: str,
+        command_name: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.get_module_command_history(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            token=self._token,
+            device_id=device_id,
+            module_name=module_name,
+            component_name=component_name,
+            command_name=command_name,
+            central_dns_suffix=central_dns_suffix,
+            api_version=self._api_version,
+        )
+
     def list_device_modules(
         self,
         device_id,
@@ -448,6 +490,7 @@ class CentralDeviceProvider:
             app_id=self._app_id,
             device_id=device_id,
             token=self._token,
+            api_version=self._api_version,
             central_dns_suffix=central_dns_suffix,
         )
 
@@ -540,6 +583,380 @@ class CentralDeviceProvider:
             app_id=self._app_id,
             device_id=device_id,
             token=self._token,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def get_device_attestation(
+        self,
+        device_id: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.get_device_attestation(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def delete_device_attestation(
+        self,
+        device_id: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.delete_device_attestation(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def update_device_attestation(
+        self,
+        device_id: str,
+        payload,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.update_device_attestation(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            payload=payload,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def create_device_attestation(
+        self,
+        device_id: str,
+        payload,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.create_device_attestation(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            payload=payload,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def list_device_components(
+        self,
+        device_id: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.list_device_components(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def list_device_module_components(
+        self,
+        device_id: str,
+        module_name: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.list_device_module_components(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            module_name=module_name,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def get_device_properties(
+        self,
+        device_id: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.get_device_properties_or_telemetry_value(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            module_name=None,
+            component_name=None,
+            telemetry_name=None,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def replace_device_properties(
+        self,
+        device_id: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.replace_properties(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            module_name=None,
+            component_name=None,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def update_device_properties(
+        self,
+        device_id: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.update_properties(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            module_name=None,
+            component_name=None,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def get_device_telemetry_value(
+        self,
+        device_id: str,
+        telemetry_name: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.get_device_properties_or_telemetry_value(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            module_name=None,
+            component_name=None,
+            telemetry_name=telemetry_name,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def get_device_component_properties(
+        self,
+        device_id: str,
+        component_name: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.get_device_properties_or_telemetry_value(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            module_name=None,
+            component_name=component_name,
+            telemetry_name=None,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def replace_device_component_properties(
+        self,
+        device_id: str,
+        component_name: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.replace_properties(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            module_name=None,
+            component_name=component_name,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def update_device_component_properties(
+        self,
+        device_id: str,
+        component_name: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.update_properties(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            module_name=None,
+            component_name=component_name,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def get_device_component_telemetry_value(
+        self,
+        device_id: str,
+        component_name: str,
+        telemetry_name: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.get_device_properties_or_telemetry_value(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            module_name=None,
+            component_name=component_name,
+            telemetry_name=telemetry_name,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def get_module_properties(
+        self,
+        device_id: str,
+        module_name: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.get_device_properties_or_telemetry_value(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            module_name=module_name,
+            component_name=None,
+            telemetry_name=None,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def replace_module_properties(
+        self,
+        device_id: str,
+        module_name: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.replace_properties(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            module_name=module_name,
+            component_name=None,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def update_module_properties(
+        self,
+        device_id: str,
+        module_name: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.update_properties(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            module_name=module_name,
+            component_name=None,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def get_module_telemetry_value(
+        self,
+        device_id: str,
+        module_name: str,
+        telemetry_name: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.get_device_properties_or_telemetry_value(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            module_name=module_name,
+            component_name=None,
+            telemetry_name=telemetry_name,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def get_module_component_properties(
+        self,
+        device_id: str,
+        module_name: str,
+        component_name: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.get_device_properties_or_telemetry_value(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            module_name=module_name,
+            component_name=component_name,
+            telemetry_name=None,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def replace_module_component_properties(
+        self,
+        device_id: str,
+        module_name: str,
+        component_name: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.replace_properties(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            module_name=module_name,
+            component_name=component_name,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def update_module_component_properties(
+        self,
+        device_id: str,
+        module_name: str,
+        component_name: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.update_properties(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            module_name=module_name,
+            component_name=component_name,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def get_module_component_telemetry_value(
+        self,
+        device_id: str,
+        module_name: str,
+        component_name: str,
+        telemetry_name: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.get_device_properties_or_telemetry_value(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            module_name=module_name,
+            component_name=component_name,
+            telemetry_name=telemetry_name,
+            token=self._token,
+            api_version=self._api_version,
             central_dns_suffix=central_dns_suffix,
         )
 

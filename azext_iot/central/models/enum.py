@@ -62,6 +62,7 @@ class ApiVersion(Enum):
     preview = "preview"
     v1 = "1.0"
     v1_1_preview = "1.1-preview"
+    ga_2022_05_31 = "2022-05-31"
 
 
 def get_enum_keys(enum: Enum) -> List[str]:
