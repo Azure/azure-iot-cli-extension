@@ -15,6 +15,7 @@ from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
 from azext_iot.central.models.preview import DeviceGroupPreview
 from azext_iot.central.models.v1_1_preview import DeviceGroupV1_1_preview
+from azext_iot.central.models.ga_2022_05_31 import DeviceGroup2022_05_31
 from azext_iot.central.models.enum import ApiVersion
 
 logger = get_logger(__name__)
@@ -30,9 +31,9 @@ def list_device_groups(
     api_version: str,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> List[Union[DeviceGroupPreview, DeviceGroupV1_1_preview]]:
+) -> List[Union[DeviceGroupPreview, DeviceGroupV1_1_preview, DeviceGroup2022_05_31]]:
     """
-    Get a list of all device groups in IoTC app
+    Get a list of all device groups.
 
     Args:
         cmd: command passed into az
@@ -86,7 +87,7 @@ def get_device_group(
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> Union[DeviceGroupPreview, DeviceGroupV1_1_preview]:
     """
-    Get a specific device group from IoTC
+    Get a specific device group.
 
     Args:
         cmd: command passed into az
@@ -99,18 +100,16 @@ def get_device_group(
     Returns:
         device_group: dict
     """
-
-    url = "https://{}.{}/{}/{}".format(
-        app_id, central_dns_suffix, BASE_PATH, device_group_id
+    result = _utility.make_api_call(
+        cmd,
+        app_id=app_id,
+        method="GET",
+        url="https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, device_group_id),
+        payload=None,
+        token=token,
+        api_version=api_version,
+        central_dnx_suffix=central_dns_suffix,
     )
-    headers = _utility.get_headers(token, cmd)
-
-    # Construct parameters
-    query_parameters = {}
-    query_parameters["api-version"] = api_version
-
-    response = requests.get(url, headers=headers, params=query_parameters)
-    result = _utility.try_extract_result(response)
     return _utility.get_object(result, model=MODEL, api_version=api_version)
 
 
@@ -127,7 +126,7 @@ def create_device_group(
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> Union[DeviceGroupPreview, DeviceGroupV1_1_preview]:
     """
-    Create a device group in IoTC
+    Create a device group.
 
     Args:
         cmd: command passed into az
@@ -146,20 +145,17 @@ def create_device_group(
     Returns:
         device_group: dict
     """
-
-    url = "https://{}.{}/{}/{}".format(
-        app_id, central_dns_suffix, BASE_PATH, device_group_id
-    )
-    headers = _utility.get_headers(token, cmd, has_json_payload=True)
-
-    # Construct parameters
-    query_parameters = {}
-    query_parameters["api-version"] = api_version
-
     payload = {"displayName": display_name, "description": description, "filter": filter, "organizations": organizations}
-
-    response = requests.put(url, headers=headers, json=payload, params=query_parameters)
-    result = _utility.try_extract_result(response)
+    result = _utility.make_api_call(
+        cmd,
+        app_id=app_id,
+        method="PUT",
+        url="https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, device_group_id),
+        payload=payload,
+        token=token,
+        api_version=api_version,
+        central_dnx_suffix=central_dns_suffix,
+    )
     return _utility.get_object(result, model=MODEL, api_version=api_version)
 
 
@@ -176,7 +172,7 @@ def update_device_group(
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> Union[DeviceGroupPreview, DeviceGroupV1_1_preview]:
     """
-    Updates a device group in IoTC
+    Updates a device group.
 
     Args:
        cmd: command passed into az
@@ -195,22 +191,17 @@ def update_device_group(
     Returns:
         device_group: dict
     """
-
-    url = "https://{}.{}/{}/{}".format(
-        app_id, central_dns_suffix, BASE_PATH, device_group_id
-    )
-    headers = _utility.get_headers(token, cmd, has_json_payload=True)
-
-    # Construct parameters
-    query_parameters = {}
-    query_parameters["api-version"] = api_version
-
     payload = {"displayName": display_name, "description": description, "filter": filter, "organizations": organizations}
-
-    response = requests.patch(
-        url, headers=headers, json=payload, params=query_parameters
+    result = _utility.make_api_call(
+        cmd,
+        app_id=app_id,
+        method="PATCH",
+        url="https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, device_group_id),
+        payload=payload,
+        token=token,
+        api_version=api_version,
+        central_dnx_suffix=central_dns_suffix,
     )
-    result = _utility.try_extract_result(response)
     return _utility.get_object(result, MODEL, api_version)
 
 
@@ -223,7 +214,7 @@ def delete_device_group(
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> dict:
     """
-    Delete a device group from IoTC
+    Delete a device group.
 
     Args:
         cmd: command passed into az
@@ -236,14 +227,13 @@ def delete_device_group(
     Returns:
         device_group: dict
     """
-    url = "https://{}.{}/{}/{}".format(
-        app_id, central_dns_suffix, BASE_PATH, device_group_id
+    return _utility.make_api_call(
+        cmd,
+        app_id=app_id,
+        method="DELETE",
+        url="https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, device_group_id),
+        payload=None,
+        token=token,
+        api_version=api_version,
+        central_dnx_suffix=central_dns_suffix,
     )
-    headers = _utility.get_headers(token, cmd)
-
-    # Construct parameters
-    query_parameters = {}
-    query_parameters["api-version"] = api_version
-
-    response = requests.delete(url, headers=headers, params=query_parameters)
-    return _utility.try_extract_result(response)

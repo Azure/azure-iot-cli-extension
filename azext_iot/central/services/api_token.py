@@ -32,7 +32,7 @@ def add_api_token(
     Args:
         cmd: command passed into az
         app_id: name of app (used for forming request URL)
-        token_id: Unique ID for the API token.
+        token_id: Unique ID for the API token
         role : permission level to access the application
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
@@ -41,8 +41,6 @@ def add_api_token(
     Returns:
     token: dict
     """
-    url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, token_id)
-
     payload = {
         "roles": [{"role": role}],
     }
@@ -50,14 +48,16 @@ def add_api_token(
     if org_id and api_version == ApiVersion.v1_1_preview.value:
         payload["roles"][0]["organization"] = org_id
 
-    # Construct parameters
-    query_parameters = {}
-    query_parameters["api-version"] = api_version
-
-    headers = _utility.get_headers(token, cmd, has_json_payload=True)
-
-    response = requests.put(url, headers=headers, json=payload, params=query_parameters)
-    return _utility.try_extract_result(response)
+    return _utility.make_api_call(
+        cmd,
+        app_id=app_id,
+        method="PUT",
+        url="https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, token_id),
+        payload=None,
+        token=token,
+        api_version=api_version,
+        central_dnx_suffix=central_dns_suffix,
+    )
 
 
 def get_api_token_list(
@@ -80,16 +80,16 @@ def get_api_token_list(
     Returns:
         tokens: dict
     """
-    url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
-
-    # Construct parameters
-    query_parameters = {}
-    query_parameters["api-version"] = api_version
-
-    headers = _utility.get_headers(token, cmd)
-
-    response = requests.get(url, params=query_parameters, headers=headers)
-    return _utility.try_extract_result(response)
+    return _utility.make_api_call(
+        cmd,
+        app_id=app_id,
+        method="GET",
+        url="https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH),
+        payload=None,
+        token=token,
+        api_version=api_version,
+        central_dnx_suffix=central_dns_suffix,
+    )
 
 
 def get_api_token(
@@ -114,16 +114,16 @@ def get_api_token(
     Returns:
         token: dict
     """
-    url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, token_id)
-
-    headers = _utility.get_headers(token, cmd)
-
-    # Construct parameters
-    query_parameters = {}
-    query_parameters["api-version"] = api_version
-
-    response = requests.get(url, headers=headers, params=query_parameters)
-    return _utility.try_extract_result(response)
+    return _utility.make_api_call(
+        cmd,
+        app_id=app_id,
+        method="GET",
+        url="https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, token_id),
+        payload=None,
+        token=token,
+        api_version=api_version,
+        central_dnx_suffix=central_dns_suffix,
+    )
 
 
 def delete_api_token(
@@ -148,13 +148,13 @@ def delete_api_token(
     Returns:
        result (currently a 201)
     """
-    url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, token_id)
-
-    headers = _utility.get_headers(token, cmd)
-
-    # Construct parameters
-    query_parameters = {}
-    query_parameters["api-version"] = api_version
-
-    response = requests.delete(url, headers=headers, params=query_parameters)
-    return _utility.try_extract_result(response)
+    return _utility.make_api_call(
+        cmd,
+        app_id=app_id,
+        method="GET",
+        url="https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, token_id),
+        payload=None,
+        token=token,
+        api_version=api_version,
+        central_dnx_suffix=central_dns_suffix,
+    )

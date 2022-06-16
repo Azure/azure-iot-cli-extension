@@ -222,8 +222,6 @@ def load_central_arguments(self, _):
             default=ApiVersion.v1_1_preview.value,
             help="The API version for the requested operation.",
         )
-
-    with self.argument_context("iot central device-group show") as context:
         context.argument(
             "device_group_id",
             options_list=["--device-group-id", "-d"],
@@ -231,11 +229,6 @@ def load_central_arguments(self, _):
         )
 
     with self.argument_context("iot central device-group create") as context:
-        context.argument(
-            "device_group_id",
-            options_list=["--device-group-id", "-d"],
-            help="Unique ID of the device group."
-        )
         context.argument(
             "displayName",
             options_list=["--displayName"],
@@ -259,11 +252,6 @@ def load_central_arguments(self, _):
 
     with self.argument_context("iot central device-group update") as context:
         context.argument(
-            "device_group_id",
-            options_list=["--device-group-id", "-d"],
-            help="Unique ID of the device group."
-        )
-        context.argument(
             "displayName",
             options_list=["--displayName"],
             help="Display name of the device group."
@@ -282,13 +270,6 @@ def load_central_arguments(self, _):
             "organizations",
             options_list=["--organizations"],
             help="List of organization IDs of the device group."
-        )
-
-    with self.argument_context("iot central device-group delete") as context:
-        context.argument(
-            "device_group_id",
-            options_list=["--device-group-id", "-d"],
-            help="Unique ID of the device group."
         )
 
     with self.argument_context("iot central user") as context:

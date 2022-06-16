@@ -60,21 +60,16 @@ def get_device(
     Returns:
         device: dict
     """
-
-    url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, device_id)
-    headers = _utility.get_headers(token, cmd)
-
-    # Construct parameters
-    query_parameters = {}
-    query_parameters["api-version"] = api_version
-
-    response = requests.get(
-        url,
-        headers=headers,
-        params=query_parameters,
-        verify=not should_disable_connection_verify(),
+    result = _utility.make_api_call(
+        cmd,
+        app_id=app_id,
+        method="GET",
+        url="https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, device_id),
+        payload=None,
+        token=token,
+        api_version=api_version,
+        central_dnx_suffix=central_dns_suffix,
     )
-    result = _utility.try_extract_result(response)
 
     return _utility.get_object(result, MODEL, api_version)
 
@@ -365,15 +360,16 @@ def delete_device(
         {"result": "success"} on success
         Raises error on failure
     """
-    url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, device_id)
-    headers = _utility.get_headers(token, cmd)
-
-    # Construct parameters
-    query_parameters = {}
-    query_parameters["api-version"] = api_version
-
-    response = requests.delete(url, headers=headers, params=query_parameters)
-    return _utility.try_extract_result(response)
+    return _utility.make_api_call(
+        cmd,
+        app_id=app_id,
+        method="DELETE",
+        url="https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, device_id),
+        payload=None,
+        token=token,
+        api_version=api_version,
+        central_dnx_suffix=central_dns_suffix,
+    )
 
 
 def list_relationships(
@@ -552,17 +548,16 @@ def get_device_credentials(
     Returns:
         device_credentials: dict
     """
-    url = "https://{}.{}/{}/{}/credentials".format(
-        app_id, central_dns_suffix, BASE_PATH, device_id
+    return _utility.make_api_call(
+        cmd,
+        app_id=app_id,
+        method="GET",
+        url="https://{}.{}/{}/{}/credentials".format(app_id, central_dns_suffix, BASE_PATH, device_id),
+        payload=None,
+        token=token,
+        api_version=api_version,
+        central_dnx_suffix=central_dns_suffix,
     )
-    headers = _utility.get_headers(token, cmd)
-
-    # Construct parameters
-    query_parameters = {}
-    query_parameters["api-version"] = api_version
-
-    response = requests.get(url, headers=headers, params=query_parameters)
-    return _utility.try_extract_result(response)
 
 
 def run_command(
@@ -743,17 +738,16 @@ def get_command_history(
     Returns:
         Command history (List) - currently limited to 1 item
     """
-    url = "https://{}.{}/{}/{}/commands/{}".format(
-        app_id, central_dns_suffix, BASE_PATH, device_id, command_name
+    return _utility.make_api_call(
+        cmd,
+        app_id=app_id,
+        method="GET",
+        url="https://{}.{}/{}/{}/commands/{}".format(app_id, central_dns_suffix, BASE_PATH, device_id, command_name),
+        payload=None,
+        token=token,
+        api_version=api_version,
+        central_dnx_suffix=central_dns_suffix,
     )
-    headers = _utility.get_headers(token, cmd)
-
-    # Construct parameters
-    query_parameters = {}
-    query_parameters["api-version"] = api_version
-
-    response = requests.get(url, headers=headers, params=query_parameters)
-    return _utility.try_extract_result(response)
 
 
 def get_component_command_history(
@@ -785,14 +779,18 @@ def get_component_command_history(
     url = "https://{}.{}/{}/{}/components/{}/commands/{}".format(
         app_id, central_dns_suffix, BASE_PATH, device_id, interface_id, command_name
     )
-    headers = _utility.get_headers(token, cmd)
 
-    # Construct parameters
-    query_parameters = {}
-    query_parameters["api-version"] = api_version
-
-    response = requests.get(url, headers=headers, params=query_parameters)
-    return _utility.try_extract_result(response)
+    return _utility.make_api_call(
+        cmd,
+        app_id=app_id,
+        method="GET",
+        url=url,
+        payload=None,
+        token=token,
+        api_version=api_version,
+        central_dnx_suffix=central_dns_suffix,
+    )
+    
 
 
 def get_module_command_history(
