@@ -1021,19 +1021,28 @@ def list_device_modules(
     Returns:
         modules: list
     """
-    response_data = _utility.make_api_call(
-        cmd,
-        app_id=app_id,
-        method="GET",
-        url=f"https://{app_id}.{central_dns_suffix}/api/devices/{device_id}/modules",
-        payload=None,
-        token=token,
-        api_version=api_version,
-        central_dnx_suffix=central_dns_suffix,
-    ).get("modules")
+    if not token:
+        aad_token = get_aad_token(cmd, resource="https://apps.azureiotcentral.com")[
+            "accessToken"
+        ]
+        token = "Bearer {}".format(aad_token)
+
+    url = f"https://{app_id}.{central_dns_suffix}/system/iotedge/devices/{device_id}/modules"
+    headers = _utility.get_headers(token, cmd)
+
+    # Construct parameters
+
+    response = requests.get(
+        url,
+        headers=headers,
+        verify=not should_disable_connection_verify(),
+    )
+
+    response_data = _utility.try_extract_result(response).get("modules")
 
     if not response_data:
         raise BadRequestError(f"Device '{device_id}' is not an IoT Edge device.")
+
     return [EdgeModule(dict_clean(module)) for module in response_data]
 
 
