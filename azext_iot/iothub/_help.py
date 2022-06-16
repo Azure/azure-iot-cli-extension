@@ -217,7 +217,6 @@ def load_iothub_help():
         type: command
         short-summary: Send a cloud-to-device message.
         long-summary: |
-                      EXPERIMENTAL requires Python 3.4+
                       This command relies on and may install dependent Cython package (uamqp) upon first execution.
                       https://github.com/Azure/azure-uamqp-python
         examples:
@@ -239,10 +238,12 @@ def load_iothub_help():
         short-summary: |
                         Send an mqtt device-to-cloud message.
                         The command supports sending messages with application and system properties.
-                        Note: The command only works for symmetric key auth (SAS) based devices
+                        Note: If using x509 authentication methods, the certificate and key files must be provided.
         examples:
         - name: Basic usage
           text: az iot device send-d2c-message -n {iothub_name} -d {device_id}
+        - name: Basic usage for device with x509 authentication
+          text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --cp {certificate_file_path} --kp {key_file_path}
         - name: Basic usage with custom data
           text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --data {message_body}
         - name: Send application properties
@@ -262,12 +263,14 @@ def load_iothub_help():
                       be acknowledged with completion. For http simulation c2d acknowledgement is based on user
                       selection which can be complete, reject or abandon. The mqtt simulation also supports direct
                       method invocation which can be acknowledged by a response status code and response payload.
-                      Note: MQTT simulation is only supported for symmetric key auth (SAS) based devices.
                       Note: The command by default will set content-type to application/json and content-encoding
                       to utf-8. This can be overriden.
+                      Note: If using x509 authentication methods, the certificate and key files must be provided.
         examples:
         - name: Basic usage (mqtt)
           text: az iot device simulate -n {iothub_name} -d {device_id}
+        - name: Basic usage for device with x509 authentication (mqtt)
+          text: az iot device simulate -n {iothub_name} -d {device_id} --cp {certificate_file_path} --kp {key_file_path}
         - name: Send mixed properties (mqtt)
           text: az iot device simulate -n {iothub_name} -d {device_id} --properties "myprop=myvalue;$.ct=application/json"
         - name: Send direct method response status code and direct method response payload as raw json (mqtt only)

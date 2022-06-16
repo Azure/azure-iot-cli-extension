@@ -8,8 +8,6 @@ import pprint
 from time import sleep
 
 from azext_iot.common.utility import check_connection_string, ensure_azure_namespace_path
-from azure.cli.core.azclierror import BadRequestError
-from azext_iot.common.shared import DeviceAuthApiType
 
 printer = pprint.PrettyPrinter(indent=2)
 

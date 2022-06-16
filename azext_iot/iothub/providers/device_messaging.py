@@ -55,14 +55,14 @@ class DeviceMessagingProvider(IoTHubProvider):
     ):
         from azext_iot.operations._mqtt import mqtt_client
 
-        if properties:
-            properties = validate_key_value_pairs(properties)
-        device = self._simulate_get_device_auth_props(
+        device = self._d2c_get_device_auth_props(
             symmetric_key=device_symmetric_key,
             certificate_file=certificate_file,
             key_file=key_file,
             passphrase=passphrase
         )
+        if properties:
+            properties = validate_key_value_pairs(properties)
 
         device_connection_string = _build_device_or_module_connection_string(device, KeyType.primary.value)
         client_mqtt = mqtt_client(
@@ -330,11 +330,6 @@ class DeviceMessagingProvider(IoTHubProvider):
         user_properties = validate_key_value_pairs(properties) or {}
         properties_to_send.update(user_properties)
 
-        # if device authentication methods are provided, should not need to find the hub and get the device info
-        # will still need hub hostname for the connection
-        # q = is the entity always {hub_name}.azure-devices.net?
-        # todo check that this doesnt conflict with offline cli execution
-
         if method_response_payload:
             method_response_payload = process_json_arg(
                 method_response_payload, argument_name="method-response-payload"
@@ -368,7 +363,7 @@ class DeviceMessagingProvider(IoTHubProvider):
                     break
 
         try:
-            device = self._simulate_get_device_auth_props(
+            device = self._d2c_get_device_auth_props(
                 symmetric_key=device_symmetric_key,
                 certificate_file=certificate_file,
                 key_file=key_file,
@@ -452,7 +447,7 @@ class DeviceMessagingProvider(IoTHubProvider):
         except CloudError as e:
             handle_service_exception(e)
 
-    def _simulate_get_device_auth_props(
+    def _d2c_get_device_auth_props(
         self,
         symmetric_key: str = None,
         certificate_file: str = None,
@@ -461,6 +456,7 @@ class DeviceMessagingProvider(IoTHubProvider):
     ):
         if symmetric_key:
             return {
+                "hub": self.target["entity"],
                 "deviceId": self.device_id,
                 "authentication": {
                     "type": DeviceAuthApiType.sas.value,

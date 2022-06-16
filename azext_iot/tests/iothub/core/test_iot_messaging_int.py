@@ -297,9 +297,63 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         for key in twin_init_props:
             assert result["properties"]["reported"][key] == twin_init_props[key]
 
-    def test_mqtt_device_simulation_x509_thumbprint(self):
+    def test_mqtt_device_simulation_key(self):
+        device_id = self.generate_device_names(1)[0]
+        device_events = []
+        enqueued_time = calculate_millisec_since_unix_epoch_utc()
+        simulate_msg = "Key Connection Simulate"
+        send_d2c_msg = "Key Connection Send-D2C-Message"
+
+        keys = self.cmd(
+            "iot hub device-identity create -d {} -n {} -g {}".format(
+                device_id, self.entity_name, self.entity_rg
+            ),
+            checks=[self.check("deviceId", device_id)],
+        ).get_output_in_json()["authentication"]["symmetricKey"]
+
+        # Simulate with primary key
+        self.cmd(
+            "iot device simulate -d {} -n {} -g {} --da '{}' --mc 1 --mi 1 --key {}".format(
+                device_id, self.entity_name, self.entity_rg, simulate_msg,
+                keys["primaryKey"]
+            )
+        )
+        device_events.append((device_id, f"{simulate_msg} #1"))
+
+        self.cmd(
+            "iot device send-d2c-message -d {} -n {} -g {} --da '{}' --key {}".format(
+                device_id, self.entity_name, self.entity_rg, send_d2c_msg,
+                keys["primaryKey"]
+            )
+        )
+        device_events.append((device_id, send_d2c_msg))
+
+        # Simulate with secondary key
+        self.cmd(
+            "iot device simulate -d {} -n {} -g {} --da '{}' --mc 1 --mi 1 --key {}".format(
+                device_id, self.entity_name, self.entity_rg, simulate_msg,
+                keys["secondaryKey"]
+            )
+        )
+        device_events.append((device_id, f"{simulate_msg} #1"))
+
+        self.cmd(
+            "iot device send-d2c-message -d {} -n {} -g {} --da '{}' --key {}".format(
+                device_id, self.entity_name, self.entity_rg, send_d2c_msg,
+                keys["secondaryKey"]
+            )
+        )
+        device_events.append((device_id, send_d2c_msg))
+
+        self._monitor_checker(enqueued_time=enqueued_time, device_events=device_events)
+
+    def test_mqtt_device_simulation_x509(self):
         device_ids = self.generate_device_names(2)
+        device_events = []
         output_dir = os.getcwd()
+        enqueued_time = calculate_millisec_since_unix_epoch_utc()
+        simulate_msg = "Cert Connection Simulate"
+        send_d2c_msg = "Cert Connection Send-D2C-Message"
 
         self.cmd(
             "iot hub device-identity create -d {} -n {} -g {} --am x509_thumbprint --valid-days 10 --od '{}'".format(
@@ -310,20 +364,37 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         self.tracked_certs.append(f"{device_ids[0]}-cert.pem")
         self.tracked_certs.append(f"{device_ids[0]}-key.pem")
 
-        # TODO: figure out if there is a simple way to get the d2c messages and check contents
+        # Need to specify files
         self.cmd(
-            "iot device simulate -d {} -n {} -g {} --da '{}' --mc 2 --mi 1 --cp {} --kp {}".format(
-                device_ids[0], self.entity_name, self.entity_rg, "Cert Connection Simulate",
-                f"{device_ids[0]}-cert.pem", f"{device_ids[0]}-key.pem"
-            )
+            "iot device simulate -d {} -n {} -g {} --da '{}' --mc 1 --mi 1".format(
+                device_ids[0], self.entity_name, self.entity_rg, simulate_msg
+            ),
+            expect_failure=True
         )
 
         self.cmd(
-            "iot device send-d2c-message -d {} -n {} -g {} --da '{}' --cp {} --kp {}".format(
-                device_ids[0], self.entity_name, self.entity_rg, "Cert Connection Message",
+            "iot device send-d2c-message -d {} -n {} -g {} --da '{}'".format(
+                device_ids[0], self.entity_name, self.entity_rg, send_d2c_msg
+            ),
+            expect_failure=True
+        )
+
+        # Normal simulation
+        self.cmd(
+            "iot device simulate -d {} -n {} -g {} --da '{}' --mc 1 --mi 1 --cp {} --kp {}".format(
+                device_ids[0], self.entity_name, self.entity_rg, simulate_msg,
                 f"{device_ids[0]}-cert.pem", f"{device_ids[0]}-key.pem"
             )
         )
+        device_events.append((device_ids[0], f"{simulate_msg} #1"))
+
+        self.cmd(
+            "iot device send-d2c-message -d {} -n {} -g {} --da '{}' --cp {} --kp {}".format(
+                device_ids[0], self.entity_name, self.entity_rg, send_d2c_msg,
+                f"{device_ids[0]}-cert.pem", f"{device_ids[0]}-key.pem"
+            )
+        )
+        device_events.append((device_ids[0], send_d2c_msg))
 
         # Set up the CA signed cert - need to upload to hub and sign
         root_cert = create_certificate(subject="root", valid_days=1, cert_output_dir=output_dir)
@@ -367,20 +438,23 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             checks=[self.check("deviceId", device_ids[1])],
         )
 
-        # TODO: figure out if there is a simple way to get the d2c messages and check contents
         self.cmd(
-            "iot device simulate -d {} -n {} -g {} --da '{}' --mc 2 --mi 1 --cp {} --kp {}".format(
-                device_ids[1], self.entity_name, self.entity_rg, "Cert Connection Simulate",
+            "iot device simulate -d {} -n {} -g {} --da '{}' --mc 1 --mi 1 --cp {} --kp {}".format(
+                device_ids[1], self.entity_name, self.entity_rg, simulate_msg,
                 f"{device_ids[1]}-cert.pem", f"{device_ids[1]}-key.pem"
             )
         )
+        device_events.append((device_ids[1], f"{simulate_msg} #1"))
 
         self.cmd(
             "iot device send-d2c-message -d {} -n {} -g {} --da '{}' --cp {} --kp {}".format(
-                device_ids[1], self.entity_name, self.entity_rg, "Cert Connection Message",
+                device_ids[1], self.entity_name, self.entity_rg, send_d2c_msg,
                 f"{device_ids[1]}-cert.pem", f"{device_ids[1]}-key.pem"
             )
         )
+        device_events.append((device_ids[1], send_d2c_msg))
+
+        self._monitor_checker(enqueued_time=enqueued_time, device_events=device_events)
 
     def test_mqtt_device_direct_method_with_custom_response_status_payload(self):
         device_count = 1
@@ -1065,3 +1139,24 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             assert result["ack"] == ack_test
             assert json.dumps(result["data"])
             assert json.dumps(result["properties"]["system"])
+
+    def _monitor_checker(self, enqueued_time, device_events):
+        # Monitor events for all devices to check that the messages were sent
+        monitor_output = self.command_execute_assert(
+            "iot hub monitor-events -n {} -g {} --et {} -t 8 -y".format(
+                self.entity_name, self.entity_rg, enqueued_time
+            )
+        )
+
+        monitor_output = monitor_output.split("...")[1].replace("\n", "")
+        monitor_events = json.loads("[" + monitor_output.replace("}{", "},{") + "]")
+
+        for i in range(len(monitor_events)):
+            monitor_event = monitor_events[i]["event"]
+            payload = monitor_event["payload"]
+            if isinstance(payload, dict):
+                payload = payload["data"]
+            event = (monitor_event["origin"], payload)
+            assert event in device_events
+            device_events.remove(event)
+        assert len(device_events) == 0
