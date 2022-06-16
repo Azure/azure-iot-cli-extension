@@ -60,13 +60,13 @@ class TestDTImportJobs(DTLiveScenarioTest):
         sleep(RBAC_SLEEP_INTERVAL)
 
         # Upload import data files to storage account
-        valid_import_data_file = os.path.join(Path(CWD), "import_data\\bulk-models-twins-relationships-valid.ndjson")
+        valid_import_data_file = os.path.join(Path(CWD), "import_data", "bulk-models-twins-relationships-invalid.ndjson")
         self.cmd(
             "storage blob upload --connection-string '{}' --container-name '{}' --file '{}' --overwrite".format(
                 self.storage_cstring, self.storage_container, valid_import_data_file
             )
         )
-        invalid_import_data_file = os.path.join(Path(CWD), "import_data\\bulk-models-twins-relationships-invalid.ndjson")
+        invalid_import_data_file = os.path.join(Path(CWD), "import_data", "bulk-models-twins-relationships-invalid.ndjson")
         self.cmd(
             "storage blob upload --connection-string '{}' --container-name '{}' --file '{}' --overwrite".format(
                 self.storage_cstring, self.storage_container, invalid_import_data_file
