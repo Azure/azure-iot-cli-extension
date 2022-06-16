@@ -12,6 +12,7 @@ from azure.cli.core.azclierror import ResourceNotFoundError
 from knack.log import get_logger
 from uuid import uuid4
 
+DEFAULT_IMPORT_JOB_ID_PREFIX = "bulk-import-job-"
 logger = get_logger(__name__)
 
 
@@ -66,10 +67,10 @@ class ImportJobProvider(DigitalTwinsProvider):
     ):
         from azext_iot.sdk.digitaltwins.dataplane.models import BulkImportJob
 
-        job_id = "bulk-import-job-{}".format(str(uuid4()).replace("-", "")) if job_id is None else job_id
-        output_blob_name = "{}_output.txt".format(job_id) if output_blob_name is None else output_blob_name
-        output_storage_account = input_storage_account if output_storage_account is None else output_storage_account
-        output_blob_container = input_blob_container if output_blob_container is None else output_blob_container
+        job_id = job_id if job_id else DEFAULT_IMPORT_JOB_ID_PREFIX + str(uuid4()).replace("-", "")
+        output_blob_name = output_blob_name if output_blob_name else "{}_output.txt".format(job_id)
+        output_storage_account = output_storage_account if output_storage_account else input_storage_account
+        output_blob_container = output_blob_container if output_blob_container else input_blob_container
 
         input_blob_url = self._get_blob_url(input_blob_name, input_blob_container, input_storage_account)
         output_blob_url = self._get_blob_url(output_blob_name, output_blob_container, output_storage_account)

@@ -11,6 +11,7 @@ from . import DTLiveScenarioTest
 from . import generate_resource_id
 from time import sleep
 from pathlib import Path
+from azext_iot.digitaltwins.providers.import_job import DEFAULT_IMPORT_JOB_ID_PREFIX
 
 logger = get_logger(__name__)
 CWD = os.path.dirname(os.path.abspath(__file__))
@@ -210,5 +211,7 @@ def assert_import_job_creation(
     assert create_import_job_output["outputBlobUri"].split("/")[-1] == expected_output_blob_name
     assert create_import_job_output["id"]
     # We know the expected job id only when it is passed in as a param, else it is system generated
-    if expected_job_id is not None:
+    if expected_job_id:
         assert create_import_job_output["id"] == expected_job_id
+    else:
+        assert create_import_job_output["id"].startswith(DEFAULT_IMPORT_JOB_ID_PREFIX)
