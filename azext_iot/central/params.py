@@ -38,7 +38,7 @@ style_type = CLIArgumentType(
 api_version = CLIArgumentType(
     options_list=["--api-version", "--av"],
     choices=CaseInsensitiveList([version.value for version in ApiVersion]),
-    default=ApiVersion.v1.value,
+    default=ApiVersion.ga_2022_05_31.value,
     help="The API version for the requested operation.",
 )
 
@@ -163,6 +163,16 @@ def load_central_arguments(self, _):
             " Name of the command.",
         )
         context.argument(
+            "component_name",
+            options_list=["--component-name"],
+            help="The name of the device component.",
+        )
+        context.argument(
+            "telemetry_name",
+            options_list=["--telemetry-name"],
+            help="The name of the device telemetry.",
+        )
+        context.argument(
             "content",
             options_list=["--content", "-k"],
             help="Configuration for request. "
@@ -214,46 +224,13 @@ def load_central_arguments(self, _):
 
     with self.argument_context("iot central device-group") as context:
         context.argument(
-            "api_version",
-            options_list=["--api-version", "--av"],
-            choices=CaseInsensitiveList(
-                [ApiVersion.preview.value, ApiVersion.v1_1_preview.value]
-            ),
-            default=ApiVersion.v1_1_preview.value,
-            help="The API version for the requested operation.",
-        )
-        context.argument(
             "device_group_id",
             options_list=["--device-group-id", "-d"],
             help="Unique ID of the device group."
         )
-
-    with self.argument_context("iot central device-group create") as context:
         context.argument(
-            "displayName",
-            options_list=["--displayName"],
-            help="Display name of the device group."
-        )
-        context.argument(
-            "filter",
-            options_list=["--filter"],
-            help="Query defining which devices should be in this group."
-        )
-        context.argument(
-            "description",
-            options_list=["--description"],
-            help="Short summary of device group."
-        )
-        context.argument(
-            "organizations",
-            options_list=["--organizations"],
-            help="List of organization IDs of the device group."
-        )
-
-    with self.argument_context("iot central device-group update") as context:
-        context.argument(
-            "displayName",
-            options_list=["--displayName"],
+            "display_name",
+            options_list=["--display-name"],
             help="Display name of the device group."
         )
         context.argument(
@@ -661,6 +638,47 @@ def load_central_arguments(self, _):
             "module_id",
             options_list=["--module-id", "-m"],
             help="The module ID of the target module.",
+        )
+        context.argument(
+            "module_name",
+            options_list=["--module-name"],
+            help="The module name of the device module.",
+        )
+        context.argument(
+            "component_name",
+            options_list=["--component-name"],
+            help="The name of the device component.",
+        )
+        context.argument(
+            "telemetry_name",
+            options_list=["--telemetry-name"],
+            help="The name of the device telemetry.",
+        )
+
+    with self.argument_context("iot central device edge module command") as context:
+        context.argument(
+            "command_name",
+            options_list=["--command-name", "--cn"],
+            help="The command name as specified in the device template. Command name could be different from the Display"
+            " Name of the command.",
+        )
+        context.argument(
+            "module_name",
+            options_list=["--module-name"],
+            help="The module name of the device module.",
+        )
+        context.argument(
+            "component_name",
+            options_list=["--component-name"],
+            help="The name of the device component.",
+        )
+        context.argument(
+            "content",
+            options_list=["--content", "-k"],
+            help="Configuration for request. "
+            "Provide path to JSON file or raw stringified JSON. "
+            "[File Path Example: ./path/to/file.json] "
+            "[Stringified JSON Example: {'a': 'b'}] ",
         )
 
     with self.argument_context("iot central device edge children") as context:

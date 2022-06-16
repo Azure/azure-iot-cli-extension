@@ -1749,6 +1749,7 @@ def _load_central_edge_help():
             --app-id {appid}
             --device-id {deviceId}
             --module-name {moduleName}
+            --content {json}
     """
 
     helps[
@@ -1764,6 +1765,7 @@ def _load_central_edge_help():
             --app-id {appid}
             --device-id {deviceId}
             --module-name {moduleName}
+            --content {json}
     """
 
     helps[
@@ -1780,6 +1782,13 @@ def _load_central_edge_help():
             --device-id {deviceId}
             --module-name {moduleName}
             --telemetry-name {telemetryName}
+    """
+
+    helps[
+        "iot central device edge module command"
+    ] = """
+        type: group
+        short-summary: Run module commands.
     """
 
     helps[
