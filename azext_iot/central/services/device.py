@@ -1357,6 +1357,7 @@ def replace_properties(
     device_id: str,
     module_name: str,
     component_name: str,
+    payload: str,
     token: str,
     api_version=ApiVersion.ga_2022_05_31.value,
     central_dns_suffix=CENTRAL_ENDPOINT,
@@ -1368,8 +1369,9 @@ def replace_properties(
         cmd: command passed into az
         app_id: name of app (used for forming request URL)
         device_id: unique case-sensitive device id
-        moduleName: name of the device module
+        module_name: name of the device module
         component_name: name of the device component
+        payload: properties in JSON
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
         central_dns_suffix: {centralDnsSuffixInPath} as found in docs
@@ -1392,7 +1394,7 @@ def replace_properties(
         app_id=app_id,
         method="PUT",
         url=url,
-        payload=None,
+        payload=payload,
         token=token,
         api_version=api_version,
         central_dnx_suffix=central_dns_suffix,
@@ -1405,6 +1407,7 @@ def update_properties(
     device_id: str,
     module_name: str,
     component_name: str,
+    payload: str,
     token: str,
     api_version=ApiVersion.ga_2022_05_31.value,
     central_dns_suffix=CENTRAL_ENDPOINT,
@@ -1418,6 +1421,7 @@ def update_properties(
         device_id: unique case-sensitive device id
         moduleName: name of the device module
         component_name: name of the device component
+        payload: properties in JSON
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
         central_dns_suffix: {centralDnsSuffixInPath} as found in docs
@@ -1440,7 +1444,7 @@ def update_properties(
         app_id=app_id,
         method="PATCH",
         url=url,
-        payload=None,
+        payload=payload,
         token=token,
         api_version=api_version,
         central_dnx_suffix=central_dns_suffix,

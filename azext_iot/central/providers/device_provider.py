@@ -696,6 +696,7 @@ class CentralDeviceProvider:
     def replace_device_properties(
         self,
         device_id: str,
+        payload: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         return central_services.device.replace_properties(
@@ -704,6 +705,7 @@ class CentralDeviceProvider:
             device_id=device_id,
             module_name=None,
             component_name=None,
+            payload=payload,
             token=self._token,
             api_version=self._api_version,
             central_dns_suffix=central_dns_suffix,
@@ -712,6 +714,7 @@ class CentralDeviceProvider:
     def update_device_properties(
         self,
         device_id: str,
+        payload: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         return central_services.device.update_properties(
@@ -720,6 +723,7 @@ class CentralDeviceProvider:
             device_id=device_id,
             module_name=None,
             component_name=None,
+            payload=payload,
             token=self._token,
             api_version=self._api_version,
             central_dns_suffix=central_dns_suffix,
@@ -765,6 +769,7 @@ class CentralDeviceProvider:
         self,
         device_id: str,
         component_name: str,
+        payload: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         return central_services.device.replace_properties(
@@ -773,6 +778,7 @@ class CentralDeviceProvider:
             device_id=device_id,
             module_name=None,
             component_name=component_name,
+            payload=payload,
             token=self._token,
             api_version=self._api_version,
             central_dns_suffix=central_dns_suffix,
@@ -782,6 +788,7 @@ class CentralDeviceProvider:
         self,
         device_id: str,
         component_name: str,
+        payload: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         return central_services.device.update_properties(
@@ -790,6 +797,7 @@ class CentralDeviceProvider:
             device_id=device_id,
             module_name=None,
             component_name=component_name,
+            payload=payload,
             token=self._token,
             api_version=self._api_version,
             central_dns_suffix=central_dns_suffix,
@@ -836,6 +844,7 @@ class CentralDeviceProvider:
         self,
         device_id: str,
         module_name: str,
+        payload: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         return central_services.device.replace_properties(
@@ -844,6 +853,7 @@ class CentralDeviceProvider:
             device_id=device_id,
             module_name=module_name,
             component_name=None,
+            payload=payload,
             token=self._token,
             api_version=self._api_version,
             central_dns_suffix=central_dns_suffix,
@@ -853,6 +863,7 @@ class CentralDeviceProvider:
         self,
         device_id: str,
         module_name: str,
+        payload: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         return central_services.device.update_properties(
@@ -861,6 +872,7 @@ class CentralDeviceProvider:
             device_id=device_id,
             module_name=module_name,
             component_name=None,
+            payload=payload,
             token=self._token,
             api_version=self._api_version,
             central_dns_suffix=central_dns_suffix,
@@ -909,6 +921,7 @@ class CentralDeviceProvider:
         device_id: str,
         module_name: str,
         component_name: str,
+        payload: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         return central_services.device.replace_properties(
@@ -917,6 +930,7 @@ class CentralDeviceProvider:
             device_id=device_id,
             module_name=module_name,
             component_name=component_name,
+            payload=payload,
             token=self._token,
             api_version=self._api_version,
             central_dns_suffix=central_dns_suffix,
@@ -927,6 +941,7 @@ class CentralDeviceProvider:
         device_id: str,
         module_name: str,
         component_name: str,
+        payload: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         return central_services.device.update_properties(
@@ -935,6 +950,7 @@ class CentralDeviceProvider:
             device_id=device_id,
             module_name=module_name,
             component_name=component_name,
+            payload=payload,
             token=self._token,
             api_version=self._api_version,
             central_dns_suffix=central_dns_suffix,

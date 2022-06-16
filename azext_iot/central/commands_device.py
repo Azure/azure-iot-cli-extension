@@ -208,14 +208,11 @@ def run_command(
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.ga_2022_05_31.value,
 ) -> dict:
-    if not isinstance(content, str):
-        raise InvalidArgumentValueError("content must be a string: {}".format(content))
-
-    payload = utility.process_json_arg(content, argument_name="content")
-
     provider = CentralDeviceProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
+
+    payload = utility.process_json_arg(content, argument_name="content")
 
     return provider.run_command(
         device_id=device_id,
@@ -431,6 +428,7 @@ def replace_module_properties(
     app_id: str,
     device_id,
     module_name,
+    content: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.ga_2022_05_31.value,
@@ -439,9 +437,12 @@ def replace_module_properties(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
 
+    payload = utility.process_json_arg(content, argument_name="content")
+
     return provider.replace_module_properties(
         device_id=device_id,
         module_name=module_name,
+        payload=payload,
         central_dns_suffix=central_dns_suffix,
     )
 
@@ -451,6 +452,7 @@ def update_module_properties(
     app_id: str,
     device_id,
     module_name,
+    content: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.ga_2022_05_31.value,
@@ -459,9 +461,12 @@ def update_module_properties(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
 
+    payload = utility.process_json_arg(content, argument_name="content")
+
     return provider.update_module_properties(
         device_id=device_id,
         module_name=module_name,
+        payload=payload,
         central_dns_suffix=central_dns_suffix,
     )
 
@@ -516,6 +521,7 @@ def replace_module_component_properties(
     device_id,
     module_name,
     component_name,
+    content: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.ga_2022_05_31.value,
@@ -524,10 +530,13 @@ def replace_module_component_properties(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
 
+    payload = utility.process_json_arg(content, argument_name="content")
+
     return provider.replace_module_component_properties(
         device_id=device_id,
         module_name=module_name,
         component_name=component_name,
+        payload=payload,
         central_dns_suffix=central_dns_suffix,
     )
 
@@ -538,6 +547,7 @@ def update_module_component_properties(
     device_id,
     module_name,
     component_name,
+    content: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.ga_2022_05_31.value,
@@ -546,10 +556,13 @@ def update_module_component_properties(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
 
+    payload = utility.process_json_arg(content, argument_name="content")
+
     return provider.update_module_component_properties(
         device_id=device_id,
         module_name=module_name,
         component_name=component_name,
+        payload=payload,
         central_dns_suffix=central_dns_suffix,
     )
 
@@ -997,11 +1010,11 @@ def update_attestation(
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.ga_2022_05_31.value,
 ) -> dict:
-    payload = utility.process_json_arg(content, argument_name="content")
-
     provider = CentralDeviceProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
+
+    payload = utility.process_json_arg(content, argument_name="content")
 
     return provider.update_device_attestation(device_id, payload=payload, central_dns_suffix=central_dns_suffix)
 
@@ -1015,11 +1028,11 @@ def create_attestation(
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.ga_2022_05_31.value,
 ) -> dict:
-    payload = utility.process_json_arg(content, argument_name="content")
-
     provider = CentralDeviceProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
+
+    payload = utility.process_json_arg(content, argument_name="content")
 
     return provider.create_device_attestation(device_id, payload=payload, central_dns_suffix=central_dns_suffix)
 
@@ -1102,6 +1115,7 @@ def replace_properties(
     cmd,
     app_id: str,
     device_id,
+    content: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.ga_2022_05_31.value,
@@ -1110,8 +1124,11 @@ def replace_properties(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
 
+    payload = utility.process_json_arg(content, argument_name="content")
+
     return provider.replace_device_properties(
         device_id=device_id,
+        payload=payload,
         central_dns_suffix=central_dns_suffix,
     )
 
@@ -1120,6 +1137,7 @@ def update_properties(
     cmd,
     app_id: str,
     device_id,
+    content: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.ga_2022_05_31.value,
@@ -1128,8 +1146,11 @@ def update_properties(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
 
+    payload = utility.process_json_arg(content, argument_name="content")
+
     return provider.update_device_properties(
         device_id=device_id,
+        payload=payload,
         central_dns_suffix=central_dns_suffix,
     )
 
@@ -1179,6 +1200,7 @@ def replace_component_properties(
     app_id: str,
     device_id,
     component_name,
+    content: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.ga_2022_05_31.value,
@@ -1187,9 +1209,12 @@ def replace_component_properties(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
 
+    payload = utility.process_json_arg(content, argument_name="content")
+
     return provider.replace_device_component_properties(
         device_id=device_id,
         component_name=component_name,
+        payload=payload,
         central_dns_suffix=central_dns_suffix,
     )
 
@@ -1199,6 +1224,7 @@ def update_component_properties(
     app_id: str,
     device_id,
     component_name,
+    content: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.ga_2022_05_31.value,
@@ -1207,9 +1233,12 @@ def update_component_properties(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
 
+    payload = utility.process_json_arg(content, argument_name="content")
+
     return provider.update_device_component_properties(
         device_id=device_id,
         component_name=component_name,
+        payload=payload,
         central_dns_suffix=central_dns_suffix,
     )
 

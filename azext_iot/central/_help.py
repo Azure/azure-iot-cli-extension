@@ -478,7 +478,9 @@ def _load_central_devices_help():
         examples:
         - name: Get registration info on specified device
           text: >
-            az iot central device registration-info --app-id {appid} --device-id {deviceid}
+            az iot central device registration-info
+            --app-id {appid}
+            --device-id {deviceid}
     """
 
     helps[
@@ -490,7 +492,9 @@ def _load_central_devices_help():
         examples:
         - name: Get device attestation on specified device
           text: >
-            az iot central device show-attestation --app-id {appid} --device-id {deviceid}
+            az iot central device show-attestation
+            --app-id {appid}
+            --device-id {deviceid}
     """
 
     helps[
@@ -502,7 +506,9 @@ def _load_central_devices_help():
         examples:
         - name: Remove an individual device attestation on specified device
           text: >
-            az iot central device delete-attestation --app-id {appid} --device-id {deviceid}
+            az iot central device delete-attestation
+            --app-id {appid}
+            --device-id {deviceid}
     """
 
     helps[
@@ -514,7 +520,10 @@ def _load_central_devices_help():
         examples:
         - name: Update an individual device attestation via patch on specified device
           text: >
-            az iot central device update-attestation --app-id {appid} --device-id {deviceid}
+            az iot central device update-attestation
+            --app-id {appid}
+            --device-id {deviceid}
+            --content {attestation}
     """
 
     helps[
@@ -526,7 +535,10 @@ def _load_central_devices_help():
         examples:
         - name: Create an individual device attestation on specified device
           text: >
-            az iot central device create-attestation --app-id {appid} --device-id {deviceid}
+            az iot central device create-attestation
+            --app-id {appid}
+            --device-id {deviceid}
+            --content {attestation}
     """
 
     helps[
@@ -538,7 +550,9 @@ def _load_central_devices_help():
         examples:
         - name: List the components present in a device
           text: >
-            az iot central device list-components --app-id {appid} --device-id {deviceid}
+            az iot central device list-components
+            --app-id {appid}
+            --device-id {deviceid}
     """
 
     helps[
@@ -551,7 +565,9 @@ def _load_central_devices_help():
         examples:
         - name: Get device properties
           text: >
-            az iot central device show-properties --app-id {appid} --device-id {deviceid}
+            az iot central device show-properties
+            --app-id {appid}
+            --device-id {deviceid}
     """
 
     helps[
@@ -564,7 +580,10 @@ def _load_central_devices_help():
         examples:
         - name: Replace device properties
           text: >
-            az iot central device replace-properties --app-id {appid} --device-id {deviceid}
+            az iot central device replace-properties
+            --app-id {appid}
+            --device-id {deviceid}
+            --content {json}
     """
 
     helps[
@@ -577,7 +596,10 @@ def _load_central_devices_help():
         examples:
         - name: Update device properties via patch
           text: >
-            az iot central device update-properties --app-id {appid} --device-id {deviceid}
+            az iot central device update-properties
+            --app-id {appid}
+            --device-id {deviceid}
+            --content {json}
     """
 
     helps[
@@ -624,6 +646,7 @@ def _load_central_devices_help():
             --app-id {appid}
             --device-id {deviceid}
             --component-name {componentname}
+            --content {json}
     """
 
     helps[
@@ -639,6 +662,7 @@ def _load_central_devices_help():
             --app-id {appid}
             --device-id {deviceid}
             --component-name {componentname}
+            --content {json}
     """
 
     helps[
@@ -1053,6 +1077,10 @@ def _load_central_device_groups_help():
             az iot central device-group create
             --app-id {appid}
             --device-group-id {devicegroupid}
+            --display-name {displayname}
+            --filter {filter}
+            --description {description}
+            --organizations {organizations}
     """
 
     helps[
@@ -1068,6 +1096,10 @@ def _load_central_device_groups_help():
             az iot central device-group update
             --app-id {appid}
             --device-group-id {devicegroupid}
+            --display-name {displayname}
+            --filter {filter}
+            --description {description}
+            --organizations {organizations}
     """
 
     helps[
@@ -1639,6 +1671,40 @@ def _load_central_edge_help():
     """
 
     helps[
+        "iot central device edge module update-component-properties"
+    ] = """
+        type: command
+        short-summary: Update module properties for a specific component via patch.
+
+        examples:
+        - name: Update module properties for a specific component via patch.
+          text: >
+            az iot central device edge module update-component-properties
+            --app-id {appid}
+            --device-id {deviceId}
+            --component-name {componentName}
+            --module-name {moduleName}
+            --content {json}
+    """
+
+    helps[
+        "iot central device edge module replace-component-properties"
+    ] = """
+        type: command
+        short-summary: Replace module properties for a specific component.
+
+        examples:
+        - name: Replace module properties for a specific component.
+          text: >
+            az iot central device edge module replace-component-properties
+            --app-id {appid}
+            --device-id {deviceId}
+            --component-name {componentName}
+            --module-name {moduleName}
+            --content {json}
+    """
+
+    helps[
         "iot central device edge module show-component-telemetry-value"
     ] = """
         type: command
@@ -1665,6 +1731,36 @@ def _load_central_edge_help():
         - name: Get module properties.
           text: >
             az iot central device edge module show-properties
+            --app-id {appid}
+            --device-id {deviceId}
+            --module-name {moduleName}
+    """
+
+    helps[
+        "iot central device edge module update-properties"
+    ] = """
+        type: command
+        short-summary: Update module properties via patch.
+        long-summary: Update property values of a module.
+        examples:
+        - name: Update module properties via patch.
+          text: >
+            az iot central device edge module update-properties
+            --app-id {appid}
+            --device-id {deviceId}
+            --module-name {moduleName}
+    """
+
+    helps[
+        "iot central device edge module replace-properties"
+    ] = """
+        type: command
+        short-summary: Replace module properties.
+        long-summary: Replace all property values of a module.
+        examples:
+        - name: Replace module properties.
+          text: >
+            az iot central device edge module replace-properties
             --app-id {appid}
             --device-id {deviceId}
             --module-name {moduleName}

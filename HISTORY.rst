@@ -19,6 +19,13 @@ unreleased
   - The Device Update command group supports all `account` and `instance` related functionality.
 
 
+**IoT Central updates**
+
+* Add support for device groups CRUD.
+* Add support for device/module properties CRUD.
+* Add support for 2022-05-31 GA version.
+
+
 0.14.1
 +++++++++++++++
 
@@ -36,14 +43,6 @@ unreleased
 **IoT Device Certification**
 
 * Updated service API endpoint to vNext URL.
-
-**IoT Central updates**
-
-* * Adds support for device groups CRUD:
-  - az iot central device-group create
-  - az iot central device-group show
-  - az iot central device-group update
-  - az iot central device-group delete
 
 
 0.14.0
