@@ -1135,6 +1135,10 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             assert json.dumps(result["data"])
             assert json.dumps(result["properties"]["system"])
 
+    def _parse_monitor_output(self, monitor_output):
+        monitor_output = monitor_output.split("...")[1].replace("\n", "")
+        return json.loads("[" + monitor_output.replace("}{", "},{") + "]")
+
     def _monitor_checker(self, enqueued_time, device_events):
         # Monitor events for all devices to check that the messages were sent
         monitor_output = self.command_execute_assert(
@@ -1144,8 +1148,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         )
 
         # Parse out the messages into json
-        monitor_output = monitor_output.split("...")[1].replace("\n", "")
-        monitor_events = json.loads("[" + monitor_output.replace("}{", "},{") + "]")
+        monitor_events = self._parse_monitor_output(monitor_output)
 
         for i in range(len(monitor_events)):
             monitor_event = monitor_events[i]["event"]
