@@ -250,7 +250,7 @@ def execute_onthread(**kwargs):
     Args:
         kwargs: Supported kwargs are 'interval' (int) to specify intervals between calls
                 'method' (func) to specify method pointer for execution
-                'args' (list) to specify method arguments
+                'args' (dict) to specify method arguments
                 'max_runs' (int) indicate an upper bound on number of executions
                 'return_handle' (bool) indicates whether to return a Thread handle
 
@@ -281,7 +281,7 @@ def execute_onthread(**kwargs):
             if max_runs:
                 if runs >= max_runs:
                     break
-            method(*method_args)
+            method(**method_args)
             runs += 1
 
     op = Thread(target=method_wrap, args=(max_runs,))

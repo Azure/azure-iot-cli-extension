@@ -182,16 +182,16 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         token, thread = execute_onthread(
             method=iot_simulate_device,
-            args=[
-                client,
-                device_ids[0],
-                self.entity_name,
-                "complete",
-                "Testing mqtt c2d and direct method invocations",
-                4,
-                5,
-                "mqtt",
-            ],
+            args={
+                "cmd": client,
+                "device_id": device_ids[0],
+                "hub_name": self.entity_name,
+                "receive_settle": "complete",
+                "data": "Testing mqtt c2d and direct method invocations",
+                "msg_count": 4,
+                "msg_interval": 5,
+                "protocol_type": "mqtt",
+            },
             max_runs=4,
             return_handle=True,
         )
@@ -220,16 +220,16 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         token, thread = execute_onthread(
             method=iot_simulate_device,
-            args=[
-                client,
-                device_ids[0],
-                self.entity_name,
-                "complete",
-                "Ping from c2d ack wait test",
-                2,
-                5,
-                "http",
-            ],
+            args={
+                "cmd": client,
+                "device_id": device_ids[0],
+                "hub_name": self.entity_name,
+                "receive_settle": "complete",
+                "data": "Ping from c2d ack wait test",
+                "msg_count": 2,
+                "msg_interval": 5,
+                "protocol_type": "http",
+            },
             max_runs=4,
             return_handle=True,
         )
@@ -477,21 +477,18 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         token, thread = execute_onthread(
             method=iot_simulate_device,
-            args=[
-                client,
-                device_ids[0],
-                self.entity_name,
-                "complete",
-                "Testing direct method invocations when simulator is run with custom method response status and payload",
-                4,
-                5,
-                "mqtt",
-                None,
-                None,
-                None,
-                204,
-                "{'result': 'Direct method executed successfully'}"
-            ],
+            args={
+                "cmd": client,
+                "device_id": device_ids[0],
+                "hub_name": self.entity_name,
+                "receive_settle": "complete",
+                "data": "Testing direct method invocations when simulator is run with custom method response status and payload",
+                "msg_count": 4,
+                "msg_interval": 5,
+                "protocol_type": "mqtt",
+                "method_response_code": 204,
+                "method_response_payload": "{'result': 'Direct method executed successfully'}"
+            },
             max_runs=4,
             return_handle=True,
         )
@@ -538,16 +535,16 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         token, thread = execute_onthread(
             method=iot_simulate_device,
-            args=[
-                client,
-                device_ids[0],
-                self.entity_name,
-                "complete",
-                "Testing device twin reported properties update",
-                4,
-                5,
-                "mqtt",
-            ],
+            args={
+                "cmd": client,
+                "device_id": device_ids[0],
+                "receive_settle": "complete",
+                "data": "Testing device twin reported properties update",
+                "msg_count": 4,
+                "msg_interval": 5,
+                "protocol_type": "mqtt",
+                "hub_name": self.entity_name,
+            },
             max_runs=4,
             return_handle=True,
         )
@@ -776,20 +773,19 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         for i in range(device_count):
             execute_onthread(
                 method=iot_device_send_message,
-                args=[
-                    client,
-                    device_ids[i],
-                    self.entity_name,
-                    send_message_data,
-                    "$.mid=12345;key0=value0;key1=1",
-                    1,
-                    self.entity_rg,
-                    None
-                ],
+                args={
+                    "cmd": client,
+                    "device_id": device_ids[i],
+                    "data": send_message_data,
+                    "properties": "$.mid=12345;key0=value0;key1=1",
+                    "msg_count": 1,
+                    "hub_name": self.entity_name,
+                    "resource_group_name": self.entity_rg,
+                },
                 max_runs=1,
                 return_handle=True,
             )
-
+        print(enqueued_time, calculate_millisec_since_unix_epoch_utc())
         # Monitor events for all devices and include sys, anno, app
         self.command_execute_assert(
             "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 8 -y -p sys anno app".format(
@@ -868,14 +864,13 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # Send messages that have JSON payload, but do not pass $.ct property
         iot_device_send_message(
-            client,
-            device_ids[i],
-            self.entity_name,
-            send_message_data,
-            "",
-            1,
-            self.entity_rg,
-            None
+            cmd=client,
+            device_id=device_ids[i],
+            data=send_message_data,
+            properties="",
+            msg_count=1,
+            hub_name=self.entity_name,
+            resource_group_name=self.entity_rg,
         )
 
         # Monitor messages for ugly JSON output
@@ -898,13 +893,13 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # Send messages that have JSON payload and have $.ct property
         iot_device_send_message(
-            client,
-            device_ids[i],
-            self.entity_name,
-            send_message_data,
-            "$.ct=application/json",
-            1,
-            self.entity_rg,
+            cmd=client,
+            device_id=device_ids[i],
+            data=send_message_data,
+            properties="$.ct=application/json",
+            msg_count=1,
+            hub_name=self.entity_name,
+            resource_group_name=self.entity_rg,
         )
 
         # Monitor messages for pretty JSON output
@@ -927,13 +922,13 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # Send messages that have improperly formatted JSON payload and a $.ct property
         iot_device_send_message(
-            client,
-            device_ids[i],
-            self.entity_name,
-            '{\r\n"payload_data1""payload_value1"\r\n}',
-            "$.ct=application/json",
-            1,
-            self.entity_rg,
+            cmd=client,
+            device_id=device_ids[i],
+            hub_name=self.entity_name,
+            data='{\r\n"payload_data1""payload_value1"\r\n}',
+            properties="$.ct=application/json",
+            msg_count=1,
+            resource_group_name=self.entity_rg,
         )
 
         # Monitor messages to ensure it returns improperly formatted JSON
@@ -1148,6 +1143,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             )
         )
 
+        # Parse out the messages into json
         monitor_output = monitor_output.split("...")[1].replace("\n", "")
         monitor_events = json.loads("[" + monitor_output.replace("}{", "},{") + "]")
 
