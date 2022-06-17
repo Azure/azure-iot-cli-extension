@@ -25,13 +25,17 @@ path_discovery_init = (
     "azext_iot.iothub.providers.discovery.IotHubDiscovery._initialize_client"
 )
 path_sas = "azext_iot._factory.SasTokenAuthentication"
-path_mqtt_device_client = (
+path_mqtt_device_client_cs = (
     "azure.iot.device.IoTHubDeviceClient.create_from_connection_string"
+)
+path_mqtt_device_client_x509 = (
+    "azure.iot.device.IoTHubDeviceClient.create_from_x509_certificate"
 )
 path_iot_hub_monitor_events_entrypoint = (
     "azext_iot.operations.hub._iot_hub_monitor_events"
 )
 path_iot_device_show = "azext_iot.operations.hub._iot_device_show"
+path_device_messaging_iot_device_show = "azext_iot.iothub.providers.device_messaging._iot_device_show"
 path_update_device_twin = "azext_iot.operations.hub._iot_device_twin_update"
 hub_entity = "myhub.azure-devices.net"
 path_iot_service_provisioning_factory = "azext_iot._factory.iot_service_provisioning_factory"
@@ -172,14 +176,20 @@ def serviceclient_generic_invalid_or_missing_etag(
 
 
 @pytest.fixture()
-def mqttclient(mocker, fixture_ghcs, fixture_sas):
-    client = mocker.patch(path_mqtt_device_client)
+def mqttclient_cs(mocker, fixture_ghcs, fixture_sas):
+    client = mocker.patch(path_mqtt_device_client_cs)
+    return client
+
+
+@pytest.fixture()
+def mqttclient_x509(mocker, fixture_ghcs, fixture_sas):
+    client = mocker.patch(path_mqtt_device_client_x509)
     return client
 
 
 @pytest.fixture()
 def mqttclient_generic_error(mocker, fixture_ghcs, fixture_sas):
-    mqtt_client = mocker.patch(path_mqtt_device_client)
+    mqtt_client = mocker.patch(path_mqtt_device_client_cs)
     mqtt_client().connect.side_effect = Exception("something happened")
     return mqtt_client
 
@@ -197,6 +207,31 @@ def fixture_update_device_twin(mocker):
 @pytest.fixture()
 def fixture_iot_device_show_sas(mocker):
     device = mocker.patch(path_iot_device_show)
+    device.return_value = {
+        "authentication": {
+            "symmetricKey": {"primaryKey": "test_pk", "secondaryKey": "test_sk"},
+            "type": DeviceAuthApiType.sas.value,
+            "x509Thumbprint": {"primaryThumbprint": None, "secondaryThumbprint": None},
+        },
+        "capabilities": {"iotEdge": False},
+        "cloudToDeviceMessageCount": 0,
+        "connectionState": "Disconnected",
+        "connectionStateUpdatedTime": "2021-05-27T00:36:11.2861732Z",
+        "deviceId": "Test_Device_1",
+        "etag": "ODgxNTgwOA==",
+        "generationId": "637534345627501371",
+        "hub": "test-iot-hub.azure-devices.net",
+        "lastActivityTime": "2021-05-27T00:18:16.3154299Z",
+        "status": "enabled",
+        "statusReason": None,
+        "statusUpdatedTime": "0001-01-01T00:00:00Z",
+    }
+    return device
+
+
+@pytest.fixture()
+def fixture_device_messaging_iot_device_show_sas(mocker):
+    device = mocker.patch(path_device_messaging_iot_device_show)
     device.return_value = {
         "authentication": {
             "symmetricKey": {"primaryKey": "test_pk", "secondaryKey": "test_sk"},

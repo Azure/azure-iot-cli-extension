@@ -17,8 +17,8 @@ class mqtt_client(object):
         self,
         hub_hostname,
         device_id,
-        x509_files=None,
         device_conn_string: str = None,
+        x509_files=None,
         method_response_code=None,
         method_response_payload=None,
         init_reported_properties=None

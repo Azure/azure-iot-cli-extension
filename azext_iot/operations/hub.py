@@ -4,8 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from os.path import exists, basename
-from time import time, sleep
+from os.path import exists
 from knack.log import get_logger
 from enum import Enum, EnumMeta
 from azure.cli.core.azclierror import (
@@ -14,7 +13,6 @@ from azure.cli.core.azclierror import (
     ClientRequestError,
     FileOperationError,
     InvalidArgumentValueError,
-    MutuallyExclusiveArgumentError,
     RequiredArgumentMissingError,
     ResourceNotFoundError,
     ValidationError,
@@ -30,10 +28,8 @@ from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import (
     DeviceAuthType,
     SdkType,
-    ProtocolType,
     ConfigType,
     KeyType,
-    SettleType,
     RenewKeyType,
     IoTHubStateType,
     DeviceAuthApiType,
@@ -44,7 +40,6 @@ from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
     handle_service_exception,
     read_file_content,
-    validate_key_value_pairs,
     init_monitoring,
     process_json_arg,
     ensure_iothub_sdk_min_version,

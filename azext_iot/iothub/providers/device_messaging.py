@@ -391,7 +391,7 @@ class DeviceMessagingProvider(IoTHubProvider):
             else:
                 op = Thread(
                     target=http_wrap,
-                    args=(self.target, self.device_id, generator(), msg_interval, msg_count)
+                    args=(generator(), msg_interval, msg_count)
                 )
                 op.start()
 
