@@ -49,7 +49,6 @@ unreleased
   - az iot central device properties
     - az iot central device properties show
     - az iot central device properties replace
-    - az iot central device properties delete
     - az iot central device properties update
     - az iot central device properties show-component-properties
     - az iot central device properties replace-component-properties
@@ -60,7 +59,6 @@ unreleased
   - az iot central device edge module properties
     - az iot central device edge module properties show
     - az iot central device edge module properties replace
-    - az iot central device edge module properties delete
     - az iot central device edge module properties update
     - az iot central device edge module properties show-component-properties
     - az iot central device edge module properties replace-component-properties
