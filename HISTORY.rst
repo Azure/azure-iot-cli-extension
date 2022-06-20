@@ -67,14 +67,14 @@ unreleased
     - az iot central device edge module properties update-component-properties
 
 * Add support for 2022-05-31 GA version.
-- az iot central api-token
-- az iot central device-template
-- az iot central device-group
-- az iot central device
-- az iot central file-upload-config
-- az iot central organization
-- az iot central role
-- az iot central user
+  - az iot central api-token
+  - az iot central device-template
+  - az iot central device-group
+  - az iot central device
+  - az iot central file-upload-config
+  - az iot central organization
+  - az iot central role
+  - az iot central user
 
 0.14.1
 +++++++++++++++
