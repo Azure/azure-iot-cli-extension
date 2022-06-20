@@ -222,6 +222,45 @@ def load_central_arguments(self, _):
             "by visiting https://github.com/iot-for-all/iot-central-high-availability-clients#readme",
         )
 
+    with self.argument_context("iot central device attestation") as context:
+        context.argument(
+            "device_id",
+            options_list=["--device-id", "-d"],
+            help="Unique identifier for the device."
+            " A case-sensitive string (up to 128 characters long) of ASCII 7-bit alphanumeric characters plus"
+            " certain special characters: - . + % _ # * ? ! ( ) , : = @ $ '",
+        )
+        context.argument(
+            "content",
+            options_list=["--content", "-k"],
+            help="Configuration for request. "
+            "Provide path to JSON file or raw stringified JSON. "
+            "[File Path Example: ./path/to/file.json] "
+            "[Stringified JSON Example: {'a': 'b'}] ",
+        )
+
+    with self.argument_context("iot central device properties") as context:
+        context.argument(
+            "device_id",
+            options_list=["--device-id", "-d"],
+            help="Unique identifier for the device."
+            " A case-sensitive string (up to 128 characters long) of ASCII 7-bit alphanumeric characters plus"
+            " certain special characters: - . + % _ # * ? ! ( ) , : = @ $ '",
+        )
+        context.argument(
+            "component_name",
+            options_list=["--component-name"],
+            help="The name of the device component.",
+        )
+        context.argument(
+            "content",
+            options_list=["--content", "-k"],
+            help="Configuration for request. "
+            "Provide path to JSON file or raw stringified JSON. "
+            "[File Path Example: ./path/to/file.json] "
+            "[Stringified JSON Example: {'a': 'b'}] ",
+        )
+
     with self.argument_context("iot central device-group") as context:
         context.argument(
             "device_group_id",
@@ -245,6 +284,7 @@ def load_central_arguments(self, _):
         )
         context.argument(
             "organizations",
+            nargs="+",
             options_list=["--organizations"],
             help="List of organization IDs of the device group."
         )
@@ -653,6 +693,33 @@ def load_central_arguments(self, _):
             "telemetry_name",
             options_list=["--telemetry-name"],
             help="The name of the device telemetry.",
+        )
+
+    with self.argument_context("iot central device edge module properties") as context:
+        context.argument(
+            "device_id",
+            options_list=["--device-id", "-d"],
+            help="Unique identifier for the device."
+            " A case-sensitive string (up to 128 characters long) of ASCII 7-bit alphanumeric characters plus"
+            " certain special characters: - . + % _ # * ? ! ( ) , : = @ $ '",
+        )
+        context.argument(
+            "module_id",
+            options_list=["--module-id", "-m"],
+            help="The module ID of the target module.",
+        )
+        context.argument(
+            "component_name",
+            options_list=["--component-name"],
+            help="The name of the device component.",
+        )
+        context.argument(
+            "content",
+            options_list=["--content", "-k"],
+            help="Configuration for request. "
+            "Provide path to JSON file or raw stringified JSON. "
+            "[File Path Example: ./path/to/file.json] "
+            "[Stringified JSON Example: {'a': 'b'}] ",
         )
 
     with self.argument_context("iot central device edge module command") as context:

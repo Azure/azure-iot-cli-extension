@@ -559,8 +559,7 @@ def _load_central_devices_help():
         "iot central device show-properties"
     ] = """
         type: command
-        short-summary: Get device properties.
-        long-summary: Get all property values of a device by device ID.
+        short-summary: Get all property values of a device by device ID.
 
         examples:
         - name: Get device properties
@@ -574,8 +573,7 @@ def _load_central_devices_help():
         "iot central device replace-properties"
     ] = """
         type: command
-        short-summary: Replace device properties.
-        long-summary: Replace all property values of a device by device ID.
+        short-summary: Replace all property values of a device by device ID.
 
         examples:
         - name: Replace device properties
@@ -590,8 +588,7 @@ def _load_central_devices_help():
         "iot central device update-properties"
     ] = """
         type: command
-        short-summary: Update device properties via patch.
-        long-summary: Update property values of a device by device ID.
+        short-summary: Update property values of a device by device ID.
 
         examples:
         - name: Update device properties via patch
@@ -606,8 +603,7 @@ def _load_central_devices_help():
         "iot central device show-telemetry-value"
     ] = """
         type: command
-        short-summary: Get device telemetry value.
-        long-summary: Get the last telemetry value from a device.
+        short-summary: Get the last telemetry value from a device.
 
         examples:
         - name:  Get device telemetry value.
@@ -1087,8 +1083,7 @@ def _load_central_device_groups_help():
         "iot central device-group update"
     ] = """
         type: command
-        short-summary: Update a device group via patch.
-        long-summary: Update an existing device group by ID.
+        short-summary: Update an existing device group by ID.
 
         examples:
         - name: Update a device group via patch
@@ -1708,8 +1703,7 @@ def _load_central_edge_help():
         "iot central device edge module show-component-telemetry-value"
     ] = """
         type: command
-        short-summary: Get module component telemetry value.
-        long-summary: Get the last telemetry value from a module component.
+        short-summary: Get the last telemetry value from a module component.
         examples:
         - name: Get module component telemetry value.
           text: >
@@ -1725,8 +1719,7 @@ def _load_central_edge_help():
         "iot central device edge module show-properties"
     ] = """
         type: command
-        short-summary: Get module properties.
-        long-summary: Get all property values of a module.
+        short-summary: Get all property values of a module.
         examples:
         - name: Get module properties.
           text: >
@@ -1740,8 +1733,7 @@ def _load_central_edge_help():
         "iot central device edge module update-properties"
     ] = """
         type: command
-        short-summary: Update module properties via patch.
-        long-summary: Update property values of a module.
+        short-summary: Update property values of a module.
         examples:
         - name: Update module properties via patch.
           text: >
@@ -1756,8 +1748,7 @@ def _load_central_edge_help():
         "iot central device edge module replace-properties"
     ] = """
         type: command
-        short-summary: Replace module properties.
-        long-summary: Replace all property values of a module.
+        short-summary: Replace all property values of a module.
         examples:
         - name: Replace module properties.
           text: >
@@ -1772,8 +1763,7 @@ def _load_central_edge_help():
         "iot central device edge module show-telemetry-value"
     ] = """
         type: command
-        short-summary: Get module telemetry value.
-        long-summary: Get the last telemetry value from a module.
+        short-summary: Get the last telemetry value from a module.
         examples:
         - name: Get module telemetry value.
           text: >

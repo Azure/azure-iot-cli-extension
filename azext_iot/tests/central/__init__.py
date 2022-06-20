@@ -31,6 +31,7 @@ CENTRAL_SETTINGS = [
     "azext_iot_central_dns_suffix",
     "azext_iot_teststorageaccount",
     "azext_iot_central_storage_container",
+    "azext_iot_teststoragecontainer",
 ]
 settings = DynamoSettings(opt_env_set=CENTRAL_SETTINGS)
 APP_RG = settings.env.azext_iot_testrg
@@ -641,7 +642,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 ),
                 include_opt_args=False,
             )
-        elif not settings.env.azext_iot_central_storage_container:
+        elif (not settings.env.azext_iot_central_storage_container) and (not settings.env.azext_iot_teststoragecontainer):
             self.cmd(
                 "storage container delete -n {} --connection-string '{}'".format(
                     self.storage_account_name, self.storage_cstring

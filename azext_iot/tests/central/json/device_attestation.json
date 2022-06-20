@@ -1,0 +1,12 @@
+{
+    "type": "x509",
+    "x509": {
+      "clientCertificates": {
+        "primary": {
+          "info": {
+            "sha1Thumbprint": "<thumbprint>"
+          }
+        }
+      }
+    }
+  }

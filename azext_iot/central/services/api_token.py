@@ -43,7 +43,8 @@ def add_api_token(
         "roles": [{"role": role}],
     }
 
-    if org_id and api_version == ApiVersion.v1_1_preview.value:
+    available_versions = [ApiVersion.v1_1_preview.value, ApiVersion.ga_2022_05_31.value]
+    if org_id and api_version in available_versions:
         payload["roles"][0]["organization"] = org_id
 
     return _utility.make_api_call(
@@ -51,7 +52,7 @@ def add_api_token(
         app_id=app_id,
         method="PUT",
         url="https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, token_id),
-        payload=None,
+        payload=payload,
         token=token,
         api_version=api_version,
         central_dnx_suffix=central_dns_suffix,
@@ -149,7 +150,7 @@ def delete_api_token(
     return _utility.make_api_call(
         cmd,
         app_id=app_id,
-        method="GET",
+        method="DELETE",
         url="https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, token_id),
         payload=None,
         token=token,

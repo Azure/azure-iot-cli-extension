@@ -143,19 +143,30 @@ def load_central_commands(self, _):
         cmd_group.command("compute-device-key", "compute_device_key")
         cmd_group.command("manual-failover", "run_manual_failover")
         cmd_group.command("manual-failback", "run_manual_failback")
-        cmd_group.command("show-attestation", "get_attestation")
-        cmd_group.command("delete-attestation", "delete_attestation")
-        cmd_group.command("update-attestation", "update_attestation")
-        cmd_group.command("create-attestation", "create_attestation")
         cmd_group.command("list-components", "list_components")
-        cmd_group.command("show-properties", "get_properties")
-        cmd_group.command("replace-properties", "replace_properties")
-        cmd_group.command("update-properties", "update_properties")
         cmd_group.command("show-telemetry-value", "get_telemetry_value")
+        cmd_group.command("show-component-telemetry-value", "get_component_telemetry_value")
+
+    with self.command_group(
+        "iot central device attestation",
+        command_type=central_device_ops,
+    ) as cmd_group:
+        cmd_group.show_command("show", "get_attestation")
+        cmd_group.command("create", "create_attestation")
+        cmd_group.command("delete", "delete_attestation")
+        cmd_group.command("update", "update_attestation")
+
+    with self.command_group(
+        "iot central device properties",
+        command_type=central_device_ops,
+    ) as cmd_group:
+        cmd_group.show_command("show", "get_properties")
+        cmd_group.command("replace", "replace_properties")
+        cmd_group.command("delete", "delete_properties")
+        cmd_group.command("update", "update_properties")
         cmd_group.command("show-component-properties", "get_component_properties")
         cmd_group.command("replace-component-properties", "replace_component_properties")
         cmd_group.command("update-component-properties", "update_component_properties")
-        cmd_group.command("show-component-telemetry-value", "get_component_telemetry_value")
 
     with self.command_group(
         "iot central device twin",
@@ -253,14 +264,20 @@ def load_central_commands(self, _):
         cmd_group.show_command("show", "get_device_module")
         cmd_group.command("restart", "restart_device_module")
         cmd_group.command("list-components", "list_module_components")
-        cmd_group.command("show-properties", "get_module_properties")
-        cmd_group.command("update-properties", "update_module_properties")
-        cmd_group.command("replace-properties", "replace_module_properties")
         cmd_group.command("show-telemetry-value", "get_module_telemetry_value")
-        cmd_group.command("show-component-properties", "get_module_component_properties")
-        cmd_group.command("update-component-properties", "update_module_component_properties")
-        cmd_group.command("replace-component-properties", "replace_module_component_properties")
         cmd_group.command("show-component-telemetry-value", "get_module_component_telemetry_value")
+
+    with self.command_group(
+        "iot central device edge module properties",
+        command_type=central_device_ops,
+    ) as cmd_group:
+        cmd_group.show_command("show", "get_module_properties")
+        cmd_group.command("replace", "replace_module_properties")
+        cmd_group.command("delete", "delete_module_properties")
+        cmd_group.command("update", "update_module_properties")
+        cmd_group.command("show-component-properties", "get_module_component_properties")
+        cmd_group.command("replace-component-properties", "replace_module_component_properties")
+        cmd_group.command("update-component-properties", "update_module_component_properties")
 
     with self.command_group(
         "iot central device edge module command",

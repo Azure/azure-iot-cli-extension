@@ -28,9 +28,53 @@ unreleased
 **IoT Central updates**
 
 * Add support for device groups CRUD.
-* Add support for device/module properties CRUD.
-* Add support for 2022-05-31 GA version.
+  - az iot central device-group
+    - az iot central device-group list
+    - az iot central device-group show
+    - az iot central device-group create
+    - az iot central device-group delete
+    - az iot central device-group update
 
+* Add support for device attestation CRUD.
+  - az iot central device attestation
+    - az iot central device attestation show
+    - az iot central device attestation create
+    - az iot central device attestation delete
+    - az iot central device attestation update
+
+* Add support for device/module properties CRUD.
+  - az iot central device list-components
+  - az iot central device show-telemetry-value
+  - az iot central device show-component-telemetry-value
+  - az iot central device properties
+    - az iot central device properties show
+    - az iot central device properties replace
+    - az iot central device properties delete
+    - az iot central device properties update
+    - az iot central device properties show-component-properties
+    - az iot central device properties replace-component-properties
+    - az iot central device properties update-component-properties
+  - az iot central device edge module list-components
+  - az iot central device edge module show-telemetry-value
+  - az iot central device edge module show-component-telemetry-value
+  - az iot central device edge module properties
+    - az iot central device edge module properties show
+    - az iot central device edge module properties replace
+    - az iot central device edge module properties delete
+    - az iot central device edge module properties update
+    - az iot central device edge module properties show-component-properties
+    - az iot central device edge module properties replace-component-properties
+    - az iot central device edge module properties update-component-properties
+
+* Add support for 2022-05-31 GA version.
+- az iot central api-token
+- az iot central device-template
+- az iot central device-group
+- az iot central device
+- az iot central file-upload-config
+- az iot central organization
+- az iot central role
+- az iot central user
 
 0.14.1
 +++++++++++++++

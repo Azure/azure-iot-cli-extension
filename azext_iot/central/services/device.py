@@ -1245,7 +1245,7 @@ def list_device_components(
     token: str,
     api_version=ApiVersion.ga_2022_05_31.value,
     central_dns_suffix=CENTRAL_ENDPOINT,
-):
+) -> dict:
     """
     List the components present in a device.
 
@@ -1280,7 +1280,7 @@ def list_device_module_components(
     token: str,
     api_version=ApiVersion.ga_2022_05_31.value,
     central_dns_suffix=CENTRAL_ENDPOINT,
-):
+) -> List[dict]:
     """
     List the components present in a module.
 
