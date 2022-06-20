@@ -117,7 +117,7 @@ def load_digitaltwins_arguments(self, _):
             "public_network_access",
             options_list=["--public-network-access", "--pna"],
             help="Determines if the Digital Twins instance can be accessed from a public network.",
-            arg_group="Networking",
+            arg_group="Network",
             arg_type=get_enum_type(ADTPublicNetworkAccessType),
         )
 
@@ -406,13 +406,13 @@ def load_digitaltwins_arguments(self, _):
             "conn_name",
             options_list=["--conn-name", "--cn"],
             help="Private endpoint connection name.",
-            arg_group="Private-Endpoint",
+            arg_group="Private Endpoint",
         )
         context.argument(
             "group_ids",
             options_list=["--group-ids"],
             help="Space seperated list of group ids that the private endpoint should connect to.",
-            arg_group="Private-Endpoint",
+            arg_group="Private Endpoint",
             nargs="+",
         )
         context.argument(
@@ -420,19 +420,19 @@ def load_digitaltwins_arguments(self, _):
             options_list=["--status"],
             help="The status of a private endpoint connection.",
             arg_type=get_enum_type(ADTPrivateConnectionStatusType),
-            arg_group="Private-Endpoint",
+            arg_group="Private Endpoint",
         )
         context.argument(
             "description",
             options_list=["--description", "--desc"],
             help="Description for the private endpoint connection.",
-            arg_group="Private-Endpoint",
+            arg_group="Private Endpoint",
         )
         context.argument(
             "actions_required",
             options_list=["--actions-required", "--ar"],
             help="A message indicating if changes on the service provider require any updates on the consumer.",
-            arg_group="Private-Endpoint",
+            arg_group="Private Endpoint",
         )
 
     with self.argument_context("dt network private-endpoint connection wait") as context:
@@ -524,4 +524,59 @@ def load_digitaltwins_arguments(self, _):
             "yes",
             options_list=['--yes', '-y'],
             help='Do not prompt for confirmation when assigning required roles.',
+        )
+
+    with self.argument_context("dt job import") as context:
+        context.argument(
+            "job_id",
+            options_list=["--job-id", "-j"],
+            help="ID of bulk import job. A system generated ID is assigned when this parameter is ommitted during job creation.",
+            arg_group="Bulk Import Job",
+        )
+
+        context.argument(
+            "data_file_name",
+            options_list=["--data-file", "--df"],
+            help="Name of data file input to the bulk import job. The file must be in 'ndjson' format. Sample input data "
+            "file: https://github.com/Azure/azure-iot-cli-extension/tree/dev/docs/samples/adt-bulk-import-data-sample.ndjson",
+            arg_group="Bulk Import Job",
+        )
+
+        context.argument(
+            "input_blob_container_name",
+            options_list=["--input-blob-container", "--ibc"],
+            help="Name of Azure Storage blob container which contains the bulk import data file.",
+            arg_group="Bulk Import Job",
+        )
+
+        context.argument(
+            "input_storage_account_name",
+            options_list=["--input-storage-account", "--isa"],
+            help="Name of Azure Storage account containing blob container which stores the bulk import data file.",
+            arg_group="Bulk Import Job",
+        )
+
+        context.argument(
+            "output_file_name",
+            options_list=["--output-file", "--of"],
+            help="Name of the bulk import job's output file. This file will contain logs as well as error information. "
+            "The file gets created automatically once the job finishes. The file gets overwritten if it already exists. "
+            "If not provided the output file is created with the name: <job_id>_output.txt",
+            arg_group="Bulk Import Job",
+        )
+
+        context.argument(
+            "output_blob_container_name",
+            options_list=["--output-blob-container", "--obc"],
+            help="Name of Azure Storage blob container where the bulk import job's output file will be created. "
+            "If not provided, will use the input blob container.",
+            arg_group="Bulk Import Job",
+        )
+
+        context.argument(
+            "output_storage_account_name",
+            options_list=["--output-storage-account", "--osa"],
+            help="Name of Azure Storage account containing blob container where bulk import job's output file will be created. "
+            "If not provided, will use the input storage account.",
+            arg_group="Bulk Import Job",
         )

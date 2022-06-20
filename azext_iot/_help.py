@@ -34,7 +34,6 @@ helps[
     type: command
     short-summary: Monitor device telemetry & messages sent to an IoT Hub.
     long-summary: |
-                  EXPERIMENTAL requires Python 3.5+
                   This command relies on and may install dependent Cython package (uamqp) upon first execution.
                   https://github.com/Azure/azure-uamqp-python
     examples:
@@ -77,7 +76,6 @@ helps[
     type: command
     short-summary: Monitor feedback sent by devices to acknowledge cloud-to-device (C2D) messages.
     long-summary: |
-                  EXPERIMENTAL requires Python 3.4+
                   This command relies on and may install dependent Cython package (uamqp) upon first execution.
                   https://github.com/Azure/azure-uamqp-python
     examples:
@@ -856,7 +854,6 @@ helps[
     type: command
     short-summary: Send a cloud-to-device message.
     long-summary: |
-                  EXPERIMENTAL requires Python 3.4+
                   This command relies on and may install dependent Cython package (uamqp) upon first execution.
                   https://github.com/Azure/azure-uamqp-python
     examples:
@@ -876,10 +873,10 @@ helps[
 ] = """
     type: command
     short-summary: |
-                    Send an mqtt device-to-cloud message.
-                    The command supports sending messages with application and system properties.
+                   Send an mqtt device-to-cloud message.
+                   The command supports sending messages with application and system properties.
 
-                    Note: The command only works for symmetric key auth (SAS) based devices
+                   Note: The command only works for symmetric key auth (SAS) based devices
     examples:
     - name: Basic usage
       text: az iot device send-d2c-message -n {iothub_name} -d {device_id}
@@ -1236,8 +1233,9 @@ helps[
     "iot dps enrollment registration"
 ] = """
     type: group
-    short-summary: Manage device registrations for an individual enrollment in an Azure IoT Hub Device
+    short-summary: Manage service-side device registrations for an individual enrollment in an Azure IoT Hub Device
         Provisioning Service.
+    long-summary: Use `az iot device registration create` to simulate device registration.
 """
 
 helps[
@@ -1368,8 +1366,9 @@ helps[
     "iot dps enrollment-group registration"
 ] = """
     type: group
-    short-summary: Manage device registrations for an enrollment group in an Azure IoT Hub Device
+    short-summary: Manage service-side device registrations for an enrollment group in an Azure IoT Hub Device
         Provisioning Service.
+    long-summary: Use `az iot device registration create` to simulate device registration.
 """
 
 helps[
