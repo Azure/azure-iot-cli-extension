@@ -42,6 +42,8 @@ try:
     from .event_routes_get_by_id_options_py3 import EventRoutesGetByIdOptions
     from .event_routes_add_options_py3 import EventRoutesAddOptions
     from .event_routes_delete_options_py3 import EventRoutesDeleteOptions
+    from .bulk_import_job_py3 import BulkImportJob
+    from .import_jobs_list_options_py3 import ImportJobsListOptions
 except (SyntaxError, ImportError):
     from .event_route import EventRoute
     from .digital_twins_model_data import DigitalTwinsModelData
@@ -79,6 +81,7 @@ from .digital_twins_model_data_paged import DigitalTwinsModelDataPaged
 from .object_paged import ObjectPaged
 from .incoming_relationship_paged import IncomingRelationshipPaged
 from .event_route_paged import EventRoutePaged
+from .bulk_import_job_paged import BulkImportJobPaged
 
 __all__ = [
     'EventRoute',
@@ -117,4 +120,7 @@ __all__ = [
     'ObjectPaged',
     'IncomingRelationshipPaged',
     'EventRoutePaged',
+    'ImportJobsListOptions',
+    'BulkImportJob',
+    'BulkImportJobPaged'
 ]

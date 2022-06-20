@@ -76,6 +76,12 @@ unreleased
   - az iot central role
   - az iot central user
 
+**Digital Twin updates**
+
+* Added `az dt job import` command group, which will allow users to create and manage jobs for bulk importing
+  models, twins and relationships to a Digital Twins instance. The bulk import data must be stored as a blob in
+  a user owned storage account and container.
+
 0.14.1
 +++++++++++++++
 
