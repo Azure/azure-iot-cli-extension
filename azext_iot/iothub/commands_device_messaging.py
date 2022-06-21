@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from typing import Optional
 from azext_iot.iothub.providers.device_messaging import DeviceMessagingProvider
 from knack.log import get_logger
 
@@ -14,20 +15,20 @@ def iot_device_send_message(
     cmd,
     device_id: str,
     data: str = "Ping from Az CLI IoT Extension",
-    properties: str = None,
+    properties: Optional[str] = None,
     msg_count: int = 1,
-    device_symmetric_key: str = None,
-    certificate_file: str = None,
-    key_file: str = None,
-    passphrase: str = "",
-    hub_name: str = None,
-    resource_group_name: str = None,
-    login: str = None,
+    device_symmetric_key: Optional[str] = None,
+    certificate_file: Optional[str] = None,
+    key_file: Optional[str] = None,
+    passphrase: Optional[str] = None,
+    hub_name: Optional[str] = None,
+    resource_group_name: Optional[str] = None,
+    login: Optional[str] = None,
 ):
-    simulator_provider = DeviceMessagingProvider(
+    messaging_provider = DeviceMessagingProvider(
         cmd=cmd, device_id=device_id, hub_name=hub_name, rg=resource_group_name, login=login
     )
-    return simulator_provider.device_send_message(
+    return messaging_provider.device_send_message(
         data=data,
         properties=properties,
         msg_count=msg_count,
@@ -41,15 +42,15 @@ def iot_device_send_message(
 def iot_c2d_message_complete(
     cmd,
     device_id: str,
-    etag: str = None,
-    hub_name: str = None,
-    resource_group_name: str = None,
-    login: str = None,
+    etag: Optional[str] = None,
+    hub_name: Optional[str] = None,
+    resource_group_name: Optional[str] = None,
+    login: Optional[str] = None,
 ):
-    simulator_provider = DeviceMessagingProvider(
+    messaging_provider = DeviceMessagingProvider(
         cmd=cmd, device_id=device_id, hub_name=hub_name, rg=resource_group_name, login=login
     )
-    return simulator_provider.c2d_message_complete(
+    return messaging_provider.c2d_message_complete(
         etag=etag
     )
 
@@ -57,15 +58,15 @@ def iot_c2d_message_complete(
 def iot_c2d_message_reject(
     cmd,
     device_id: str,
-    etag: str = None,
-    hub_name: str = None,
-    resource_group_name: str = None,
-    login: str = None,
+    etag: Optional[str] = None,
+    hub_name: Optional[str] = None,
+    resource_group_name: Optional[str] = None,
+    login: Optional[str] = None,
 ):
-    simulator_provider = DeviceMessagingProvider(
+    messaging_provider = DeviceMessagingProvider(
         cmd=cmd, device_id=device_id, hub_name=hub_name, rg=resource_group_name, login=login
     )
-    return simulator_provider.c2d_message_reject(
+    return messaging_provider.c2d_message_reject(
         etag=etag
     )
 
@@ -73,15 +74,15 @@ def iot_c2d_message_reject(
 def iot_c2d_message_abandon(
     cmd,
     device_id: str,
-    etag: str = None,
-    hub_name: str = None,
-    resource_group_name: str = None,
-    login: str = None,
+    etag: Optional[str] = None,
+    hub_name: Optional[str] = None,
+    resource_group_name: Optional[str] = None,
+    login: Optional[str] = None,
 ):
-    simulator_provider = DeviceMessagingProvider(
+    messaging_provider = DeviceMessagingProvider(
         cmd=cmd, device_id=device_id, hub_name=hub_name, rg=resource_group_name, login=login
     )
-    return simulator_provider.c2d_message_abandon(
+    return messaging_provider.c2d_message_abandon(
         etag=etag
     )
 
@@ -93,14 +94,14 @@ def iot_c2d_message_receive(
     abandon: bool = False,
     complete: bool = False,
     reject: bool = False,
-    hub_name: str = None,
-    resource_group_name: str = None,
-    login: str = None,
+    hub_name: Optional[str] = None,
+    resource_group_name: Optional[str] = None,
+    login: Optional[str] = None,
 ):
-    simulator_provider = DeviceMessagingProvider(
+    messaging_provider = DeviceMessagingProvider(
         cmd=cmd, device_id=device_id, hub_name=hub_name, rg=resource_group_name, login=login
     )
-    return simulator_provider.c2d_message_receive(
+    return messaging_provider.c2d_message_receive(
         lock_timeout=lock_timeout, abandon=abandon, complete=complete, reject=reject
     )
 
@@ -109,26 +110,26 @@ def iot_c2d_message_send(
     cmd,
     device_id: str,
     data: str = "Ping from Az CLI IoT Extension",
-    message_id: str = None,
-    correlation_id: str = None,
-    user_id: str = None,
+    message_id: Optional[str] = None,
+    correlation_id: Optional[str] = None,
+    user_id: Optional[str] = None,
     content_encoding: str = "utf-8",
-    content_type: str = None,
-    expiry_time_utc=None,
-    properties: str = None,
-    ack=None,
-    wait_on_feedback=False,
+    content_type: Optional[str] = None,
+    expiry_time_utc: Optional[str] = None,
+    properties: Optional[str] = None,
+    ack: Optional[str] = None,
+    wait_on_feedback: bool = False,
     yes: bool = False,
     repair: bool = False,
-    hub_name: str = None,
-    resource_group_name: str = None,
-    login: str = None,
-    auth_type_dataplane: str = None
+    hub_name: Optional[str] = None,
+    resource_group_name: Optional[str] = None,
+    login: Optional[str] = None,
+    auth_type_dataplane: Optional[str] = None
 ):
     from azext_iot.common.deps import ensure_uamqp
     ensure_uamqp(cmd.cli_ctx.config, yes, repair)
 
-    simulator_provider = DeviceMessagingProvider(
+    messaging_provider = DeviceMessagingProvider(
         cmd=cmd,
         device_id=device_id,
         hub_name=hub_name,
@@ -136,7 +137,7 @@ def iot_c2d_message_send(
         login=login,
         auth_type_dataplane=auth_type_dataplane
     )
-    return simulator_provider.c2d_message_send(
+    return messaging_provider.c2d_message_send(
         data=data,
         message_id=message_id,
         correlation_id=correlation_id,
@@ -153,14 +154,14 @@ def iot_c2d_message_send(
 def iot_c2d_message_purge(
     cmd,
     device_id: str,
-    hub_name: str = None,
-    resource_group_name: str = None,
-    login: str = None,
+    hub_name: Optional[str] = None,
+    resource_group_name: Optional[str] = None,
+    login: Optional[str] = None,
 ):
-    simulator_provider = DeviceMessagingProvider(
+    messaging_provider = DeviceMessagingProvider(
         cmd=cmd, device_id=device_id, hub_name=hub_name, rg=resource_group_name, login=login
     )
-    return simulator_provider.c2d_message_purge()
+    return messaging_provider.c2d_message_purge()
 
 
 def iot_simulate_device(
@@ -171,22 +172,22 @@ def iot_simulate_device(
     msg_count: int = 100,
     msg_interval: int = 3,
     protocol_type: str = "mqtt",
-    properties: str = None,
-    device_symmetric_key: str = None,
-    certificate_file: str = None,
-    key_file: str = None,
-    passphrase: str = "",
-    method_response_code: str = None,
-    method_response_payload: str = None,
-    init_reported_properties: str = None,
-    hub_name: str = None,
-    resource_group_name: str = None,
-    login: str = None,
+    properties: Optional[str] = None,
+    device_symmetric_key: Optional[str] = None,
+    certificate_file: Optional[str] = None,
+    key_file: Optional[str] = None,
+    passphrase: Optional[str] = None,
+    method_response_code: Optional[str] = None,
+    method_response_payload: Optional[str] = None,
+    init_reported_properties: Optional[str] = None,
+    hub_name: Optional[str] = None,
+    resource_group_name: Optional[str] = None,
+    login: Optional[str] = None,
 ):
-    simulator_provider = DeviceMessagingProvider(
+    messaging_provider = DeviceMessagingProvider(
         cmd=cmd, device_id=device_id, hub_name=hub_name, rg=resource_group_name, login=login
     )
-    return simulator_provider.simulate_device(
+    return messaging_provider.simulate_device(
         receive_settle=receive_settle,
         data=data,
         properties=properties,
@@ -208,14 +209,14 @@ def iot_device_upload_file(
     device_id: str,
     file_path: str,
     content_type: str,
-    hub_name: str = None,
-    resource_group_name: str = None,
-    login: str = None,
+    hub_name: Optional[str] = None,
+    resource_group_name: Optional[str] = None,
+    login: Optional[str] = None,
 ):
-    simulator_provider = DeviceMessagingProvider(
+    messaging_provider = DeviceMessagingProvider(
         cmd=cmd, device_id=device_id, hub_name=hub_name, rg=resource_group_name, login=login
     )
-    return simulator_provider.device_upload_file(
+    return messaging_provider.device_upload_file(
         file_path=file_path,
         content_type=content_type,
     )

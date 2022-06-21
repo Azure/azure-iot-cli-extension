@@ -23,7 +23,6 @@ from threading import Event, Thread
 from datetime import datetime
 from knack.log import get_logger
 from azure.cli.core.azclierror import (
-    BadRequestError,
     CLIInternalError,
     FileOperationError,
     InvalidArgumentValueError,
@@ -598,12 +597,3 @@ def ensure_azure_namespace_path():
         sys.path.insert(0, ext_path)
 
     return
-
-
-def check_connection_string(connection_string):
-    """
-    Check if the connection string is usuable for SAS token authentication.
-    The connection string must not have x509=True in it.
-    """
-    if "x509=true" in connection_string:
-        raise BadRequestError("Please provide the certificate and key files for the device.")

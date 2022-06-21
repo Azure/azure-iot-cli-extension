@@ -6,6 +6,7 @@
 
 from os.path import exists, basename
 from time import time, sleep
+from typing import Dict, Optional
 from knack.log import get_logger
 from azext_iot.common.shared import DeviceAuthApiType, KeyType, ProtocolType, SdkType, SettleType
 from azext_iot.common.utility import (
@@ -34,7 +35,15 @@ printer = pprint.PrettyPrinter(indent=2)
 
 
 class DeviceMessagingProvider(IoTHubProvider):
-    def __init__(self, cmd, device_id, hub_name=None, rg=None, login=None, auth_type_dataplane=None):
+    def __init__(
+        self,
+        cmd,
+        device_id: str,
+        hub_name: Optional[str] = None,
+        rg: Optional[str] = None,
+        login: Optional[str] = None,
+        auth_type_dataplane: Optional[str] = None
+    ):
         super(DeviceMessagingProvider, self).__init__(
             cmd=cmd, hub_name=hub_name, rg=rg, login=login, auth_type_dataplane=auth_type_dataplane
         )
@@ -46,14 +55,14 @@ class DeviceMessagingProvider(IoTHubProvider):
     def device_send_message(
         self,
         data: str = "Ping from Az CLI IoT Extension",
-        properties: str = None,
+        properties: Optional[str] = None,
         msg_count: int = 1,
-        device_symmetric_key: str = None,
-        certificate_file: str = None,
-        key_file: str = None,
-        passphrase: str = "",
+        device_symmetric_key: Optional[str] = None,
+        certificate_file: Optional[str] = None,
+        key_file: Optional[str] = None,
+        passphrase: Optional[str] = None,
     ):
-        from azext_iot.operations._mqtt import mqtt_client
+        from azext_iot.iothub.providers.mqtt_provider import MQTTProvider
 
         device = self._d2c_get_device_auth_props(
             symmetric_key=device_symmetric_key,
@@ -65,7 +74,7 @@ class DeviceMessagingProvider(IoTHubProvider):
             properties = validate_key_value_pairs(properties)
 
         device_connection_string = _build_device_or_module_connection_string(device, KeyType.primary.value)
-        client_mqtt = mqtt_client(
+        client_mqtt = MQTTProvider(
             hub_hostname=self.target["entity"],
             device_conn_string=device_connection_string,
             x509_files=device["authentication"].get("x509_files"),
@@ -130,7 +139,7 @@ class DeviceMessagingProvider(IoTHubProvider):
 
         return self._c2d_message_receive(lock_timeout, ack)
 
-    def _c2d_message_receive(self, lock_timeout=60, ack=None):
+    def _c2d_message_receive(self, lock_timeout: int = 60, ack: Optional[str] = None):
         from azext_iot.constants import MESSAGING_HTTP_C2D_SYSTEM_PROPERTIES
 
         request_headers = {}
@@ -214,15 +223,15 @@ class DeviceMessagingProvider(IoTHubProvider):
     def c2d_message_send(
         self,
         data: str = "Ping from Az CLI IoT Extension",
-        message_id: str = None,
-        correlation_id: str = None,
-        user_id: str = None,
+        message_id: Optional[str] = None,
+        correlation_id: Optional[str] = None,
+        user_id: Optional[str] = None,
         content_encoding: str = "utf-8",
-        content_type: str = None,
-        expiry_time_utc=None,
-        properties: str = None,
-        ack=None,
-        wait_on_feedback=False,
+        content_type: Optional[str] = None,
+        expiry_time_utc: Optional[str] = None,
+        properties: Optional[str] = None,
+        ack: Optional[str] = None,
+        wait_on_feedback: bool = False,
     ):
         if wait_on_feedback and not ack:
             raise RequiredArgumentMissingError(
@@ -274,20 +283,20 @@ class DeviceMessagingProvider(IoTHubProvider):
         msg_count: int = 100,
         msg_interval: int = 3,
         protocol_type: str = "mqtt",
-        properties: str = None,
-        device_symmetric_key: str = None,
-        certificate_file: str = None,
-        key_file: str = None,
-        passphrase: str = "",
-        method_response_code: str = None,
-        method_response_payload: str = None,
-        init_reported_properties: str = None
+        properties: Optional[str] = None,
+        device_symmetric_key: Optional[str] = None,
+        certificate_file: Optional[str] = None,
+        key_file: Optional[str] = None,
+        passphrase: Optional[str] = None,
+        method_response_code: Optional[str] = None,
+        method_response_payload: Optional[str] = None,
+        init_reported_properties: Optional[str] = None
     ):
         import sys
         import uuid
         import datetime
         import json
-        from azext_iot.operations._mqtt import mqtt_client
+        from azext_iot.iothub.providers.mqtt_provider import MQTTProvider
         from threading import Event, Thread
         from tqdm import tqdm
         from azext_iot.constants import (
@@ -372,7 +381,7 @@ class DeviceMessagingProvider(IoTHubProvider):
             if protocol_type == ProtocolType.mqtt.name:
                 device_connection_string = _build_device_or_module_connection_string(device, KeyType.primary.value)
 
-                client_mqtt = mqtt_client(
+                client_mqtt = MQTTProvider(
                     hub_hostname=self.target["entity"],
                     device_conn_string=device_connection_string,
                     x509_files=device["authentication"].get("x509_files"),
@@ -409,8 +418,8 @@ class DeviceMessagingProvider(IoTHubProvider):
 
     def device_upload_file(
         self,
-        file_path,
-        content_type,
+        file_path: str,
+        content_type: str,
     ):
         from azext_iot.sdk.iothub.device.models import FileUploadCompletionStatus
 
@@ -449,10 +458,10 @@ class DeviceMessagingProvider(IoTHubProvider):
 
     def _d2c_get_device_auth_props(
         self,
-        symmetric_key: str = None,
-        certificate_file: str = None,
-        key_file: str = None,
-        passphrase: str = ""
+        symmetric_key: Optional[str] = None,
+        certificate_file: Optional[str] = None,
+        key_file: Optional[str] = None,
+        passphrase: Optional[str] = None
     ):
         if symmetric_key:
             return {
@@ -489,7 +498,7 @@ class DeviceMessagingProvider(IoTHubProvider):
             # Get the device info from the service side
             return _iot_device_show(self.target, self.device_id)
 
-    def _handle_c2d_msg(self, receive_settle, lock_timeout=60):
+    def _handle_c2d_msg(self, receive_settle: str, lock_timeout: int = 60):
         result = self._c2d_message_receive(lock_timeout)
         if result:
             print()
@@ -508,7 +517,7 @@ class DeviceMessagingProvider(IoTHubProvider):
         return False
 
 
-def _simulate_get_default_properties(protocol):
+def _simulate_get_default_properties(protocol: str) -> Dict[str, str]:
     default_properties = {}
     is_mqtt = protocol == ProtocolType.mqtt.name
 

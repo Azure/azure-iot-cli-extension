@@ -10,7 +10,7 @@ import responses
 import re
 from azext_iot.iothub import commands_device_messaging as subject
 from azext_iot.common.utility import validate_key_value_pairs
-from azext_iot.operations import _mqtt as mqtt_subject
+from azext_iot.iothub.providers import mqtt_provider as mqtt_subject
 from knack.util import CLIError
 from azext_iot.tests.conftest import (
     fixture_cmd,
@@ -561,23 +561,23 @@ class TestDeviceSimulate:
 
 
 class TestMQTTClientSetup:
-    def test_mqtt_client_creation_sas_device(self, mqttclient_cs):
-        mqtt_subject.mqtt_client(
+    def test_mqtt_provider_creation_sas_device(self, mqttclient_cs):
+        mqtt_subject.MQTTProvider(
             hub_hostname=mock_target["entity"],
             device_id="test_device_id",
             device_conn_string="test_conn_string"
         )
 
-    def test_mqtt_client_creation_bad_sas_device(self, mqttclient_cs):
+    def test_mqtt_provider_creation_bad_sas_device(self, mqttclient_cs):
         with pytest.raises(CLIError):
-            mqtt_subject.mqtt_client(
+            mqtt_subject.MQTTProvider(
                 hub_hostname=mock_target["entity"],
                 device_id="test_device_id",
                 device_conn_string="test_conn_string;x509=true"
             )
 
-    def test_mqtt_client_creation_sx509_device(self, mqttclient_x509):
-        mqtt_subject.mqtt_client(
+    def test_mqtt_provider_creation_sx509_device(self, mqttclient_x509):
+        mqtt_subject.MQTTProvider(
             hub_hostname=mock_target["entity"],
             device_id="test_device_id",
             x509_files={

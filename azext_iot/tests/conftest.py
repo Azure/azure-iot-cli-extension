@@ -189,9 +189,9 @@ def mqttclient_x509(mocker, fixture_ghcs, fixture_sas):
 
 @pytest.fixture()
 def mqttclient_generic_error(mocker, fixture_ghcs, fixture_sas):
-    mqtt_client = mocker.patch(path_mqtt_device_client_cs)
-    mqtt_client().connect.side_effect = Exception("something happened")
-    return mqtt_client
+    MQTTProvider = mocker.patch(path_mqtt_device_client_cs)
+    MQTTProvider().connect.side_effect = Exception("something happened")
+    return MQTTProvider
 
 
 @pytest.fixture()

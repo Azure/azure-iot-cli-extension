@@ -25,7 +25,8 @@ unreleased
   are supported. Once registered, the device will show up in the linked IoT Hub and can be interacted with or
   simulated using other `az iot device` commands.
 
-* Added support for devices that use x509 thumbprint or CA authentication for:
+* Added support for simulating device identities that use x509 thumbprint or CA authentication, impacting the
+  following commands:
     - `az iot device simulate`
     - `az iot device send-d2c-message`
 

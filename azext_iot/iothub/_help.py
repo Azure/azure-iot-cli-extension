@@ -151,7 +151,8 @@ def load_iothub_help():
         "iot device"
     ] = """
         type: group
-        short-summary: Leverage device-to-cloud and cloud-to-device messaging capabilities.
+        short-summary: Leverage device simulation and other device-centric operations such as device-to-cloud or
+          cloud-to-device messaging capabilities.
     """
 
     helps[

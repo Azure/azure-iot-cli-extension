@@ -6,22 +6,24 @@
 
 import pprint
 from time import sleep
+from typing import Any, Dict, Optional
 
-from azext_iot.common.utility import check_connection_string, ensure_azure_namespace_path
+from azext_iot.common.utility import ensure_azure_namespace_path
+from azure.cli.core.azclierror import BadRequestError
 
 printer = pprint.PrettyPrinter(indent=2)
 
 
-class mqtt_client(object):
+class MQTTProvider(object):
     def __init__(
         self,
-        hub_hostname,
-        device_id,
-        device_conn_string: str = None,
-        x509_files=None,
-        method_response_code=None,
-        method_response_payload=None,
-        init_reported_properties=None
+        hub_hostname: str,
+        device_id: str,
+        device_conn_string: Optional[str] = None,
+        x509_files: Optional[Dict[str, str]] = None,
+        method_response_code: Optional[str] = None,
+        method_response_payload: Optional[str] = None,
+        init_reported_properties: Optional[str] = None
     ):
         ensure_azure_namespace_path()
         from azure.iot.device import IoTHubDeviceClient as mqtt_device_client
@@ -40,9 +42,9 @@ class mqtt_client(object):
                 device_id=self.device_id,
                 websockets=True
             )
+        elif "x509=true" in device_conn_string:
+            raise BadRequestError("Please provide the certificate and key files for the device.")
         else:
-            # Make sure we do not try to connect a x509 device using the connection string
-            check_connection_string(device_conn_string)
             self.device_client = mqtt_device_client.create_from_connection_string(
                 device_conn_string,
                 websockets=True
@@ -56,7 +58,7 @@ class mqtt_client(object):
         self.init_reported_properties = init_reported_properties
 
     def send_d2c_message(
-        self, message_text, properties=None
+        self, message_text: str, properties: Optional[Dict[str, Any]] = None
     ):
         from azure.iot.device import Message
 
@@ -132,7 +134,7 @@ class mqtt_client(object):
         self.device_client.send_method_response(method_response)
 
     def twin_patch_handler(
-        self, patch
+        self, patch: Dict[str, Any]
     ):
         modified_properties = {}
         for prop in patch:
@@ -145,7 +147,7 @@ class mqtt_client(object):
             self.device_client.patch_twin_reported_properties(modified_properties)
 
     def execute(
-        self, data, properties={}, publish_delay=2, msg_count=100
+        self, data, properties: Dict[str, Any] = {}, publish_delay: int = 2, msg_count: int = 100
     ):
         from tqdm import tqdm
 

@@ -24,7 +24,7 @@ from knack.log import get_logger
 logger = get_logger(__name__)
 
 LIVE_CONSUMER_GROUPS = ["test1", "test2", "test3"]
-MQTT_CLIENT_SETUP_TIME = 15
+MQTT_PROVIDER_SETUP_TIME = 15
 
 
 class TestIoTHubMessaging(IoTLiveScenarioTest):
@@ -493,7 +493,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             return_handle=True,
         )
 
-        sleep(MQTT_CLIENT_SETUP_TIME)
+        sleep(MQTT_PROVIDER_SETUP_TIME)
 
         # invoke device method with response status and payload
         result = self.cmd(
@@ -549,7 +549,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             return_handle=True,
         )
 
-        sleep(MQTT_CLIENT_SETUP_TIME)
+        sleep(MQTT_PROVIDER_SETUP_TIME)
 
         # invoke device twin property update
         self.cmd(
