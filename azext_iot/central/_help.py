@@ -570,7 +570,7 @@ def _load_central_devices_help():
     """
 
     helps[
-        "iot central device properties show-properties"
+        "iot central device properties show"
     ] = """
         type: command
         short-summary: Get all property values of a device by device ID.
@@ -578,13 +578,13 @@ def _load_central_devices_help():
         examples:
         - name: Get device properties
           text: >
-            az iot central device properties show-properties
+            az iot central device properties show
             --app-id {appid}
             --device-id {deviceid}
     """
 
     helps[
-        "iot central device properties replace-properties"
+        "iot central device properties replace"
     ] = """
         type: command
         short-summary: Replace all property values of a device by device ID.
@@ -592,14 +592,14 @@ def _load_central_devices_help():
         examples:
         - name: Replace device properties
           text: >
-            az iot central device properties replace-properties
+            az iot central device properties replace
             --app-id {appid}
             --device-id {deviceid}
             --content {json}
     """
 
     helps[
-        "iot central device properties update-properties"
+        "iot central device properties update"
     ] = """
         type: command
         short-summary: Update property values of a device by device ID.
@@ -607,7 +607,7 @@ def _load_central_devices_help():
         examples:
         - name: Update device properties via patch
           text: >
-            az iot central device properties update-properties
+            az iot central device properties update
             --app-id {appid}
             --device-id {deviceid}
             --content {json}
@@ -1737,28 +1737,28 @@ def _load_central_edge_help():
     """
 
     helps[
-        "iot central device edge module properties show-properties"
+        "iot central device edge module properties show"
     ] = """
         type: command
         short-summary: Get all property values of a module.
         examples:
         - name: Get module properties.
           text: >
-            az iot central device edge module properties show-properties
+            az iot central device edge module properties show
             --app-id {appid}
             --device-id {deviceId}
             --module-name {moduleName}
     """
 
     helps[
-        "iot central device edge module properties update-properties"
+        "iot central device edge module properties update"
     ] = """
         type: command
         short-summary: Update property values of a module.
         examples:
         - name: Update module properties via patch.
           text: >
-            az iot central device edge module properties update-properties
+            az iot central device edge module properties update
             --app-id {appid}
             --device-id {deviceId}
             --module-name {moduleName}
@@ -1766,14 +1766,14 @@ def _load_central_edge_help():
     """
 
     helps[
-        "iot central device edge module properties replace-properties"
+        "iot central device edge module properties replace"
     ] = """
         type: command
         short-summary: Replace all property values of a module.
         examples:
         - name: Replace module properties.
           text: >
-            az iot central device edge module properties replace-properties
+            az iot central device edge module properties replace
             --app-id {appid}
             --device-id {deviceId}
             --module-name {moduleName}
