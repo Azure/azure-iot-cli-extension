@@ -9,7 +9,7 @@ from time import sleep
 from typing import Any, Dict, Optional
 
 from azext_iot.common.utility import ensure_azure_namespace_path
-from azure.cli.core.azclierror import BadRequestError
+from azure.cli.core.azclierror import RequiredArgumentMissingError
 
 printer = pprint.PrettyPrinter(indent=2)
 
@@ -43,7 +43,7 @@ class MQTTProvider(object):
                 websockets=True
             )
         elif "x509=true" in device_conn_string:
-            raise BadRequestError("Please provide the certificate and key files for the device.")
+            raise RequiredArgumentMissingError("Please provide the certificate and key files for the device.")
         else:
             self.device_client = mqtt_device_client.create_from_connection_string(
                 device_conn_string,

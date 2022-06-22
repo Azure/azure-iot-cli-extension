@@ -239,12 +239,14 @@ def load_iothub_help():
         short-summary: |
                         Send an mqtt device-to-cloud message.
                         The command supports sending messages with application and system properties.
-                        Note: If using x509 authentication methods, the certificate and key files must be provided.
+                        Note: If using x509 authentication methods, the certificate and key files (and passphrase if needed) must be provided.
         examples:
         - name: Basic usage
           text: az iot device send-d2c-message -n {iothub_name} -d {device_id}
         - name: Basic usage for device with x509 authentication
           text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --cp {certificate_file_path} --kp {key_file_path}
+        - name: Basic usage for device with x509 authentication in which the key file has a passphrase
+          text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --cp {certificate_file_path} --kp {key_file_path} --pass {passphrase}
         - name: Basic usage with custom data
           text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --data {message_body}
         - name: Send application properties
@@ -258,20 +260,22 @@ def load_iothub_help():
     ] = """
         type: command
         short-summary: |
-                      Simulate a device in an Azure IoT Hub.
-                      While the device simulation is running, the device will automatically receive
-                      and acknowledge cloud-to-device (c2d) messages. For mqtt simulation, all c2d messages will
-                      be acknowledged with completion. For http simulation c2d acknowledgement is based on user
-                      selection which can be complete, reject or abandon. The mqtt simulation also supports direct
-                      method invocation which can be acknowledged by a response status code and response payload.
-                      Note: The command by default will set content-type to application/json and content-encoding
-                      to utf-8. This can be overriden.
-                      Note: If using x509 authentication methods, the certificate and key files must be provided.
+                        Simulate a device in an Azure IoT Hub.
+                        While the device simulation is running, the device will automatically receive
+                        and acknowledge cloud-to-device (c2d) messages. For mqtt simulation, all c2d messages will
+                        be acknowledged with completion. For http simulation c2d acknowledgement is based on user
+                        selection which can be complete, reject or abandon. The mqtt simulation also supports direct
+                        method invocation which can be acknowledged by a response status code and response payload.
+                        Note: The command by default will set content-type to application/json and content-encoding
+                        to utf-8. This can be overriden.
+                        Note: If using x509 authentication methods, the certificate and key files (and passphrase if needed) must be provided.
         examples:
         - name: Basic usage (mqtt)
           text: az iot device simulate -n {iothub_name} -d {device_id}
         - name: Basic usage for device with x509 authentication (mqtt)
           text: az iot device simulate -n {iothub_name} -d {device_id} --cp {certificate_file_path} --kp {key_file_path}
+        - name: Basic usage for device with x509 authentication (mqtt) in which the key file has a passphrase
+          text: az iot device simulate -n {iothub_name} -d {device_id} --cp {certificate_file_path} --kp {key_file_path} --pass {passphrase}
         - name: Send mixed properties (mqtt)
           text: az iot device simulate -n {iothub_name} -d {device_id} --properties "myprop=myvalue;$.ct=application/json"
         - name: Send direct method response status code and direct method response payload as raw json (mqtt only)

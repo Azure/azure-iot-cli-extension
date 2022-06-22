@@ -92,7 +92,8 @@ def load_iothub_arguments(self, _):
             "device_symmetric_key",
             options_list=["--symmetric-key", "--key"],
             arg_group="Device Authentication",
-            help="Symmetric key to use for the device.",
+            help="Symmetric key to use for the device. If the symmetric key and other device "
+            "authentication arguments are provided, symmetric key takes priority.",
         )
         context.argument(
             "certificate_file",

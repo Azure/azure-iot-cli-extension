@@ -398,12 +398,14 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # Set up the CA signed cert - need to upload to hub and sign
         root_cert = create_certificate(subject="root", valid_days=1, cert_output_dir=output_dir)
+        fake_pass = "pass1234"
         create_certificate(
             subject=device_ids[1],
             valid_days=1,
             cert_output_dir=output_dir,
             cert_object=root_cert,
-            chain_cert=True
+            chain_cert=True,
+            signing_password=fake_pass
         )
         for cert_name in ["root", device_ids[1]]:
             self.tracked_certs.append(cert_name + CERT_ENDING)
@@ -423,6 +425,8 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         create_certificate(
             subject=verification_code, valid_days=1, cert_output_dir=output_dir, cert_object=root_cert
         )
+        self.tracked_certs.append(verification_code + CERT_ENDING)
+        self.tracked_certs.append(verification_code + KEY_ENDING)
 
         self.cmd(
             "iot hub certificate verify --hub-name {} -g {} -n {} -p {} -e *".format(
@@ -439,17 +443,17 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         )
 
         self.cmd(
-            "iot device simulate -d {} -n {} -g {} --da '{}' --mc 1 --mi 1 --cp {} --kp {}".format(
+            "iot device simulate -d {} -n {} -g {} --da '{}' --mc 1 --mi 1 --cp {} --kp {} --pass {}".format(
                 device_ids[1], self.entity_name, self.entity_rg, simulate_msg,
-                f"{device_ids[1]}-cert.pem", f"{device_ids[1]}-key.pem"
+                f"{device_ids[1]}-cert.pem", f"{device_ids[1]}-key.pem", fake_pass
             )
         )
         device_events.append((device_ids[1], f"{simulate_msg} #1"))
 
         self.cmd(
-            "iot device send-d2c-message -d {} -n {} -g {} --da '{}' --cp {} --kp {}".format(
+            "iot device send-d2c-message -d {} -n {} -g {} --da '{}' --cp {} --kp {} --pass {}".format(
                 device_ids[1], self.entity_name, self.entity_rg, send_d2c_msg,
-                f"{device_ids[1]}-cert.pem", f"{device_ids[1]}-key.pem"
+                f"{device_ids[1]}-cert.pem", f"{device_ids[1]}-key.pem", fake_pass
             )
         )
         device_events.append((device_ids[1], send_d2c_msg))

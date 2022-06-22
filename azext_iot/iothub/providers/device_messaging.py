@@ -62,7 +62,7 @@ class DeviceMessagingProvider(IoTHubProvider):
         key_file: Optional[str] = None,
         passphrase: Optional[str] = None,
     ):
-        from azext_iot.iothub.providers.mqtt_provider import MQTTProvider
+        from azext_iot.iothub.providers.mqtt import MQTTProvider
 
         device = self._d2c_get_device_auth_props(
             symmetric_key=device_symmetric_key,
@@ -296,7 +296,7 @@ class DeviceMessagingProvider(IoTHubProvider):
         import uuid
         import datetime
         import json
-        from azext_iot.iothub.providers.mqtt_provider import MQTTProvider
+        from azext_iot.iothub.providers.mqtt import MQTTProvider
         from threading import Event, Thread
         from tqdm import tqdm
         from azext_iot.constants import (
@@ -476,8 +476,7 @@ class DeviceMessagingProvider(IoTHubProvider):
             }
         elif (certificate_file and key_file):
             # custom device structure to hold needed info
-            # Note that here signed vs ca doesnt matter. CA will need a verified cert
-            # (stuff from dps enrollment group certs)
+            # Note that here signed vs ca doesnt matter. CA will need a verified cert in the service
             # Note that for the CA device the subject of the cert must be the device_id
             return {
                 "deviceId": self.device_id,
@@ -490,7 +489,7 @@ class DeviceMessagingProvider(IoTHubProvider):
                     }
                 }
             }
-        elif certificate_file or key_file:
+        elif any([certificate_file, key_file, passphrase]):
             raise RequiredArgumentMissingError(
                 "Both 'certificate-file' and 'key-file' required for x509 certificate authentication."
             )

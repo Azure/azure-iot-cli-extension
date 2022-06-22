@@ -10,7 +10,7 @@ import responses
 import re
 from azext_iot.iothub import commands_device_messaging as subject
 from azext_iot.common.utility import validate_key_value_pairs
-from azext_iot.iothub.providers import mqtt_provider as mqtt_subject
+from azext_iot.iothub.providers import mqtt as mqtt_subject
 from knack.util import CLIError
 from azext_iot.tests.conftest import (
     fixture_cmd,

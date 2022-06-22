@@ -13,9 +13,6 @@ from azext_iot.tests.helpers import CERT_ENDING, KEY_ENDING, ROOT_CERT_NAME
 from azext_iot.tests.test_utils import create_certificate
 
 
-DEVICE_CERT_NAME = "aziotcli-device"
-
-
 class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
     def __init__(self, test_case):
         super(TestDPSDeviceRegistrationsGroup, self).__init__(test_case, cert_only=False)
@@ -244,7 +241,8 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
             )
 
     def test_dps_device_registration_x509_lifecycle(self):
-        device_thumbprint = self._prepare_x509_certificates_for_dps()
+        fake_pass = "pass1234"
+        devices = self._prepare_x509_certificates_for_dps(device_passwords=[None, fake_pass])
         hub_host_name = f"{self.entity_hub_name}.azure-devices.net"
 
         for auth_phase in DATAPLANE_AUTH_TYPES:
@@ -257,9 +255,9 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
                     "--cp {} --kp {}".format(
                         self.entity_dps_name,
                         self.entity_rg,
-                        DEVICE_CERT_NAME,
-                        DEVICE_CERT_NAME + CERT_ENDING,
-                        DEVICE_CERT_NAME + KEY_ENDING
+                        devices[0][0],
+                        devices[0][0] + CERT_ENDING,
+                        devices[0][0] + KEY_ENDING
                     ),
                     auth_type=auth_phase
                 ),
@@ -283,7 +281,7 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot device registration create --dps-name {} -g {} --registration-id {}".format(
-                        self.entity_dps_name, self.entity_rg, DEVICE_CERT_NAME
+                        self.entity_dps_name, self.entity_rg, devices[0][0]
                     ),
                     auth_type=auth_phase
                 ),
@@ -291,63 +289,66 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
             )
 
             # Normal registration
-            self.cmd(
+            registrations = [self.cmd(
                 self.set_cmd_auth_type(
                     "iot device registration create --dps-name {} -g {} --registration-id {} "
                     "--cp {} --kp {}".format(
                         self.entity_dps_name,
                         self.entity_rg,
-                        DEVICE_CERT_NAME,
-                        DEVICE_CERT_NAME + CERT_ENDING,
-                        DEVICE_CERT_NAME + KEY_ENDING
+                        devices[0][0],
+                        devices[0][0] + CERT_ENDING,
+                        devices[0][0] + KEY_ENDING
                     ),
                     auth_type=auth_phase
                 ),
                 checks=[
                     self.exists("operationId"),
                     self.check("registrationState.assignedHub", hub_host_name),
-                    self.check("registrationState.deviceId", DEVICE_CERT_NAME),
-                    self.check("registrationState.registrationId", DEVICE_CERT_NAME),
+                    self.check("registrationState.deviceId", devices[0][0]),
+                    self.check("registrationState.registrationId", devices[0][0]),
                     self.check("registrationState.substatus", "initialAssignment"),
                     self.check("status", "assigned"),
                 ],
-            )
-            self.check_hub_device(DEVICE_CERT_NAME, "selfSigned", thumbprint=device_thumbprint)
+            ).get_output_in_json()["registrationState"]]
+            self.check_hub_device(devices[0][0], "selfSigned", thumbprint=devices[0][1])
 
-            # Use id scope and host
+            # Use id scope and host to register the second device with password
             provisioning_host = f"{self.entity_dps_name}.azure-devices-provisioning.net"
-            registration = self.cmd(
+            registrations.append(self.cmd(
                 self.set_cmd_auth_type(
                     "iot device registration create --id-scope {} --registration-id {} "
-                    "--cp {} --kp {} --host {}".format(
+                    "--cp {} --kp {} --host {} --pass {}".format(
                         self.id_scope,
-                        DEVICE_CERT_NAME,
-                        DEVICE_CERT_NAME + CERT_ENDING,
-                        DEVICE_CERT_NAME + KEY_ENDING,
-                        provisioning_host
+                        devices[1][0],
+                        devices[1][0] + CERT_ENDING,
+                        devices[1][0] + KEY_ENDING,
+                        provisioning_host,
+                        fake_pass
                     ),
                     auth_type=auth_phase
                 ),
                 checks=[
                     self.exists("operationId"),
                     self.check("registrationState.assignedHub", hub_host_name),
-                    self.check("registrationState.deviceId", DEVICE_CERT_NAME),
-                    self.check("registrationState.registrationId", DEVICE_CERT_NAME),
+                    self.check("registrationState.deviceId", devices[1][0]),
+                    self.check("registrationState.registrationId", devices[1][0]),
                     self.check("registrationState.substatus", "initialAssignment"),
                     self.check("status", "assigned"),
                 ],
-            ).get_output_in_json()["registrationState"]
+            ).get_output_in_json()["registrationState"])
+            self.check_hub_device(devices[1][0], "selfSigned", thumbprint=devices[1][1])
 
             # Check registration from service side
-            service_side = self.cmd(
-                self.set_cmd_auth_type(
-                    "iot dps enrollment-group registration show --dps-name {} -g {} --rid {}".format(
-                        self.entity_dps_name, self.entity_rg, DEVICE_CERT_NAME
+            for i in range(len(devices)):
+                service_side = self.cmd(
+                    self.set_cmd_auth_type(
+                        "iot dps enrollment-group registration show --dps-name {} -g {} --rid {}".format(
+                            self.entity_dps_name, self.entity_rg, devices[i][0]
+                        ),
+                        auth_type=auth_phase
                     ),
-                    auth_type=auth_phase
-                ),
-            ).get_output_in_json()
-            compare_registrations(registration, service_side)
+                ).get_output_in_json()
+                compare_registrations(registrations[i], service_side)
 
             # Try with payload
             self.kwargs["payload"] = json.dumps(
@@ -360,9 +361,9 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
                     "--cp {} --kp {} --payload '{}'".format(
                         self.entity_dps_name,
                         self.entity_rg,
-                        DEVICE_CERT_NAME,
-                        DEVICE_CERT_NAME + CERT_ENDING,
-                        DEVICE_CERT_NAME + KEY_ENDING,
+                        devices[0][0],
+                        devices[0][0] + CERT_ENDING,
+                        devices[0][0] + KEY_ENDING,
                         "{payload}"
                     ),
                     auth_type=auth_phase
@@ -370,8 +371,8 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
                 checks=[
                     self.exists("operationId"),
                     self.check("registrationState.assignedHub", hub_host_name),
-                    self.check("registrationState.deviceId", DEVICE_CERT_NAME),
-                    self.check("registrationState.registrationId", DEVICE_CERT_NAME),
+                    self.check("registrationState.deviceId", devices[0][0]),
+                    self.check("registrationState.registrationId", devices[0][0]),
                     self.check("registrationState.substatus", "initialAssignment"),
                     self.check("status", "assigned"),
                 ],
@@ -484,20 +485,26 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
                 ],
             )
 
-    def _prepare_x509_certificates_for_dps(self):
+    def _prepare_x509_certificates_for_dps(self, device_passwords=[None]):
         # Create root and device certificates
         output_dir = os.getcwd()
         root_cert_obj = create_certificate(
             subject=ROOT_CERT_NAME, valid_days=1, cert_output_dir=output_dir
         )
-        device_thumbprint = create_certificate(
-            subject=DEVICE_CERT_NAME,
-            valid_days=1,
-            cert_output_dir=output_dir,
-            cert_object=root_cert_obj,
-            chain_cert=True
-        )['thumbprint']
-        for cert_name in [ROOT_CERT_NAME, DEVICE_CERT_NAME]:
+        devices = []
+        device_names = self.generate_device_names(len(device_passwords))
+        for d, device in enumerate(device_names):
+            device_thumbprint = create_certificate(
+                subject=device,
+                valid_days=1,
+                cert_output_dir=output_dir,
+                cert_object=root_cert_obj,
+                chain_cert=True,
+                signing_password=device_passwords[d]
+            )['thumbprint']
+            devices.append((device, device_thumbprint))
+
+        for cert_name in [ROOT_CERT_NAME] + device_names:
             self.tracked_certs.append(cert_name + CERT_ENDING)
             self.tracked_certs.append(cert_name + KEY_ENDING)
 
@@ -528,6 +535,7 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
         )
         self.tracked_certs.append(verification_code + CERT_ENDING)
         self.tracked_certs.append(verification_code + KEY_ENDING)
+
         self.cmd(
             "iot dps certificate verify --dps-name {} -g {} -n {} -p {} -e *".format(
                 self.entity_dps_name,
@@ -536,4 +544,4 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
                 verification_code + CERT_ENDING
             )
         )
-        return device_thumbprint
+        return devices
