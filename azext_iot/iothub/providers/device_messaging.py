@@ -329,9 +329,9 @@ class DeviceMessagingProvider(IoTHubProvider):
                 raise ArgumentUsageError(
                     "'init-reported-properties' not supported, {} doesn't allow setting twin props".format(protocol_type)
                 )
-            if certificate_file or key_file:
+            if any([certificate_file, key_file, passphrase]):
                 raise ArgumentUsageError(
-                    "'certificate-file' and 'key-file' not supported, {} doesn't allow x509 "
+                    "'certificate-file', 'key-file', and 'passphrase' not supported, {} doesn't allow x509 "
                     "certificate authentication".format(protocol_type)
                 )
 
