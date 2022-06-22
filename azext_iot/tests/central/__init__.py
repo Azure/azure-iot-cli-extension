@@ -6,6 +6,7 @@
 
 import json
 import time
+from turtle import update
 from typing import Tuple
 
 from azure.cli.core.azclierror import CLIInternalError, InvalidArgumentValueError
@@ -228,7 +229,6 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         return self._scope_id
 
     def _create_users(self, api_version):
-
         users = []
         for role in Role:
             user_id = self.create_random_name(prefix="aztest", length=24)
@@ -263,6 +263,61 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         self.cmd(
             "iot central user delete --app-id {} --user-id {}".format(
                 self.app_id, user_id
+            ),
+            api_version=api_version,
+            checks=[self.check("result", "success")],
+        )
+
+    def _create_device_group(self, api_version, template_name, org_id):
+        device_group_id = self.create_random_name(prefix="aztest", length=24)
+        display_name = self.create_random_name(prefix="aztest", length=10)
+        filter = f'"SELECT * FROM devices WHERE $template = \\"{template_name}\\""'
+        description = self.create_random_name(prefix="aztest", length=30)
+        organization = org_id
+
+        command = f'''
+            iot central device-group create \
+            --app-id {self.app_id} \
+            --device-group-id {device_group_id} \
+            --display-name {display_name} \
+            --filter {filter} \
+            --description {description} \
+            --organizations {organization}'''
+
+        return self.cmd(
+            command,
+            api_version=api_version,
+            checks=[
+                self.check("displayName", display_name),
+                self.check("description", description),
+                self.check("filter", f'SELECT * FROM devices WHERE $template = \"{template_name}\"'),
+                self.check("organizations[0]", organization),
+            ],
+        ).get_output_in_json()
+
+    def _update_device_group(self, api_version, device_group_id):
+        new_description = self.create_random_name(prefix="aztest", length=30)
+
+        command = f'''
+            iot central device-group update
+            --app-id {self.app_id}
+            --device-group-id {device_group_id}
+            --description {new_description}'''
+
+        update_result = self.cmd(
+            command,
+            api_version=api_version,
+            checks=[
+                self.check("description", new_description),
+            ],
+        ).get_output_in_json()
+        
+        return (update_result, new_description)
+
+    def _delete_device_group(self, api_version, device_group_id) -> None:
+        self.cmd(
+            "iot central device-group delete --app-id {} --device-group-id {}".format(
+                self.app_id, device_group_id
             ),
             api_version=api_version,
             checks=[self.check("result", "success")],

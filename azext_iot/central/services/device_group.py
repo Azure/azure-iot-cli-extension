@@ -21,7 +21,7 @@ from azext_iot.central.models.enum import ApiVersion
 logger = get_logger(__name__)
 
 BASE_PATH = "api/deviceGroups"
-MODEL = "deviceGroup"
+MODEL = "DeviceGroup"
 
 
 def list_device_groups(
@@ -195,7 +195,19 @@ def update_device_group(
     Returns:
         device_group: dict
     """
-    payload = {"displayName": display_name, "description": description, "filter": filter, "organizations": organizations}
+    payload = {}
+    if display_name is not None:
+        payload["displayName"] = display_name
+
+    if filter is not None:
+        payload["filter"] = filter
+
+    if description is not None:
+        payload["description"] = description
+
+    if organizations is not None:
+        payload["organizations"] = organizations
+
     result = _utility.make_api_call(
         cmd,
         app_id=app_id,
