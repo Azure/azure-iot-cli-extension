@@ -1,0 +1,12 @@
+{
+  "@id": "dtmi:digitaltwins:rec_3_3:asset:PlumbingHeatTracing;1",
+  "@type": "Interface",
+  "displayName": {
+    "en": "Plumbing heat tracing"
+  },
+  "extends": [
+    "dtmi:digitaltwins:rec_3_3:asset:PlumbingEquipment;1",
+    "dtmi:digitaltwins:rec_3_3:asset:HeatTracing;1"
+  ],
+  "@context": "dtmi:dtdl:context;2"
+}

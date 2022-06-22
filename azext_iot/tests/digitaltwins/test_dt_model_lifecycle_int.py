@@ -31,6 +31,7 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
         inline_model = "./models/Floor.json"
         room_dtmi = "dtmi:com:example:Room;1"
         floor_dtmi = "dtmi:com:example:Floor;1"
+        ontology_directory = "./ontology"
 
         create_output = self.cmd(
             "dt create -n {} -g {} -l {}".format(instance_name, self.rg, self.region)
@@ -147,6 +148,17 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
                 ).get_output_in_json()
             )
             == 0
+        )
+
+        # Create Ontology with number of models exceeding API limit
+        create_ontology_output = self.cmd(
+            "dt model create -n {} --from-directory '{}'".format(
+                instance_name, ontology_directory
+            )
+        ).get_output_in_json()
+
+        assert_create_models_attributes(
+            create_ontology_output, directory_path=ontology_directory
         )
 
 

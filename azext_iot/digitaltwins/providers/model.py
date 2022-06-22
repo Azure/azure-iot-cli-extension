@@ -10,11 +10,14 @@ from azure.cli.core.azclierror import ForbiddenError, RequiredArgumentMissingErr
 from azext_iot.common.utility import process_json_arg, handle_service_exception, scantree
 from azext_iot.digitaltwins.providers.base import DigitalTwinsProvider
 from azext_iot.sdk.digitaltwins.dataplane.models import ErrorResponseException
+from tqdm import tqdm
 
 logger = get_logger(__name__)
+MAX_MODELS_API_LIMIT = 250
+MAX_MODELS_PER_BATCH = 44
 
 
-def get_model_dependencies(model):
+def get_model_dependencies(model, model_id_to_model_map=None):
     """Return a list of dependency DTMIs for a given model"""
     dependencies = []
 
@@ -34,18 +37,26 @@ def get_model_dependencies(model):
         if isinstance(item, str):
             # If its just a string, thats a single DTMI reference, so just add that to our set
             no_dup.add(item)
+            # Calculate recursive dependencies if model id to model map is passed
+            if model_id_to_model_map is not None:
+                dep_model = model_id_to_model_map[item]
+                no_dup.update(set(get_model_dependencies(dep_model, model_id_to_model_map)))
         elif isinstance(item, dict):
             # If its a single nested model, get its dtmi reference, dependencies and add them
-            no_dup.update(set(get_model_dependencies(item)))
+            no_dup.update(set(get_model_dependencies(item, model_id_to_model_map)))
         elif isinstance(item, list):
             # If its a list, could have DTMIs or nested models
             for sub_item in item:
                 if isinstance(sub_item, str):
                     # If there are strings in the list, that's a DTMI reference, so add it
                     no_dup.add(sub_item)
+                    # Calculate recursive dependencies if model id to model map is passed
+                    if model_id_to_model_map is not None:
+                        sub_dep_model = model_id_to_model_map[sub_item]
+                        no_dup.update(set(get_model_dependencies(sub_dep_model, model_id_to_model_map)))
                 elif isinstance(sub_item, dict):
                     # This is a nested model. Now go get its dependencies and add them
-                    no_dup.update(set(get_model_dependencies(sub_item)))
+                    no_dup.update(set(get_model_dependencies(sub_item, model_id_to_model_map)))
 
     return list(no_dup)
 
@@ -78,6 +89,44 @@ class ModelProvider(DigitalTwinsProvider):
 
         # @vilit - hack to customize 403's to have more specific error messages
         try:
+            # Process models in batches if models to process exceed the API limit
+            if len(payload) > MAX_MODELS_API_LIMIT:
+
+                model_id_to_model_map = {}
+                for model_def in payload:
+                    model_id_to_model_map[model_def['@id']] = model_def
+
+                # Create a dictionary to categorize models by their number of dependencies
+                dep_count_to_models_map = {}
+                for model in payload:
+                    num_dependencies = len(get_model_dependencies(model, model_id_to_model_map))
+                    if num_dependencies not in dep_count_to_models_map:
+                        dep_count_to_models_map[num_dependencies] = []
+                    dep_count_to_models_map[num_dependencies].append(model)
+
+                # Sort the dictionary by dependency count
+                dep_count_to_models_map = dict(sorted(dep_count_to_models_map.items()))
+                models_batch = []
+                response = []
+                pbar = tqdm(total=len(payload), desc='Creating models...', ascii=' #')
+                # The map being iterated is sorted by dependency count, hence models with 0 dependencies go first,
+                # followed by models with 1 dependency, then 2 dependencies and so on... This ensures that all dependencies
+                # of each model being added were either already added in a previous iteration or are in the current payload.
+                for models_list in dep_count_to_models_map.values():
+                    while len(models_batch) + len(models_list) > MAX_MODELS_PER_BATCH:
+                        num_models_to_add = MAX_MODELS_PER_BATCH - len(models_batch)
+                        models_batch.extend(models_list[0:num_models_to_add])
+                        response.extend(self.model_sdk.add(models_batch, raw=True).response.json())
+                        pbar.update(len(models_batch))
+                        # Remove the model ids which have been processed
+                        models_list = models_list[num_models_to_add:]
+                        models_batch = []
+                    models_batch.extend(models_list)
+                # Process the last set of model ids
+                if len(models_batch) > 0:
+                    pbar.update(len(models_batch))
+                    response.extend(self.model_sdk.add(models_batch, raw=True).response.json())
+                return response
             return self.model_sdk.add(payload, raw=True).response.json()
         except ErrorResponseException as e:
             if e.response.status_code == 403:

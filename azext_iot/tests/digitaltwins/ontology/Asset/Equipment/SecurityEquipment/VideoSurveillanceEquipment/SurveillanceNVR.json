@@ -1,0 +1,12 @@
+{
+  "@id": "dtmi:digitaltwins:rec_3_3:asset:SurveillanceNVR;1",
+  "@type": "Interface",
+  "description": {
+    "en": "Network video recorder."
+  },
+  "displayName": {
+    "en": "Surveillance NVR"
+  },
+  "extends": "dtmi:digitaltwins:rec_3_3:asset:VideoSurveillanceEquipment;1",
+  "@context": "dtmi:dtdl:context;2"
+}

@@ -1,0 +1,12 @@
+{
+  "@id": "dtmi:digitaltwins:rec_3_3:building:RecordingRoom;1",
+  "@type": "Interface",
+  "description": {
+    "en": "Room for making audio and/or video recordings. A.ka. studio."
+  },
+  "displayName": {
+    "en": "RecordingRoom"
+  },
+  "extends": "dtmi:digitaltwins:rec_3_3:core:Room;1",
+  "@context": "dtmi:dtdl:context;2"
+}

@@ -1,0 +1,28 @@
+{
+  "@id": "dtmi:digitaltwins:rec_3_3:asset:FanPoweredBoxReheat;1",
+  "@type": "Interface",
+  "contents": [
+    {
+      "@type": "Property",
+      "displayName": {
+        "en": "nominal heating capacity"
+      },
+      "name": "nominalHeatingCapacity",
+      "schema": "double",
+      "writable": true
+    },
+    {
+      "@type": "Component",
+      "displayName": {
+        "en": "re-heating method"
+      },
+      "name": "reHeatingMethod",
+      "schema": "dtmi:digitaltwins:rec_3_3:asset:HVACHeatingMethod;1"
+    }
+  ],
+  "displayName": {
+    "en": "Fan powered box with reheat"
+  },
+  "extends": "dtmi:digitaltwins:rec_3_3:asset:FanPoweredBox;1",
+  "@context": "dtmi:dtdl:context;2"
+}

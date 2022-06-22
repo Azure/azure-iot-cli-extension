@@ -1,0 +1,12 @@
+{
+  "@id": "dtmi:digitaltwins:rec_3_3:core:Room;1",
+  "@type": "Interface",
+  "description": {
+    "en": "Base class for all more specific room types."
+  },
+  "displayName": {
+    "en": "Room"
+  },
+  "extends": "dtmi:digitaltwins:rec_3_3:core:Space;1",
+  "@context": "dtmi:dtdl:context;2"
+}

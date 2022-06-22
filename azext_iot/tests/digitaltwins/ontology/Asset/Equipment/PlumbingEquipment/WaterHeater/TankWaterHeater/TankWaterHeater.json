@@ -1,0 +1,20 @@
+{
+  "@id": "dtmi:digitaltwins:rec_3_3:asset:TankWaterHeater;1",
+  "@type": "Interface",
+  "contents": [
+    {
+      "@type": "Property",
+      "displayName": {
+        "en": "tank capacity"
+      },
+      "name": "tankCapacity",
+      "schema": "double",
+      "writable": true
+    }
+  ],
+  "displayName": {
+    "en": "Water heater with tank"
+  },
+  "extends": "dtmi:digitaltwins:rec_3_3:asset:WaterHeater;1",
+  "@context": "dtmi:dtdl:context;2"
+}

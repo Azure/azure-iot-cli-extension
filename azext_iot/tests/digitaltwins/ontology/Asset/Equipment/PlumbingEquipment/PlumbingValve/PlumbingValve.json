@@ -1,0 +1,12 @@
+{
+  "@id": "dtmi:digitaltwins:rec_3_3:asset:PlumbingValve;1",
+  "@type": "Interface",
+  "displayName": {
+    "en": "Plumbing valve"
+  },
+  "extends": [
+    "dtmi:digitaltwins:rec_3_3:asset:Valve;2",
+    "dtmi:digitaltwins:rec_3_3:asset:PlumbingEquipment;1"
+  ],
+  "@context": "dtmi:dtdl:context;2"
+}

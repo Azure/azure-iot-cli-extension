@@ -1,0 +1,78 @@
+{
+  "@id": "dtmi:digitaltwins:rec_3_3:business:Lease;1",
+  "@type": "Interface",
+  "contents": [
+    {
+      "@type": "Property",
+      "description": {
+        "en": "Time at which a lease arrangement begins."
+      },
+      "displayName": {
+        "en": "lease start"
+      },
+      "name": "leaseStart",
+      "schema": "dateTime",
+      "writable": true
+    },
+    {
+      "@type": "Property",
+      "description": {
+        "en": "Time at which a lease arrangement ends."
+      },
+      "displayName": {
+        "en": "lease end"
+      },
+      "name": "leaseEnd",
+      "schema": "dateTime",
+      "writable": true
+    },
+    {
+      "@type": "Relationship",
+      "description": {
+        "en": "A lease is regulated by some contract entered into by the leasor and leasees."
+      },
+      "displayName": {
+        "en": "regulated by"
+      },
+      "name": "regulatedBy",
+      "target": "dtmi:digitaltwins:rec_3_3:business:LeaseContract;1"
+    },
+    {
+      "@type": "Relationship",
+      "description": {
+        "en": "The agent leasing out some leasable object, i.e., the owner of the asset."
+      },
+      "displayName": {
+        "en": "leasor"
+      },
+      "name": "leasor",
+      "target": "dtmi:digitaltwins:rec_3_3:core:Agent;1"
+    },
+    {
+      "@type": "Relationship",
+      "description": {
+        "en": "The agent leasing some leasable object, i.e., the user of the asset."
+      },
+      "displayName": {
+        "en": "leasee"
+      },
+      "name": "leasee",
+      "target": "dtmi:digitaltwins:rec_3_3:core:Agent;1"
+    },
+    {
+      "@type": "Relationship",
+      "description": {
+        "en": "The object (e.g., property, equipment, etc) that this a lease of."
+      },
+      "displayName": {
+        "en": "lease of"
+      },
+      "name": "leaseOf"
+    }
+  ],
+  "displayName": {
+    "en": "Lease"
+  },
+  "extends": "dtmi:digitaltwins:rec_3_3:core:Event;1",
+  "@context": "dtmi:dtdl:context;2"
+}

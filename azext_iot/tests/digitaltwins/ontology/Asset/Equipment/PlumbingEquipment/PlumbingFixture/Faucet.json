@@ -1,0 +1,59 @@
+{
+  "@id": "dtmi:digitaltwins:rec_3_3:asset:Faucet;1",
+  "@type": "Interface",
+  "contents": [
+    {
+      "@type": "Property",
+      "displayName": {
+        "en": "type"
+      },
+      "name": "type",
+      "dtmi:dtdl:property:schema;2": {
+        "@type": "Enum",
+        "dtmi:dtdl:property:enumValues;2": [
+          {
+            "enumValue": "Touchless",
+            "name": "Touchless"
+          },
+          {
+            "enumValue": "ManualOnly",
+            "name": "ManualOnly"
+          }
+        ],
+        "valueSchema": "string"
+      },
+      "writable": true
+    },
+    {
+      "@type": "Property",
+      "displayName": {
+        "en": "maximum flow rate"
+      },
+      "name": "maxFlowRate",
+      "schema": "double",
+      "writable": true
+    },
+    {
+      "@type": "Property",
+      "displayName": {
+        "en": "number of handles"
+      },
+      "name": "numberOfHandles",
+      "schema": "integer",
+      "writable": true
+    },
+    {
+      "@type": "Relationship",
+      "displayName": {
+        "en": "mounted on"
+      },
+      "name": "mountedOn",
+      "target": "dtmi:digitaltwins:rec_3_3:asset:Sink;1"
+    }
+  ],
+  "displayName": {
+    "en": "Faucet"
+  },
+  "extends": "dtmi:digitaltwins:rec_3_3:asset:PlumbingFixture;1",
+  "@context": "dtmi:dtdl:context;2"
+}

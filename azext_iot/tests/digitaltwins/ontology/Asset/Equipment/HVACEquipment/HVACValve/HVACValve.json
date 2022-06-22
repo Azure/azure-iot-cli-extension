@@ -1,0 +1,12 @@
+{
+  "@id": "dtmi:digitaltwins:rec_3_3:asset:HVACValve;1",
+  "@type": "Interface",
+  "displayName": {
+    "en": "HVAC valve"
+  },
+  "extends": [
+    "dtmi:digitaltwins:rec_3_3:asset:Valve;2",
+    "dtmi:digitaltwins:rec_3_3:asset:HVACEquipment;1"
+  ],
+  "@context": "dtmi:dtdl:context;2"
+}

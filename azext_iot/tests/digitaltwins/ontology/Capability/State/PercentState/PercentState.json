@@ -1,0 +1,21 @@
+{
+  "@id": "dtmi:digitaltwins:rec_3_3:device:PercentState;1",
+  "@type": "Interface",
+  "displayName": {
+    "en": "Percent state"
+  },
+  "extends": "dtmi:digitaltwins:rec_3_3:core:State;1",
+  "contents": [
+    {
+      "@type": "Property",
+      "name": "lastValue",
+      "displayName": {
+        "en": "Last Value"
+      },
+      "writable": true,
+      "schema": "double",
+      "comment": "%"
+    }
+  ],
+  "@context": "dtmi:dtdl:context;2"
+}

@@ -1,0 +1,12 @@
+{
+  "@id": "dtmi:digitaltwins:rec_3_3:building:VirtualBuilding;1",
+  "@type": "Interface",
+  "description": {
+    "en": "A non-physical Building. Belongs to a RealEstate."
+  },
+  "displayName": {
+    "en": "Virtual building"
+  },
+  "extends": "dtmi:digitaltwins:rec_3_3:core:Building;1",
+  "@context": "dtmi:dtdl:context;2"
+}

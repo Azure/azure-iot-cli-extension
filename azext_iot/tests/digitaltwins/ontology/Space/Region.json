@@ -1,0 +1,12 @@
+{
+  "@id": "dtmi:digitaltwins:rec_3_3:core:Region;1",
+  "@type": "Interface",
+  "description": {
+    "en": "An administrative geospatial unit larger than the individual real estate. For instance, \"Lombary\", \"North America\", \"The Back Bay\", \"Elnätsområde Syd\", etc."
+  },
+  "displayName": {
+    "en": "Region"
+  },
+  "extends": "dtmi:digitaltwins:rec_3_3:core:Space;1",
+  "@context": "dtmi:dtdl:context;2"
+}

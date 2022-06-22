@@ -1,0 +1,58 @@
+{
+  "@id": "dtmi:digitaltwins:rec_3_3:asset:UnitHeater;1",
+  "@type": "Interface",
+  "contents": [
+    {
+      "@type": "Property",
+      "displayName": {
+        "en": "type"
+      },
+      "name": "type",
+      "dtmi:dtdl:property:schema;2": {
+        "@type": "Enum",
+        "dtmi:dtdl:property:enumValues;2": [
+          {
+            "enumValue": "vertical",
+            "name": "vertical"
+          },
+          {
+            "enumValue": "horizontal",
+            "name": "horizontal"
+          }
+        ],
+        "valueSchema": "string"
+      },
+      "writable": true
+    },
+    {
+      "@type": "Property",
+      "displayName": {
+        "en": "nominal heating capacity"
+      },
+      "name": "nominalHeatingCapacity",
+      "schema": "double",
+      "writable": true
+    },
+    {
+      "@type": "Component",
+      "displayName": {
+        "en": "heating method"
+      },
+      "name": "heatingMethod",
+      "schema": "dtmi:digitaltwins:rec_3_3:asset:HVACHeatingMethod;1"
+    },
+    {
+      "@type": "Component",
+      "displayName": {
+        "en": "fan"
+      },
+      "name": "fan",
+      "schema": "dtmi:digitaltwins:rec_3_3:asset:Fan;1"
+    }
+  ],
+  "displayName": {
+    "en": "Unit heater"
+  },
+  "extends": "dtmi:digitaltwins:rec_3_3:asset:HVACEquipment;1",
+  "@context": "dtmi:dtdl:context;2"
+}

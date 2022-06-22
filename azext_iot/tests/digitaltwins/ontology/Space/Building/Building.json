@@ -1,0 +1,33 @@
+{
+  "@id": "dtmi:digitaltwins:rec_3_3:core:Building;1",
+  "@type": "Interface",
+  "contents": [
+    {
+      "@type": "Component",
+      "displayName": {
+        "en": "address"
+      },
+      "name": "address",
+      "schema": "dtmi:digitaltwins:rec_3_3:addressing:Address;1"
+    },
+    {
+      "@type": "Relationship",
+      "description": {
+        "en": "Parthood traversal property linking Buildings to the Building Components that they are made up of. Inverse of: isPartOfBuilding, componentOfBuilding"
+      },
+      "displayName": {
+        "en": "has building component"
+      },
+      "name": "hasBuildingComponent",
+      "target": "dtmi:digitaltwins:rec_3_3:core:BuildingComponent;1"
+    }
+  ],
+  "description": {
+    "en": "A confined building structure."
+  },
+  "displayName": {
+    "en": "Building"
+  },
+  "extends": "dtmi:digitaltwins:rec_3_3:core:Space;1",
+  "@context": "dtmi:dtdl:context;2"
+}

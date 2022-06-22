@@ -1,0 +1,80 @@
+{
+  "@id": "dtmi:digitaltwins:rec_3_3:asset:ThermalMeter;1",
+  "@type": "Interface",
+  "contents": [
+    {
+      "@type": "Property",
+      "displayName": {
+        "en": "type"
+      },
+      "name": "type",
+      "schema": "string",
+      "writable": true
+    },
+    {
+      "@type": "Property",
+      "displayName": {
+        "en": "minimum volume flow rating"
+      },
+      "name": "minVolumeFlowRating",
+      "schema": "double",
+      "writable": true
+    },
+    {
+      "@type": "Property",
+      "displayName": {
+        "en": "minimum temperature rating"
+      },
+      "name": "minTemperatureRating",
+      "schema": "double",
+      "writable": true
+    },
+    {
+      "@type": "Property",
+      "displayName": {
+        "en": "maximum volume flow rating"
+      },
+      "name": "maxVolumeFlowRating",
+      "schema": "double",
+      "writable": true
+    },
+    {
+      "@type": "Property",
+      "displayName": {
+        "en": "maximum temperature rating"
+      },
+      "name": "maxTemperatureRating",
+      "schema": "double",
+      "writable": true
+    },
+    {
+      "@type": "Property",
+      "displayName": {
+        "en": "maximum pressure rating"
+      },
+      "name": "maxPressureRating",
+      "schema": "double",
+      "writable": true
+    },
+    {
+      "@type": "Relationship",
+      "displayName": {
+        "en": "sub-meter of"
+      },
+      "name": "subMeterOf",
+      "target": "dtmi:digitaltwins:rec_3_3:asset:ThermalMeter;1"
+    },
+    {
+      "@type": "Relationship",
+      "displayName": {
+        "en": "measures"
+      },
+      "name": "measures"
+    }
+  ],
+  "displayName": {
+    "en": "Thermal meter"
+  },
+  "extends": "dtmi:digitaltwins:rec_3_3:asset:Meter;1",
+  "@context": "dtmi:dtdl:context;2"
+}

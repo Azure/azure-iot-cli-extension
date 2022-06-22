@@ -1,0 +1,119 @@
+{
+  "@id": "dtmi:digitaltwins:rec_3_3:asset:FanCoilUnit;1",
+  "@type": "Interface",
+  "contents": [
+    {
+      "@type": "Property",
+      "displayName": {
+        "en": "type"
+      },
+      "name": "type",
+      "dtmi:dtdl:property:schema;2": {
+        "@type": "Enum",
+        "dtmi:dtdl:property:enumValues;2": [
+          {
+            "enumValue": "vertical",
+            "name": "vertical"
+          },
+          {
+            "enumValue": "horizontal",
+            "name": "horizontal"
+          }
+        ],
+        "valueSchema": "string"
+      },
+      "writable": true
+    },
+    {
+      "@type": "Property",
+      "displayName": {
+        "en": "refrigerant type"
+      },
+      "name": "refrigerantType",
+      "schema": "string",
+      "writable": true
+    },
+    {
+      "@type": "Property",
+      "displayName": {
+        "en": "nominal cooling capacity"
+      },
+      "name": "nominalCoolingCapacity",
+      "schema": "double",
+      "writable": true
+    },
+    {
+      "@type": "Property",
+      "displayName": {
+        "en": "net sensible cooling capacity"
+      },
+      "name": "netSensibleCoolingCapacity",
+      "schema": "double",
+      "writable": true
+    },
+    {
+      "@type": "Property",
+      "displayName": {
+        "en": "mounting"
+      },
+      "name": "mounting",
+      "dtmi:dtdl:property:schema;2": {
+        "@type": "Enum",
+        "dtmi:dtdl:property:enumValues;2": [
+          {
+            "enumValue": "wall",
+            "name": "wall"
+          },
+          {
+            "enumValue": "floor",
+            "name": "floor"
+          },
+          {
+            "enumValue": "ceiling",
+            "name": "ceiling"
+          }
+        ],
+        "valueSchema": "string"
+      },
+      "writable": true
+    },
+    {
+      "@type": "Property",
+      "displayName": {
+        "en": "filter type"
+      },
+      "name": "filterType",
+      "schema": "string",
+      "writable": true
+    },
+    {
+      "@type": "Component",
+      "displayName": {
+        "en": "secondary cooling method"
+      },
+      "name": "secondaryCoolingMethod",
+      "schema": "dtmi:digitaltwins:rec_3_3:asset:HVACCoolingMethod;1"
+    },
+    {
+      "@type": "Component",
+      "displayName": {
+        "en": "primary cooling method"
+      },
+      "name": "primaryCoolingMethod",
+      "schema": "dtmi:digitaltwins:rec_3_3:asset:HVACCoolingMethod;1"
+    },
+    {
+      "@type": "Component",
+      "displayName": {
+        "en": "fan"
+      },
+      "name": "fan",
+      "schema": "dtmi:digitaltwins:rec_3_3:asset:Fan;1"
+    }
+  ],
+  "displayName": {
+    "en": "Fan coil unit"
+  },
+  "extends": "dtmi:digitaltwins:rec_3_3:asset:TerminalUnit;1",
+  "@context": "dtmi:dtdl:context;2"
+}
