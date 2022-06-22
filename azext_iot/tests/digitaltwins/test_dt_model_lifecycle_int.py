@@ -21,6 +21,7 @@ logger = get_logger(__name__)
 @pytest.mark.usefixtures("set_cwd")
 class TestDTModelLifecycle(DTLiveScenarioTest):
     def __init__(self, test_case):
+        import pdb; pdb.set_trace()
         super(TestDTModelLifecycle, self).__init__(test_case)
 
     def test_dt_models(self):
@@ -31,7 +32,7 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
         inline_model = "./models/Floor.json"
         room_dtmi = "dtmi:com:example:Room;1"
         floor_dtmi = "dtmi:com:example:Floor;1"
-        ontology_directory = "./ontology"
+        ontology_directory = "./references/opendigitaltwins-building/Ontology"
 
         create_output = self.cmd(
             "dt create -n {} -g {} -l {}".format(instance_name, self.rg, self.region)
@@ -150,16 +151,18 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
             == 0
         )
 
-        # Create Ontology with number of models exceeding API limit
-        create_ontology_output = self.cmd(
-            "dt model create -n {} --from-directory '{}'".format(
-                instance_name, ontology_directory
-            )
-        ).get_output_in_json()
+        # run the following part of test only if model files exist in the directory
+        if _get_models_from_directory(ontology_directory) > 0:
+            # Create Ontology with number of models exceeding API limit
+            create_ontology_output = self.cmd(
+                "dt model create -n {} --from-directory '{}'".format(
+                    instance_name, ontology_directory
+                )
+            ).get_output_in_json()
 
-        assert_create_models_attributes(
-            create_ontology_output, directory_path=ontology_directory
-        )
+            assert_create_models_attributes(
+                create_ontology_output, directory_path=ontology_directory
+            )
 
 
 def assert_create_models_attributes(result, directory_path=None, models=None):

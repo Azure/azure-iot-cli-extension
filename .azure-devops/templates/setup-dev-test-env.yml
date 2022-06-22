@@ -14,6 +14,10 @@ parameters:
   - msi
 
 steps:
+  - checkout: self
+    displayName: 'Checkout repository and submodules'
+    submodules: true
+
   - task: UsePythonVersion@0
     inputs:
       versionSpec: ${{ parameters.pythonVersion }}
