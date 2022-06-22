@@ -1,8 +1,4 @@
 steps:
-  - checkout: self
-    displayName: 'Checkout repository and submodules'
-    submodules: true
-
   - script: 'python setup.py sdist bdist_wheel'
     displayName: 'Build wheel for Azure IoT CLI extension'
     workingDirectory: '.'

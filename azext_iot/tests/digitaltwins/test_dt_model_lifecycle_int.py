@@ -152,7 +152,7 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
         )
 
         # run the following part of test only if model files exist in the directory
-        if _get_models_from_directory(ontology_directory) > 0:
+        if len(_get_models_from_directory(ontology_directory)) > 0:
             # Create Ontology with number of models exceeding API limit
             create_ontology_output = self.cmd(
                 "dt model create -n {} --from-directory '{}'".format(
