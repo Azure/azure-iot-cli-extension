@@ -21,7 +21,6 @@ logger = get_logger(__name__)
 @pytest.mark.usefixtures("set_cwd")
 class TestDTModelLifecycle(DTLiveScenarioTest):
     def __init__(self, test_case):
-        import pdb; pdb.set_trace()
         super(TestDTModelLifecycle, self).__init__(test_case)
 
     def test_dt_models(self):
