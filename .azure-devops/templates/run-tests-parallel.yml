@@ -88,7 +88,7 @@ steps:
         ${{ if containsValue(parameters.parallel_execution_dirs, parameters.path) }}:
           inlineScript: |
             export COVERAGE_FILE=.coverage.${{ parameters.name }}
-            pytest -vv ${{ parameters.path }} -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --durations=0
+            pytest -vv ${{ parameters.path }} -k "dt_model_lifecycle_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --durations=0
         ${{ if contains(parameters.path, 'azext_iot/tests/iothub') }}:
           inlineScript: |
             export COVERAGE_FILE=.coverage.${{ parameters.name }}
