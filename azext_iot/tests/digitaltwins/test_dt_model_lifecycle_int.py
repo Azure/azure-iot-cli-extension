@@ -6,6 +6,7 @@
 
 import pytest
 import json
+import os
 from time import sleep
 from knack.log import get_logger
 from azext_iot.common.utility import (
@@ -150,8 +151,8 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
             == 0
         )
 
-        # run the following part of test only if model files exist in the directory
-        if len(_get_models_from_directory(ontology_directory)) > 0:
+        # Run the following part of test only if model files exist in the ontology directory
+        if os.path.isdir(ontology_directory) and len(os. listdir(ontology_directory)) > 0:
             # Create Ontology with number of models exceeding API limit
             create_ontology_output = self.cmd(
                 "dt model create -n {} --from-directory '{}'".format(
