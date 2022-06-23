@@ -11,12 +11,11 @@ from azext_iot.common.utility import process_json_arg, handle_service_exception,
 from azext_iot.digitaltwins.providers.base import DigitalTwinsProvider
 from azext_iot.sdk.digitaltwins.dataplane.models import ErrorResponseException
 from tqdm import tqdm
-from time import sleep
 
 logger = get_logger(__name__)
 MAX_MODELS_API_LIMIT = 250
 # avagraw - Max number of models the API's dependency resolution can handle when models are created across multiple API calls.
-MAX_MODELS_PER_BATCH = 44
+MAX_MODELS_PER_BATCH = 40
 
 
 def get_model_dependencies(model, model_id_to_model_map=None):
@@ -119,7 +118,6 @@ class ModelProvider(DigitalTwinsProvider):
                         num_models_to_add = MAX_MODELS_PER_BATCH - len(models_batch)
                         models_batch.extend(models_list[0:num_models_to_add])
                         response.extend(self.model_sdk.add(models_batch, raw=True).response.json())
-                        sleep(5)
                         pbar.update(len(models_batch))
                         # Remove the model ids which have been processed
                         models_list = models_list[num_models_to_add:]
