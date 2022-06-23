@@ -1,3 +1,6 @@
 [submodule "opendigitaltwins-building"]
 	path = azext_iot/tests/digitaltwins/references/opendigitaltwins-building
 	url = https://github.com/Azure/opendigitaltwins-building
+[submodule "opendigitaltwins-smartcities"]
+	path = azext_iot/tests/digitaltwins/references/opendigitaltwins-smartcities
+	url = https://github.com/Azure/opendigitaltwins-smartcities
