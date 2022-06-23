@@ -1,9 +1,0 @@
-{
-  "@id": "dtmi:digitaltwins:rec_3_3:building:ShowerRoom;1",
-  "@type": "Interface",
-  "displayName": {
-    "en": "ShowerRoom"
-  },
-  "extends": "dtmi:digitaltwins:rec_3_3:building:PersonalHygiene;1",
-  "@context": "dtmi:dtdl:context;2"
-}
