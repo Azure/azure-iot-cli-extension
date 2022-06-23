@@ -14,3 +14,7 @@ steps:
       script: |
         echo "##vso[task.prependPath]C:\Program Files (x86)\Microsoft SDKs\Azure\CLI2"
         echo "##vso[task.prependPath]C:\Program Files (x86)\Microsoft SDKs\Azure\CLI2\Scripts"
+        & "C:\Program Files (x86)\Microsoft SDKs\Azure\CLI2\python.exe" -m pip install --upgrade pip
+        & "C:\Program Files (x86)\Microsoft SDKs\Azure\CLI2\python.exe" -m pip install -r dev_requirements
+        & "C:\Program Files (x86)\Microsoft SDKs\Azure\CLI2\python.exe" -m pip install cryptography
+        & "C:\Program Files (x86)\Microsoft SDKs\Azure\CLI2\python.exe" -m pip freeze

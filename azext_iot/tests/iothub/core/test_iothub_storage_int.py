@@ -224,6 +224,9 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
         self.assign_storage_role_if_needed(hub_id)
 
+        # give time to finish job
+        sleep(30)
+
         self.cmd(
             'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {} --ik true'.format(
                 self.entity_name, self.live_storage_uri, "identity", "[system]"
@@ -237,6 +240,9 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 self.exists("jobId"),
             ],
         )
+
+        # give time to finish job
+        sleep(30)
 
         self.cmd(
             'iot hub device-identity import -n {} --ibcu "{}" --obcu "{}" --auth-type {} --identity {}'.format(
@@ -252,12 +258,18 @@ class TestIoTStorage(IoTLiveScenarioTest):
             ],
         )
 
+        # give time to finish job
+        sleep(30)
+
         self.cmd(
             'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {}'.format(
                 self.entity_name, self.live_storage_uri, "identity", "fake_managed_identity"
             ),
             expect_failure=True
         )
+
+        # give time to finish job
+        sleep(30)
 
         # if we enabled identity for this hub, undo identity and RBAC
         if identity_enabled:
