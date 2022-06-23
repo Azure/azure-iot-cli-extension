@@ -13,6 +13,7 @@ pnp_runtime_ops = CliCommandType(
     operations_tmpl="azext_iot.iothub.commands_pnp_runtime#{}"
 )
 iothub_job_ops = CliCommandType(operations_tmpl="azext_iot.iothub.commands_job#{}")
+iothub_state_ops = CliCommandType(operations_tmpl="azext_iot.iothub.commands_state#{}")
 
 
 def load_iothub_commands(self, _):
@@ -29,3 +30,7 @@ def load_iothub_commands(self, _):
         cmd_group.command("invoke-command", "invoke_device_command")
         cmd_group.show_command("show", "get_digital_twin")
         cmd_group.command("update", "patch_digital_twin")
+
+    with self.command_group("iot hub state", command_type=iothub_state_ops) as cmd_group:
+        cmd_group.command("export", "state_export")
+        cmd_group.command("import", "state_import")
