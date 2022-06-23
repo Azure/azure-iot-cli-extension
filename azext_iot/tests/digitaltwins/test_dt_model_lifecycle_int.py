@@ -34,7 +34,8 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
         floor_dtmi = "dtmi:com:example:Floor;1"
         ontology_directories = [
             "./references/opendigitaltwins-building/Ontology",
-            "./references/opendigitaltwins-smartcities/Ontology"
+            "./references/opendigitaltwins-smartcities/Ontology",
+            "./references/opendigitaltwins-energygrid/Ontology"
         ]
 
         create_output = self.cmd(
