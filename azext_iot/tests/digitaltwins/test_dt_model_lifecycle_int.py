@@ -32,7 +32,10 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
         inline_model = "./models/Floor.json"
         room_dtmi = "dtmi:com:example:Room;1"
         floor_dtmi = "dtmi:com:example:Floor;1"
-        ontology_directory = "./references/opendigitaltwins-building/Ontology"
+        ontology_directories = [
+            "./references/opendigitaltwins-building/Ontology",
+            "./references/opendigitaltwins-smartcities/Ontology"
+        ]
 
         create_output = self.cmd(
             "dt create -n {} -g {} -l {}".format(instance_name, self.rg, self.region)
@@ -151,18 +154,19 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
             == 0
         )
 
-        # Run the following part of test only if model files exist in the ontology directory
-        if os.path.isdir(ontology_directory) and len(os.listdir(ontology_directory)) > 0:
-            # Create Ontology with number of models exceeding API limit
-            create_ontology_output = self.cmd(
-                "dt model create -n {} --from-directory '{}'".format(
-                    instance_name, ontology_directory
-                )
-            ).get_output_in_json()
+        for ontology_directory in ontology_directories:
+            # Run the following part of test only if model files exist in the ontology directory
+            if os.path.isdir(ontology_directory) and len(os.listdir(ontology_directory)) > 0:
+                # Create Ontology with number of models exceeding API limit
+                create_ontology_output = self.cmd(
+                    "dt model create -n {} --from-directory '{}'".format(
+                        instance_name, ontology_directory
+                    )
+                ).get_output_in_json()
 
-            assert_create_models_attributes(
-                create_ontology_output, directory_path=ontology_directory
-            )
+                assert_create_models_attributes(
+                    create_ontology_output, directory_path=ontology_directory
+                )
 
 
 def assert_create_models_attributes(result, directory_path=None, models=None):

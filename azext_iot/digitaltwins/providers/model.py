@@ -88,7 +88,6 @@ class ModelProvider(DigitalTwinsProvider):
 
         logger.info("Models payload %s", json.dumps(payload))
 
-        # @vilit - hack to customize 403's to have more specific error messages
         try:
             # Process models in batches if models to process exceed the API limit
             if len(payload) > MAX_MODELS_API_LIMIT:
@@ -130,6 +129,7 @@ class ModelProvider(DigitalTwinsProvider):
                 return response
             return self.model_sdk.add(payload, raw=True).response.json()
         except ErrorResponseException as e:
+            # @vilit - hack to customize 403's to have more specific error messages
             if e.response.status_code == 403:
                 error_text = "Current principal access is forbidden. Please validate rbac role assignments."
                 raise ForbiddenError(error_text)
