@@ -89,7 +89,6 @@ class ModelProvider(DigitalTwinsProvider):
         logger.info("Models payload %s", json.dumps(payload))
 
         models_created = []
-        pbar = tqdm(total=len(payload), desc='Creating models...', ascii=' #')
         try:
             # Process models in batches if models to process exceed the API limit
             if len(payload) > MAX_MODELS_API_LIMIT:
@@ -110,6 +109,7 @@ class ModelProvider(DigitalTwinsProvider):
                 dep_count_to_models_map = dict(sorted(dep_count_to_models_map.items()))
                 models_batch = []
                 response = []
+                pbar = tqdm(total=len(payload), desc='Creating models...', ascii=' #')
                 # The map being iterated is sorted by dependency count, hence models with 0 dependencies go first,
                 # followed by models with 1 dependency, then 2 dependencies and so on... This ensures that all dependencies
                 # of each model being added were either already added in a previous iteration or are in the current payload.
@@ -132,8 +132,8 @@ class ModelProvider(DigitalTwinsProvider):
                 return response
             return self.model_sdk.add(payload, raw=True).response.json()
         except ErrorResponseException as e:
-            pbar.close()
             if len(models_created) > 0:
+                pbar.close()
                 logger.error(
                     "Error creating models. Deleting {} models already created by this operation...".format(len(models_created))
                 )
