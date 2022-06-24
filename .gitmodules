@@ -7,4 +7,3 @@
 [submodule "opendigitaltwins-energygrid"]
 	path = azext_iot/tests/digitaltwins/references/opendigitaltwins-energygrid
 	url = https://github.com/Azure/opendigitaltwins-energygrid.git
-
