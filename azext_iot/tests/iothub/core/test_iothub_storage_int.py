@@ -112,7 +112,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 role_assignment_principal_ids = [assignment["principalId"] for assignment in role_assignments]
                 sleep(10)
 
-            sleep(30)
+            sleep(45)
 
     def tearDown(self):
         if self.managed_identity:
@@ -163,7 +163,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
         )
 
         # give time to finish job
-        sleep(30)
+        sleep(45)
 
         self.cmd(
             'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --ik true'.format(
@@ -179,7 +179,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
         )
 
         # give time to finish job
-        sleep(30)
+        sleep(45)
 
         self.cmd(
             'iot hub device-identity import -n {} --ibcu "{}" --obcu "{}" --auth-type {}'.format(
@@ -224,9 +224,6 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
         self.assign_storage_role_if_needed(hub_id)
 
-        # give time to finish job
-        sleep(30)
-
         self.cmd(
             'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {} --ik true'.format(
                 self.entity_name, self.live_storage_uri, "identity", "[system]"
@@ -242,7 +239,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
         )
 
         # give time to finish job
-        sleep(30)
+        sleep(45)
 
         self.cmd(
             'iot hub device-identity import -n {} --ibcu "{}" --obcu "{}" --auth-type {} --identity {}'.format(
@@ -259,7 +256,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
         )
 
         # give time to finish job
-        sleep(30)
+        sleep(45)
 
         self.cmd(
             'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {}'.format(
@@ -269,7 +266,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
         )
 
         # give time to finish job
-        sleep(30)
+        sleep(45)
 
         # if we enabled identity for this hub, undo identity and RBAC
         if identity_enabled:
@@ -336,7 +333,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 )
 
                 # give time to finish job
-                sleep(30)
+                sleep(45)
 
                 self.cmd(
                     'iot hub device-identity import -n {} --ibcu "{}" --obcu "{}" --auth-type {} --identity {}'.format(
