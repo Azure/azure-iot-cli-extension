@@ -6,29 +6,49 @@
 
 import pprint
 from time import sleep
+from typing import Any, Dict, Optional
 
-from azure.cli.core.azclierror import BadRequestError
 from azext_iot.common.utility import ensure_azure_namespace_path
-from azext_iot.common.shared import DeviceAuthApiType
+from azure.cli.core.azclierror import RequiredArgumentMissingError
 
 printer = pprint.PrettyPrinter(indent=2)
 
 
-class mqtt_client(object):
+class MQTTProvider(object):
     def __init__(
-        self, target, device_conn_string, device_id, device_auth_api_type,
-        method_response_code=None, method_response_payload=None, init_reported_properties=None
+        self,
+        hub_hostname: str,
+        device_id: str,
+        device_conn_string: Optional[str] = None,
+        x509_files: Optional[Dict[str, str]] = None,
+        method_response_code: Optional[str] = None,
+        method_response_payload: Optional[str] = None,
+        init_reported_properties: Optional[str] = None
     ):
         ensure_azure_namespace_path()
         from azure.iot.device import IoTHubDeviceClient as mqtt_device_client
-
-        if device_auth_api_type != DeviceAuthApiType.sas.value:
-            raise BadRequestError('MQTT simulation is only supported for symmetric key auth (SAS) based devices')
+        from azure.iot.device import X509
 
         self.device_id = device_id
-        self.target = target
         # The client automatically connects when we send/receive a message or method invocation
-        self.device_client = mqtt_device_client.create_from_connection_string(device_conn_string, websockets=True)
+        if x509_files:
+            self.device_client = mqtt_device_client.create_from_x509_certificate(
+                x509=X509(
+                    cert_file=x509_files["certificateFile"],
+                    key_file=x509_files["keyFile"],
+                    pass_phrase=x509_files["passphrase"],
+                ),
+                hostname=hub_hostname,
+                device_id=self.device_id,
+                websockets=True
+            )
+        elif "x509=true" in device_conn_string:
+            raise RequiredArgumentMissingError("Please provide the certificate and key files for the device.")
+        else:
+            self.device_client = mqtt_device_client.create_from_connection_string(
+                device_conn_string,
+                websockets=True
+            )
         self.device_client.on_message_received = self.message_handler
         self.device_client.on_method_request_received = self.method_request_handler
         self.method_response_code = method_response_code
@@ -38,7 +58,7 @@ class mqtt_client(object):
         self.init_reported_properties = init_reported_properties
 
     def send_d2c_message(
-        self, message_text, properties=None
+        self, message_text: str, properties: Optional[Dict[str, Any]] = None
     ):
         from azure.iot.device import Message
 
@@ -114,7 +134,7 @@ class mqtt_client(object):
         self.device_client.send_method_response(method_response)
 
     def twin_patch_handler(
-        self, patch
+        self, patch: Dict[str, Any]
     ):
         modified_properties = {}
         for prop in patch:
@@ -127,7 +147,7 @@ class mqtt_client(object):
             self.device_client.patch_twin_reported_properties(modified_properties)
 
     def execute(
-        self, data, properties={}, publish_delay=2, msg_count=100
+        self, data, properties: Dict[str, Any] = {}, publish_delay: int = 2, msg_count: int = 100
     ):
         from tqdm import tqdm
 
