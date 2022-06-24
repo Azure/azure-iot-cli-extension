@@ -24,7 +24,7 @@ def load_deviceprovisioningservice_help():
           The following attestation mechanisms are supported:
           - Symmetric key
           - x509 certificate
-          If using x509 authentication methods, the certificate and key files must be provided.
+          If using x509 authentication methods, the certificate and key files (and passphrase if needed) must be provided.
         examples:
         - name: Register an IoT device using an individual enrollment.
           text: az iot device registration create -n {dps_name} --rid {registration_id}
@@ -46,6 +46,11 @@ def load_deviceprovisioningservice_help():
         - name: Register an IoT device using an individual enrollment, the Device Provisioning Service
             ID Scope, and given certificate and key files. This will bypass retrieving the ID Scope.
           text: az iot device registration create --id-scope {id_scope} --rid {registration_id} --cp {certificate_file} --kp {key_file}
+        - name: Register an IoT device using an individual enrollment, the Device Provisioning Service
+            ID Scope, and given certificate and key files and passphrase for the key file. This will
+            bypass retrieving the ID Scope.
+          text: az iot device registration create --id-scope {id_scope} --rid {registration_id} --cp {certificate_file} --kp {key_file}
+            --pass {passphrase}
         - name: Register an IoT device using a group enrollment, the Device Provisioning Service
             ID Scope, and given certificate and key files. This will bypass retrieving the ID Scope.
             Note that the group enrollment id is not needed for x509 attestations and the subject of
