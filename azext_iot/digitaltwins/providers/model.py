@@ -88,6 +88,8 @@ class ModelProvider(DigitalTwinsProvider):
 
         logger.info("Models payload %s", json.dumps(payload))
 
+        models_created = []
+        pbar = tqdm(total=len(payload), desc='Creating models...', ascii=' #')
         try:
             # Process models in batches if models to process exceed the API limit
             if len(payload) > MAX_MODELS_API_LIMIT:
@@ -108,7 +110,6 @@ class ModelProvider(DigitalTwinsProvider):
                 dep_count_to_models_map = dict(sorted(dep_count_to_models_map.items()))
                 models_batch = []
                 response = []
-                pbar = tqdm(total=len(payload), desc='Creating models...', ascii=' #')
                 # The map being iterated is sorted by dependency count, hence models with 0 dependencies go first,
                 # followed by models with 1 dependency, then 2 dependencies and so on... This ensures that all dependencies
                 # of each model being added were either already added in a previous iteration or are in the current payload.
@@ -117,6 +118,7 @@ class ModelProvider(DigitalTwinsProvider):
                         num_models_to_add = MAX_MODELS_PER_BATCH - len(models_batch)
                         models_batch.extend(models_list[0:num_models_to_add])
                         response.extend(self.model_sdk.add(models_batch, raw=True).response.json())
+                        models_created.extend([model['@id'] for model in models_batch])
                         pbar.update(len(models_batch))
                         # Remove the model ids which have been processed
                         models_list = models_list[num_models_to_add:]
@@ -126,9 +128,20 @@ class ModelProvider(DigitalTwinsProvider):
                 if len(models_batch) > 0:
                     pbar.update(len(models_batch))
                     response.extend(self.model_sdk.add(models_batch, raw=True).response.json())
+                pbar.close()
                 return response
             return self.model_sdk.add(payload, raw=True).response.json()
         except ErrorResponseException as e:
+            pbar.close()
+            if len(models_created) > 0:
+                logger.error(
+                    "Error creating models. Deleting {} models already created by this operation...".format(len(models_created))
+                )
+                # In case of error delete all models created by this operation. Models will be deleted in the reverse
+                # order they were created, hence ensuring each model's dependencies are deleted after deleting the model.
+                models_created.reverse()
+                for model_id in models_created:
+                    self.delete(model_id)
             # @vilit - hack to customize 403's to have more specific error messages
             if e.response.status_code == 403:
                 error_text = "Current principal access is forbidden. Please validate rbac role assignments."
