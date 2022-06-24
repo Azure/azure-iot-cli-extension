@@ -577,6 +577,31 @@ helps[
 """
 
 helps[
+    "iot hub state export"
+] = """
+    type: command
+    short-summary: Saves the device information of an IoT Hub to a file. 
+    examples:
+    - name: Export the devices in the specified hub to the specified file.
+      text: >
+        az iot hub state export -n {iothub_name} -f {filename}
+"""
+
+helps[
+    "iot hub state import"
+] = """
+    type: command
+    short-summary: Uploads the device information from a file to an IoT Hub.  
+    examples:
+    - name: Upload the devices from the specified file to the specified hub. 
+      text: >
+        az iot hub state import -n {iothub_name} -f {filename}
+    - name: Upload the devices from the default file to the specified hub, overwriting the devices already in the hub. 
+      text: >
+        az iot hub state import -n {iothub_name} --overwrite
+"""
+
+helps[
     "iot hub generate-sas-token"
 ] = """
     type: command
