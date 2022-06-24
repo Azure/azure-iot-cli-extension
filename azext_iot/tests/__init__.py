@@ -47,7 +47,7 @@ class CaptureOutputLiveScenarioTest(LiveScenarioTest):
         super(CaptureOutputLiveScenarioTest, self).__init__(test_scenario)
 
     # TODO: @digimaun - Maybe put a helper like this in the shared lib, when you create it?
-    def command_execute_assert(self, command, asserts):
+    def command_execute_assert(self, command, asserts=[]):
         from . import capture_output
 
         with capture_output() as buffer:
