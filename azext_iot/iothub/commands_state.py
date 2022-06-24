@@ -12,10 +12,10 @@ from azext_iot.iothub.providers.state import StateProvider
 logger = get_logger(__name__)
 
 
-def state_export(cmd, orig_hub, filename='/project/files/deviceFile.json'):
-    sp = StateProvider(cmd, filename, orig_hub)
-    sp.save_devices()
+def state_export(cmd, hub, rg=None, filename='/project/files/deviceFile.json'):
+    sp = StateProvider(cmd, hub, rg)
+    sp.save_devices(filename)
 
-def state_import(cmd, dest_hub, filename='/project/files/deviceFile.json'): 
-    sp = StateProvider(cmd, filename, dest_hub)
-    sp.load_devices()
+def state_import(cmd, hub, rg=None, filename='/project/files/deviceFile.json', overwrite=False): 
+    sp = StateProvider(cmd, hub, rg)
+    sp.upload_devices(filename, overwrite)

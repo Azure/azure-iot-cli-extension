@@ -761,6 +761,45 @@ def load_arguments(self, _):
             type=int,
             help="Maximum number of configurations to return. By default all configurations are returned.",
         )
+    
+    with self.argument_context("iot hub state export") as context:
+        context.argument(
+            "hub",
+            options_list=["--hub-name", "-n"],
+            help="IoT Hub name."
+        )
+        context.argument(
+            "rg",
+            options_list=["--resource-group", "-rg"],
+            help="Name of resource group. You can configure the default group using `az configure --defaults group=<name>`."
+        )
+        context.argument(
+            "filename",
+            options_list=["--filename", "-f"],
+            help="The path to the file where the device identity and twin information will be stored."
+        )
+
+    with self.argument_context("iot hub state import") as context:
+        context.argument(
+            "hub",
+            options_list=["--hub-name", "-n"],
+            help="IoT Hub name."
+        )
+        context.argument(
+            "rg",
+            options_list=["--resource-group", "-rg"],
+            help="Name of resource group. You can configure the default group using `az configure --defaults group=<name>`."
+        )
+        context.argument(
+            "filename",
+            options_list=["--filename", "-f"],
+            help="The path to the file from which the device identity and twin information will be read."
+        )
+        context.argument(
+            "overwrite",
+            options_list=["--overwrite"],
+            help="If this flag is set, then the import will overwrite all devices already in the destination hub."
+        )
 
     with self.argument_context("iot edge") as context:
         context.argument(
