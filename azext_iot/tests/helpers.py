@@ -21,6 +21,10 @@ TAG_ENV_VAR = [
     "use_tags"
 ]
 
+CERT_ENDING = "-cert.pem"
+KEY_ENDING = "-key.pem"
+ROOT_CERT_NAME = "aziotcli-root"
+
 settings = DynamoSettings(opt_env_set=TAG_ENV_VAR)
 # Make sure that TEST_PIPELINE_ID is only populated if correct variables are present
 TEST_PIPELINE_ID = "{} {} {}".format(
