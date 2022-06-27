@@ -52,3 +52,4 @@ def load_iothub_commands(self, _):
     with self.command_group("iot hub state", command_type=iothub_state_ops) as cmd_group:
         cmd_group.command("export", "state_export")
         cmd_group.command("import", "state_import")
+        cmd_group.command("migrate", "state_migrate")

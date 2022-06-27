@@ -602,6 +602,17 @@ helps[
 """
 
 helps[
+    "iot hub state migrate"
+] = """
+    type: command
+    short-summary: Copies the device information from one hub to another hub without saving to a file. 
+    examples:
+    - name: Migrate the device from the original hub to the new hub, overwriting the devices already in the hub.
+      text: >
+        az iot hub state export -n {iothub_name} --orig-hub {origin_hub} --overwrite
+"""
+
+helps[
     "iot hub generate-sas-token"
 ] = """
     type: command
