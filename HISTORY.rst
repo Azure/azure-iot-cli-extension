@@ -36,6 +36,8 @@ unreleased
   models, twins and relationships to a Digital Twins instance. The bulk import data must be stored as a blob in
   a user owned storage account and container.
 
+* Data History commands, under the `az dt data-history` command group, are now GA.
+
 0.14.1
 +++++++++++++++
 
