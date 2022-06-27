@@ -36,6 +36,9 @@ unreleased
   models, twins and relationships to a Digital Twins instance. The bulk import data must be stored as a blob in
   a user owned storage account and container.
 
+* Updated `az dt model create` command to process input ontologies larger than 250 models in a single command run.
+  Size of input ontology is only constrained by the maximum number of models(default 10000) a DT instance can store.
+
 0.14.1
 +++++++++++++++
 
