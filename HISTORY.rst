@@ -39,6 +39,9 @@ unreleased
 * Updated `az dt model create` command to process input ontologies larger than 250 models in a single command run.
   Size of input ontology is only constrained by the maximum number of models(default 10000) a DT instance can store.
 
+* Data History commands, under the `az dt data-history` command group, are now GA.
+
+
 0.14.1
 +++++++++++++++
 
