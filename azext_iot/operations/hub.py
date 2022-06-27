@@ -100,6 +100,7 @@ def iot_device_show(
     login=None,
     auth_type_dataplane=None,
 ):
+
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         resource_name=hub_name,
