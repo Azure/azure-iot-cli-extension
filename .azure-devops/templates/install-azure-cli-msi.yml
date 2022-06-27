@@ -14,3 +14,13 @@ steps:
       script: |
         echo "##vso[task.prependPath]C:\Program Files (x86)\Microsoft SDKs\Azure\CLI2"
         echo "##vso[task.prependPath]C:\Program Files (x86)\Microsoft SDKs\Azure\CLI2\Scripts"
+  - task: PowerShell@2
+    displayName: 'Install required packages for the MSI python'
+    inputs:
+      targetType: inline
+      script: |
+        python -c "import sys; print(sys.executable)"
+        python -m pip install --upgrade pip
+        python -m pip install -r dev_requirements
+        python -m pip install cryptography
+        python -m pip freeze

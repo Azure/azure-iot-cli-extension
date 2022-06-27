@@ -18,12 +18,17 @@ unreleased
 
   - The Device Update command group supports all `account` and `instance` related functionality.
 
-**IoT DPS updates**
+**IoT Device updates**
 
 * Added device registration commands, `az iot device registration create` to register a device to an individual
   enrollment or an enrollment group. Currently, devices with symmetric key and x509 certificate authentication
   are supported. Once registered, the device will show up in the linked IoT Hub and can be interacted with or
   simulated using other `az iot device` commands.
+
+* Added support for simulating device identities that use x509 thumbprint or CA authentication, impacting the
+  following commands:
+    - `az iot device simulate`
+    - `az iot device send-d2c-message`
 
 **Digital Twin updates**
 

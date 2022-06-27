@@ -189,7 +189,8 @@ def create_certificate(
     cert_path: str = None,
     key_path: str = None,
     cert_object: Dict[str, str] = None,
-    password: str = None,
+    loading_password: str = None,
+    signing_password: str = None,
     chain_cert: bool = False
 ):
     """
@@ -205,7 +206,8 @@ def create_certificate(
         key_path (str): Path to key pem file.
         cert_object (dict): dict with certificate value, private key and thumbprint, returned from
             create_self_signed_certificate
-        password (str): password for loading the private key.
+        loading_password (str): loading_password for loading the private key within the given certificate.
+        signing_password (str): signing_password for encrypting the new private key.
         chain_cert (bool): whether the cert object should have the root certificate in it.
             Required for device certificates.
 
@@ -215,7 +217,7 @@ def create_certificate(
     # Get root certificate and key if needed
     root_cert_object = {}
     if any([cert_path, key_path, cert_object]):
-        root_cert_object = _load_cert_data(cert_path, key_path, cert_object, password)
+        root_cert_object = _load_cert_data(cert_path, key_path, cert_object, loading_password)
 
     # create a key pair
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -228,10 +230,15 @@ def create_certificate(
     )
 
     # dump the data
+    encryption = (
+        serialization.BestAvailableEncryption(str.encode(signing_password))
+        if signing_password else
+        serialization.NoEncryption()
+    )
     key_dump = key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.TraditionalOpenSSL,
-        encryption_algorithm=serialization.NoEncryption(),
+        encryption_algorithm=encryption,
     ).decode("utf-8")
     cert_dump = cert.public_bytes(serialization.Encoding.PEM).decode("utf-8")
     thumbprint = cert.fingerprint(hashes.SHA256()).hex().upper()
