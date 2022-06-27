@@ -1,7 +1,10 @@
 steps:
-- script: python -m pip install --upgrade pip
-  displayName: 'Upgrade pip'
-- script: python -m pip install -r dev_requirements
-  displayName: 'Installing CI requirements'
-- script: python -m pip install cryptography
-  displayName: 'Install cryptography'
+  - task: PowerShell@2
+    displayName: 'Upgrade pip, install dev_requirements and cryptography'
+    name: 'Install_Dev_tools'
+    inputs:
+      targetType: 'inline'
+      script: |
+        python -m pip install --upgrade pip
+        python -m pip install -r dev_requirements
+        python -m pip install cryptography
