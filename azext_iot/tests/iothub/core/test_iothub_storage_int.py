@@ -29,6 +29,7 @@ USER_IDENTITY_SETUP_MAX_ATTEMPTS = 5
 class TestIoTStorage(IoTLiveScenarioTest):
     def __init__(self, test_case):
         self.storage_cstring = None
+        self.sku = "S2"
         super(TestIoTStorage, self).__init__(test_case)
         self.managed_identity = None
 
