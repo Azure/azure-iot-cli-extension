@@ -77,8 +77,8 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 if hasattr(self, 'storage_cstring'):
                     self.cmd(
                         "iot hub create --name {} --resource-group {} --fc {} --fcs {} --sku {} ".format(
-                            self.entity_name, self.entity_rg, self.sku,
-                            self.storage_container, self.storage_cstring
+                            self.entity_name, self.entity_rg,
+                            self.storage_container, self.storage_cstring, self.sku,
                         )
                     )
                 else:
