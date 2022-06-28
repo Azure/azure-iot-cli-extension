@@ -284,14 +284,14 @@ def load_central_commands(self, _):
         command_type=central_device_ops,
         is_preview=True,
     ) as cmd_group:
-        cmd_group.command("show", "get_module_telemetry_value")
+        cmd_group.show_command("show", "get_module_telemetry_value")
 
     with self.command_group(
         "iot central device edge module component-telemetry",
         command_type=central_device_ops,
         is_preview=True,
     ) as cmd_group:
-        cmd_group.command("show", "get_module_component_telemetry_value")
+        cmd_group.show_command("show", "get_module_component_telemetry_value")
 
     with self.command_group(
         "iot central device edge module properties",
