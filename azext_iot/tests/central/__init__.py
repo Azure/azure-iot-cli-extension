@@ -6,7 +6,6 @@
 
 import json
 import time
-from turtle import update
 from typing import Tuple
 
 from azure.cli.core.azclierror import CLIInternalError, InvalidArgumentValueError
@@ -311,7 +310,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 self.check("description", new_description),
             ],
         ).get_output_in_json()
-        
+
         return (update_result, new_description)
 
     def _delete_device_group(self, api_version, device_group_id) -> None:

@@ -629,7 +629,14 @@ def _load_central_devices_help():
     """
 
     helps[
-        "iot central device properties show-component-properties"
+        "iot central device component-properties"
+    ] = """
+        type: group
+        short-summary: Manage and configure IoT Central device component properties.
+    """
+
+    helps[
+        "iot central device component-properties show"
     ] = """
         type: command
         short-summary: Get device properties for a specific component.
@@ -644,7 +651,7 @@ def _load_central_devices_help():
     """
 
     helps[
-        "iot central device properties replace-component-properties"
+        "iot central device component-properties replace"
     ] = """
         type: command
         short-summary: Replace device properties for a specific component.
@@ -660,7 +667,7 @@ def _load_central_devices_help():
     """
 
     helps[
-        "iot central device properties update-component-properties"
+        "iot central device component-properties update"
     ] = """
         type: command
         short-summary: Update device properties for a specific component via patch.
@@ -1672,7 +1679,14 @@ def _load_central_edge_help():
     """
 
     helps[
-        "iot central device edge module properties show-component-properties"
+        "iot central device edge module component-properties"
+    ] = """
+        type: group
+        short-summary: Manage and configure IoT Central device component properties in a module.
+    """
+
+    helps[
+        "iot central device edge module component-properties show"
     ] = """
         type: command
         short-summary: Get module properties for a specific component.
@@ -1687,7 +1701,7 @@ def _load_central_edge_help():
     """
 
     helps[
-        "iot central device edge module properties update-component-properties"
+        "iot central device edge module component-properties update"
     ] = """
         type: command
         short-summary: Update module properties for a specific component via patch.
@@ -1704,7 +1718,7 @@ def _load_central_edge_help():
     """
 
     helps[
-        "iot central device edge module properties replace-component-properties"
+        "iot central device edge module component-properties replace"
     ] = """
         type: command
         short-summary: Replace module properties for a specific component.

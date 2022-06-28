@@ -515,7 +515,7 @@ class TestIotCentral(CentralLiveScenarioTest):
 
         # Update
         (update_result, update_description) = self._update_device_group(
-            api_version=self._api_version, 
+            api_version=self._api_version,
             device_group_id=device_group["id"])
         assert update_result["description"] == update_description
 

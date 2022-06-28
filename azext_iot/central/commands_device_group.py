@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 # Dev note - think of this as a controller
 
-from typing import List, Union
+from typing import List, Optional, Union
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.models.preview import DeviceGroupPreview
 from azext_iot.central.models.v1_1_preview import DeviceGroupV1_1_preview
@@ -47,7 +47,7 @@ def create_device_group(
     device_group_id: str,
     display_name: str,
     filter: str,
-    description: str = None,
+    description: Optional[str] = None,
     organizations: List[str] = None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
@@ -72,9 +72,9 @@ def update_device_group(
     cmd,
     app_id: str,
     device_group_id: str,
-    display_name: str = None,
-    filter: str = None,
-    description: str = None,
+    display_name: Optional[str] = None,
+    filter: Optional[str] = None,
+    description: Optional[str] = None,
     organizations: List[str] = None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
