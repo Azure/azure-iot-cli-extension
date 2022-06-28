@@ -90,6 +90,7 @@ class CentralDeviceGroupProvider:
         display_name: str,
         filter: str,
         description: str = None,
+        etag: str = None,
         organizations: List[str] = None,
         central_dns_suffix=CENTRAL_ENDPOINT
     ) -> Union[DeviceGroupPreview, DeviceGroupV1_1_preview, DeviceGroupGa20220531]:
@@ -100,6 +101,7 @@ class CentralDeviceGroupProvider:
             display_name=display_name,
             filter=filter,
             description=description,
+            etag=etag,
             organizations=organizations,
             token=self._token,
             central_dns_suffix=central_dns_suffix,

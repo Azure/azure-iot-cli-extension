@@ -124,6 +124,7 @@ def create_device_group(
     display_name: str,
     filter: str,
     description: str,
+    etag: str,
     organizations: List[str],
     token: str,
     api_version: str,
@@ -149,7 +150,17 @@ def create_device_group(
     Returns:
         device_group: dict
     """
-    payload = {"displayName": display_name, "description": description, "filter": filter, "organizations": organizations}
+    payload = {"displayName": display_name, "filter": filter}
+
+    if description is not None:
+        payload['description'] = description
+
+    if organizations is not None:
+        payload['organizations'] = organizations
+
+    if etag is not None:
+        payload['etag'] = etag
+
     result = _utility.make_api_call(
         cmd,
         app_id=app_id,
