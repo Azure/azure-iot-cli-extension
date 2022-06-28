@@ -149,6 +149,9 @@ class TestIoTStorage(IoTLiveScenarioTest):
             checks=self.is_empty(),
         )
 
+        # sleep?
+        sleep(30)
+
         job_id = self.cmd(
             'iot hub device-identity export -n {} --bcu "{}"'.format(
                 self.entity_name, self.live_storage_uri
@@ -380,7 +383,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
     def wait_till_job_completion(self, job_id, status=""):
         tries = 0
-        while status not in ["failed", "completed"] and tries < USER_IDENTITY_SETUP_MAX_ATTEMPTS:
+        while status not in ["failed", "completed"] and tries < 10:
             status = self.cmd(
                 f"iot hub job show -n {self.entity_name} -g {self.entity_rg} --job-id {job_id}"
             ).get_output_in_json()["status"]
