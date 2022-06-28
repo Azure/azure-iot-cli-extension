@@ -130,7 +130,7 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
             cert_output_dir=output_dir,
             cert_only=cert_only,
             file_prefix=file_prefix,
-            sha_version=256
+            sha_version=256,
         )["thumbprint"]
         self.tracked_certs.append(CERT_PATH)
         if not cert_only:

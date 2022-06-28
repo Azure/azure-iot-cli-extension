@@ -18,7 +18,7 @@ unreleased
 
   - The Device Update command group supports all `account` and `instance` related functionality.
 
-**IoT DPS updates**
+**IoT Device updates**
 
 * Added device registration commands, `az iot device registration create` to register a device to an individual
   enrollment or an enrollment group. Currently, devices with symmetric key and x509 certificate authentication
@@ -74,11 +74,18 @@ unreleased
   - az iot central role
   - az iot central user
 
+* Added support for simulating device identities that use x509 thumbprint or CA authentication, impacting the
+  following commands:
+    - `az iot device simulate`
+    - `az iot device send-d2c-message`
+
 **Digital Twin updates**
 
 * Added `az dt job import` command group, which will allow users to create and manage jobs for bulk importing
   models, twins and relationships to a Digital Twins instance. The bulk import data must be stored as a blob in
   a user owned storage account and container.
+
+* Data History commands, under the `az dt data-history` command group, are now GA.
 
 0.14.1
 +++++++++++++++

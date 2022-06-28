@@ -52,7 +52,6 @@ def load_digitaltwins_commands(self, _):
     with self.command_group(
         "dt data-history",
         command_type=digitaltwins_resource_ops,
-        is_preview=True,
     ) as cmd_group:
         pass
 
