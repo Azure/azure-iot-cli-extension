@@ -144,8 +144,18 @@ def load_central_commands(self, _):
         cmd_group.command("manual-failover", "run_manual_failover")
         cmd_group.command("manual-failback", "run_manual_failback")
         cmd_group.command("list-components", "list_components")
-        cmd_group.command("show-telemetry-value", "get_telemetry_value")
-        cmd_group.command("show-component-telemetry-value", "get_component_telemetry_value")
+
+    with self.command_group(
+        "iot central device telemetry",
+        command_type=central_device_ops,
+    ) as cmd_group:
+        cmd_group.show_command("show", "get_telemetry_value")
+
+    with self.command_group(
+        "iot central device component-telemetry",
+        command_type=central_device_ops,
+    ) as cmd_group:
+        cmd_group.show_command("show", "get_component_telemetry_value")
 
     with self.command_group(
         "iot central device attestation",
@@ -268,8 +278,20 @@ def load_central_commands(self, _):
         cmd_group.show_command("show", "get_device_module")
         cmd_group.command("restart", "restart_device_module")
         cmd_group.command("list-components", "list_module_components")
-        cmd_group.command("show-telemetry-value", "get_module_telemetry_value")
-        cmd_group.command("show-component-telemetry-value", "get_module_component_telemetry_value")
+
+    with self.command_group(
+        "iot central device edge module telemetry",
+        command_type=central_device_ops,
+        is_preview=True,
+    ) as cmd_group:
+        cmd_group.command("show", "get_module_telemetry_value")
+
+    with self.command_group(
+        "iot central device edge module component-telemetry",
+        command_type=central_device_ops,
+        is_preview=True,
+    ) as cmd_group:
+        cmd_group.command("show", "get_module_component_telemetry_value")
 
     with self.command_group(
         "iot central device edge module properties",
@@ -292,7 +314,6 @@ def load_central_commands(self, _):
         command_type=central_device_ops,
     ) as cmd_group:
         cmd_group.command("run", "run_module_command")
-        cmd_group.command("run-component-command", "run_module_component_command")
         cmd_group.command("history", "get_module_command_history")
         cmd_group.command("component-history", "get_module_component_command_history")
 

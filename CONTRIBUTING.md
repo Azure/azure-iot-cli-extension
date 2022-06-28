@@ -230,32 +230,6 @@ To run specific test:
 
 `pytest azext_iot/tests/central/test_iot_central_int.py::TestIotCentral::test_central_query_methods_run`
 
-Integration test environment variables needed:
-
-```
-env =
-    AZURE_TEST_RUN_LIVE=True
-    azext_iot_testrg=
-    azext_iot_teststorageaccount=
-    azext_iot_teststoragecontainer=
-    azext_iot_central_app_id=
-    azext_iot_central_scope_id=
-    azext_iot_central_token=
-    azext_iot_central_primarykey=
-    azext_iot_central_storage_cstring=
-    azext_iot_central_storage_container=
-```
-
-Not all of them are required. `azext_iot_teststoragecontainer` is the same as `azext_iot_central_storage_container`.
-
-If you have the error message when you start running integration tests:
-
-```
-ERROR    cli.azure.cli.core.azclierror:azlogging.py:212 (ResourceGroupNotFound) Resource group 'xxxxx' could not be found.
-```
-
-You need to set up your azure CLI subscription using `az account set --subscription xxxxxx` so CLI could find the resource group successfully.
-
 ##### Test Resource Tagging
 
 There are 4 more test variables used for tagging the test resources:

@@ -614,7 +614,14 @@ def _load_central_devices_help():
     """
 
     helps[
-        "iot central device show-telemetry-value"
+        "iot central device telemetry"
+    ] = """
+        type: group
+        short-summary: Query IoT Central devices telemetry value
+    """
+
+    helps[
+        "iot central device telemetry show"
     ] = """
         type: command
         short-summary: Get the last telemetry value from a device.
@@ -622,7 +629,7 @@ def _load_central_devices_help():
         examples:
         - name:  Get device telemetry value.
           text: >
-            az iot central device show-telemetry-value
+            az iot central device telemetry show
             --app-id {appid}
             --device-id {deviceid}
             --telemetry-name {telemetryname}
@@ -683,7 +690,14 @@ def _load_central_devices_help():
     """
 
     helps[
-        "iot central device show-component-telemetry-value"
+        "iot central device component-telemetry"
+    ] = """
+        type: group
+        short-summary: Query IoT Central devices component telemetry value
+    """
+
+    helps[
+        "iot central device component-telemetry show"
     ] = """
         type: command
         short-summary: Get component telemetry value.
@@ -692,7 +706,7 @@ def _load_central_devices_help():
         examples:
         - name:  Get component telemetry value.
           text: >
-            az iot central device show-component-telemetry-value
+            az iot central device component-telemetry show
             --app-id {appid}
             --device-id {deviceid}
             --component-name {componentname}
@@ -1735,14 +1749,21 @@ def _load_central_edge_help():
     """
 
     helps[
-        "iot central device edge module show-component-telemetry-value"
+        "iot central device edge module component-telemetry"
+    ] = """
+        type: group
+        short-summary: Query IoT Edge device component telemetry value.
+    """
+
+    helps[
+        "iot central device edge module component-telemetry show"
     ] = """
         type: command
         short-summary: Get the last telemetry value from a module component.
         examples:
         - name: Get module component telemetry value.
           text: >
-            az iot central device edge module show-component-telemetry-value
+            az iot central device edge module component-telemetry show
             --app-id {appid}
             --device-id {deviceId}
             --component-name {componentName}
@@ -1795,14 +1816,21 @@ def _load_central_edge_help():
     """
 
     helps[
-        "iot central device edge module show-telemetry-value"
+        "iot central device edge module telemetry"
+    ] = """
+        type: group
+        short-summary: Query IoT Edge device telemetry value.
+    """
+
+    helps[
+        "iot central device edge module telemetry show"
     ] = """
         type: command
         short-summary: Get the last telemetry value from a module.
         examples:
         - name: Get module telemetry value.
           text: >
-            az iot central device edge module show-telemetry-value
+            az iot central device edge module telemetry show
             --app-id {appid}
             --device-id {deviceId}
             --module-name {moduleName}
@@ -1830,27 +1858,6 @@ def _load_central_edge_help():
             - name: Run a module command
               text: >
                 az iot central device edge module command run
-                --app-id {appid}
-                --device-id {deviceid}
-                --module-name {modulename}
-                --command-name {commandname}
-                --content {payload}
-        """
-
-    helps[
-        "iot central device edge module command run-component-command"
-    ] = """
-            type: command
-            short-summary: Run a module component command.
-            long-summary: |
-                Note: payload should be nested under "request".
-                i.e. if your device expects the payload in a shape {"key": "value"}
-                payload should be {"request": {"key": "value"}}.
-                --content can also be pointed at a filepath like this (.../path/to/payload.json)
-            examples:
-            - name: Run a module component command
-              text: >
-                az iot central device edge module command run-component-command
                 --app-id {appid}
                 --device-id {deviceid}
                 --module-name {modulename}

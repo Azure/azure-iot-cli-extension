@@ -63,18 +63,13 @@ def list_device_groups(
         if "value" not in result:
             raise AzureResponseError("Value is not present in body: {}".format(result))
 
-        device_groups.extend(
-            [
-                DeviceGroupPreview(device_group)
-                if api_version == ApiVersion.preview.value
-                else (
-                    DeviceGroupV1_1_preview(device_group)
-                    if api_version == ApiVersion.v1_1_preview.value
-                    else DeviceGroupGa20220531(device_group)
-                )
-                for device_group in result["value"]
-            ]
-        )
+        for device_group in result["value"]:
+            if api_version == ApiVersion.preview.value:
+                device_groups.extend(DeviceGroupPreview(device_group))
+            elif api_version == ApiVersion.v1_1_preview.value:
+                device_groups.extend(DeviceGroupV1_1_preview(device_group))
+            else:
+                device_groups.extend(DeviceGroupGa20220531(device_group))
 
         url = result.get("nextLink", None)
         pages_processed = pages_processed + 1

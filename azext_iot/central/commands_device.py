@@ -13,7 +13,7 @@ from azext_iot.central.providers import (
     CentralDeviceTemplateProvider,
 )
 
-from typing import Union, List, Any
+from typing import Optional, Union, List, Any
 from azure.cli.core.azclierror import (
     InvalidArgumentValueError,
     RequiredArgumentMissingError,
@@ -230,34 +230,7 @@ def run_module_command(
     module_name: str,
     command_name: str,
     content: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> dict:
-    payload = utility.process_json_arg(content, argument_name="content")
-
-    provider = CentralDeviceProvider(
-        cmd=cmd, app_id=app_id, token=token, api_version=api_version
-    )
-
-    return provider.run_module_command(
-        device_id=device_id,
-        module_name=module_name,
-        component_name=None,
-        command_name=command_name,
-        payload=payload,
-        central_dns_suffix=central_dns_suffix,
-    )
-
-
-def run_module_component_command(
-    cmd,
-    app_id: str,
-    device_id: str,
-    module_name: str,
-    component_name: str,
-    command_name: str,
-    content: str,
+    component_name: Optional[str] = None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.ga_2022_05_31.value,
