@@ -222,23 +222,6 @@ def load_central_arguments(self, _):
             "by visiting https://github.com/iot-for-all/iot-central-high-availability-clients#readme",
         )
 
-    with self.argument_context("iot central device attestation") as context:
-        context.argument(
-            "device_id",
-            options_list=["--device-id", "-d"],
-            help="Unique identifier for the device."
-            " A case-sensitive string (up to 128 characters long) of ASCII 7-bit alphanumeric characters plus"
-            " certain special characters: - . + % _ # * ? ! ( ) , : = @ $ '",
-        )
-        context.argument(
-            "content",
-            options_list=["--content", "-k"],
-            help="Configuration for request. "
-            "Provide path to JSON file or raw stringified JSON. "
-            "[File Path Example: ./path/to/file.json] "
-            "[Stringified JSON Example: {'a': 'b'}] ",
-        )
-
     with self.argument_context("iot central device properties") as context:
         context.argument(
             "device_id",

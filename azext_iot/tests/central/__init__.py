@@ -31,7 +31,6 @@ CENTRAL_SETTINGS = [
     "azext_iot_central_dns_suffix",
     "azext_iot_teststorageaccount",
     "azext_iot_central_storage_container",
-    "azext_iot_teststoragecontainer",
 ]
 settings = DynamoSettings(opt_env_set=CENTRAL_SETTINGS)
 APP_RG = settings.env.azext_iot_testrg
