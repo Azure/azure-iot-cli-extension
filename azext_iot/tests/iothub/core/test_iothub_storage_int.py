@@ -149,7 +149,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
             checks=self.is_empty(),
         )
 
-        self.cmd(
+        job_id = self.cmd(
             'iot hub device-identity export -n {} --bcu "{}"'.format(
                 self.entity_name, self.live_storage_uri
             ),
@@ -160,12 +160,12 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 self.check("excludeKeysInExport", True),
                 self.exists("jobId"),
             ],
-        )
+        ).get_output_in_json()["jobId"]
 
         # give time to finish job
-        sleep(45)
+        self.wait_till_job_completion(job_id)
 
-        self.cmd(
+        job_id = self.cmd(
             'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --ik true'.format(
                 self.entity_name, self.live_storage_uri, "key"
             ),
@@ -176,10 +176,10 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 self.check("excludeKeysInExport", False),
                 self.exists("jobId"),
             ],
-        )
+        ).get_output_in_json()["jobId"]
 
         # give time to finish job
-        sleep(45)
+        self.wait_till_job_completion(job_id)
 
         self.cmd(
             'iot hub device-identity import -n {} --ibcu "{}" --obcu "{}" --auth-type {}'.format(
@@ -223,8 +223,9 @@ class TestIoTStorage(IoTLiveScenarioTest):
         assert hub_id
 
         self.assign_storage_role_if_needed(hub_id)
+        sleep(30)
 
-        self.cmd(
+        job_id = self.cmd(
             'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {} --ik true'.format(
                 self.entity_name, self.live_storage_uri, "identity", "[system]"
             ),
@@ -236,12 +237,12 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 self.check("storageAuthenticationType", "identityBased"),
                 self.exists("jobId"),
             ],
-        )
+        ).get_output_in_json()["jobId"]
 
         # give time to finish job
-        sleep(45)
+        self.wait_till_job_completion(job_id)
 
-        self.cmd(
+        job_id = self.cmd(
             'iot hub device-identity import -n {} --ibcu "{}" --obcu "{}" --auth-type {} --identity {}'.format(
                 self.entity_name, self.live_storage_uri, self.live_storage_uri, "identity", "[system]"
             ),
@@ -253,10 +254,10 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 self.check("storageAuthenticationType", "identityBased"),
                 self.exists("jobId"),
             ],
-        )
+        ).get_output_in_json()["jobId"]
 
         # give time to finish job
-        sleep(45)
+        self.wait_till_job_completion(job_id)
 
         self.cmd(
             'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {}'.format(
@@ -264,9 +265,6 @@ class TestIoTStorage(IoTLiveScenarioTest):
             ),
             expect_failure=True
         )
-
-        # give time to finish job
-        sleep(45)
 
         # if we enabled identity for this hub, undo identity and RBAC
         if identity_enabled:
@@ -318,7 +316,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 sleep(30)
 
                 # identity-based device-identity export
-                self.cmd(
+                job_id = self.cmd(
                     'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {} --ik true'.format(
                         self.entity_name, self.live_storage_uri, "identity", identity_id
                     ),
@@ -330,12 +328,12 @@ class TestIoTStorage(IoTLiveScenarioTest):
                         self.check("storageAuthenticationType", "identityBased"),
                         self.exists("jobId"),
                     ],
-                )
+                ).get_output_in_json()["jobId"]
 
                 # give time to finish job
-                sleep(45)
+                self.wait_till_job_completion(job_id)
 
-                self.cmd(
+                job_id = self.cmd(
                     'iot hub device-identity import -n {} --ibcu "{}" --obcu "{}" --auth-type {} --identity {}'.format(
                         self.entity_name, self.live_storage_uri, self.live_storage_uri, "identity", identity_id
                     ),
@@ -347,7 +345,10 @@ class TestIoTStorage(IoTLiveScenarioTest):
                         self.check("storageAuthenticationType", "identityBased"),
                         self.exists("jobId"),
                     ],
-                )
+                ).get_output_in_json()["jobId"]
+
+                # give time to finish job
+                self.wait_till_job_completion(job_id)
 
                 self.cmd(
                     'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {}'.format(
@@ -376,3 +377,21 @@ class TestIoTStorage(IoTLiveScenarioTest):
             )
 
         self.tearDown()
+
+    def wait_till_job_completion(self, job_id, status=""):
+        tries = 0
+        while status not in ["failed", "completed"] and tries < USER_IDENTITY_SETUP_MAX_ATTEMPTS:
+            status = self.cmd(
+                f"iot hub job show -n {self.entity_name} -g {self.entity_rg} --job-id {job_id}"
+            ).get_output_in_json()["status"]
+            print(status)
+            sleep(10)
+            tries += 1
+
+        if status == "failed":
+            print(
+                self.cmd(
+                    f"iot hub job show -n {self.entity_name} -g {self.entity_rg} --job-id {job_id}"
+                ).get_output_in_json()
+            )
+        assert status == "completed"
