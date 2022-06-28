@@ -160,3 +160,19 @@ iot central device properties update:
     central_dns_suffix:
       rule_exclusions:
       - no_parameter_defaults_for_update_commands
+iot central device component-properties update:
+  parameters:
+    api_version:
+      rule_exclusions:
+      - no_parameter_defaults_for_update_commands
+    central_dns_suffix:
+      rule_exclusions:
+      - no_parameter_defaults_for_update_commands
+iot central device edge module component-properties update:
+  parameters:
+    api_version:
+      rule_exclusions:
+      - no_parameter_defaults_for_update_commands
+    central_dns_suffix:
+      rule_exclusions:
+      - no_parameter_defaults_for_update_commands

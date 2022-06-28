@@ -644,7 +644,7 @@ def _load_central_devices_help():
         examples:
         - name:  Get device properties for a specific component.
           text: >
-            az iot central device properties show-component-properties
+            az iot central device component-properties show
             --app-id {appid}
             --device-id {deviceid}
             --component-name {componentname}
@@ -659,7 +659,7 @@ def _load_central_devices_help():
         examples:
         - name:  Replace device properties for a specific component.
           text: >
-            az iot central device properties replace-component-properties
+            az iot central device component-properties replace
             --app-id {appid}
             --device-id {deviceid}
             --component-name {componentname}
@@ -675,7 +675,7 @@ def _load_central_devices_help():
         examples:
         - name:  Update device properties for a specific component via patch.
           text: >
-            az iot central device properties update-component-properties
+            az iot central device component-properties update
             --app-id {appid}
             --device-id {deviceid}
             --component-name {componentname}
@@ -1693,7 +1693,7 @@ def _load_central_edge_help():
         examples:
         - name: Get module properties for a specific component.
           text: >
-            az iot central device edge module properties show-component-properties
+            az iot central device edge module component-properties show
             --app-id {appid}
             --device-id {deviceId}
             --component-name {componentName}
@@ -1709,7 +1709,7 @@ def _load_central_edge_help():
         examples:
         - name: Update module properties for a specific component via patch.
           text: >
-            az iot central device edge module properties update-component-properties
+            az iot central device edge module component-properties update
             --app-id {appid}
             --device-id {deviceId}
             --component-name {componentName}
@@ -1726,7 +1726,7 @@ def _load_central_edge_help():
         examples:
         - name: Replace module properties for a specific component.
           text: >
-            az iot central device edge module properties replace-component-properties
+            az iot central device edge module component-properties replace
             --app-id {appid}
             --device-id {deviceId}
             --component-name {componentName}

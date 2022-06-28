@@ -163,9 +163,6 @@ def load_central_commands(self, _):
         cmd_group.show_command("show", "get_properties")
         cmd_group.command("replace", "replace_properties")
         cmd_group.command("update", "update_properties")
-        cmd_group.command("show-component-properties", "get_component_properties")
-        cmd_group.command("replace-component-properties", "replace_component_properties")
-        cmd_group.command("update-component-properties", "update_component_properties")
 
     with self.command_group(
         "iot central device component-properties",
@@ -281,9 +278,6 @@ def load_central_commands(self, _):
         cmd_group.show_command("show", "get_module_properties")
         cmd_group.command("replace", "replace_module_properties")
         cmd_group.command("update", "update_module_properties")
-        cmd_group.command("show-component-properties", "get_module_component_properties")
-        cmd_group.command("replace-component-properties", "replace_module_component_properties")
-        cmd_group.command("update-component-properties", "update_module_component_properties")
 
     with self.command_group(
         "iot central device edge module component-properties",
