@@ -154,7 +154,6 @@ class TestCentralDeviceProvider:
     _device_template = load_json(FileNames.central_device_template_file)
     _edge_template = load_json(FileNames.central_edge_template_file)
     _device_twin = load_json(FileNames.central_device_twin_file)
-    _device_attestation = load_json(FileNames.central_device_attestation_file)
     _device_properties = load_json(FileNames.central_device_properties_file)
     _edge_modules = load_json(FileNames.central_edge_modules_file)
     _device_component = load_json(FileNames.central_device_component_file)
@@ -381,13 +380,19 @@ class TestCentralDeviceProvider:
 
     @mock.patch("azext_iot.central.services.device")
     def test_should_return_attestation(self, mock_device_svc):
+        device_attestation = {
+            "type": "symmetricKey",
+            "symmetricKey": {
+                "primaryKey": "<primary key>",
+                "secondaryKey": "<secondary key>"
+            }
+        }
         provider = CentralDeviceProvider(
             cmd=None, app_id=app_id, api_version=ApiVersion.ga_2022_05_31.value
         )
-        mock_device_svc.get_device_attestation.return_value = self._device_attestation
-
+        mock_device_svc.get_device_attestation.return_value = device_attestation
         attestation = provider.get_device_attestation("someDeviceId")
-        assert attestation == self._device_attestation
+        assert attestation == device_attestation
 
     @mock.patch("azext_iot.central.services.device")
     def test_should_return_properties(self, mock_device_svc):
