@@ -1556,6 +1556,7 @@ def _load_central_monitors_help():
             az iot central device twin update
             --app-id {appid}
             --device-id {deviceid}
+            -k {content}
         - name: Replace device properties
           text: >
             az iot central device twin update
