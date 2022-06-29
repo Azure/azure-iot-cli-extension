@@ -218,6 +218,59 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
             is None
         )
 
+    def test_central_device_properties_methods(self):
+        (template_id, _) = self._create_device_template(api_version=self._api_version)
+        (device_id, _) = self._create_device(
+            template=template_id, api_version=self._api_version, simulated=False
+        )
+
+        # List components
+        command = f'''
+            iot central device list-components
+            --app-id {self.app_id}
+            --device-id {device_id}'''
+        show_response = self.cmd(command, api_version=self._api_version)
+        show_result = show_response.get_output_in_json()
+        assert show_result['value'][0]['name'] == 'dtmiIntTestDeviceTemplateV33jl'
+
+        # Update properties
+        update_device_properties = self._update_device_properties(api_version=self._api_version, device_id=device_id)
+        assert update_device_properties['$metadata']['testFirstProperty']['desiredValue'] == 'updatedTestFirstProperty'
+        assert update_device_properties['$metadata']['testSecondProperty']['desiredValue'] == 'updatedTestSecondProperty'
+
+        # Show properties
+        command = f'''
+            iot central device properties show
+            --app-id {self.app_id}
+            --device-id {device_id}'''
+        show_response = self.cmd(command, api_version=self._api_version)
+        show_result = show_response.get_output_in_json()
+        assert show_result['$metadata']['testFirstProperty']['desiredValue'] == 'updatedTestFirstProperty'
+        assert show_result['$metadata']['testSecondProperty']['desiredValue'] == 'updatedTestSecondProperty'
+
+        # Update component properties
+        update_device_component_properties = self._update_device_component_properties(
+            api_version=self._api_version,
+            device_id=device_id,
+            component_name='dtmiIntTestDeviceTemplateV33jl')
+        assert update_device_component_properties['$metadata']['testComponentFirstProperty']['desiredValue'] == \
+            'updatedTestComponentFirstProperty'
+        assert update_device_component_properties['$metadata']['testComponentSecondProperty']['desiredValue'] == \
+            'updatedTestComponentSecondProperty'
+
+        # Show component properties
+        command = f'''
+            iot central device component-properties show
+            --app-id {self.app_id}
+            --device-id {device_id}
+            --component-name 'dtmiIntTestDeviceTemplateV33jl' '''
+        show_response = self.cmd(command, api_version=self._api_version)
+        show_result = show_response.get_output_in_json()
+        assert show_result['$metadata']['testComponentFirstProperty']['desiredValue'] == \
+            'updatedTestComponentFirstProperty'
+        assert show_result['$metadata']['testComponentSecondProperty']['desiredValue'] == \
+            'updatedTestComponentSecondProperty'
+
     def test_central_edge_device_methods(self):
         # force API Version 1.1-preview as we want deployment manifest to be included
 
@@ -270,6 +323,72 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         self._delete_device_template(
             template_id=template_id, api_version=self._api_version
         )
+
+    def test_central_edge_device_properties_methods(self):
+        (template_id, _) = self._create_device_template(
+            api_version=ApiVersion.ga_2022_05_31.value, edge=True
+        )
+
+        (device_id, _) = self._create_device(
+            template=template_id,
+            api_version=ApiVersion.ga_2022_05_31.value,
+            simulated=True,
+        )
+
+        # wait about a few seconds for simulator to kick in so that provisioning completes
+        time.sleep(60)
+
+        # List module components
+        command = f'''
+            iot central device edge module list-components
+            --app-id {self.app_id}
+            --device-id {device_id}
+            --module-name 'testModule' '''
+        show_response = self.cmd(command, api_version=self._api_version)
+        show_result = show_response.get_output_in_json()
+        assert show_result['value'][0]['name'] == 'ModuleComponent'
+
+        # Update module properties
+        update_device_properties = self._update_device_module_properties(
+            api_version=self._api_version,
+            device_id=device_id,
+            module_name='testModule')
+        # Module properties update response is an empty object {}
+        assert update_device_properties == {}
+
+        # Show module properties
+        command = f'''
+            iot central device edge module properties show
+            --app-id {self.app_id}
+            --device-id {device_id}
+            --module-name 'testModule' '''
+        show_response = self.cmd(command, api_version=self._api_version)
+        show_result = show_response.get_output_in_json()
+        assert show_result['$metadata']['testFirstProperty']['desiredValue'] == 'updatedTestFirstProperty'
+        assert show_result['$metadata']['testSecondProperty']['desiredValue'] == 'updatedTestSecondProperty'
+
+        # Update module component properties
+        update_device_component_properties = self._update_device_module_component_properties(
+            api_version=self._api_version,
+            device_id=device_id,
+            module_name='testModule',
+            component_name='ModuleComponent')
+        # Module properties update response is an empty object {}
+        assert update_device_component_properties == {}
+
+        # Show module component properties
+        command = f'''
+            iot central device edge module component-properties show
+            --app-id {self.app_id}
+            --device-id {device_id}
+            --module-name 'testModule'
+            --component-name 'ModuleComponent' '''
+        show_response = self.cmd(command, api_version=self._api_version)
+        show_result = show_response.get_output_in_json()
+        assert show_result['$metadata']['testComponentFirstProperty']['desiredValue'] == \
+            'updatedTestComponentFirstProperty'
+        assert show_result['$metadata']['testComponentSecondProperty']['desiredValue'] == \
+            'updatedTestComponentSecondProperty'
 
     def test_central_edge_children_methods(self):
         # force API Version 1.1-preview as we want deployment manifest to be included
@@ -436,7 +555,9 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         updated = self.cmd(
             command, api_version=self._api_version, checks=checks
         ).get_output_in_json()
-        assert updated["capabilityModel"]["contents"] == updated_contents
+        # Compare JSON without element's order
+        assert self._ordered(updated["capabilityModel"]["contents"]) == \
+            self._ordered(updated_contents)
 
         # DELETE
         self._delete_device_template(
@@ -487,10 +608,68 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
                 is None
             )
 
-    def test_central_device_groups_list(self):
-        result = self._list_device_groups()
-        # assert object is empty or populated but not null
-        assert result is not None and (result == [] or bool(result) is True)
+    def test_central_device_group_methods_CRUD(self):
+        # Create
+        (_, template_name) = self._create_device_template(api_version=self._api_version)
+        org = self._create_organization(api_version=self._api_version)
+        device_group = self._create_device_group(api_version=self._api_version, template_name=template_name, org_id=org["id"])
+
+        # Show
+        command = f'''
+            iot central device-group show
+            --app-id {self.app_id}
+            --device-group-id {device_group["id"]}'''
+        show_response = self.cmd(command, api_version=self._api_version)
+        show_result = show_response.get_output_in_json()
+        assert show_result["organizations"][0] == org["id"]
+
+        # List
+        command = "iot central device-group list --app-id {}".format(self.app_id)
+        groups = self.cmd(command, api_version=self._api_version).get_output_in_json()
+        assert device_group in groups
+
+        # Update
+        (update_result, update_description) = self._update_device_group(
+            api_version=self._api_version,
+            device_group_id=device_group["id"])
+        assert update_result["description"] == update_description
+
+        # Delete
+        self._delete_device_group(api_version=self._api_version, device_group_id=device_group["id"])
+
+    def test_central_device_attestation_CRUD(self):
+        # Create
+        (template_id, _) = self._create_device_template(api_version=self._api_version)
+        (device_id, _) = self._create_device(
+            template=template_id, api_version=self._api_version, simulated=False
+        )
+        device_attestation = self._create_device_attestation(api_version=self._api_version, device_id=device_id)
+        assert device_attestation["symmetricKey"]["primaryKey"] is not None
+        assert device_attestation["symmetricKey"]["secondaryKey"] is not None
+
+        # Show
+        command = f'''
+            iot central device attestation show
+            --app-id {self.app_id}
+            --device-id {device_id}'''
+        show_response = self.cmd(command, api_version=self._api_version)
+        show_result = show_response.get_output_in_json()
+        assert show_result["symmetricKey"]["primaryKey"] == device_attestation["symmetricKey"]["primaryKey"]
+        assert show_result["symmetricKey"]["secondaryKey"] == device_attestation["symmetricKey"]["secondaryKey"]
+
+        # Update
+        updated_device_attestation = self._update_device_attestation(api_version=self._api_version, device_id=device_id)
+        assert updated_device_attestation["symmetricKey"]["primaryKey"] is not None
+        assert updated_device_attestation["symmetricKey"]["secondaryKey"] is not None
+        assert updated_device_attestation["symmetricKey"]["primaryKey"] != device_attestation["symmetricKey"]["primaryKey"]
+        assert updated_device_attestation["symmetricKey"]["primaryKey"] != device_attestation["symmetricKey"]["secondaryKey"]
+
+        # Delete
+        command = f'''
+            iot central device attestation delete
+            --app-id {self.app_id}
+            --device-id {device_id}'''
+        show_response = self.cmd(command, api_version=self._api_version)
 
     def test_central_device_registration_info_registered(self):
         (template_id, _) = self._create_device_template(api_version=self._api_version)
@@ -671,15 +850,17 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         assert len(hubIdentifierFinal) > 0
         assert hubIdentifierOriginal == hubIdentifierFinal
 
-    def _list_device_groups(self):
-        return self.cmd(
-            "iot central device-group list --app-id {}".format(self.app_id),
-            api_version=self._api_version,
-        ).get_output_in_json()
-
     def _connect_gettwin_disconnect_wait_tobeprovisioned(self, device_id, credentials):
         device_client = helpers.dps_connect_device(device_id, credentials)
         device_client.get_twin()
         device_client.disconnect()
         device_client.shutdown()
         self._wait_for_provisioned(device_id=device_id, api_version=self._api_version)
+
+    def _ordered(self, obj):
+        if isinstance(obj, dict):
+            return sorted((k, self._ordered(v)) for k, v in obj.items())
+        if isinstance(obj, list):
+            return sorted(self._ordered(x) for x in obj)
+        else:
+            return obj

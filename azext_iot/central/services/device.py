@@ -1120,7 +1120,7 @@ def get_device_attestation(
     return _utility.make_api_call(
         cmd,
         app_id=app_id,
-        method="DELETE",
+        method="GET",
         url=f"https://{app_id}.{central_dns_suffix}/api/devices/{device_id}/attestation",
         payload=None,
         token=token,

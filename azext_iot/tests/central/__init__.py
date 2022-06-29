@@ -53,6 +53,10 @@ edge_template_path_preview = get_context_path(
     __file__, "json/device_template_edge.json"
 )
 sync_command_params = get_context_path(__file__, "json/sync_command_args.json")
+device_attestation_path = get_context_path(__file__, "json/device_attestation.json")
+device_attestation2_path = get_context_path(__file__, "json/device_attestation2.json")
+device_updated_properties_path = get_context_path(__file__, "json/device_update_properties.json")
+device_updated_component_properties_path = get_context_path(__file__, "json/device_update_component_properties.json")
 DEFAULT_FILE_UPLOAD_TTL = "PT1H"
 
 
@@ -321,6 +325,78 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             checks=[self.check("result", "success")],
         )
 
+    def _create_device_attestation(self, api_version, device_id):
+        command = f'''
+            iot central device attestation create
+            --app-id {self.app_id}
+            --device-id {device_id}
+            --content '{device_attestation_path}' '''
+
+        return self.cmd(
+            command,
+            api_version=api_version,
+        ).get_output_in_json()
+
+    def _update_device_attestation(self, api_version, device_id):
+        command = f'''
+            iot central device attestation update
+            --app-id {self.app_id}
+            --device-id {device_id}
+            --content '{device_attestation2_path}' '''
+
+        return self.cmd(
+            command,
+            api_version=api_version,
+        ).get_output_in_json()
+
+    def _update_device_properties(self, api_version, device_id):
+        command = f'''
+            iot central device properties update
+            --app-id {self.app_id}
+            --device-id {device_id}
+            --content '{device_updated_properties_path}' '''
+        return self.cmd(
+            command,
+            api_version=api_version,
+        ).get_output_in_json()
+
+    def _update_device_component_properties(self, api_version, device_id, component_name):
+        command = f'''
+            iot central device component-properties update
+            --app-id {self.app_id}
+            --device-id {device_id}
+            --component-name {component_name}
+            --content '{device_updated_component_properties_path}' '''
+        return self.cmd(
+            command,
+            api_version=api_version,
+        ).get_output_in_json()
+
+    def _update_device_module_properties(self, api_version, device_id, module_name):
+        command = f'''
+            iot central device edge module properties update
+            --app-id {self.app_id}
+            --device-id {device_id}
+            --module-name {module_name}
+            --content '{device_updated_properties_path}' '''
+        return self.cmd(
+            command,
+            api_version=api_version,
+        ).get_output_in_json()
+
+    def _update_device_module_component_properties(self, api_version, device_id, module_name, component_name):
+        command = f'''
+            iot central device edge module component-properties update
+            --app-id {self.app_id}
+            --device-id {device_id}
+            --component-name {component_name}
+            --module-name {module_name}
+            --content '{device_updated_component_properties_path}' '''
+        return self.cmd(
+            command,
+            api_version=api_version,
+        ).get_output_in_json()
+
     def _create_api_tokens(self, api_version):
         tokens = []
         for role in Role:
@@ -381,7 +457,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         )
 
     def _create_device_template(self, api_version, edge=False):
-        if edge and api_version != ApiVersion.v1_1_preview.value:
+        if edge and (api_version != ApiVersion.v1_1_preview.value and api_version != ApiVersion.ga_2022_05_31.value):
             raise InvalidArgumentValueError(
                 "Edge template creation is only available for api version >= 1.1-preview."
             )
@@ -695,7 +771,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 ),
                 include_opt_args=False,
             )
-        elif (not settings.env.azext_iot_central_storage_container) and (not settings.env.azext_iot_teststoragecontainer):
+        elif not settings.env.azext_iot_central_storage_container:
             self.cmd(
                 "storage container delete -n {} --connection-string '{}'".format(
                     self.storage_account_name, self.storage_cstring

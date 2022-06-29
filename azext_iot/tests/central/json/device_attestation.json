@@ -1,12 +1,7 @@
 {
-    "type": "x509",
-    "x509": {
-      "clientCertificates": {
-        "primary": {
-          "info": {
-            "sha1Thumbprint": "<thumbprint>"
-          }
-        }
-      }
-    }
+  "type": "symmetricKey",
+  "symmetricKey": {
+    "primaryKey": "ya9+G4ED+/g0BgLduhjETJnbeEWMl1HIUApWCCpGMAU=",
+    "secondaryKey": "D8jeWazxcCK+MAxrn9KlqDLb8trbuKs35KEbcLBnS48="
   }
+}
