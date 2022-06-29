@@ -261,15 +261,15 @@ class TestCentralDeviceProvider:
         provider = CentralDeviceProvider(
             cmd=None, app_id=app_id, api_version=ApiVersion.ga_2022_05_31.value
         )
-        mock_device_svc.list_device_components.return_value = self._device_component
+        mock_device_svc.list_device_module_components.return_value = self._device_component
 
         # act
         components = [
-            todict(component) for component in provider.list_device_components("someDeviceId").get("value")
+            todict(component) for component in provider.list_device_module_components("someDeviceId").get("value")
         ]
 
         # verify
-        assert mock_device_svc.list_device_components.call_count == 1
+        assert mock_device_svc.list_device_module_components.call_count == 1
         assert components == self._device_component["value"]
 
     @mock.patch("azext_iot.central.services.device_template")

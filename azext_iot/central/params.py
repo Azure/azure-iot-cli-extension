@@ -164,12 +164,17 @@ def load_central_arguments(self, _):
         )
         context.argument(
             "component_name",
-            options_list=["--component-name"],
+            options_list=["--component-name", "--co"],
             help="The name of the device component.",
         )
         context.argument(
+            "module_name",
+            options_list=["--module-name", "--mn"],
+            help="The name of the device module.",
+        )
+        context.argument(
             "telemetry_name",
-            options_list=["--telemetry-name"],
+            options_list=["--telemetry-name" "--tn"],
             help="The name of the device telemetry.",
         )
         context.argument(
@@ -222,26 +227,12 @@ def load_central_arguments(self, _):
             "by visiting https://github.com/iot-for-all/iot-central-high-availability-clients#readme",
         )
 
-    with self.argument_context("iot central device properties") as context:
+    with self.argument_context("iot central device twin") as context:
         context.argument(
-            "device_id",
-            options_list=["--device-id", "-d"],
-            help="Unique identifier for the device."
-            " A case-sensitive string (up to 128 characters long) of ASCII 7-bit alphanumeric characters plus"
-            " certain special characters: - . + % _ # * ? ! ( ) , : = @ $ '",
-        )
-        context.argument(
-            "component_name",
-            options_list=["--component-name"],
-            help="The name of the device component.",
-        )
-        context.argument(
-            "content",
-            options_list=["--content", "-k"],
-            help="Configuration for request. "
-            "Provide path to JSON file or raw stringified JSON. "
-            "[File Path Example: ./path/to/file.json] "
-            "[Stringified JSON Example: {'a': 'b'}] ",
+            "replace",
+            options_list=["--replace", "-r"],
+            arg_type=get_three_state_flag(),
+            help="The boolean status for replacing device twin, True or False.",
         )
 
     with self.argument_context("iot central device-group") as context:
@@ -661,47 +652,6 @@ def load_central_arguments(self, _):
             "module_id",
             options_list=["--module-id", "-m"],
             help="The module ID of the target module.",
-        )
-        context.argument(
-            "module_name",
-            options_list=["--module-name"],
-            help="The module name of the device module.",
-        )
-        context.argument(
-            "component_name",
-            options_list=["--component-name"],
-            help="The name of the device component.",
-        )
-        context.argument(
-            "telemetry_name",
-            options_list=["--telemetry-name"],
-            help="The name of the device telemetry.",
-        )
-
-    with self.argument_context("iot central device edge module command") as context:
-        context.argument(
-            "command_name",
-            options_list=["--command-name", "--cn"],
-            help="The command name as specified in the device template. Command name could be different from the Display"
-            " Name of the command.",
-        )
-        context.argument(
-            "module_name",
-            options_list=["--module-name"],
-            help="The module name of the device module.",
-        )
-        context.argument(
-            "component_name",
-            options_list=["--component-name"],
-            help="The name of the device component.",
-        )
-        context.argument(
-            "content",
-            options_list=["--content", "-k"],
-            help="Configuration for request. "
-            "Provide path to JSON file or raw stringified JSON. "
-            "[File Path Example: ./path/to/file.json] "
-            "[Stringified JSON Example: {'a': 'b'}] ",
         )
 
     with self.argument_context("iot central device edge children") as context:

@@ -81,33 +81,6 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         assert device_id in cmd_output["message"]
         assert "Total messages purged:" in cmd_output["message"]
 
-    def test_central_device_twin_show_success(self):
-        (template_id, _) = self._create_device_template(api_version=self._api_version)
-        (device_id, _) = self._create_device(
-            template=template_id, api_version=self._api_version, simulated=True
-        )
-
-        # wait about a few seconds for simulator to kick in so that provisioning completes
-        time.sleep(60)
-
-        command = "iot central device twin show --app-id {} --device-id {}".format(
-            self.app_id, device_id
-        )
-
-        self.cmd(
-            command,
-            checks=[
-                self.check("deviceId", device_id),
-                self.check("tags", {}),
-                self.check("_links", None),
-            ],
-        )
-
-        self._delete_device(device_id=device_id, api_version=self._api_version)
-        self._delete_device_template(
-            template_id=template_id, api_version=self._api_version
-        )
-
     def test_device_connect(self):
         if self.app_primary_key is None:
             pytest.skip(
@@ -240,7 +213,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
 
         # Show properties
         command = f'''
-            iot central device properties show
+            iot central device twin show
             --app-id {self.app_id}
             --device-id {device_id}'''
         show_response = self.cmd(command, api_version=self._api_version)
@@ -260,7 +233,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
 
         # Show component properties
         command = f'''
-            iot central device component-properties show
+            iot central device twin show
             --app-id {self.app_id}
             --device-id {device_id}
             --component-name 'dtmiIntTestDeviceTemplateV33jl' '''
@@ -324,7 +297,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
             template_id=template_id, api_version=self._api_version
         )
 
-    def test_central_edge_device_properties_methods(self):
+    def test_central_device_module_properties_methods(self):
         (template_id, _) = self._create_device_template(
             api_version=ApiVersion.ga_2022_05_31.value, edge=True
         )
@@ -340,7 +313,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
 
         # List module components
         command = f'''
-            iot central device edge module list-components
+            iot central device list-components
             --app-id {self.app_id}
             --device-id {device_id}
             --module-name 'testModule' '''
@@ -358,7 +331,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
 
         # Show module properties
         command = f'''
-            iot central device edge module properties show
+            iot central device twin show
             --app-id {self.app_id}
             --device-id {device_id}
             --module-name 'testModule' '''
@@ -378,7 +351,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
 
         # Show module component properties
         command = f'''
-            iot central device edge module component-properties show
+            iot central device twin show
             --app-id {self.app_id}
             --device-id {device_id}
             --module-name 'testModule'
@@ -423,14 +396,6 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
             command = "iot central device list --app-id {} --edge-only"
             devs_list = self.cmd(command).get_output_in_json()
             assert device_id in [dev.id for dev in devs_list]
-        else:
-            # check twin to evaluate the iotedge flag
-            command = "iot central device twin show --app-id {} -d {}".format(
-                self.app_id, device_id
-            )
-            twin = self.cmd(command).get_output_in_json()
-
-            assert twin["capabilities"]["iotEdge"] is True
 
         # CHILDREN
         command = "iot central device edge children add --app-id {} -d {} --children-ids {}".format(

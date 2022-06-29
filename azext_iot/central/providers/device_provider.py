@@ -373,6 +373,8 @@ class CentralDeviceProvider:
         self,
         device_id: str,
         interface_id: str,
+        component_name: str,
+        module_name: str,
         command_name: str,
         payload: dict,
         central_dns_suffix=CENTRAL_ENDPOINT,
@@ -382,12 +384,13 @@ class CentralDeviceProvider:
             interface_id=interface_id,
             central_dns_suffix=central_dns_suffix,
         ):
-            return central_services.device.run_component_command(
+            return central_services.device.run_command(
                 cmd=self._cmd,
                 app_id=self._app_id,
                 token=self._token,
                 device_id=device_id,
-                interface_id=interface_id,
+                component_name=interface_id,
+                module_name=module_name,
                 command_name=command_name,
                 payload=payload,
                 central_dns_suffix=central_dns_suffix,
@@ -398,28 +401,8 @@ class CentralDeviceProvider:
             app_id=self._app_id,
             token=self._token,
             device_id=device_id,
-            command_name=command_name,
-            payload=payload,
-            central_dns_suffix=central_dns_suffix,
-            api_version=self._api_version,
-        )
-
-    def run_module_command(
-        self,
-        device_id: str,
-        module_name: str,
-        component_name: str,
-        command_name: str,
-        payload: dict,
-        central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
-        return central_services.device.run_module_command(
-            cmd=self._cmd,
-            app_id=self._app_id,
-            token=self._token,
-            device_id=device_id,
-            module_name=module_name,
             component_name=component_name,
+            module_name=module_name,
             command_name=command_name,
             payload=payload,
             central_dns_suffix=central_dns_suffix,
@@ -430,6 +413,8 @@ class CentralDeviceProvider:
         self,
         device_id: str,
         interface_id: str,
+        component_name: str,
+        module_name: str,
         command_name: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
@@ -439,12 +424,13 @@ class CentralDeviceProvider:
             interface_id=interface_id,
             central_dns_suffix=central_dns_suffix,
         ):
-            return central_services.device.get_component_command_history(
+            return central_services.device.get_command_history(
                 cmd=self._cmd,
                 app_id=self._app_id,
                 token=self._token,
                 device_id=device_id,
-                interface_id=interface_id,
+                component_name=interface_id,
+                module_name=module_name,
                 command_name=command_name,
                 central_dns_suffix=central_dns_suffix,
                 api_version=self._api_version,
@@ -455,6 +441,8 @@ class CentralDeviceProvider:
             app_id=self._app_id,
             token=self._token,
             device_id=device_id,
+            component_name=component_name,
+            module_name=module_name,
             command_name=command_name,
             central_dns_suffix=central_dns_suffix,
             api_version=self._api_version,
@@ -647,12 +635,12 @@ class CentralDeviceProvider:
             central_dns_suffix=central_dns_suffix,
         )
 
-    def list_device_components(
+    def list_modules(
         self,
         device_id: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
-        return central_services.device.list_device_components(
+        return central_services.device.list_modules(
             cmd=self._cmd,
             app_id=self._app_id,
             device_id=device_id,
@@ -664,7 +652,7 @@ class CentralDeviceProvider:
     def list_device_module_components(
         self,
         device_id: str,
-        module_name: str,
+        module_name: str = None,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         return central_services.device.list_device_module_components(
@@ -680,14 +668,16 @@ class CentralDeviceProvider:
     def get_device_properties(
         self,
         device_id: str,
+        component_name: str = None,
+        module_name: str = None,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         return central_services.device.get_device_properties_or_telemetry_value(
             cmd=self._cmd,
             app_id=self._app_id,
             device_id=device_id,
-            module_name=None,
-            component_name=None,
+            module_name=module_name,
+            component_name=component_name,
             telemetry_name=None,
             token=self._token,
             api_version=self._api_version,
@@ -698,14 +688,16 @@ class CentralDeviceProvider:
         self,
         device_id: str,
         payload: str,
+        component_name: str = None,
+        module_name: str = None,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         return central_services.device.replace_properties(
             cmd=self._cmd,
             app_id=self._app_id,
             device_id=device_id,
-            module_name=None,
-            component_name=None,
+            module_name=module_name,
+            component_name=component_name,
             payload=payload,
             token=self._token,
             api_version=self._api_version,
@@ -716,23 +708,27 @@ class CentralDeviceProvider:
         self,
         device_id: str,
         payload: str,
+        component_name: str = None,
+        module_name: str = None,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         return central_services.device.update_properties(
             cmd=self._cmd,
             app_id=self._app_id,
             device_id=device_id,
-            module_name=None,
-            component_name=None,
+            module_name=module_name,
+            component_name=component_name,
             payload=payload,
             token=self._token,
             api_version=self._api_version,
             central_dns_suffix=central_dns_suffix,
         )
 
-    def get_device_telemetry_value(
+    def get_telemetry_value(
         self,
         device_id: str,
+        component_name: str,
+        module_name: str,
         telemetry_name: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
@@ -740,27 +736,9 @@ class CentralDeviceProvider:
             cmd=self._cmd,
             app_id=self._app_id,
             device_id=device_id,
-            module_name=None,
-            component_name=None,
-            telemetry_name=telemetry_name,
-            token=self._token,
-            api_version=self._api_version,
-            central_dns_suffix=central_dns_suffix,
-        )
-
-    def get_device_component_properties(
-        self,
-        device_id: str,
-        component_name: str,
-        central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
-        return central_services.device.get_device_properties_or_telemetry_value(
-            cmd=self._cmd,
-            app_id=self._app_id,
-            device_id=device_id,
-            module_name=None,
+            module_name=module_name,
             component_name=component_name,
-            telemetry_name=None,
+            telemetry_name=telemetry_name,
             token=self._token,
             api_version=self._api_version,
             central_dns_suffix=central_dns_suffix,
@@ -799,179 +777,6 @@ class CentralDeviceProvider:
             module_name=None,
             component_name=component_name,
             payload=payload,
-            token=self._token,
-            api_version=self._api_version,
-            central_dns_suffix=central_dns_suffix,
-        )
-
-    def get_device_component_telemetry_value(
-        self,
-        device_id: str,
-        component_name: str,
-        telemetry_name: str,
-        central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
-        return central_services.device.get_device_properties_or_telemetry_value(
-            cmd=self._cmd,
-            app_id=self._app_id,
-            device_id=device_id,
-            module_name=None,
-            component_name=component_name,
-            telemetry_name=telemetry_name,
-            token=self._token,
-            api_version=self._api_version,
-            central_dns_suffix=central_dns_suffix,
-        )
-
-    def get_module_properties(
-        self,
-        device_id: str,
-        module_name: str,
-        central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
-        return central_services.device.get_device_properties_or_telemetry_value(
-            cmd=self._cmd,
-            app_id=self._app_id,
-            device_id=device_id,
-            module_name=module_name,
-            component_name=None,
-            telemetry_name=None,
-            token=self._token,
-            api_version=self._api_version,
-            central_dns_suffix=central_dns_suffix,
-        )
-
-    def replace_module_properties(
-        self,
-        device_id: str,
-        module_name: str,
-        payload: str,
-        central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
-        return central_services.device.replace_properties(
-            cmd=self._cmd,
-            app_id=self._app_id,
-            device_id=device_id,
-            module_name=module_name,
-            component_name=None,
-            payload=payload,
-            token=self._token,
-            api_version=self._api_version,
-            central_dns_suffix=central_dns_suffix,
-        )
-
-    def update_module_properties(
-        self,
-        device_id: str,
-        module_name: str,
-        payload: str,
-        central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
-        return central_services.device.update_properties(
-            cmd=self._cmd,
-            app_id=self._app_id,
-            device_id=device_id,
-            module_name=module_name,
-            component_name=None,
-            payload=payload,
-            token=self._token,
-            api_version=self._api_version,
-            central_dns_suffix=central_dns_suffix,
-        )
-
-    def get_module_telemetry_value(
-        self,
-        device_id: str,
-        module_name: str,
-        telemetry_name: str,
-        central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
-        return central_services.device.get_device_properties_or_telemetry_value(
-            cmd=self._cmd,
-            app_id=self._app_id,
-            device_id=device_id,
-            module_name=module_name,
-            component_name=None,
-            telemetry_name=telemetry_name,
-            token=self._token,
-            api_version=self._api_version,
-            central_dns_suffix=central_dns_suffix,
-        )
-
-    def get_module_component_properties(
-        self,
-        device_id: str,
-        module_name: str,
-        component_name: str,
-        central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
-        return central_services.device.get_device_properties_or_telemetry_value(
-            cmd=self._cmd,
-            app_id=self._app_id,
-            device_id=device_id,
-            module_name=module_name,
-            component_name=component_name,
-            telemetry_name=None,
-            token=self._token,
-            api_version=self._api_version,
-            central_dns_suffix=central_dns_suffix,
-        )
-
-    def replace_module_component_properties(
-        self,
-        device_id: str,
-        module_name: str,
-        component_name: str,
-        payload: str,
-        central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
-        return central_services.device.replace_properties(
-            cmd=self._cmd,
-            app_id=self._app_id,
-            device_id=device_id,
-            module_name=module_name,
-            component_name=component_name,
-            payload=payload,
-            token=self._token,
-            api_version=self._api_version,
-            central_dns_suffix=central_dns_suffix,
-        )
-
-    def update_module_component_properties(
-        self,
-        device_id: str,
-        module_name: str,
-        component_name: str,
-        payload: str,
-        central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
-        return central_services.device.update_properties(
-            cmd=self._cmd,
-            app_id=self._app_id,
-            device_id=device_id,
-            module_name=module_name,
-            component_name=component_name,
-            payload=payload,
-            token=self._token,
-            api_version=self._api_version,
-            central_dns_suffix=central_dns_suffix,
-        )
-
-    def get_module_component_telemetry_value(
-        self,
-        device_id: str,
-        module_name: str,
-        component_name: str,
-        telemetry_name: str,
-        central_dns_suffix=CENTRAL_ENDPOINT,
-    ):
-        return central_services.device.get_device_properties_or_telemetry_value(
-            cmd=self._cmd,
-            app_id=self._app_id,
-            device_id=device_id,
-            module_name=module_name,
-            component_name=component_name,
-            telemetry_name=telemetry_name,
             token=self._token,
             api_version=self._api_version,
             central_dns_suffix=central_dns_suffix,

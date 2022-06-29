@@ -44,30 +44,12 @@ unreleased
 
 * Add support for device/module properties/telemetry/command.
   - az iot central device list-components
+  - az iot central device list-modules
   - az iot central device telemetry
     - az iot central device telemetry show
-  - az iot central device component-telemetry
-    - az iot central device component-telemetry show
-  - az iot central device properties
-    - az iot central device properties show
-    - az iot central device properties replace
-    - az iot central device properties update
-    - az iot central device component-properties show
-    - az iot central device component-properties replace
-    - az iot central device component-properties update
-  - az iot central device edge module list-components
-  - az iot central device edge module telemetry
-    - az iot central device edge module telemetry show
-  - az iot central device edge module component-telemetry
-    - az iot central device edge module component-telemetry show
-  - az iot central device edge module command run
-  - az iot central device edge module properties
-    - az iot central device edge module properties show
-    - az iot central device edge module properties replace
-    - az iot central device edge module properties update
-    - az iot central device edge module component-properties show
-    - az iot central device edge module component-properties replace
-    - az iot central device edge module component-properties update
+  - az iot central device twin
+    - az iot central device twin show
+    - az iot central device twin update
 
 * Add support for 2022-05-31 GA version.
   - az iot central api-token

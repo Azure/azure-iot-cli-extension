@@ -373,7 +373,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
     def _update_device_properties(self, api_version, device_id):
         command = f'''
-            iot central device properties update
+            iot central device twin update
             --app-id {self.app_id}
             --device-id {device_id}
             --content '{device_updated_properties_path}' '''
@@ -384,7 +384,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
     def _update_device_component_properties(self, api_version, device_id, component_name):
         command = f'''
-            iot central device component-properties update
+            iot central device twin update
             --app-id {self.app_id}
             --device-id {device_id}
             --component-name {component_name}
@@ -396,7 +396,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
     def _update_device_module_properties(self, api_version, device_id, module_name):
         command = f'''
-            iot central device edge module properties update
+            iot central device twin update
             --app-id {self.app_id}
             --device-id {device_id}
             --module-name {module_name}
@@ -408,7 +408,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
     def _update_device_module_component_properties(self, api_version, device_id, module_name, component_name):
         command = f'''
-            iot central device edge module component-properties update
+            iot central device twin update
             --app-id {self.app_id}
             --device-id {device_id}
             --component-name {component_name}
