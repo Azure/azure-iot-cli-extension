@@ -686,10 +686,10 @@ def _load_central_command_help():
             type: command
             short-summary: Run a command on a device and view associated response. Does NOT monitor property updates that the command may perform.
             long-summary: |
-                Note: payload should be nested under "request".
-                i.e. if your device expects the payload in a shape {"key": "value"}
-                payload should be {"request": {"key": "value"}}.
-                --content can also be pointed at a filepath like this (.../path/to/payload.json)
+              Note: payload should be nested under "request".
+              i.e. if your device expects the payload in a shape {"key": "value"}
+              payload should be {"request": {"key": "value"}}.
+              --content can also be pointed at a filepath like this (.../path/to/payload.json)
             examples:
             - name: Run command response
               text: >
@@ -709,8 +709,8 @@ def _load_central_command_help():
                 --cn {commandname}
                 -k {payload}
 
-             - name: Run component command response
-              text: >
+            - name: Run component command response
+               text: >
                 az iot central device command run
                 -n {appid}
                 -d {deviceid}
