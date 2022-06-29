@@ -326,11 +326,22 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         )
 
     def _create_device_attestation(self, api_version, device_id):
+        payload = {
+            'type': 'symmetricKey',
+            'symmetricKey': {
+                # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="int test only")]
+                'primaryKey': 'ya9+G4ED+/g0BgLduhjETJnbeEWMl1HIUApWCCpGMAU=',
+                # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="int test only")]
+                'secondaryKey': 'D8jeWazxcCK+MAxrn9KlqDLb8trbuKs35KEbcLBnS48='
+            }
+        }
+
         command = f'''
             iot central device attestation create
             --app-id {self.app_id}
             --device-id {device_id}
-            --content '{device_attestation_path}' '''
+            --content '{json.dumps(payload).replace("{", "{{").replace("}", "}}")}'
+        '''
 
         return self.cmd(
             command,
@@ -338,11 +349,22 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         ).get_output_in_json()
 
     def _update_device_attestation(self, api_version, device_id):
+        payload = {
+            'type': 'symmetricKey',
+            'symmetricKey': {
+                # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="int test only")]
+                'primaryKey': 'r9KdK+LBaLiZ0p+RfAVj6eu9umGE6VqJj+AMLHdw+io=',
+                # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="int test only")]
+                'secondaryKey': 'W7/4/oaMpA83RYfirH9vzic4ZeK2Piy0jO5rTOM5wxg='
+            }
+        }
+
         command = f'''
             iot central device attestation update
             --app-id {self.app_id}
             --device-id {device_id}
-            --content '{device_attestation2_path}' '''
+            --content '{json.dumps(payload).replace("{", "{{").replace("}", "}}")}'
+        '''
 
         return self.cmd(
             command,
