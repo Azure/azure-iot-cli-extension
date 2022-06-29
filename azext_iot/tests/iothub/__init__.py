@@ -56,9 +56,6 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
         self.entity_name = ENTITY_NAME
         super(IoTLiveScenarioTest, self).__init__(test_scenario)
 
-        if not hasattr(self, 'sku'):
-            self.sku = "S1"
-
         if hasattr(self, 'storage_cstring'):
             self._create_storage_account()
 
@@ -76,15 +73,15 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             if not target_hub:
                 if hasattr(self, 'storage_cstring'):
                     self.cmd(
-                        "iot hub create --name {} --resource-group {} --fc {} --fcs {} --sku {} ".format(
+                        "iot hub create --name {} --resource-group {} --fc {} --fcs {} --sku S1 ".format(
                             self.entity_name, self.entity_rg,
-                            self.storage_container, self.storage_cstring, self.sku,
+                            self.storage_container, self.storage_cstring
                         )
                     )
                 else:
                     self.cmd(
-                        "iot hub create --name {} --resource-group {} --sku {} ".format(
-                            self.entity_name, self.entity_rg, self.sku,
+                        "iot hub create --name {} --resource-group {} --sku S1 ".format(
+                            self.entity_name, self.entity_rg
                         )
                     )
                 sleep(ROLE_ASSIGNMENT_REFRESH_TIME)

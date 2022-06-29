@@ -105,6 +105,7 @@ jobs:
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
       pythonVersion: $(python)
       serviceConnection: $(AzureServiceConnection)
+      num_threads: 1
 
 - job: 'testHub_job_2'
   condition: and(succeeded(), eq('${{ parameters.testHub }}', true))
