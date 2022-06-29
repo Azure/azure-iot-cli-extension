@@ -387,7 +387,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
             status = self.cmd(
                 f"iot hub job show -n {self.entity_name} -g {self.entity_rg} --job-id {job_id}"
             ).get_output_in_json()["status"]
-            print(status)
+            print(f"Try number: {tries} for {self.entity_name}: status {status}")
             sleep(10)
             tries += 1
 
