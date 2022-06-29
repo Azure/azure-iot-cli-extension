@@ -710,7 +710,7 @@ def _load_central_command_help():
                 -k {payload}
 
             - name: Run component command response
-               text: >
+              text: >
                 az iot central device command run
                 -n {appid}
                 -d {deviceid}
