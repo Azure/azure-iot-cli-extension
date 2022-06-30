@@ -74,7 +74,6 @@ class StateProvider(IoTHubProvider):
                 json.dump(twin, f)
                 f.write('\n')
 
-
                 for module in module_objs:
                     module = vars(module)
 
