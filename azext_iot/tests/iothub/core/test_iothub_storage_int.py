@@ -428,5 +428,5 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 f"iot hub job list -n {self.entity_name} -g {self.entity_rg} --job-type {job_type} --job-status running"
             ).get_output_in_json())
         if len(job_list) > 0:
-            for job_id in job_list:
-                self.wait_till_job_completion(job_id)
+            for job in job_list:
+                self.wait_till_job_completion(job["jobId"])
