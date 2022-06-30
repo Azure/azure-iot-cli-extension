@@ -23,7 +23,7 @@ from azure.cli.core.mock import DummyCli
 STORAGE_ROLE = "Storage Blob Data Contributor"
 CWD = os.path.dirname(os.path.abspath(__file__))
 user_managed_identity_name = generate_generic_id()
-USER_IDENTITY_SETUP_MAX_ATTEMPTS = 5
+SETUP_MAX_ATTEMPTS = 5
 
 
 class TestIoTStorage(IoTLiveScenarioTest):
@@ -149,54 +149,60 @@ class TestIoTStorage(IoTLiveScenarioTest):
             checks=self.is_empty(),
         )
 
-        # sleep?
-        sleep(30)
+        attempts = 0
+        setup_completed = False
+        while not setup_completed:
+            try:
+                job_id = self.cmd(
+                    'iot hub device-identity export -n {} --bcu "{}"'.format(
+                        self.entity_name, self.live_storage_uri
+                    ),
+                    checks=[
+                        self.check("outputBlobContainerUri", self.live_storage_uri),
+                        self.check("failureReason", None),
+                        self.check("type", "export"),
+                        self.check("excludeKeysInExport", True),
+                        self.exists("jobId"),
+                    ],
+                ).get_output_in_json()["jobId"]
 
-        job_id = self.cmd(
-            'iot hub device-identity export -n {} --bcu "{}"'.format(
-                self.entity_name, self.live_storage_uri
-            ),
-            checks=[
-                self.check("outputBlobContainerUri", self.live_storage_uri),
-                self.check("failureReason", None),
-                self.check("type", "export"),
-                self.check("excludeKeysInExport", True),
-                self.exists("jobId"),
-            ],
-        ).get_output_in_json()["jobId"]
+                # give time to finish job
+                self.wait_till_job_completion(job_id)
 
-        # give time to finish job
-        self.wait_till_job_completion(job_id)
+                job_id = self.cmd(
+                    'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --ik true'.format(
+                        self.entity_name, self.live_storage_uri, "key"
+                    ),
+                    checks=[
+                        self.check("outputBlobContainerUri", self.live_storage_uri),
+                        self.check("failureReason", None),
+                        self.check("type", "export"),
+                        self.check("excludeKeysInExport", False),
+                        self.exists("jobId"),
+                    ],
+                ).get_output_in_json()["jobId"]
 
-        job_id = self.cmd(
-            'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --ik true'.format(
-                self.entity_name, self.live_storage_uri, "key"
-            ),
-            checks=[
-                self.check("outputBlobContainerUri", self.live_storage_uri),
-                self.check("failureReason", None),
-                self.check("type", "export"),
-                self.check("excludeKeysInExport", False),
-                self.exists("jobId"),
-            ],
-        ).get_output_in_json()["jobId"]
+                # give time to finish job
+                self.wait_till_job_completion(job_id)
 
-        # give time to finish job
-        self.wait_till_job_completion(job_id)
-
-        self.cmd(
-            'iot hub device-identity import -n {} --ibcu "{}" --obcu "{}" --auth-type {}'.format(
-                self.entity_name, self.live_storage_uri, self.live_storage_uri, "key"
-            ),
-            checks=[
-                self.check("outputBlobContainerUri", self.live_storage_uri),
-                self.check("inputBlobContainerUri", self.live_storage_uri),
-                self.check("failureReason", None),
-                self.check("type", "import"),
-                self.check("storageAuthenticationType", "keyBased"),
-                self.exists("jobId"),
-            ],
-        )
+                self.cmd(
+                    'iot hub device-identity import -n {} --ibcu "{}" --obcu "{}" --auth-type {}'.format(
+                        self.entity_name, self.live_storage_uri, self.live_storage_uri, "key"
+                    ),
+                    checks=[
+                        self.check("outputBlobContainerUri", self.live_storage_uri),
+                        self.check("inputBlobContainerUri", self.live_storage_uri),
+                        self.check("failureReason", None),
+                        self.check("type", "import"),
+                        self.check("storageAuthenticationType", "keyBased"),
+                        self.exists("jobId"),
+                    ],
+                )
+                setup_completed = True
+            except Exception as x:
+                attempts += 1
+                if attempts >= SETUP_MAX_ATTEMPTS:
+                    raise x
 
     @pytest.mark.skipif(
         not ensure_iothub_sdk_min_version(IOTHUB_TRACK_2_SDK_MIN_VERSION),
@@ -225,49 +231,59 @@ class TestIoTStorage(IoTLiveScenarioTest):
         hub_id = hub_identity.get("principalId", None)
         assert hub_id
 
-        self.assign_storage_role_if_needed(hub_id)
-        sleep(30)
+        attempts = 0
+        setup_completed = False
+        while not setup_completed:
+            try:
+                self.assign_storage_role_if_needed(hub_id)
+                sleep(30)
 
-        job_id = self.cmd(
-            'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {} --ik true'.format(
-                self.entity_name, self.live_storage_uri, "identity", "[system]"
-            ),
-            checks=[
-                self.check("outputBlobContainerUri", self.live_storage_uri),
-                self.check("failureReason", None),
-                self.check("type", "export"),
-                self.check("excludeKeysInExport", False),
-                self.check("storageAuthenticationType", "identityBased"),
-                self.exists("jobId"),
-            ],
-        ).get_output_in_json()["jobId"]
+                job_id = self.cmd(
+                    'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {} --ik true'.format(
+                        self.entity_name, self.live_storage_uri, "identity", "[system]"
+                    ),
+                    checks=[
+                        self.check("outputBlobContainerUri", self.live_storage_uri),
+                        self.check("failureReason", None),
+                        self.check("type", "export"),
+                        self.check("excludeKeysInExport", False),
+                        self.check("storageAuthenticationType", "identityBased"),
+                        self.exists("jobId"),
+                    ],
+                ).get_output_in_json()["jobId"]
 
-        # give time to finish job
-        self.wait_till_job_completion(job_id)
+                # give time to finish job
+                self.wait_till_job_completion(job_id)
 
-        job_id = self.cmd(
-            'iot hub device-identity import -n {} --ibcu "{}" --obcu "{}" --auth-type {} --identity {}'.format(
-                self.entity_name, self.live_storage_uri, self.live_storage_uri, "identity", "[system]"
-            ),
-            checks=[
-                self.check("outputBlobContainerUri", self.live_storage_uri),
-                self.check("inputBlobContainerUri", self.live_storage_uri),
-                self.check("failureReason", None),
-                self.check("type", "import"),
-                self.check("storageAuthenticationType", "identityBased"),
-                self.exists("jobId"),
-            ],
-        ).get_output_in_json()["jobId"]
+                job_id = self.cmd(
+                    'iot hub device-identity import -n {} --ibcu "{}" --obcu "{}" --auth-type {} --identity {}'.format(
+                        self.entity_name, self.live_storage_uri, self.live_storage_uri, "identity", "[system]"
+                    ),
+                    checks=[
+                        self.check("outputBlobContainerUri", self.live_storage_uri),
+                        self.check("inputBlobContainerUri", self.live_storage_uri),
+                        self.check("failureReason", None),
+                        self.check("type", "import"),
+                        self.check("storageAuthenticationType", "identityBased"),
+                        self.exists("jobId"),
+                    ],
+                ).get_output_in_json()["jobId"]
 
-        # give time to finish job
-        self.wait_till_job_completion(job_id)
+                # give time to finish job
+                self.wait_till_job_completion(job_id)
 
-        self.cmd(
-            'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {}'.format(
-                self.entity_name, self.live_storage_uri, "identity", "fake_managed_identity"
-            ),
-            expect_failure=True
-        )
+                self.cmd(
+                    'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {}'.format(
+                        self.entity_name, self.live_storage_uri, "identity", "fake_managed_identity"
+                    ),
+                    expect_failure=True
+                )
+
+                setup_completed = True
+            except Exception as x:
+                attempts += 1
+                if attempts >= SETUP_MAX_ATTEMPTS:
+                    raise x
 
         # if we enabled identity for this hub, undo identity and RBAC
         if identity_enabled:
@@ -362,7 +378,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 user_identity_setup_completed = True
             except Exception as x:
                 attempts += 1
-                if attempts >= USER_IDENTITY_SETUP_MAX_ATTEMPTS:
+                if attempts >= SETUP_MAX_ATTEMPTS:
                     raise x
 
         # if we enabled identity for this hub, undo identity and RBAC
@@ -383,7 +399,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
     def wait_till_job_completion(self, job_id, status=""):
         tries = 0
-        while status not in ["failed", "completed"] and tries < 10:
+        while status not in ["failed", "completed"] and tries < SETUP_MAX_ATTEMPTS:
             status = self.cmd(
                 f"iot hub job show -n {self.entity_name} -g {self.entity_rg} --job-id {job_id}"
             ).get_output_in_json()["status"]
