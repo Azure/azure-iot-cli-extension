@@ -689,7 +689,7 @@ def get_downstream_rel_name(
 def get_attestation(
     cmd,
     app_id: str,
-    device_id,
+    device_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.ga_2022_05_31.value,

@@ -685,31 +685,27 @@ def _load_central_command_help():
     ] = """
             type: command
             short-summary: Run a command on a device and view associated response. Does NOT monitor property updates that the command may perform.
-            long-summary: |
-              Note: payload should be nested under "request".
-              i.e. if your device expects the payload in a shape {"key": "value"}
-              payload should be {"request": {"key": "value"}}.
-              --content can also be pointed at a filepath like this (.../path/to/payload.json)
+            long-summary: --content can be inline json or file path.
             examples:
-            - name: Run command response
+            - name: Run command with inline payload.
               text: >
                 az iot central device command run
                 --app-id {appid}
                 --device-id {deviceid}
                 --interface-id {interfaceid}
                 --command-name {commandname}
-                --content {payload}
+                --content {"request": {"key": "value"}}
 
-            - name: Short Run command response
+            - name: Short Run command with json payload path.
               text: >
                 az iot central device command run
                 -n {appid}
                 -d {deviceid}
                 -i {interfaceid}
                 --cn {commandname}
-                -k {payload}
+                -k {.../path/to/payload.json}
 
-            - name: Run component command response
+            - name: Run component command.
               text: >
                 az iot central device command run
                 -n {appid}
@@ -718,7 +714,7 @@ def _load_central_command_help():
                 --cn {commandname}
                 -k {payload}
 
-            - name: Run module component command response
+            - name: Run module component command.
               text: >
                 az iot central device command run
                 -n {appid}
@@ -1562,16 +1558,16 @@ def _load_central_monitors_help():
             az iot central device twin update
             --app-id {appid}
             --device-id {deviceid}
-            -r {replace}
             -k {content}
+            -r
         - name: Update device component properties
           text: >
             az iot central device twin update
             --app-id {appid}
             --device-id {deviceid}
             --co {componentname}
-            -r {replace}
             -k {content}
+            -r
         - name: Update device module component properties
           text: >
             az iot central device twin update
@@ -1579,8 +1575,8 @@ def _load_central_monitors_help():
             --device-id {deviceid}
             --mn {modulename}
             --co {componentname}
-            -r {replace}
             -k {content}
+            -r
     """
 
 

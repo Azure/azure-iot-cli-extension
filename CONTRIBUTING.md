@@ -129,6 +129,10 @@ Execute the following command to run the IoT Hub integration tests:
 
 `pytest azext_iot/tests/iothub/ -k "_int.py"`
 
+To run specific test in any integration test file, such as:
+
+`pytest azext_iot/tests/central/test_iot_central_int.py::TestIotCentral::test_central_query_methods_run`
+
 #### Azure Resource Setup
 
 The following resources will be needed for the integration tests.
@@ -225,10 +229,6 @@ e.g. run tests against v 1.0
 `pytest azext_iot/tests/central/ -k "_int.py" --api-version "1.0"`
 
 If the "--api-version" argument is not specified, all runs act against default api version for each tested command.
-
-To run specific test:
-
-`pytest azext_iot/tests/central/test_iot_central_int.py::TestIotCentral::test_central_query_methods_run`
 
 ##### Test Resource Tagging
 

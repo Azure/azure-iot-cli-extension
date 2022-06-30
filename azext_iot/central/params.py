@@ -232,7 +232,7 @@ def load_central_arguments(self, _):
             "replace",
             options_list=["--replace", "-r"],
             arg_type=get_three_state_flag(),
-            help="The boolean status for replacing device twin, True or False.",
+            help="The flag for replacing device twin.",
         )
 
     with self.argument_context("iot central device-group") as context:
