@@ -153,6 +153,8 @@ class TestIoTStorage(IoTLiveScenarioTest):
         setup_completed = False
         while not setup_completed:
             try:
+                self.check_for_running_import_export()
+
                 job_id = self.cmd(
                     'iot hub device-identity export -n {} --bcu "{}"'.format(
                         self.entity_name, self.live_storage_uri
@@ -397,8 +399,12 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
         self.tearDown()
 
-    def wait_till_job_completion(self, job_id, status=""):
+    def wait_till_job_completion(self, job_id):
         tries = 0
+        status = self.cmd(
+            f"iot hub job show -n {self.entity_name} -g {self.entity_rg} --job-id {job_id}"
+        ).get_output_in_json()["status"]
+
         while status not in ["failed", "completed"] and tries < SETUP_MAX_ATTEMPTS:
             status = self.cmd(
                 f"iot hub job show -n {self.entity_name} -g {self.entity_rg} --job-id {job_id}"
@@ -414,3 +420,13 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 ).get_output_in_json()
             )
         assert status == "completed"
+
+    def check_for_running_import_export(self):
+        job_list = []
+        for job_type in ["import", "export"]:
+            job_list.extend(self.cmd(
+                f"iot hub job list -n {self.entity_name} -g {self.entity_rg} --job-type {job_type} --job-status running"
+            ).get_output_in_json())
+        if len(job_list) > 0:
+            for job_id in job_list:
+                self.wait_till_job_completion(job_id)
