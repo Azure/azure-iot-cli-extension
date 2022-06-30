@@ -687,14 +687,14 @@ def _load_central_command_help():
             short-summary: Run a command on a device and view associated response. Does NOT monitor property updates that the command may perform.
             long-summary: --content can be inline json or file path.
             examples:
-            - name: Run command with inline payload. Payload should be under "request" in json, such as '{"request": {"key": "value"}}'
+            - name: Run command with inline payload. Payload should be under "request" in json
               text: >
                 az iot central device command run
                 --app-id {appid}
                 --device-id {deviceid}
                 --interface-id {interfaceid}
                 --command-name {commandname}
-                --content {inlinePayload}
+                --content '{"request": {payload}}'
 
             - name: Short Run command with json payload path.
               text: >
