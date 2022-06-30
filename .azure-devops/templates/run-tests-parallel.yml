@@ -89,6 +89,13 @@ steps:
           inlineScript: |
             export COVERAGE_FILE=.coverage.${{ parameters.name }}
             pytest -vv ${{ parameters.path }} -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --deselect=azext_iot/tests/iothub/core/test_iothub_discovery_int.py::TestIoTHubDiscovery::test_iothub_targets --durations=0
+        ${{ if contains(parameters.path, 'azext_iot/tests/dps') }}:
+          inlineScript: |
+            sed -i '/  azext_iot_testhub=\n/  azext_iot_testhub=test_dps_hub_py_$${{ parameters.pythonVersion }}\n' pytest.ini
+            az iot hub create -n test_dps_hub_py_$${{ parameters.pythonVersion }} -g $(AZEXT_IOT_TESTRG)
+            export COVERAGE_FILE=.coverage.${{ parameters.name }}
+            pytest -vv ${{ parameters.path }} -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --durations=0
+            az iot hub delete -n test_dps_hub_py_$${{ parameters.pythonVersion }} -g $(AZEXT_IOT_TESTRG)
 
   - task: PublishBuildArtifacts@1
     inputs:
