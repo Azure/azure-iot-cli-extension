@@ -6,6 +6,10 @@ Release History
 unreleased
 +++++++++++++++
 
+
+0.15.0
++++++++++++++++
+
 **General updates**
 
 * Dropped support for Python 3.6. The IoT extension is constrained to Python 3.7 or greater.
@@ -15,7 +19,9 @@ unreleased
 
 * Introducing the Azure Device Update for IoT Hub root command group `az iot device-update`.
   To learn more about the service visit https://docs.microsoft.com/en-us/azure/iot-hub-device-update/.
-
+ 
+  - This command group is behind a feature flag environment variable. Set `IOT_CLI_ADU_ENABLED` to any value
+    to activate the command group.
   - The Device Update command group supports all `account` and `instance` related functionality.
 
 **IoT Device updates**
