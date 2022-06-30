@@ -580,7 +580,7 @@ helps[
     "iot hub state export"
 ] = """
     type: command
-    short-summary: Saves the device information of an IoT Hub to a file. 
+    short-summary: Saves the configuration and device information of an IoT Hub to a file. 
     examples:
     - name: Export the devices in the specified hub to the specified file.
       text: >
@@ -591,12 +591,12 @@ helps[
     "iot hub state import"
 ] = """
     type: command
-    short-summary: Uploads the device information from a file to an IoT Hub.  
+    short-summary: Uploads the configuration and device information from a file to an IoT Hub.  
     examples:
     - name: Upload the devices from the specified file to the specified hub. 
       text: >
         az iot hub state import -n {iothub_name} -f {filename}
-    - name: Upload the devices from the default file to the specified hub, overwriting the devices already in the hub. 
+    - name: Upload the devices from the default file to the specified hub, overwriting the configurations and devices already in the hub. 
       text: >
         az iot hub state import -n {iothub_name} --overwrite
 """
@@ -605,9 +605,9 @@ helps[
     "iot hub state migrate"
 ] = """
     type: command
-    short-summary: Copies the device information from one hub to another hub without saving to a file. 
+    short-summary: Copies the configuration and device information from one hub to another hub without saving to a file. 
     examples:
-    - name: Migrate the device from the original hub to the new hub, overwriting the devices already in the hub.
+    - name: Migrate the state of the original hub to the new hub, overwriting the configurations and devices already in the hub.
       text: >
         az iot hub state export -n {iothub_name} --orig-hub {origin_hub} --overwrite
 """

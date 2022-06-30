@@ -776,7 +776,7 @@ def load_arguments(self, _):
         context.argument(
             "filename",
             options_list=["--filename", "-f"],
-            help="The path to the file where the device identity and twin information will be stored."
+            help="The path to the file where the hub and device information will be stored."
         )
         context.argument(
             "auth_type_dataplane",
@@ -798,7 +798,7 @@ def load_arguments(self, _):
         context.argument(
             "filename",
             options_list=["--filename", "-f"],
-            help="The path to the file from which the device identity and twin information will be read."
+            help="The path to the file from which the hub and device information will be read."
         )
         context.argument(
             "auth_type_dataplane",
@@ -808,29 +808,29 @@ def load_arguments(self, _):
         context.argument(
             "overwrite",
             options_list=["--overwrite"],
-            help="If this flag is set, then the import will overwrite all devices already in the destination hub."
+            help="If this flag is set, then the import will overwrite all configurations and devices in the destination hub."
         )
 
     with self.argument_context("iot hub state migrate") as context:
         context.argument(
             "dest_hub",
             options_list=["--dest-hub", "-n"],
-            help="Name of IoT Hub to which devices will be copied."
+            help="Name of IoT Hub to which the origin hub will be copied."
         )
         context.argument(
             "dest_rg",
             options_list=["--resource-group", "-rg"],
-            help="Name of resource group of the IoT Hub to which devices will be copied."
+            help="Name of resource group of the IoT Hub to which the origin hub will be copied."
         )
         context.argument(
             "orig_hub",
             options_list=["--orig-hub"],
-            help="Name of IoT Hub from which devices will be copied."
+            help="Name of IoT Hub from which the origin hub will be copied."
         )
         context.argument(
             "orig_rg",
             options_list=["--orig-rg"],
-            help="Name of resource group of the IoT Hub from which devices will be copied."
+            help="Name of resource group of the IoT Hub from which the origin hub will be copied."
         )
         context.argument(
             "auth_type_dataplane",
@@ -840,7 +840,7 @@ def load_arguments(self, _):
         context.argument(
             "overwrite",
             options_list=["--overwrite"],
-            help="If this flag is set, then the import will overwrite all devices already in the destination hub."
+            help="If this flag is set, then the import will overwrite all configurations and devices in the destination hub."
         )
 
     with self.argument_context("iot edge") as context:

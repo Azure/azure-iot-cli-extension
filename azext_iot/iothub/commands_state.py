@@ -14,19 +14,13 @@ logger = get_logger(__name__)
 
 
 def state_export(cmd, hub, rg=None, filename='/project/files/deviceFile.json', auth_type_dataplane=None):
-    before = time.perf_counter()
     sp = StateProvider(cmd, hub, rg, auth_type_dataplane)
-    sp.save_devices(filename)
-    print("Total export time: ", time.perf_counter() - before)
+    sp.save_state(filename)
 
 def state_import(cmd, hub, rg=None, filename='/project/files/deviceFile.json', auth_type_dataplane=None, overwrite=False): 
-    before = time.perf_counter()
     sp = StateProvider(cmd, hub, rg, auth_type_dataplane)
-    sp.upload_devices(filename, overwrite)
-    print("Total import time: ", time.perf_counter() - before)
+    sp.upload_state(filename, overwrite)
 
 def state_migrate(cmd, orig_hub, dest_hub, orig_rg=None, dest_rg=None, auth_type_dataplane=None, overwrite=False): 
-    before = time.perf_counter()
     sp = StateProvider(cmd, dest_hub, dest_rg, auth_type_dataplane, orig_hub, orig_rg)
     sp.migrate_devices(overwrite)
-    print("Total migrate time: ", time.perf_counter() - before)
