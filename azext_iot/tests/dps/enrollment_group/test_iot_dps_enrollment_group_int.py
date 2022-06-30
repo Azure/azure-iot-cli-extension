@@ -11,7 +11,6 @@ from azext_iot.tests.dps import (
     CERT_PATH,
     DATAPLANE_AUTH_TYPES,
     WEBHOOK_URL,
-    TEST_ENDORSEMENT_KEY,
     IoTDPSLiveScenarioTest
 )
 
@@ -19,14 +18,6 @@ from azext_iot.tests.dps import (
 class TestDPSEnrollmentGroups(IoTDPSLiveScenarioTest):
     def __init__(self, test_case):
         super(TestDPSEnrollmentGroups, self).__init__(test_case)
-
-    def test_dps_compute_device_key(self):
-        offline_device_key = self.cmd(
-            'az iot dps enrollment-group compute-device-key --key "{}" '
-            "--registration-id myarbitrarydeviceId".format(TEST_ENDORSEMENT_KEY)
-        ).output
-        offline_device_key = offline_device_key.strip("\"'\n")
-        assert offline_device_key == "cT/EXZvsplPEpT//p98Pc6sKh8mY3kYgSxavHwMkl7w="
 
     def test_dps_enrollment_group_x509_lifecycle(self):
         for auth_phase in DATAPLANE_AUTH_TYPES:
