@@ -7,7 +7,7 @@
 import pytest
 import os
 from time import sleep
-from azext_iot.tests.helpers import add_test_tag
+from azext_iot.tests.helpers import CERT_ENDING, KEY_ENDING, add_test_tag
 
 from azext_iot.tests.settings import (
     DynamoSettings,
@@ -31,11 +31,6 @@ DATAPLANE_AUTH_TYPES = [
 ]
 
 CERT_NAME = "aziotcli"
-CERT_PATH = "aziotcli-cert.pem"
-KEY_PATH = "aziotcli-key.pem"
-SECONDARY_CERT_NAME = "aziotcli2"
-SECONDARY_CERT_PATH = "aziotcli2-cert.pem"
-SECONDARY_KEY_PATH = "aziotcli2-key.pem"
 WEBHOOK_URL = "https://www.test.test"
 API_VERSION = "2019-03-31"
 
@@ -99,7 +94,7 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
         self.dps_cstring = self.get_dps_cstring()
         self.hub_cstring = self.get_hub_cstring()
         self._ensure_dps_hub_link()
-        self._cleanup_enrollments()
+        # self._cleanup_enrollments()
 
         # Create the test certificate
         self.thumbprint = self.create_test_cert(cert_only=cert_only)
@@ -132,9 +127,9 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
             file_prefix=file_prefix,
             sha_version=256,
         )["thumbprint"]
-        self.tracked_certs.append(CERT_PATH)
+        self.tracked_certs.append(subject + CERT_ENDING)
         if not cert_only:
-            self.tracked_certs.append(KEY_PATH)
+            self.tracked_certs.append(subject + KEY_ENDING)
         return thumbprint
 
     def create_dps(self):

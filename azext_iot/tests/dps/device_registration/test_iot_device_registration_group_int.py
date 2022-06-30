@@ -9,7 +9,8 @@ import os
 from azext_iot.common.shared import EntityStatusType
 from azext_iot.tests.dps import DATAPLANE_AUTH_TYPES, IoTDPSLiveScenarioTest
 from azext_iot.tests.dps.device_registration import compare_registrations
-from azext_iot.tests.helpers import CERT_ENDING, KEY_ENDING, ROOT_CERT_NAME
+from azext_iot.tests.generators import generate_generic_id
+from azext_iot.tests.helpers import CERT_ENDING, KEY_ENDING
 from azext_iot.tests.test_utils import create_certificate
 
 
@@ -242,7 +243,7 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
 
     def test_dps_device_registration_x509_lifecycle(self):
         fake_pass = "pass1234"
-        devices = self._prepare_x509_certificates_for_dps(device_passwords=[None, fake_pass])
+        root_name, devices = self._prepare_x509_certificates_for_dps(device_passwords=[None, fake_pass])
         hub_host_name = f"{self.entity_hub_name}.azure-devices.net"
 
         for auth_phase in DATAPLANE_AUTH_TYPES:
@@ -271,7 +272,7 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
                         group_id,
                         self.entity_rg,
                         self.entity_dps_name,
-                        ROOT_CERT_NAME + CERT_ENDING
+                        root_name + CERT_ENDING
                     ),
                     auth_type=auth_phase
                 ),
@@ -488,8 +489,9 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
     def _prepare_x509_certificates_for_dps(self, device_passwords=[None]):
         # Create root and device certificates
         output_dir = os.getcwd()
+        root_name = "root" + generate_generic_id()
         root_cert_obj = create_certificate(
-            subject=ROOT_CERT_NAME, valid_days=1, cert_output_dir=output_dir
+            subject=root_name, valid_days=1, cert_output_dir=output_dir
         )
         devices = []
         device_names = self.generate_device_names(len(device_passwords))
@@ -504,7 +506,7 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
             )['thumbprint']
             devices.append((device, device_thumbprint))
 
-        for cert_name in [ROOT_CERT_NAME] + device_names:
+        for cert_name in [root_name] + device_names:
             self.tracked_certs.append(cert_name + CERT_ENDING)
             self.tracked_certs.append(cert_name + KEY_ENDING)
 
@@ -513,8 +515,8 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
             "iot dps certificate create --dps-name {} -g {} -n {} -p {}".format(
                 self.entity_dps_name,
                 self.entity_rg,
-                ROOT_CERT_NAME,
-                ROOT_CERT_NAME + CERT_ENDING
+                root_name,
+                root_name + CERT_ENDING
             )
         )
 
@@ -522,7 +524,7 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
             "iot dps certificate generate-verification-code --dps-name {} -g {} -n {} -e *".format(
                 self.entity_dps_name,
                 self.entity_rg,
-                ROOT_CERT_NAME
+                root_name
             )
         ).get_output_in_json()["properties"]["verificationCode"]
 
@@ -540,8 +542,8 @@ class TestDPSDeviceRegistrationsGroup(IoTDPSLiveScenarioTest):
             "iot dps certificate verify --dps-name {} -g {} -n {} -p {} -e *".format(
                 self.entity_dps_name,
                 self.entity_rg,
-                ROOT_CERT_NAME,
+                root_name,
                 verification_code + CERT_ENDING
             )
         )
-        return devices
+        return (root_name, devices)
