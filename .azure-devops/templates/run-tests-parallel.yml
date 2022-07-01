@@ -42,10 +42,6 @@ parameters:
   - 'azext_iot/tests/central'
   - 'azext_iot/tests/digitaltwins'
   - 'azext_iot/tests/deviceupdate'
-- name: serial_execution_dirs
-  type: object
-  default:
-  - 'azext_iot/tests/dps'
 
 steps:
   - template: setup-dev-test-env.yml
@@ -77,10 +73,6 @@ steps:
         azureSubscription: ${{ parameters.serviceConnection }}
         scriptType: bash
         scriptLocation: inlineScript
-        ${{ if containsValue(parameters.serial_execution_dirs, parameters.path) }}:
-          inlineScript: |
-            export COVERAGE_FILE=.coverage.${{ parameters.name }}
-            pytest -vv ${{ parameters.path }} -k "_int.py" --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --durations=0
         ${{ if containsValue(parameters.parallel_execution_dirs, parameters.path) }}:
           inlineScript: |
             export COVERAGE_FILE=.coverage.${{ parameters.name }}

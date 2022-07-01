@@ -75,7 +75,7 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                     auth_type=auth_phase
                 )
             ).get_output_in_json()
-            assert enrollment_id in [e["registratonId"] for e in enrollment_list]
+            assert enrollment_id in [e["registrationId"] for e in enrollment_list]
 
             self.cmd(
                 self.set_cmd_auth_type(
@@ -190,7 +190,7 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                     auth_type=auth_phase
                 ),
             ).get_output_in_json()
-            assert enrollment_id in [e["registratonId"] for e in enrollment_list]
+            assert enrollment_id in [e["registrationId"] for e in enrollment_list]
 
             self.cmd(
                 self.set_cmd_auth_type(
@@ -296,7 +296,7 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                     auth_type=auth_phase
                 )
             ).get_output_in_json()
-            assert enrollment_id in [e["registratonId"] for e in enrollment_list]
+            assert enrollment_id in [e["registrationId"] for e in enrollment_list]
 
             self.cmd(
                 self.set_cmd_auth_type(
