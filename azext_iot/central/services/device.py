@@ -1118,7 +1118,7 @@ def create_device_attestation(
     )
 
 
-def list_device_module_components(
+def list_device_components(
     cmd,
     app_id: str,
     device_id: str,

@@ -649,13 +649,13 @@ class CentralDeviceProvider:
             central_dns_suffix=central_dns_suffix,
         )
 
-    def list_device_module_components(
+    def list_device_components(
         self,
         device_id: str,
         module_name: str = None,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
-        return central_services.device.list_device_module_components(
+        return central_services.device.list_device_components(
             cmd=self._cmd,
             app_id=self._app_id,
             device_id=device_id,
@@ -817,4 +817,11 @@ class CentralDeviceProvider:
             api_version=self._api_version,
         )
 
-        return bool(interface_id in template.components)
+        if interface_id in template.components:
+            return True
+
+        for module in template.modules:
+            if interface_id in module.components:
+                return True
+
+        return False

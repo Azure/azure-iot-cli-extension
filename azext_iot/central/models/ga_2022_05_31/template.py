@@ -23,6 +23,8 @@ class Template(BaseTemplate):
                     self.components
                 )
 
+            self.modules = self._extract_modules(template)
+
         except Exception:
             raise CLIInternalError("Could not parse iot central device template.")
 
@@ -67,6 +69,42 @@ class Template(BaseTemplate):
             }
         except Exception:
             details = "Unable to extract device schema from template '{}'.".format(
+                self.id
+            )
+            raise CLIInternalError(details)
+
+    def _extract_modules(self, template: dict) -> dict:
+        try:
+            modules = []
+
+            dcm = template.get("capabilityModel", {})
+            contents = dcm.get("contents", {})
+
+            for content in contents:
+                # Module
+                if 'EdgeModule' in content['@type'] and content.get("target"):
+                    # For reusing some functions, add "capabilityModel" key here
+                    template = {"capabilityModel": content.get("target")[0]}
+
+                    id = content.get("@id")
+                    interfaces = self._extract_interfaces(template)
+                    schema_names = self._extract_schema_names(interfaces)
+                    components = self._extract_components(template)
+                    if components:
+                        component_schema_names = self._extract_schema_names(components)
+
+                    modules.append({
+                        'id': id,
+                        'interfaces': interfaces,
+                        'schema_names': schema_names,
+                        'components': components,
+                        'component_schema_names': component_schema_names
+                    })
+
+            return modules
+
+        except Exception:
+            details = "Unable to extract device module schema from template '{}'.".format(
                 self.id
             )
             raise CLIInternalError(details)

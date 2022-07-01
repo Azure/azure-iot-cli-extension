@@ -238,7 +238,7 @@ def load_central_arguments(self, _):
     with self.argument_context("iot central device-group") as context:
         context.argument(
             "device_group_id",
-            options_list=["--device-group-id", "-d"],
+            options_list=["--device-group-id"],
             help="Unique ID of the device group."
         )
         context.argument(

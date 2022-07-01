@@ -587,7 +587,7 @@ def _load_central_devices_help():
         "iot central device telemetry"
     ] = """
         type: group
-        short-summary: Query IoT Central devices telemetry value
+        short-summary: Query IoT Central device last telemetry value
     """
 
     helps[
@@ -687,7 +687,7 @@ def _load_central_command_help():
             short-summary: Run a command on a device and view associated response. Does NOT monitor property updates that the command may perform.
             long-summary: --content can be inline json or file path.
             examples:
-            - name: Run command with inline payload. Payload should be under "request" in json
+            - name: Run command with inline payload. Payload should be under "request" in json string
               text: >
                 az iot central device command run
                 --app-id {appid}
@@ -696,14 +696,14 @@ def _load_central_command_help():
                 --command-name {commandname}
                 --content '{"request": {payload}}'
 
-            - name: Short Run command with json payload path.
+            - name: Short run command with json payload path.
               text: >
                 az iot central device command run
                 -n {appid}
                 -d {deviceid}
                 -i {interfaceid}
                 --cn {commandname}
-                -k {.../path/to/payload.json}
+                -k {payload_file_path}
 
             - name: Run component command.
               text: >

@@ -785,7 +785,7 @@ def list_components(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
 
-    return provider.list_device_module_components(
+    return provider.list_device_components(
         device_id=device_id,
         module_name=module_name,
         central_dns_suffix=central_dns_suffix,
