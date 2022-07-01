@@ -83,10 +83,10 @@ steps:
             pytest -vv ${{ parameters.path }} -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --deselect=azext_iot/tests/iothub/core/test_iothub_discovery_int.py::TestIoTHubDiscovery::test_iothub_targets --durations=0
         ${{ if contains(parameters.path, 'azext_iot/tests/dps') }}:
           inlineScript: |
-            echo test-dps-hub-py-$${{ parameters.pythonVersion }}
-            IOTHUB=`echo test-dps-hub-py-$${{ parameters.pythonVersion }} | tr . -`
+            echo test-dps-hub-py$${{ parameters.pythonVersion }}
+            IOTHUB=`echo test-dps-hub-py$${{ parameters.pythonVersion }} | tr . -`
             echo $IOTHUB
-            sed -i '/  azext_iot_testhub=\n/  azext_iot_testhub=$IOTHUB\n' pytest.ini
+            sed -z -i 's/azext_iot_testhub=\n/azext_iot_testhub='"$IOTHUB"'\n/g' pytest.ini
             cat pytest.ini
             az iot hub create -n $IOTHUB -g $(AZEXT_IOT_TESTRG)
             export COVERAGE_FILE=.coverage.${{ parameters.name }}
