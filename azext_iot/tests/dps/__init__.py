@@ -84,13 +84,14 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
             rtype=ResourceTypes.dps.value,
             test_tag=test_scenario
         )
-        add_test_tag(
-            cmd=self.cmd,
-            name=self.entity_hub_name,
-            rg=self.entity_rg,
-            rtype=ResourceTypes.hub.value,
-            test_tag=test_scenario
-        )
+        # for now since the hub is shared btw dps runs
+        # add_test_tag(
+        #     cmd=self.cmd,
+        #     name=self.entity_hub_name,
+        #     rg=self.entity_rg,
+        #     rtype=ResourceTypes.hub.value,
+        #     test_tag=test_scenario
+        # )
         self.dps_cstring = self.get_dps_cstring()
         self.hub_cstring = self.get_hub_cstring()
         self._ensure_dps_hub_link()

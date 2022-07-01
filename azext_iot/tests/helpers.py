@@ -76,7 +76,7 @@ def add_test_tag(cmd, name: str, rg: str, rtype: str, test_tag: str):
             current_tags["pipeline_id"] = f"'{TEST_PIPELINE_ID}'"
 
         new_tags = " ".join(f"{k}={v}" for k, v in current_tags.items())
-        cmd(f"resource tag -n {name} -g {rg} --resource-type {rtype} --tags {new_tags}")
+        cmd(f"resource tag -n {name} -g {rg} --resource-type {rtype} --tags {new_tags} -i")
 
 
 def create_storage_account(
