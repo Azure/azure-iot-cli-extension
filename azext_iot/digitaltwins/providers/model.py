@@ -105,15 +105,15 @@ class ModelProvider(DigitalTwinsProvider):
                         dep_count_to_models_map[num_dependencies] = []
                     dep_count_to_models_map[num_dependencies].append(model)
 
-                # Sort the dictionary by dependency count
-                dep_count_to_models_map = dict(sorted(dep_count_to_models_map.items()))
+                # Sort by dependency count
+                dep_count_to_models_tuples = sorted(dep_count_to_models_map.items())
                 models_batch = []
                 response = []
                 pbar = tqdm(total=len(payload), desc='Creating models...', ascii=' #')
-                # The map being iterated is sorted by dependency count, hence models with 0 dependencies go first,
+                # The tuples being iterated are sorted by dependency count, hence models with 0 dependencies go first,
                 # followed by models with 1 dependency, then 2 dependencies and so on... This ensures that all dependencies
                 # of each model being added were either already added in a previous iteration or are in the current payload.
-                for models_list in dep_count_to_models_map.values():
+                for _, models_list in dep_count_to_models_tuples:
                     while len(models_batch) + len(models_list) > MAX_MODELS_PER_BATCH:
                         num_models_to_add = MAX_MODELS_PER_BATCH - len(models_batch)
                         models_batch.extend(models_list[0:num_models_to_add])
