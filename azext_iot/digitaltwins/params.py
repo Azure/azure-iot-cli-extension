@@ -367,13 +367,19 @@ def load_digitaltwins_arguments(self, _):
         context.argument(
             "from_directory",
             options_list=["--from-directory", "--fd"],
-            help="The directory JSON model files will be parsed from.",
+            help="The directory JSON model files will be parsed from. "
+            "Please Note: Input model set is chunked & created in batches when directory has more than 250 models(API limit). "
+            "In case of an error processing a batch, the operation gets rolled back. During the rollback all models created in "
+            "previous batches are deleted one at a time, thereby enforcing atomicity of this operation.",
             arg_group="Models Input",
         )
         context.argument(
             "models",
             options_list=["--models"],
-            help="Inline model JSON or file path to model JSON.",
+            help="Inline model JSON or file path to model JSON. "
+            "Please Note: Input model set is chunked & created in batches when model JSON has more than 250 models(API limit). "
+            "In case of an error processing a batch, the operation gets rolled back. During the rollback all models created in "
+            "previous batches are deleted one at a time, thereby enforcing atomicity of this operation.",
             arg_group="Models Input",
         )
         context.argument(
