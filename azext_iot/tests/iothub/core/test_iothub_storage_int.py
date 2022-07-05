@@ -23,7 +23,7 @@ from azure.cli.core.mock import DummyCli
 STORAGE_ROLE = "Storage Blob Data Contributor"
 CWD = os.path.dirname(os.path.abspath(__file__))
 user_managed_identity_name = generate_generic_id()
-SETUP_MAX_ATTEMPTS = 5
+SETUP_MAX_ATTEMPTS = 3
 
 
 class TestIoTStorage(IoTLiveScenarioTest):
