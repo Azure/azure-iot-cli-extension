@@ -48,6 +48,10 @@ parameters:
   - 'azext_iot/tests/dps'
 
 steps:
+  - checkout: self
+    displayName: 'Checkout repository and submodules needed for tests'
+    submodules: true
+
   - template: setup-dev-test-env.yml
     parameters:
       architecture: ${{ parameters.architecture }}
