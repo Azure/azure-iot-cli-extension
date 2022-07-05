@@ -6,6 +6,11 @@ Release History
 unreleased
 +++++++++++++++
 
+**Digital Twin updates**
+
+* Updated `az dt model create` command to process input ontologies larger than 250 models in a single command run.
+  Size of input ontology is only constrained by the maximum number of models(default 10000) a DT instance can store.
+
 
 0.15.0
 +++++++++++++++
@@ -41,9 +46,6 @@ unreleased
 * Added `az dt job import` command group, which will allow users to create and manage jobs for bulk importing
   models, twins and relationships to a Digital Twins instance. The bulk import data must be stored as a blob in
   a user owned storage account and container.
-
-* Updated `az dt model create` command to process input ontologies larger than 250 models in a single command run.
-  Size of input ontology is only constrained by the maximum number of models(default 10000) a DT instance can store.
 
 * Data History commands, under the `az dt data-history` command group, are now GA.
 
