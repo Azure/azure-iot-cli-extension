@@ -84,18 +84,9 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
             rtype=ResourceTypes.dps.value,
             test_tag=test_scenario
         )
-        # for now since the hub is shared btw dps runs
-        # add_test_tag(
-        #     cmd=self.cmd,
-        #     name=self.entity_hub_name,
-        #     rg=self.entity_rg,
-        #     rtype=ResourceTypes.hub.value,
-        #     test_tag=test_scenario
-        # )
         self.dps_cstring = self.get_dps_cstring()
         self.hub_cstring = self.get_hub_cstring()
         self._ensure_dps_hub_link()
-        # self._cleanup_enrollments()
 
         # Create the test certificate
         self.thumbprint = self.create_test_cert(cert_only=cert_only)
@@ -149,8 +140,8 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
         # Create the min version dps and assign the correct roles
         if not target_dps:
             target_dps = self.cmd(
-                "iot dps create --name {} --resource-group {} ".format(
-                    self.entity_dps_name, self.entity_rg
+                "iot dps create --name {} --resource-group {} --tags hubname={}".format(
+                    self.entity_dps_name, self.entity_rg, self.entity_hub_name
                 )
             ).get_output_in_json()
 
