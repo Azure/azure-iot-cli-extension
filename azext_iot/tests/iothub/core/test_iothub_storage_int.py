@@ -421,7 +421,8 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 f"iot hub job show -n {self.entity_name} -g {self.entity_rg} --job-id {job_id}"
             ).get_output_in_json()
             logger.error(status)
-        assert status == "completed"
+        if status != "completed":
+            raise Exception(f"Job is not completed - status is {status}.")
 
     def check_for_running_import_export(self):
         job_list = []
