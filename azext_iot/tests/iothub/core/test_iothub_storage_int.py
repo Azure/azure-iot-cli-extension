@@ -27,8 +27,9 @@ STORAGE_ROLE = "Storage Blob Data Contributor"
 CWD = os.path.dirname(os.path.abspath(__file__))
 user_managed_identity_name = generate_generic_id()
 SETUP_MAX_ATTEMPTS = 3
+JOB_POLL_MAX_ATTEMPTS = 5
 SETUP_SLEEP_INTERVAL = 10
-IDENTITY_SLEEP_INTERVAL = 30
+IDENTITY_SLEEP_INTERVAL = 75
 
 
 class TestIoTStorage(IoTLiveScenarioTest):
@@ -117,7 +118,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 role_assignment_principal_ids = [assignment["principalId"] for assignment in role_assignments]
                 sleep(10)
 
-            sleep(45)
+            sleep(IDENTITY_SLEEP_INTERVAL)
 
     def tearDown(self):
         if self.managed_identity:
@@ -243,7 +244,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
         while not setup_completed:
             try:
                 self.assign_storage_role_if_needed(hub_id)
-                sleep(IDENTITY_SLEEP_INTERVAL)
+                self.check_for_running_import_export()
 
                 job_id = self.cmd(
                     'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {} --ik true'.format(
@@ -337,9 +338,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
         while not user_identity_setup_completed:
             try:
                 self.assign_storage_role_if_needed(identity_principal)
-
-                # user identity assignment takes longer than expected
-                sleep(IDENTITY_SLEEP_INTERVAL)
+                self.check_for_running_import_export()
 
                 # identity-based device-identity export
                 job_id = self.cmd(
@@ -410,7 +409,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
             f"iot hub job show -n {self.entity_name} -g {self.entity_rg} --job-id {job_id}"
         ).get_output_in_json()["status"]
 
-        while status not in ["failed", "completed"] and tries < SETUP_MAX_ATTEMPTS:
+        while status not in ["failed", "completed"] and tries < JOB_POLL_MAX_ATTEMPTS:
             status = self.cmd(
                 f"iot hub job show -n {self.entity_name} -g {self.entity_rg} --job-id {job_id}"
             ).get_output_in_json()["status"]
