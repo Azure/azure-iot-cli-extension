@@ -9,6 +9,7 @@ import pytest
 from time import sleep
 from knack.util import CLIError
 from pathlib import Path
+from knack.log import get_logger
 
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.settings import UserTypes
@@ -20,10 +21,14 @@ from azext_iot.constants import IOTHUB_TRACK_2_SDK_MIN_VERSION
 from azure.cli.core._profile import Profile
 from azure.cli.core.mock import DummyCli
 
+
+logger = get_logger(__name__)
 STORAGE_ROLE = "Storage Blob Data Contributor"
 CWD = os.path.dirname(os.path.abspath(__file__))
 user_managed_identity_name = generate_generic_id()
 SETUP_MAX_ATTEMPTS = 3
+SETUP_SLEEP_INTERVAL = 10
+IDENTITY_SLEEP_INTERVAL = 30
 
 
 class TestIoTStorage(IoTLiveScenarioTest):
@@ -238,7 +243,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
         while not setup_completed:
             try:
                 self.assign_storage_role_if_needed(hub_id)
-                sleep(30)
+                sleep(IDENTITY_SLEEP_INTERVAL)
 
                 job_id = self.cmd(
                     'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {} --ik true'.format(
@@ -334,7 +339,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 self.assign_storage_role_if_needed(identity_principal)
 
                 # user identity assignment takes longer than expected
-                sleep(30)
+                sleep(IDENTITY_SLEEP_INTERVAL)
 
                 # identity-based device-identity export
                 job_id = self.cmd(
@@ -409,16 +414,14 @@ class TestIoTStorage(IoTLiveScenarioTest):
             status = self.cmd(
                 f"iot hub job show -n {self.entity_name} -g {self.entity_rg} --job-id {job_id}"
             ).get_output_in_json()["status"]
-            print(f"Try number: {tries} for {self.entity_name}: status {status}")
-            sleep(10)
+            sleep(SETUP_SLEEP_INTERVAL)
             tries += 1
 
         if status == "failed":
-            print(
-                self.cmd(
-                    f"iot hub job show -n {self.entity_name} -g {self.entity_rg} --job-id {job_id}"
-                ).get_output_in_json()
-            )
+            status = self.cmd(
+                f"iot hub job show -n {self.entity_name} -g {self.entity_rg} --job-id {job_id}"
+            ).get_output_in_json()
+            logger.error(status)
         assert status == "completed"
 
     def check_for_running_import_export(self):
