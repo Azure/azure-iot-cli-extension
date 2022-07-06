@@ -50,6 +50,7 @@ unreleased
   - az iot central device twin
     - az iot central device twin show
     - az iot central device twin update
+    - az iot central device twin replace
 
 * Add support for 2022-05-31 GA version.
   - az iot central api-token
