@@ -850,6 +850,32 @@ def update_properties(
     )
 
 
+def replace_properties(
+    cmd,
+    app_id: str,
+    device_id,
+    content: str,
+    component_name: Optional[str] = None,
+    module_name: Optional[str] = None,
+    token: Optional[str] = None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=ApiVersion.ga_2022_05_31.value,
+) -> dict:
+    provider = CentralDeviceProvider(
+        cmd=cmd, app_id=app_id, token=token, api_version=api_version
+    )
+
+    payload = utility.process_json_arg(content, argument_name="content")
+
+    return provider.replace_device_properties(
+        device_id=device_id,
+        payload=payload,
+        component_name=component_name,
+        module_name=module_name,
+        central_dns_suffix=central_dns_suffix,
+    )
+
+
 def get_telemetry_value(
     cmd,
     app_id: str,

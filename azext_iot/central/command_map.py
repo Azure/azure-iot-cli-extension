@@ -167,6 +167,7 @@ def load_central_commands(self, _):
     ) as cmd_group:
         cmd_group.show_command("show", "get_properties")
         cmd_group.command("update", "update_properties")
+        cmd_group.command("replace", "replace_properties")
 
     with self.command_group(
         "iot central device c2d-message",
@@ -186,7 +187,6 @@ def load_central_commands(self, _):
         command_type=central_device_templates_ops,
     ) as cmd_group:
         cmd_group.command("list", "list_device_templates")
-        # cmd_group.command("map", "map_device_templates")
         cmd_group.show_command("show", "get_device_template")
         cmd_group.command("create", "create_device_template")
         cmd_group.command("update", "update_device_template")

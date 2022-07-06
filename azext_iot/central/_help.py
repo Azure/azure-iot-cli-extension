@@ -1538,14 +1538,37 @@ def _load_central_monitors_help():
         "iot central device twin show"
     ] = """
         type: command
-        short-summary: Get the device properties from IoT Central.
+        short-summary: Get all property values of a device, a device component, a device module or a device module component.
+        long-summary: Providing --component-name, --module-name or both of them to get device component properties,
+                      device module properties or device module component properties.
+        examples:
+        - name: Get device properties
+          text: >
+            az iot central device twin show
+            --app-id {appid}
+            --device-id {deviceid}
+        - name: Get device component properties
+          text: >
+            az iot central device twin show
+            --app-id {appid}
+            --device-id {deviceid}
+            --co {componentname}
+        - name: Get device module component properties
+          text: >
+            az iot central device twin show
+            --app-id {appid}
+            --device-id {deviceid}
+            --mn {modulename}
+            --co {componentname}
     """
 
     helps[
         "iot central device twin update"
     ] = """
         type: command
-        short-summary: Manage the device properties from IoT Central.
+        short-summary: Update all property values of a device, a device component, a device module or a device module component.
+        long-summary: Providing --component-name, --module-name or both of them to update device component properties,
+                      device module properties or device module component properties.
         examples:
         - name: Update device properties
           text: >
@@ -1553,13 +1576,6 @@ def _load_central_monitors_help():
             --app-id {appid}
             --device-id {deviceid}
             -k {content}
-        - name: Replace device properties
-          text: >
-            az iot central device twin update
-            --app-id {appid}
-            --device-id {deviceid}
-            -k {content}
-            -r
         - name: Update device component properties
           text: >
             az iot central device twin update
@@ -1567,7 +1583,6 @@ def _load_central_monitors_help():
             --device-id {deviceid}
             --co {componentname}
             -k {content}
-            -r
         - name: Update device module component properties
           text: >
             az iot central device twin update
@@ -1576,7 +1591,37 @@ def _load_central_monitors_help():
             --mn {modulename}
             --co {componentname}
             -k {content}
-            -r
+    """
+
+    helps[
+        "iot central device twin replace"
+    ] = """
+        type: command
+        short-summary: Replace all property values of a device, a device component or a device module or a device module component.
+        long-summary: Providing --component-name, --module-name or both of them to replace device component properties,
+                      device module properties or device module component properties.
+        examples:
+        - name: Replace device properties
+          text: >
+            az iot central device twin replace
+            --app-id {appid}
+            --device-id {deviceid}
+            -k {content}
+        - name: Replace device component properties
+          text: >
+            az iot central device twin replace
+            --app-id {appid}
+            --device-id {deviceid}
+            --co {componentname}
+            -k {content}
+        - name: Replace device module component properties
+          text: >
+            az iot central device twin replace
+            --app-id {appid}
+            --device-id {deviceid}
+            --mn {modulename}
+            --co {componentname}
+            -k {content}
     """
 
 

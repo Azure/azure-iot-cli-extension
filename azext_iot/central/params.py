@@ -227,14 +227,6 @@ def load_central_arguments(self, _):
             "by visiting https://github.com/iot-for-all/iot-central-high-availability-clients#readme",
         )
 
-    with self.argument_context("iot central device twin") as context:
-        context.argument(
-            "replace",
-            options_list=["--replace", "-r"],
-            arg_type=get_three_state_flag(),
-            help="The flag for replacing device twin.",
-        )
-
     with self.argument_context("iot central device-group") as context:
         context.argument(
             "device_group_id",
