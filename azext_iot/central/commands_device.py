@@ -821,7 +821,6 @@ def update_properties(
     content: str,
     component_name: Optional[str] = None,
     module_name: Optional[str] = None,
-    replace: bool = False,
     token: Optional[str] = None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.ga_2022_05_31.value,
@@ -831,15 +830,6 @@ def update_properties(
     )
 
     payload = utility.process_json_arg(content, argument_name="content")
-
-    if replace:
-        return provider.replace_device_properties(
-            device_id=device_id,
-            payload=payload,
-            component_name=component_name,
-            module_name=module_name,
-            central_dns_suffix=central_dns_suffix,
-        )
 
     return provider.update_device_properties(
         device_id=device_id,
