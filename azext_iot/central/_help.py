@@ -1566,7 +1566,7 @@ def _load_central_monitors_help():
         "iot central device twin update"
     ] = """
         type: command
-        short-summary: Update all property values of a device, a device component, a device module or a device module component.
+        short-summary: Update writable property values of a device, a device component, a device module or a device module component.
         long-summary: Providing --component-name, --module-name or both of them to update device component properties,
                       device module properties or device module component properties.
         examples:
@@ -1597,7 +1597,7 @@ def _load_central_monitors_help():
         "iot central device twin replace"
     ] = """
         type: command
-        short-summary: Replace all property values of a device, a device component or a device module or a device module component.
+        short-summary: Replace writable property values of a device, a device component or a device module or a device module component.
         long-summary: Providing --component-name, --module-name or both of them to replace device component properties,
                       device module properties or device module component properties.
         examples:
