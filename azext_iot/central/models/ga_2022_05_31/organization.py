@@ -8,3 +8,4 @@ class Organization:
     def __init__(self, org: dict):
         self.display_name = org.get("displayName")
         self.id = org.get("id")
+        self.id = org.get("parent")

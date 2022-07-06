@@ -570,6 +570,26 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                             else "template"
                         ]
                         if device_template == template_id:
+                            if api_version == ApiVersion.v1_1_preview.value:
+                                # delete attached children devices if any
+                                list_children_command = "iot central device edge children list --app-id {} -d {}".format(
+                                    self.app_id, device["id"]
+                                )
+
+                                children = self.cmd(
+                                    list_children_command, api_version=api_version
+                                ).get_output_in_json()
+
+                                for child in children:
+                                    self.cmd(
+                                        "iot central device delete --app-id {} --device-id {}".format(
+                                            self.app_id, child["id"]
+                                        ),
+                                        api_version=api_version,
+                                    )
+
+                                time.sleep(10)
+
                             self.cmd(
                                 "iot central device delete --app-id {} --device-id {}".format(
                                     self.app_id, device["id"]
