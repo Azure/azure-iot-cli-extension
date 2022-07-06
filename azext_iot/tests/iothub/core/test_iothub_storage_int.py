@@ -27,9 +27,9 @@ STORAGE_ROLE = "Storage Blob Data Contributor"
 CWD = os.path.dirname(os.path.abspath(__file__))
 user_managed_identity_name = generate_generic_id()
 SETUP_MAX_ATTEMPTS = 3
-JOB_POLL_MAX_ATTEMPTS = 5
+JOB_POLL_MAX_ATTEMPTS = 3
 SETUP_SLEEP_INTERVAL = 10
-IDENTITY_SLEEP_INTERVAL = 75
+IDENTITY_SLEEP_INTERVAL = 60
 
 
 class TestIoTStorage(IoTLiveScenarioTest):
