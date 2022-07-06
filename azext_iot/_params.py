@@ -770,7 +770,7 @@ def load_arguments(self, _):
         )
         context.argument(
             "rg",
-            options_list=["--resource-group", "-rg"],
+            options_list=["--resource-group", "-g"],
             help="Name of resource group. You can configure the default group using `az configure --defaults group=<name>`."
         )
         context.argument(
@@ -792,7 +792,7 @@ def load_arguments(self, _):
         )
         context.argument(
             "rg",
-            options_list=["--resource-group", "-rg"],
+            options_list=["--resource-group", "-g"],
             help="Name of resource group. You can configure the default group using `az configure --defaults group=<name>`."
         )
         context.argument(
@@ -814,22 +814,22 @@ def load_arguments(self, _):
     with self.argument_context("iot hub state migrate") as context:
         context.argument(
             "dest_hub",
-            options_list=["--dest-hub", "-n"],
+            options_list=["--destination-hub", "-dh"],
             help="Name of IoT Hub to which the origin hub will be copied."
         )
         context.argument(
             "dest_rg",
-            options_list=["--resource-group", "-rg"],
+            options_list=["--destination-resource-group", "-dg"],
             help="Name of resource group of the IoT Hub to which the origin hub will be copied."
         )
         context.argument(
             "orig_hub",
-            options_list=["--orig-hub"],
+            options_list=["--origin-hub", "-oh"],
             help="Name of IoT Hub from which the origin hub will be copied."
         )
         context.argument(
             "orig_rg",
-            options_list=["--orig-rg"],
+            options_list=["--origin-resource-group", "-og"],
             help="Name of resource group of the IoT Hub from which the origin hub will be copied."
         )
         context.argument(

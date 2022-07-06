@@ -15,6 +15,10 @@ pnp_runtime_ops = CliCommandType(
 iothub_job_ops = CliCommandType(operations_tmpl="azext_iot.iothub.commands_job#{}")
 iothub_state_ops = CliCommandType(operations_tmpl="azext_iot.iothub.commands_state#{}")
 
+device_messaging_ops = CliCommandType(
+    operations_tmpl="azext_iot.iothub.commands_device_messaging#{}"
+)
+
 
 def load_iothub_commands(self, _):
     """
