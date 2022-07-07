@@ -242,6 +242,7 @@ def load_central_arguments(self, _):
             "filter",
             options_list=["--filter"],
             help="Query defining which devices should be in this group."
+            "[Query filter Example: SELECT * FROM devices WHERE $template = \"dtmi:modelDefinition:dtdlv2\"]"
         )
         context.argument(
             "description",

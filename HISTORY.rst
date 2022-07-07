@@ -48,11 +48,6 @@ unreleased
   - az iot central role
   - az iot central user
 
-* Added support for simulating device identities that use x509 thumbprint or CA authentication, impacting the
-  following commands:
-    - `az iot device simulate`
-    - `az iot device send-d2c-message`
-
 
 0.15.0
 +++++++++++++++
@@ -85,6 +80,13 @@ unreleased
   a user owned storage account and container.
 
 * Data History commands, under the `az dt data-history` command group, are now GA.
+
+**IoT Central updates**
+
+* Added support for simulating device identities that use x509 thumbprint or CA authentication, impacting the
+  following commands:
+    - `az iot device simulate`
+    - `az iot device send-d2c-message`
 
 
 0.14.1

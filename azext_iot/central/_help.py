@@ -1027,7 +1027,9 @@ def _load_central_device_groups_help():
         "iot central device-group show"
     ] = """
         type: command
-        short-summary: Get the device group by ID.
+        short-summary: Get the device group.
+        long-summary: |
+                Note:  Only one organization support today, multiple organizations will be supported soon.
 
         examples:
         - name: Get the device group by ID
@@ -1035,6 +1037,10 @@ def _load_central_device_groups_help():
             az iot central device-group show
             --app-id {appid}
             --device-group-id {devicegroupid}
+            --display-name "DeviceGroup1"
+            --filter "SELECT * FROM devices WHERE $provisioned = true",
+            --description "This is a default device group."
+            --organizations {organization}
     """
 
     helps[
@@ -1042,6 +1048,8 @@ def _load_central_device_groups_help():
     ] = """
         type: command
         short-summary: Create or update a device group.
+        long-summary: |
+                Note:  Only one organization support today, multiple organizations will be supported soon.
 
         examples:
         - name: Create or update a device group.
@@ -1052,7 +1060,7 @@ def _load_central_device_groups_help():
             --display-name {displayname}
             --filter {filter}
             --description {description}
-            --organizations {organizations}
+            --organizations {organization}
     """
 
     helps[
@@ -1070,7 +1078,7 @@ def _load_central_device_groups_help():
             --display-name {displayname}
             --filter {filter}
             --description {description}
-            --organizations {organizations}
+            --organizations {organization}
     """
 
     helps[
