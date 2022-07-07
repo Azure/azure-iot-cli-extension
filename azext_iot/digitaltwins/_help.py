@@ -924,7 +924,8 @@ def load_digitaltwins_help():
     helps["dt model create"] = """
         type: command
         short-summary: Uploads one or more models. When any error occurs, no models are uploaded.
-        long-summary: --models can be inline json or file path.
+        long-summary: --models can be inline json or file path. Size of input model set (ontology) is
+                      constrained by max number of models which the DT instance can store (default is 10000 models).
 
         examples:
         - name: Bulk upload all .json or .dtdl model files from a target directory. Model processing is recursive.
