@@ -15,8 +15,8 @@ from msrest.pipeline import ClientRawResponse
 from .. import models
 
 
-class DeviceRegistrationStateOperations(object):
-    """DeviceRegistrationStateOperations operations.
+class CertificateAuthorityOperations(object):
+    """CertificateAuthorityOperations operations.
 
     :param client: Client for service requests.
     :param config: Configuration of service client.
@@ -38,17 +38,21 @@ class DeviceRegistrationStateOperations(object):
 
     def get(
             self, id, custom_headers=None, raw=False, **operation_config):
-        """Gets the device registration state.
+        """Get a certificate authority. This operation requires the
+        certificateAuthorities/read permission.
 
-        :param id: Registration ID.
+        :param id: The certificate authority id. A case-insensitive string (up
+         to 128 characters long) of alphanumeric characters plus certain
+         special characters : . _ -. No special characters allowed at start or
+         end.
         :type id: str
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
          deserialized response
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
-        :return: DeviceRegistrationState or ClientRawResponse if raw=true
-        :rtype: ~dps.models.DeviceRegistrationState or
+        :return: CertificateAuthority or ClientRawResponse if raw=true
+        :rtype: ~dps.models.CertificateAuthority or
          ~msrest.pipeline.ClientRawResponse
         :raises:
          :class:`ProvisioningServiceErrorDetailsException<dps.models.ProvisioningServiceErrorDetailsException>`
@@ -85,7 +89,86 @@ class DeviceRegistrationStateOperations(object):
         header_dict = {}
 
         if response.status_code == 200:
-            deserialized = self._deserialize('DeviceRegistrationState', response)
+            deserialized = self._deserialize('CertificateAuthority', response)
+            header_dict = {
+                'ETag': 'str',
+                'x-ms-error-code': 'str',
+            }
+
+        if raw:
+            client_raw_response = ClientRawResponse(deserialized, response)
+            client_raw_response.add_headers(header_dict)
+            return client_raw_response
+
+        return deserialized
+    get.metadata = {'url': '/certificateAuthorities/{id}'}
+
+    def create_or_update(
+            self, id, certificate_authority, if_match=None, custom_headers=None, raw=False, **operation_config):
+        """Create or replace a certificate authority with the specified
+        certificate authority source type. This operation requires the
+        certificateAuthorities/write permission.
+
+        :param id: The desired certificate authority name. A case-insensitive
+         string (up to 128 characters long) of alphanumeric characters plus
+         certain special characters : . _ -. No special characters allowed at
+         start or end.
+        :type id: str
+        :param certificate_authority: The created certificate authority
+         object.
+        :type certificate_authority: ~dps.models.CertificateAuthority
+        :param if_match: The ETag of the certificate authority.
+        :type if_match: str
+        :param dict custom_headers: headers that will be added to the request
+        :param bool raw: returns the direct response alongside the
+         deserialized response
+        :param operation_config: :ref:`Operation configuration
+         overrides<msrest:optionsforoperations>`.
+        :return: CertificateAuthority or ClientRawResponse if raw=true
+        :rtype: ~dps.models.CertificateAuthority or
+         ~msrest.pipeline.ClientRawResponse
+        :raises:
+         :class:`ProvisioningServiceErrorDetailsException<dps.models.ProvisioningServiceErrorDetailsException>`
+        """
+        # Construct URL
+        url = self.create_or_update.metadata['url']
+        path_format_arguments = {
+            'id': self._serialize.url("id", id, 'str')
+        }
+        url = self._client.format_url(url, **path_format_arguments)
+
+        # Construct parameters
+        query_parameters = {}
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+
+        # Construct headers
+        header_parameters = {}
+        header_parameters['Content-Type'] = 'application/json; charset=utf-8'
+        if self.config.generate_client_request_id:
+            header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
+        if custom_headers:
+            header_parameters.update(custom_headers)
+        if if_match is not None:
+            header_parameters['If-Match'] = self._serialize.header("if_match", if_match, 'str')
+        if self.config.accept_language is not None:
+            header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
+
+        # Construct body
+        body_content = self._serialize.body(certificate_authority, 'CertificateAuthority')
+
+        # Construct and send request
+        request = self._client.put(url, query_parameters)
+        response = self._client.send(
+            request, header_parameters, body_content, stream=False, **operation_config)
+
+        if response.status_code not in [200]:
+            raise models.ProvisioningServiceErrorDetailsException(self._deserialize, response)
+
+        deserialized = None
+        header_dict = {}
+
+        if response.status_code == 200:
+            deserialized = self._deserialize('CertificateAuthority', response)
             header_dict = {
                 'x-ms-error-code': 'str',
             }
@@ -96,15 +179,19 @@ class DeviceRegistrationStateOperations(object):
             return client_raw_response
 
         return deserialized
-    get.metadata = {'url': '/registrations/{id}'}
+    create_or_update.metadata = {'url': '/certificateAuthorities/{id}'}
 
     def delete(
-            self, id, if_match=None, custom_headers=None, raw=False, **operation_config):
-        """Deletes the device registration.
+            self, id, if_match, custom_headers=None, raw=False, **operation_config):
+        """Delete the certificate authority. This operation requires the
+        certificateAuthorities/delete permission.
 
-        :param id: Registration ID.
+        :param id: The certificate authority name. A case-insensitive string
+         (up to 128 characters long) of alphanumeric characters plus certain
+         special characters : . _ -. No special characters allowed at start or
+         end.
         :type id: str
-        :param if_match: The ETag of the registration status record.
+        :param if_match: The ETag of the certificate authority.
         :type if_match: str
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
@@ -134,8 +221,7 @@ class DeviceRegistrationStateOperations(object):
             header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
         if custom_headers:
             header_parameters.update(custom_headers)
-        if if_match is not None:
-            header_parameters['If-Match'] = self._serialize.header("if_match", if_match, 'str')
+        header_parameters['If-Match'] = self._serialize.header("if_match", if_match, 'str')
         if self.config.accept_language is not None:
             header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
 
@@ -152,17 +238,19 @@ class DeviceRegistrationStateOperations(object):
                 'x-ms-error-code': 'str',
             })
             return client_raw_response
-    delete.metadata = {'url': '/registrations/{id}'}
+    delete.metadata = {'url': '/certificateAuthorities/{id}'}
 
     def query(
-            self, id, x_ms_max_item_count=None, x_ms_continuation=None, custom_headers=None, raw=False, **operation_config):
-        """Gets the registration state of devices in this enrollmentGroup.
+            self, query, x_ms_max_item_count=None, x_ms_continuation=None, custom_headers=None, raw=False, **operation_config):
+        """Retrieves a list of the certificate authorities and a continuation
+        token to retrieve the next page. This operation requires the
+        certificateAuthorities/read permission.
 
-        :param id: Enrollment group ID.
-        :type id: str
-        :param x_ms_max_item_count: pageSize
+        :param query:
+        :type query: str
+        :param x_ms_max_item_count: Page size
         :type x_ms_max_item_count: int
-        :param x_ms_continuation: continuation token
+        :param x_ms_continuation: Continuation token
         :type x_ms_continuation: str
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
@@ -170,17 +258,15 @@ class DeviceRegistrationStateOperations(object):
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
         :return: list or ClientRawResponse if raw=true
-        :rtype: list[~dps.models.DeviceRegistrationState] or
+        :rtype: list[~dps.models.CertificateAuthority] or
          ~msrest.pipeline.ClientRawResponse
         :raises:
          :class:`ProvisioningServiceErrorDetailsException<dps.models.ProvisioningServiceErrorDetailsException>`
         """
+        query_specification = models.QuerySpecification(query=query)
+
         # Construct URL
         url = self.query.metadata['url']
-        path_format_arguments = {
-            'id': self._serialize.url("id", id, 'str')
-        }
-        url = self._client.format_url(url, **path_format_arguments)
 
         # Construct parameters
         query_parameters = {}
@@ -200,9 +286,13 @@ class DeviceRegistrationStateOperations(object):
         if self.config.accept_language is not None:
             header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
 
+        # Construct body
+        body_content = self._serialize.body(query_specification, 'QuerySpecification')
+
         # Construct and send request
         request = self._client.post(url, query_parameters)
-        response = self._client.send(request, header_parameters, stream=False, **operation_config)
+        response = self._client.send(
+            request, header_parameters, body_content, stream=False, **operation_config)
 
         if response.status_code not in [200]:
             raise models.ProvisioningServiceErrorDetailsException(self._deserialize, response)
@@ -211,7 +301,7 @@ class DeviceRegistrationStateOperations(object):
         header_dict = {}
 
         if response.status_code == 200:
-            deserialized = self._deserialize('[DeviceRegistrationState]', response)
+            deserialized = self._deserialize('[CertificateAuthority]', response)
             header_dict = {
                 'x-ms-continuation': 'str',
                 'x-ms-max-item-count': 'int',
@@ -225,4 +315,4 @@ class DeviceRegistrationStateOperations(object):
             return client_raw_response
 
         return deserialized
-    query.metadata = {'url': '/registrations/{id}/query'}
+    query.metadata = {'url': '/certificateAuthorities/query'}

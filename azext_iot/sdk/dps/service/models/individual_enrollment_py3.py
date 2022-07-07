@@ -34,6 +34,14 @@ class IndividualEnrollment(Model):
     :type optional_device_information: ~dps.models.TwinCollection
     :param attestation: Required. Attestation method used by the device.
     :type attestation: ~dps.models.AttestationMechanism
+    :param device_hostname: Hostname of the device (optional). Will be
+     lower-cased.
+     Must adhere to the domain name spec:
+     https://datatracker.ietf.org/doc/html/rfc1035.
+    :type device_hostname: str
+    :param device_ip_address: IP address of the device (optional).
+     This can be an IPv4 or IPv6 address.
+    :type device_ip_address: str
     :param capabilities: Capabilities of the device.
     :type capabilities: ~dps.models.DeviceCapabilities
     :param iot_hub_host_name: The Iot Hub host name.
@@ -75,6 +83,17 @@ class IndividualEnrollment(Model):
     :param custom_allocation_definition: This tells DPS which webhook to call
      when using custom allocation.
     :type custom_allocation_definition: ~dps.models.CustomAllocationDefinition
+    :param trust_bundle_id: Optional trust bundle id to associate with the
+     enrollment.
+    :type trust_bundle_id: str
+    :param client_certificate_issuance_policy: Certificate issuance policy for
+     device client certificates.
+    :type client_certificate_issuance_policy:
+     ~dps.models.CertificateIssuancePolicy
+    :param server_certificate_issuance_policy: Certificate issuance policy for
+     device server certificates.
+    :type server_certificate_issuance_policy:
+     ~dps.models.CertificateIssuancePolicy
     """
 
     _validation = {
@@ -91,6 +110,8 @@ class IndividualEnrollment(Model):
         'registration_state': {'key': 'registrationState', 'type': 'DeviceRegistrationState'},
         'optional_device_information': {'key': 'optionalDeviceInformation', 'type': 'TwinCollection'},
         'attestation': {'key': 'attestation', 'type': 'AttestationMechanism'},
+        'device_hostname': {'key': 'deviceHostname', 'type': 'str'},
+        'device_ip_address': {'key': 'deviceIpAddress', 'type': 'str'},
         'capabilities': {'key': 'capabilities', 'type': 'DeviceCapabilities'},
         'iot_hub_host_name': {'key': 'iotHubHostName', 'type': 'str'},
         'initial_twin': {'key': 'initialTwin', 'type': 'InitialTwin'},
@@ -102,15 +123,20 @@ class IndividualEnrollment(Model):
         'allocation_policy': {'key': 'allocationPolicy', 'type': 'str'},
         'iot_hubs': {'key': 'iotHubs', 'type': '[str]'},
         'custom_allocation_definition': {'key': 'customAllocationDefinition', 'type': 'CustomAllocationDefinition'},
+        'trust_bundle_id': {'key': 'trustBundleId', 'type': 'str'},
+        'client_certificate_issuance_policy': {'key': 'clientCertificateIssuancePolicy', 'type': 'CertificateIssuancePolicy'},
+        'server_certificate_issuance_policy': {'key': 'serverCertificateIssuancePolicy', 'type': 'CertificateIssuancePolicy'},
     }
 
-    def __init__(self, *, registration_id: str, attestation, device_id: str=None, optional_device_information=None, capabilities=None, iot_hub_host_name: str=None, initial_twin=None, etag: str=None, provisioning_status="enabled", reprovision_policy=None, allocation_policy=None, iot_hubs=None, custom_allocation_definition=None, **kwargs) -> None:
+    def __init__(self, *, registration_id: str, attestation, device_id: str=None, optional_device_information=None, device_hostname: str=None, device_ip_address: str=None, capabilities=None, iot_hub_host_name: str=None, initial_twin=None, etag: str=None, provisioning_status="enabled", reprovision_policy=None, allocation_policy=None, iot_hubs=None, custom_allocation_definition=None, trust_bundle_id: str=None, client_certificate_issuance_policy=None, server_certificate_issuance_policy=None, **kwargs) -> None:
         super(IndividualEnrollment, self).__init__(**kwargs)
         self.registration_id = registration_id
         self.device_id = device_id
         self.registration_state = None
         self.optional_device_information = optional_device_information
         self.attestation = attestation
+        self.device_hostname = device_hostname
+        self.device_ip_address = device_ip_address
         self.capabilities = capabilities
         self.iot_hub_host_name = iot_hub_host_name
         self.initial_twin = initial_twin
@@ -122,3 +148,6 @@ class IndividualEnrollment(Model):
         self.allocation_policy = allocation_policy
         self.iot_hubs = iot_hubs
         self.custom_allocation_definition = custom_allocation_definition
+        self.trust_bundle_id = trust_bundle_id
+        self.client_certificate_issuance_policy = client_certificate_issuance_policy
+        self.server_certificate_issuance_policy = server_certificate_issuance_policy

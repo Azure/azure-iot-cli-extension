@@ -9,12 +9,16 @@
 # regenerated.
 # --------------------------------------------------------------------------
 
+from .certificate_authority_operations import CertificateAuthorityOperations
 from .individual_enrollment_operations import IndividualEnrollmentOperations
 from .enrollment_group_operations import EnrollmentGroupOperations
 from .device_registration_state_operations import DeviceRegistrationStateOperations
+from .trust_bundle_operations import TrustBundleOperations
 
 __all__ = [
+    'CertificateAuthorityOperations',
     'IndividualEnrollmentOperations',
     'EnrollmentGroupOperations',
     'DeviceRegistrationStateOperations',
+    'TrustBundleOperations',
 ]

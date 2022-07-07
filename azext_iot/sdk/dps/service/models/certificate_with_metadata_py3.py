@@ -12,21 +12,28 @@
 from msrest.serialization import Model
 
 
-class X509CertificateWithInfo(Model):
-    """Certificate and Certificate info.
+class CertificateWithMetadata(Model):
+    """CertificateWithMetadata.
 
+    Variables are only populated by the server, and will be ignored when
+    sending a request.
+
+    :ivar certificate_metadata:
+    :vartype certificate_metadata: ~dps.models.CertificateMetadata
     :param certificate:
     :type certificate: str
-    :param info:
-    :type info: ~dps.models.X509CertificateInfo
     """
 
-    _attribute_map = {
-        'certificate': {'key': 'certificate', 'type': 'str'},
-        'info': {'key': 'info', 'type': 'X509CertificateInfo'},
+    _validation = {
+        'certificate_metadata': {'readonly': True},
     }
 
-    def __init__(self, **kwargs):
-        super(X509CertificateWithInfo, self).__init__(**kwargs)
-        self.certificate = kwargs.get('certificate', None)
-        self.info = kwargs.get('info', None)
+    _attribute_map = {
+        'certificate_metadata': {'key': 'certificateMetadata', 'type': 'CertificateMetadata'},
+        'certificate': {'key': 'certificate', 'type': 'str'},
+    }
+
+    def __init__(self, *, certificate: str=None, **kwargs) -> None:
+        super(CertificateWithMetadata, self).__init__(**kwargs)
+        self.certificate_metadata = None
+        self.certificate = certificate

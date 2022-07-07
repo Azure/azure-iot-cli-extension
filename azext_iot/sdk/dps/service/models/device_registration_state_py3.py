@@ -57,6 +57,20 @@ class DeviceRegistrationState(Model):
     :ivar payload: Custom allocation payload returned from the webhook to the
      device.
     :vartype payload: object
+    :ivar trust_bundle: The optional trust bundle result returned after a
+     successful device registation.
+    :vartype trust_bundle: ~dps.models.TrustBundle
+    :ivar issued_client_certificate: Client certificate issued to the device
+     in PEM format.
+    :vartype issued_client_certificate: str
+    :ivar device_certificate_issuance_settings: Certificate issuance settings
+     specification for the device.
+    :vartype device_certificate_issuance_settings:
+     ~dps.models.DeviceCertificateIssuanceSettings
+    :ivar device_hostname: Optional configured hostname for the device.
+    :vartype device_hostname: str
+    :ivar device_ip_address: Optional configured IP address for the device.
+    :vartype device_ip_address: str
     """
 
     _validation = {
@@ -71,6 +85,11 @@ class DeviceRegistrationState(Model):
         'last_updated_date_time_utc': {'readonly': True},
         'etag': {'readonly': True},
         'payload': {'readonly': True},
+        'trust_bundle': {'readonly': True},
+        'issued_client_certificate': {'readonly': True},
+        'device_certificate_issuance_settings': {'readonly': True},
+        'device_hostname': {'readonly': True},
+        'device_ip_address': {'readonly': True},
     }
 
     _attribute_map = {
@@ -85,6 +104,11 @@ class DeviceRegistrationState(Model):
         'last_updated_date_time_utc': {'key': 'lastUpdatedDateTimeUtc', 'type': 'iso-8601'},
         'etag': {'key': 'etag', 'type': 'str'},
         'payload': {'key': 'payload', 'type': 'object'},
+        'trust_bundle': {'key': 'trustBundle', 'type': 'TrustBundle'},
+        'issued_client_certificate': {'key': 'issuedClientCertificate', 'type': 'str'},
+        'device_certificate_issuance_settings': {'key': 'deviceCertificateIssuanceSettings', 'type': 'DeviceCertificateIssuanceSettings'},
+        'device_hostname': {'key': 'deviceHostname', 'type': 'str'},
+        'device_ip_address': {'key': 'deviceIpAddress', 'type': 'str'},
     }
 
     def __init__(self, **kwargs) -> None:
@@ -100,3 +124,8 @@ class DeviceRegistrationState(Model):
         self.last_updated_date_time_utc = None
         self.etag = None
         self.payload = None
+        self.trust_bundle = None
+        self.issued_client_certificate = None
+        self.device_certificate_issuance_settings = None
+        self.device_hostname = None
+        self.device_ip_address = None

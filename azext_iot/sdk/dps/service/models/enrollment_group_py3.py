@@ -65,6 +65,17 @@ class EnrollmentGroup(Model):
     :param custom_allocation_definition: This tells DPS which webhook to call
      when using custom allocation.
     :type custom_allocation_definition: ~dps.models.CustomAllocationDefinition
+    :param trust_bundle_id: Optional trust bundle id to associate with the
+     enrollment.
+    :type trust_bundle_id: str
+    :param client_certificate_issuance_policy: Certificate issuance policy for
+     device client certificates.
+    :type client_certificate_issuance_policy:
+     ~dps.models.CertificateIssuancePolicy
+    :param server_certificate_issuance_policy: Certificate issuance policy for
+     device server certificates.
+    :type server_certificate_issuance_policy:
+     ~dps.models.CertificateIssuancePolicy
     """
 
     _validation = {
@@ -88,9 +99,12 @@ class EnrollmentGroup(Model):
         'allocation_policy': {'key': 'allocationPolicy', 'type': 'str'},
         'iot_hubs': {'key': 'iotHubs', 'type': '[str]'},
         'custom_allocation_definition': {'key': 'customAllocationDefinition', 'type': 'CustomAllocationDefinition'},
+        'trust_bundle_id': {'key': 'trustBundleId', 'type': 'str'},
+        'client_certificate_issuance_policy': {'key': 'clientCertificateIssuancePolicy', 'type': 'CertificateIssuancePolicy'},
+        'server_certificate_issuance_policy': {'key': 'serverCertificateIssuancePolicy', 'type': 'CertificateIssuancePolicy'},
     }
 
-    def __init__(self, *, enrollment_group_id: str, attestation, capabilities=None, iot_hub_host_name: str=None, initial_twin=None, etag: str=None, provisioning_status="enabled", reprovision_policy=None, allocation_policy=None, iot_hubs=None, custom_allocation_definition=None, **kwargs) -> None:
+    def __init__(self, *, enrollment_group_id: str, attestation, capabilities=None, iot_hub_host_name: str=None, initial_twin=None, etag: str=None, provisioning_status="enabled", reprovision_policy=None, allocation_policy=None, iot_hubs=None, custom_allocation_definition=None, trust_bundle_id: str=None, client_certificate_issuance_policy=None, server_certificate_issuance_policy=None, **kwargs) -> None:
         super(EnrollmentGroup, self).__init__(**kwargs)
         self.enrollment_group_id = enrollment_group_id
         self.attestation = attestation
@@ -105,3 +119,6 @@ class EnrollmentGroup(Model):
         self.allocation_policy = allocation_policy
         self.iot_hubs = iot_hubs
         self.custom_allocation_definition = custom_allocation_definition
+        self.trust_bundle_id = trust_bundle_id
+        self.client_certificate_issuance_policy = client_certificate_issuance_policy
+        self.server_certificate_issuance_policy = server_certificate_issuance_policy

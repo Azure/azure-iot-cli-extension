@@ -12,24 +12,18 @@
 from msrest.serialization import Model
 
 
-class DeviceCapabilities(Model):
-    """Device capabilities.
+class CertificateIssuancePolicy(Model):
+    """Certificate issuance policy.
 
-    All required parameters must be populated in order to send to Azure.
-
-    :param iot_edge: Required. If set to true, this device is an IoTEdge
-     device. Default value: False .
-    :type iot_edge: bool
+    :param certificate_authority_name: Certificate authority name used to
+     issue certificates.
+    :type certificate_authority_name: str
     """
 
-    _validation = {
-        'iot_edge': {'required': True},
-    }
-
     _attribute_map = {
-        'iot_edge': {'key': 'iotEdge', 'type': 'bool'},
+        'certificate_authority_name': {'key': 'certificateAuthorityName', 'type': 'str'},
     }
 
-    def __init__(self, **kwargs):
-        super(DeviceCapabilities, self).__init__(**kwargs)
-        self.iot_edge = kwargs.get('iot_edge', False)
+    def __init__(self, *, certificate_authority_name: str=None, **kwargs) -> None:
+        super(CertificateIssuancePolicy, self).__init__(**kwargs)
+        self.certificate_authority_name = certificate_authority_name
