@@ -226,6 +226,15 @@ e.g. run tests against v 1.0
 
 If the "--api-version" argument is not specified, all runs act against default api version for each tested command.
 
+
+### IoT Digital Twins
+
+IoT Digital Twins test for creation of larger ontologies require ontology submodules to be cloned.
+
+Run the following command to clone required submodules.
+
+`git submodule update --init --recursive`
+
 ##### Test Resource Tagging
 
 There are 4 more test variables used for tagging the test resources:

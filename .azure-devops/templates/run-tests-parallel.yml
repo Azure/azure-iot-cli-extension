@@ -44,6 +44,10 @@ parameters:
   - 'azext_iot/tests/deviceupdate'
 
 steps:
+  - checkout: self
+    displayName: 'Checkout repository and submodules needed for tests'
+    submodules: true
+
   - template: setup-dev-test-env.yml
     parameters:
       architecture: ${{ parameters.architecture }}
