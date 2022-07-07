@@ -23,6 +23,8 @@ from azext_iot.tests.digitaltwins.dt_helpers import (
     url_model_id
 )
 from azext_iot.tests.conftest import hostname
+from azext_iot.digitaltwins.providers.model import MAX_MODELS_PER_BATCH
+from azext_iot.digitaltwins.common import ADTModelCreateFailurePolicy
 
 
 class TestAddModels(object):
@@ -186,6 +188,43 @@ class TestAddModels(object):
             # Since deletion happens in the reverse order, hence we reverse the array before asserting equality
             models_deleted.reverse()
             assert models_added == models_deleted
+
+    @pytest.mark.usefixtures("set_cwd")
+    @responses.activate
+    def test_large_ontology_error_failure_policy_none(self, fixture_cmd, fixture_dt_client):
+        models_added = []
+
+        def post_request_callback(request):
+            payload = json.loads(request.body)
+            headers = {"content_type": "application/json"}
+            # First batch to succeed
+            if payload[0]["@id"] == "dtmi:digitaltwins:rec_3_3:core:Agent;1":
+                models_added.extend([model["@id"] for model in payload])
+                resp_body = [{"status": "succeeded"}]
+                return (200, headers, json.dumps(resp_body))
+            # Next batch to fail
+            else:
+                resp_body = [{"status": "failed"}]
+                return (400, headers, json.dumps(resp_body))
+
+        responses.add_callback(
+            responses.POST,
+            "https://{}/models".format(hostname),
+            callback=post_request_callback,
+            content_type="application/json",
+        )
+
+        ontology_directory = "./references/opendigitaltwins-building/Ontology"
+        if os.path.isdir(ontology_directory) and len(os.listdir(ontology_directory)) > 0:
+            with pytest.raises(CLIError):
+                subject.add_models(
+                    cmd=fixture_cmd,
+                    name_or_hostname=hostname,
+                    models=None,
+                    from_directory=ontology_directory,
+                    failure_policy=ADTModelCreateFailurePolicy.NONE.value,
+                )
+            assert len(models_added) == MAX_MODELS_PER_BATCH
 
     def test_add_model_no_models_directory(self, fixture_cmd):
         with pytest.raises(CLIError):

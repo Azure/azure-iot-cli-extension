@@ -19,6 +19,7 @@ from azext_iot.digitaltwins.common import (
     ADTEndpointAuthType,
     ADTPrivateConnectionStatusType,
     ADTPublicNetworkAccessType,
+    ADTModelCreateFailurePolicy
 )
 
 depfor_type = CLIArgumentType(
@@ -368,19 +369,30 @@ def load_digitaltwins_arguments(self, _):
             "from_directory",
             options_list=["--from-directory", "--fd"],
             help="The directory JSON model files will be parsed from. "
-            "Please Note: Input model set is chunked & created in batches when directory has more than 250 models(API limit). "
-            "In case of an error processing a batch, the operation gets rolled back. During the rollback all models created in "
-            "previous batches are deleted one at a time, thereby enforcing atomicity of this operation.",
+            "Please Note: Models are created atomically when directory contains 250 or lesser models, hence in case of an "
+            "error none of the models get created."
+            "Input model set is chunked & created in batches when directory has more than 250 models(API limit). "
+            "In case of an error processing a batch, the behavior is determined by the --failure-policy parameter. ",
             arg_group="Models Input",
         )
         context.argument(
             "models",
             options_list=["--models"],
             help="Inline model JSON or file path to model JSON. "
-            "Please Note: Input model set is chunked & created in batches when model JSON has more than 250 models(API limit). "
-            "In case of an error processing a batch, the operation gets rolled back. During the rollback all models created in "
-            "previous batches are deleted one at a time, thereby enforcing atomicity of this operation.",
+            "Please Note: Models are created atomically when model JSON contains 250 or lesser models, hence in case of an "
+            "error none of the models get created."
+            "Input model set is chunked & created in batches when model JSON has more than 250 models(API limit). "
+            "In case of an error processing a batch, the behavior is determined by the --failure-policy parameter. ",
             arg_group="Models Input",
+        )
+        context.argument(
+            "failure_policy",
+            options_list=["--failure-policy", "--fp"],
+            help="Indicates the failure policy when an error occurs while processing a models batch. Defaults to 'Rollback'. "
+            "In the 'Rollback' mode all models created in previous batches are deleted one at a time. "
+            "When selected as 'None' the models created in previous batches are not deleted from DT instance.",
+            arg_group="Models Input",
+            arg_type=get_enum_type(ADTModelCreateFailurePolicy),
         )
         context.argument(
             "definition",

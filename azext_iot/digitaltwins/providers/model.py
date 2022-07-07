@@ -6,8 +6,9 @@
 
 import json
 from knack.log import get_logger
-from azure.cli.core.azclierror import ForbiddenError, RequiredArgumentMissingError
+from azure.cli.core.azclierror import ForbiddenError, RequiredArgumentMissingError, InvalidArgumentValueError
 from azext_iot.common.utility import process_json_arg, handle_service_exception, scantree
+from azext_iot.digitaltwins.common import ADTModelCreateFailurePolicy
 from azext_iot.digitaltwins.providers.base import DigitalTwinsProvider
 from azext_iot.sdk.digitaltwins.dataplane.models import ErrorResponseException
 from tqdm import tqdm
@@ -15,7 +16,7 @@ from tqdm import tqdm
 logger = get_logger(__name__)
 MAX_MODELS_API_LIMIT = 250
 # avagraw - Max number of models the API's dependency resolution can handle when models are created across multiple API calls.
-MAX_MODELS_PER_BATCH = 40
+MAX_MODELS_PER_BATCH = 50
 
 
 def get_model_dependencies(model, model_id_to_model_map=None):
@@ -69,7 +70,7 @@ class ModelProvider(DigitalTwinsProvider):
         )
         self.model_sdk = self.get_sdk().digital_twin_models
 
-    def add(self, models=None, from_directory=None):
+    def add(self, models=None, from_directory=None, failure_policy=ADTModelCreateFailurePolicy.ROLLBACK.value):
         if not any([models, from_directory]):
             raise RequiredArgumentMissingError("Provide either --models or --from-directory.")
 
@@ -134,14 +135,27 @@ class ModelProvider(DigitalTwinsProvider):
         except ErrorResponseException as e:
             if len(models_created) > 0:
                 pbar.close()
-                logger.error(
-                    "Error creating models. Deleting {} models already created by this operation...".format(len(models_created))
-                )
-                # In case of error delete all models created by this operation. Models will be deleted in the reverse
-                # order they were created, hence ensuring each model's dependencies are deleted after deleting the model.
-                models_created.reverse()
-                for model_id in models_created:
-                    self.delete(model_id)
+                # Delete all models created by this operation when the failure policy is set to 'Rollback'
+                if failure_policy == ADTModelCreateFailurePolicy.ROLLBACK.value:
+                    logger.error(
+                        "Error creating models. Deleting {} models created by this operation...".format(len(models_created))
+                    )
+                    # Models will be deleted in the reverse order they were created.
+                    # Hence, ensuring each model's dependencies are deleted after deleting the model.
+                    models_created.reverse()
+                    for model_id in models_created:
+                        self.delete(model_id)
+                # Models created by this operation are not deleted when the failure policy is set to 'None'
+                elif failure_policy == ADTModelCreateFailurePolicy.NONE.value:
+                    logger.error(
+                        "Error creating current model batch. Successfully created {} models.".format(len(models_created))
+                    )
+                else:
+                    raise InvalidArgumentValueError(
+                        "Invalid failure policy: {}. Supported values are: '{}' and '{}'".format(
+                            failure_policy, ADTModelCreateFailurePolicy.ROLLBACK.value, ADTModelCreateFailurePolicy.NONE.value
+                        )
+                    )
             # @vilit - hack to customize 403's to have more specific error messages
             if e.response.status_code == 403:
                 error_text = "Current principal access is forbidden. Please validate rbac role assignments."
