@@ -34,7 +34,7 @@ def get_device_group(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.ga_2022_05_31.value,
-) -> Union[DeviceGroupPreview, DeviceGroupV1_1_preview, DeviceGroupGa20220531]:
+) -> DeviceGroupGa20220531:
     provider = CentralDeviceGroupProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
@@ -52,7 +52,7 @@ def create_device_group(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.ga_2022_05_31.value,
-) -> Union[DeviceGroupPreview, DeviceGroupV1_1_preview, DeviceGroupGa20220531]:
+) -> DeviceGroupGa20220531:
     provider = CentralDeviceGroupProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
@@ -79,7 +79,7 @@ def update_device_group(
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=ApiVersion.ga_2022_05_31.value,
-) -> Union[DeviceGroupPreview, DeviceGroupV1_1_preview, DeviceGroupGa20220531]:
+) -> DeviceGroupGa20220531:
     provider = CentralDeviceGroupProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )

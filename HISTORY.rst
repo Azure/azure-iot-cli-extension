@@ -11,31 +11,6 @@ unreleased
 * Updated `az dt model create` command to process input ontologies larger than 250 models in a single command run.
   Size of input ontology is only constrained by the maximum number of models(default 10000) a DT instance can store.
 
-
-0.15.0
-+++++++++++++++
-
-**General updates**
-
-* Dropped support for Python 3.6. The IoT extension is constrained to Python 3.7 or greater.
-  If for whatever reason you cannot upgrade from 3.6 you are able to use older extension versions.
-
-**Device Update**
-
-* Introducing the Azure Device Update for IoT Hub root command group `az iot device-update`.
-  To learn more about the service visit https://docs.microsoft.com/en-us/azure/iot-hub-device-update/.
- 
-  - This command group is behind a feature flag environment variable. Set `IOT_CLI_ADU_ENABLED` to any value
-    to activate the command group.
-  - The Device Update command group supports all `account` and `instance` related functionality.
-
-**IoT Device updates**
-
-* Added device registration commands, `az iot device registration create` to register a device to an individual
-  enrollment or an enrollment group. Currently, devices with symmetric key and x509 certificate authentication
-  are supported. Once registered, the device will show up in the linked IoT Hub and can be interacted with or
-  simulated using other `az iot device` commands.
-
 **IoT Central updates**
 
 * Add support for device groups CRUD.
@@ -77,6 +52,31 @@ unreleased
   following commands:
     - `az iot device simulate`
     - `az iot device send-d2c-message`
+
+
+0.15.0
++++++++++++++++
+
+**General updates**
+
+* Dropped support for Python 3.6. The IoT extension is constrained to Python 3.7 or greater.
+  If for whatever reason you cannot upgrade from 3.6 you are able to use older extension versions.
+
+**Device Update**
+
+* Introducing the Azure Device Update for IoT Hub root command group `az iot device-update`.
+  To learn more about the service visit https://docs.microsoft.com/en-us/azure/iot-hub-device-update/.
+ 
+  - This command group is behind a feature flag environment variable. Set `IOT_CLI_ADU_ENABLED` to any value
+    to activate the command group.
+  - The Device Update command group supports all `account` and `instance` related functionality.
+
+**IoT Device updates**
+
+* Added device registration commands, `az iot device registration create` to register a device to an individual
+  enrollment or an enrollment group. Currently, devices with symmetric key and x509 certificate authentication
+  are supported. Once registered, the device will show up in the linked IoT Hub and can be interacted with or
+  simulated using other `az iot device` commands.
 
 **Digital Twin updates**
 

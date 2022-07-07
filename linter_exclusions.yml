@@ -18,7 +18,7 @@ dt endpoint create eventhub:
       - parameter_should_not_end_in_resource_group
 dt data-history connection create:
   rule_exclusions:
-      - require_wait_command_if_no_wait
+  - require_wait_command_if_no_wait
 dt data-history connection create adx:
   parameters:
     adx_resource_group:
