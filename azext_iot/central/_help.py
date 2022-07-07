@@ -1029,7 +1029,7 @@ def _load_central_device_groups_help():
         type: command
         short-summary: Get the device group.
         long-summary: |
-                Note:  Only one organization support today, multiple organizations will be supported soon.
+                Note: Only one organization is supported today, multiple organizations will be supported soon.
 
         examples:
         - name: Get the device group by ID
@@ -1038,7 +1038,7 @@ def _load_central_device_groups_help():
             --app-id {appid}
             --device-group-id {devicegroupid}
             --display-name "DeviceGroup1"
-            --filter "SELECT * FROM devices WHERE $provisioned = true",
+            --filter "SELECT * FROM devices WHERE $provisioned = true"
             --description "This is a default device group."
             --organizations {organization}
     """
@@ -1049,7 +1049,7 @@ def _load_central_device_groups_help():
         type: command
         short-summary: Create or update a device group.
         long-summary: |
-                Note:  Only one organization support today, multiple organizations will be supported soon.
+                Note: Only one organization is supported today, multiple organizations will be supported soon.
 
         examples:
         - name: Create or update a device group.
@@ -1067,7 +1067,9 @@ def _load_central_device_groups_help():
         "iot central device-group update"
     ] = """
         type: command
-        short-summary: Update an existing device group by ID.
+        short-summary: Update an existing device group.
+        long-summary: |
+                Note: Only one organization is supported today, multiple organizations will be supported soon.
 
         examples:
         - name: Update a device group via patch

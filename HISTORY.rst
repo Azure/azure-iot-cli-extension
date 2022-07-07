@@ -73,6 +73,11 @@ unreleased
   are supported. Once registered, the device will show up in the linked IoT Hub and can be interacted with or
   simulated using other `az iot device` commands.
 
+* Added support for simulating device identities that use x509 thumbprint or CA authentication, impacting the
+  following commands:
+    - `az iot device simulate`
+    - `az iot device send-d2c-message`
+
 **Digital Twin updates**
 
 * Added `az dt job import` command group, which will allow users to create and manage jobs for bulk importing
@@ -80,13 +85,6 @@ unreleased
   a user owned storage account and container.
 
 * Data History commands, under the `az dt data-history` command group, are now GA.
-
-**IoT Central updates**
-
-* Added support for simulating device identities that use x509 thumbprint or CA authentication, impacting the
-  following commands:
-    - `az iot device simulate`
-    - `az iot device send-d2c-message`
 
 
 0.14.1
