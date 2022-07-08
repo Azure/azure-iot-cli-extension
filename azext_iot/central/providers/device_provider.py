@@ -19,6 +19,7 @@ from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.enum import DeviceStatus, ApiVersion
 from azext_iot.central.models.v1 import DeviceV1
+from azext_iot.central.models.ga_2022_05_31 import DeviceGa20220531
 from azext_iot.central.models.v1_1_preview import (
     DeviceV1_1_preview,
     RelationshipV1_1_preview,
@@ -58,7 +59,7 @@ class CentralDeviceProvider:
         self,
         device_id,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> Union[DeviceV1, DeviceV1_1_preview, DevicePreview]:
+    ) -> Union[DeviceGa20220531, DeviceV1, DeviceV1_1_preview, DevicePreview]:
 
         # get or add to cache
         device = self._devices.get(device_id)
@@ -84,7 +85,7 @@ class CentralDeviceProvider:
         self,
         filter=None,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> List[Union[DeviceV1, DeviceV1_1_preview, DevicePreview]]:
+    ) -> List[Union[DeviceGa20220531, DeviceV1, DeviceV1_1_preview, DevicePreview]]:
         devices = central_services.device.list_devices(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -107,7 +108,7 @@ class CentralDeviceProvider:
         simulated=False,
         organizations=None,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> Union[DeviceV1, DeviceV1_1_preview, DevicePreview]:
+    ) -> Union[DeviceGa20220531, DeviceV1, DeviceV1_1_preview, DevicePreview]:
         if not device_id:
             raise RequiredArgumentMissingError("Device id must be specified.")
 
@@ -146,7 +147,7 @@ class CentralDeviceProvider:
         enabled=None,
         organizations=None,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> Union[DeviceV1, DeviceV1_1_preview, DevicePreview]:
+    ) -> Union[DeviceGa20220531, DeviceV1, DeviceV1_1_preview, DevicePreview]:
         if not device_id:
             raise RequiredArgumentMissingError("Device id must be specified.")
 
@@ -372,6 +373,8 @@ class CentralDeviceProvider:
         self,
         device_id: str,
         interface_id: str,
+        component_name: str,
+        module_name: str,
         command_name: str,
         payload: dict,
         central_dns_suffix=CENTRAL_ENDPOINT,
@@ -381,12 +384,13 @@ class CentralDeviceProvider:
             interface_id=interface_id,
             central_dns_suffix=central_dns_suffix,
         ):
-            return central_services.device.run_component_command(
+            return central_services.device.run_command(
                 cmd=self._cmd,
                 app_id=self._app_id,
                 token=self._token,
                 device_id=device_id,
-                interface_id=interface_id,
+                component_name=interface_id,
+                module_name=module_name,
                 command_name=command_name,
                 payload=payload,
                 central_dns_suffix=central_dns_suffix,
@@ -397,6 +401,8 @@ class CentralDeviceProvider:
             app_id=self._app_id,
             token=self._token,
             device_id=device_id,
+            component_name=component_name,
+            module_name=module_name,
             command_name=command_name,
             payload=payload,
             central_dns_suffix=central_dns_suffix,
@@ -407,6 +413,8 @@ class CentralDeviceProvider:
         self,
         device_id: str,
         interface_id: str,
+        component_name: str,
+        module_name: str,
         command_name: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
@@ -416,12 +424,13 @@ class CentralDeviceProvider:
             interface_id=interface_id,
             central_dns_suffix=central_dns_suffix,
         ):
-            return central_services.device.get_component_command_history(
+            return central_services.device.get_command_history(
                 cmd=self._cmd,
                 app_id=self._app_id,
                 token=self._token,
                 device_id=device_id,
-                interface_id=interface_id,
+                component_name=interface_id,
+                module_name=module_name,
                 command_name=command_name,
                 central_dns_suffix=central_dns_suffix,
                 api_version=self._api_version,
@@ -432,6 +441,28 @@ class CentralDeviceProvider:
             app_id=self._app_id,
             token=self._token,
             device_id=device_id,
+            component_name=component_name,
+            module_name=module_name,
+            command_name=command_name,
+            central_dns_suffix=central_dns_suffix,
+            api_version=self._api_version,
+        )
+
+    def get_module_command_history(
+        self,
+        device_id: str,
+        module_name: str,
+        component_name: str,
+        command_name: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.get_module_command_history(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            token=self._token,
+            device_id=device_id,
+            module_name=module_name,
+            component_name=component_name,
             command_name=command_name,
             central_dns_suffix=central_dns_suffix,
             api_version=self._api_version,
@@ -448,6 +479,7 @@ class CentralDeviceProvider:
             app_id=self._app_id,
             device_id=device_id,
             token=self._token,
+            api_version=self._api_version,
             central_dns_suffix=central_dns_suffix,
         )
 
@@ -543,6 +575,213 @@ class CentralDeviceProvider:
             central_dns_suffix=central_dns_suffix,
         )
 
+    def get_device_attestation(
+        self,
+        device_id: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.get_device_attestation(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def delete_device_attestation(
+        self,
+        device_id: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.delete_device_attestation(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def update_device_attestation(
+        self,
+        device_id: str,
+        payload,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.update_device_attestation(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            payload=payload,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def create_device_attestation(
+        self,
+        device_id: str,
+        payload,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.create_device_attestation(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            payload=payload,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def list_modules(
+        self,
+        device_id: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.list_modules(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def list_device_components(
+        self,
+        device_id: str,
+        module_name: str = None,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.list_device_components(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            module_name=module_name,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def get_device_properties(
+        self,
+        device_id: str,
+        component_name: str = None,
+        module_name: str = None,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.get_device_properties_or_telemetry_value(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            module_name=module_name,
+            component_name=component_name,
+            telemetry_name=None,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def replace_device_properties(
+        self,
+        device_id: str,
+        payload: str,
+        component_name: str = None,
+        module_name: str = None,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.replace_properties(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            module_name=module_name,
+            component_name=component_name,
+            payload=payload,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def update_device_properties(
+        self,
+        device_id: str,
+        payload: str,
+        component_name: str = None,
+        module_name: str = None,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.update_properties(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            module_name=module_name,
+            component_name=component_name,
+            payload=payload,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def get_telemetry_value(
+        self,
+        device_id: str,
+        component_name: str,
+        module_name: str,
+        telemetry_name: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.get_device_properties_or_telemetry_value(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            module_name=module_name,
+            component_name=component_name,
+            telemetry_name=telemetry_name,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def replace_device_component_properties(
+        self,
+        device_id: str,
+        component_name: str,
+        payload: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.replace_properties(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            module_name=None,
+            component_name=component_name,
+            payload=payload,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
+    def update_device_component_properties(
+        self,
+        device_id: str,
+        component_name: str,
+        payload: str,
+        central_dns_suffix=CENTRAL_ENDPOINT,
+    ):
+        return central_services.device.update_properties(
+            cmd=self._cmd,
+            app_id=self._app_id,
+            device_id=device_id,
+            module_name=None,
+            component_name=component_name,
+            payload=payload,
+            token=self._token,
+            api_version=self._api_version,
+            central_dns_suffix=central_dns_suffix,
+        )
+
     def _dps_populate_essential_info(self, dps_info, device_status: DeviceStatus):
         error = {
             DeviceStatus.provisioned: "None.",
@@ -578,4 +817,11 @@ class CentralDeviceProvider:
             api_version=self._api_version,
         )
 
-        return bool(interface_id in template.components)
+        if interface_id in template.components:
+            return True
+
+        for module in template.modules:
+            if interface_id in module.components:
+                return True
+
+        return False

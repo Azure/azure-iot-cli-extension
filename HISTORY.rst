@@ -11,6 +11,43 @@ unreleased
 * Updated `az dt model create` command to process input ontologies larger than 250 models in a single command run.
   Size of input ontology is only constrained by the maximum number of models(default 10000) a DT instance can store.
 
+**IoT Central updates**
+
+* Add support for device groups CRUD.
+  - az iot central device-group
+    - az iot central device-group list
+    - az iot central device-group show
+    - az iot central device-group create
+    - az iot central device-group delete
+    - az iot central device-group update
+
+* Add support for device attestation CRUD.
+  - az iot central device attestation
+    - az iot central device attestation show
+    - az iot central device attestation create
+    - az iot central device attestation delete
+    - az iot central device attestation update
+
+* Add support for device/module properties/telemetry/command.
+  - az iot central device list-components
+  - az iot central device list-modules
+  - az iot central device telemetry
+    - az iot central device telemetry show
+  - az iot central device twin
+    - az iot central device twin show
+    - az iot central device twin update
+    - az iot central device twin replace
+
+* Add support for 2022-05-31 GA version.
+  - az iot central api-token
+  - az iot central device-template
+  - az iot central device-group
+  - az iot central device
+  - az iot central file-upload-config
+  - az iot central organization
+  - az iot central role
+  - az iot central user
+
 
 0.15.0
 +++++++++++++++

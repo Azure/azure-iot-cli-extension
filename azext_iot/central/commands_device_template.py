@@ -5,7 +5,6 @@
 # --------------------------------------------------------------------------------------------
 # Dev note - think of this as a controller
 
-from azure.cli.core.azclierror import InvalidArgumentValueError
 from typing import Union
 from azext_iot.central.models.preview import TemplatePreview
 from azext_iot.central.models.v1 import TemplateV1
@@ -22,7 +21,7 @@ def get_device_template(
     device_template_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
+    api_version=ApiVersion.ga_2022_05_31.value,
 ) -> Union[TemplatePreview, TemplateV1, TemplateV1_1_preview]:
     provider = CentralDeviceTemplateProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
@@ -41,7 +40,7 @@ def list_device_templates(
     compact=False,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
+    api_version=ApiVersion.ga_2022_05_31.value,
 ):
     provider = CentralDeviceTemplateProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
@@ -58,7 +57,7 @@ def map_device_templates(
     app_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
+    api_version=ApiVersion.ga_2022_05_31.value,
 ):
     provider = CentralDeviceTemplateProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
@@ -74,11 +73,8 @@ def create_device_template(
     content: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
+    api_version=ApiVersion.ga_2022_05_31.value,
 ):
-    if not isinstance(content, str):
-        raise InvalidArgumentValueError("content must be a string: {}".format(content))
-
     payload = utility.process_json_arg(content, argument_name="content")
 
     provider = CentralDeviceTemplateProvider(
@@ -100,11 +96,8 @@ def update_device_template(
     content: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
+    api_version=ApiVersion.ga_2022_05_31.value,
 ):
-    if not isinstance(content, str):
-        raise InvalidArgumentValueError("content must be a string: {}".format(content))
-
     payload = utility.process_json_arg(content, argument_name="content")
 
     provider = CentralDeviceTemplateProvider(
@@ -125,7 +118,7 @@ def delete_device_template(
     device_template_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
+    api_version=ApiVersion.ga_2022_05_31.value,
 ):
     provider = CentralDeviceTemplateProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
