@@ -11,7 +11,7 @@ import responses
 from azext_iot.operations import dps as subject
 from knack.util import CLIError
 from azext_iot.tests.conftest import mock_dps_target, mock_symmetric_key_attestation
-from azext_iot.tests.dps import TEST_ENDORSEMENT_KEY
+from azext_iot.tests.dps import GENERATED_KEY, TEST_ENDORSEMENT_KEY, TEST_KEY_REGISTRATION_ID
 
 
 enrollment_id = 'myenrollment'
@@ -788,8 +788,8 @@ class TestComputeDeviceKey():
     def test_offline_compute_device_key(self, fixture_cmd):
         offline_device_key = subject.iot_dps_compute_device_key(
             cmd=fixture_cmd,
-            registration_id="myarbitrarydeviceId",
+            registration_id=TEST_KEY_REGISTRATION_ID,
             symmetric_key=TEST_ENDORSEMENT_KEY
         ).decode()
         offline_device_key = offline_device_key.strip("\"'\n")
-        assert offline_device_key == "cT/EXZvsplPEpT//p98Pc6sKh8mY3kYgSxavHwMkl7w="
+        assert offline_device_key == GENERATED_KEY

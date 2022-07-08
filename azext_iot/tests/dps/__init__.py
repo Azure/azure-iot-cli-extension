@@ -49,6 +49,8 @@ TEST_ENDORSEMENT_KEY = (
     "Dj7r7Mh5uF9HBppGKQCBoVSVV8dI91lNazmSdpGWyqCkO7iM4VvUMv2HT/ym53aYlUrau+Qq87Tu+uQipWYgRdF11KDfcpMHqqzB"
     "QQ1NpOJVhrsTrhyJzO7KNw=="
 )
+TEST_KEY_REGISTRATION_ID = "myarbitrarydeviceId"
+GENERATED_KEY = "cT/EXZvsplPEpT//p98Pc6sKh8mY3kYgSxavHwMkl7w="
 
 # Test Environment Variables
 settings = DynamoSettings(
@@ -57,7 +59,7 @@ settings = DynamoSettings(
 )
 ENTITY_RG = settings.env.azext_iot_testrg
 ENTITY_DPS_NAME = settings.env.azext_iot_testdps if settings.env.azext_iot_testdps else "test-dps-" + generate_generic_id()
-ENTITY_HUB_NAME = settings.env.azext_iot_testhub if settings.env.azext_iot_testhub else "test-dps-hub-" + generate_generic_id()
+ENTITY_HUB_NAME = settings.env.azext_iot_testdps_hub if settings.env.azext_iot_testdps_hub else "test-dps-hub-" + generate_generic_id()
 MAX_RBAC_ASSIGNMENT_TRIES = settings.env.azext_iot_rbac_max_tries if settings.env.azext_iot_rbac_max_tries else 10
 
 
@@ -73,7 +75,7 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
         # Create resources if needed
         if not settings.env.azext_iot_testdps:
             self.create_dps()
-        if not settings.env.azext_iot_testhub:
+        if not settings.env.azext_iot_testdps_hub:
             self.create_hub()
 
         # Prep the DPS for testing

@@ -160,6 +160,7 @@ You can either manually set the environment variables or use the `pytest.ini.exa
     azext_iot_testrg=
     azext_iot_testhub=
     azext_iot_testdps=
+    azext_iot_testdps_hub=
     azext_iot_teststorageaccount=
     azext_iot_teststoragecontainer=
     azext_iot_central_app_id=
@@ -193,8 +194,9 @@ For all resources, if the environmental variable is not provided, a new instance
 | `az_iot_testrg`  	|    All          	| The resource group that contains the IoT Hub and DPS instances or where all test resources are created. It will be the default resource group if any other resource group variables are not provided.	|
 | `azext_iot_teststorageaccount`	| Iot Hub and Central Storage Tests	| The storage account used for running IoT Hub and Central storage tests. During these tests, your hub will be assigned a System-Assigned AAD identity, and will be granted the role of "Storage Blob Data Contributor" on the storage account you provide. Both the hub's identity and the RBAC role will be removed once the test completes. No role assignments are made for the IoT Central App.	|
 | `azext_iot_teststoragecontainer`	| Iot Hub Storage Tests	| The name of blob container belonging to the `azext_iot_teststorageaccount` storage account. Defaults to 'devices' when not specified.	|
-| `azext_iot_testhub` 	| Iot Hub and DPS Tests	| The name of the Iot Hub instance. 	|
+| `azext_iot_testhub` 	| Iot Hub Tests	| The name of the Iot Hub instance. 	|
 | `azext_iot_testdps`	| Iot DPS Tests	| The name of the Iot DPS instance.	|
+| `azext_iot_testdps_hub`	| Iot DPS Tests	| The name of the Iot Hub instance to use for DPS tests.	|
 | `azext_iot_central_app_id`	| Iot Central Tests	| The IoT Central Application Id or name.	|
 | `azext_iot_central_scope_id`	| Iot Central Tests	| The ID scope for the DPS associated with the IoT Central Application.	|
 | `azext_iot_central_token`	| Iot Central Tests	| The api token to use for the IoT Central Application. This is only used to populate --token argument in IoT Central commands.	|

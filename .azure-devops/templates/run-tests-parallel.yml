@@ -88,14 +88,14 @@ steps:
         ${{ if contains(parameters.path, 'azext_iot/tests/dps') }}:
           inlineScript: |
             IOTHUB=`echo test-dps-hub-py$RANDOM`
-            CREATE_HUB=`grep -c "azext_iot_testhub=$" pytest.ini`
+            CREATE_HUB=`grep -c "azext_iot_testdps_hub=$" pytest.ini`
 
             if (($CREATE_HUB > 0))
             then
-            echo $IOTHUB
-            sed -z -i 's/azext_iot_testhub=\n/azext_iot_testhub='"$IOTHUB"'\n/g' pytest.ini
-            cat pytest.ini
-            az iot hub create -n $IOTHUB -g $(AZEXT_IOT_TESTRG)
+              echo $IOTHUB
+              sed -z -i 's/azext_iot_testdps_hub=\n/azext_iot_testdps_hub='"$IOTHUB"'\n/g' pytest.ini
+              cat pytest.ini
+              az iot hub create -n $IOTHUB -g $(AZEXT_IOT_TESTRG)
             fi
 
             export COVERAGE_FILE=.coverage.${{ parameters.name }}
