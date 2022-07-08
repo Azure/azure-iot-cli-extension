@@ -32,7 +32,11 @@ class FileNames:
     central_job_file = "central/json/job.json"
     central_fileupload_file = "central/json/fileupload.json"
     central_device_twin_file = "central/json/device_twin.json"
+    central_device_attestation_file = "central/json/device_attestation.json"
+    central_device_attestation_file2 = "central/json/device_attestation2.json"
     central_edge_modules_file = "central/json/edge_modules.json"
+    central_device_component_file = "central/json/device_components.json"
+    central_device_properties_file = "central/json/device_properties.json"
     central_property_validation_template_file = (
         "central/json/property_validation_template.json"
     )

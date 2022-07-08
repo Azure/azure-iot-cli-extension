@@ -53,6 +53,10 @@ edge_template_path_preview = get_context_path(
     __file__, "json/device_template_edge.json"
 )
 sync_command_params = get_context_path(__file__, "json/sync_command_args.json")
+device_attestation_path = get_context_path(__file__, "json/device_attestation.json")
+device_attestation2_path = get_context_path(__file__, "json/device_attestation2.json")
+device_updated_properties_path = get_context_path(__file__, "json/device_update_properties.json")
+device_updated_component_properties_path = get_context_path(__file__, "json/device_update_component_properties.json")
 DEFAULT_FILE_UPLOAD_TTL = "PT1H"
 
 
@@ -227,7 +231,6 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         return self._scope_id
 
     def _create_users(self, api_version):
-
         users = []
         for role in Role:
             user_id = self.create_random_name(prefix="aztest", length=24)
@@ -266,6 +269,155 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             api_version=api_version,
             checks=[self.check("result", "success")],
         )
+
+    def _create_device_group(self, api_version, template_name, org_id):
+        device_group_id = self.create_random_name(prefix="aztest", length=24)
+        display_name = self.create_random_name(prefix="aztest", length=10)
+        filter = f'"SELECT * FROM devices WHERE $template = \\"{template_name}\\""'
+        description = self.create_random_name(prefix="aztest", length=30)
+        organization = org_id
+
+        command = f'''
+            iot central device-group create \
+            --app-id {self.app_id} \
+            --device-group-id {device_group_id} \
+            --display-name {display_name} \
+            --filter {filter} \
+            --description {description} \
+            --organizations {organization}'''
+
+        return self.cmd(
+            command,
+            api_version=api_version,
+            checks=[
+                self.check("displayName", display_name),
+                self.check("description", description),
+                self.check("filter", f'SELECT * FROM devices WHERE $template = \"{template_name}\"'),
+                self.check("organizations[0]", organization),
+            ],
+        ).get_output_in_json()
+
+    def _update_device_group(self, api_version, device_group_id):
+        new_description = self.create_random_name(prefix="aztest", length=30)
+
+        command = f'''
+            iot central device-group update
+            --app-id {self.app_id}
+            --device-group-id {device_group_id}
+            --description {new_description}'''
+
+        update_result = self.cmd(
+            command,
+            api_version=api_version,
+            checks=[
+                self.check("description", new_description),
+            ],
+        ).get_output_in_json()
+
+        return (update_result, new_description)
+
+    def _delete_device_group(self, api_version, device_group_id) -> None:
+        self.cmd(
+            "iot central device-group delete --app-id {} --device-group-id {}".format(
+                self.app_id, device_group_id
+            ),
+            api_version=api_version,
+            checks=[self.check("result", "success")],
+        )
+
+    def _create_device_attestation(self, api_version, device_id):
+        payload = {
+            'type': 'symmetricKey',
+            'symmetricKey': {
+                # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="int test only")]
+                'primaryKey': 'ya9+G4ED+/g0BgLduhjETJnbeEWMl1HIUApWCCpGMAU=',
+                # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="int test only")]
+                'secondaryKey': 'D8jeWazxcCK+MAxrn9KlqDLb8trbuKs35KEbcLBnS48='
+            }
+        }
+
+        command = f'''
+            iot central device attestation create
+            --app-id {self.app_id}
+            --device-id {device_id}
+            --content '{json.dumps(payload).replace("{", "{{").replace("}", "}}")}'
+        '''
+
+        return self.cmd(
+            command,
+            api_version=api_version,
+        ).get_output_in_json()
+
+    def _update_device_attestation(self, api_version, device_id):
+        payload = {
+            'type': 'symmetricKey',
+            'symmetricKey': {
+                # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="int test only")]
+                'primaryKey': 'r9KdK+LBaLiZ0p+RfAVj6eu9umGE6VqJj+AMLHdw+io=',
+                # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="int test only")]
+                'secondaryKey': 'W7/4/oaMpA83RYfirH9vzic4ZeK2Piy0jO5rTOM5wxg='
+            }
+        }
+
+        command = f'''
+            iot central device attestation update
+            --app-id {self.app_id}
+            --device-id {device_id}
+            --content '{json.dumps(payload).replace("{", "{{").replace("}", "}}")}'
+        '''
+
+        return self.cmd(
+            command,
+            api_version=api_version,
+        ).get_output_in_json()
+
+    def _update_device_properties(self, api_version, device_id):
+        command = f'''
+            iot central device twin update
+            --app-id {self.app_id}
+            --device-id {device_id}
+            --content '{device_updated_properties_path}' '''
+        return self.cmd(
+            command,
+            api_version=api_version,
+        ).get_output_in_json()
+
+    def _update_device_component_properties(self, api_version, device_id, component_name):
+        command = f'''
+            iot central device twin update
+            --app-id {self.app_id}
+            --device-id {device_id}
+            --component-name {component_name}
+            --content '{device_updated_component_properties_path}' '''
+        return self.cmd(
+            command,
+            api_version=api_version,
+        ).get_output_in_json()
+
+    def _update_device_module_properties(self, api_version, device_id, module_name):
+        command = f'''
+            iot central device twin update
+            --app-id {self.app_id}
+            --device-id {device_id}
+            --module-name {module_name}
+            --content '{device_updated_properties_path}' '''
+        return self.cmd(
+            command,
+            api_version=api_version,
+        ).get_output_in_json()
+
+    def _update_device_module_component_properties(self, api_version, device_id, module_name, component_name):
+        command = f'''
+            iot central device twin update
+            --app-id {self.app_id}
+            --device-id {device_id}
+            --component-name {component_name}
+            --module-name {module_name}
+            --content '{device_updated_component_properties_path}' '''
+        return self.cmd(
+            command,
+            api_version=api_version,
+        ).get_output_in_json()
 
     def _create_api_tokens(self, api_version):
         tokens = []
@@ -327,7 +479,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         )
 
     def _create_device_template(self, api_version, edge=False):
-        if edge and api_version != ApiVersion.v1_1_preview.value:
+        if edge and (api_version != ApiVersion.v1_1_preview.value and api_version != ApiVersion.ga_2022_05_31.value):
             raise InvalidArgumentValueError(
                 "Edge template creation is only available for api version >= 1.1-preview."
             )
@@ -418,6 +570,26 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                             else "template"
                         ]
                         if device_template == template_id:
+                            if api_version == ApiVersion.v1_1_preview.value:
+                                # delete attached children devices if any
+                                list_children_command = "iot central device edge children list --app-id {} -d {}".format(
+                                    self.app_id, device["id"]
+                                )
+
+                                children = self.cmd(
+                                    list_children_command, api_version=api_version
+                                ).get_output_in_json()
+
+                                for child in children:
+                                    self.cmd(
+                                        "iot central device delete --app-id {} --device-id {}".format(
+                                            self.app_id, child["id"]
+                                        ),
+                                        api_version=api_version,
+                                    )
+
+                                time.sleep(10)
+
                             self.cmd(
                                 "iot central device delete --app-id {} --device-id {}".format(
                                     self.app_id, device["id"]

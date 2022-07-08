@@ -1,0 +1,62 @@
+{
+    "LastReported": "2023-03-02T03:14:30.327Z",
+    "$metadata": {
+        "LastReported": {
+            "lastUpdateTime": "2022-06-15T18:01:52.5900235Z"
+        },
+        "LightThreshold": {
+            "desiredValue": 30,
+            "desiredVersion": 2,
+            "lastUpdateTime": "2022-05-23T22:43:47.1082781Z",
+            "ackVersion": 2,
+            "ackDescription": "completed",
+            "ackCode": 200
+        },
+        "TempThreshold": {
+            "desiredValue": 20,
+            "desiredVersion": 2,
+            "lastUpdateTime": "2022-05-23T22:43:47.1082781Z",
+            "ackVersion": 2,
+            "ackDescription": "completed",
+            "ackCode": 200
+        },
+        "TiltThreshold": {
+            "desiredValue": 45,
+            "desiredVersion": 2,
+            "lastUpdateTime": "2022-05-23T22:43:47.1082781Z",
+            "ackVersion": 2,
+            "ackDescription": "completed",
+            "ackCode": 200
+        },
+        "HumidityThreshold": {
+            "desiredValue": 20,
+            "desiredVersion": 2,
+            "lastUpdateTime": "2022-05-23T22:43:47.1082781Z",
+            "ackVersion": 2,
+            "ackDescription": "completed",
+            "ackCode": 200
+        },
+        "ShockThreshold": {
+            "desiredValue": 10,
+            "desiredVersion": 2,
+            "lastUpdateTime": "2022-05-23T22:43:47.1082781Z",
+            "ackVersion": 2,
+            "ackDescription": "completed",
+            "ackCode": 200
+        },
+        "PressureThreshold": {
+            "desiredValue": 1100,
+            "desiredVersion": 2,
+            "lastUpdateTime": "2022-05-23T22:43:47.1082781Z",
+            "ackVersion": 2,
+            "ackDescription": "completed",
+            "ackCode": 200
+        }
+    },
+    "LightThreshold": 30,
+    "TempThreshold": 20,
+    "TiltThreshold": 45,
+    "HumidityThreshold": 20,
+    "ShockThreshold": 10,
+    "PressureThreshold": 1100
+}
