@@ -95,9 +95,9 @@ steps:
             echo $IOTHUB
             sed -z -i 's/azext_iot_testhub=\n/azext_iot_testhub='"$IOTHUB"'\n/g' pytest.ini
             cat pytest.ini
+            az iot hub create -n $IOTHUB -g $(AZEXT_IOT_TESTRG)
             fi
 
-            az iot hub create -n $IOTHUB -g $(AZEXT_IOT_TESTRG)
             export COVERAGE_FILE=.coverage.${{ parameters.name }}
             pytest -vv ${{ parameters.path }} -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --durations=0
 
