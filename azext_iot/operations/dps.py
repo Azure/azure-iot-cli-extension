@@ -61,7 +61,7 @@ def iot_dps_device_enrollment_list(
     login=None,
     auth_type_dataplane=None,
 ):
-    from azext_iot.sdk.dps.service.models.query_specification import QuerySpecification
+    from azext_iot.sdk.dps.service.models.query_specification_py3 import QuerySpecification
 
     discovery = DPSDiscovery(cmd)
     target = discovery.get_target(
