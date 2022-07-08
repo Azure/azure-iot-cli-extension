@@ -1,0 +1,18 @@
+{
+    "value": [
+        {
+            "@type": "Component",
+            "name": "component2",
+            "displayName": "component2",
+            "description": "component2",
+            "comment": "component2"
+        },
+        {
+            "@type": "Component",
+            "name": "component3",
+            "displayName": "component3",
+            "description": "component3",
+            "comment": "component3"
+        }
+    ]
+}

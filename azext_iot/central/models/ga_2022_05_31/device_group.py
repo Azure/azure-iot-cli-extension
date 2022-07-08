@@ -5,7 +5,10 @@
 # --------------------------------------------------------------------------------------------
 
 
-class Role:
-    def __init__(self, role: dict):
-        self.display_name = role.get("displayName")
-        self.id = role.get("id")
+class DeviceGroup:
+    def __init__(self, group: dict):
+        self.display_name = group.get("displayName")
+        self.id = group.get("id")
+        self.organizations = group.get("organizations")
+        self.filter = group.get("filter")
+        self.description = group.get("description")
