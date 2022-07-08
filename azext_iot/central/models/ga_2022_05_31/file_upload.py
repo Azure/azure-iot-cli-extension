@@ -5,7 +5,10 @@
 # --------------------------------------------------------------------------------------------
 
 
-class Role:
-    def __init__(self, role: dict):
-        self.display_name = role.get("displayName")
-        self.id = role.get("id")
+class FileUpload:
+    def __init__(self, fileupload: dict):
+        self.account = fileupload.get("account")
+        self.connection_string = fileupload.get("connectionString")
+        self.container = fileupload.get("container")
+        self.sas_ttl = fileupload.get("sasTtl")
+        self.state = fileupload.get("state")

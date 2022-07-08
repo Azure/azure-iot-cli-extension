@@ -19,7 +19,7 @@ def add_api_token(
     org_id=None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
+    api_version=ApiVersion.ga_2022_05_31.value,
 ) -> dict:
     provider = CentralApiTokenProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
@@ -43,7 +43,7 @@ def list_api_tokens(
     app_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
+    api_version=ApiVersion.ga_2022_05_31.value,
 ) -> List[dict]:
 
     provider = CentralApiTokenProvider(
@@ -59,7 +59,7 @@ def get_api_token(
     token_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
+    api_version=ApiVersion.ga_2022_05_31.value,
 ):
 
     provider = CentralApiTokenProvider(
@@ -78,7 +78,7 @@ def delete_api_token(
     token_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
+    api_version=ApiVersion.ga_2022_05_31.value,
 ) -> dict:
     provider = CentralApiTokenProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
