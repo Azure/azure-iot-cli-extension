@@ -103,7 +103,7 @@ steps:
 
             if (($CREATE_HUB > 0))
             then
-            az iot hub delete -n $IOTHUB -g $(AZEXT_IOT_TESTRG)
+              az iot hub delete -n $IOTHUB -g $(AZEXT_IOT_TESTRG)
             fi
 
   - task: PublishBuildArtifacts@1
