@@ -189,10 +189,10 @@ class TestAddModels(object):
                     models=None,
                     from_directory=os.path.realpath(ontology_directory),
                 )
-            assert len(models_added) == MAX_MODELS_PER_BATCH
-            # Since deletion happens in the reverse order, hence we reverse the array before asserting equality
-            models_deleted.reverse()
-            assert models_added == models_deleted
+                assert len(models_added) == MAX_MODELS_PER_BATCH
+                # Since deletion happens in the reverse order, hence we reverse the array before asserting equality
+                models_deleted.reverse()
+                assert models_added == models_deleted
 
     @responses.activate
     def test_large_ontology_error_failure_policy_none(self, fixture_cmd, fixture_dt_client):
