@@ -184,7 +184,7 @@ class TestAddModels(object):
                     cmd=fixture_cmd,
                     name_or_hostname=hostname,
                     models=None,
-                    from_directory=os.path.realpath(ontology_directory),
+                    from_directory=ontology_directory,
                 )
                 assert len(models_added) == MAX_MODELS_PER_BATCH
                 # Since deletion happens in the reverse order, hence we reverse the array before asserting equality
@@ -223,7 +223,7 @@ class TestAddModels(object):
                     cmd=fixture_cmd,
                     name_or_hostname=hostname,
                     models=None,
-                    from_directory=os.path.abspath(ontology_directory),
+                    from_directory=ontology_directory,
                     failure_policy=ADTModelCreateFailurePolicy.NONE.value,
                 )
                 assert len(models_added) == MAX_MODELS_PER_BATCH
