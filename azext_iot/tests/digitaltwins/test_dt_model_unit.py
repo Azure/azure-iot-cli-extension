@@ -225,7 +225,7 @@ class TestAddModels(object):
                     cmd=fixture_cmd,
                     name_or_hostname=hostname,
                     models=None,
-                    from_directory=os.path.realpath(ontology_directory),
+                    from_directory=os.path.abspath(ontology_directory),
                     failure_policy=ADTModelCreateFailurePolicy.NONE.value,
                 )
             assert len(models_added) == MAX_MODELS_PER_BATCH
