@@ -25,12 +25,8 @@ from azext_iot.tests.digitaltwins.dt_helpers import (
 from azext_iot.tests.conftest import hostname
 from azext_iot.digitaltwins.providers.model import MAX_MODELS_PER_BATCH
 from azext_iot.digitaltwins.common import ADTModelCreateFailurePolicy
-from pathlib import Path
-
-CWD = os.path.dirname(os.path.abspath(__file__))
 
 
-@pytest.mark.usefixtures("set_cwd")
 class TestAddModels(object):
     @pytest.fixture(params=[200, 201])
     def service_client(self, mocked_response, fixture_dt_client, request):
@@ -135,6 +131,7 @@ class TestAddModels(object):
         assert request_body == expected_payload
         assert result == json.loads('[' + generic_result + ']')
 
+    @pytest.mark.usefixtures("set_cwd")
     @responses.activate
     def test_large_ontology_error(self, fixture_cmd, fixture_dt_client):
         models_added = []
@@ -179,7 +176,7 @@ class TestAddModels(object):
             callback=delete_request_callback,
             content_type="application/json",
         )
-        ontology_directory = os.path.join(Path(CWD), "references", "opendigitaltwins-building", "Ontology")
+        ontology_directory = "./references/opendigitaltwins-building/Ontology"
 
         if os.path.isdir(ontology_directory) and len(os.listdir(ontology_directory)) > 0:
             with pytest.raises(CLIError):
@@ -194,6 +191,7 @@ class TestAddModels(object):
                 models_deleted.reverse()
                 assert models_added == models_deleted
 
+    @pytest.mark.usefixtures("set_cwd")
     @responses.activate
     def test_large_ontology_error_failure_policy_none(self, fixture_cmd, fixture_dt_client):
         models_added = []
@@ -218,7 +216,7 @@ class TestAddModels(object):
             content_type="application/json",
         )
 
-        ontology_directory = os.path.join(Path(CWD), "references", "opendigitaltwins-building", "Ontology")
+        ontology_directory = "./references/opendigitaltwins-building/Ontology"
         if os.path.isdir(ontology_directory) and len(os.listdir(ontology_directory)) > 0:
             with pytest.raises(CLIError):
                 subject.add_models(
@@ -228,7 +226,7 @@ class TestAddModels(object):
                     from_directory=os.path.abspath(ontology_directory),
                     failure_policy=ADTModelCreateFailurePolicy.NONE.value,
                 )
-            assert len(models_added) == MAX_MODELS_PER_BATCH
+                assert len(models_added) == MAX_MODELS_PER_BATCH
 
     def test_add_model_no_models_directory(self, fixture_cmd):
         with pytest.raises(CLIError):
