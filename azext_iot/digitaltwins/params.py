@@ -388,7 +388,7 @@ def load_digitaltwins_arguments(self, _):
         context.argument(
             "failure_policy",
             options_list=["--failure-policy", "--fp"],
-            help="Indicates the failure policy when an error occurs while processing a models batch. Defaults to 'Rollback'. "
+            help="Indicates the failure policy when an error occurs while processing a models batch. "
             "In the 'Rollback' mode all models created in previous batches are deleted one at a time. "
             "When selected as 'None' the models created in previous batches are not deleted from DT instance.",
             arg_group="Models Input",
