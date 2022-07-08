@@ -129,6 +129,10 @@ Execute the following command to run the IoT Hub integration tests:
 
 `pytest azext_iot/tests/iothub/ -k "_int.py"`
 
+To run specific test in any integration test file, such as:
+
+`pytest azext_iot/tests/central/test_iot_central_int.py::TestIotCentral::test_central_query_methods_run`
+
 #### Azure Resource Setup
 
 The following resources will be needed for the integration tests.
