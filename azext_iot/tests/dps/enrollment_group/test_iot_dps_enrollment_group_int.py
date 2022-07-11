@@ -20,6 +20,7 @@ class TestDPSEnrollmentGroups(IoTDPSLiveScenarioTest):
         super(TestDPSEnrollmentGroups, self).__init__(test_case)
 
     def test_dps_enrollment_group_x509_lifecycle(self):
+        raise Exception("I want to fail.")
         cert_name = self.generate_device_names()[0]
         cert_path = cert_name + CERT_ENDING
         self.create_test_cert(subject=cert_name)
