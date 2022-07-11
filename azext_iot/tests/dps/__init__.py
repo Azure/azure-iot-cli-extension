@@ -59,7 +59,9 @@ settings = DynamoSettings(
 )
 ENTITY_RG = settings.env.azext_iot_testrg
 ENTITY_DPS_NAME = settings.env.azext_iot_testdps if settings.env.azext_iot_testdps else "test-dps-" + generate_generic_id()
-ENTITY_HUB_NAME = settings.env.azext_iot_testdps_hub if settings.env.azext_iot_testdps_hub else "test-dps-hub-" + generate_generic_id()
+ENTITY_HUB_NAME = (
+    settings.env.azext_iot_testdps_hub if settings.env.azext_iot_testdps_hub else "test-dps-hub-" + generate_generic_id()
+)
 MAX_RBAC_ASSIGNMENT_TRIES = settings.env.azext_iot_rbac_max_tries if settings.env.azext_iot_rbac_max_tries else 10
 
 
