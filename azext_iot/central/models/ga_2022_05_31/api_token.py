@@ -5,7 +5,8 @@
 # --------------------------------------------------------------------------------------------
 
 
-class Role:
-    def __init__(self, role: dict):
-        self.display_name = role.get("displayName")
-        self.id = role.get("id")
+class ApiToken:
+    def __init__(self, apitoken: dict):
+        self.id = apitoken.get("id")
+        self.token = apitoken.get("token")
+        self.expiry = apitoken.get("expiry")
