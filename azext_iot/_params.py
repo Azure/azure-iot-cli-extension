@@ -785,11 +785,11 @@ def load_arguments(self, _):
         )
 
     with self.argument_context("iot hub state import") as context:
-        context.argument(
-            "hub",
-            options_list=["--hub-name", "-n"],
-            help="IoT Hub name."
-        )
+        # context.argument(
+        #     "hub",
+        #     options_list=["--hub-name", "-n"],
+        #     help="IoT Hub name."
+        # )
         context.argument(
             "rg",
             options_list=["--resource-group", "-g"],
@@ -814,22 +814,22 @@ def load_arguments(self, _):
     with self.argument_context("iot hub state migrate") as context:
         context.argument(
             "dest_hub",
-            options_list=["--destination-hub", "-dh"],
+            options_list=["--destination-hub", "--dh"],
             help="Name of IoT Hub to which the origin hub will be copied."
         )
         context.argument(
             "dest_rg",
-            options_list=["--destination-resource-group", "-dg"],
+            options_list=["--destination-resource-group", "--dg"],
             help="Name of resource group of the IoT Hub to which the origin hub will be copied."
         )
         context.argument(
             "orig_hub",
-            options_list=["--origin-hub", "-oh"],
+            options_list=["--origin-hub", "--oh"],
             help="Name of IoT Hub from which the origin hub will be copied."
         )
         context.argument(
             "orig_rg",
-            options_list=["--origin-resource-group", "-og"],
+            options_list=["--origin-resource-group", "--og"],
             help="Name of resource group of the IoT Hub from which the origin hub will be copied."
         )
         context.argument(
