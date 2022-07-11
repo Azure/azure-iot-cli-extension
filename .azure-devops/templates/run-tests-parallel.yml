@@ -88,6 +88,7 @@ steps:
         ${{ if contains(parameters.path, 'azext_iot/tests/dps') }}:
           inlineScript: |
             IOTHUB=`echo test-dps-hub-py$RANDOM`
+            sudo apt install dos2unix -y -q
             dos2unix pytest.ini
             CREATE_HUB=`grep -c "azext_iot_testdps_hub=$" pytest.ini`
 
