@@ -334,7 +334,7 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     os.remove(cert)
                 except OSError as e:
                     logger.error(f"Failed to remove {cert}. {e}")
-        if not settings.env.azext_iot_testhub:
+        if not settings.env.azext_iot_testdps_hub:
             self.cmd(
                 "iot hub delete --name {} --resource-group {}".format(
                     ENTITY_HUB_NAME, ENTITY_RG
