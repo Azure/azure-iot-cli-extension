@@ -764,46 +764,16 @@ def load_arguments(self, _):
     
     with self.argument_context("iot hub state export") as context:
         context.argument(
-            "hub",
-            options_list=["--hub-name", "-n"],
-            help="IoT Hub name."
-        )
-        context.argument(
-            "rg",
-            options_list=["--resource-group", "-g"],
-            help="Name of resource group. You can configure the default group using `az configure --defaults group=<name>`."
-        )
-        context.argument(
             "filename",
             options_list=["--filename", "-f"],
             help="The path to the file where the hub and device information will be stored."
         )
-        context.argument(
-            "auth_type_dataplane",
-            options_list=["--auth-type"],
-            arg_type=hub_auth_type_dataplane_param_type,
-        )
 
     with self.argument_context("iot hub state import") as context:
-        # context.argument(
-        #     "hub",
-        #     options_list=["--hub-name", "-n"],
-        #     help="IoT Hub name."
-        # )
-        context.argument(
-            "rg",
-            options_list=["--resource-group", "-g"],
-            help="Name of resource group. You can configure the default group using `az configure --defaults group=<name>`."
-        )
         context.argument(
             "filename",
             options_list=["--filename", "-f"],
             help="The path to the file from which the hub and device information will be read."
-        )
-        context.argument(
-            "auth_type_dataplane",
-            options_list=["--auth-type"],
-            arg_type=hub_auth_type_dataplane_param_type,
         )
         context.argument(
             "overwrite",
@@ -831,11 +801,6 @@ def load_arguments(self, _):
             "orig_rg",
             options_list=["--origin-resource-group", "--og"],
             help="Name of resource group of the IoT Hub from which the origin hub will be copied."
-        )
-        context.argument(
-            "auth_type_dataplane",
-            options_list=["--auth-type"],
-            arg_type=hub_auth_type_dataplane_param_type,
         )
         context.argument(
             "overwrite",

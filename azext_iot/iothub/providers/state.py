@@ -129,12 +129,12 @@ class StateProvider(IoTHubProvider):
                 status_reason=status_reason, resource_group_name=self.rg, auth_type_dataplane=self.auth_type)
 
         elif(auth_type == DeviceAuthApiType.selfSigned.value):
-            iot_device_create(self.cmd, device_id, self.hub_name, edge, auth_method='x509_thumbprint', \
+            iot_device_create(self.cmd, device_id, self.hub_name, edge, DeviceAuthType.x509_thumbprint.value, \
                     primary_thumbprint=ptp, secondary_thumbprint=stp, status=status, status_reason=status_reason, resource_group_name=self.rg, \
                     auth_type_dataplane=self.auth_type)
 
         elif(auth_type == DeviceAuthApiType.certificateAuthority.value):
-                iot_device_create(self.cmd, device_id, self.hub_name, edge, auth_method='x509_ca', status=status, status_reason=status_reason, \
+                iot_device_create(self.cmd, device_id, self.hub_name, edge, DeviceAuthType.x509_ca.value, status=status, status_reason=status_reason, \
                     resource_group_name=self.rg, auth_type_dataplane=self.auth_type)
 
         else: 
@@ -156,11 +156,11 @@ class StateProvider(IoTHubProvider):
             ptp = identity["x509Thumbprint"]["primaryThumbprint"]
             stp = identity["x509Thumbprint"]["secondaryThumbprint"]
 
-            iot_device_module_create(self.cmd, device_id, module_id, self.hub_name, auth_method='x509_thumbprint', primary_thumbprint=ptp, secondary_thumbprint=stp, \
+            iot_device_module_create(self.cmd, device_id, module_id, self.hub_name, auth_method=DeviceAuthType.x509_thumbprint.value, primary_thumbprint=ptp, secondary_thumbprint=stp, \
                 resource_group_name=self.rg, auth_type_dataplane=self.auth_type)
 
         elif(auth_type == DeviceAuthApiType.certificateAuthority.value):
-            iot_device_module_create(self.cmd, device_id, module_id, self.hub_name, auth_method='x509_ca', resource_group_name=self.rg, auth_type_dataplane=self.auth_type)
+            iot_device_module_create(self.cmd, device_id, module_id, self.hub_name, auth_method=DeviceAuthType.x509_ca.value, resource_group_name=self.rg, auth_type_dataplane=self.auth_type)
 
         else:
             logger.error("Authorization type for module '{0}' in device '{1}' not recognized.".format(module_id, device_id))

@@ -35,7 +35,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
         if not settings.env.azext_iot_desthub:
             self.cmd("iot hub create --name {} --resource-group {} --sku S1 ".format(self.dest_hub, self.entity_rg))
 
-        # make a configuration for the hub
+        # make a configuration for the hub (applies to 0 devices, this is just to test the configuration settings)
 
         config_content = {"deviceContent" : 
             {"properties.desired.propFromConfig" : generate_generic_id()}
@@ -50,7 +50,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
 
         metrics = {"metrics": {
             "queries": {
-                # "mymetric": "SELECT deviceId from devices where properties.reported.lastDesiredStatus.code = 200"
+                "mymetric": "SELECT deviceId from devices where properties.reported.lastDesiredStatus.code = 200"
             }
         }}
         metrics = json.dumps(metrics)
@@ -60,7 +60,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
         self.kwargs["metrics"] = metrics
 
         self.cmd("iot hub configuration create --config-id {} -n {} -g {} --content '{}' --labels '{}' --priority {} --metrics '{}' --target-condition {}" \
-            .format("hubConfig", self.entity_name, self.entity_rg, "{config_content}", "{labels}", priority, "{metrics}", "*"))
+            .format("hubConfig", self.entity_name, self.entity_rg, "{config_content}", "{labels}", priority, "{metrics}", "tags.bar=12"))
 
         # populate hub with devices
         
@@ -110,6 +110,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
                         generate_generic_id(): generate_generic_id(),
                         generate_generic_id(): generate_generic_id(),
                     }
+
                     self.kwargs["patch_tags"] = json.dumps(patch_tags)
       
                     self.cmd(
@@ -285,28 +286,12 @@ class TestHubExportImport(IoTLiveScenarioTest):
 
         self.create_hub_state()
 
-        # orig_hub_configs = self.cmd(
-        #         f"iot hub configuration list -n {self.entity_name} -g {self.entity_rg}"
-        #     ).get_output_in_json()
-
-        # print()
-        # print(orig_hub_configs[0]["systemMetrics"])
-        # print()
-
-        # orig_hub_identities = self.cmd(
-        #     f"iot hub device-identity list -n {self.entity_name} -g {self.entity_rg}"
-        # ).get_output_in_json()
-
-        # print("orig hub devices before export")
-        # for id in orig_hub_identities:
-        #     print(id["properties"]["desired"])
-
         self.cmd(
-            f"iot hub state export -n {self.entity_name} -g {self.entity_rg} -f {self.filename}"
+            f"iot hub state export -n {self.entity_name} -f {self.filename} -g {self.entity_rg}"
         )
 
         self.cmd(
-            f"iot hub state import -n {self.dest_hub} -g {self.dest_hub_rg} -f {self.filename} --overwrite"
+            f"iot hub state import -n {self.dest_hub} -f {self.filename} -g {self.dest_hub_rg} --overwrite"
         )
 
         self.compare_hubs()
@@ -318,29 +303,10 @@ class TestHubExportImport(IoTLiveScenarioTest):
 
         self.create_hub_state()
 
-        # orig_hub_identities = self.cmd(
-        #     f"iot hub device-identity list -n {self.entity_name} -g {self.entity_rg}"
-        # ).get_output_in_json()
-    
-        # print()
-        # print("orig hub devices before migrate")
-        # for id in orig_hub_identities:
-        #     print(id["properties"]["desired"])
-
         self.cmd(
             f"iot hub state migrate --origin-hub {self.entity_name} --origin-resource-group {self.entity_rg} --destination-hub {self.dest_hub} \
                 --destination-resource-group {self.dest_hub_rg} --overwrite"
         )
-
-        # dest_hub_identities = self.cmd(
-        #     f"iot hub device-identity list -n {self.dest_hub} -g {self.dest_hub_rg}"
-        # ).get_output_in_json()
-
-    
-        # print()
-        # print("dest hub devices after migrate")
-        # for id in dest_hub_identities:
-        #     print(id["properties"]["desired"])
 
         self.compare_hubs()
         self.clean_up_dest_hub()

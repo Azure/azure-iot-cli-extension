@@ -13,12 +13,12 @@ import time
 logger = get_logger(__name__)
 
 
-def state_export(cmd, hub, rg=None, filename='/project/files/deviceFile.json', auth_type_dataplane=None):
-    sp = StateProvider(cmd, hub, rg, auth_type_dataplane=None)
+def state_export(cmd, hub_name, filename, resource_group_name=None, auth_type_dataplane=None):
+    sp = StateProvider(cmd, hub_name, resource_group_name, auth_type_dataplane=None)
     sp.save_state(filename)
 
-def state_import(cmd, hub, rg=None, filename='/project/files/deviceFile.json', auth_type_dataplane=None, overwrite=False): 
-    sp = StateProvider(cmd, hub, rg, auth_type_dataplane=None)
+def state_import(cmd, hub_name, filename, resource_group_name=None, auth_type_dataplane=None, overwrite=False): 
+    sp = StateProvider(cmd, hub_name, resource_group_name, auth_type_dataplane=None)
     sp.upload_state(filename, overwrite)
 
 def state_migrate(cmd, orig_hub, dest_hub, orig_rg=None, dest_rg=None, auth_type_dataplane=None, overwrite=False): 
