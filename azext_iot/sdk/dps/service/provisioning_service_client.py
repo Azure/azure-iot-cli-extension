@@ -42,7 +42,7 @@ class ProvisioningServiceClientConfiguration(AzureConfiguration):
 
         super(ProvisioningServiceClientConfiguration, self).__init__(base_url)
 
-        self.add_user_agent('service/{}'.format(VERSION))
+        self.add_user_agent('provisioningserviceclient/{}'.format(VERSION))
         self.add_user_agent('Azure-SDK-For-Python')
 
         self.credentials = credentials
