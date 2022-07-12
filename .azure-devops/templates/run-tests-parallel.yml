@@ -97,6 +97,7 @@ steps:
               echo $IOTHUB
               sed -z -i 's/azext_iot_testdps_hub=\n/azext_iot_testdps_hub='"$IOTHUB"'\n/g' pytest.ini
               cat pytest.ini
+              az -v
               az iot hub create -n $IOTHUB -g $(AZEXT_IOT_TESTRG)
             fi
 
