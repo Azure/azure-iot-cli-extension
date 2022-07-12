@@ -424,12 +424,12 @@ class TestDPSDeviceRegistrationsIndividual(IoTDPSLiveScenarioTest):
             )
 
     def test_dps_device_registration_unlinked_hub(self):
-        # Unlink hub
+        # Unlink hub - use hub host name until min version is 2.32
         self.cmd(
             "iot dps linked-hub delete --dps-name {} -g {} --linked-hub {}".format(
                 self.entity_dps_name,
                 self.entity_rg,
-                self.entity_hub_name
+                self.hub_host_name
             )
         )
 
