@@ -783,14 +783,24 @@ def load_arguments(self, _):
 
     with self.argument_context("iot hub state migrate") as context:
         context.argument(
-            "dest_hub",
+            "hub_name",
             options_list=["--destination-hub", "--dh"],
             help="Name of IoT Hub to which the origin hub will be copied."
         )
         context.argument(
-            "dest_rg",
+            "rg",
             options_list=["--destination-resource-group", "--dg"],
             help="Name of resource group of the IoT Hub to which the origin hub will be copied."
+        )
+        context.argument(
+            "login",
+            options_list=["--destination-hub-login", "--dl"],
+            validator=mode2_iot_login_handler,
+            help="This command supports an entity connection string with rights to perform action. "
+            'Use to avoid session login via "az login". '
+            "If both an entity connection string and name are provided the connection string takes priority. "
+            "Required if --dps-name is not provided.",
+            arg_group="Device Provisioning Service Identifier"
         )
         context.argument(
             "orig_hub",
@@ -801,6 +811,16 @@ def load_arguments(self, _):
             "orig_rg",
             options_list=["--origin-resource-group", "--og"],
             help="Name of resource group of the IoT Hub from which the origin hub will be copied."
+        )
+        context.argument(
+            "orig_hub_login",
+            options_list=["--origin-hub-login", "--ol"],
+            validator=mode2_iot_login_handler,
+            help="This command supports an entity connection string with rights to perform action. "
+            'Use to avoid session login via "az login". '
+            "If both an entity connection string and name are provided the connection string takes priority. "
+            "Required if --dps-name is not provided.",
+            arg_group="Device Provisioning Service Identifier"
         )
         context.argument(
             "overwrite",

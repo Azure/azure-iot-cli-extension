@@ -13,14 +13,21 @@ import time
 logger = get_logger(__name__)
 
 
-def state_export(cmd, hub_name, filename, resource_group_name=None, auth_type_dataplane=None):
-    sp = StateProvider(cmd, hub_name, resource_group_name, auth_type_dataplane=None)
+def state_export(cmd, filename, hub_name=None, resource_group_name=None, login=None, auth_type_dataplane=None):
+    b = time.perf_counter()
+    sp = StateProvider(cmd=cmd, hub=hub_name, rg=resource_group_name, login=login, auth_type_dataplane=auth_type_dataplane)
     sp.save_state(filename)
+    print("total time: ", time.perf_counter()-b)
 
-def state_import(cmd, hub_name, filename, resource_group_name=None, auth_type_dataplane=None, overwrite=False): 
-    sp = StateProvider(cmd, hub_name, resource_group_name, auth_type_dataplane=None)
+def state_import(cmd, filename, hub_name=None, resource_group_name=None, login=None, auth_type_dataplane=None, overwrite=False): 
+    b = time.perf_counter()
+    sp = StateProvider(cmd=cmd, hub=hub_name, rg=resource_group_name, login=login, auth_type_dataplane=auth_type_dataplane)
     sp.upload_state(filename, overwrite)
+    print("total time: ", time.perf_counter()-b)
 
-def state_migrate(cmd, orig_hub, dest_hub, orig_rg=None, dest_rg=None, auth_type_dataplane=None, overwrite=False): 
-    sp = StateProvider(cmd, dest_hub, dest_rg, orig_hub, orig_rg, auth_type_dataplane=None)
-    sp.migrate_devices(overwrite)
+def state_migrate(cmd, hub_name=None, rg=None, login=None, orig_hub=None, orig_rg=None, orig_hub_login=None, overwrite=False, auth_type_dataplane=None):
+    b = time.perf_counter()
+    sp = StateProvider(cmd=cmd, hub=hub_name, rg=rg, login=login, auth_type_dataplane=auth_type_dataplane)
+    sp.migrate_devices(orig_hub, orig_rg, orig_hub_login, overwrite)
+    print("total time: ", time.perf_counter()-b)
+

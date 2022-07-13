@@ -26,7 +26,11 @@ class TestHubExportImport(IoTLiveScenarioTest):
         super(TestHubExportImport, self).__init__(test_case)
         self.dest_hub = settings.env.azext_iot_desthub or "test-hub-" + generate_generic_id()
         self.dest_hub_rg = settings.env.azext_iot_destrg
-        self.filename = "/project/files/" + generate_generic_id() + ".json" # change this
+        self.dest_hub_cstring = self.cmd(
+            "iot hub connection-string show -n {} -g {}".format(self.dest_hub, self.dest_hub_rg)
+        ).get_output_in_json()["connectionString"]
+
+        self.filename = "/project/files/" + generate_generic_id() + ".json" # TODO: change this
 
     def create_hub_state(self):
 
@@ -286,12 +290,20 @@ class TestHubExportImport(IoTLiveScenarioTest):
 
         self.create_hub_state()
 
+        # self.cmd(
+        #     f"iot hub state export -n {self.entity_name} -f {self.filename} -g {self.entity_rg}"
+        # )
+
+        # self.cmd(
+        #     f"iot hub state import -n {self.dest_hub} -f {self.filename} -g {self.dest_hub_rg} --overwrite"
+        # )
+
         self.cmd(
-            f"iot hub state export -n {self.entity_name} -f {self.filename} -g {self.entity_rg}"
+            f"iot hub state export -f {self.filename} -l {self.connection_string}"
         )
 
         self.cmd(
-            f"iot hub state import -n {self.dest_hub} -f {self.filename} -g {self.dest_hub_rg} --overwrite"
+            f"iot hub state import -f {self.filename} -l {self.dest_hub_cstring} --overwrite"
         )
 
         self.compare_hubs()
@@ -303,9 +315,13 @@ class TestHubExportImport(IoTLiveScenarioTest):
 
         self.create_hub_state()
 
+        # self.cmd(
+        #     f"iot hub state migrate --origin-hub {self.entity_name} --origin-resource-group {self.entity_rg} --destination-hub {self.dest_hub} \
+        #         --destination-resource-group {self.dest_hub_rg} --overwrite"
+        # )
+
         self.cmd(
-            f"iot hub state migrate --origin-hub {self.entity_name} --origin-resource-group {self.entity_rg} --destination-hub {self.dest_hub} \
-                --destination-resource-group {self.dest_hub_rg} --overwrite"
+            f"iot hub state migrate --origin-hub-login {self.connection_string} --destination-hub-login {self.dest_hub_cstring} --overwrite"
         )
 
         self.compare_hubs()

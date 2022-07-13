@@ -11,10 +11,13 @@ PARAM_MAPPING = {
 
 
 def error_no_hub_or_login_on_input(entity_type="IoT Hub"):
-    return (
-        "Please provide an {0} entity name (via the '{1}' or '-n' parameter)"
-        " or {0} connection string via --login..."
-    ).format(entity_type, PARAM_MAPPING[entity_type])
+    if entity_type:
+        return (
+            "Please provide an {0} entity name (via the '{1}' or '-n' parameter)"
+            " or {0} connection string via --login..."
+        ).format(entity_type, PARAM_MAPPING[entity_type])
+    else:
+        return ("Required entity type missing, please check _validators.py for required entities.")
 
 
 def error_param_top_out_of_bounds(upper_limit=None):

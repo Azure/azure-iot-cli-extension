@@ -609,7 +609,7 @@ helps[
     examples:
     - name: Migrate the state of the original hub to the new hub, overwriting the configurations and devices already in the hub.
       text: >
-        az iot hub state export --destination-hub {dest_hub_name} --origin-hub {orig_hub_name} --overwrite
+        az iot hub state migrate --destination-hub {dest_hub_name} --origin-hub {orig_hub_name} --overwrite
 """
 
 helps[
