@@ -92,15 +92,12 @@ steps:
             dos2unix pytest.ini
             CREATE_HUB=`grep -c "azext_iot_testdps_hub=$" pytest.ini`
 
-            if (($CREATE_HUB > 0))
+            if (($CREATE_HUB > 0 && (${{ parameters.azureCLIVersion }} == "released" || ${{ parameters.azureCLIVersion }} == "min")))
             then
               echo $IOTHUB
               az iot hub create -n $IOTHUB -g $(AZEXT_IOT_TESTRG)
-              if (($? == 0))
-              then
-                sed -z -i 's/azext_iot_testdps_hub=\n/azext_iot_testdps_hub='"$IOTHUB"'\n/g' pytest.ini
-                cat pytest.ini
-              fi
+              sed -z -i 's/azext_iot_testdps_hub=\n/azext_iot_testdps_hub='"$IOTHUB"'\n/g' pytest.ini
+              cat pytest.ini
             fi
 
             export COVERAGE_FILE=.coverage.${{ parameters.name }}
