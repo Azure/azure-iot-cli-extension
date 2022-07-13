@@ -105,7 +105,7 @@ steps:
             pytest -vv ${{ parameters.path }} -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --durations=0
             e=$?
 
-            if [[ $CREATE_HUB > 0 ]]
+            if [[ $CREATE_HUB > 0 ]] && [[ ${{ parameters.azureCLIVersion }} == "released" || ${{ parameters.azureCLIVersion }} == "min" ]]
             then
               az iot hub delete -n $IOTHUB -g $(AZEXT_IOT_TESTRG)
             fi
