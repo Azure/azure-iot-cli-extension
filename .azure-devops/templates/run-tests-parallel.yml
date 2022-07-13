@@ -91,6 +91,9 @@ steps:
             sudo apt install dos2unix -y -q
             dos2unix pytest.ini
             CREATE_HUB=`grep -c "azext_iot_testdps_hub=$" pytest.ini`
+            echo `(${{ parameters.azureCLIVersion }} == "released" || ${{ parameters.azureCLIVersion }} == "min")`
+            echo ${{ parameters.azureCLIVersion }}
+
 
             if (($CREATE_HUB > 0 && (${{ parameters.azureCLIVersion }} == "released" || ${{ parameters.azureCLIVersion }} == "min")))
             then
