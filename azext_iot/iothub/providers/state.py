@@ -6,17 +6,9 @@
 
 from multiprocessing.sharedctypes import Value
 from knack.log import get_logger
-from azext_iot.operations import hub
-from azext_iot.sdk.iothub import device
-from azure.cli.core.azclierror import (
-    CLIInternalError,
-    InvalidArgumentValueError,
-    RequiredArgumentMissingError,
-)
-from azext_iot.common.shared import SdkType, JobStatusType, JobType, JobVersionType, DeviceAuthApiType, DeviceAuthType
-from azext_iot.common.utility import handle_service_exception, process_json_arg
-from azext_iot.operations.generic import _execute_query, _process_top
-from azext_iot.iothub.providers.base import IoTHubProvider, CloudError, SerializationError
+
+from azext_iot.common.shared import DeviceAuthApiType, DeviceAuthType
+from azext_iot.iothub.providers.base import IoTHubProvider
 from azext_iot.operations.hub import _iot_device_show, _iot_device_twin_show, _iot_device_module_twin_show, _iot_device_module_show
 from azext_iot.operations.hub import iot_device_list, iot_device_create, iot_device_delete, iot_device_twin_replace, iot_hub_configuration_create, iot_hub_configuration_list, \
     iot_hub_configuration_delete, iot_device_module_list, iot_device_module_create, iot_device_module_twin_replace
@@ -36,13 +28,13 @@ class StateProvider(IoTHubProvider):
             login=login,
             auth_type_dataplane=auth_type_dataplane
         )
+        self.auth_type = auth_type_dataplane
 
-        if login:
+        # the login argument doesn't work later if auth type = "login" and a connection string isn't given initially
+        if login or auth_type_dataplane == "key":
             self.login = self.target["cs"]
         else:
             self.login = None
-
-        self.auth_type = auth_type_dataplane
 
     def save_state(self, filename):
         '''
@@ -61,7 +53,7 @@ class StateProvider(IoTHubProvider):
             for i in tqdm(range(len(identities)), desc ="Exporting devices"):
                 id = identities[i]
 
-                module_objs = iot_device_module_list(cmd=self.cmd, device_id=id["deviceId"], hub_name=self.hub_name, top=-1, resource_group_name=self.rg, login=self.login, auth_type_dataplane=self.auth_type, )
+                module_objs = iot_device_module_list(cmd=self.cmd, device_id=id["deviceId"], hub_name=self.hub_name, resource_group_name=self.rg, login=self.login, auth_type_dataplane=self.auth_type)
 
                 # number of modules in the device (not including the two modules automatically included in edge devices)
                 if(id["capabilities"]["iotEdge"]):
@@ -170,12 +162,14 @@ class StateProvider(IoTHubProvider):
 
     def delete_all_configs(self):
         configs = iot_hub_configuration_list(cmd=self.cmd, hub_name=self.hub_name, resource_group_name=self.rg, login=self.login, auth_type_dataplane=self.auth_type)
-        for c in configs:
+        for i in tqdm(range(len(configs)), desc ="Deleting configurations from destination hub"):
+            c = configs[i]
             iot_hub_configuration_delete(cmd=self.cmd, config_id=c["id"], hub_name=self.hub_name, resource_group_name=self.rg, login=self.login, auth_type_dataplane=self.auth_type)
 
     def delete_all_devices(self):
         identities = iot_device_list(cmd=self.cmd, hub_name=self.hub_name, top=-1, resource_group_name=self.rg, login=self.login, auth_type_dataplane=self.auth_type) 
-        for id in identities:
+        for i in tqdm(range(len(identities)), desc ="Deleting identities from destination hub"):
+            id = identities[i]
             iot_device_delete(cmd=self.cmd, device_id=id["deviceId"], hub_name=self.hub_name, resource_group_name=self.rg, login=self.login, auth_type_dataplane=self.auth_type)
 
     def upload_state(self, filename, overwrite):
@@ -251,6 +245,8 @@ class StateProvider(IoTHubProvider):
             auth_type=self.auth_type
         )
 
+        self.orig_hub_login = orig_hub_target["cs"]
+
         configs = iot_hub_configuration_list(cmd=self.cmd, hub_name=orig_hub, resource_group_name=orig_rg, login=orig_hub_login, auth_type_dataplane=self.auth_type)
 
         for i in tqdm(range(len(configs)), desc ="Migrating hub configurations"):
@@ -278,7 +274,7 @@ class StateProvider(IoTHubProvider):
 
             # upload modules for the given device
 
-            module_objs = iot_device_module_list(cmd=self.cmd, device_id=id["deviceId"], hub_name=orig_hub, top=-1, resource_group_name=orig_rg, login=orig_hub_login, auth_type_dataplane=self.auth_type)
+            module_objs = iot_device_module_list(cmd=self.cmd, device_id=id["deviceId"], hub_name=orig_hub, resource_group_name=orig_rg, login=orig_hub_login, auth_type_dataplane=self.auth_type)
 
             for module in module_objs:
                 module = vars(module)

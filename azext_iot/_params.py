@@ -761,19 +761,12 @@ def load_arguments(self, _):
             type=int,
             help="Maximum number of configurations to return. By default all configurations are returned.",
         )
-    
-    with self.argument_context("iot hub state export") as context:
+
+    with self.argument_context("iot hub state") as context:
         context.argument(
             "filename",
             options_list=["--filename", "-f"],
             help="The path to the file where the hub and device information will be stored."
-        )
-
-    with self.argument_context("iot hub state import") as context:
-        context.argument(
-            "filename",
-            options_list=["--filename", "-f"],
-            help="The path to the file from which the hub and device information will be read."
         )
         context.argument(
             "overwrite",
@@ -796,8 +789,8 @@ def load_arguments(self, _):
             "login",
             options_list=["--destination-hub-login", "--dl"],
             validator=mode2_iot_login_handler,
-            help="This command supports an entity connection string with rights to perform action. "
-            'Use to avoid session login via "az login". '
+            help="This command supports an entity connection string with rights to perform action on the destination hub. "
+            'Use to avoid session login via "az login" for this IoT Hub instance. '
             "If both an entity connection string and name are provided the connection string takes priority. "
             "Required if --dps-name is not provided.",
             arg_group="Device Provisioning Service Identifier"
@@ -805,27 +798,22 @@ def load_arguments(self, _):
         context.argument(
             "orig_hub",
             options_list=["--origin-hub", "--oh"],
-            help="Name of IoT Hub from which the origin hub will be copied."
+            help="Name of IoT Hub which will be copied."
         )
         context.argument(
             "orig_rg",
             options_list=["--origin-resource-group", "--og"],
-            help="Name of resource group of the IoT Hub from which the origin hub will be copied."
+            help="Name of resource group of the IoT Hub which will be copied."
         )
         context.argument(
             "orig_hub_login",
             options_list=["--origin-hub-login", "--ol"],
             validator=mode2_iot_login_handler,
-            help="This command supports an entity connection string with rights to perform action. "
-            'Use to avoid session login via "az login". '
+            help="This command supports an entity connection string with rights to perform action on the origin hub. "
+            'Use to avoid session login via "az login" for this IoT Hub instance. '
             "If both an entity connection string and name are provided the connection string takes priority. "
             "Required if --dps-name is not provided.",
             arg_group="Device Provisioning Service Identifier"
-        )
-        context.argument(
-            "overwrite",
-            options_list=["--overwrite"],
-            help="If this flag is set, then the import will overwrite all configurations and devices in the destination hub."
         )
 
     with self.argument_context("iot edge") as context:
