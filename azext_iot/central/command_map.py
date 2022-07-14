@@ -73,7 +73,7 @@ def load_central_commands(self, _):
         cmd_group.command("list", "list_destinations")
         cmd_group.show_command("show", "get_destination")
         cmd_group.command("delete", "delete_destination")
-        cmd_group.command("create", "add_destination")
+        cmd_group.command("create", "create_destination")
         cmd_group.command("update", "update_destination")
 
     with self.command_group(
@@ -124,7 +124,7 @@ def load_central_commands(self, _):
         "iot central api-token",
         command_type=central_api_token_ops,
     ) as cmd_group:
-        cmd_group.command("create", "add_api_token")
+        cmd_group.command("create", "create_api_token")
         cmd_group.command("list", "list_api_tokens")
         cmd_group.show_command("show", "get_api_token")
         cmd_group.command("delete", "delete_api_token")

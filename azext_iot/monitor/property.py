@@ -33,25 +33,19 @@ class PropertyMonitor:
         cmd,
         app_id: str,
         device_id: str,
-        token: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         self._cmd = cmd
         self._app_id = app_id
         self._device_id = device_id
-        self._token = token
         self._central_dns_suffix = central_dns_suffix
         self._central_device_provider = CentralDeviceProvider(
             cmd=self._cmd,
             app_id=self._app_id,
-            token=self._token,
-            api_version=ApiVersion.v1.value,
         )
         self._central_template_provider = CentralDeviceTemplateProvider(
             cmd=self._cmd,
             app_id=self._app_id,
-            token=self._token,
-            api_version=ApiVersion.v1.value,
         )
         self._template = self._get_device_template()
 

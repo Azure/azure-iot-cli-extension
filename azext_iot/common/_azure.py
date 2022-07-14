@@ -7,7 +7,7 @@
 from azure.cli.core.azclierror import AzureResponseError, CLIInternalError
 from azext_iot.common.utility import validate_key_value_pairs
 from azext_iot.common.auth import get_aad_token
-
+from azext_iot.constants import CENTRAL_ENDPOINT
 
 IOT_SERVICE_CS_TEMPLATE = "HostName={};SharedAccessKeyName={};SharedAccessKey={}"
 
@@ -46,17 +46,16 @@ def parse_iot_device_module_connection_string(cs):
     return _parse_connection_string(cs, validate, "Module")
 
 
-def get_iot_central_tokens(cmd, app_id, token, central_dns_suffix):
+def get_iot_central_tokens(cmd, app_id):
     import requests
 
-    if not token:
-        aad_token = get_aad_token(cmd, resource="https://apps.azureiotcentral.com")[
-            "accessToken"
-        ]
-        token = "Bearer {}".format(aad_token)
+    aad_token = get_aad_token(cmd, resource="https://apps.azureiotcentral.com")[
+        "accessToken"
+    ]
+    token = "Bearer {}".format(aad_token)
 
     url = "https://{}.{}/system/iothubs/generateEventSasTokens".format(
-        app_id, central_dns_suffix
+        app_id, CENTRAL_ENDPOINT
     )
 
     response = requests.post(url, headers={"Authorization": token})

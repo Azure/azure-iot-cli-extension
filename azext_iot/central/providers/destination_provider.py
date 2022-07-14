@@ -4,69 +4,38 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from typing import List, Union
+
+from typing import List
+
 from azure.cli.core.azclierror import AzureResponseError, ClientRequestError, ResourceNotFoundError
-from knack.log import get_logger
 
-from azext_iot.central.providers.central_provider import CentralProvider
-from azext_iot.constants import CENTRAL_ENDPOINT
-from azext_iot.central import services as central_services
-from azext_iot.central.models.v1_1_preview import (
-    DestinationV1_1_preview,
-    WebhookDestinationV1_1_preview,
-    AdxDestinationV1_1_preview,
-)
-
-logger = get_logger(__name__)
+from azext_iot.central.providers.base import IoTCentralProvider
+from azext_iot._factory import CloudError
+from azext_iot.common.utility import handle_service_exception
+from azext_iot.sdk.central.preview_2022_06_30.models import Destination
 
 
-class CentralDestinationProvider(CentralProvider):
-    def __init__(self, cmd, app_id: str, api_version: str, token=None):
-        super().__init__(cmd, app_id, api_version, token=token)
+class CentralDestinationProvider(IoTCentralProvider):
+    def __init__(self, cmd, app_id: str):
+        super().__init__(cmd, app_id)
+        self.sdk = self.get_sdk_preview().destinations
         self._destinations = {}
 
-    def list_destinations(
-        self, central_dns_suffix=CENTRAL_ENDPOINT
-    ) -> List[
-        Union[
-            DestinationV1_1_preview,
-            WebhookDestinationV1_1_preview,
-            AdxDestinationV1_1_preview,
-        ]
-    ]:
-        destinations = central_services.destination.list_destinations(
-            cmd=self._cmd,
-            app_id=self._app_id,
-            token=self._token,
-            central_dns_suffix=central_dns_suffix,
-            api_version=self._api_version,
-        )
-
-        # add to cache
-        for destination in destinations:
-            self._destinations.update({destination["id"]: destination})
-
-        return destinations
-
-    def add_destination(
-        self, destination_id, payload, central_dnx_suffix=CENTRAL_ENDPOINT
-    ) -> Union[
-        DestinationV1_1_preview,
-        WebhookDestinationV1_1_preview,
-        AdxDestinationV1_1_preview,
-    ]:
+    def create(
+        self,
+        destination_id: str,
+        payload,
+    ) -> Destination:
         if destination_id in self._destinations:
             raise ClientRequestError("Destination already exists")
 
-        destination = central_services.destination.add_destination(
-            self._cmd,
-            self._app_id,
-            destination_id=destination_id,
-            payload=payload,
-            token=self._token,
-            api_version=self._api_version,
-            central_dns_suffix=central_dnx_suffix,
-        )
+        try:
+            destination = self.sdk.create(
+                destination_id=destination_id,
+                body=payload,
+            )
+        except CloudError as e:
+            handle_service_exception(e)
 
         if not destination:
             raise AzureResponseError(
@@ -78,22 +47,18 @@ class CentralDestinationProvider(CentralProvider):
 
         return destination
 
-    def update_destination(
-        self, destination_id, payload, central_dnx_suffix=CENTRAL_ENDPOINT
-    ) -> Union[
-        DestinationV1_1_preview,
-        WebhookDestinationV1_1_preview,
-        AdxDestinationV1_1_preview,
-    ]:
-        destination = central_services.destination.update_destination(
-            self._cmd,
-            self._app_id,
-            destination_id=destination_id,
-            payload=payload,
-            token=self._token,
-            api_version=self._api_version,
-            central_dns_suffix=central_dnx_suffix,
-        )
+    def update(
+        self,
+        destination_id: str,
+        payload,
+    ) -> Destination:
+        try:
+            destination = self.sdk.update(
+                destination_id=destination_id,
+                body=payload,
+            )
+        except CloudError as e:
+            handle_service_exception(e)
 
         if not destination:
             raise AzureResponseError(
@@ -105,24 +70,30 @@ class CentralDestinationProvider(CentralProvider):
 
         return destination
 
-    def get_destination(
-        self, destination_id, central_dnx_suffix=CENTRAL_ENDPOINT
-    ) -> Union[
-        DestinationV1_1_preview,
-        WebhookDestinationV1_1_preview,
-        AdxDestinationV1_1_preview,
-    ]:
-        # get or add to cache
+    def list(self) -> List[Destination]:
+        try:
+            destinations = self.sdk.list()
+        except CloudError as e:
+            handle_service_exception(e)
+
+        # add to cache
+        for destination in destinations:
+            self._destinations.update({destination["id"]: destination})
+
+        return destinations
+
+    def get(
+        self,
+        destination_id: str,
+    ) -> Destination:
+        # get from cache
         destination = self._destinations.get(destination_id)
+
         if not destination:
-            destination = central_services.destination.get_destination(
-                cmd=self._cmd,
-                app_id=self._app_id,
-                token=self._token,
-                api_version=self._api_version,
-                destination_id=destination_id,
-                central_dns_suffix=central_dnx_suffix,
-            )
+            try:
+                destination = self.sdk.get(destination_id=destination_id)
+            except CloudError as e:
+                handle_service_exception(e)
 
         if not destination:
             raise ResourceNotFoundError("No destination found with id: '{}'.".format(destination_id))
@@ -131,14 +102,16 @@ class CentralDestinationProvider(CentralProvider):
 
         return destination
 
-    def delete_destination(self, destination_id, central_dnx_suffix=CENTRAL_ENDPOINT):
-        central_services.destination.delete_destination(
-            cmd=self._cmd,
-            app_id=self._app_id,
-            token=self._token,
-            api_version=self._api_version,
-            destination_id=destination_id,
-            central_dns_suffix=central_dnx_suffix,
-        )
+    def delete(
+        self,
+        destination_id: str,
+    ):
+        try:
+            destination = self.sdk.remove(destination_id=destination_id)
+        except CloudError as e:
+            handle_service_exception(e)
 
         self._destinations.pop(destination_id, None)
+
+        # Should be empty json
+        return destination

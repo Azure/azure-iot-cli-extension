@@ -6,85 +6,65 @@
 # Dev note - think of this as a controller
 
 from typing import List
-from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.providers import CentralApiTokenProvider
-from azext_iot.central.models.enum import Role, ApiVersion
+from azext_iot.central.models.enum import Role
+from azext_iot.sdk.central.ga_2022_05_31.models import ApiToken
 
 
-def add_api_token(
+def create_api_token(
     cmd,
     app_id: str,
     token_id: str,
     role: str,
     org_id=None,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> dict:
+) -> ApiToken:
     provider = CentralApiTokenProvider(
-        cmd=cmd, app_id=app_id, token=token, api_version=api_version
+        cmd=cmd, app_id=app_id
     )
 
+    # Convert 3 role's name to id
     try:
         role = Role[role].value
     except Exception:
         pass
 
-    return provider.add_api_token(
+    return provider.create(
         token_id=token_id,
         org_id=org_id,
-        role=role,
-        central_dns_suffix=central_dns_suffix,
+        role=role
     )
 
 
 def list_api_tokens(
     cmd,
     app_id: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> List[dict]:
-
+) -> List[ApiToken]:
     provider = CentralApiTokenProvider(
-        cmd=cmd, app_id=app_id, token=token, api_version=api_version
+        cmd=cmd, app_id=app_id
     )
 
-    return provider.get_api_token_list(central_dns_suffix=central_dns_suffix)
+    return provider.list()
 
 
 def get_api_token(
     cmd,
     app_id: str,
     token_id: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-):
-
+) -> ApiToken:
     provider = CentralApiTokenProvider(
-        cmd=cmd, app_id=app_id, token=token, api_version=api_version
+        cmd=cmd, app_id=app_id
     )
 
-    return provider.get_api_token(
-        token_id=token_id,
-        central_dns_suffix=central_dns_suffix,
-    )
+    return provider.get(token_id=token_id)
 
 
 def delete_api_token(
     cmd,
     app_id: str,
     token_id: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> dict:
+):
     provider = CentralApiTokenProvider(
-        cmd=cmd, app_id=app_id, token=token, api_version=api_version
+        cmd=cmd, app_id=app_id
     )
 
-    return provider.delete_api_token(
-        token_id=token_id,
-        central_dns_suffix=central_dns_suffix,
-    )
+    return provider.delete(token_id=token_id)

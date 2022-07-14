@@ -5,74 +5,50 @@
 # --------------------------------------------------------------------------------------------
 # Dev note - think of this as a controller
 
-from typing import List, Union
+from typing import List, Optional
+
 from azext_iot.common import utility
-from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.providers import CentralExportProvider
-from azext_iot.central.models.enum import ApiVersion
-from azext_iot.central.models.v1_1_preview import ExportV1_1_preview
+from azext_iot.sdk.central.preview_2022_06_30.models import Export
 
 
 def get_export(
     cmd,
     app_id: str,
     export_id: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1_1_preview.value,
-) -> Union[dict, ExportV1_1_preview]:
-    provider = CentralExportProvider(
-        cmd=cmd, app_id=app_id, api_version=api_version, token=token
-    )
-
-    return provider.get_export(
-        export_id=export_id, central_dnx_suffix=central_dns_suffix
-    )
+) -> Export:
+    provider = CentralExportProvider(cmd=cmd, app_id=app_id)
+    return provider.get(export_id=export_id)
 
 
 def delete_export(
     cmd,
     app_id: str,
     export_id: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1_1_preview.value,
 ):
-    provider = CentralExportProvider(
-        cmd=cmd, app_id=app_id, api_version=api_version, token=token
-    )
-
-    provider.delete_export(export_id=export_id, central_dnx_suffix=central_dns_suffix)
+    provider = CentralExportProvider(cmd=cmd, app_id=app_id)
+    provider.delete(export_id=export_id)
 
 
 def list_exports(
     cmd,
     app_id: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1_1_preview.value,
-) -> List[Union[dict, ExportV1_1_preview]]:
-    provider = CentralExportProvider(
-        cmd=cmd, app_id=app_id, api_version=api_version, token=token
-    )
-
-    return provider.list_exports(central_dns_suffix=central_dns_suffix)
+) -> List[Export]:
+    provider = CentralExportProvider(cmd=cmd, app_id=app_id)
+    return provider.list()
 
 
-def add_export(
+def create_export(
     cmd,
     app_id: str,
     export_id: str,
-    source,
-    destinations,
-    display_name,
-    enabled=True,
-    filter=None,
-    enrichments=None,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1_1_preview.value,
-) -> Union[dict, ExportV1_1_preview]:
+    source: str,
+    destinations: List,
+    display_name: str,
+    enabled: Optional[bool] = True,
+    filter: Optional[str] = None,
+    enrichments: Optional[dict] = None,
+) -> Export:
     export = {
         "id": export_id,
         "source": source,
@@ -101,14 +77,10 @@ def add_export(
             }
         )
 
-    provider = CentralExportProvider(
-        cmd=cmd, app_id=app_id, api_version=api_version, token=token
-    )
-
-    return provider.add_export(
+    provider = CentralExportProvider(cmd=cmd, app_id=app_id)
+    return provider.create(
         export_id=export_id,
         payload=export,
-        central_dnx_suffix=central_dns_suffix,
     )
 
 
@@ -117,18 +89,11 @@ def update_export(
     app_id: str,
     export_id: str,
     content: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1_1_preview.value,
-) -> Union[dict, ExportV1_1_preview]:
+) -> Export:
     payload = utility.process_json_arg(content, argument_name="content")
 
-    provider = CentralExportProvider(
-        cmd=cmd, app_id=app_id, api_version=api_version, token=token
-    )
-
-    return provider.update_export(
+    provider = CentralExportProvider(cmd=cmd, app_id=app_id)
+    return provider.update(
         export_id=export_id,
         payload=payload,
-        central_dnx_suffix=central_dns_suffix,
     )

@@ -5,32 +5,19 @@
 # --------------------------------------------------------------------------------------------
 # Dev note - think of this as a controller
 
-from typing import Union
-from azext_iot.central.models.preview import TemplatePreview
-from azext_iot.central.models.v1 import TemplateV1
-from azext_iot.central.models.v1_1_preview import TemplateV1_1_preview
-from azext_iot.constants import CENTRAL_ENDPOINT
+
 from azext_iot.common import utility
 from azext_iot.central.providers import CentralDeviceTemplateProvider
-from azext_iot.central.models.enum import ApiVersion
+from azext_iot.sdk.central.ga_2022_05_31.models import DeviceTemplate
 
 
 def get_device_template(
     cmd,
     app_id: str,
     device_template_id: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> Union[TemplatePreview, TemplateV1, TemplateV1_1_preview]:
-    provider = CentralDeviceTemplateProvider(
-        cmd=cmd, app_id=app_id, token=token, api_version=api_version
-    )
-
-    template = provider.get_device_template(
-        device_template_id=device_template_id,
-        central_dns_suffix=central_dns_suffix,
-    )
+) -> DeviceTemplate:
+    provider = CentralDeviceTemplateProvider(cmd=cmd, app_id=app_id)
+    template = provider.get(device_template_id=device_template_id)
     return template.raw_template
 
 
@@ -38,32 +25,18 @@ def list_device_templates(
     cmd,
     app_id: str,
     compact=False,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
 ):
-    provider = CentralDeviceTemplateProvider(
-        cmd=cmd, app_id=app_id, token=token, api_version=api_version
-    )
-
-    templates = provider.list_device_templates(
-        compact=compact, central_dns_suffix=central_dns_suffix
-    )
+    provider = CentralDeviceTemplateProvider(cmd=cmd, app_id=app_id)
+    templates = provider.list(compact=compact)
     return templates
 
 
 def map_device_templates(
     cmd,
     app_id: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
 ):
-    provider = CentralDeviceTemplateProvider(
-        cmd=cmd, app_id=app_id, token=token, api_version=api_version
-    )
-
-    return provider.map_device_templates(central_dns_suffix=central_dns_suffix)
+    provider = CentralDeviceTemplateProvider(cmd=cmd, app_id=app_id)
+    return provider.map()
 
 
 def create_device_template(
@@ -71,20 +44,13 @@ def create_device_template(
     app_id: str,
     device_template_id: str,
     content: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
 ):
     payload = utility.process_json_arg(content, argument_name="content")
 
-    provider = CentralDeviceTemplateProvider(
-        cmd=cmd, app_id=app_id, token=token, api_version=api_version
-    )
-
-    template = provider.create_device_template(
+    provider = CentralDeviceTemplateProvider(cmd=cmd, app_id=app_id)
+    template = provider.create(
         device_template_id=device_template_id,
         payload=payload,
-        central_dns_suffix=central_dns_suffix,
     )
     return template.raw_template
 
@@ -94,20 +60,13 @@ def update_device_template(
     app_id: str,
     device_template_id: str,
     content: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
 ):
     payload = utility.process_json_arg(content, argument_name="content")
 
-    provider = CentralDeviceTemplateProvider(
-        cmd=cmd, app_id=app_id, token=token, api_version=api_version
-    )
-
-    template = provider.update_device_template(
+    provider = CentralDeviceTemplateProvider(cmd=cmd, app_id=app_id)
+    template = provider.update(
         device_template_id=device_template_id,
         payload=payload,
-        central_dns_suffix=central_dns_suffix,
     )
     return template.raw_template
 
@@ -116,15 +75,7 @@ def delete_device_template(
     cmd,
     app_id: str,
     device_template_id: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
 ):
-    provider = CentralDeviceTemplateProvider(
-        cmd=cmd, app_id=app_id, token=token, api_version=api_version
-    )
+    provider = CentralDeviceTemplateProvider(cmd=cmd, app_id=app_id)
 
-    return provider.delete_device_template(
-        device_template_id=device_template_id,
-        central_dns_suffix=central_dns_suffix,
-    )
+    return provider.delete(device_template_id=device_template_id)

@@ -7,7 +7,7 @@
 
 from knack.util import to_snake_case, to_camel_case
 from requests import Response
-from knack.log import logging
+from knack.log import logging, get_logger
 
 from azure.cli.core.azclierror import (
     AzureResponseError,
@@ -21,6 +21,9 @@ import uuid
 from importlib import import_module
 from azext_iot.central.models.enum import ApiVersion
 from azure.cli.core.util import should_disable_connection_verify
+
+
+logger = get_logger(__name__)
 
 
 def make_api_call(

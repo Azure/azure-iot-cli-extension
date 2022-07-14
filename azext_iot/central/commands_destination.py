@@ -5,94 +5,27 @@
 # --------------------------------------------------------------------------------------------
 # Dev note - think of this as a controller
 
-from typing import List, Union
+
 from azure.cli.core.azclierror import RequiredArgumentMissingError
 from azext_iot.central.common import DestinationType
 from azext_iot.common import utility
-from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.providers import CentralDestinationProvider
-from azext_iot.central.models.enum import ApiVersion
-from azext_iot.central.models.v1_1_preview import (
-    DestinationV1_1_preview,
-    WebhookDestinationV1_1_preview,
-    AdxDestinationV1_1_preview,
-)
+from azext_iot.sdk.central.preview_2022_06_30.models import Destination
 
 
-def get_destination(
+def create_destination(
     cmd,
     app_id: str,
     destination_id: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1_1_preview.value,
-) -> Union[
-    DestinationV1_1_preview, WebhookDestinationV1_1_preview, AdxDestinationV1_1_preview
-]:
-    provider = CentralDestinationProvider(
-        cmd=cmd, app_id=app_id, api_version=api_version, token=token
-    )
-
-    return provider.get_destination(
-        destination_id=destination_id, central_dnx_suffix=central_dns_suffix
-    )
-
-
-def delete_destination(
-    cmd,
-    app_id: str,
-    destination_id: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1_1_preview.value,
-):
-    provider = CentralDestinationProvider(
-        cmd=cmd, app_id=app_id, api_version=api_version, token=token
-    )
-
-    provider.delete_destination(
-        destination_id=destination_id, central_dnx_suffix=central_dns_suffix
-    )
-
-
-def list_destinations(
-    cmd,
-    app_id: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1_1_preview.value,
-) -> List[
-    Union[
-        DestinationV1_1_preview,
-        WebhookDestinationV1_1_preview,
-        AdxDestinationV1_1_preview,
-    ]
-]:
-    provider = CentralDestinationProvider(
-        cmd=cmd, app_id=app_id, api_version=api_version, token=token
-    )
-
-    return provider.list_destinations(central_dns_suffix=central_dns_suffix)
-
-
-def add_destination(
-    cmd,
-    app_id: str,
-    destination_id: str,
-    type,
-    display_name,
+    type: str,
+    display_name: str,
     url=None,
     cluster_url=None,
     database=None,
     table=None,
     header_customizations=None,
     authorization=None,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1_1_preview.value,
-) -> Union[
-    DestinationV1_1_preview, WebhookDestinationV1_1_preview, AdxDestinationV1_1_preview
-]:
+) -> Destination:
     destination = {
         "id": destination_id,
         "type": type,
@@ -145,15 +78,25 @@ def add_destination(
                 "Parameter authorization is required when creating a non-webhook destination."
             )
 
-    provider = CentralDestinationProvider(
-        cmd=cmd, app_id=app_id, api_version=api_version, token=token
-    )
+    provider = CentralDestinationProvider(cmd=cmd, app_id=app_id)
+    return provider.create(destination_id=destination_id, payload=destination)
 
-    return provider.add_destination(
-        destination_id=destination_id,
-        payload=destination,
-        central_dnx_suffix=central_dns_suffix,
-    )
+
+def list_destinations(
+    cmd,
+    app_id: str,
+) -> Destination:
+    provider = CentralDestinationProvider(cmd=cmd, app_id=app_id)
+    return provider.list()
+
+
+def get_destination(
+    cmd,
+    app_id: str,
+    destination_id: str,
+) -> Destination:
+    provider = CentralDestinationProvider(cmd=cmd, app_id=app_id)
+    return provider.get(destination_id=destination_id)
 
 
 def update_destination(
@@ -161,20 +104,17 @@ def update_destination(
     app_id: str,
     destination_id: str,
     content: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1_1_preview.value,
-) -> Union[
-    DestinationV1_1_preview, WebhookDestinationV1_1_preview, AdxDestinationV1_1_preview
-]:
+) -> Destination:
     payload = utility.process_json_arg(content, argument_name="content")
 
-    provider = CentralDestinationProvider(
-        cmd=cmd, app_id=app_id, api_version=api_version, token=token
-    )
+    provider = CentralDestinationProvider(cmd=cmd, app_id=app_id)
+    return provider.update(destination_id=destination_id, payload=payload)
 
-    return provider.update_destination(
-        destination_id=destination_id,
-        payload=payload,
-        central_dnx_suffix=central_dns_suffix,
-    )
+
+def delete_destination(
+    cmd,
+    app_id: str,
+    destination_id: str,
+):
+    provider = CentralDestinationProvider(cmd=cmd, app_id=app_id)
+    return provider.delete(destination_id=destination_id)

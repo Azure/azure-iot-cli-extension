@@ -419,7 +419,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             api_version=api_version,
         ).get_output_in_json()
 
-    def _create_api_tokens(self, api_version):
+    def _create_api_tokens(self):
         tokens = []
         for role in Role:
             token_id = self.create_random_name(prefix="aztest", length=24)
@@ -438,19 +438,10 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
             tokens.append(
                 self.cmd(
-                    command, api_version=api_version, checks=checks
+                    command, checks=checks
                 ).get_output_in_json()
             )
         return tokens
-
-    def _delete_api_token(self, api_version, token_id) -> None:
-        self.cmd(
-            "iot central api-token delete --app-id {} --token-id {}".format(
-                self.app_id, token_id
-            ),
-            api_version=api_version,
-            checks=[self.check("result", "success")],
-        )
 
     def _wait_for_provisioned(self, api_version, device_id):
         command = "iot central device show --app-id {} -d {}".format(
@@ -478,16 +469,9 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             command, api_version=api_version, checks=[self.check("result", "success")]
         )
 
-    def _create_device_template(self, api_version, edge=False):
-        if edge and (api_version != ApiVersion.v1_1_preview.value and api_version != ApiVersion.ga_2022_05_31.value):
-            raise InvalidArgumentValueError(
-                "Edge template creation is only available for api version >= 1.1-preview."
-            )
-
+    def _create_device_template(self, edge=False):
         if edge:
             template_path = edge_template_path_preview
-        elif api_version == ApiVersion.preview.value:
-            template_path = device_template_path_preview
         else:
             template_path = device_template_path
 
@@ -843,22 +827,18 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             time.sleep(10)
 
     def _appendOptionalArgsToCommand(self, command: str, api_version: str):
-        if self.token:
-            command += ' --token "{}"'.format(self.token)
+        # if self.token:
+        #     command += ' --token "{}"'.format(self.token)
         if self.dns_suffix:
             command += ' --central-dns-suffix "{}"'.format(self.dns_suffix)
-        if api_version:
-            command += " --api-version {}".format(api_version)
+        # if api_version:
+        #     command += " --api-version {}".format(api_version)
         return command
 
-    def _get_template_id(self, api_version, template):
-        if api_version == ApiVersion.preview.value:
-            return template["id"]
+    def _get_template_id(self, template):
         return template["@id"]
 
-    def _get_template_id_key(self, api_version):
-        if api_version == ApiVersion.preview.value:
-            return "id"
+    def _get_template_id_key(self):
         return "@id"
 
     def tearDown(self):

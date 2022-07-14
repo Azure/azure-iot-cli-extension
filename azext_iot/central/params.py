@@ -54,18 +54,28 @@ def load_central_arguments(self, _):
             help="The App ID of the IoT Central app you want to manage."
             ' You can find the App ID in the "About" page for your application under the help menu.',
         )
-        context.argument("api_version", arg_type=api_version)
+        context.argument(
+            "api_version",
+            arg_type=api_version,
+            help="This command parameter has been deprecated and will be removed."
+            "In a future release. We only support IoT Central APIs from latest GA or Preview version.",
+            deprecate_info=context.deprecate())
         context.argument(
             "token",
             options_list=["--token"],
-            help="If you'd prefer to submit your request without authenticating against the Azure CLI, you can specify a valid"
+            help="This command parameter has been deprecated and will be removed."
+            "Please using Azure CLI authentication to access the IoT Central Apps."
+            "If you'd prefer to submit your request without authenticating against the Azure CLI, you can specify a valid"
             " user token to authenticate your request. You must specify the type of key as part of the request."
             " Learn more at https://aka.ms/iotcentraldocsapi",
-        )
+            deprecate_info=context.deprecate())
         context.argument(
             "central_dns_suffix",
             options_list=["--central-dns-suffix", "--central-api-uri"],
-            help="The IoT Central DNS suffix associated with your application.",
+            help="This command parameter has been deprecated and will be removed."
+            "We will always use azureiotcentral.com as DNS suffix to access IoT Central Apps."
+            "The IoT Central DNS suffix associated with your application.",
+            deprecate_info=context.deprecate()
         )
         context.argument(
             "device_id",
@@ -153,8 +163,11 @@ def load_central_arguments(self, _):
         context.argument(
             "interface_id",
             options_list=["--interface-id", "-i"],
-            help="The name of the interface/component as specified in the device template.You can find it by navigating"
+            help="This command parameter has been deprecated and will be removed."
+            "Please using --component-name to specify componetn name in the device command."
+            "The name of the interface/component as specified in the device template.You can find it by navigating"
             " to Device Template and view the interface/component identity under the corresponding device capability.",
+            deprecate_info=context.deprecate()
         )
         context.argument(
             "command_name",
@@ -286,8 +299,10 @@ def load_central_arguments(self, _):
         context.argument(
             "org_id",
             options_list=["--organization-id", "--org-id"],
-            help="The ID of the organization for the user role assignment."
+            help="This command parameter has been deprecated and will be removed since 1.1-preview will be removed in CLI extension."
+            "The ID of the organization for the user role assignment."
             " Only available for api-version == 1.1-preview",
+            deprecate_info=context.deprecate()
         )
 
     with self.argument_context("iot central user update") as context:

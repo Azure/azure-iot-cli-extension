@@ -6,60 +6,38 @@
 # Dev note - think of this as a controller
 
 from azure.cli.core.azclierror import InvalidArgumentValueError
-from typing import Union, List, Any
-from azext_iot.constants import CENTRAL_ENDPOINT
-from azext_iot.central.models.enum import ApiVersion
-from azext_iot.central.providers.job_provider import CentralJobProvider
-from azext_iot.central.models.preview import JobPreview
-from azext_iot.central.models.v1_1_preview import JobV1_1_preview
-from azext_iot.common import utility
+from typing import List, Optional
 
-JobType = Union[JobPreview, JobV1_1_preview]
+from azext_iot.central.providers.job_provider import CentralJobProvider
+from azext_iot.common import utility
+from azext_iot.sdk.central.preview_2022_06_30.models import Job, JobDeviceStatus, JobCancellationThreshold, JobBatch
 
 
 def get_job(
     cmd,
     app_id: str,
     job_id: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1_1_preview.value,
-) -> JobType:
-    provider = CentralJobProvider(
-        cmd=cmd, app_id=app_id, api_version=api_version, token=token
-    )
-
-    return provider.get_job(job_id=job_id, central_dns_suffix=central_dns_suffix)
+) -> Job:
+    provider = CentralJobProvider(cmd=cmd, app_id=app_id)
+    return provider.get(job_id=job_id)
 
 
 def stop_job(
     cmd,
     app_id: str,
     job_id: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1_1_preview.value,
-) -> JobType:
-    provider = CentralJobProvider(
-        cmd=cmd, app_id=app_id, api_version=api_version, token=token
-    )
-
-    return provider.stop_job(job_id=job_id, central_dns_suffix=central_dns_suffix)
+) -> Job:
+    provider = CentralJobProvider(cmd=cmd, app_id=app_id)
+    return provider.stop(job_id=job_id)
 
 
 def resume_job(
     cmd,
     app_id: str,
     job_id: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1_1_preview.value,
-) -> JobType:
-    provider = CentralJobProvider(
-        cmd=cmd, app_id=app_id, api_version=api_version, token=token
-    )
-
-    return provider.resume_job(job_id=job_id, central_dns_suffix=central_dns_suffix)
+) -> Job:
+    provider = CentralJobProvider(cmd=cmd, app_id=app_id)
+    return provider.resume(job_id=job_id)
 
 
 def rerun_job(
@@ -67,48 +45,26 @@ def rerun_job(
     app_id: str,
     job_id: str,
     rerun_id: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1_1_preview.value,
-) -> JobType:
-    provider = CentralJobProvider(
-        cmd=cmd, app_id=app_id, api_version=api_version, token=token
-    )
-
-    return provider.rerun_job(
-        job_id=job_id, rerun_id=rerun_id, central_dns_suffix=central_dns_suffix
-    )
+) -> Job:
+    provider = CentralJobProvider(cmd=cmd, app_id=app_id)
+    return provider.rerun(job_id=job_id, rerun_id=rerun_id)
 
 
 def get_job_devices(
     cmd,
     app_id: str,
     job_id: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1_1_preview.value,
-) -> List[Any]:
-    provider = CentralJobProvider(
-        cmd=cmd, app_id=app_id, api_version=api_version, token=token
-    )
-
-    return provider.get_job_devices(
-        job_id=job_id, central_dns_suffix=central_dns_suffix
-    )
+) -> List[JobDeviceStatus]:
+    provider = CentralJobProvider(cmd=cmd, app_id=app_id)
+    return provider.get_job_devices(job_id=job_id)
 
 
 def list_jobs(
     cmd,
     app_id: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1_1_preview.value,
-) -> List[JobType]:
-    provider = CentralJobProvider(
-        cmd=cmd, app_id=app_id, api_version=api_version, token=token
-    )
-
-    return provider.list_jobs(central_dns_suffix=central_dns_suffix)
+) -> List[Job]:
+    provider = CentralJobProvider(cmd=cmd, app_id=app_id)
+    return provider.list()
 
 
 def create_job(
@@ -117,28 +73,21 @@ def create_job(
     job_id: str,
     group_id: str,
     content: str,
-    job_name=None,
-    description=None,
-    batch_type=None,
-    threshold_type=None,
-    threshold_batch=None,
-    batch=None,
-    threshold=None,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1_1_preview.value,
-) -> JobType:
-
+    job_name: Optional[str] = None,
+    description: Optional[str] = None,
+    batch_type: Optional[str] = None,
+    threshold_type: Optional[str] = None,
+    threshold_batch: Optional[JobCancellationThreshold] = None,
+    batch: Optional[JobBatch] = None,
+    threshold: Optional[str] = None,
+) -> Job:
     if not isinstance(content, str):
         raise InvalidArgumentValueError("content must be a string: {}".format(content))
 
     payload = utility.process_json_arg(content, argument_name="content")
 
-    provider = CentralJobProvider(
-        cmd=cmd, app_id=app_id, api_version=api_version, token=token
-    )
-
-    return provider.create_job(
+    provider = CentralJobProvider(cmd=cmd, app_id=app_id)
+    return provider.create(
         job_id=job_id,
         job_name=job_name,
         group_id=group_id,
@@ -153,5 +102,4 @@ def create_job(
         threshold_batch=threshold_batch,
         batch=batch,
         threshold=threshold,
-        central_dns_suffix=central_dns_suffix,
     )

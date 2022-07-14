@@ -5,80 +5,49 @@
 # --------------------------------------------------------------------------------------------
 # Dev note - think of this as a controller
 
-from typing import List
-from azext_iot.constants import CENTRAL_ENDPOINT
+from typing import List, Optional
 from azext_iot.central.providers import CentralOrganizationProvider
-from azext_iot.central.models.enum import ApiVersion
-from azext_iot.central.models.v1_1_preview import OrganizationV1_1_preview
+from azext_iot.sdk.central.ga_2022_05_31.models import Organization
 
 
 def get_org(
     cmd,
     app_id: str,
     org_id: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> OrganizationV1_1_preview:
-    provider = CentralOrganizationProvider(
-        cmd=cmd, app_id=app_id, api_version=api_version, token=token
-    )
-
-    return provider.get_organization(
-        org_id=org_id, central_dns_suffix=central_dns_suffix
-    )
+) -> Organization:
+    provider = CentralOrganizationProvider(cmd=cmd, app_id=app_id)
+    return provider.get(org_id=org_id)
 
 
 def delete_org(
     cmd,
     app_id: str,
     org_id: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> OrganizationV1_1_preview:
-    provider = CentralOrganizationProvider(
-        cmd=cmd, app_id=app_id, api_version=api_version, token=token
-    )
-
-    return provider.delete_organization(
-        org_id=org_id, central_dns_suffix=central_dns_suffix
-    )
+) -> Organization:
+    provider = CentralOrganizationProvider(cmd=cmd, app_id=app_id)
+    return provider.delete(org_id=org_id)
 
 
 def list_orgs(
     cmd,
     app_id: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> List[OrganizationV1_1_preview]:
-    provider = CentralOrganizationProvider(
-        cmd=cmd, app_id=app_id, api_version=api_version, token=token
-    )
-
-    return provider.list_organizations(central_dns_suffix=central_dns_suffix)
+) -> List[Organization]:
+    provider = CentralOrganizationProvider(cmd=cmd, app_id=app_id)
+    return provider.list()
 
 
 def create_org(
     cmd,
     app_id: str,
     org_id: str,
-    org_name=None,
-    parent_org=None,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> OrganizationV1_1_preview:
-    provider = CentralOrganizationProvider(
-        cmd=cmd, app_id=app_id, api_version=api_version, token=token
-    )
-
-    return provider.create_or_update_organization(
+    org_name: Optional[str] = None,
+    parent_org: Optional[str] = None,
+) -> Organization:
+    provider = CentralOrganizationProvider(cmd=cmd, app_id=app_id)
+    return provider.create(
         org_id=org_id,
         org_name=org_name,
         parent_org=parent_org,
-        central_dns_suffix=central_dns_suffix,
     )
 
 
@@ -86,20 +55,12 @@ def update_org(
     cmd,
     app_id: str,
     org_id: str,
-    org_name=None,
-    parent_org=None,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> OrganizationV1_1_preview:
-    provider = CentralOrganizationProvider(
-        cmd=cmd, app_id=app_id, api_version=api_version, token=token
-    )
-
-    return provider.create_or_update_organization(
+    org_name: Optional[str] = None,
+    parent_org: Optional[str] = None,
+) -> Organization:
+    provider = CentralOrganizationProvider(cmd=cmd, app_id=app_id)
+    return provider.update(
         org_id=org_id,
         org_name=org_name,
         parent_org=parent_org,
-        update=True,
-        central_dns_suffix=central_dns_suffix,
     )

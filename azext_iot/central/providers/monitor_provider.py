@@ -27,29 +27,21 @@ class MonitorProvider:
         self,
         cmd: AzCliCommand,
         app_id: str,
-        token: str,
         consumer_group: str,
         central_handler_args: CentralHandlerArguments,
-        central_dns_suffix: str,
     ):
-        central_device_provider = CentralDeviceProvider(
-            cmd=cmd, app_id=app_id, token=token, api_version=ApiVersion.v1.value
-        )
-        central_template_provider = CentralDeviceTemplateProvider(
-            cmd=cmd, app_id=app_id, token=token, api_version=ApiVersion.v1.value
-        )
+        central_device_provider = CentralDeviceProvider(cmd=cmd, app_id=app_id)
+        central_template_provider = CentralDeviceTemplateProvider(cmd=cmd, app_id=app_id)
+
         self._targets = self._build_targets(
             cmd=cmd,
             app_id=app_id,
-            token=token,
             consumer_group=consumer_group,
-            central_dns_suffix=central_dns_suffix,
         )
         self._handler = self._build_handler(
             central_device_provider=central_device_provider,
             central_template_provider=central_template_provider,
             central_handler_args=central_handler_args,
-            central_dns_suffix=central_dns_suffix,
         )
 
     def start_monitor_events(self, telemetry_args: TelemetryArguments):
@@ -78,15 +70,11 @@ class MonitorProvider:
         self,
         cmd: AzCliCommand,
         app_id: str,
-        token: str,
         consumer_group: str,
-        central_dns_suffix: str,
     ):
         from azext_iot.monitor.builders import central_target_builder
 
-        targets = central_target_builder.build_central_event_hub_targets(
-            cmd, app_id, token, central_dns_suffix
-        )
+        targets = central_target_builder.build_central_event_hub_targets(cmd, app_id)
         [target.add_consumer_group(consumer_group) for target in targets]
 
         return targets
@@ -96,7 +84,6 @@ class MonitorProvider:
         central_device_provider: CentralDeviceProvider,
         central_template_provider: CentralDeviceTemplateProvider,
         central_handler_args: CentralHandlerArguments,
-        central_dns_suffix=CENTRAL_ENDPOINT,
     ):
         from azext_iot.monitor.handlers import CentralHandler
 
@@ -104,5 +91,4 @@ class MonitorProvider:
             central_device_provider=central_device_provider,
             central_template_provider=central_template_provider,
             central_handler_args=central_handler_args,
-            central_dns_suffix=central_dns_suffix,
         )

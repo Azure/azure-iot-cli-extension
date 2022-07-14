@@ -4,99 +4,92 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from typing import List, Union
-from knack.log import get_logger
+from typing import List
 
 from azure.cli.core.azclierror import AzureResponseError, ClientRequestError, ResourceNotFoundError
-from azext_iot.central.providers.central_provider import CentralProvider
-from azext_iot.constants import CENTRAL_ENDPOINT
-from azext_iot.central import services as central_services
-from azext_iot.central.models.v1_1_preview import ExportV1_1_preview
-
-logger = get_logger(__name__)
+from azext_iot.central.providers.base import IoTCentralProvider
+from azext_iot._factory import CloudError
+from azext_iot.common.utility import handle_service_exception
+from azext_iot.sdk.central.preview_2022_06_30.models import Export
 
 
-class CentralExportProvider(CentralProvider):
-    def __init__(self, cmd, app_id: str, api_version: str, token=None):
-        super().__init__(cmd, app_id, api_version, token=token)
+class CentralExportProvider(IoTCentralProvider):
+    def __init__(self, cmd, app_id: str):
+        super().__init__(cmd=cmd, app_id=app_id)
+        self.sdk_preview = self.get_sdk_preview().exports
+
+        # Cache
         self._exports = {}
 
-    def list_exports(
-        self, central_dns_suffix=CENTRAL_ENDPOINT
-    ) -> List[Union[dict, ExportV1_1_preview]]:
-        exports = central_services.export.list_exports(
-            cmd=self._cmd,
-            app_id=self._app_id,
-            token=self._token,
-            central_dns_suffix=central_dns_suffix,
-            api_version=self._api_version,
-        )
+    def list(self) -> List[Export]:
+        try:
+            exports = self.sdk_preview.list()
+        except CloudError as e:
+            handle_service_exception(e)
 
-        # add to cache
+        # Update cache
         for export in exports:
             self._exports.update({export["id"]: export})
 
         return exports
 
-    def add_export(
-        self, export_id, payload, central_dnx_suffix=CENTRAL_ENDPOINT
-    ) -> Union[dict, ExportV1_1_preview]:
+    def create(
+        self,
+        export_id: str,
+        payload: dict
+    ) -> Export:
         if export_id in self._exports:
             raise ClientRequestError("Destination already exists")
 
-        export = central_services.export.add_export(
-            self._cmd,
-            self._app_id,
-            export_id=export_id,
-            payload=payload,
-            token=self._token,
-            api_version=self._api_version,
-            central_dns_suffix=central_dnx_suffix,
-        )
+        try:
+            export = self.sdk_preview.create(
+                export_id=export_id,
+                body=payload,
+            )
+        except CloudError as e:
+            handle_service_exception(e)
 
         if not export:
             raise AzureResponseError("Failed to create export with id: '{}'.".format(export_id))
 
-        # add to cache
+        # Update cache
         self._exports[export["id"]] = export
 
         return export
 
-    def update_export(
-        self, export_id, payload, central_dnx_suffix=CENTRAL_ENDPOINT
-    ) -> Union[dict, ExportV1_1_preview]:
-        export = central_services.export.update_export(
-            self._cmd,
-            self._app_id,
-            export_id=export_id,
-            payload=payload,
-            token=self._token,
-            api_version=self._api_version,
-            central_dns_suffix=central_dnx_suffix,
-        )
+    def update(
+        self,
+        export_id: str,
+        payload: dict,
+    ) -> Export:
+        try:
+            export = self.sdk_preview.update(
+                export_id=export_id,
+                body=payload,
+            )
+        except CloudError as e:
+            handle_service_exception(e)
 
         if not export:
             raise AzureResponseError("Failed to create export with id: '{}'.".format(export_id))
 
-        # add to cache
+        # Update cache
         self._exports[export_id] = export
 
         return export
 
-    def get_export(
-        self, export_id, central_dnx_suffix=CENTRAL_ENDPOINT
-    ) -> Union[dict, ExportV1_1_preview]:
-        # get or add to cache
+    def get(
+        self,
+        export_id: str,
+    ) -> Export:
+        # Try cache
         export = self._exports.get(export_id)
+
         if not export:
-            export = central_services.export.get_export(
-                cmd=self._cmd,
-                app_id=self._app_id,
-                token=self._token,
-                api_version=self._api_version,
-                export_id=export_id,
-                central_dns_suffix=central_dnx_suffix,
-            )
+            try:
+                export = self.sdk_preview.get(export_id=export_id)
+            except CloudError as e:
+                handle_service_exception(e)
 
         if not export:
             raise ResourceNotFoundError("No export found with id: '{}'.".format(export_id))
@@ -105,14 +98,16 @@ class CentralExportProvider(CentralProvider):
 
         return export
 
-    def delete_export(self, export_id, central_dnx_suffix=CENTRAL_ENDPOINT):
-        central_services.export.delete_export(
-            cmd=self._cmd,
-            app_id=self._app_id,
-            token=self._token,
-            api_version=self._api_version,
-            export_id=export_id,
-            central_dns_suffix=central_dnx_suffix,
-        )
+    def delete(
+        self,
+        export_id: str
+    ):
+        try:
+            result = self.sdk_preview.remove(export_id=export_id)
+        except CloudError as e:
+            handle_service_exception(e)
 
+        # Delete cache
         self._exports.pop(export_id, None)
+
+        return result

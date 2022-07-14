@@ -239,31 +239,41 @@ class TestIotCentral(CentralLiveScenarioTest):
             self._delete_user(user_id=user.get("id"), api_version=self._api_version)
 
     def test_central_api_token_methods_CRD(self):
-        tokens = self._create_api_tokens(api_version=self._api_version)
+        # Create
+        tokens = self._create_api_tokens()
         command = "iot central api-token show --app-id {} --token-id {}".format(
             self.app_id, tokens[0].get("id")
         )
-        self.cmd(command, api_version=self._api_version)
+        self.cmd(command)
 
+        # List
         command = "iot central api-token list --app-id {}".format(
             self.app_id,
         )
-        result = self.cmd(command, api_version=self._api_version).get_output_in_json()
-
-        token_list = result.get("value")
-
-        for token in tokens:
-            self._delete_api_token(
-                token_id=token.get("id"), api_version=self._api_version
-            )
-
+        token_list = self.cmd(command).get_output_in_json()
         for token in tokens:
             token_info_basic = {
                 "expiry": token.get("expiry"),
                 "id": token.get("id"),
                 "roles": token.get("roles"),
+                "token": None,
             }
             assert token_info_basic in token_list
+
+        # Delete
+        for token in tokens:
+            self.cmd("iot central api-token delete --app-id {} --token-id {}".format(
+                self.app_id, token.get("id")
+            ))
+
+        # List
+        command = "iot central api-token list --app-id {}".format(
+            self.app_id,
+        )
+        token_list = self.cmd(command).get_output_in_json()
+        for token in token_list:
+            for deleted_token in tokens:
+                assert token["id"] != deleted_token["id"]
 
     def test_central_roles_list(self):
         result = self._list_roles(api_version=self._api_version)
