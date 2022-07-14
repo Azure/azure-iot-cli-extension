@@ -33,3 +33,4 @@
 {"$dtId":"twin7","$relationshipId":"relationship","$targetId":"twin8","$relationshipName":"has","relationshipProperty1":"propertyValue1","relationshipProperty2":10}
 {"$dtId":"twin8","$relationshipId":"relationship","$targetId":"twin9","$relationshipName":"has","relationshipProperty1":"propertyValue1","relationshipProperty2":10}
 {"$dtId":"twin9","$relationshipId":"relationship","$targetId":"twin0","$relationshipName":"has","relationshipProperty1":"propertyValue1","relationshipProperty2":10}
+
