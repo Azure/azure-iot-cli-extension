@@ -4,6 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from azure.cli.core.commands.parameters import get_enum_type
+from azext_iot.iothub.common import CertificateAuthorityVersions
 from azure.cli.core.commands.parameters import get_enum_type, get_three_state_flag
 from azext_iot.common.shared import SettleType, ProtocolType, AckType
 from azext_iot.assets.user_messages import info_param_properties_device
@@ -236,4 +238,12 @@ def load_iothub_arguments(self, _):
             "content_type",
             options_list=["--content-type", "--ct"],
             help="MIME Type of file.",
+        )
+
+    with self.argument_context("iot hub certificate root-authority set") as context:
+        context.argument(
+            "ca_version",
+            options_list=["--certificate-authority", "--cav"],
+            help="Certificate Root Authority version. The v1 represents Baltimore CA and v2 represents Digicert CA.",
+            arg_type=get_enum_type(CertificateAuthorityVersions),
         )

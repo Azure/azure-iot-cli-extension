@@ -1,0 +1,102 @@
+# coding=utf-8
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See License.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+
+from typing import Dict, Optional
+from azext_iot.common.embedded_cli import EmbeddedCLI
+from azext_iot.digitaltwins.common import ABORT_MSG
+from azext_iot.iothub.common import (
+    CA_REVERT_WARNING,
+    CA_TRANSITION_API_VERSION,
+    CA_TRANSITION_WARNING,
+    CONT_INPUT_MSG,
+    DEFAULT_ROOT_AUTHORITY,
+    HUB_PROVIDER,
+    NO_CHANGE_MSG,
+    CertificateAuthorityVersions
+)
+from azext_iot.iothub.providers.base import IoTHubProvider
+from azure.cli.core.azclierror import ManualInterrupt
+from knack.log import get_logger
+from knack.prompting import prompt_y_n
+
+
+logger = get_logger(__name__)
+
+
+class CertificateProvider(IoTHubProvider):
+    def __init__(
+        self, cmd, hub_name: str = None, rg: str = None, login: str = None, auth_type_dataplane: str = None
+    ):
+        super(CertificateProvider, self).__init__(
+            cmd=cmd, hub_name=hub_name, rg=rg, login=login, auth_type_dataplane=auth_type_dataplane
+        )
+        self.cli = EmbeddedCLI()
+        # Need to ensure rg
+        if "resourcegroup" not in self.target:
+            self.target["resourcegroup"] = self.discovery.get_target(
+                resource_name=self.target["entity"].split(".")[0]
+            )["resourcegroup"]
+
+    def iot_hub_certificate_root_authority_show(self) -> Optional[Dict[str, str]]:
+        return self._get_target_root_certificate()
+
+    def iot_hub_certificate_root_authority_set(
+        self,
+        ca_version: str,
+        yes: bool = False
+    ) -> Optional[Dict[str, str]]:
+        current_target = self._get_target_root_certificate()
+        if not current_target:
+            return
+        root_ca = current_target.get("enableRootCertificateV2") or False
+
+        # Check if changes are needed
+        if (
+            (root_ca and ca_version == CertificateAuthorityVersions.v2.value) or
+            (not root_ca and ca_version == CertificateAuthorityVersions.v1.value)
+        ):
+            print(NO_CHANGE_MSG.format(ca_version))
+            return
+        elif ca_version == CertificateAuthorityVersions.v2.value:
+            print(CA_TRANSITION_WARNING)
+            if not yes and not prompt_y_n(msg=CONT_INPUT_MSG, default="n"):
+                raise ManualInterrupt(ABORT_MSG)
+            root_ca = True
+        else:
+            print(CA_REVERT_WARNING)
+            if not yes and not prompt_y_n(msg=CONT_INPUT_MSG, default="n"):
+                raise ManualInterrupt(ABORT_MSG)
+            root_ca = False
+
+        result = self.cli.invoke(
+            "resource update -n {} -g {} --api-version {} --set properties.rootCertificate.enableRootCertificateV2={} "
+            "--resource-type {}".format(
+                self.target["entity"].split(".")[0],
+                self.target['resourcegroup'],
+                CA_TRANSITION_API_VERSION,
+                root_ca,
+                HUB_PROVIDER
+            )
+        )
+        if not result.success():
+            return
+        return result.as_json().get("properties").get("rootCertificate")
+
+    def _get_target_root_certificate(self) -> Optional[Dict[str, str]]:
+        result = self.cli.invoke(
+            "resource show -n {} -g {} --api-version {} --resource-type {}".format(
+                self.target["entity"].split(".")[0],
+                self.target['resourcegroup'],
+                CA_TRANSITION_API_VERSION,
+                HUB_PROVIDER
+            )
+        )
+        if not result.success():
+            # Error will already be printed out
+            return
+        current_target = result.as_json().get("properties").get("rootCertificate")
+        # Since a newly created IoT Hub has empty rootCertificate property
+        return current_target if current_target else DEFAULT_ROOT_AUTHORITY

@@ -16,7 +16,9 @@ iothub_job_ops = CliCommandType(operations_tmpl="azext_iot.iothub.commands_job#{
 device_messaging_ops = CliCommandType(
     operations_tmpl="azext_iot.iothub.commands_device_messaging#{}"
 )
-
+iothub_resource_ops = CliCommandType(
+    operations_tmpl="azext_iot.iothub.commands_certificate#{}"
+)
 
 def load_iothub_commands(self, _):
     """
@@ -47,3 +49,7 @@ def load_iothub_commands(self, _):
         cmd_group.command("receive", "iot_c2d_message_receive")
         cmd_group.command("send", "iot_c2d_message_send")
         cmd_group.command("purge", "iot_c2d_message_purge")
+
+    with self.command_group("iot hub certificate root-authority", command_type=iothub_resource_ops) as cmd_group:
+        cmd_group.show_command("show", "certificate_root_authority_show")
+        cmd_group.command("set", "certificate_root_authority_set")

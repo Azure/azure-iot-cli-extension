@@ -305,3 +305,33 @@ def load_iothub_help():
         type: command
         short-summary: Upload a local file as a device to a pre-configured blob storage container.
     """
+
+    helps["iot hub certificate root-authority"] = """
+        type: group
+        short-summary: Manage the certificate root-authority for an IoT Hub instance.
+    """
+
+    helps["iot hub certificate root-authority set"] = """
+        type: command
+        short-summary: Set the certificate root-authority for an IoT Hub instance to a specific version.
+        long-summary: Transition this resource to a certificate on the DigiCert Global G2 root. Before making this
+          transition, please ensure all devices are updated to contain the public portion of the G2 root. Devices
+          will disconnect and reconnect using the new root.
+          We suggest monitoring current connections but another metric may be more appropriate for your situation.
+        examples:
+        - name: Transition the target IoT Hub certificate root authority to Digicert.
+          text: >
+            az iot hub certificate root-authority set -n {iothub_name} --certificate-authority v2
+        - name: Revert the target IoT Hub certificate root authority to Baltimore.
+          text: >
+            az iot hub certificate root-authority set -n {iothub_name} --certificate-authority v1
+    """
+
+    helps["iot hub certificate root-authority show"] = """
+        type: command
+        short-summary: Show the current certificate root-authority for an IoT Hub instance.
+        examples:
+        - name: Show the target IoT Hub certificate root authority.
+          text: >
+            az iot hub certificate root-authority show -n {iothub_name}
+    """
