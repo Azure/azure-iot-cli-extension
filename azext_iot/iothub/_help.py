@@ -272,6 +272,8 @@ def load_iothub_help():
         examples:
         - name: Basic usage (mqtt)
           text: az iot device simulate -n {iothub_name} -d {device_id}
+        - name: Basic usage for device registering the model Id of 'dtmi:com:example:Thermostat;1' upon connection (mqtt)
+          text: az iot device simulate -n {iothub_name} -d {device_id} --model-id 'dtmi:com:example:Thermostat;1'
         - name: Basic usage for device with x509 authentication (mqtt)
           text: az iot device simulate -n {iothub_name} -d {device_id} --cp {certificate_file_path} --kp {key_file_path}
         - name: Basic usage for device with x509 authentication (mqtt) in which the key file has a passphrase

@@ -52,18 +52,29 @@ def create_instance(
 
 def update_instance(cmd, parameters: DeviceUpdateMgmtModels.Instance):
     from azext_iot.deviceupdate.common import ADUInstanceDiagnosticStorageAuthType
+
     instance_manager = DeviceUpdateInstanceManager(cmd=cmd)
     storage_properties = parameters.diagnostic_storage_properties
-
-    if (
-        storage_properties
-        and storage_properties.authentication_type == ADUInstanceDiagnosticStorageAuthType.KEYBASED.value
-        and storage_properties.resource_id
-        and storage_properties.connection_string is None
-    ):
-        parameters.diagnostic_storage_properties = instance_manager.assemble_diagnostic_storage(
-            storage_properties.resource_id
+    if storage_properties:
+        is_dict = isinstance(storage_properties, dict)
+        authentication_type = (
+            storage_properties.get("authenticationType") if is_dict else storage_properties.authentication_type
         )
+        if not authentication_type:
+            authentication_type = ADUInstanceDiagnosticStorageAuthType.KEYBASED.value
+
+        resource_id = storage_properties.get("resourceId") if is_dict else storage_properties.resource_id
+        connection_string = (
+            storage_properties.get("connectionString") if is_dict else storage_properties.connection_string
+        )
+        if (
+            authentication_type == ADUInstanceDiagnosticStorageAuthType.KEYBASED.value
+            and resource_id
+            and not connection_string
+        ):
+            parameters.diagnostic_storage_properties = instance_manager.assemble_diagnostic_storage(
+                resource_id
+            )
 
     try:
         return instance_manager.mgmt_client.instances.begin_create(

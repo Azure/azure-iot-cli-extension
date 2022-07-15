@@ -6,6 +6,15 @@ Release History
 unreleased
 +++++++++++++++
 
+
+0.16.0
++++++++++++++++
+
+**Device Update**
+
+* The **in preview** `az iot device-update` command group is now always available.
+  No environment variable is needed for activation.
+
 **Digital Twin updates**
 
 * Updated `az dt model create` command to process input ontologies larger than 250 models in a single command run.
@@ -48,6 +57,11 @@ unreleased
   - az iot central role
   - az iot central user
 
+**IoT device updates**
+
+* `az iot device simulate` supports a `--model-id` argument. The model Id is used by a device to advertise the
+  digital twin interface it implements.
+
 
 0.15.0
 +++++++++++++++
@@ -59,14 +73,14 @@ unreleased
 
 **Device Update**
 
-* Introducing the Azure Device Update for IoT Hub root command group `az iot device-update`.
+* Introducing the **in preview** Azure Device Update for IoT Hub root command group `az iot device-update`.
   To learn more about the service visit https://docs.microsoft.com/en-us/azure/iot-hub-device-update/.
  
   - This command group is behind a feature flag environment variable. Set `IOT_CLI_ADU_ENABLED` to any value
     to activate the command group.
   - The Device Update command group supports all `account` and `instance` related functionality.
 
-**IoT Device updates**
+**IoT device updates**
 
 * Added device registration commands, `az iot device registration create` to register a device to an individual
   enrollment or an enrollment group. Currently, devices with symmetric key and x509 certificate authentication

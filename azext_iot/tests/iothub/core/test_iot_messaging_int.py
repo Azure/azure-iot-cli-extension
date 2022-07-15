@@ -10,6 +10,7 @@ import json
 
 from time import time
 from uuid import uuid4
+from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests.helpers import CERT_ENDING, KEY_ENDING
 from azext_iot.tests.iothub import IoTLiveScenarioTest, PREFIX_DEVICE
 from azext_iot.common.utility import (
@@ -303,6 +304,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         enqueued_time = calculate_millisec_since_unix_epoch_utc()
         simulate_msg = "Key Connection Simulate"
         send_d2c_msg = "Key Connection Send-D2C-Message"
+        model_id = f"dtmi:com:example:{generate_generic_id()};1"
 
         keys = self.cmd(
             "iot hub device-identity create -d {} -n {} -g {}".format(
@@ -328,13 +330,17 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         )
         device_events.append((device_id, send_d2c_msg))
 
-        # Simulate with secondary key
+        # Simulate with secondary key and include model Id upon connection
         self.cmd(
-            "iot device simulate -d {} -n {} -g {} --da '{}' --mc 1 --mi 1 --key {}".format(
+            "iot device simulate -d {} -n {} -g {} --da '{}' --mc 1 --mi 1 --key {} --model-id {}".format(
                 device_id, self.entity_name, self.entity_rg, simulate_msg,
-                keys["secondaryKey"]
+                keys["secondaryKey"], model_id
             )
         )
+        twin_result = self.cmd(
+            f"iot hub device-twin show -d {device_id} -n {self.entity_name} -g {self.entity_rg}").get_output_in_json()
+        assert twin_result["modelId"] == model_id
+
         device_events.append((device_id, f"{simulate_msg} #1"))
 
         self.cmd(
@@ -354,6 +360,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         enqueued_time = calculate_millisec_since_unix_epoch_utc()
         simulate_msg = "Cert Connection Simulate"
         send_d2c_msg = "Cert Connection Send-D2C-Message"
+        model_id = f"dtmi:com:example:{generate_generic_id()};1"
 
         self.cmd(
             "iot hub device-identity create -d {} -n {} -g {} --am x509_thumbprint --valid-days 10 --od '{}'".format(
@@ -442,12 +449,17 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             checks=[self.check("deviceId", device_ids[1])],
         )
 
+        # x509 CA device simulation and include model Id upon connection
         self.cmd(
-            "iot device simulate -d {} -n {} -g {} --da '{}' --mc 1 --mi 1 --cp {} --kp {} --pass {}".format(
+            "iot device simulate -d {} -n {} -g {} --da '{}' --mc 1 --mi 1 --cp {} --kp {} --pass {} --model-id {}".format(
                 device_ids[1], self.entity_name, self.entity_rg, simulate_msg,
-                f"{device_ids[1]}-cert.pem", f"{device_ids[1]}-key.pem", fake_pass
+                f"{device_ids[1]}-cert.pem", f"{device_ids[1]}-key.pem", fake_pass, model_id
             )
         )
+        twin_result = self.cmd(
+            f"iot hub device-twin show -d {device_ids[1]} -n {self.entity_name} -g {self.entity_rg}").get_output_in_json()
+        assert twin_result["modelId"] == model_id
+
         device_events.append((device_ids[1], f"{simulate_msg} #1"))
 
         self.cmd(

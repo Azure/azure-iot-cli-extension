@@ -211,6 +211,11 @@ def load_deviceupdate_help():
         - name: Set a specific instance tag attribute.
           text: >
             az iot device-update instance update -n {account_name} -i {instance_name} --set tags.env='test'
+
+        - name: Enable diagnostics and configure a storage account for log collection.
+          text: >
+            az iot device-update instance update -n {account_name} -i {instance_name} --set enableDiagnostics=true
+            diagnosticStorageProperties.resourceId={storage_account_resource_id}
     """
 
     helps["iot device-update instance show"] = """

@@ -290,7 +290,8 @@ class DeviceMessagingProvider(IoTHubProvider):
         passphrase: Optional[str] = None,
         method_response_code: Optional[str] = None,
         method_response_payload: Optional[str] = None,
-        init_reported_properties: Optional[str] = None
+        init_reported_properties: Optional[str] = None,
+        model_id: Optional[str] = None,
     ):
         import sys
         import uuid
@@ -333,6 +334,10 @@ class DeviceMessagingProvider(IoTHubProvider):
                 raise ArgumentUsageError(
                     "'certificate-file', 'key-file', and 'passphrase' not supported, {} doesn't allow x509 "
                     "certificate authentication".format(protocol_type)
+                )
+            if model_id:
+                raise ArgumentUsageError(
+                    f"`model-id` is not supported with {protocol_type} protocol."
                 )
 
         properties_to_send = _simulate_get_default_properties(protocol_type)
@@ -388,7 +393,8 @@ class DeviceMessagingProvider(IoTHubProvider):
                     device_id=self.device_id,
                     method_response_code=method_response_code,
                     method_response_payload=method_response_payload,
-                    init_reported_properties=init_reported_properties
+                    init_reported_properties=init_reported_properties,
+                    model_id=model_id
                 )
                 client_mqtt.execute(
                     data=generator(),

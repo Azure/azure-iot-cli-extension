@@ -138,6 +138,12 @@ def load_iothub_arguments(self, _):
             help="Initial state of twin reported properties for the target device when the simulator is run. "
             "Optional param, only supported for mqtt.",
         )
+        context.argument(
+            "model_id",
+            options_list=["--model-id", "--dtmi"],
+            help="The Digital Twin Model Id the device will report when connecting to the hub.",
+            arg_group="Digital Twin"
+        )
 
     with self.argument_context("iot device c2d-message") as context:
         context.argument(
