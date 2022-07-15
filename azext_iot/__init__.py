@@ -9,7 +9,6 @@ from azure.cli.core.commands import CliCommandType
 from azext_iot.constants import VERSION
 import azext_iot._help  # noqa: F401
 from azext_iot.product.command_map import load_product_commands
-import os
 
 
 iothub_ops = CliCommandType(operations_tmpl="azext_iot.operations.hub#{}")
