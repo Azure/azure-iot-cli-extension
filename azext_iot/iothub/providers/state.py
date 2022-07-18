@@ -15,12 +15,18 @@ from azext_iot.operations.hub import iot_device_list, iot_device_create, iot_dev
 
 import json
 from tqdm import tqdm
+from typing import Optional
 
 logger = get_logger(__name__)
 
-
 class StateProvider(IoTHubProvider):
-    def __init__(self, cmd, hub=None, rg=None, login=None, auth_type_dataplane=None):
+    def __init__(self, 
+        cmd, 
+        hub: Optional[str] = None, 
+        rg: Optional[str] = None, 
+        login: Optional[str] = None, 
+        auth_type_dataplane: Optional[str] = None
+    ):
         super(StateProvider, self).__init__(
             cmd=cmd, 
             hub_name=hub,
@@ -36,7 +42,7 @@ class StateProvider(IoTHubProvider):
         else:
             self.login = None
 
-    def save_state(self, filename):
+    def save_state(self, filename: str):
         '''
         Writes all hub configurations, device identities and device twins from the origin hub to a json file
         '''
@@ -100,7 +106,7 @@ class StateProvider(IoTHubProvider):
 
         logger.info("Saved state of IoT Hub '{}' to {}".format(self.hub_name, filename))
 
-    def upload_device_identity(self, identity):
+    def upload_device_identity(self, identity: dict):
         device_id = identity["deviceId"]
         auth_type = identity["authenticationType"]
         edge = identity["capabilities"]["iotEdge"]
@@ -132,7 +138,7 @@ class StateProvider(IoTHubProvider):
         else: 
             logger.error("Authorization type for device '{0}' not recognized.".format(device_id))
 
-    def upload_module_identity(self, identity):
+    def upload_module_identity(self, identity: dict):
 
         device_id = identity["device_id"]
         module_id = identity["module_id"]
@@ -172,12 +178,12 @@ class StateProvider(IoTHubProvider):
             id = identities[i]
             iot_device_delete(cmd=self.cmd, device_id=id["deviceId"], hub_name=self.hub_name, resource_group_name=self.rg, login=self.login, auth_type_dataplane=self.auth_type)
 
-    def upload_state(self, filename, overwrite):
+    def upload_state(self, filename: str, replace: Optional[bool] = None):
         '''
         Uses device info from file to recreate the devices
         '''
 
-        if overwrite:
+        if replace:
             self.delete_all_configs()
             self.delete_all_devices()
 
@@ -232,9 +238,14 @@ class StateProvider(IoTHubProvider):
 
         logger.info("Uploaded state from '{}' to IoT Hub '{}'".format(filename, self.hub_name))
 
-    def migrate_devices(self, orig_hub, orig_rg, orig_hub_login, overwrite):
+    def migrate_devices(self, 
+        orig_hub: Optional[str] = None, 
+        orig_rg: Optional[str] = None, 
+        orig_hub_login: Optional[str] = None, 
+        replace: Optional[bool] = None
+    ):
 
-        if overwrite:
+        if replace:
             self.delete_all_configs()
             self.delete_all_devices()
 

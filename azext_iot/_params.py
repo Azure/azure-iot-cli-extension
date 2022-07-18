@@ -769,8 +769,8 @@ def load_arguments(self, _):
             help="The path to the file where the hub and device information will be stored."
         )
         context.argument(
-            "overwrite",
-            options_list=["--overwrite"],
+            "replace",
+            options_list=["--replace", "-r"],
             help="If this flag is set, then the import will overwrite all configurations and devices in the destination hub."
         )
 
@@ -781,7 +781,7 @@ def load_arguments(self, _):
             help="Name of IoT Hub to which the origin hub will be copied."
         )
         context.argument(
-            "rg",
+            "resource_group_name",
             options_list=["--destination-resource-group", "--dg"],
             help="Name of resource group of the IoT Hub to which the origin hub will be copied."
         )
@@ -801,7 +801,7 @@ def load_arguments(self, _):
             help="Name of IoT Hub which will be copied."
         )
         context.argument(
-            "orig_rg",
+            "orig_resource_group_name",
             options_list=["--origin-resource-group", "--og"],
             help="Name of resource group of the IoT Hub which will be copied."
         )

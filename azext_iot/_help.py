@@ -598,7 +598,7 @@ helps[
         az iot hub state import -n {iothub_name} -f {filename}
     - name: Upload the devices from the default file to the specified hub, overwriting the configurations and devices already in the hub. 
       text: >
-        az iot hub state import -n {iothub_name} --overwrite
+        az iot hub state import -n {iothub_name} -r
 """
 
 helps[
@@ -609,7 +609,7 @@ helps[
     examples:
     - name: Migrate the state of the original hub to the new hub, overwriting the configurations and devices already in the hub.
       text: >
-        az iot hub state migrate --destination-hub {dest_hub_name} --origin-hub {orig_hub_name} --overwrite
+        az iot hub state migrate --destination-hub {dest_hub_name} --origin-hub {orig_hub_name} -r
 """
 
 helps[
