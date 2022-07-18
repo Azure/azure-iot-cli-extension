@@ -460,6 +460,15 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             f"iot hub device-twin show -d {device_ids[1]} -n {self.entity_name} -g {self.entity_rg}").get_output_in_json()
         assert twin_result["modelId"] == model_id
 
+        # Error - a valid dtmi is expected.
+        self.cmd(
+            "iot device simulate -d {} -n {} -g {} --da '{}' --mc 1 --mi 1 --cp {} --kp {} --pass {} --model-id {}".format(
+                device_ids[1], self.entity_name, self.entity_rg, simulate_msg,
+                f"{device_ids[1]}-cert.pem", f"{device_ids[1]}-key.pem", fake_pass, "not:good:dtmi"
+            ),
+            expect_failure=True
+        )
+
         device_events.append((device_ids[1], f"{simulate_msg} #1"))
 
         self.cmd(

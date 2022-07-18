@@ -68,7 +68,7 @@ def test_account_create_identity_system_assign_scope(provisioned_accounts: Dict[
 def test_account_create_custom():
     # Test create --no-wait/wait combo.
     target_account_name = generate_account_id()
-    # @digimaun - We can uncomment once we have more capacity in none eastus2euap location.
+    # @digimaun - We can uncomment once we have more capacity in non-eastus2euap locations.
     # group = cli.invoke(f"group show -n {ACCOUNT_RG}").as_json()
     cli.invoke(f"iot device-update account create -n {target_account_name} -g {ACCOUNT_RG} -l eastus2euap --no-wait")
     cli.invoke(f"iot device-update account wait -n {target_account_name} --created")

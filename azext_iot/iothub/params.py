@@ -8,6 +8,7 @@ from azure.cli.core.commands.parameters import get_enum_type, get_three_state_fl
 from azext_iot.common.shared import SettleType, ProtocolType, AckType
 from azext_iot.assets.user_messages import info_param_properties_device
 from azext_iot._params import hub_auth_type_dataplane_param_type
+from azext_iot.iothub._validators import validate_device_model_id
 
 
 def load_iothub_arguments(self, _):
@@ -141,8 +142,10 @@ def load_iothub_arguments(self, _):
         context.argument(
             "model_id",
             options_list=["--model-id", "--dtmi"],
-            help="The Digital Twin Model Id the device will report when connecting to the hub.",
-            arg_group="Digital Twin"
+            help="The Digital Twin Model Id the device will report when connecting to the hub. See "
+            "https://docs.microsoft.com/en-us/azure/iot-develop/overview-iot-plug-and-play for more details.",
+            arg_group="Digital Twin",
+            validator=validate_device_model_id,
         )
 
     with self.argument_context("iot device c2d-message") as context:

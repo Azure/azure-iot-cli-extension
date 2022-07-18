@@ -56,17 +56,20 @@ def update_instance(cmd, parameters: DeviceUpdateMgmtModels.Instance):
     instance_manager = DeviceUpdateInstanceManager(cmd=cmd)
     storage_properties = parameters.diagnostic_storage_properties
     if storage_properties:
-        is_dict = isinstance(storage_properties, dict)
-        authentication_type = (
-            storage_properties.get("authenticationType") if is_dict else storage_properties.authentication_type
-        )
+        # Storage properties can be a dict or DeviceUpdateMgmtModels.DiagnosticStorageProperties
+        # depending on how the CLI core generic update helpers are used i.e. --set with an existing object vs new.
+        if isinstance(storage_properties, dict):
+            authentication_type = storage_properties.get("authenticationType")
+            resource_id = storage_properties.get("resourceId")
+            connection_string = storage_properties.get("connectionString")
+        else:
+            authentication_type = storage_properties.authentication_type
+            resource_id = storage_properties.resource_id
+            connection_string = storage_properties.connection_string
+
         if not authentication_type:
             authentication_type = ADUInstanceDiagnosticStorageAuthType.KEYBASED.value
 
-        resource_id = storage_properties.get("resourceId") if is_dict else storage_properties.resource_id
-        connection_string = (
-            storage_properties.get("connectionString") if is_dict else storage_properties.connection_string
-        )
         if (
             authentication_type == ADUInstanceDiagnosticStorageAuthType.KEYBASED.value
             and resource_id
