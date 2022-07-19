@@ -580,7 +580,7 @@ helps[
     "iot hub state"
 ] = """
     type: group
-    short-summary: Download, upload or migrate the state of an IoT Hub. 
+    short-summary: Download, upload or migrate the state of an IoT Hub.
 """
 
 helps[
