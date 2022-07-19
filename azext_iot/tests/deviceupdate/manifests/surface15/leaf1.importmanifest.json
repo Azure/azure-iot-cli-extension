@@ -1,0 +1,32 @@
+﻿{
+  "updateId": {
+    "provider": "Microsoft",
+    "name": "Microphone",
+    "version": "1.3"
+  },
+  "isDeployable": false,
+  "compatibility": [
+    {
+      "deviceModel": "Microphone",
+      "deviceManufacturer": "Microsoft"
+    }
+  ],
+  "instructions": {
+    "steps": [
+      {
+        "type": "inline",
+        "handler": "microsoft/swupdate:1",
+        "files": [ "action.sh" ]
+      }
+    ]
+  },
+  "files": [
+    {
+      "filename": "action.sh",
+      "sizeInBytes": 33,
+      "hashes": { "sha256": "n+KGjLjSGr7LVKsgWiExUDeU6Z2ZTJu0tpAWxkmYKxA=" }
+    }
+  ],
+  "createdDateTime": "2021-11-10T01:30:04.8795262Z",
+  "manifestVersion": "4.0"
+}

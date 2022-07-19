@@ -17,7 +17,8 @@ from azure.cli.core.commands.parameters import (
 from azext_iot.deviceupdate.common import (
     ADUPublicNetworkAccessType,
     ADUPrivateLinkServiceConnectionStatus,
-    ADUAccountSKUType
+    ADUAccountSKUType,
+    ADUManageDeviceImportType,
 )
 
 
@@ -31,16 +32,16 @@ def load_deviceupdate_arguments(self, _):
             arg_type=resource_group_name_type,
             help="Device Update account resource group name. "
             "You can configure the default group using `az configure --defaults group=<name>`.",
+            arg_group="Account Identifier",
         )
         context.argument(
-            "name",
-            options_list=["-n", "--account"],
-            help="Device Update account name.",
+            "name", options_list=["-n", "--account"], help="Device Update account name.", arg_group="Account Identifier"
         )
         context.argument(
             "instance_name",
             options_list=["-i", "--instance"],
             help="Device Update instance name.",
+            arg_group="Account Identifier",
         )
         context.argument(
             "public_network_access",
@@ -91,9 +92,7 @@ def load_deviceupdate_arguments(self, _):
             arg_type=get_enum_type(ADUAccountSKUType),
         )
 
-    with self.argument_context(
-        "iot device-update account private-endpoint-connection"
-    ) as context:
+    with self.argument_context("iot device-update account private-endpoint-connection") as context:
         context.argument(
             "conn_name",
             options_list=["--cn", "--conn-name"],
@@ -105,12 +104,6 @@ def load_deviceupdate_arguments(self, _):
             help="The status of the private endpoint connection.",
             arg_type=get_enum_type(ADUPrivateLinkServiceConnectionStatus),
         )
-        # @digimaun - actionsRequired is in exposed in the API spec however it is not yet implemented.
-        # context.argument(
-        #     "actions",
-        #     options_list=["--actions"],
-        #     help="Message indicating if changes on the service provider require any updates on the consumer.",
-        # )
         context.argument(
             "description",
             options_list=["--desc"],
@@ -136,4 +129,303 @@ def load_deviceupdate_arguments(self, _):
             arg_group="Storage",
             options_list=["--diagnostics-storage-id"],
             help="User provided storage account resource Id for use in diagnostic logs collection.",
+        )
+
+    with self.argument_context("iot device-update update") as context:
+        context.argument(
+            "update_name",
+            options_list=["--update-name", "--un"],
+            help="The update name.",
+        )
+        context.argument(
+            "update_provider",
+            options_list=["--update-provider", "--up"],
+            help="The update provider.",
+        )
+        context.argument(
+            "update_version",
+            options_list=["--update-version", "--uv"],
+            help="The update version.",
+        )
+        context.argument(
+            "update_file_id",
+            options_list=["--update-file-id", "--ufid"],
+            help="The update file Id.",
+        )
+        context.argument(
+            "friendly_name",
+            options_list=["--friendly-name"],
+            help="Friendly name associated with the update definition.",
+        )
+
+    with self.argument_context("iot device-update update list") as context:
+        context.argument(
+            "by_provider",
+            options_list=["--by-provider"],
+            help="Flag indicating the result set should be constrained to update providers.",
+            arg_type=get_three_state_flag(),
+            arg_group="Constraint"
+        )
+        context.argument(
+            "by_name",
+            options_list=["--by-name"],
+            help="Flag indicating the result set should be constrained to update names by provider. "
+            "When using this flag --update-provider is required.",
+            arg_type=get_three_state_flag(),
+            arg_group="Constraint"
+        )
+        context.argument(
+            "by_version",
+            options_list=["--by-version"],
+            help="Flag indicating the result set should be constrained to update versions by provider and update name. "
+            "When using this flag --update-provider and --update-name are required.",
+            arg_type=get_three_state_flag(),
+            arg_group="Constraint"
+        )
+        context.argument(
+            "search",
+            options_list=["--search"],
+            help="Request updates matching a free-text search expression. "
+            "Supported with no constraint flags.",
+            arg_group="Filter",
+        )
+        context.argument(
+            "filter",
+            options_list=["--filter"],
+            help="Restricts the set of updates returned by property values. "
+            "Supported with --by-version and no constraint flags. ",
+            arg_group="Filter",
+        )
+
+    with self.argument_context("iot device-update update import") as context:
+        context.argument(
+            "url",
+            options_list=["--url"],
+            help="Routable location from which the import manifest can be downloaded by Device Update for IoT Hub. "
+            "This is typically a read-only SAS-protected blob URL with an expiration set to at least 4 hours.",
+        )
+        context.argument(
+            "file",
+            options_list=["--file"],
+            nargs="+",
+            action="append",
+            help="Space-separated KEY=VALUE pairs corresponding to import metadata file properties. "
+            "Required key values include filename and url. --file can be used 1 or more times.",
+        )
+        context.argument(
+            "hashes",
+            options_list=["--hashes"],
+            nargs="+",
+            help="Space-separated KEY=VALUE pairs where the KEY is the hash algorithm used and the VALUE is the base64 encoded "
+            "update manifest file hash. At least a sha256 entry is required. "
+            "If not provided it will by calculated from the provided url.",
+        )
+        context.argument(
+            "size",
+            type=int,
+            options_list=["--size"],
+            help="File size in number of bytes. " "If not provided it will by calculated from the provided url.",
+        )
+
+    with self.argument_context("iot device-update device") as context:
+        context.argument("device_group_id", options_list=["--group-id", "--gid"], help="Device group Id.")
+        context.argument("device_class_id", options_list=["--class-id", "--cid"], help="Device class Id.")
+
+    with self.argument_context("iot device-update device list") as context:
+        context.argument(
+            "filter",
+            options_list=["--filter"],
+            help="Restricts the set of devices returned. You can filter on groupId, deviceClassId, "
+            "or groupId and deploymentStatus.",
+        )
+
+    with self.argument_context("iot device-update device health") as context:
+        context.argument(
+            "filter",
+            options_list=["--filter"],
+            help="Device health filter. Supports the properties of state or deviceId. "
+            "If deviceId is provided moduleId can be optionally specified.",
+        )
+
+    with self.argument_context("iot device-update device class") as context:
+        context.argument(
+            "installable_updates",
+            options_list=["--installable-updates"],
+            help="Flag indicating the command should fetch installable updates for the device class.",
+            arg_group="Update",
+            arg_type=get_three_state_flag(),
+        )
+        context.argument(
+            "best_update",
+            options_list=["--best-update"],
+            help="Flag indicating the command should fetch the best available update for the device class subgroup including "
+            "a count of how many devices need the update. Group Id is required for this flag.",
+            arg_group="Update",
+            arg_type=get_three_state_flag(),
+        )
+        context.argument(
+            "update_compliance",
+            options_list=["--update-compliance"],
+            help="Flag indicating the command should fetch device class subgroup update compliance information, "
+            "such as how many devices are on their latest update, how many need new updates, and how many are "
+            "in progress on receiving a new update. Group Id is required for this flag.",
+            arg_group="Update",
+            arg_type=get_three_state_flag(),
+        )
+        context.argument(
+            "friendly_name",
+            options_list=["--friendly-name"],
+            help="Friendly name associated with the device class.",
+        )
+
+    with self.argument_context("iot device-update device class list") as context:
+        context.argument(
+            "filter",
+            options_list=["--filter"],
+            help="Filters device class subgroups based on device class compat property names and values. "
+            "For example \"compatProperties/manufacturer eq 'Contoso'\". --group-id is required to use --filter."
+        )
+
+    with self.argument_context("iot device-update device group") as context:
+        context.argument(
+            "best_updates",
+            options_list=["--best-updates"],
+            help="Flag indicating the command should fetch the best available updates for the device group including "
+            "a count of how many devices need each update.",
+            arg_group="Update",
+            arg_type=get_three_state_flag(),
+        )
+        context.argument(
+            "update_compliance",
+            options_list=["--update-compliance"],
+            help="Flag indicating the command should fetch device group update compliance information such as how many devices "
+            "are on their latest update, how many need new updates, and how many are in progress on receiving a new update.",
+            arg_group="Update",
+            arg_type=get_three_state_flag(),
+        )
+        context.argument(
+            "order_by",
+            options_list=["--order-by"],
+            help="Orders the set of groups returned. You can order by groupId, deviceCount, "
+            "createdDateTime, subgroupsWithNewUpdatesAvailableCount, subgroupsWithUpdatesInProgressCount "
+            "or subgroupsWithOnLatestUpdateCount.",
+        )
+
+    with self.argument_context("iot device-update device import") as context:
+        context.argument(
+            "import_type",
+            options_list=["--import-type", "--it"],
+            help="The types of devices to import from IoT Hub.",
+            arg_type=get_enum_type(ADUManageDeviceImportType),
+        )
+
+    with self.argument_context("iot device-update device deployment") as context:
+        context.argument("deployment_id", options_list=["--deployment-id", "--did"], help="Deployment Id.")
+        context.argument(
+            "status",
+            options_list=["--status"],
+            help="Gets the status of a deployment including a breakdown of how many devices "
+            "in the deployment are in progress, completed, or failed.",
+            arg_type=get_three_state_flag(),
+        )
+        context.argument(
+            "update_name",
+            options_list=["--update-name", "--un"],
+            help="The update name.",
+            arg_group="Update Id",
+        )
+        context.argument(
+            "update_provider",
+            options_list=["--update-provider", "--up"],
+            help="The update provider.",
+            arg_group="Update Id",
+        )
+        context.argument(
+            "update_version",
+            options_list=["--update-version", "--uv"],
+            help="The update version.",
+            arg_group="Update Id",
+        )
+        context.argument(
+            "order_by",
+            options_list=["--order-by"],
+            help="Orders the set of deployments returned. You can order by startDateTime [desc/asc].",
+        )
+
+    with self.argument_context("iot device-update device deployment list-devices") as context:
+        context.argument(
+            "filter",
+            options_list=["--filter"],
+            help="Restricts the set of deployment device states returned. You can filter on "
+            "deviceId and moduleId and/or deviceState.",
+        )
+
+    with self.argument_context("iot device-update device deployment create") as context:
+        context.argument(
+            "start_date_time",
+            options_list=["--start-time"],
+            help="The iso-8601 compliant start time for deployment. If no value is provided the "
+            "corresponding value for UTC 'now' will be used.",
+        )
+        context.argument(
+            "rollback_update_name",
+            options_list=["--rollback-update-name", "--rbun"],
+            help="The rollback update name.",
+            arg_group="Update Rollback Policy",
+        )
+        context.argument(
+            "rollback_update_provider",
+            options_list=["--rollback-update-provider", "--rbup"],
+            help="The rollback update provider.",
+            arg_group="Update Rollback Policy",
+        )
+        context.argument(
+            "rollback_update_version",
+            options_list=["--rollback-update-version", "--rbuv"],
+            help="The rollback update version.",
+            arg_group="Update Rollback Policy",
+        )
+        context.argument(
+            "devices_failed_count",
+            type=int,
+            options_list=["--failed-count", "--fc"],
+            help="Integer representing the number of failed devices in a deployment before a cloud initated rollback occurs. "
+            "Required when defining rollback policy.",
+            arg_group="Update Rollback Policy",
+        )
+        context.argument(
+            "devices_failed_percentage",
+            type=int,
+            options_list=["--failed-percentage", "--fp"],
+            help="Integer representing the percentage of failed devices in a deployment before a cloud initated rollback occurs. "
+            "Required when defining rollback policy.",
+            arg_group="Update Rollback Policy",
+        )
+
+    with self.argument_context("iot device-update device log") as context:
+        context.argument(
+            "log_collection_id",
+            options_list=["--log-collection-id", "--lcid"],
+            help="Log collection Id.",
+        )
+        context.argument(
+            "detailed_status",
+            options_list=["--detailed"],
+            help="Flag indicating whether the command should fetch the detailed status of a log collection operation.",
+            arg_type=get_three_state_flag(),
+        )
+
+    with self.argument_context("iot device-update device log collect") as context:
+        context.argument(
+            "agent_id",
+            options_list=["--agent-id"],
+            nargs="+",
+            action="append",
+            help="Space-separated KEY=VALUE pairs corresponding to device update agent identifier properties. "
+            "The KEY of deviceId is required, while moduleId is optional. --agent-id can be used 1 or more times.",
+        )
+        context.argument(
+            "description",
+            options_list=["--description"],
+            help="Description for the log collection operation.",
         )
