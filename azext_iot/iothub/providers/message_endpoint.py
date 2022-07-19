@@ -10,6 +10,7 @@ from knack.log import get_logger
 from azure.cli.core.azclierror import (
     ArgumentUsageError,
     RequiredArgumentMissingError,
+    ResourceNotFoundError
 )
 from azext_iot._factory import SdkResolver
 from azext_iot.iothub.providers.base import IoTHubProvider
@@ -87,7 +88,7 @@ class MessageEndpoint(IoTHubProvider):
     def create(
         self,
         endpoint_name: str,
-        endpoint_type,
+        endpoint_type: str,
         endpoint_resource_group: Optional[str] = None,
         endpoint_subscription_id: Optional[str] = None,
         connection_string=None,
@@ -108,16 +109,19 @@ class MessageEndpoint(IoTHubProvider):
         identity=None
     ):
         resource_group_name = self.hub_resource.additional_properties['resourcegroup']
-        if identity and authentication_type != AuthenticationType.IdentityBased.value:
-            raise ArgumentUsageError("In order to use an identity for authentication, you must select --auth-type as 'identityBased'")
-        endpoint_identity = ManagedIdentity(user_assigned_identity=identity) if identity and identity not in [IdentityType.none.value, SYSTEM_ASSIGNED_IDENTITY] else None
-
         if not endpoint_resource_group:
             endpoint_resource_group = resource_group_name
         if not endpoint_subscription_id:
             endpoint_subscription_id = self.hub_resource.additional_properties['subscriptionid']
 
+        endpoint_identity = None
+        if identity and authentication_type != AuthenticationType.IdentityBased.value:
+            raise ArgumentUsageError("In order to use an identity for authentication, you must select --auth-type as 'identityBased'")
+        elif identity and identity not in [IdentityType.none.value, SYSTEM_ASSIGNED_IDENTITY]:
+            endpoint_identity = ManagedIdentity(user_assigned_identity=identity)
+
         if EndpointType.EventHub.value == endpoint_type.lower():
+            # check connection string? endpoint uri? Entity path?
             self.hub_resource.properties.routing.endpoints.event_hubs.append(
                 RoutingEventHubProperties(
                     connection_string=connection_string,
@@ -131,6 +135,7 @@ class MessageEndpoint(IoTHubProvider):
                 )
             )
         elif EndpointType.ServiceBusQueue.value == endpoint_type.lower():
+            # check connection string? Endpoint uri?
             self.hub_resource.properties.routing.endpoints.service_bus_queues.append(
                 RoutingServiceBusQueueEndpointProperties(
                     connection_string=connection_string,
@@ -238,7 +243,61 @@ class MessageEndpoint(IoTHubProvider):
             {'IF-MATCH': self.hub_resource.etag}
         )
 
-    def get(
-        self
-    ):
-        pass
+    def show(self, endpoint_name: str):
+        for endpoint_list in self.hub_resource.properties.routing.endpoints:
+            for endpoint in endpoint_list:
+                if endpoint.name.lower() == endpoint_name.lower():
+                    return endpoint
+        raise ResourceNotFoundError("No endpoint found.")
+
+    def list(self, endpoint_type: Optional[str] = None):
+        if not endpoint_type:
+            return self.hub_resource.properties.routing.endpoints
+        if EndpointType.EventHub.value == endpoint_type.lower():
+            return self.hub_resource.properties.routing.endpoints.event_hubs
+        if EndpointType.ServiceBusQueue.value == endpoint_type.lower():
+            return self.hub_resource.properties.routing.endpoints.service_bus_queues
+        if EndpointType.ServiceBusTopic.value == endpoint_type.lower():
+            return self.hub_resource.properties.routing.endpoints.service_bus_topics
+        if EndpointType.AzureStorageContainer.value == endpoint_type.lower():
+            return self.hub_resource.properties.routing.endpoints.storage_containers
+
+    def delete(self, endpoint_name: Optional[str] = None, endpoint_type: Optional[str] = None):
+        endpoints = self.hub_resource.properties.routing.endpoints
+        if endpoint_type:
+            if EndpointType.ServiceBusQueue.value == endpoint_type.lower():
+                endpoints.service_bus_queues = []
+            elif EndpointType.ServiceBusTopic.value == endpoint_type.lower():
+                endpoints.service_bus_topics = []
+            elif EndpointType.AzureStorageContainer.value == endpoint_type.lower():
+                endpoints.storage_containers = []
+            elif EndpointType.EventHub.value == endpoint_type.lower():
+                endpoints.event_hubs = []
+
+        if endpoint_name:
+            if any(e.name.lower() == endpoint_name.lower() for e in endpoints.service_bus_queues):
+                sbq_endpoints = [e for e in endpoints.service_bus_queues if e.name.lower() != endpoint_name.lower()]
+                endpoints.service_bus_queues = sbq_endpoints
+            elif any(e.name.lower() == endpoint_name.lower() for e in endpoints.service_bus_topics):
+                sbt_endpoints = [e for e in endpoints.service_bus_topics if e.name.lower() != endpoint_name.lower()]
+                endpoints.service_bus_topics = sbt_endpoints
+            elif any(e.name.lower() == endpoint_name.lower() for e in endpoints.storage_containers):
+                sc_endpoints = [e for e in endpoints.storage_containers if e.name.lower() != endpoint_name.lower()]
+                endpoints.storage_containers = sc_endpoints
+            elif any(e.name.lower() == endpoint_name.lower() for e in endpoints.event_hubs):
+                eh_endpoints = [e for e in endpoints.event_hubs if e.name.lower() != endpoint_name.lower()]
+                endpoints.event_hubs = eh_endpoints
+
+        if not endpoint_type and not endpoint_name:
+            endpoints.service_bus_queues = []
+            endpoints.service_bus_topics = []
+            endpoints.storage_containers = []
+            endpoints.event_hubs = []
+
+        self.hub_resource.properties.routing.endpoints = endpoints
+        return self.client.iot_hub_resource.create_or_update(
+            self.hub_resource.additional_properties['resourcegroup'],
+            self.hub_resource.name,
+            self.hub_resource,
+            {'IF-MATCH': self.hub_resource.etag}
+        )
