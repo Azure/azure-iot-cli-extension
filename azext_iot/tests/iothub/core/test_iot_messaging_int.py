@@ -10,7 +10,6 @@ import json
 
 from time import time
 from uuid import uuid4
-from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests.helpers import CERT_ENDING, KEY_ENDING
 from azext_iot.tests.iothub import IoTLiveScenarioTest, PREFIX_DEVICE
 from azext_iot.common.utility import (
