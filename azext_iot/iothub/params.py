@@ -237,3 +237,16 @@ def load_iothub_arguments(self, _):
             options_list=["--content-type", "--ct"],
             help="MIME Type of file.",
         )
+
+    with self.argument_context("iot hub messaging-endpoint") as context:
+        context.argument(
+            'hub_name',
+            options_list=['--hub-name', '-n'],
+            help='IoT Hub name.',
+            arg_group='IoT Hub Identifier'
+        )
+        context.argument(
+            'endpoint_name',
+            options_list=['--endpoint-name', '--endpoint', '--en'],
+            help='Name of the routing endpoint.'
+        )
