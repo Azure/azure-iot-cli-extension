@@ -553,7 +553,7 @@ def load_digitaltwins_help():
         type: group
         short-summary: Manage and configure event routes.
         long-summary:
-            Note that an endpoint must first be configred before adding an event route.
+            Note that an endpoint must first be configured before adding an event route.
     """
 
     helps["dt route create"] = """
