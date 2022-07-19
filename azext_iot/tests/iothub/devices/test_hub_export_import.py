@@ -129,8 +129,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
                     stp = create_self_signed_certificate(subject="aziotcli", valid_days=1, cert_output_dir=None)["thumbprint"]
 
                     self.cmd("iot hub module-identity create -d {} -m deviceModule -l {} --am x509_thumbprint --ptp {} \
-                        --stp {}".format(device, self.connection_string, ptp, stp)
-                    )
+                        --stp {}".format(device, self.connection_string, ptp, stp))
 
                 # add a property and a tag to each module's twin
 

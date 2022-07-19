@@ -577,6 +577,13 @@ helps[
 """
 
 helps[
+    "iot hub state"
+] = """
+    type: group
+    short-summary: Download, upload or migrate the state of an IoT Hub. 
+"""
+
+helps[
     "iot hub state export"
 ] = """
     type: command
@@ -598,7 +605,7 @@ helps[
         az iot hub state import -n {iothub_name} -f {filename}
     - name: Upload the devices from the default file to the specified hub, overwriting the configurations and devices already in the hub.
       text: >
-        az iot hub state import -n {iothub_name} -r
+        az iot hub state import -n {iothub_name} -f {filename} -r
 """
 
 helps[
