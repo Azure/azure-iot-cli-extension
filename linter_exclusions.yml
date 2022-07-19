@@ -39,12 +39,12 @@ iot dps enrollment-group update:
       - no_parameter_defaults_for_update_commands
 iot hub state migrate:
   parameters:
-    rg:
+    orig_resource_group_name:
       rule exclusions:
       - parameter_should_not_end_in_resource_group
 iot hub state migrate:
   parameters:
-    orig_rg:
+    orig_orig_resource_group_name:
       rule exclusions:
       - parameter_should_not_end_in_resource_group
 iot hub configuration update:

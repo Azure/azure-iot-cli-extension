@@ -17,6 +17,7 @@ from azext_iot.tests.iothub import (
 
 settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED, opt_env_set=ENV_SET_TEST_IOTHUB_OPTIONAL)
 
+
 class TestHubExportImport(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestHubExportImport, self).__init__(test_case)
@@ -33,20 +34,19 @@ class TestHubExportImport(IoTLiveScenarioTest):
         ).get_output_in_json()["connectionString"]
 
         self.filename = generate_generic_id() + ".json"
-        
+
         self.create_hub_state()
 
     def create_hub_state(self):
 
         # make a configuration for the hub (applies to 0 devices, this is just to test the configuration settings)
 
-        config_content = {"deviceContent" : 
-            {"properties.desired.propFromConfig" : generate_generic_id()}
-        }
+        config_content = {"deviceContent" : {
+            "properties.desired.propFromConfig" : generate_generic_id()
+        }}
         config_content = json.dumps(config_content)
 
-        labels = {generate_generic_id():generate_generic_id(), 
-            generate_generic_id():generate_generic_id()}
+        labels = {generate_generic_id() : generate_generic_id(), generate_generic_id() : generate_generic_id()}
         labels = json.dumps(labels)
 
         priority = random.randint(1, 10)
@@ -62,7 +62,8 @@ class TestHubExportImport(IoTLiveScenarioTest):
         self.kwargs["labels"] = labels
         self.kwargs["metrics"] = metrics
 
-        self.cmd("iot hub configuration create --config-id {} -l {} --content '{}' --labels '{}' --priority {} --metrics '{}' --target-condition {}" \
+        self.cmd("iot hub configuration create --config-id {} -l {} --content '{}' --labels '{}' --priority {} --metrics '{}' \
+            --target-condition {}"
             .format("hubConfig", self.connection_string, "{config_content}", "{labels}", priority, "{metrics}", "tags.bar=12"))
 
         # populate hub with devices
@@ -78,7 +79,8 @@ class TestHubExportImport(IoTLiveScenarioTest):
             custom_primary_key = generate_key()
             custom_secondary_key = generate_key()
             self.cmd(
-                f"iot hub device-identity create -d {device_ids[0]} -l {self.connection_string} --pk {custom_primary_key} --sk {custom_secondary_key} {edge_enabled}"
+                f"iot hub device-identity create -d {device_ids[0]} -l {self.connection_string} --pk {custom_primary_key} \
+                    --sk {custom_secondary_key} {edge_enabled}"
             )
 
             # create x509_ca device
@@ -107,32 +109,34 @@ class TestHubExportImport(IoTLiveScenarioTest):
                 }
 
                 self.kwargs["patch_tags"] = json.dumps(patch_tags)
-    
+
                 self.cmd(
                     f"iot hub device-twin update -d {device} -l {self.connection_string}"
                     " --tags '{patch_tags}'"
                 )
-                
+
                 # make a module for each device, same authentication method as device
 
                 if(i == 0):
                     self.cmd("iot hub module-identity create -d {} -m deviceModule -l {} ".format(device, self.connection_string))
 
                 elif(i == 1):
-                    self.cmd("iot hub module-identity create -d {} -m deviceModule -l {} --am x509_ca".format(device, self.connection_string))
+                    self.cmd("iot hub module-identity create -d {} -m deviceModule -l {} --am x509_ca"
+                        .format(device, self.connection_string))
 
                 elif(i == 2):
                     ptp = create_self_signed_certificate(subject="aziotcli", valid_days=1, cert_output_dir=None)["thumbprint"]
                     stp = create_self_signed_certificate(subject="aziotcli", valid_days=1, cert_output_dir=None)["thumbprint"]
 
-                    self.cmd("iot hub module-identity create -d {} -m deviceModule -l {} --am x509_thumbprint --ptp {} --stp {}" \
+                    self.cmd("iot hub module-identity create -d {} -m deviceModule -l {} --am x509_thumbprint --ptp {} --stp {}"
                         .format(device, self.connection_string, ptp, stp))
-                    
+
                 # add a property and a tag to each module's twin
 
                 val = generate_generic_id()
                 self.cmd(
-                    f"iot hub module-twin update -d {device} -m deviceModule -l {self.connection_string} --set properties.desired.testProp={val}"
+                    f"iot hub module-twin update -d {device} -m deviceModule -l {self.connection_string} --set \
+                        properties.desired.testProp={val}"
                 )
 
                 patch_tags = {
@@ -166,11 +170,14 @@ class TestHubExportImport(IoTLiveScenarioTest):
             assert (device1["tags"] == device2["tags"])
 
         if(device1["authenticationType"] == DeviceAuthApiType.sas.value):
-            id1 = self.cmd("iot hub device-identity show -l {} -d {}".format(self.connection_string, device1['deviceId'])).get_output_in_json()
-            id2 = self.cmd("iot hub device-identity show -l {} -d {}".format(self.dest_hub_cstring, device1['deviceId'])).get_output_in_json()
+            id1 = self.cmd("iot hub device-identity show -l {} -d {}".format(self.connection_string, device1['deviceId'])) \
+                .get_output_in_json()
+            id2 = self.cmd("iot hub device-identity show -l {} -d {}".format(self.dest_hub_cstring, device1['deviceId'])) \
+                .get_output_in_json()
             assert (id1["authentication"]["symmetricKey"]["primaryKey"] == id2["authentication"]["symmetricKey"]["primaryKey"])
-            assert (id1["authentication"]["symmetricKey"]["secondaryKey"] == id2["authentication"]["symmetricKey"]["secondaryKey"])
-            
+            assert (id1["authentication"]["symmetricKey"]["secondaryKey"] == \
+                id2["authentication"]["symmetricKey"]["secondaryKey"])
+
         if(device1["authenticationType"] == DeviceAuthApiType.selfSigned.value):
             assert (device1["x509Thumbprint"]["primaryThumbprint"] == device2["x509Thumbprint"]["primaryThumbprint"])
             assert (device1["x509Thumbprint"]["secondaryThumbprint"] == device2["x509Thumbprint"]["secondaryThumbprint"])
@@ -209,17 +216,17 @@ class TestHubExportImport(IoTLiveScenarioTest):
 
             module_twin = self.cmd(
                 f"iot hub module-twin show -m {module['moduleId']} -d {device1['deviceId']} -l {self.connection_string}"
-            ).get_output_in_json()  
+            ).get_output_in_json()
             target_module_twin = self.cmd(
                 f"iot hub module-twin show -m {module['moduleId']} -d {device1['deviceId']} -l {self.dest_hub_cstring}"
-            ).get_output_in_json()   
-            
+            ).get_output_in_json()
+
             assert (len(module_twin["properties"]["desired"]) == len(target_module_twin["properties"]["desired"]))
             for prop in module_twin["properties"]["desired"]:
                 if(prop != "$metadata" and prop != "version"):
                     assert (prop in target_module_twin["properties"]["desired"])
                     assert (module_twin["properties"]["desired"][prop] == target_module_twin["properties"]["desired"][prop])
-            
+
             if("tags" in module_twin.keys()):
                 assert (module_twin["tags"] == target_module_twin["tags"])
             assert (module_twin["status"] == target_module_twin["status"])
@@ -262,10 +269,6 @@ class TestHubExportImport(IoTLiveScenarioTest):
 
     def clean_up_dest_hub(self):
 
-        # if not settings.env.azext_iot_desthub:
-        #     self.cmd("iot hub delete -l {}".format(self.dest_hub_cstring))
-        # else: 
-
         dest_hub_configs = self.cmd(
             f"iot hub configuration list -l {self.dest_hub_cstring}"
         ).get_output_in_json()
@@ -278,7 +281,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
         dest_hub_identities = self.cmd(
             f"iot hub device-identity list -l {self.dest_hub_cstring}"
         ).get_output_in_json()
-        
+
         for id in dest_hub_identities:
             self.cmd(
                 "iot hub device-identity delete -d {} -l {}".format(id["deviceId"], self.dest_hub_cstring)
@@ -297,7 +300,6 @@ class TestHubExportImport(IoTLiveScenarioTest):
         self.cmd(
             f"iot hub state import -n {self.dest_hub} -f {self.filename} -g {self.dest_hub_rg} -r"
         )
-
         self.compare_hubs()
         self.clean_up_dest_hub()
 
@@ -309,7 +311,6 @@ class TestHubExportImport(IoTLiveScenarioTest):
         self.cmd(
             f"iot hub state import -n {self.dest_hub} -f {self.filename} -g {self.dest_hub_rg} --auth-type login -r"
         )
-
         self.compare_hubs()
         self.clean_up_dest_hub()
 
@@ -321,9 +322,8 @@ class TestHubExportImport(IoTLiveScenarioTest):
         self.cmd(
             f"iot hub state import -f {self.filename} -l {self.dest_hub_cstring} -r"
         )
-
         self.compare_hubs()
-        
+
         os.remove(self.filename)
         if not settings.env.azext_iot_desthub:
             self.cmd("iot hub delete -n {} -g {}".format(self.dest_hub, self.dest_hub_rg))
@@ -331,37 +331,34 @@ class TestHubExportImport(IoTLiveScenarioTest):
             self.clean_up_dest_hub()
 
     def test_migrate(self):
-        
+
         # auth-type = key (default)
 
         self.cmd(
-            f"iot hub state migrate --origin-hub {self.entity_name} --origin-resource-group {self.entity_rg} --destination-hub {self.dest_hub} \
-                --destination-resource-group {self.dest_hub_rg} --auth-type login --replace"
+            f"iot hub state migrate --origin-hub {self.entity_name} --origin-resource-group {self.entity_rg} --destination-hub \
+                {self.dest_hub} --destination-resource-group {self.dest_hub_rg} --auth-type login --replace"
         )
-
         self.compare_hubs()
         self.clean_up_dest_hub()
 
         # auth-type = login
 
         self.cmd(
-            f"iot hub state migrate --origin-hub {self.entity_name} --origin-resource-group {self.entity_rg} --destination-hub {self.dest_hub} \
-                --destination-resource-group {self.dest_hub_rg} --auth-type login -r"
+            f"iot hub state migrate --origin-hub {self.entity_name} --origin-resource-group {self.entity_rg} --destination-hub \
+                {self.dest_hub} --destination-resource-group {self.dest_hub_rg} --auth-type login -r"
         )
-
         self.compare_hubs()
         self.clean_up_dest_hub()
 
         # connection string
 
         self.cmd(
-            f"iot hub state migrate --origin-hub-login {self.connection_string} --destination-hub-login {self.dest_hub_cstring} -r"
+            f"iot hub state migrate --origin-hub-login {self.connection_string} --destination-hub-login \
+                {self.dest_hub_cstring} -r"
         )
-
         self.compare_hubs()
 
         if not settings.env.azext_iot_desthub:
             self.cmd("iot hub delete -n {} -g {}".format(self.dest_hub, self.dest_hub_rg))
         else:
             self.clean_up_dest_hub()
-    

@@ -74,8 +74,8 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
     def create_hub(self, hub_name, resource_group, storage_container=None, storage_cstring=None):
         hubs_list = self.cmd(
-                'iot hub list -g "{}"'.format(resource_group)
-            ).get_output_in_json()
+            'iot hub list -g "{}"'.format(resource_group)
+        ).get_output_in_json()
 
         target_hub = None
         for hub in hubs_list:
