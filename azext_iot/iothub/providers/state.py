@@ -46,12 +46,11 @@ class StateProvider(IoTHubProvider):
         '''
         Writes all hub configurations, device identities and device twins from the origin hub to a json file
         '''
-
         configs = iot_hub_configuration_list(cmd=self.cmd, hub_name=self.hub_name, resource_group_name=self.rg, login=self.login, auth_type_dataplane=self.auth_type)
 
         identities = iot_device_list(cmd=self.cmd, hub_name=self.hub_name, top=-1, resource_group_name=self.rg, login=self.login, auth_type_dataplane=self.auth_type)
 
-        with open(filename, 'w') as f:
+        with open(filename, 'w', encoding='utf-8') as f:
 
             json.dump(configs, f)
             f.write('\n')
@@ -72,11 +71,7 @@ class StateProvider(IoTHubProvider):
                     id2 = _iot_device_show(self.target, id["deviceId"])
                     id["symmetricKey"] = id2["authentication"]["symmetricKey"]
 
-                twin = _iot_device_twin_show(self.target, id["deviceId"])
-
                 json.dump(id, f)
-                f.write('\n')
-                json.dump(twin, f)
                 f.write('\n')
 
                 for module in module_objs:
@@ -132,8 +127,8 @@ class StateProvider(IoTHubProvider):
                     login=self.login, auth_type_dataplane=self.auth_type)
 
         elif(auth_type == DeviceAuthApiType.certificateAuthority.value):
-                iot_device_create(self.cmd, device_id, self.hub_name, edge, DeviceAuthType.x509_ca.value, status=status, status_reason=status_reason, \
-                    resource_group_name=self.rg, login=self.login, auth_type_dataplane=self.auth_type)
+            iot_device_create(self.cmd, device_id, self.hub_name, edge, DeviceAuthType.x509_ca.value, status=status, status_reason=status_reason, \
+                resource_group_name=self.rg, login=self.login, auth_type_dataplane=self.auth_type)
 
         else: 
             logger.error("Authorization type for device '{0}' not recognized.".format(device_id))
@@ -188,7 +183,7 @@ class StateProvider(IoTHubProvider):
             self.delete_all_devices()
 
         hub_info = []
-        with open(filename, 'r') as f:
+        with open(filename, 'r', encoding='utf-8') as f:
             for obj in f:
                 hub_info.append(json.loads(obj))
 
@@ -211,18 +206,24 @@ class StateProvider(IoTHubProvider):
 
             numModules = hub_info[i]["numModules"]
             identity = hub_info[i]
-            twin = hub_info[i+1]
 
             self.upload_device_identity(identity)
+
+            # all necessary twin attributes are already included in the identity
+
+            twin = identity 
+            if identity["authenticationType"] == DeviceAuthApiType.sas.value:
+                twin.pop("symmetricKey")
 
             iot_device_twin_replace(cmd=self.cmd, device_id=identity["deviceId"], target_json=json.dumps(twin), hub_name=self.hub_name, resource_group_name=self.rg, \
                 login=self.login, auth_type_dataplane=self.auth_type)
 
+            i += 1
+            pbar.update(1)
+
             # upload module identities and twins for the given device
 
-            for j in range(numModules):
-                i += 2
-                pbar.update(2)
+            for _ in range(numModules):
                 module_identity = hub_info[i]
                 module_twin = hub_info[i+1]
 
@@ -230,9 +231,9 @@ class StateProvider(IoTHubProvider):
 
                 iot_device_module_twin_replace(cmd=self.cmd, device_id=identity["deviceId"], module_id=module_identity["module_id"], target_json=json.dumps(module_twin), \
                     hub_name=self.hub_name, resource_group_name=self.rg, login=self.login, auth_type_dataplane=self.auth_type)
-            
-            i += 2
-            pbar.update(2)
+              
+                i += 2
+                pbar.update(2)
 
         pbar.close()
 
