@@ -357,14 +357,15 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         self.cmd(
             "iot device send-d2c-message -d {} -n {} -g {} --da '{}' --key {} --model-id {}".format(
                 device_id, self.entity_name, self.entity_rg, send_d2c_msg,
-                keys["secondaryKey"], "abcd:com:example"
+                keys["secondaryKey"], "abcd:com:"
             ),
             expect_failure=True
         )
 
+        # Error - model Id requires valid dtmi.
         self.cmd(
             "iot device send-d2c-message -d {} -n {} -g {} --da '{}' --key {} --model-id {} ".format(
-                device_id, self.entity_name, self.entity_rg, send_d2c_msg, keys["primaryKey"], "dtmi:com:example"
+                device_id, self.entity_name, self.entity_rg, send_d2c_msg, keys["primaryKey"], "dtmi:com:example;"
             ),
             expect_failure=True
         )
