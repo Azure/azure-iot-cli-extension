@@ -243,6 +243,8 @@ def load_iothub_help():
         examples:
         - name: Basic usage
           text: az iot device send-d2c-message -n {iothub_name} -d {device_id}
+        - name: Basic usage for device registering the model Id of 'dtmi:com:example:Thermostat;1' upon connection
+          text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --model-id 'dtmi:com:example:Thermostat;1'
         - name: Basic usage for device with x509 authentication
           text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --cp {certificate_file_path} --kp {key_file_path}
         - name: Basic usage for device with x509 authentication in which the key file has a passphrase

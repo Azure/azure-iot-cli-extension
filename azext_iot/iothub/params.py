@@ -114,6 +114,14 @@ def load_iothub_arguments(self, _):
             arg_group="Device Authentication",
             help="Passphrase for key file.",
         )
+        context.argument(
+            "model_id",
+            options_list=["--model-id", "--dtmi"],
+            help="The Digital Twin Model Id the device will report when connecting to the hub. See "
+            "https://docs.microsoft.com/en-us/azure/iot-develop/overview-iot-plug-and-play for more details.",
+            arg_group="Digital Twin",
+            validator=validate_device_model_id,
+        )
 
     with self.argument_context("iot device simulate") as context:
         context.argument(
@@ -138,14 +146,6 @@ def load_iothub_arguments(self, _):
             options_list=["--init-reported-properties", "--irp"],
             help="Initial state of twin reported properties for the target device when the simulator is run. "
             "Optional param, only supported for mqtt.",
-        )
-        context.argument(
-            "model_id",
-            options_list=["--model-id", "--dtmi"],
-            help="The Digital Twin Model Id the device will report when connecting to the hub. See "
-            "https://docs.microsoft.com/en-us/azure/iot-develop/overview-iot-plug-and-play for more details.",
-            arg_group="Digital Twin",
-            validator=validate_device_model_id,
         )
 
     with self.argument_context("iot device c2d-message") as context:

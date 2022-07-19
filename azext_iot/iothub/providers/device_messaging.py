@@ -61,6 +61,7 @@ class DeviceMessagingProvider(IoTHubProvider):
         certificate_file: Optional[str] = None,
         key_file: Optional[str] = None,
         passphrase: Optional[str] = None,
+        model_id: Optional[str] = None,
     ):
         from azext_iot.iothub.providers.mqtt import MQTTProvider
 
@@ -78,7 +79,8 @@ class DeviceMessagingProvider(IoTHubProvider):
             hub_hostname=self.target["entity"],
             device_conn_string=device_connection_string,
             x509_files=device["authentication"].get("x509_files"),
-            device_id=self.device_id
+            device_id=self.device_id,
+            model_id=model_id
         )
         for _ in range(msg_count):
             client_mqtt.send_d2c_message(message_text=data, properties=properties)

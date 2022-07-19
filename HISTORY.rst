@@ -71,8 +71,8 @@ unreleased
 
 **IoT device updates**
 
-* `az iot device simulate` supports a `--model-id` argument. The model Id is used by a device to advertise the
-  digital twin interface it implements.
+* `az iot device simulate` and `az iot device send-d2c-message` support a `--model-id` argument.
+  The model Id is used by a device to advertise the digital twin interface it implements.
 
 
 0.15.0

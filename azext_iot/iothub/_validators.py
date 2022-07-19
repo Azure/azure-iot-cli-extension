@@ -12,8 +12,8 @@ def validate_device_model_id(namespace: Namespace):
     if hasattr(namespace, 'model_id'):
         from azext_iot.common.utility import is_valid_dtmi
         model_id = namespace.model_id
-        if not(is_valid_dtmi(model_id)):
+        if model_id and not(is_valid_dtmi(model_id)):
             raise InvalidArgumentValueError(
-                "Invalid dtmi value provided. A valid dtmi will look like "
+                f"Invalid dtmi value '{model_id}' provided. A valid dtmi will look like "
                 "'dtmi:com:example:TemperatureController;1'. "
                 "See https://github.com/Azure/digital-twin-model-identifier for more details.")
