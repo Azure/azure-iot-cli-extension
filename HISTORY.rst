@@ -6,6 +6,18 @@ Release History
 unreleased
 +++++++++++++++
 
+
+0.16.0
++++++++++++++++
+
+**Device Update**
+
+* The **in preview** `az iot device-update` command group is now always available.
+  No environment variable is needed for activation.
+
+  - The Device Update command group supports all `account` and `instance` related functionality against
+    control plane API version 2022-04-01-preview.
+
 **Digital Twin updates**
 
 * Updated `az dt model create` command to process input ontologies larger than 250 models in a single command run.
@@ -14,7 +26,9 @@ unreleased
 **IoT Central updates**
 
 * Add support for device groups CRUD.
+
   - az iot central device-group
+
     - az iot central device-group list
     - az iot central device-group show
     - az iot central device-group create
@@ -22,23 +36,30 @@ unreleased
     - az iot central device-group update
 
 * Add support for device attestation CRUD.
+
   - az iot central device attestation
+
     - az iot central device attestation show
     - az iot central device attestation create
     - az iot central device attestation delete
     - az iot central device attestation update
 
 * Add support for device/module properties/telemetry/command.
+
   - az iot central device list-components
   - az iot central device list-modules
   - az iot central device telemetry
+
     - az iot central device telemetry show
+
   - az iot central device twin
+
     - az iot central device twin show
     - az iot central device twin update
     - az iot central device twin replace
 
 * Add support for 2022-05-31 GA version.
+
   - az iot central api-token
   - az iot central device-template
   - az iot central device-group
@@ -47,6 +68,11 @@ unreleased
   - az iot central organization
   - az iot central role
   - az iot central user
+
+**IoT device updates**
+
+* `az iot device simulate` and `az iot device send-d2c-message` support a `--model-id` argument.
+  The model Id is used by a device to advertise the digital twin interface it implements.
 
 
 0.15.0
@@ -59,14 +85,15 @@ unreleased
 
 **Device Update**
 
-* Introducing the Azure Device Update for IoT Hub root command group `az iot device-update`.
+* Introducing the **in preview** Azure Device Update for IoT Hub root command group `az iot device-update`.
   To learn more about the service visit https://docs.microsoft.com/en-us/azure/iot-hub-device-update/.
  
   - This command group is behind a feature flag environment variable. Set `IOT_CLI_ADU_ENABLED` to any value
     to activate the command group.
-  - The Device Update command group supports all `account` and `instance` related functionality.
+  - The Device Update command group supports all `account` and `instance` related functionality against
+    control plane API version 2022-04-01-preview.
 
-**IoT Device updates**
+**IoT device updates**
 
 * Added device registration commands, `az iot device registration create` to register a device to an individual
   enrollment or an enrollment group. Currently, devices with symmetric key and x509 certificate authentication

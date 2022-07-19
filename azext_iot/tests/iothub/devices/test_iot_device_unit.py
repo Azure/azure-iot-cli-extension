@@ -553,12 +553,6 @@ class TestDeviceSimulate:
                 cmd=fixture_cmd, device_id=device_id, hub_name=mock_target["entity"]
             )
 
-    def test_device_simulate_mqtt_non_sas_device_error(self, fixture_ghcs, fixture_self_signed_device_show_self_signed):
-        with pytest.raises(CLIError):
-            subject.iot_simulate_device(
-                cmd=fixture_cmd, device_id=device_id, hub_name=mock_target["entity"]
-            )
-
 
 class TestMQTTClientSetup:
     def test_mqtt_provider_creation_sas_device(self, mqttclient_cs):
