@@ -7,16 +7,21 @@
 """
 Load CLI commands
 """
-from azure.cli.core.commands import CliCommandType
+from azure.cli.core.commands import CliCommandType, LongRunningOperation
 
 pnp_runtime_ops = CliCommandType(
     operations_tmpl="azext_iot.iothub.commands_pnp_runtime#{}"
 )
 iothub_job_ops = CliCommandType(operations_tmpl="azext_iot.iothub.commands_job#{}")
+iothub_message_endpoint_ops = CliCommandType(operations_tmpl="azext_iot.iothub.commands_message_endpoint#{}")
 device_messaging_ops = CliCommandType(
     operations_tmpl="azext_iot.iothub.commands_device_messaging#{}"
 )
 
+class EndpointUpdateResultTransform(LongRunningOperation):  # pylint: disable=too-few-public-methods
+    def __call__(self, poller):
+        result = super(EndpointUpdateResultTransform, self).__call__(poller)
+        return result.properties.routing.endpoints
 
 def load_iothub_commands(self, _):
     """
@@ -32,6 +37,21 @@ def load_iothub_commands(self, _):
         cmd_group.command("invoke-command", "invoke_device_command")
         cmd_group.show_command("show", "get_digital_twin")
         cmd_group.command("update", "patch_digital_twin")
+
+    with self.command_group("iot hub messaging-endpoint", command_type=iothub_message_endpoint_ops) as cmd_group:
+        pass
+
+    with self.command_group("iot hub messaging-endpoint create", command_type=iothub_message_endpoint_ops) as cmd_group:
+        cmd_group.command("event-hub", "message_endpoint_create_event_hub",
+                         transform=EndpointUpdateResultTransform(self.cli_ctx))
+        cmd_group.command("service-bus-queue", "message_endpoint_create_service_bus_queue",
+                         transform=EndpointUpdateResultTransform(self.cli_ctx))
+        cmd_group.command("service-bus-topic", "message_endpoint_create_service_bus_topic",
+                         transform=EndpointUpdateResultTransform(self.cli_ctx))
+        cmd_group.command("cosmos-db-collection", "message_endpoint_create_cosmos_db_collection",
+                         transform=EndpointUpdateResultTransform(self.cli_ctx))
+        cmd_group.command("storage-container", "message_endpoint_create_storage_container",
+                         transform=EndpointUpdateResultTransform(self.cli_ctx))
 
     with self.command_group("iot device", command_type=device_messaging_ops) as cmd_group:
         cmd_group.command("send-d2c-message", "iot_device_send_message")

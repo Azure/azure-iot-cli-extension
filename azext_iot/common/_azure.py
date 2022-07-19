@@ -46,6 +46,11 @@ def parse_iot_device_module_connection_string(cs):
     return _parse_connection_string(cs, validate, "Module")
 
 
+def parse_cosmos_db_connection_string(cs):
+    validate = ["AccountEndpoint", "AccountKey"]
+    return _parse_connection_string(cs, validate, "Cosmos DB Collection")
+
+
 def get_iot_central_tokens(cmd, app_id, token, central_dns_suffix):
     import requests
 
