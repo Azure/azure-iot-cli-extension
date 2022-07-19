@@ -153,12 +153,6 @@ def load_arguments(self, _):
             help="Json payload to be passed to method. Must be file path or raw json.",
         )
         context.argument(
-            "timeout",
-            options_list=["--timeout", "--to"],
-            type=int,
-            help="Maximum number of seconds to wait for device method result.",
-        )
-        context.argument(
             "method_connect_timeout",
             options_list=["--method-connect-timeout", "--mct"],
             type=int,
@@ -300,6 +294,22 @@ def load_arguments(self, _):
             "auth_type_dataplane",
             options_list=["--auth-type"],
             arg_type=hub_auth_type_dataplane_param_type,
+        )
+
+    with self.argument_context("iot hub invoke-device-method") as context:
+        context.argument(
+            "timeout",
+            options_list=["--timeout", "--to"],
+            type=int,
+            help="Maximum number of seconds to wait for the device method result.",
+        )
+
+    with self.argument_context("iot hub invoke-module-method") as context:
+        context.argument(
+            "timeout",
+            options_list=["--timeout", "--to"],
+            type=int,
+            help="Maximum number of seconds to wait for the module method result.",
         )
 
     with self.argument_context("iot hub connection-string") as context:

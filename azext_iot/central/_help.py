@@ -478,7 +478,148 @@ def _load_central_devices_help():
         examples:
         - name: Get registration info on specified device
           text: >
-            az iot central device registration-info --app-id {appid} --device-id {deviceid}
+            az iot central device registration-info
+            --app-id {appid}
+            --device-id {deviceid}
+    """
+
+    helps[
+        "iot central device attestation"
+    ] = """
+        type: group
+        short-summary: Manage and configure IoT Central device attestation.
+    """
+
+    helps[
+        "iot central device attestation show"
+    ] = """
+        type: command
+        short-summary: Get device attestation.
+
+        examples:
+        - name: Get device attestation on specified device
+          text: >
+            az iot central device attestation show
+            --app-id {appid}
+            --device-id {deviceid}
+    """
+
+    helps[
+        "iot central device attestation delete"
+    ] = """
+        type: command
+        short-summary: Remove an individual device attestation.
+
+        examples:
+        - name: Remove an individual device attestation on specified device
+          text: >
+            az iot central device attestation delete
+            --app-id {appid}
+            --device-id {deviceid}
+    """
+
+    helps[
+        "iot central device attestation update"
+    ] = """
+        type: command
+        short-summary: Update an individual device attestation via patch.
+
+        examples:
+        - name: Update an individual device attestation via patch on specified device
+          text: >
+            az iot central device attestation update
+            --app-id {appid}
+            --device-id {deviceid}
+            --content {attestation}
+    """
+
+    helps[
+        "iot central device attestation create"
+    ] = """
+        type: command
+        short-summary: Create an individual device attestation.
+
+        examples:
+        - name: Create an individual device attestation on specified device
+          text: >
+            az iot central device attestation create
+            --app-id {appid}
+            --device-id {deviceid}
+            --content {attestation}
+    """
+
+    helps[
+        "iot central device list-components"
+    ] = """
+        type: command
+        short-summary: List the components present in a device.
+
+        examples:
+        - name: List the components present in a device
+          text: >
+            az iot central device list-components
+            --app-id {appid}
+            --device-id {deviceid}
+
+        - name: List the components present in a device module
+          text: >
+            az iot central device list-components
+            --app-id {appid}
+            --module-name {modulename}
+            --device-id {deviceid}
+    """
+
+    helps[
+        "iot central device list-modules"
+    ] = """
+        type: command
+        short-summary: List the modules present in a device.
+
+        examples:
+        - name: List the modules present in a device
+          text: >
+            az iot central device list-modules
+            --app-id {appid}
+            --device-id {deviceid}
+    """
+
+    helps[
+        "iot central device telemetry"
+    ] = """
+        type: group
+        short-summary: Query IoT Central device last telemetry value
+    """
+
+    helps[
+        "iot central device telemetry show"
+    ] = """
+        type: command
+        short-summary: Get the last telemetry value from a device.
+
+        examples:
+        - name:  Get device telemetry value.
+          text: >
+            az iot central device telemetry show
+            --app-id {appid}
+            --device-id {deviceid}
+            --telemetry-name {telemetryname}
+
+        - name:  Get device component telemetry value.
+          text: >
+            az iot central device telemetry show
+            --app-id {appid}
+            --device-id {deviceid}
+            --component-name {componentname}
+            --telemetry-name {telemetryname}
+
+        - name:  Get device module component telemetry value.
+          text: >
+            az iot central device telemetry show
+            --app-id {appid}
+            --device-id {deviceid}
+            --module-name {modulename}
+            --component-name {componentname}
+            --telemetry-name {telemetryname}
     """
 
 
@@ -520,6 +661,23 @@ def _load_central_command_help():
                 --device-id {deviceid}
                 --interface-id {interfaceid}
                 --command-name {commandname}
+
+            - name: Show component command response
+              text: >
+                az iot central device command history
+                --app-id {appid}
+                --device-id {deviceid}
+                --component-name {componentname}
+                --command-name {commandname}
+
+            - name: Show module component command response
+              text: >
+                az iot central device command history
+                --app-id {appid}
+                --device-id {deviceid}
+                --module-name {modulename}
+                --component-name {componentname}
+                --command-name {commandname}
         """
 
     helps[
@@ -527,27 +685,42 @@ def _load_central_command_help():
     ] = """
             type: command
             short-summary: Run a command on a device and view associated response. Does NOT monitor property updates that the command may perform.
-            long-summary: |
-                Note: payload should be nested under "request".
-                i.e. if your device expects the payload in a shape {"key": "value"}
-                payload should be {"request": {"key": "value"}}.
-                --content can also be pointed at a filepath like this (.../path/to/payload.json)
+            long-summary: --content can be inline json or file path.
             examples:
-            - name: Run command response
+            - name: Run command with inline payload. Payload should be under "request" in json string
               text: >
                 az iot central device command run
                 --app-id {appid}
                 --device-id {deviceid}
                 --interface-id {interfaceid}
                 --command-name {commandname}
-                --content {payload}
+                --content '{"request": {payload}}'
 
-            - name: Short Run command response
+            - name: Short run command with json payload path.
               text: >
                 az iot central device command run
                 -n {appid}
                 -d {deviceid}
                 -i {interfaceid}
+                --cn {commandname}
+                -k {payload_file_path}
+
+            - name: Run component command.
+              text: >
+                az iot central device command run
+                -n {appid}
+                -d {deviceid}
+                --co {componentname}
+                --cn {commandname}
+                -k {payload}
+
+            - name: Run module component command.
+              text: >
+                az iot central device command run
+                -n {appid}
+                -d {deviceid}
+                --mn {modulename}
+                --co {componentname}
                 --cn {commandname}
                 -k {payload}
         """
@@ -848,6 +1021,74 @@ def _load_central_device_groups_help():
           text: >
             az iot central device-group list
             --app-id {appid}
+    """
+
+    helps[
+        "iot central device-group show"
+    ] = """
+        type: command
+        short-summary: Get the device group  by ID.
+
+        examples:
+        - name: Get the device group by ID.
+          text: >
+            az iot central device-group show
+            --app-id {appid}
+            --device-group-id {devicegroupid}
+    """
+
+    helps[
+        "iot central device-group create"
+    ] = """
+        type: command
+        short-summary: Create a device group.
+        long-summary: |
+                Note: Only one organization is supported today, multiple organizations will be supported soon.
+
+        examples:
+        - name: Create a device group.
+          text: >
+            az iot central device-group create
+            --app-id {appid}
+            --device-group-id {devicegroupid}
+            --display-name "DeviceGroup1"
+            --filter "SELECT * FROM devices WHERE $provisioned = true"
+            --description "This is a default device group."
+            --organizations {organization}
+    """
+
+    helps[
+        "iot central device-group update"
+    ] = """
+        type: command
+        short-summary: Update an existing device group.
+        long-summary: |
+                Note: Only one organization is supported today, multiple organizations will be supported soon.
+
+        examples:
+        - name: Update a device group via patch
+          text: >
+            az iot central device-group update
+            --app-id {appid}
+            --device-group-id {devicegroupid}
+            --display-name {displayname}
+            --filter {filter}
+            --description {description}
+            --organizations {organization}
+    """
+
+    helps[
+        "iot central device-group delete"
+    ] = """
+        type: command
+        short-summary: Delete a device group.
+
+        examples:
+        - name: Delete a device group
+          text: >
+            az iot central device-group delete
+            --app-id {appid}
+            --device-group-id {devicegroupid}
     """
 
 
@@ -1301,7 +1542,90 @@ def _load_central_monitors_help():
         "iot central device twin show"
     ] = """
         type: command
-        short-summary: Get the device twin from IoT Hub.
+        short-summary: Get all property values of a device, a device component, a device module or a device module component.
+        long-summary: Providing --component-name, --module-name or both of them to get device component properties,
+                      device module properties or device module component properties.
+        examples:
+        - name: Get device properties
+          text: >
+            az iot central device twin show
+            --app-id {appid}
+            --device-id {deviceid}
+        - name: Get device component properties
+          text: >
+            az iot central device twin show
+            --app-id {appid}
+            --device-id {deviceid}
+            --co {componentname}
+        - name: Get device module component properties
+          text: >
+            az iot central device twin show
+            --app-id {appid}
+            --device-id {deviceid}
+            --mn {modulename}
+            --co {componentname}
+    """
+
+    helps[
+        "iot central device twin update"
+    ] = """
+        type: command
+        short-summary: Update writable property values of a device, a device component, a device module or a device module component.
+        long-summary: Providing --component-name, --module-name or both of them to update device component properties,
+                      device module properties or device module component properties.
+        examples:
+        - name: Update device properties
+          text: >
+            az iot central device twin update
+            --app-id {appid}
+            --device-id {deviceid}
+            -k {content}
+        - name: Update device component properties
+          text: >
+            az iot central device twin update
+            --app-id {appid}
+            --device-id {deviceid}
+            --co {componentname}
+            -k {content}
+        - name: Update device module component properties
+          text: >
+            az iot central device twin update
+            --app-id {appid}
+            --device-id {deviceid}
+            --mn {modulename}
+            --co {componentname}
+            -k {content}
+    """
+
+    helps[
+        "iot central device twin replace"
+    ] = """
+        type: command
+        short-summary: Replace writable property values of a device, a device component or a device module or a device module component.
+        long-summary: Providing --component-name, --module-name or both of them to replace device component properties,
+                      device module properties or device module component properties.
+        examples:
+        - name: Replace device properties
+          text: >
+            az iot central device twin replace
+            --app-id {appid}
+            --device-id {deviceid}
+            -k {content}
+        - name: Replace device component properties
+          text: >
+            az iot central device twin replace
+            --app-id {appid}
+            --device-id {deviceid}
+            --co {componentname}
+            -k {content}
+        - name: Replace device module component properties
+          text: >
+            az iot central device twin replace
+            --app-id {appid}
+            --device-id {deviceid}
+            --mn {modulename}
+            --co {componentname}
+            -k {content}
     """
 
 

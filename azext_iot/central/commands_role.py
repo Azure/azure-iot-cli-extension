@@ -22,7 +22,7 @@ def get_role(
     role_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
+    api_version=ApiVersion.ga_2022_05_31.value,
 ) -> RoleType:
     provider = CentralRoleProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
@@ -36,7 +36,7 @@ def list_roles(
     app_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
+    api_version=ApiVersion.ga_2022_05_31.value,
 ) -> List[RoleType]:
     provider = CentralRoleProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token

@@ -597,3 +597,17 @@ def ensure_azure_namespace_path():
         sys.path.insert(0, ext_path)
 
     return
+
+
+def is_valid_dtmi(dtmi):
+    """Checks validity of a DTMI
+    :param str dtmi: DTMI
+    :returns: Boolean indicating if DTMI is valid
+    :rtype: bool
+    """
+    pattern = re.compile(
+        "^dtmi:[A-Za-z](?:[A-Za-z0-9_]*[A-Za-z0-9])?(?::[A-Za-z](?:[A-Za-z0-9_]*[A-Za-z0-9])?)*;[1-9][0-9]{0,8}$"
+    )
+    if not pattern.match(dtmi):
+        return False
+    return True

@@ -1,7 +1,4 @@
-dt endpoint:
-  rule_exclusions:
-    - require_wait_command_if_no_wait
-dt data-history:
+dt endpoint create:
   rule_exclusions:
     - require_wait_command_if_no_wait
 dt endpoint create servicebus:
@@ -19,6 +16,9 @@ dt endpoint create eventhub:
     eventhub_resource_group:
       rule_exclusions:
       - parameter_should_not_end_in_resource_group
+dt data-history connection create:
+  rule_exclusions:
+  - require_wait_command_if_no_wait
 dt data-history connection create adx:
   parameters:
     adx_resource_group:
@@ -112,6 +112,14 @@ iot central device-template update:
     central_dns_suffix:
       rule_exclusions:
       - no_parameter_defaults_for_update_commands
+iot central device-group update:
+  parameters:
+    api_version:
+      rule_exclusions:
+      - no_parameter_defaults_for_update_commands
+    central_dns_suffix:
+      rule_exclusions:
+      - no_parameter_defaults_for_update_commands
 iot central file-upload-config update:
   parameters:
     api_version:
@@ -135,4 +143,21 @@ iot central user update:
       - no_parameter_defaults_for_update_commands
     central_dns_suffix:
       rule_exclusions:
+      - no_parameter_defaults_for_update_commands
+iot central device attestation update:
+  parameters:
+    api_version:
+      rule_exclusions:
+      - no_parameter_defaults_for_update_commands
+    central_dns_suffix:
+      rule_exclusions:
+      - no_parameter_defaults_for_update_commands
+iot central device twin update:
+  parameters:
+    api_version:
+      rule_exclusions:
+      - no_parameter_defaults_for_update_commands
+    central_dns_suffix:
+      rule_exclusions:
+      - no_parameter_defaults_for_update_commands
       - no_parameter_defaults_for_update_commands
