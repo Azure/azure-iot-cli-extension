@@ -63,8 +63,8 @@ class TestHubExportImport(IoTLiveScenarioTest):
         self.kwargs["metrics"] = metrics
 
         self.cmd("iot hub configuration create --config-id {} -l {} --content '{}' --labels '{}' --priority {} --metrics '{}' \
-            --target-condition {}"
-            .format("hubConfig", self.connection_string, "{config_content}", "{labels}", priority, "{metrics}", "tags.bar=12"))
+            --target-condition {}".format("hubConfig", self.connection_string, "{config_content}", "{labels}", priority,
+                                          "{metrics}", "tags.bar=12"))
 
         # populate hub with devices
 
@@ -118,18 +118,19 @@ class TestHubExportImport(IoTLiveScenarioTest):
                 # make a module for each device, same authentication method as device
 
                 if(i == 0):
-                    self.cmd("iot hub module-identity create -d {} -m deviceModule -l {} ".format(device, self.connection_string))
+                    self.cmd("iot hub module-identity create -d {} -m deviceModule -l {}".format(device, self.connection_string))
 
                 elif(i == 1):
-                    self.cmd("iot hub module-identity create -d {} -m deviceModule -l {} --am x509_ca"
-                        .format(device, self.connection_string))
+                    self.cmd("iot hub module-identity create -d {} -m deviceModule -l {} --am x509_ca".format(
+                             device, self.connection_string))
 
                 elif(i == 2):
                     ptp = create_self_signed_certificate(subject="aziotcli", valid_days=1, cert_output_dir=None)["thumbprint"]
                     stp = create_self_signed_certificate(subject="aziotcli", valid_days=1, cert_output_dir=None)["thumbprint"]
 
-                    self.cmd("iot hub module-identity create -d {} -m deviceModule -l {} --am x509_thumbprint --ptp {} --stp {}"
-                        .format(device, self.connection_string, ptp, stp))
+                    self.cmd("iot hub module-identity create -d {} -m deviceModule -l {} --am x509_thumbprint --ptp {} \
+                        --stp {}".format(device, self.connection_string, ptp, stp)
+                    )
 
                 # add a property and a tag to each module's twin
 
@@ -161,33 +162,33 @@ class TestHubExportImport(IoTLiveScenarioTest):
 
     def compare_devices(self, device1, device2):
 
-        assert (device1["authenticationType"] == device2["authenticationType"])
-        assert (device1["capabilities"]["iotEdge"] == device2["capabilities"]["iotEdge"])
-        assert (device1["connectionState"] == device2["connectionState"])
-        assert (device1["status"] == device2["status"])
+        assert(device1["authenticationType"] == device2["authenticationType"])
+        assert(device1["capabilities"]["iotEdge"] == device2["capabilities"]["iotEdge"])
+        assert(device1["connectionState"] == device2["connectionState"])
+        assert(device1["status"] == device2["status"])
 
         if("tags" in device1.keys()):
-            assert (device1["tags"] == device2["tags"])
+            assert(device1["tags"] == device2["tags"])
 
         if(device1["authenticationType"] == DeviceAuthApiType.sas.value):
             id1 = self.cmd("iot hub device-identity show -l {} -d {}".format(self.connection_string, device1['deviceId'])) \
                 .get_output_in_json()
             id2 = self.cmd("iot hub device-identity show -l {} -d {}".format(self.dest_hub_cstring, device1['deviceId'])) \
                 .get_output_in_json()
-            assert (id1["authentication"]["symmetricKey"]["primaryKey"] == id2["authentication"]["symmetricKey"]["primaryKey"])
-            assert (id1["authentication"]["symmetricKey"]["secondaryKey"] == \
-                id2["authentication"]["symmetricKey"]["secondaryKey"])
+            assert(id1["authentication"]["symmetricKey"]["primaryKey"] == id2["authentication"]["symmetricKey"]["primaryKey"])
+            assert(id1["authentication"]["symmetricKey"]["secondaryKey"] ==
+                   id2["authentication"]["symmetricKey"]["secondaryKey"])
 
         if(device1["authenticationType"] == DeviceAuthApiType.selfSigned.value):
-            assert (device1["x509Thumbprint"]["primaryThumbprint"] == device2["x509Thumbprint"]["primaryThumbprint"])
-            assert (device1["x509Thumbprint"]["secondaryThumbprint"] == device2["x509Thumbprint"]["secondaryThumbprint"])
+            assert(device1["x509Thumbprint"]["primaryThumbprint"] == device2["x509Thumbprint"]["primaryThumbprint"])
+            assert(device1["x509Thumbprint"]["secondaryThumbprint"] == device2["x509Thumbprint"]["secondaryThumbprint"])
 
-        assert (len(device1["properties"]["desired"]) == len(device2["properties"]["desired"]))
+        assert(len(device1["properties"]["desired"]) == len(device2["properties"]["desired"]))
 
         for prop in device1["properties"]["desired"]:
             if(prop != "$metadata" and prop != "$version"):
-                assert (prop in device2["properties"]["desired"])
-                assert (device1["properties"]["desired"][prop] == device2["properties"]["desired"][prop])
+                assert(prop in device2["properties"]["desired"])
+                assert(device1["properties"]["desired"][prop] == device2["properties"]["desired"][prop])
 
         # compare modules
 
@@ -199,9 +200,9 @@ class TestHubExportImport(IoTLiveScenarioTest):
         ).get_output_in_json()
 
         if(device1["capabilities"]["iotEdge"]):
-            assert (len(orig_modules) == len(dest_modules) == 3)
+            assert(len(orig_modules) == len(dest_modules) == 3)
         else:
-            assert (len(orig_modules) == len(dest_modules) == 1)
+            assert(len(orig_modules) == len(dest_modules) == 1)
 
         for module in orig_modules:
             target_module = None
@@ -212,7 +213,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
 
             assert target_module
 
-            assert (module["authentication"] == target_module["authentication"])
+            assert(module["authentication"] == target_module["authentication"])
 
             module_twin = self.cmd(
                 f"iot hub module-twin show -m {module['moduleId']} -d {device1['deviceId']} -l {self.connection_string}"
@@ -221,15 +222,15 @@ class TestHubExportImport(IoTLiveScenarioTest):
                 f"iot hub module-twin show -m {module['moduleId']} -d {device1['deviceId']} -l {self.dest_hub_cstring}"
             ).get_output_in_json()
 
-            assert (len(module_twin["properties"]["desired"]) == len(target_module_twin["properties"]["desired"]))
+            assert(len(module_twin["properties"]["desired"]) == len(target_module_twin["properties"]["desired"]))
             for prop in module_twin["properties"]["desired"]:
                 if(prop != "$metadata" and prop != "version"):
-                    assert (prop in target_module_twin["properties"]["desired"])
-                    assert (module_twin["properties"]["desired"][prop] == target_module_twin["properties"]["desired"][prop])
+                    assert(prop in target_module_twin["properties"]["desired"])
+                    assert(module_twin["properties"]["desired"][prop] == target_module_twin["properties"]["desired"][prop])
 
             if("tags" in module_twin.keys()):
-                assert (module_twin["tags"] == target_module_twin["tags"])
-            assert (module_twin["status"] == target_module_twin["status"])
+                assert(module_twin["tags"] == target_module_twin["tags"])
+            assert(module_twin["status"] == target_module_twin["status"])
 
     def compare_hubs(self):
 

@@ -51,10 +51,10 @@ class StateProvider(IoTHubProvider):
         '''
 
         configs = iot_hub_configuration_list(cmd=self.cmd, hub_name=self.hub_name, resource_group_name=self.rg,
-            login=self.login, auth_type_dataplane=self.auth_type)
+                                             login=self.login, auth_type_dataplane=self.auth_type)
 
         identities = iot_device_list(cmd=self.cmd, hub_name=self.hub_name, top=-1, resource_group_name=self.rg,
-            login=self.login, auth_type_dataplane=self.auth_type)
+                                     login=self.login, auth_type_dataplane=self.auth_type)
 
         with open(filename, 'w', encoding='utf-8') as f:
 
@@ -65,7 +65,8 @@ class StateProvider(IoTHubProvider):
                 id = identities[i]
 
                 module_objs = iot_device_module_list(cmd=self.cmd, device_id=id["deviceId"], hub_name=self.hub_name,
-                    resource_group_name=self.rg, login=self.login, auth_type_dataplane=self.auth_type)
+                                                     resource_group_name=self.rg, login=self.login,
+                                                     auth_type_dataplane=self.auth_type)
 
                 # number of modules in the device (not including the two modules automatically included in edge devices)
                 if(id["capabilities"]["iotEdge"]):
@@ -131,16 +132,18 @@ class StateProvider(IoTHubProvider):
             sk = identity["symmetricKey"]["secondaryKey"]
 
             iot_device_create(self.cmd, device_id, self.hub_name, edge, primary_key=pk, secondary_key=sk, status=status,
-                status_reason=status_reason, resource_group_name=self.rg, login=self.login, auth_type_dataplane=self.auth_type)
+                              status_reason=status_reason, resource_group_name=self.rg, login=self.login,
+                              auth_type_dataplane=self.auth_type)
 
         elif(auth_type == DeviceAuthApiType.selfSigned.value):
             iot_device_create(self.cmd, device_id, self.hub_name, edge, DeviceAuthType.x509_thumbprint.value,
-                primary_thumbprint=ptp, secondary_thumbprint=stp, status=status, status_reason=status_reason,
-                resource_group_name=self.rg, login=self.login, auth_type_dataplane=self.auth_type)
+                              primary_thumbprint=ptp, secondary_thumbprint=stp, status=status, status_reason=status_reason,
+                              resource_group_name=self.rg, login=self.login, auth_type_dataplane=self.auth_type)
 
         elif(auth_type == DeviceAuthApiType.certificateAuthority.value):
             iot_device_create(self.cmd, device_id, self.hub_name, edge, DeviceAuthType.x509_ca.value, status=status,
-                status_reason=status_reason, resource_group_name=self.rg, login=self.login, auth_type_dataplane=self.auth_type)
+                              status_reason=status_reason, resource_group_name=self.rg, login=self.login,
+                              auth_type_dataplane=self.auth_type)
 
         else:
             logger.error("Authorization type for device '{0}' not recognized.".format(device_id))
@@ -156,38 +159,38 @@ class StateProvider(IoTHubProvider):
             sk = identity["symmetricKey"]["secondaryKey"]
 
             iot_device_module_create(self.cmd, device_id, module_id, self.hub_name, primary_key=pk, secondary_key=sk,
-                resource_group_name=self.rg, login=self.login, auth_type_dataplane=self.auth_type)
+                                     resource_group_name=self.rg, login=self.login, auth_type_dataplane=self.auth_type)
 
         elif(auth_type == DeviceAuthApiType.selfSigned.value):
             ptp = identity["x509Thumbprint"]["primaryThumbprint"]
             stp = identity["x509Thumbprint"]["secondaryThumbprint"]
 
-            iot_device_module_create(self.cmd, device_id, module_id, self.hub_name, 
-                auth_method=DeviceAuthType.x509_thumbprint.value, primary_thumbprint=ptp,
-                secondary_thumbprint=stp, resource_group_name=self.rg, login=self.login, auth_type_dataplane=self.auth_type)
+            iot_device_module_create(self.cmd, device_id, module_id, self.hub_name, primary_thumbprint=ptp,
+                                     secondary_thumbprint=stp, auth_method=DeviceAuthType.x509_thumbprint.value,
+                                     resource_group_name=self.rg, login=self.login, auth_type_dataplane=self.auth_type)
 
         elif(auth_type == DeviceAuthApiType.certificateAuthority.value):
             iot_device_module_create(self.cmd, device_id, module_id, self.hub_name, auth_method=DeviceAuthType.x509_ca.value,
-                resource_group_name=self.rg, login=self.login, auth_type_dataplane=self.auth_type)
+                                     resource_group_name=self.rg, login=self.login, auth_type_dataplane=self.auth_type)
 
         else:
             logger.error("Authorization type for module '{0}' in device '{1}' not recognized.".format(module_id, device_id))
 
     def delete_all_configs(self):
         configs = iot_hub_configuration_list(cmd=self.cmd, hub_name=self.hub_name, resource_group_name=self.rg, login=self.login,
-            auth_type_dataplane=self.auth_type)
+                                             auth_type_dataplane=self.auth_type)
         for i in tqdm(range(len(configs)), desc="Deleting configurations from destination hub"):
             c = configs[i]
             iot_hub_configuration_delete(cmd=self.cmd, config_id=c["id"], hub_name=self.hub_name, resource_group_name=self.rg,
-                login=self.login, auth_type_dataplane=self.auth_type)
+                                         login=self.login, auth_type_dataplane=self.auth_type)
 
     def delete_all_devices(self):
         identities = iot_device_list(cmd=self.cmd, hub_name=self.hub_name, top=-1, resource_group_name=self.rg, login=self.login,
-            auth_type_dataplane=self.auth_type)
+                                     auth_type_dataplane=self.auth_type)
         for i in tqdm(range(len(identities)), desc="Deleting identities from destination hub"):
             id = identities[i]
             iot_device_delete(cmd=self.cmd, device_id=id["deviceId"], hub_name=self.hub_name, resource_group_name=self.rg,
-                login=self.login, auth_type_dataplane=self.auth_type)
+                              login=self.login, auth_type_dataplane=self.auth_type)
 
     def upload_state(self, filename: str, replace: Optional[bool] = None):
         '''
@@ -209,10 +212,10 @@ class StateProvider(IoTHubProvider):
 
         for i in tqdm(range(len(configs)), desc="Uploading hub configurations"):
             c = configs[i]
-            iot_hub_configuration_create(cmd=self.cmd, config_id=c["id"], content=json.dumps(c["content"]), hub_name=self.hub_name,
-                target_condition=c["targetCondition"], priority=c["priority"], labels=json.dumps(c["labels"]),
-                metrics=json.dumps(c["metrics"]), resource_group_name=self.rg, login=self.login,
-                auth_type_dataplane=self.auth_type)
+            iot_hub_configuration_create(cmd=self.cmd, config_id=c["id"], content=json.dumps(c["content"]), login=self.login,
+                                         target_condition=c["targetCondition"], priority=c["priority"], hub_name=self.hub_name,
+                                         metrics=json.dumps(c["metrics"]), resource_group_name=self.rg,
+                                         labels=json.dumps(c["labels"]), auth_type_dataplane=self.auth_type)
 
         pbar = tqdm(total=len(hub_info), desc="Uploading devices and modules")
         i = 1
@@ -228,13 +231,13 @@ class StateProvider(IoTHubProvider):
 
             self.upload_device_identity(identity)
 
-            # all necessary twin attributes are already included in the identity. we could potentially not save the twin and just do this:
+            # all necessary twin attributes are already included in the identity. maybe don't save the twin and just do this:
             # twin = identity
             # if identity["authenticationType"] == DeviceAuthApiType.sas.value:
             #     twin.pop("symmetricKey")
 
-            iot_device_twin_replace(cmd=self.cmd, device_id=identity["deviceId"], target_json=json.dumps(twin), 
-                hub_name=self.hub_name, resource_group_name=self.rg, login=self.login, auth_type_dataplane=self.auth_type)
+            iot_device_twin_replace(cmd=self.cmd, device_id=identity["deviceId"], target_json=json.dumps(twin), login=self.login,
+                                    hub_name=self.hub_name, resource_group_name=self.rg, auth_type_dataplane=self.auth_type)
 
             i += 2
             pbar.update(2)
@@ -247,9 +250,9 @@ class StateProvider(IoTHubProvider):
 
                 self.upload_module_identity(module_identity)
 
-                iot_device_module_twin_replace(cmd=self.cmd, device_id=identity["deviceId"], 
-                    module_id=module_identity["module_id"], target_json=json.dumps(module_twin), hub_name=self.hub_name, 
-                    resource_group_name=self.rg, login=self.login, auth_type_dataplane=self.auth_type)
+                iot_device_module_twin_replace(cmd=self.cmd, device_id=identity["deviceId"], resource_group_name=self.rg,
+                                               module_id=module_identity["module_id"], target_json=json.dumps(module_twin),
+                                               hub_name=self.hub_name, login=self.login, auth_type_dataplane=self.auth_type)
 
                 i += 2
                 pbar.update(2)
@@ -280,17 +283,17 @@ class StateProvider(IoTHubProvider):
         self.orig_hub_login = orig_hub_target["cs"]
 
         configs = iot_hub_configuration_list(cmd=self.cmd, hub_name=orig_hub, resource_group_name=orig_rg, login=orig_hub_login,
-            auth_type_dataplane=self.auth_type)
+                                             auth_type_dataplane=self.auth_type)
 
         for i in tqdm(range(len(configs)), desc="Migrating hub configurations"):
             c = configs[i]
             iot_hub_configuration_create(cmd=self.cmd, config_id=c["id"], content=json.dumps(c["content"]),
-                hub_name=self.hub_name, target_condition=c["targetCondition"], priority=c["priority"],
-                labels=json.dumps(c["labels"]), metrics=json.dumps(c["metrics"]), resource_group_name=self.rg, login=self.login,
-                auth_type_dataplane=self.auth_type)
+                                         hub_name=self.hub_name, target_condition=c["targetCondition"], priority=c["priority"],
+                                         labels=json.dumps(c["labels"]), metrics=json.dumps(c["metrics"]),
+                                         resource_group_name=self.rg, login=self.login, auth_type_dataplane=self.auth_type)
 
         identities = iot_device_list(cmd=self.cmd, hub_name=orig_hub, top=-1, resource_group_name=orig_rg, login=orig_hub_login,
-            auth_type_dataplane=self.auth_type)
+                                     auth_type_dataplane=self.auth_type)
 
         for i in tqdm(range(len(identities)), desc="Migrating devices"):
             id = identities[i]
@@ -306,12 +309,13 @@ class StateProvider(IoTHubProvider):
 
             self.upload_device_identity(id)
             iot_device_twin_replace(self.cmd, id["deviceId"], json.dumps(twin), self.hub_name, self.rg, login=self.login,
-                auth_type_dataplane=self.auth_type)
+                                    auth_type_dataplane=self.auth_type)
 
             # upload modules for the given device
 
             module_objs = iot_device_module_list(cmd=self.cmd, device_id=id["deviceId"], hub_name=orig_hub,
-                resource_group_name=orig_rg, login=orig_hub_login, auth_type_dataplane=self.auth_type)
+                                                 resource_group_name=orig_rg, login=orig_hub_login,
+                                                 auth_type_dataplane=self.auth_type)
 
             for module in module_objs:
                 module = vars(module)
@@ -330,8 +334,9 @@ class StateProvider(IoTHubProvider):
 
                     self.upload_module_identity(module)
 
-                    iot_device_module_twin_replace(cmd=self.cmd, device_id=id["deviceId"], module_id=module["module_id"], \
-                        target_json=json.dumps(module_twin), hub_name=self.hub_name, resource_group_name=self.rg, \
-                        login=self.login, auth_type_dataplane=self.auth_type)
+                    iot_device_module_twin_replace(cmd=self.cmd, device_id=id["deviceId"], module_id=module["module_id"],
+                                                   target_json=json.dumps(module_twin), hub_name=self.hub_name,
+                                                   resource_group_name=self.rg, login=self.login,
+                                                   auth_type_dataplane=self.auth_type)
 
         logger.info("Migrated state from IoT Hub '{}' to {}".format(orig_hub, self.hub_name))

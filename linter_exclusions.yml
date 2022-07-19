@@ -44,7 +44,7 @@ iot hub state migrate:
       - parameter_should_not_end_in_resource_group
 iot hub state migrate:
   parameters:
-    orig_orig_resource_group_name:
+    resource_group_name:
       rule exclusions:
       - parameter_should_not_end_in_resource_group
 iot hub configuration update:
