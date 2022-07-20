@@ -29,7 +29,3 @@ class IoTHubProvider(object):
 
     def get_sdk(self, sdk_type):
         return self.resolver.get_sdk(sdk_type)
-
-    def get_iot_hub_resource(self, hub_name, rg):
-        return self.discovery.find_resource(hub_name, rg)
-

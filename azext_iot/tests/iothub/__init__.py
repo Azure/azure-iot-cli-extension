@@ -48,6 +48,19 @@ STORAGE_CONTAINER = settings.env.azext_iot_teststoragecontainer or DEFAULT_CONTA
 MAX_RBAC_ASSIGNMENT_TRIES = settings.env.azext_iot_rbac_max_tries or 10
 ROLE_ASSIGNMENT_REFRESH_TIME = 120
 
+# Endpoints
+EP_RG = settings.env.azext_iot_ep_rg
+EP_EVENTHUB_NAMESPACE = settings.env.azext_iot_eventhub_namespace
+EP_EVENTHUB_INSTANCE = settings.env.azext_iot_eventhub_instance
+EP_EVENTHUB_POLICY = settings.env.azext_iot_eventhub_policy
+EP_SERVICEBUS_NAMESPACE = settings.env.azext_iot_servicebus_namespace
+EP_SERVICEBUS_QUEUE = settings.env.azext_iot_servicebus_queue
+EP_SERVICEBUS_TOPIC = settings.env.azext_iot_servicebus_topic
+EP_SERVICEBUS_POLICY = settings.env.azext_iot_servicebus_policy
+EP_COSMOS_NAMESPACE = settings.env.azext_iot_cosmos_namespace
+EP_COSMOS_DATABASE = settings.env.azext_iot_cosmos_database
+EP_COSMOS_COLLECTION = settings.env.azext_iot_cosmos_collection
+
 
 class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def __init__(self, test_scenario):

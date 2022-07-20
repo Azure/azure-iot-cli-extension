@@ -305,3 +305,63 @@ def load_iothub_help():
         type: command
         short-summary: Upload a local file as a device to a pre-configured blob storage container.
     """
+
+    helps[
+        "iot hub messaging-endpoint"
+    ] = """
+        type: group
+        short-summary: Manage custom endpoints of an IoT hub.
+    """
+
+    helps[
+        "iot hub messaging-endpoint create"
+    ] = """
+        type: group
+        short-summary: Add an endpoint to your IoT Hub.
+    """
+
+    helps[
+        "iot hub messaging-endpoint list"
+    ] = """
+        type: command
+        short-summary: Get information on all the endpoints for your IoT Hub.
+        long-summary: Get information on all endpoints in your IoT Hub. You can also specify which endpoint type you want to get informaiton on.
+        examples:
+          - name: Get all the endpoints from "MyIotHub" IoT Hub.
+            text: >
+                az iot hub routing-endpoint list -g MyResourceGroup --hub-name MyIotHub
+          - name: Get all the endpoints of type "EventHub" from "MyIotHub" IoT Hub.
+            text: >
+                az iot hub routing-endpoint list -g MyResourceGroup --hub-name MyIotHub --endpoint-type eventhub
+    """
+
+    helps[
+        "iot hub messaging-endpoint show"
+    ] = """
+        type: command
+        short-summary: Get information on mentioned endpoint for your IoT Hub.
+        long-summary: Get information on a specific endpoint in your IoT Hub
+        examples:
+          - name: Get an endpoint information from "MyIotHub" IoT Hub.
+            text: |
+                az iot hub routing-endpoint show --resource-group MyResourceGroup --hub-name MyIotHub \\
+                --endpoint-name {endpointName}
+    """
+
+    helps[
+        "iot hub messaging-endpoint delete"
+    ] = """
+        type: command
+        short-summary: Delete all or mentioned endpoint for your IoT Hub.
+        long-summary: Delete an endpoint for your IoT Hub. We recommend that you delete any routes to the endpoint, before deleting the endpoint.
+        examples:
+          - name: Delete endpoint "E2" from "MyIotHub" IoT Hub.
+            text: >
+                az iot hub routing-endpoint delete --resource-group MyResourceGroup --hub-name MyIotHub --endpoint-name E2
+          - name: Delete all the endpoints of type "EventHub" from "MyIotHub" IoT Hub.
+            text: >
+                az iot hub routing-endpoint delete --resource-group MyResourceGroup --hub-name MyIotHub --endpoint-type eventhub
+          - name: Delete all the endpoints from "MyIotHub" IoT Hub.
+            text: >
+                az iot hub routing-endpoint delete --resource-group MyResourceGroup --hub-name MyIotHub
+    """

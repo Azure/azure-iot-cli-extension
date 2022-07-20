@@ -179,10 +179,17 @@ class BaseDiscovery(ABC):
         resource_list = self.get_resources()
 
         if resource_list:
-            target = next(
-                (resource for resource in resource_list if resource_name.lower() == resource.name.lower()),
-                None
-            )
+            target = None
+            if isinstance(resource_list[0], dict):
+                target = next(
+                    (resource for resource in resource_list if resource_name.lower() == resource["name"].lower()),
+                    None
+                )
+            else:
+                target = next(
+                    (resource for resource in resource_list if resource_name.lower() == resource.name.lower()),
+                    None
+                )
             if target:
                 return target
 

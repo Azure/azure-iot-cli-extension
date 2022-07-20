@@ -21,7 +21,7 @@ device_messaging_ops = CliCommandType(
 class EndpointUpdateResultTransform(LongRunningOperation):  # pylint: disable=too-few-public-methods
     def __call__(self, poller):
         result = super(EndpointUpdateResultTransform, self).__call__(poller)
-        return result.properties.routing.endpoints
+        return result["properties"]["routing"]["endpoints"]
 
 def load_iothub_commands(self, _):
     """
@@ -39,19 +39,41 @@ def load_iothub_commands(self, _):
         cmd_group.command("update", "patch_digital_twin")
 
     with self.command_group("iot hub messaging-endpoint", command_type=iothub_message_endpoint_ops) as cmd_group:
-        pass
+        cmd_group.show_command("show", "message_endpoint_show")
+        cmd_group.command("list", "message_endpoint_list")
+        cmd_group.command(
+            "delete", "message_endpoint_delete", transform=EndpointUpdateResultTransform(self.cli_ctx)
+        )
 
-    with self.command_group("iot hub messaging-endpoint create", command_type=iothub_message_endpoint_ops) as cmd_group:
-        cmd_group.command("event-hub", "message_endpoint_create_event_hub",
-                         transform=EndpointUpdateResultTransform(self.cli_ctx))
-        cmd_group.command("service-bus-queue", "message_endpoint_create_service_bus_queue",
-                         transform=EndpointUpdateResultTransform(self.cli_ctx))
-        cmd_group.command("service-bus-topic", "message_endpoint_create_service_bus_topic",
-                         transform=EndpointUpdateResultTransform(self.cli_ctx))
-        cmd_group.command("cosmos-db-collection", "message_endpoint_create_cosmos_db_collection",
-                         transform=EndpointUpdateResultTransform(self.cli_ctx))
-        cmd_group.command("storage-container", "message_endpoint_create_storage_container",
-                         transform=EndpointUpdateResultTransform(self.cli_ctx))
+    with self.command_group(
+        "iot hub messaging-endpoint create",
+        command_type=iothub_message_endpoint_ops
+    ) as cmd_group:
+        cmd_group.command(
+            "event-hub",
+            "message_endpoint_create_event_hub",
+            transform=EndpointUpdateResultTransform(self.cli_ctx)
+        )
+        cmd_group.command(
+            "service-bus-queue",
+            "message_endpoint_create_service_bus_queue",
+            transform=EndpointUpdateResultTransform(self.cli_ctx)
+        )
+        cmd_group.command(
+            "service-bus-topic",
+            "message_endpoint_create_service_bus_topic",
+            transform=EndpointUpdateResultTransform(self.cli_ctx)
+        )
+        cmd_group.command(
+            "cosmos-db-collection",
+            "message_endpoint_create_cosmos_db_collection",
+            transform=EndpointUpdateResultTransform(self.cli_ctx)
+        )
+        cmd_group.command(
+            "storage-container",
+            "message_endpoint_create_storage_container",
+            transform=EndpointUpdateResultTransform(self.cli_ctx)
+        )
 
     with self.command_group("iot device", command_type=device_messaging_ops) as cmd_group:
         cmd_group.command("send-d2c-message", "iot_device_send_message")
