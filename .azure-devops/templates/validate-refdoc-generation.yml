@@ -1,0 +1,32 @@
+steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.10.x'
+      architecture: 'x64'
+  - task: DownloadBuildArtifacts@0
+    displayName : 'Download Extension wheel from Build Artifacts'
+    inputs:
+      buildType: 'current'
+      downloadType: 'single'
+      artifactName: 'azure-iot'
+      downloadPath: '$(System.ArtifactsDirectory)/extension'
+  - task: Bash@3
+    displayName: 'Validate reference doc generation'
+    inputs:
+      targetType: 'inline'
+      script: |
+        set -ev
+        pip install virtualenv
+        python -m virtualenv venv/
+        source ./venv/bin/activate
+        pip install azdev sphinx==1.7.0 Jinja2==3.0.3 install wheel==0.30.0
+        git clone --single-branch -b dev https://github.com/Azure/azure-cli.git ../azure-cli
+        azdev --version
+        azdev setup -c ../azure-cli -r ./
+        git clone --single-branch -b main https://github.com/Azure/azure-cli-extensions ../azure-cli-extensions
+        ARTIFACTS_DIR=$(System.ArtifactsDirectory)/extension
+        WHEELS=$(ls $ARTIFACTS_DIR/azure-iot/*.whl)
+        az --version
+        for i in $WHEELS; do
+          python ../azure-cli-extensions/scripts/refdoc/generate.py -e $i
+        done
