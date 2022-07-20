@@ -7,6 +7,12 @@ unreleased
 +++++++++++++++
 
 
+0.16.1
++++++++++++++++
+
+* Fix issue preventing reference docgen.
+
+
 0.16.0
 +++++++++++++++
 
