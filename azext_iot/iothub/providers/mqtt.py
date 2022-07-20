@@ -23,7 +23,8 @@ class MQTTProvider(object):
         x509_files: Optional[Dict[str, str]] = None,
         method_response_code: Optional[str] = None,
         method_response_payload: Optional[str] = None,
-        init_reported_properties: Optional[str] = None
+        init_reported_properties: Optional[str] = None,
+        **kwargs: Any,
     ):
         ensure_azure_namespace_path()
         from azure.iot.device import IoTHubDeviceClient as mqtt_device_client
@@ -40,14 +41,16 @@ class MQTTProvider(object):
                 ),
                 hostname=hub_hostname,
                 device_id=self.device_id,
-                websockets=True
+                websockets=True,
+                product_info=kwargs.get("model_id", None),
             )
         elif "x509=true" in device_conn_string:
             raise RequiredArgumentMissingError("Please provide the certificate and key files for the device.")
         else:
             self.device_client = mqtt_device_client.create_from_connection_string(
                 device_conn_string,
-                websockets=True
+                websockets=True,
+                product_info=kwargs.get("model_id", None),
             )
         self.device_client.on_message_received = self.message_handler
         self.device_client.on_method_request_received = self.method_request_handler

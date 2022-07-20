@@ -38,7 +38,7 @@ style_type = CLIArgumentType(
 api_version = CLIArgumentType(
     options_list=["--api-version", "--av"],
     choices=CaseInsensitiveList([version.value for version in ApiVersion]),
-    default=ApiVersion.v1.value,
+    default=ApiVersion.ga_2022_05_31.value,
     help="The API version for the requested operation.",
 )
 
@@ -163,6 +163,21 @@ def load_central_arguments(self, _):
             " Name of the command.",
         )
         context.argument(
+            "component_name",
+            options_list=["--component-name", "--co"],
+            help="The name of the device component.",
+        )
+        context.argument(
+            "module_name",
+            options_list=["--module-name", "--mn"],
+            help="The name of the device module.",
+        )
+        context.argument(
+            "telemetry_name",
+            options_list=["--telemetry-name" "--tn"],
+            help="The name of the device telemetry.",
+        )
+        context.argument(
             "content",
             options_list=["--content", "-k"],
             help="Configuration for request. "
@@ -214,13 +229,31 @@ def load_central_arguments(self, _):
 
     with self.argument_context("iot central device-group") as context:
         context.argument(
-            "api_version",
-            options_list=["--api-version", "--av"],
-            choices=CaseInsensitiveList(
-                [ApiVersion.preview.value, ApiVersion.v1_1_preview.value]
-            ),
-            default=ApiVersion.v1_1_preview.value,
-            help="The API version for the requested operation.",
+            "device_group_id",
+            options_list=["--device-group-id"],
+            help="Unique ID of the device group."
+        )
+        context.argument(
+            "display_name",
+            options_list=["--display-name"],
+            help="Display name of the device group."
+        )
+        context.argument(
+            "filter",
+            options_list=["--filter"],
+            help="Query defining which devices should be in this group."
+            "[Query filter Example: SELECT * FROM devices WHERE $template = \"dtmi:modelDefinition:dtdlv2\"]"
+        )
+        context.argument(
+            "description",
+            options_list=["--description"],
+            help="Short summary of device group."
+        )
+        context.argument(
+            "organizations",
+            nargs="+",
+            options_list=["--organizations"],
+            help="List of organization IDs of the device group."
         )
 
     with self.argument_context("iot central user") as context:

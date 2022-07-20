@@ -42,12 +42,12 @@ parameters:
   - 'azext_iot/tests/central'
   - 'azext_iot/tests/digitaltwins'
   - 'azext_iot/tests/deviceupdate'
-- name: serial_execution_dirs
-  type: object
-  default:
-  - 'azext_iot/tests/dps'
 
 steps:
+  - checkout: self
+    displayName: 'Checkout repository and submodules needed for tests'
+    submodules: true
+
   - template: setup-dev-test-env.yml
     parameters:
       architecture: ${{ parameters.architecture }}
@@ -77,10 +77,6 @@ steps:
         azureSubscription: ${{ parameters.serviceConnection }}
         scriptType: bash
         scriptLocation: inlineScript
-        ${{ if containsValue(parameters.serial_execution_dirs, parameters.path) }}:
-          inlineScript: |
-            export COVERAGE_FILE=.coverage.${{ parameters.name }}
-            pytest -vv ${{ parameters.path }} -k "_int.py" --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --durations=0
         ${{ if containsValue(parameters.parallel_execution_dirs, parameters.path) }}:
           inlineScript: |
             export COVERAGE_FILE=.coverage.${{ parameters.name }}
@@ -89,6 +85,31 @@ steps:
           inlineScript: |
             export COVERAGE_FILE=.coverage.${{ parameters.name }}
             pytest -vv ${{ parameters.path }} -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --deselect=azext_iot/tests/iothub/core/test_iothub_discovery_int.py::TestIoTHubDiscovery::test_iothub_targets --durations=0
+        ${{ if contains(parameters.path, 'azext_iot/tests/dps') }}:
+          inlineScript: |
+            IOTHUB=`echo test-dps-hub-py$RANDOM`
+            sudo apt install dos2unix -y -q
+            dos2unix pytest.ini
+            CREATE_HUB=`grep -c "azext_iot_testdps_hub=$" pytest.ini`
+
+
+            if [[ $CREATE_HUB > 0 ]] && [[ ${{ parameters.azureCLIVersion }} == "released" || ${{ parameters.azureCLIVersion }} == "min" ]]
+            then
+              echo $IOTHUB
+              az iot hub create -n $IOTHUB -g $(AZEXT_IOT_TESTRG)
+              sed -z -i 's/azext_iot_testdps_hub=\n/azext_iot_testdps_hub='"$IOTHUB"'\n/g' pytest.ini
+              cat pytest.ini
+            fi
+
+            export COVERAGE_FILE=.coverage.${{ parameters.name }}
+            pytest -vv ${{ parameters.path }} -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --durations=0
+            e=$?
+
+            if [[ $CREATE_HUB > 0 ]] && [[ ${{ parameters.azureCLIVersion }} == "released" || ${{ parameters.azureCLIVersion }} == "min" ]]
+            then
+              az iot hub delete -n $IOTHUB -g $(AZEXT_IOT_TESTRG)
+            fi
+            exit $e
 
   - task: PublishBuildArtifacts@1
     inputs:
