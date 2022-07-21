@@ -147,6 +147,10 @@ stages:
       displayName: 'Evaluate Command Table'
       steps:
       - template: templates/evaluate-command-table.yml
+    - job: 'validate_ref_docs'
+      displayName: 'Validate Reference Document Generation'
+      steps:
+      - template: templates/validate-refdoc-generation.yml
 
   - stage: 'smokeTest'
     displayName: 'Run smoke tests'
