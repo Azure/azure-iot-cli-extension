@@ -5,15 +5,16 @@
 # --------------------------------------------------------------------------------------------
 
 from azext_iot.iothub.providers.state import StateProvider
+from typing import Optional
 
 
 def state_export(
     cmd,
-    filename,
-    hub_name=None,
-    resource_group_name=None,
-    login=None,
-    auth_type_dataplane=None
+    filename: str,
+    hub_name: Optional[str] = None,
+    resource_group_name: Optional[str] = None,
+    login: Optional[str] = None,
+    auth_type_dataplane: Optional[str] = None
 ):
     sp = StateProvider(cmd=cmd, hub=hub_name, rg=resource_group_name, login=login, auth_type_dataplane=auth_type_dataplane)
     sp.save_state(filename)
@@ -21,12 +22,12 @@ def state_export(
 
 def state_import(
     cmd,
-    filename,
-    hub_name=None,
-    resource_group_name=None,
-    login=None,
-    auth_type_dataplane=None,
-    replace=False
+    filename: str,
+    hub_name: Optional[str] = None,
+    resource_group_name: Optional[str] = None,
+    login: Optional[str] = None,
+    auth_type_dataplane: Optional[str] = None,
+    replace: Optional[bool] = False
 ):
     sp = StateProvider(cmd=cmd, hub=hub_name, rg=resource_group_name, login=login, auth_type_dataplane=auth_type_dataplane)
     sp.upload_state(filename, replace)
@@ -34,14 +35,14 @@ def state_import(
 
 def state_migrate(
     cmd,
-    hub_name=None,
-    resource_group_name=None,
-    login=None,
-    orig_hub=None,
-    orig_resource_group_name=None,
-    orig_hub_login=None,
-    replace=False,
-    auth_type_dataplane=None
+    hub_name: Optional[str] = None,
+    resource_group_name: Optional[str] = None,
+    login: Optional[str] = None,
+    orig_hub: Optional[str] = None,
+    orig_resource_group_name: Optional[str] = None,
+    orig_hub_login: Optional[str] = None,
+    auth_type_dataplane: Optional[str] = None,
+    replace: Optional[bool] = False
 ):
     sp = StateProvider(cmd=cmd, hub=hub_name, rg=resource_group_name, login=login, auth_type_dataplane=auth_type_dataplane)
     sp.migrate_devices(orig_hub, orig_resource_group_name, orig_hub_login, replace)

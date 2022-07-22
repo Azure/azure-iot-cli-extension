@@ -301,6 +301,16 @@ def load_arguments(self, _):
             options_list=["--auth-type"],
             arg_type=hub_auth_type_dataplane_param_type,
         )
+        context.argument(
+            "filename",
+            options_list=["--filename", "-f"],
+            help="The path to the file where the hub and device information will be stored."
+        )
+        context.argument(
+            "replace",
+            options_list=["--replace", "-r"],
+            help="If this flag is set, then the command will overwrite all configurations and devices in the destination hub."
+        )
 
     with self.argument_context("iot hub connection-string") as context:
         context.argument(
@@ -762,18 +772,6 @@ def load_arguments(self, _):
             help="Maximum number of configurations to return. By default all configurations are returned.",
         )
 
-    with self.argument_context("iot hub state") as context:
-        context.argument(
-            "filename",
-            options_list=["--filename", "-f"],
-            help="The path to the file where the hub and device information will be stored."
-        )
-        context.argument(
-            "replace",
-            options_list=["--replace", "-r"],
-            help="If this flag is set, then the import will overwrite all configurations and devices in the destination hub."
-        )
-
     with self.argument_context("iot hub state migrate") as context:
         context.argument(
             "hub_name",
@@ -792,8 +790,8 @@ def load_arguments(self, _):
             help="This command supports an entity connection string with rights to perform action on the destination hub. "
             'Use to avoid session login via "az login" for this IoT Hub instance. '
             "If both an entity connection string and name are provided the connection string takes priority. "
-            "Required if --dps-name is not provided.",
-            arg_group="Device Provisioning Service Identifier"
+            "Required if --hub-name is not provided.",
+            arg_group="IoT Hub Identifier"
         )
         context.argument(
             "orig_hub",
@@ -812,8 +810,8 @@ def load_arguments(self, _):
             help="This command supports an entity connection string with rights to perform action on the origin hub. "
             'Use to avoid session login via "az login" for this IoT Hub instance. '
             "If both an entity connection string and name are provided the connection string takes priority. "
-            "Required if --dps-name is not provided.",
-            arg_group="Device Provisioning Service Identifier"
+            "Required if --hub-name is not provided.",
+            arg_group="IoT Hub Identifier"
         )
 
     with self.argument_context("iot edge") as context:
