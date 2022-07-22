@@ -24,6 +24,7 @@ def iot_device_send_message(
     hub_name: Optional[str] = None,
     resource_group_name: Optional[str] = None,
     login: Optional[str] = None,
+    model_id: Optional[str] = None,
 ):
     messaging_provider = DeviceMessagingProvider(
         cmd=cmd, device_id=device_id, hub_name=hub_name, rg=resource_group_name, login=login
@@ -35,7 +36,8 @@ def iot_device_send_message(
         device_symmetric_key=device_symmetric_key,
         certificate_file=certificate_file,
         key_file=key_file,
-        passphrase=passphrase
+        passphrase=passphrase,
+        model_id=model_id,
     )
 
 
@@ -183,6 +185,7 @@ def iot_simulate_device(
     hub_name: Optional[str] = None,
     resource_group_name: Optional[str] = None,
     login: Optional[str] = None,
+    model_id: Optional[str] = None,
 ):
     messaging_provider = DeviceMessagingProvider(
         cmd=cmd, device_id=device_id, hub_name=hub_name, rg=resource_group_name, login=login
@@ -200,7 +203,8 @@ def iot_simulate_device(
         passphrase=passphrase,
         method_response_code=method_response_code,
         method_response_payload=method_response_payload,
-        init_reported_properties=init_reported_properties
+        init_reported_properties=init_reported_properties,
+        model_id=model_id
     )
 
 
