@@ -7,7 +7,7 @@ from azext_iot.common.shared import DeviceAuthApiType
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.generators import generate_generic_id
-from azext_iot.common.utility import generate_key
+from azext_iot.common.utility import generate_key, read_file_content
 from azext_iot.common.certops import create_self_signed_certificate
 from azext_iot.tests.iothub import (
     PRIMARY_THUMBPRINT,
@@ -42,30 +42,37 @@ class TestHubExportImport(IoTLiveScenarioTest):
 
         # make a configuration for the hub (applies to 0 devices, this is just to test the configuration settings)
 
-        config_content = {"deviceContent" : {
-            "properties.desired.propFromConfig" : generate_generic_id()
-        }}
-        config_content = json.dumps(config_content)
-
         labels = {generate_generic_id() : generate_generic_id(), generate_generic_id() : generate_generic_id()}
         labels = json.dumps(labels)
 
-        priority = random.randint(1, 10)
+        metrics_path = os.path.dirname(__file__) + "\\..\\configurations\\test_config_generic_metrics.json"
+        content_path = os.path.dirname(__file__) + "\\..\\configurations\\test_adm_device_content.json"
 
-        metrics = {"metrics": {
-            "queries": {
-                "mymetric": "SELECT deviceId from devices where properties.reported.lastDesiredStatus.code = 200"
-            }
-        }}
-        metrics = json.dumps(metrics)
-
-        self.kwargs["config_content"] = config_content
+        self.kwargs["config_content"] = read_file_content(content_path)
         self.kwargs["labels"] = labels
-        self.kwargs["metrics"] = metrics
+        self.kwargs["metrics"] = read_file_content(metrics_path)
 
         self.cmd(
-            "iot hub configuration create --config-id {} -l {} --content '{}' --labels '{}' --priority {} --metrics '{}' \
-            --target-condition {}".format("hubConfig", self.connection_string, "{config_content}", "{labels}", priority,
+            "iot hub configuration create --config-id hubConfig -l {} --content '{}' --labels '{}' --priority {} --metrics '{}' \
+            --target-condition {}".format(self.connection_string, "{config_content}", "{labels}", random.randint(1, 10),
+                                          "{metrics}", "tags.bar=12")
+        )
+
+        # make a regular edge deployment
+        deployment1_path = os.path.dirname(__file__) + "\\..\\configurations\\test_edge_deployment.json"
+        self.kwargs["edge_content1"] = read_file_content(deployment1_path)
+        self.cmd(
+            "iot edge deployment create -d deployment1 -l {} --content '{}' --labels '{}' --priority {} --metrics '{}' \
+            --target-condition {}".format(self.connection_string, "{edge_content1}", "{labels}", random.randint(1, 10),
+                                          "{metrics}", "tags.bar=12")
+        )
+
+        # make a layered edge deployment
+        deployment2_path = os.path.dirname(__file__) + "\\..\\configurations\\test_edge_deployment_layered.json"
+        self.kwargs["edge_content2"] = read_file_content(deployment2_path)
+        self.cmd(
+            "iot edge deployment create -d deployment2 -l {} --content '{}' --labels '{}' --priority {} --metrics '{}' \
+            --target-condition {} --layered".format(self.connection_string, "{edge_content1}", "{labels}", random.randint(1, 10),
                                           "{metrics}", "tags.bar=12")
         )
 
@@ -109,6 +116,15 @@ class TestHubExportImport(IoTLiveScenarioTest):
                     --ptp {ptp} --stp {stp}"
             )
 
+            # add some children
+            if edge_enabled:
+                self.cmd(
+                    f"iot hub device-identity children add -l {self.connection_string} -d {device_ids[0]} --cl {device_ids[1]}"
+                )
+                self.cmd(
+                    f"iot hub device-identity children add -l {self.connection_string} -d {device_ids[1]} --cl {device_ids[2]}"
+                )
+
             # add a property and a tag to each device's twin
             for i in range(len(device_ids)):
                 device = device_ids[i]
@@ -147,14 +163,25 @@ class TestHubExportImport(IoTLiveScenarioTest):
                     " --tags '{patch_tags}'"
                 )
 
-    def compare_configs(self, config1, config2):
+    def compare_configs(self, configlist1, configlist2):
 
-        assert(config1["id"] == config2["id"])
-        assert(config1["content"] == config2["content"])
-        assert(config1["metrics"] == config2["metrics"])
-        assert(config1["priority"] == config2["priority"])
-        assert(config1["systemMetrics"]["queries"] == config2["systemMetrics"]["queries"])
-        assert(config1["targetCondition"] == config2["targetCondition"])
+        assert(len(configlist1) == len(configlist2))
+
+        for config in configlist1:
+            target = None
+            for c in configlist2:
+                if c["id"] == config["id"]:
+                    target = c
+                    break
+
+            assert target
+
+        assert(config["id"] == target["id"])
+        assert(config["content"] == target["content"])
+        assert(config["metrics"] == target["metrics"])
+        assert(config["priority"] == target["priority"])
+        assert(config["systemMetrics"]["queries"] == target["systemMetrics"]["queries"])
+        assert(config["targetCondition"] == target["targetCondition"])
 
     def compare_devices(self, device1, device2):
 
@@ -167,7 +194,6 @@ class TestHubExportImport(IoTLiveScenarioTest):
             assert(device1["tags"] == device2["tags"])
 
         if device1["authenticationType"] == DeviceAuthApiType.sas.value:
-            
             assert(device1["symmetricKey"]["primaryKey"] ==
                    device2["symmetricKey"]["primaryKey"])
             assert(device1["symmetricKey"]["secondaryKey"] ==
@@ -202,14 +228,20 @@ class TestHubExportImport(IoTLiveScenarioTest):
         orig_hub_configs = self.cmd(
             f"iot hub configuration list -l {self.connection_string}"
         ).get_output_in_json()
-
         dest_hub_configs = self.cmd(
             f"iot hub configuration list -l {self.dest_hub_cstring}"
         ).get_output_in_json()
+        self.compare_configs(orig_hub_configs, dest_hub_configs)
 
-        assert(len(orig_hub_configs) == len(dest_hub_configs) == 1)
+        # compare edge deployments
 
-        self.compare_configs(orig_hub_configs[0], dest_hub_configs[0])
+        orig_hub_deploys = self.cmd(
+            f"iot edge deployment list -l {self.connection_string}"
+        ).get_output_in_json()
+        dest_hub_deploys = self.cmd(
+            f"iot edge deployment list -l {self.dest_hub_cstring}"
+        ).get_output_in_json()
+        self.compare_configs(orig_hub_deploys, dest_hub_deploys)
 
         # compare devices
 
@@ -277,17 +309,39 @@ class TestHubExportImport(IoTLiveScenarioTest):
 
                 self.compare_module_twins(module_twin, target_module_twin)
 
+            # compare children
+
+            if device["capabilities"]["iotEdge"]:
+                orig_children = self.cmd(
+                    f"iot hub device-identity children list -d {device['deviceId']} -l {self.connection_string}"
+                ).get_output_in_json()
+                dest_children = self.cmd(
+                    f"iot hub device-identity children list -d {device['deviceId']} -l {self.dest_hub_cstring}"
+                ).get_output_in_json()
+
+                assert(orig_children == dest_children)
+
     def compare_hub_to_file(self):
         with open(self.filename, 'r', encoding='utf-8') as f:
             hub_info = json.load(f)
+
+        # compare configurations
 
         file_configs = hub_info["configurations"]
         hub_configs = self.cmd(
             f"iot hub configuration list -l {self.connection_string}"
         ).get_output_in_json()
-        
-        assert(len(file_configs) == len(hub_configs) == 1)
-        self.compare_configs(file_configs[0], hub_configs[0])
+        self.compare_configs(file_configs, hub_configs)
+
+        # compare edge deployments
+
+        file_deploys = hub_info["edgeDeployments"]
+        hub_deploys = self.cmd(
+            f"iot edge deployment list -l {self.connection_string}"
+        ).get_output_in_json()
+        self.compare_configs(file_deploys, hub_deploys)
+
+        # compare devices
 
         file_devices = hub_info["devices"]
         hub_devices = self.cmd(
@@ -339,13 +393,26 @@ class TestHubExportImport(IoTLiveScenarioTest):
 
                 self.compare_module_twins(module_twin, target_module_twin)
 
+            # compare children
+            if device["capabilities"]["iotEdge"]:
+                file_children = hub_info["children"][device["deviceId"]]
+                dest_children = self.cmd(
+                    f"iot hub device-identity children list -d {device['deviceId']} -l {self.connection_string}"
+                ).get_output_in_json()
+
+                assert(file_children == dest_children)
+
     def clean_up_hub(self, cstring):
 
         dest_hub_configs = self.cmd(
             f"iot hub configuration list -l {cstring}"
         ).get_output_in_json()
 
-        for config in dest_hub_configs:
+        dest_hub_deploys = self.cmd(
+            f"iot edge deployment list -l {self.dest_hub_cstring}"
+        ).get_output_in_json()
+
+        for config in dest_hub_configs + dest_hub_deploys:
             self.cmd(
                 "iot hub configuration delete -c {} -l {}".format(config["id"], cstring)
             )
@@ -374,7 +441,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
             self.cmd("iot hub delete -n {} -g {}".format(self.dest_hub, self.dest_hub_rg))
         else:
             self.clean_up_hub(self.dest_hub_cstring)
-        
+
     def test_export_import(self):
 
         for auth_phase in DATAPLANE_AUTH_TYPES:
@@ -394,16 +461,16 @@ class TestHubExportImport(IoTLiveScenarioTest):
                     auth_type=auth_phase
                 )
             )
-            time.sleep(1) # gives the hub time to update before the checks
+            time.sleep(1)  # gives the hub time to update before the checks
             self.compare_hub_to_file()
 
     def test_migrate(self):
 
         for auth_phase in DATAPLANE_AUTH_TYPES:
             if auth_phase == "cstring":
-                 self.cmd(
+                self.cmd(
                     f"iot hub state migrate --origin-hub-login {self.connection_string} --destination-hub-login \
-                    {self.dest_hub_cstring} -r"
+                        {self.dest_hub_cstring} -r"
                 )
             else:
                 self.cmd(
@@ -414,6 +481,6 @@ class TestHubExportImport(IoTLiveScenarioTest):
                     )
                 )
 
-            time.sleep(1) # gives the hub time to update before the checks
+            time.sleep(1)  # gives the hub time to update before the checks
             self.compare_hubs()
             self.clean_up_hub(self.dest_hub_cstring)

@@ -6,12 +6,12 @@
 
 from knack.log import get_logger
 
-from azext_iot.common.shared import DeviceAuthApiType, DeviceAuthType
+from azext_iot.common.shared import DeviceAuthApiType, DeviceAuthType, ConfigType
 from azext_iot.iothub.providers.base import IoTHubProvider
 from azext_iot.operations.hub import _iot_device_show, _iot_device_module_twin_show, _iot_device_module_create, \
     _iot_device_module_show, _iot_device_create, _iot_device_delete, _iot_hub_configuration_delete, _iot_device_twin_replace, \
     _iot_device_module_list, _iot_device_module_twin_replace, _iot_device_list, _iot_hub_configuration_list, \
-    _iot_hub_configuration_create
+    _iot_hub_configuration_create, _iot_device_children_list, _iot_device_children_add
 
 import json
 from tqdm import tqdm
@@ -51,17 +51,35 @@ class StateProvider(IoTHubProvider):
 
         hub_state = {}
 
-        hub_state["configurations"] = _iot_hub_configuration_list(hub_name, target)
+        all_configs = _iot_hub_configuration_list(hub_name, target)
+
+        adm_configs = [
+            c for c in all_configs
+            if (
+                c["content"].get("deviceContent") is not None
+                or c["content"].get("moduleContent") is not None
+            )
+        ]
+
+        hub_state["configurations"] = adm_configs
 
         num_configs = len(hub_state["configurations"])
         pbar = tqdm(total=num_configs, desc="Saving configurations")
         pbar.update(num_configs)
         pbar.close()
 
+        hub_state["edgeDeployments"] = [c for c in all_configs if c["content"].get("modulesContent") is not None]
+
+        num_edge_deployments = len(hub_state["edgeDeployments"])
+        pbar = tqdm(total=num_edge_deployments, desc="Saving edge deployments")
+        pbar.update(num_edge_deployments)
+        pbar.close()
+
         identities = _iot_device_list(hub_name, target, top=-1)
 
         hub_state["devices"] = {}
         hub_state["modules"] = {}
+        hub_state["children"] = {}
 
         for i in tqdm(range(len(identities)), desc="Saving devices and modules"):
 
@@ -74,6 +92,10 @@ class StateProvider(IoTHubProvider):
             if id["authenticationType"] == DeviceAuthApiType.sas.value:
                 id2 = _iot_device_show(target, id["deviceId"])
                 identities[i]["symmetricKey"] = id2["authentication"]["symmetricKey"]
+
+            if id["capabilities"]["iotEdge"]:
+                children = _iot_device_children_list(target, id["deviceId"])
+                hub_state["children"][id["deviceId"]] = [c["deviceId"] for c in children]
 
             hub_state["devices"][id["deviceId"]] = identities[i]
 
@@ -91,7 +113,7 @@ class StateProvider(IoTHubProvider):
                     module2 = _iot_device_module_show(target, id["deviceId"], module["module_id"])
                     module["authentication"] = module2["authentication"]
 
-                    hub_state["modules"][id["deviceId"]].append( [module, module_twin] )
+                    hub_state["modules"][id["deviceId"]].append([module, module_twin])
 
         return hub_state
 
@@ -104,10 +126,21 @@ class StateProvider(IoTHubProvider):
         for i in tqdm(range(len(configs)), desc="Uploading hub configurations"):
             c = configs[i]
             _iot_hub_configuration_create(target=self.target, config_id=c["id"], content=json.dumps(c["content"]),
-                                         target_condition=c["targetCondition"], priority=c["priority"],
-                                         labels=json.dumps(c["labels"]), metrics=json.dumps(c["metrics"]))
+                                          target_condition=c["targetCondition"], priority=c["priority"],
+                                          labels=json.dumps(c["labels"]), metrics=json.dumps(c["metrics"]))
 
-        # for i in tqdm(range(len(hub_state["devices"])), desc="Uploading devices and modules"):
+        edge_deployments = hub_state["edgeDeployments"]
+
+        for i in tqdm(range(len(edge_deployments)), desc="Uploading edge deployments"):
+            d = edge_deployments[i]
+            # config_type = ConfigType.layered if layered or no_validation else ConfigType.edge
+            config_type = ConfigType.edge
+
+            _iot_hub_configuration_create(target=self.target, config_id=d["id"], content=json.dumps(d["content"]),
+                                          target_condition=d["targetCondition"], priority=d["priority"],
+                                          labels=json.dumps(d["labels"]), metrics=json.dumps(d["metrics"]),
+                                          config_type=config_type)
+
         for i in tqdm(hub_state["devices"], desc="Uploading devices and modules"):
 
             # upload device identity and twin
@@ -116,6 +149,7 @@ class StateProvider(IoTHubProvider):
             self.upload_device_identity(identity)
 
             # all necessary twin attributes are already included in the identity
+            # symmetricKey isn't a valid twin attribute
             twin = identity
             if identity["authenticationType"] == DeviceAuthApiType.sas.value:
                 twin.pop("symmetricKey")
@@ -125,7 +159,7 @@ class StateProvider(IoTHubProvider):
             # upload module identities and twins for the given device
 
             modules = hub_state["modules"][identity["deviceId"]]
-            
+
             for j in range(len(modules)):
                 module_identity = modules[j][0]
                 module_twin = modules[j][1]
@@ -135,11 +169,17 @@ class StateProvider(IoTHubProvider):
                 _iot_device_module_twin_replace(self.target, identity["deviceId"], module_identity["module_id"],
                                                 json.dumps(module_twin))
 
+        # set parent-child relationships
+        for parentId in hub_state["children"]:
+            child_list = hub_state["children"][parentId]
+            _iot_device_children_add(self.target, parentId, child_list) 
+
     def save_state(self, filename: str):
         '''
         Writes all hub configurations, device identities and device twins from the origin hub to a json file
         {
             "configurations": [{}, ...],
+            "edgeDeployments": [{}, ...],
             "devices": {
                 "deviceId": {},
                 ...
@@ -216,7 +256,7 @@ class StateProvider(IoTHubProvider):
 
     def delete_all_configs(self):
         configs = _iot_hub_configuration_list(self.hub_name, self.target)
-        for i in tqdm(range(len(configs)), desc="Deleting configurations from destination hub"):
+        for i in tqdm(range(len(configs)), desc="Deleting configurations and edge deployments from destination hub"):
             c = configs[i]
             _iot_hub_configuration_delete(self.target, config_id=c["id"])
 

@@ -167,6 +167,7 @@ def _iot_device_list(hub_name, target, edge_enabled=False, top=1000):
         logger.info('No registered devices found on hub "%s".', hub_name)
     return result
 
+
 def iot_device_create(
     cmd,
     device_id,
@@ -634,6 +635,14 @@ def iot_device_children_add(
         login=login,
         auth_type=auth_type_dataplane,
     )
+    return _iot_device_children_add(target, device_id, child_list, force)
+
+
+def _iot_device_children_add(target,
+    device_id,
+    child_list,
+    force=False
+):
     devices = []
     edge_device = _iot_device_show(target, device_id)
     _validate_edge_device(edge_device)
@@ -671,9 +680,7 @@ def iot_device_children_remove(
     )
     devices = []
     if remove_all:
-        result = _iot_device_children_list(
-            cmd, device_id, hub_name, resource_group_name, login
-        )
+        result = _iot_device_children_list(target, device_id)
         if not result:
             raise ClientRequestError(
                 'No registered child devices found for "{}" edge device.'.format(
@@ -715,26 +722,6 @@ def iot_device_children_list(
     login=None,
     auth_type_dataplane=None,
 ):
-    result = _iot_device_children_list(
-        cmd=cmd,
-        device_id=device_id,
-        hub_name=hub_name,
-        resource_group_name=resource_group_name,
-        login=login,
-        auth_type_dataplane=auth_type_dataplane,
-    )
-
-    return [device["deviceId"] for device in result]
-
-
-def _iot_device_children_list(
-    cmd,
-    device_id,
-    hub_name=None,
-    resource_group_name=None,
-    login=None,
-    auth_type_dataplane=None,
-):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         resource_name=hub_name,
@@ -742,6 +729,12 @@ def _iot_device_children_list(
         login=login,
         auth_type=auth_type_dataplane,
     )
+    result = _iot_device_children_list(target, device_id)
+
+    return [device["deviceId"] for device in result]
+
+
+def _iot_device_children_list(target, device_id):
     device = _iot_device_show(target, device_id)
     _validate_edge_device(device)
     query = (
@@ -751,15 +744,16 @@ def _iot_device_children_list(
     )
 
     # TODO: Inefficient
-    return iot_query(
-        cmd=cmd,
-        query_command=query,
-        hub_name=hub_name,
-        top=None,
-        resource_group_name=resource_group_name,
-        login=login,
-        auth_type_dataplane=auth_type_dataplane,
-    )
+    # return iot_query(
+    #     cmd=cmd,
+    #     query_command=query,
+    #     hub_name=hub_name,
+    #     top=None,
+    #     resource_group_name=resource_group_name,
+    #     login=login,
+    #     auth_type_dataplane=auth_type_dataplane,
+    # )
+    return _iot_query(target, query)
 
 
 def _update_device_parent(target, device, is_edge, device_scope=None):
