@@ -638,7 +638,8 @@ def iot_device_children_add(
     return _iot_device_children_add(target, device_id, child_list, force)
 
 
-def _iot_device_children_add(target,
+def _iot_device_children_add(
+    target,
     device_id,
     child_list,
     force=False

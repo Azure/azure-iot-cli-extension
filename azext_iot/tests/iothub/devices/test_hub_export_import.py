@@ -73,7 +73,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
         self.cmd(
             "iot edge deployment create -d deployment2 -l {} --content '{}' --labels '{}' --priority {} --metrics '{}' \
             --target-condition {} --layered".format(self.connection_string, "{edge_content1}", "{labels}", random.randint(1, 10),
-                                          "{metrics}", "tags.bar=12")
+                                                    "{metrics}", "tags.bar=12")
         )
 
         # populate hub with devices

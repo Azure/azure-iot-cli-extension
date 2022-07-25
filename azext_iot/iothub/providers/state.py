@@ -133,8 +133,11 @@ class StateProvider(IoTHubProvider):
 
         for i in tqdm(range(len(edge_deployments)), desc="Uploading edge deployments"):
             d = edge_deployments[i]
-            # config_type = ConfigType.layered if layered or no_validation else ConfigType.edge
-            config_type = ConfigType.edge
+
+            if "properties.desired" in d["content"]["modulesContent"]["$edgeAgent"]:
+                config_type = ConfigType.edge
+            else:
+                config_type = ConfigType.layered
 
             _iot_hub_configuration_create(target=self.target, config_id=d["id"], content=json.dumps(d["content"]),
                                           target_condition=d["targetCondition"], priority=d["priority"],
@@ -172,7 +175,7 @@ class StateProvider(IoTHubProvider):
         # set parent-child relationships
         for parentId in hub_state["children"]:
             child_list = hub_state["children"][parentId]
-            _iot_device_children_add(self.target, parentId, child_list) 
+            _iot_device_children_add(self.target, parentId, child_list)
 
     def save_state(self, filename: str):
         '''
