@@ -51,29 +51,33 @@ class TestHubExportImport(IoTLiveScenarioTest):
         self.kwargs["config_content"] = read_file_content(content_path)
         self.kwargs["labels"] = labels
         self.kwargs["metrics"] = read_file_content(metrics_path)
+        self.kwargs["target_condition"] = "tags.bar=12"
 
         self.cmd(
-            "iot hub configuration create --config-id hubConfig -l {} --content '{}' --labels '{}' --priority {} --metrics '{}' \
-            --target-condition {}".format(self.connection_string, "{config_content}", "{labels}", random.randint(1, 10),
-                                          "{metrics}", "tags.bar=12")
+            "iot hub configuration create --config-id hubConfig -l {} --content '{}' --labels '{}' --priority {} --metrics '{}' "
+            "--target-condition {}".format(
+                self.connection_string, "{config_content}", "{labels}", random.randint(1, 10), "{metrics}", "{target_condition}"
+            )
         )
 
         # make a regular edge deployment
         deployment1_path = os.path.dirname(__file__) + "\\..\\configurations\\test_edge_deployment.json"
         self.kwargs["edge_content1"] = read_file_content(deployment1_path)
         self.cmd(
-            "iot edge deployment create -d deployment1 -l {} --content '{}' --labels '{}' --priority {} --metrics '{}' \
-            --target-condition {}".format(self.connection_string, "{edge_content1}", "{labels}", random.randint(1, 10),
-                                          "{metrics}", "tags.bar=12")
+            "iot edge deployment create -d deployment1 -l {} --content '{}' --labels '{}' --priority {} --metrics '{}' "
+            "--target-condition {}".format(
+                self.connection_string, "{edge_content1}", "{labels}", random.randint(1, 10), "{metrics}", "{target_condition}"
+            )
         )
 
         # make a layered edge deployment
         deployment2_path = os.path.dirname(__file__) + "\\..\\configurations\\test_edge_deployment_layered.json"
         self.kwargs["edge_content2"] = read_file_content(deployment2_path)
         self.cmd(
-            "iot edge deployment create -d deployment2 -l {} --content '{}' --labels '{}' --priority {} --metrics '{}' \
-            --target-condition {} --layered".format(self.connection_string, "{edge_content1}", "{labels}", random.randint(1, 10),
-                                                    "{metrics}", "tags.bar=12")
+            "iot edge deployment create -d deployment2 -l {} --content '{}' --labels '{}' --priority {} --metrics '{}' "
+            "--target-condition {} --layered".format(
+                self.connection_string, "{edge_content1}", "{labels}", random.randint(1, 10), "{metrics}", "{target_condition}"
+            )
         )
 
         # populate hub with devices
@@ -89,8 +93,8 @@ class TestHubExportImport(IoTLiveScenarioTest):
             custom_primary_key = generate_key()
             custom_secondary_key = generate_key()
             self.cmd(
-                f"iot hub device-identity create -d {device_ids[0]} -l {self.connection_string} --pk {custom_primary_key} \
-                    --sk {custom_secondary_key} {edge_enabled}"
+                f"iot hub device-identity create -d {device_ids[0]} -l {self.connection_string} --pk {custom_primary_key} "
+                f"--sk {custom_secondary_key} {edge_enabled}"
             )
             self.cmd(
                 f"iot hub module-identity create -m deviceModule -d {device_ids[0]} -l {self.connection_string}"
@@ -106,14 +110,14 @@ class TestHubExportImport(IoTLiveScenarioTest):
 
             # create x509_thumbprint device and module
             self.cmd(
-                f"iot hub device-identity create -d {device_ids[2]} -l {self.connection_string} --am x509_thumbprint \
-                    --ptp {PRIMARY_THUMBPRINT} --stp {SECONDARY_THUMBPRINT} {edge_enabled}"
+                f"iot hub device-identity create -d {device_ids[2]} -l {self.connection_string} --am x509_thumbprint "
+                f"--ptp {PRIMARY_THUMBPRINT} --stp {SECONDARY_THUMBPRINT} {edge_enabled}"
             )
             ptp = create_self_signed_certificate(subject="aziotcli", valid_days=1, cert_output_dir=None)["thumbprint"]
             stp = create_self_signed_certificate(subject="aziotcli", valid_days=1, cert_output_dir=None)["thumbprint"]
             self.cmd(
-                f"iot hub module-identity create -m deviceModule -d {device_ids[2]} -l {self.connection_string} --am x509_thumbprint \
-                    --ptp {ptp} --stp {stp}"
+                f"iot hub module-identity create -m deviceModule -d {device_ids[2]} -l {self.connection_string} --am x509_thumbprint "
+                f"--ptp {ptp} --stp {stp}"
             )
 
             # add some children
@@ -148,8 +152,8 @@ class TestHubExportImport(IoTLiveScenarioTest):
 
                 val = generate_generic_id()
                 self.cmd(
-                    f"iot hub module-twin update -d {device} -m deviceModule -l {self.connection_string} --set \
-                        properties.desired.testProp={val}"
+                    f"iot hub module-twin update -d {device} -m deviceModule -l {self.connection_string} --set "
+                    f"properties.desired.testProp={val}"
                 )
 
                 patch_tags = {
@@ -469,14 +473,14 @@ class TestHubExportImport(IoTLiveScenarioTest):
         for auth_phase in DATAPLANE_AUTH_TYPES:
             if auth_phase == "cstring":
                 self.cmd(
-                    f"iot hub state migrate --origin-hub-login {self.connection_string} --destination-hub-login \
-                        {self.dest_hub_cstring} -r"
+                    f"iot hub state migrate --origin-hub-login {self.connection_string} --destination-hub-login "
+                    f"{self.dest_hub_cstring} -r"
                 )
             else:
                 self.cmd(
                     self.set_cmd_auth_type(
-                        f"iot hub state migrate --origin-hub {self.entity_name} --origin-resource-group {self.entity_rg} \
-                        --destination-hub {self.dest_hub} --destination-resource-group {self.dest_hub_rg} -r",
+                        f"iot hub state migrate --origin-hub {self.entity_name} --origin-resource-group {self.entity_rg} "
+                        f"--destination-hub {self.dest_hub} --destination-resource-group {self.dest_hub_rg} -r",
                         auth_type=auth_phase
                     )
                 )

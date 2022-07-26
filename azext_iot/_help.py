@@ -588,10 +588,10 @@ helps[
 ] = """
     type: command
     short-summary: Export the state of an IoT Hub to a file.
-    long-summary: The exported state will include hub configurations, device identities and twins, and module identities and
-                  twins.
+    long-summary: The exported state will include hub configurations, edge deployments, device identities and twins, and module
+                  identities and twins.
     examples:
-    - name: Export the configurations and devices in the specified hub to the specified file.
+    - name: Export the state of the specified hub to the specified file.
       text: >
         az iot hub state export -n {iothub_name} -f {filename}
 """
@@ -600,13 +600,14 @@ helps[
     "iot hub state import"
 ] = """
     type: command
-    short-summary: Import configurations, device information, and device twins from a file to an IoT Hub.
+    short-summary: Import a Hub state from a file to an IoT Hub.
+    long-summary: The imported state will include hub configurations, edge deployments, device identities and twins, and module
+                  identities and twins.
     examples:
-    - name: Import the devices from the specified file to the specified hub.
+    - name: Import the state from the specified file to the specified hub.
       text: >
         az iot hub state import -n {iothub_name} -f {filename}
-    - name: Import the devices from the default file to the specified hub, overwriting the configurations and devices already in
-            the hub.
+    - name: Import the state from the default file to the specified hub, overwriting the previous state of the hub.
       text: >
         az iot hub state import -n {iothub_name} -f {filename} -r
 """
@@ -616,13 +617,13 @@ helps[
 ] = """
     type: command
     short-summary: Copy the state of one hub to another hub without saving to a file.
-    long-summary: The migrated state will include hub configurations, device identities and twins, and module identities and
-                  twins.
+    long-summary: The migrated state will include hub configurations, edge deployments, device identities and twins, and module
+                  identities and twins.
     examples:
-    - name: Migrate the state of the original hub to the new hub.
+    - name: Migrate the state of the original hub to the destination hub.
       text: >
         az iot hub state migrate --destination-hub {dest_hub_name} --origin-hub {orig_hub_name}
-    - name: Migrate the state of the original hub to the new hub, overwriting the configurations and devices already in the hub.
+    - name: Migrate the state of the original hub to the destination hub, overwriting the previous state of the hub.
       text: >
         az iot hub state migrate --destination-hub {dest_hub_name} --origin-hub {orig_hub_name} -r
 """

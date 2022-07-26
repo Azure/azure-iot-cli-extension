@@ -298,7 +298,7 @@ def load_arguments(self, _):
         context.argument(
             "filename",
             options_list=["--filename", "-f"],
-            help="The path to the file where the hub and device information will be stored."
+            help="The path to the file where the state information will be stored."
         )
         context.argument(
             "replace",

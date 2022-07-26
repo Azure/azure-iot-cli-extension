@@ -133,37 +133,27 @@ def iot_device_list(
     login=None,
     auth_type_dataplane=None,
 ):
-    top = _process_top(top)
-    query = (
-        "select * from devices where capabilities.iotEdge = true"
-        if edge_enabled
-        else "select * from devices"
-    )
-    result = iot_query(
-        cmd=cmd,
-        query_command=query,
-        hub_name=hub_name,
-        top=top,
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        resource_name=hub_name,
         resource_group_name=resource_group_name,
         login=login,
-        auth_type_dataplane=auth_type_dataplane,
+        auth_type=auth_type_dataplane,
     )
-
-    if not result:
-        logger.info('No registered devices found on hub "%s".', hub_name)
-    return result
+    return _iot_device_list(target, edge_enabled, top)
 
 
-def _iot_device_list(hub_name, target, edge_enabled=False, top=1000):
+def _iot_device_list(target, edge_enabled=False, top=1000):
     top = _process_top(top)
     query = (
         "select * from devices where capabilities.iotEdge = true"
         if edge_enabled
         else "select * from devices"
     )
-    result = _iot_query(target, query, top)
+    result = _iot_query(target=target, query_command=query, top=top)
 
     if not result:
+        hub_name = target["entity"].split('.')[0]
         logger.info('No registered devices found on hub "%s".', hub_name)
     return result
 
@@ -745,15 +735,6 @@ def _iot_device_children_list(target, device_id):
     )
 
     # TODO: Inefficient
-    # return iot_query(
-    #     cmd=cmd,
-    #     query_command=query,
-    #     hub_name=hub_name,
-    #     top=None,
-    #     resource_group_name=resource_group_name,
-    #     login=login,
-    #     auth_type_dataplane=auth_type_dataplane,
-    # )
     return _iot_query(target, query)
 
 
@@ -1602,7 +1583,7 @@ def iot_hub_configuration_list(
         login=login,
         auth_type=auth_type_dataplane,
     )
-    result = _iot_hub_configuration_list(hub_name, target)
+    result = _iot_hub_configuration_list(target)
 
     filtered = [
         c
@@ -1630,19 +1611,20 @@ def iot_edge_deployment_list(
         login=login,
         auth_type=auth_type_dataplane,
     )
-    result = _iot_hub_configuration_list(hub_name, target)
+    result = _iot_hub_configuration_list(target)
 
     filtered = [c for c in result if c["content"].get("modulesContent") is not None]
     return filtered[:top]  # list[:None] == list[:len(list)]
 
 
-def _iot_hub_configuration_list(hub_name, target):
+def _iot_hub_configuration_list(target):
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
     try:
         result = service_sdk.configuration.get_configurations(raw=True).response.json()
         if not result:
+            hub_name = target["entity"].split('.')[0]
             logger.info('No configurations found on hub "%s".', hub_name)
         return result
     except CloudError as e:
