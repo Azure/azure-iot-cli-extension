@@ -174,7 +174,7 @@ class StateProvider(IoTHubProvider):
                 self.upload_module_identity(module_identity)
 
                 _iot_device_module_twin_replace(target=self.target, device_id=identity["deviceId"],
-                                                module_id=module_identity["module_id"],  target_json=json.dumps(module_twin))
+                                                module_id=module_identity["module_id"], target_json=json.dumps(module_twin))
 
         # set parent-child relationships
         for parentId in hub_state["children"]:
