@@ -21,7 +21,8 @@ device_messaging_ops = CliCommandType(
 class EndpointUpdateResultTransform(LongRunningOperation):  # pylint: disable=too-few-public-methods
     def __call__(self, poller):
         result = super(EndpointUpdateResultTransform, self).__call__(poller)
-        return result["properties"]["routing"]["endpoints"]
+        return result.properties.routing.endpoints
+        # return result["properties"]["routing"]["endpoints"]
 
 def load_iothub_commands(self, _):
     """
@@ -50,22 +51,22 @@ def load_iothub_commands(self, _):
         command_type=iothub_message_endpoint_ops
     ) as cmd_group:
         cmd_group.command(
-            "event-hub",
+            "eventhub",
             "message_endpoint_create_event_hub",
             transform=EndpointUpdateResultTransform(self.cli_ctx)
         )
         cmd_group.command(
-            "service-bus-queue",
+            "servicebus-queue",
             "message_endpoint_create_service_bus_queue",
             transform=EndpointUpdateResultTransform(self.cli_ctx)
         )
         cmd_group.command(
-            "service-bus-topic",
+            "servicebus-topic",
             "message_endpoint_create_service_bus_topic",
             transform=EndpointUpdateResultTransform(self.cli_ctx)
         )
         cmd_group.command(
-            "cosmos-db-collection",
+            "cosmosdb-collection",
             "message_endpoint_create_cosmos_db_collection",
             transform=EndpointUpdateResultTransform(self.cli_ctx)
         )

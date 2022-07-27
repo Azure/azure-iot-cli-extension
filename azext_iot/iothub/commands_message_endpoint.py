@@ -50,6 +50,7 @@ def message_endpoint_create_service_bus_queue(
     connection_string: Optional[str] = None,
     authentication_type: Optional[str] = None,
     endpoint_uri: Optional[str] = None,
+    entity_path: Optional[str] = None,
     identity: Optional[str] = None,
     resource_group_name: Optional[str] = None,
 ):
@@ -64,6 +65,7 @@ def message_endpoint_create_service_bus_queue(
         connection_string=connection_string,
         authentication_type=authentication_type,
         endpoint_uri=endpoint_uri,
+        entity_path=entity_path,
         identity=identity
     )
 

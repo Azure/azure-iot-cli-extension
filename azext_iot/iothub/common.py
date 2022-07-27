@@ -27,10 +27,10 @@ class EndpointType(Enum):
     Type of the routing endpoint.
     """
     EventHub = 'eventhub'
-    ServiceBusQueue = 'servicebusqueue'
-    ServiceBusTopic = 'servicebustopic'
-    AzureStorageContainer = 'azurestoragecontainer'
-    CosmosDBCollection = 'cosmosdbcollection'
+    ServiceBusQueue = 'servicebus-queue'
+    ServiceBusTopic = 'servicebus-topic'
+    AzureStorageContainer = 'storage-container'
+    CosmosDBCollection = 'cosmosdb-collection'
 
 
 class IdentityType(Enum):

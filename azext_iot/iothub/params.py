@@ -244,7 +244,7 @@ def load_iothub_arguments(self, _):
             "hub_name",
             options_list=["--hub-name", "-n"],
             help="IoT Hub name.",
-            arg_group="IoT Hub Identifier"
+            arg_group=None
         )
         context.argument(
             "endpoint_name",
@@ -331,7 +331,7 @@ def load_iothub_arguments(self, _):
                 ' mandatory but can be reordered with or without delimiters.'
             )
 
-    with self.argument_context("iot hub messaging-endpoint create cosmos-db-collection") as context:
+    with self.argument_context("iot hub messaging-endpoint create cosmosdb-collection") as context:
         context.argument(
             'database_name',
             options_list=['--database-name', '--dn'],
@@ -346,11 +346,13 @@ def load_iothub_arguments(self, _):
             'primary_key',
             options_list=['--primary-key', '--pk'],
             help='The primary key of the cosmos DB account.',
+            arg_group=None
         )
         context.argument(
             'secondary_key',
             options_list=['--secondary-key', '--sk'],
-                   help='The secondary key of the cosmos DB account.',
+            help='The secondary key of the cosmos DB account.',
+            arg_group=None
         )
         context.argument(
             'partition_key_name',

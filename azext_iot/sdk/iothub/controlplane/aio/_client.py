@@ -13,6 +13,7 @@ from azure.core.rest import AsyncHttpResponse, HttpRequest
 from azure.mgmt.core import AsyncARMPipelineClient
 
 from .._serialization import Deserializer, Serializer
+from ..models import _models as models
 from ._configuration import IotHubClientConfiguration
 from .operations import (
     CertificatesOperations,
@@ -26,8 +27,6 @@ from .operations import (
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import,ungrouped-imports
-    from typing import Dict
-
     from azure.core.credentials_async import AsyncTokenCredential
 
 
@@ -75,8 +74,9 @@ class IotHubClient:  # pylint: disable=client-accepts-api-version-keyword,too-ma
         self._config = IotHubClientConfiguration(subscription_id=subscription_id, credential=credential, **kwargs)
         self._client = AsyncARMPipelineClient(base_url=endpoint, config=self._config, **kwargs)
 
-        self._serialize = Serializer()
-        self._deserialize = Deserializer()
+        client_models = {k: v for k, v in models.__dict__.items() if isinstance(v, type)}
+        self._serialize = Serializer(client_models)
+        self._deserialize = Deserializer(client_models)
         self._serialize.client_side_validation = False
         self.operations = Operations(self._client, self._config, self._serialize, self._deserialize)
         self.iot_hub_resource = IotHubResourceOperations(self._client, self._config, self._serialize, self._deserialize)

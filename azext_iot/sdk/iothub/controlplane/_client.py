@@ -14,6 +14,7 @@ from azure.mgmt.core import ARMPipelineClient
 
 from ._configuration import IotHubClientConfiguration
 from ._serialization import Deserializer, Serializer
+from .models import _models as models
 from .operations import (
     CertificatesOperations,
     IotHubOperations,
@@ -26,8 +27,6 @@ from .operations import (
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import,ungrouped-imports
-    from typing import Dict
-
     from azure.core.credentials import TokenCredential
 
 
@@ -71,15 +70,15 @@ class IotHubClient:  # pylint: disable=client-accepts-api-version-keyword,too-ma
         endpoint: str = "https://management.azure.com",
         **kwargs: Any
     ) -> None:
-        # # @vilit - remove api version from kwargs
-        # kwargs.pop("api_version", "2022-04-30-preview")
+        # @ vilit - had to swap credential and sub id
         self._config = IotHubClientConfiguration(subscription_id=subscription_id, credential=credential, **kwargs)
         # @vilit - had to do this since kwargs has base url too.
-        base_url = kwargs.pop("base_url")
-        self._client = ARMPipelineClient(base_url=(base_url or endpoint), config=self._config, **kwargs)
+        endpoint = kwargs.pop("base_url")
+        self._client = ARMPipelineClient(base_url=endpoint, config=self._config, **kwargs)
 
-        self._serialize = Serializer()
-        self._deserialize = Deserializer()
+        client_models = {k: v for k, v in models.__dict__.items() if isinstance(v, type)}
+        self._serialize = Serializer(client_models)
+        self._deserialize = Deserializer(client_models)
         self._serialize.client_side_validation = False
         self.operations = Operations(self._client, self._config, self._serialize, self._deserialize)
         self.iot_hub_resource = IotHubResourceOperations(self._client, self._config, self._serialize, self._deserialize)
