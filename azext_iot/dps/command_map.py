@@ -13,6 +13,10 @@ dps_device_registration_ops = CliCommandType(
     operations_tmpl="azext_iot.dps.commands_device_registration#{}"
 )
 
+dps_trust_bundle_ops = CliCommandType(
+    operations_tmpl="azext_iot.dps.commands_trust_bundle#{}"
+)
+
 
 def load_dps_commands(self, _):
     """
@@ -24,3 +28,14 @@ def load_dps_commands(self, _):
         is_preview=True
     ) as cmd_group:
         cmd_group.command("create", "create_device_registration")
+    
+    with self.command_group(
+        "iot dps trust-bundle",
+        command_type=dps_trust_bundle_ops,
+        is_preview=True,
+    ) as cmd_group:
+        cmd_group.command("create", "create_trust_bundle")
+        cmd_group.command("update", "update_trust_bundle")
+        cmd_group.show_command("show", "show_trust_bundle")
+        cmd_group.command("list", "list_trust_bundles")
+        cmd_group.command("delete", "delete_trust_bundle", confirmation=True)

@@ -13,6 +13,7 @@ shared: Define shared data types(enums) and constant strings.
 DPS_IDENTIFIER = "DPS Identifier"
 SYM_KEY_AUTH = "Symmetric Key Authentication"
 CERT_AUTH = "x509 Authentication"
+TRUST_BUNDLE = "Trust Bundle"
 
 # Error messages from Device SDK
 DISABLED_REGISTRATION_ERROR = "Query Status Operation encountered an invalid registration status 'disabled' with a "\

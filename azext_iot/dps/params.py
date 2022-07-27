@@ -9,7 +9,7 @@ CLI parameter definitions.
 """
 
 from azext_iot._validators import mode2_iot_login_handler
-from azext_iot.dps.common import CERT_AUTH, DPS_IDENTIFIER, SYM_KEY_AUTH
+from azext_iot.dps.common import CERT_AUTH, DPS_IDENTIFIER, SYM_KEY_AUTH, TRUST_BUNDLE
 
 
 def load_dps_arguments(self, _):
@@ -92,4 +92,25 @@ def load_dps_arguments(self, _):
             options_list=["--passphrase", "--pass"],
             help="Passphrase for the certificate.",
             arg_group=CERT_AUTH
+        )
+
+    with self.argument_context("iot dps trust-bundle") as context:
+        context.argument(
+            "trust_bundle_id",
+            options_list=["--trust-bundle-id", "--tb"],
+            help="The trust bundle id. A case-insensitive string of alphanumeric & certain special characters : . _ - "
+            "It can be upto 128 characters long. Special characters are not allowed at start or end.",
+            arg_group=TRUST_BUNDLE,
+        )
+        context.argument(
+            "trusted_certificates",
+            options_list=["--trusted-certificates", "--tc"],
+            help="Inline trusted certificates JSON or file path to trusted certificates JSON.",
+            arg_group=TRUST_BUNDLE,
+        )
+        context.argument(
+            "with_certificate_data",
+            options_list=["--with-certificate-data", "--wcd"],
+            help="Flag to specify if certificate data is to be fetched when listing certificates.",
+            arg_group=TRUST_BUNDLE,
         )
