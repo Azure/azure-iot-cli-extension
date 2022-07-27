@@ -580,6 +580,8 @@ def ensure_azure_namespace_path():
     from azext_iot.constants import EXTENSION_NAME
 
     ext_path = get_extension_path(EXTENSION_NAME)
+    if not ext_path:
+        return
 
     ext_azure_dir = os.path.join(ext_path, "azure")
     if os.path.isdir(ext_azure_dir):
