@@ -7,7 +7,7 @@
 import pytest
 import os
 from time import sleep
-from azext_iot.tests.helpers import add_test_tag
+from azext_iot.tests.helpers import CERT_ENDING, KEY_ENDING, add_test_tag
 
 from azext_iot.tests.settings import (
     DynamoSettings,
@@ -31,11 +31,6 @@ DATAPLANE_AUTH_TYPES = [
 ]
 
 CERT_NAME = "aziotcli"
-CERT_PATH = "aziotcli-cert.pem"
-KEY_PATH = "aziotcli-key.pem"
-SECONDARY_CERT_NAME = "aziotcli2"
-SECONDARY_CERT_PATH = "aziotcli2-cert.pem"
-SECONDARY_KEY_PATH = "aziotcli2-key.pem"
 WEBHOOK_URL = "https://www.test.test"
 API_VERSION = "2019-03-31"
 
@@ -54,6 +49,8 @@ TEST_ENDORSEMENT_KEY = (
     "Dj7r7Mh5uF9HBppGKQCBoVSVV8dI91lNazmSdpGWyqCkO7iM4VvUMv2HT/ym53aYlUrau+Qq87Tu+uQipWYgRdF11KDfcpMHqqzB"
     "QQ1NpOJVhrsTrhyJzO7KNw=="
 )
+TEST_KEY_REGISTRATION_ID = "myarbitrarydeviceId"
+GENERATED_KEY = "cT/EXZvsplPEpT//p98Pc6sKh8mY3kYgSxavHwMkl7w="
 
 # Test Environment Variables
 settings = DynamoSettings(
@@ -62,7 +59,9 @@ settings = DynamoSettings(
 )
 ENTITY_RG = settings.env.azext_iot_testrg
 ENTITY_DPS_NAME = settings.env.azext_iot_testdps if settings.env.azext_iot_testdps else "test-dps-" + generate_generic_id()
-ENTITY_HUB_NAME = settings.env.azext_iot_testhub if settings.env.azext_iot_testhub else "test-dps-hub-" + generate_generic_id()
+ENTITY_HUB_NAME = (
+    settings.env.azext_iot_testdps_hub if settings.env.azext_iot_testdps_hub else "test-dps-hub-" + generate_generic_id()
+)
 MAX_RBAC_ASSIGNMENT_TRIES = settings.env.azext_iot_rbac_max_tries if settings.env.azext_iot_rbac_max_tries else 10
 
 
@@ -78,7 +77,7 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
         # Create resources if needed
         if not settings.env.azext_iot_testdps:
             self.create_dps()
-        if not settings.env.azext_iot_testhub:
+        if not settings.env.azext_iot_testdps_hub:
             self.create_hub()
 
         # Prep the DPS for testing
@@ -89,17 +88,9 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
             rtype=ResourceTypes.dps.value,
             test_tag=test_scenario
         )
-        add_test_tag(
-            cmd=self.cmd,
-            name=self.entity_hub_name,
-            rg=self.entity_rg,
-            rtype=ResourceTypes.hub.value,
-            test_tag=test_scenario
-        )
         self.dps_cstring = self.get_dps_cstring()
         self.hub_cstring = self.get_hub_cstring()
         self._ensure_dps_hub_link()
-        self._cleanup_enrollments()
 
         # Create the test certificate
         self.thumbprint = self.create_test_cert(cert_only=cert_only)
@@ -132,9 +123,9 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
             file_prefix=file_prefix,
             sha_version=256,
         )["thumbprint"]
-        self.tracked_certs.append(CERT_PATH)
+        self.tracked_certs.append(subject + CERT_ENDING)
         if not cert_only:
-            self.tracked_certs.append(KEY_PATH)
+            self.tracked_certs.append(subject + KEY_ENDING)
         return thumbprint
 
     def create_dps(self):
@@ -153,8 +144,8 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
         # Create the min version dps and assign the correct roles
         if not target_dps:
             target_dps = self.cmd(
-                "iot dps create --name {} --resource-group {} ".format(
-                    self.entity_dps_name, self.entity_rg
+                "iot dps create --name {} --resource-group {} --tags hubname={}".format(
+                    self.entity_dps_name, self.entity_rg, self.entity_hub_name
                 )
             ).get_output_in_json()
 
@@ -343,7 +334,7 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     os.remove(cert)
                 except OSError as e:
                     logger.error(f"Failed to remove {cert}. {e}")
-        if not settings.env.azext_iot_testhub:
+        if not settings.env.azext_iot_testdps_hub:
             self.cmd(
                 "iot hub delete --name {} --resource-group {}".format(
                     ENTITY_HUB_NAME, ENTITY_RG
