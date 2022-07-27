@@ -42,7 +42,7 @@ try:
     from .event_routes_get_by_id_options_py3 import EventRoutesGetByIdOptions
     from .event_routes_add_options_py3 import EventRoutesAddOptions
     from .event_routes_delete_options_py3 import EventRoutesDeleteOptions
-    from .bulk_import_job_py3 import BulkImportJob
+    from .bulk_import_job_py3 import BulkImportJob, ImportJobError
     from .import_jobs_list_options_py3 import ImportJobsListOptions
 except (SyntaxError, ImportError):
     from .event_route import EventRoute
@@ -122,5 +122,6 @@ __all__ = [
     'EventRoutePaged',
     'ImportJobsListOptions',
     'BulkImportJob',
-    'BulkImportJobPaged'
+    'BulkImportJobPaged',
+    'ImportJobError'
 ]
