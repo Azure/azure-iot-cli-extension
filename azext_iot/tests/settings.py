@@ -19,7 +19,6 @@ ENV_SET_TEST_IOTHUB_OPTIONAL = [
 ]
 
 ENV_SET_TEST_IOTDPS_OPTIONAL = [
-    "azext_iot_testdps_hub",
     "azext_iot_testdps",
     "azext_iot_rbac_max_tries"
 ]

@@ -298,11 +298,3 @@ class DiscoveryResourceType(Enum):
     """
     IoTHub = "IoT Hub"
     DPS = "IoT Hub Device Provisioning Service"
-
-
-class SHAHashVersions(Enum):
-    """
-    Supported SHA types for generating the certificate thumbprint.
-    """
-    SHA1 = 1
-    SHA256 = 256

@@ -6,20 +6,15 @@
 
 import json
 from knack.log import get_logger
-from azure.cli.core.azclierror import ForbiddenError, RequiredArgumentMissingError, InvalidArgumentValueError
+from azure.cli.core.azclierror import ForbiddenError, RequiredArgumentMissingError
 from azext_iot.common.utility import process_json_arg, handle_service_exception, scantree
-from azext_iot.digitaltwins.common import ADTModelCreateFailurePolicy
 from azext_iot.digitaltwins.providers.base import DigitalTwinsProvider
 from azext_iot.sdk.digitaltwins.dataplane.models import ErrorResponseException
-from tqdm import tqdm
 
 logger = get_logger(__name__)
-MAX_MODELS_API_LIMIT = 250
-# avagraw - Max number of models the API's dependency resolution can handle when models are created across multiple API calls.
-MAX_MODELS_PER_BATCH = 40
 
 
-def get_model_dependencies(model, model_id_to_model_map=None):
+def get_model_dependencies(model):
     """Return a list of dependency DTMIs for a given model"""
     dependencies = []
 
@@ -39,26 +34,18 @@ def get_model_dependencies(model, model_id_to_model_map=None):
         if isinstance(item, str):
             # If its just a string, thats a single DTMI reference, so just add that to our set
             no_dup.add(item)
-            # Calculate recursive dependencies if model id to model map is passed
-            if model_id_to_model_map is not None:
-                dep_model = model_id_to_model_map[item]
-                no_dup.update(set(get_model_dependencies(dep_model, model_id_to_model_map)))
         elif isinstance(item, dict):
             # If its a single nested model, get its dtmi reference, dependencies and add them
-            no_dup.update(set(get_model_dependencies(item, model_id_to_model_map)))
+            no_dup.update(set(get_model_dependencies(item)))
         elif isinstance(item, list):
             # If its a list, could have DTMIs or nested models
             for sub_item in item:
                 if isinstance(sub_item, str):
                     # If there are strings in the list, that's a DTMI reference, so add it
                     no_dup.add(sub_item)
-                    # Calculate recursive dependencies if model id to model map is passed
-                    if model_id_to_model_map is not None:
-                        sub_dep_model = model_id_to_model_map[sub_item]
-                        no_dup.update(set(get_model_dependencies(sub_dep_model, model_id_to_model_map)))
                 elif isinstance(sub_item, dict):
                     # This is a nested model. Now go get its dependencies and add them
-                    no_dup.update(set(get_model_dependencies(sub_item, model_id_to_model_map)))
+                    no_dup.update(set(get_model_dependencies(sub_item)))
 
     return list(no_dup)
 
@@ -70,7 +57,7 @@ class ModelProvider(DigitalTwinsProvider):
         )
         self.model_sdk = self.get_sdk().digital_twin_models
 
-    def add(self, models=None, from_directory=None, failure_policy=ADTModelCreateFailurePolicy.ROLLBACK.value):
+    def add(self, models=None, from_directory=None):
         if not any([models, from_directory]):
             raise RequiredArgumentMissingError("Provide either --models or --from-directory.")
 
@@ -89,74 +76,10 @@ class ModelProvider(DigitalTwinsProvider):
 
         logger.info("Models payload %s", json.dumps(payload))
 
-        models_created = []
+        # @vilit - hack to customize 403's to have more specific error messages
         try:
-            # Process models in batches if models to process exceed the API limit
-            if len(payload) > MAX_MODELS_API_LIMIT:
-
-                model_id_to_model_map = {}
-                for model_def in payload:
-                    model_id_to_model_map[model_def['@id']] = model_def
-
-                # Create a dictionary to categorize models by their number of dependencies
-                dep_count_to_models_map = {}
-                for model in payload:
-                    num_dependencies = len(get_model_dependencies(model, model_id_to_model_map))
-                    if num_dependencies not in dep_count_to_models_map:
-                        dep_count_to_models_map[num_dependencies] = []
-                    dep_count_to_models_map[num_dependencies].append(model)
-
-                # Sort by dependency count
-                dep_count_to_models_tuples = sorted(dep_count_to_models_map.items())
-                models_batch = []
-                response = []
-                pbar = tqdm(total=len(payload), desc='Creating models...', ascii=' #')
-                # The tuples being iterated are sorted by dependency count, hence models with 0 dependencies go first,
-                # followed by models with 1 dependency, then 2 dependencies and so on... This ensures that all dependencies
-                # of each model being added were either already added in a previous iteration or are in the current payload.
-                for _, models_list in dep_count_to_models_tuples:
-                    while len(models_batch) + len(models_list) > MAX_MODELS_PER_BATCH:
-                        num_models_to_add = MAX_MODELS_PER_BATCH - len(models_batch)
-                        models_batch.extend(models_list[0:num_models_to_add])
-                        response.extend(self.model_sdk.add(models_batch, raw=True).response.json())
-                        models_created.extend([model['@id'] for model in models_batch])
-                        pbar.update(len(models_batch))
-                        # Remove the model ids which have been processed
-                        models_list = models_list[num_models_to_add:]
-                        models_batch = []
-                    models_batch.extend(models_list)
-                # Process the last set of model ids
-                if len(models_batch) > 0:
-                    pbar.update(len(models_batch))
-                    response.extend(self.model_sdk.add(models_batch, raw=True).response.json())
-                pbar.close()
-                return response
             return self.model_sdk.add(payload, raw=True).response.json()
         except ErrorResponseException as e:
-            if len(models_created) > 0:
-                pbar.close()
-                # Delete all models created by this operation when the failure policy is set to 'Rollback'
-                if failure_policy == ADTModelCreateFailurePolicy.ROLLBACK.value:
-                    logger.error(
-                        "Error creating models. Deleting {} models created by this operation...".format(len(models_created))
-                    )
-                    # Models will be deleted in the reverse order they were created.
-                    # Hence, ensuring each model's dependencies are deleted after deleting the model.
-                    models_created.reverse()
-                    for model_id in models_created:
-                        self.delete(model_id)
-                # Models created by this operation are not deleted when the failure policy is set to 'None'
-                elif failure_policy == ADTModelCreateFailurePolicy.NONE.value:
-                    logger.error(
-                        "Error creating current model batch. Successfully created {} models.".format(len(models_created))
-                    )
-                else:
-                    raise InvalidArgumentValueError(
-                        "Invalid failure policy: {}. Supported values are: '{}' and '{}'".format(
-                            failure_policy, ADTModelCreateFailurePolicy.ROLLBACK.value, ADTModelCreateFailurePolicy.NONE.value
-                        )
-                    )
-            # @vilit - hack to customize 403's to have more specific error messages
             if e.response.status_code == 403:
                 error_text = "Current principal access is forbidden. Please validate rbac role assignments."
                 raise ForbiddenError(error_text)

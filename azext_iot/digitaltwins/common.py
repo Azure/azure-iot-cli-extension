@@ -87,11 +87,3 @@ class ProvisioningStateType(Enum):
     FINISHED = frozenset(['succeeded', 'canceled', 'failed'])
     FAILED = frozenset(['canceled', 'failed'])
     SUCCEEDED = frozenset(['succeeded'])
-
-
-class ADTModelCreateFailurePolicy(Enum):
-    """
-    Batched model creation failure policies
-    """
-    ROLLBACK = "Rollback"
-    NONE = "None"

@@ -1,5 +1,5 @@
 parameters:
-  pythonVersion: '3.8'
+  pythonVersion: '3.8.x'
   architecture: 'x64'
 
 steps:

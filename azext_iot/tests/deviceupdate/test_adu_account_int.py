@@ -13,7 +13,6 @@ from azext_iot.tests.deviceupdate.conftest import (
 )
 from typing import Dict
 
-
 cli = EmbeddedCLI()
 
 
@@ -68,14 +67,11 @@ def test_account_create_identity_system_assign_scope(provisioned_accounts: Dict[
 def test_account_create_custom():
     # Test create --no-wait/wait combo.
     target_account_name = generate_account_id()
-    # @digimaun - We can uncomment once we have more capacity in non-eastus2euap locations.
-    # group = cli.invoke(f"group show -n {ACCOUNT_RG}").as_json()
     cli.invoke(f"iot device-update account create -n {target_account_name} -g {ACCOUNT_RG} -l eastus2euap --no-wait")
     cli.invoke(f"iot device-update account wait -n {target_account_name} --created")
     account = cli.invoke(f"iot device-update account show -n {target_account_name}").as_json()
     assert account["provisioningState"] == "Succeeded"
     assert account["name"] == target_account_name
-    # assert account["location"] == group["location"]
     cli.invoke(f"iot device-update account delete -n {target_account_name} -y --no-wait")
 
 
@@ -107,14 +103,15 @@ def test_account_private_links_endpoint_connections(provisioned_accounts: Dict[s
     target_account_name = list(provisioned_accounts["accounts"].keys())[0]
     # There is a single command for private link resources
     expected_links = ["DeviceUpdate"]
-    link_resources: list = cli.invoke(
-        f"iot device-update account private-link-resource list -n {target_account_name}").as_json()
-    assert len(link_resources) > 0
-    link_map = {}
-    for link in link_resources:
-        link_map[link["groupId"]] = 1
-    for expected_link in expected_links:
-        assert expected_link in link_map
+    # @digimaun - private-link-resource operations currently error in the API.
+    # link_resources: list = cli.invoke(
+    #     f"iot device-update account private-link-resource list -n {target_account_name}").as_json()
+    # assert len(link_resources) > 0
+    # link_map = {}
+    # for link in link_resources:
+    #     link_map[link["groupId"]] = 1
+    # for expected_link in expected_links:
+    #     assert expected_link in link_map
 
     nsg_name = generate_generic_id()
     vnet_name = generate_generic_id()
@@ -125,6 +122,7 @@ def test_account_private_links_endpoint_connections(provisioned_accounts: Dict[s
     try:
         cli.invoke(f"network nsg create -n {nsg_name} -g {ACCOUNT_RG}").as_json()  # Will fail if not succesful
         cli.invoke(f"network vnet create -n {vnet_name} -g {ACCOUNT_RG} --subnet-name {subnet_name} --nsg {nsg_name}").as_json()
+
         cli.invoke(
             f"network private-endpoint create --connection-name {conn_name} -n {endpoint_name} "
             f"--private-connection-resource-id {provisioned_accounts['accounts'][target_account_name]['id']} "

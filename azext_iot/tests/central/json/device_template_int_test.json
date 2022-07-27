@@ -12,27 +12,6 @@
                 "schema": "double"
             },
             {
-                "@type": "Property",
-                "displayName": "testFirstProperty",
-                "name": "testFirstProperty",
-                "schema": "string",
-                "writable": true
-            },
-            {
-                "@type": "Property",
-                "displayName": "testSecondProperty",
-                "name": "testSecondProperty",
-                "schema": "string",
-                "writable": true
-            },
-            {
-                "@type": "Property",
-                "displayName": "testReadOnlyProperty",
-                "name": "testReadOnlyProperty",
-                "schema": "string",
-                "writable": false
-            },
-            {
                 "@id": "dtmi:sampleApp:modelOnebz:dtmiIntTestDeviceTemplateV33jl;3",
                 "@type": "Component",
                 "displayName": "Component",
@@ -47,27 +26,6 @@
                             "commandType": "synchronous",
                             "displayName": "testCommand",
                             "name": "testCommand"
-                        },
-                        {
-                            "@type": "Property",
-                            "displayName": "testComponentFirstProperty",
-                            "name": "testComponentFirstProperty",
-                            "schema": "string",
-                            "writable": true
-                        },
-                        {
-                            "@type": "Property",
-                            "displayName": "testComponentSecondProperty",
-                            "name": "testComponentSecondProperty",
-                            "schema": "string",
-                            "writable": true
-                        },
-                        {
-                            "@type": "Property",
-                            "displayName": "testComponentReadOnlyProperty",
-                            "name": "testComponentReadOnlyProperty",
-                            "schema": "string",
-                            "writable": false
                         }
                     ],
                     "displayName": "Component"

@@ -143,31 +143,15 @@ def load_central_commands(self, _):
         cmd_group.command("compute-device-key", "compute_device_key")
         cmd_group.command("manual-failover", "run_manual_failover")
         cmd_group.command("manual-failback", "run_manual_failback")
-        cmd_group.command("list-components", "list_components")
-        cmd_group.command("list-modules", "list_modules")
-
-    with self.command_group(
-        "iot central device telemetry",
-        command_type=central_device_ops,
-    ) as cmd_group:
-        cmd_group.show_command("show", "get_telemetry_value")
-
-    with self.command_group(
-        "iot central device attestation",
-        command_type=central_device_ops,
-    ) as cmd_group:
-        cmd_group.show_command("show", "get_attestation")
-        cmd_group.command("create", "create_attestation")
-        cmd_group.command("delete", "delete_attestation")
-        cmd_group.command("update", "update_attestation")
 
     with self.command_group(
         "iot central device twin",
         command_type=central_device_ops,
     ) as cmd_group:
-        cmd_group.show_command("show", "get_properties")
-        cmd_group.command("update", "update_properties")
-        cmd_group.command("replace", "replace_properties")
+        cmd_group.show_command(
+            "show",
+            "get_device_twin",
+        )
 
     with self.command_group(
         "iot central device c2d-message",
@@ -187,6 +171,7 @@ def load_central_commands(self, _):
         command_type=central_device_templates_ops,
     ) as cmd_group:
         cmd_group.command("list", "list_device_templates")
+        # cmd_group.command("map", "map_device_templates")
         cmd_group.show_command("show", "get_device_template")
         cmd_group.command("create", "create_device_template")
         cmd_group.command("update", "update_device_template")
@@ -198,10 +183,6 @@ def load_central_commands(self, _):
         is_preview=True,
     ) as cmd_group:
         cmd_group.command("list", "list_device_groups")
-        cmd_group.show_command("show", "get_device_group")
-        cmd_group.command("create", "create_device_group")
-        cmd_group.command("update", "update_device_group")
-        cmd_group.command("delete", "delete_device_group")
 
     with self.command_group(
         "iot central role", command_type=central_roles_ops, is_preview=True

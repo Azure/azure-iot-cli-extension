@@ -7,12 +7,9 @@
 import pytest
 import responses
 import json
-import os
-import re
 from knack.cli import CLIError
 from azext_iot.digitaltwins import commands_models as subject
 from msrest.paging import Paged
-from urllib.parse import unquote
 from azext_iot.tests.digitaltwins.dt_helpers import (
     generate_model_id,
     generate_model_result,
@@ -23,8 +20,6 @@ from azext_iot.tests.digitaltwins.dt_helpers import (
     url_model_id
 )
 from azext_iot.tests.conftest import hostname
-from azext_iot.digitaltwins.providers.model import MAX_MODELS_PER_BATCH
-from azext_iot.digitaltwins.common import ADTModelCreateFailurePolicy
 
 
 class TestAddModels(object):
@@ -130,103 +125,6 @@ class TestAddModels(object):
         request_body = json.loads(service_client.calls[0].request.body)
         assert request_body == expected_payload
         assert result == json.loads('[' + generic_result + ']')
-
-    @pytest.mark.usefixtures("set_cwd")
-    @responses.activate
-    def test_large_ontology_error(self, fixture_cmd, fixture_dt_client):
-        models_added = []
-        models_deleted = []
-
-        def post_request_callback(request):
-            payload = json.loads(request.body)
-            headers = {"content_type": "application/json"}
-            # First batch to succeed
-            if payload[0]["@id"] == "dtmi:digitaltwins:rec_3_3:core:Agent;1":
-                models_added.extend([model["@id"] for model in payload])
-                resp_body = [{"status": "succeeded"}]
-                return (200, headers, json.dumps(resp_body))
-            # Next batch to fail
-            else:
-                resp_body = [{"status": "failed"}]
-                return (400, headers, json.dumps(resp_body))
-
-        responses.add_callback(
-            responses.POST,
-            "https://{}/models".format(hostname),
-            callback=post_request_callback,
-            content_type="application/json",
-        )
-
-        def delete_request_callback(request):
-            url = unquote(request.url.split("?")[0])
-            headers = {"content_type": "application/json"}
-            model = url.split("/")[-1]
-            # Ensures that we are deleting the models which were added in the successful batch
-            if model in models_added:
-                resp_body = [{"status": "succeeded"}]
-                models_deleted.append(model)
-                return (204, headers, json.dumps(resp_body))
-            else:
-                resp_body = [{"status": "Failed - Unexpected model deletion"}]
-                return (400, headers, json.dumps(resp_body))
-
-        responses.add_callback(
-            responses.DELETE,
-            re.compile("https://{}/models/.+".format(hostname)),
-            callback=delete_request_callback,
-            content_type="application/json",
-        )
-        ontology_directory = "./references/opendigitaltwins-building/Ontology"
-
-        if os.path.isdir(ontology_directory) and len(os.listdir(ontology_directory)) > 0:
-            with pytest.raises(CLIError):
-                subject.add_models(
-                    cmd=fixture_cmd,
-                    name_or_hostname=hostname,
-                    models=None,
-                    from_directory=ontology_directory,
-                )
-                assert len(models_added) == MAX_MODELS_PER_BATCH
-                # Since deletion happens in the reverse order, hence we reverse the array before asserting equality
-                models_deleted.reverse()
-                assert models_added == models_deleted
-
-    @pytest.mark.usefixtures("set_cwd")
-    @responses.activate
-    def test_large_ontology_error_failure_policy_none(self, fixture_cmd, fixture_dt_client):
-        models_added = []
-
-        def post_request_callback(request):
-            payload = json.loads(request.body)
-            headers = {"content_type": "application/json"}
-            # First batch to succeed
-            if payload[0]["@id"] == "dtmi:digitaltwins:rec_3_3:core:Agent;1":
-                models_added.extend([model["@id"] for model in payload])
-                resp_body = [{"status": "succeeded"}]
-                return (200, headers, json.dumps(resp_body))
-            # Next batch to fail
-            else:
-                resp_body = [{"status": "failed"}]
-                return (400, headers, json.dumps(resp_body))
-
-        responses.add_callback(
-            responses.POST,
-            "https://{}/models".format(hostname),
-            callback=post_request_callback,
-            content_type="application/json",
-        )
-
-        ontology_directory = "./references/opendigitaltwins-building/Ontology"
-        if os.path.isdir(ontology_directory) and len(os.listdir(ontology_directory)) > 0:
-            with pytest.raises(CLIError):
-                subject.add_models(
-                    cmd=fixture_cmd,
-                    name_or_hostname=hostname,
-                    models=None,
-                    from_directory=ontology_directory,
-                    failure_policy=ADTModelCreateFailurePolicy.NONE.value,
-                )
-                assert len(models_added) == MAX_MODELS_PER_BATCH
 
     def test_add_model_no_models_directory(self, fixture_cmd):
         with pytest.raises(CLIError):

@@ -75,12 +75,5 @@ class DPSDiscovery(BaseDiscovery):
         result["secondarykey"] = policy.secondary_key
         result["subscription"] = self.sub_id
         result["cmd"] = self.cmd
-        result["idscope"] = resource.properties.id_scope
 
         return result
-
-    def get_id_scope(self, resource_name: str, rg: str = None) -> str:
-        """Get the ID scope. Only needed for certain DPS operations."""
-        return self.find_resource(
-            resource_name=resource_name, rg=rg
-        ).properties.id_scope

@@ -17,7 +17,6 @@ from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
 from azext_iot.central.models.preview import TemplatePreview
 from azext_iot.central.models.v1 import TemplateV1
-from azext_iot.central.models.ga_2022_05_31 import TemplateGa20220531
 from azext_iot.central.models.v1_1_preview import TemplateV1_1_preview
 
 logger = get_logger(__name__)
@@ -33,7 +32,7 @@ def get_device_template(
     token: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[TemplatePreview, TemplateV1, TemplateV1_1_preview, TemplateGa20220531]:
+) -> Union[TemplatePreview, TemplateV1, TemplateV1_1_preview]:
     """
     Get a specific device template from IoTC
 
@@ -46,7 +45,7 @@ def get_device_template(
         central_dns_suffix: {centralDnsSuffixInPath} as found in docs
 
     Returns:
-        device_template: dict
+        device: dict
     """
     url = "https://{}.{}/{}/{}".format(
         app_id, central_dns_suffix, BASE_PATH, device_template_id
@@ -69,7 +68,7 @@ def list_device_templates(
     api_version: str,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> List[Union[TemplatePreview, TemplateV1, TemplateV1_1_preview, TemplateGa20220531]]:
+) -> List[Union[TemplatePreview, TemplateV1, TemplateV1_1_preview]]:
     """
     Get a list of all device templates in IoTC
 
@@ -130,7 +129,7 @@ def create_device_template(
     token: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[TemplatePreview, TemplateV1, TemplateV1_1_preview, TemplateGa20220531]:
+) -> Union[TemplatePreview, TemplateV1, TemplateV1_1_preview]:
     """
     Create a device template in IoTC
 
@@ -172,7 +171,7 @@ def update_device_template(
     token: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[TemplatePreview, TemplateV1, TemplateV1_1_preview, TemplateGa20220531]:
+) -> Union[TemplatePreview, TemplateV1, TemplateV1_1_preview]:
     """
     Updates a device template in IoTC
 

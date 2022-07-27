@@ -21,9 +21,6 @@ TAG_ENV_VAR = [
     "use_tags"
 ]
 
-CERT_ENDING = "-cert.pem"
-KEY_ENDING = "-key.pem"
-
 settings = DynamoSettings(opt_env_set=TAG_ENV_VAR)
 # Make sure that TEST_PIPELINE_ID is only populated if correct variables are present
 TEST_PIPELINE_ID = "{} {} {}".format(
@@ -76,7 +73,7 @@ def add_test_tag(cmd, name: str, rg: str, rtype: str, test_tag: str):
             current_tags["pipeline_id"] = f"'{TEST_PIPELINE_ID}'"
 
         new_tags = " ".join(f"{k}={v}" for k, v in current_tags.items())
-        cmd(f"resource tag -n {name} -g {rg} --resource-type {rtype} --tags {new_tags} -i")
+        cmd(f"resource tag -n {name} -g {rg} --resource-type {rtype} --tags {new_tags}")
 
 
 def create_storage_account(

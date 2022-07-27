@@ -17,7 +17,7 @@ def get_fileupload(
     app_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=ApiVersion.v1_1_preview.value,
 ) -> FileUploadV1_1_preview:
     provider = CentralFileUploadProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
@@ -31,7 +31,7 @@ def delete_fileupload(
     app_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=ApiVersion.v1_1_preview.value,
 ) -> FileUploadV1_1_preview:
     provider = CentralFileUploadProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
@@ -49,7 +49,7 @@ def create_fileupload(
     sasTtl=None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=ApiVersion.v1_1_preview.value,
 ) -> FileUploadV1_1_preview:
     provider = CentralFileUploadProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
@@ -73,7 +73,7 @@ def update_fileupload(
     sasTtl=None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=ApiVersion.v1_1_preview.value,
 ) -> FileUploadV1_1_preview:
     provider = CentralFileUploadProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token

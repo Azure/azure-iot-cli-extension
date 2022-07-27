@@ -6,6 +6,6 @@
 
 
 class Role:
-    def __init__(self, role: dict):
-        self.display_name = role.get("displayName")
-        self.id = role.get("id")
+    def __init__(self, device: dict):
+        self.display_name = device.get("displayName")
+        self.id = device.get("id")

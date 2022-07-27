@@ -77,9 +77,7 @@ class SdkResolver(object):
         # This initialization will likely need to change to support more variation of SDK
         self.sas_uri = self.target["entity"]
         self.endpoint = "https://{}".format(self.sas_uri)
-
-        # Base endpoints stay the same
-        if self.device_id:
+        if self.device_id:  # IoT Hub base endpoint stays the same
             self.sas_uri = "{}/devices/{}".format(self.sas_uri, self.device_id)
 
     def get_sdk(self, sdk_type):

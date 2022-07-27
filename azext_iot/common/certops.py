@@ -11,24 +11,17 @@ certops: Functions for working with certificates.
 import datetime
 from os.path import exists, join
 import base64
-from typing import Dict
 from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import rsa
-from azext_iot.common.shared import SHAHashVersions
 
 
 def create_self_signed_certificate(
-    subject: str,
-    valid_days: int,
-    cert_output_dir: str,
-    cert_only: bool = False,
-    file_prefix: str = None,
-    sha_version: int = SHAHashVersions.SHA1.value,
-) -> Dict[str, str]:
+    subject, valid_days, cert_output_dir, cert_only=False
+):
     """
-    Function used to create a basic self-signed certificate with no extensions.
+    Function used to create a self-signed certificate
 
     Args:
         subject (str): Certificate common name; host name or wildcard.
@@ -36,9 +29,6 @@ def create_self_signed_certificate(
             certificate expiry.
         cert_putput_dir (str): string value of output directory.
         cert_only (bool): generate certificate only; no private key or thumbprint.
-        file_prefix (str): Certificate file name if it needs to be different from the subject.
-        sha_version (int): The SHA version to use for generating the thumbprint. For
-            IoT Hub, SHA1 is currently used. For DPS, SHA256 has to be used.
 
     Returns:
         result (dict): dict with certificate value, private key and thumbprint.
@@ -71,20 +61,11 @@ def create_self_signed_certificate(
         encryption_algorithm=serialization.NoEncryption(),
     ).decode("utf-8")
     cert_dump = cert.public_bytes(serialization.Encoding.PEM).decode("utf-8")
-
-    hash = None
-    if sha_version == SHAHashVersions.SHA1.value:
-        hash = hashes.SHA1()
-    elif sha_version == SHAHashVersions.SHA256.value:
-        hash = hashes.SHA256()
-    else:
-        raise ValueError("Only SHA1 and SHA256 supported for now.")
-
-    thumbprint = cert.fingerprint(hash).hex().upper()
+    thumbprint = cert.fingerprint(hashes.SHA1()).hex().upper()
 
     if cert_output_dir and exists(cert_output_dir):
-        cert_file = (file_prefix or subject) + "-cert.pem"
-        key_file = (file_prefix or subject) + "-key.pem"
+        cert_file = subject + "-cert.pem"
+        key_file = subject + "-key.pem"
 
         with open(join(cert_output_dir, cert_file), "wt", encoding="utf-8") as f:
             f.write(cert_dump)
@@ -102,10 +83,10 @@ def create_self_signed_certificate(
     return result
 
 
-def open_certificate(certificate_path: str) -> str:
+def open_certificate(certificate_path):
     """
     Opens certificate file (as read binary) from the file system and
-    returns the value read.
+    retruns the value read.
 
     Args:
         certificate_path (str): the path the the certificate file.

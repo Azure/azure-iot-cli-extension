@@ -8,12 +8,12 @@ from azext_iot.common.shared import EntityStatusType, AttestationType, Allocatio
 from azext_iot.common.utility import generate_key
 from azext_iot.tests.dps import (
     API_VERSION,
+    CERT_PATH,
     DATAPLANE_AUTH_TYPES,
     WEBHOOK_URL,
     TEST_ENDORSEMENT_KEY,
     IoTDPSLiveScenarioTest
 )
-from azext_iot.tests.helpers import CERT_ENDING
 
 
 class TestDPSEnrollments(IoTDPSLiveScenarioTest):
@@ -67,15 +67,18 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
             ).get_output_in_json()
             etag = enrollment["etag"]
 
-            enrollment_list = self.cmd(
+            self.cmd(
                 self.set_cmd_auth_type(
                     "iot dps enrollment list -g {} --dps-name {}".format(
                         self.entity_rg, self.entity_dps_name
                     ),
                     auth_type=auth_phase
-                )
-            ).get_output_in_json()
-            assert enrollment_id in [e["registrationId"] for e in enrollment_list]
+                ),
+                checks=[
+                    self.check("length(@)", 1),
+                    self.check("[0].registrationId", enrollment_id),
+                ],
+            )
 
             self.cmd(
                 self.set_cmd_auth_type(
@@ -137,9 +140,6 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
             )
 
     def test_dps_enrollment_x509_lifecycle(self):
-        cert_name = self.generate_device_names()[0]
-        cert_path = cert_name + CERT_ENDING
-        self.create_test_cert(subject=cert_name)
         attestation_type = AttestationType.x509.value
         for auth_phase in DATAPLANE_AUTH_TYPES:
             enrollment_id = self.generate_enrollment_names()[0]
@@ -156,8 +156,8 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                         attestation_type,
                         self.entity_rg,
                         self.entity_dps_name,
-                        cert_path,
-                        cert_path,
+                        CERT_PATH,
+                        CERT_PATH,
                         EntityStatusType.enabled.value,
                         device_id,
                         '"{generic_dict}"',
@@ -184,13 +184,16 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                 ],
             ).get_output_in_json()["etag"]
 
-            enrollment_list = self.cmd(
+            self.cmd(
                 self.set_cmd_auth_type(
                     "iot dps enrollment list -g {} --dps-name {}".format(self.entity_rg, self.entity_dps_name),
                     auth_type=auth_phase
                 ),
-            ).get_output_in_json()
-            assert enrollment_id in [e["registrationId"] for e in enrollment_list]
+                checks=[
+                    self.check("length(@)", 1),
+                    self.check("[0].registrationId", enrollment_id),
+                ],
+            )
 
             self.cmd(
                 self.set_cmd_auth_type(
@@ -290,13 +293,16 @@ class TestDPSEnrollments(IoTDPSLiveScenarioTest):
                 ],
             ).get_output_in_json()["etag"]
 
-            enrollment_list = self.cmd(
+            self.cmd(
                 self.set_cmd_auth_type(
                     "iot dps enrollment list -g {} --dps-name {}".format(self.entity_rg, self.entity_dps_name),
                     auth_type=auth_phase
-                )
-            ).get_output_in_json()
-            assert enrollment_id in [e["registrationId"] for e in enrollment_list]
+                ),
+                checks=[
+                    self.check("length(@)", 1),
+                    self.check("[0].registrationId", enrollment_id),
+                ],
+            )
 
             self.cmd(
                 self.set_cmd_auth_type(

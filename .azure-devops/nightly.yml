@@ -25,22 +25,22 @@ parameters:
 - name: pythonVersion
   displayName: 'Python version for building wheel, KPIs'
   type: string
-  default: '3.8'
+  default: '3.8.x'
   values:
-  - '3.8'
-  - '3.9'
-  - '3.10'
+  - '3.8.x'
+  - '3.9.x'
+  - '3.10.x'
 - name: pythonVersionsTestingMatrix
   type: object
   default: >
     {
       Python37: 
       {
-        python: '3.7'
+        python: '3.7.x'
       },
       Python310:
       {
-        python: '3.10'
+        python: '3.10.x'
       }
     }
 - name: architecture
@@ -73,7 +73,7 @@ variables:
       {
         PythonMSI: 
         {
-          python: '3.8'
+          python: '3.8.x'
         }
       }
 

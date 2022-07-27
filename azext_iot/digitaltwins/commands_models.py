@@ -5,19 +5,15 @@
 # --------------------------------------------------------------------------------------------
 
 from azext_iot.digitaltwins.providers.model import ModelProvider
-from azext_iot.digitaltwins.common import ADTModelCreateFailurePolicy
 from knack.log import get_logger
 
 logger = get_logger(__name__)
 
 
-def add_models(
-    cmd, name_or_hostname, models=None, from_directory=None,
-    resource_group_name=None, failure_policy=ADTModelCreateFailurePolicy.ROLLBACK.value
-):
+def add_models(cmd, name_or_hostname, models=None, from_directory=None, resource_group_name=None):
     model_provider = ModelProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
     logger.debug("Received models input: %s", models)
-    return model_provider.add(models=models, from_directory=from_directory, failure_policy=failure_policy)
+    return model_provider.add(models=models, from_directory=from_directory)
 
 
 def show_model(cmd, name_or_hostname, model_id, definition=False, resource_group_name=None):

@@ -249,7 +249,7 @@ def execute_onthread(**kwargs):
     Args:
         kwargs: Supported kwargs are 'interval' (int) to specify intervals between calls
                 'method' (func) to specify method pointer for execution
-                'args' (dict) to specify method arguments
+                'args' (list) to specify method arguments
                 'max_runs' (int) indicate an upper bound on number of executions
                 'return_handle' (bool) indicates whether to return a Thread handle
 
@@ -280,7 +280,7 @@ def execute_onthread(**kwargs):
             if max_runs:
                 if runs >= max_runs:
                     break
-            method(**method_args)
+            method(*method_args)
             runs += 1
 
     op = Thread(target=method_wrap, args=(max_runs,))
@@ -580,8 +580,6 @@ def ensure_azure_namespace_path():
     from azext_iot.constants import EXTENSION_NAME
 
     ext_path = get_extension_path(EXTENSION_NAME)
-    if not ext_path:
-        return
 
     ext_azure_dir = os.path.join(ext_path, "azure")
     if os.path.isdir(ext_azure_dir):
@@ -599,17 +597,3 @@ def ensure_azure_namespace_path():
         sys.path.insert(0, ext_path)
 
     return
-
-
-def is_valid_dtmi(dtmi):
-    """Checks validity of a DTMI
-    :param str dtmi: DTMI
-    :returns: Boolean indicating if DTMI is valid
-    :rtype: bool
-    """
-    pattern = re.compile(
-        "^dtmi:[A-Za-z](?:[A-Za-z0-9_]*[A-Za-z0-9])?(?::[A-Za-z](?:[A-Za-z0-9_]*[A-Za-z0-9])?)*;[1-9][0-9]{0,8}$"
-    )
-    if not pattern.match(dtmi):
-        return False
-    return True

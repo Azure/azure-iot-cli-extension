@@ -8,9 +8,6 @@
 Load CLI commands
 """
 from azure.cli.core.commands import CliCommandType
-from azext_iot.deviceupdate._help import load_deviceupdate_help
-
-load_deviceupdate_help()
 
 deviceupdate_account_ops = CliCommandType(
     operations_tmpl="azext_iot.deviceupdate.commands_account#{}"

@@ -1233,9 +1233,8 @@ helps[
     "iot dps enrollment registration"
 ] = """
     type: group
-    short-summary: Manage service-side device registrations for an individual enrollment in an Azure IoT Hub Device
+    short-summary: Manage device registrations for an individual enrollment in an Azure IoT Hub Device
         Provisioning Service.
-    long-summary: Use `az iot device registration create` to simulate device registration.
 """
 
 helps[
@@ -1366,9 +1365,8 @@ helps[
     "iot dps enrollment-group registration"
 ] = """
     type: group
-    short-summary: Manage service-side device registrations for an enrollment group in an Azure IoT Hub Device
+    short-summary: Manage device registrations for an enrollment group in an Azure IoT Hub Device
         Provisioning Service.
-    long-summary: Use `az iot device registration create` to simulate device registration.
 """
 
 helps[

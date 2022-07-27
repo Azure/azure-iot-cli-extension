@@ -76,7 +76,6 @@ jobs:
       serviceConnection: $(AzureServiceConnection)
 
 - job: 'testDPS'
-  timeoutInMinutes: 90
   displayName: 'Test DPS'
   condition: and(succeeded(), eq('${{ parameters.testDPS }}', true))
   strategy:

@@ -39,7 +39,7 @@ jobs:
   steps:
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.8'
+      versionSpec: '3.8.x'
       architecture: 'x64'
 
   - template: templates/setup-ci-machine.yml
@@ -52,7 +52,7 @@ jobs:
   steps:
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.8'
+      versionSpec: '3.8.x'
       architecture: 'x64'
 
   - template: templates/setup-ci-machine.yml
@@ -65,13 +65,13 @@ jobs:
   strategy:
     matrix:
       Python37:
-        python.version: '3.7'
+        python.version: '3.7.x'
       Python38:
-        python.version: '3.8'
+        python.version: '3.8.x'
       Python39:
-        python.version: '3.9'
+        python.version: '3.9.x'
       Python310:
-        python.version: '3.10'
+        python.version: '3.10.x'
 
   steps:
   - bash: sudo rm -R -f /usr/local/lib/azureExtensionDir
@@ -85,12 +85,12 @@ jobs:
 - job: 'run_unit_tests_macOs'
   dependsOn: ['build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']
   pool:
-    vmImage: 'macOS-11'
+    vmImage: 'macOS-10.15'
 
   steps:
   - template: templates/run-tests-parallel.yml
     parameters:
-      pythonVersion: '3.8'
+      pythonVersion: '3.8.x'
       runUnitTests: true
       runIntTests: false
 
@@ -107,7 +107,7 @@ jobs:
 
   - template: templates/run-tests-parallel.yml
     parameters:
-      pythonVersion: '3.8'
+      pythonVersion: '3.8.x'
       runUnitTests: true
       runIntTests: false
 
@@ -119,7 +119,7 @@ jobs:
   steps:
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.8'
+      versionSpec: '3.8.x'
       architecture: 'x64'
 
   - template: templates/install-azure-cli-released.yml
@@ -143,15 +143,6 @@ jobs:
 
   steps:
   - template: templates/evaluate-command-table.yml
-
-- job: 'validate_ref_docs'
-  dependsOn: ['build_and_publish_azure_iot_cli_ext']
-  displayName: 'Validate Reference Document Generation'
-  pool:
-    vmImage: ${{ parameters.linuxImage }}
-
-  steps:
-  - template: templates/validate-refdoc-generation.yml
 
 - job: CredScan
   displayName: 'Credential Scan'

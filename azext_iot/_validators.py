@@ -31,8 +31,6 @@ def mode2_iot_login_handler(cmd, namespace):
             elif 'symmetric_key' in args:
                 # support offline az iot dps compute-device-keys
                 offline = args['symmetric_key']
-            elif 'id_scope' in args:
-                offline = args['id_scope']
 
             if not any([login_value, entity_value, offline]):
                 raise RequiredArgumentMissingError(error_no_hub_or_login_on_input(iot_cmd_type))

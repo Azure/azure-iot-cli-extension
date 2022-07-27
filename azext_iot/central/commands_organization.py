@@ -18,7 +18,7 @@ def get_org(
     org_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=ApiVersion.v1_1_preview.value,
 ) -> OrganizationV1_1_preview:
     provider = CentralOrganizationProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
@@ -35,7 +35,7 @@ def delete_org(
     org_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=ApiVersion.v1_1_preview.value,
 ) -> OrganizationV1_1_preview:
     provider = CentralOrganizationProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
@@ -51,7 +51,7 @@ def list_orgs(
     app_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=ApiVersion.v1_1_preview.value,
 ) -> List[OrganizationV1_1_preview]:
     provider = CentralOrganizationProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
@@ -68,7 +68,7 @@ def create_org(
     parent_org=None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=ApiVersion.v1_1_preview.value,
 ) -> OrganizationV1_1_preview:
     provider = CentralOrganizationProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
@@ -90,7 +90,7 @@ def update_org(
     parent_org=None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=ApiVersion.v1_1_preview.value,
 ) -> OrganizationV1_1_preview:
     provider = CentralOrganizationProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token

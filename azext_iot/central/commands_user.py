@@ -27,7 +27,7 @@ def add_user(
     org_id=None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=ApiVersion.v1.value,
 ) -> UserType:
     provider = CentralUserProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
@@ -62,7 +62,7 @@ def update_user(
     object_id=None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=ApiVersion.v1.value,
 ) -> UserType:
     provider = CentralUserProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
@@ -90,7 +90,7 @@ def list_users(
     app_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=ApiVersion.v1.value,
 ) -> List[UserType]:
     provider = CentralUserProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
@@ -107,7 +107,7 @@ def get_user(
     assignee: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=ApiVersion.v1.value,
 ) -> UserType:
     provider = CentralUserProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
@@ -125,7 +125,7 @@ def delete_user(
     assignee: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=ApiVersion.v1.value,
 ) -> dict:
     provider = CentralUserProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token

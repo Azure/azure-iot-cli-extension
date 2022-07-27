@@ -13,7 +13,7 @@ from azext_iot.central.providers import (
     CentralDeviceTemplateProvider,
 )
 
-from typing import Optional, Union, List, Any
+from typing import Union, List, Any
 from azure.cli.core.azclierror import (
     InvalidArgumentValueError,
     RequiredArgumentMissingError,
@@ -39,7 +39,7 @@ def list_devices(
     edge_only=False,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=ApiVersion.v1.value,
 ) -> List[DeviceType]:
     provider = CentralDeviceProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
@@ -77,7 +77,7 @@ def get_device(
     device_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=ApiVersion.v1.value,
 ) -> DeviceType:
     provider = CentralDeviceProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
@@ -113,7 +113,7 @@ def create_device(
     organizations=None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=ApiVersion.v1.value,
 ) -> DeviceType:
     if simulated and not template:
         raise RequiredArgumentMissingError(
@@ -169,7 +169,7 @@ def delete_device(
     device_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=ApiVersion.v1.value,
 ) -> dict:
     provider = CentralDeviceProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
@@ -203,24 +203,23 @@ def run_command(
     device_id: str,
     command_name: str,
     content: str,
-    component_name: Optional[str] = None,
-    module_name: Optional[str] = None,
-    interface_id: Optional[str] = None,
-    token: Optional[str] = None,
+    interface_id=None,
+    token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=ApiVersion.v1.value,
 ) -> dict:
+    if not isinstance(content, str):
+        raise InvalidArgumentValueError("content must be a string: {}".format(content))
+
+    payload = utility.process_json_arg(content, argument_name="content")
+
     provider = CentralDeviceProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
 
-    payload = utility.process_json_arg(content, argument_name="content")
-
     return provider.run_command(
         device_id=device_id,
         interface_id=interface_id,
-        component_name=component_name,
-        module_name=module_name,
         command_name=command_name,
         payload=payload,
         central_dns_suffix=central_dns_suffix,
@@ -287,12 +286,10 @@ def get_command_history(
     app_id: str,
     device_id: str,
     command_name: str,
-    interface_id: Optional[str] = None,
-    component_name: Optional[str] = None,
-    module_name: Optional[str] = None,
-    token: Optional[str] = None,
+    token=None,
+    interface_id=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=ApiVersion.v1.value,
 ) -> dict:
     provider = CentralDeviceProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
@@ -301,8 +298,6 @@ def get_command_history(
     return provider.get_command_history(
         device_id=device_id,
         interface_id=interface_id,
-        component_name=component_name,
-        module_name=module_name,
         command_name=command_name,
         central_dns_suffix=central_dns_suffix,
     )
@@ -517,7 +512,7 @@ def list_device_modules(
 ) -> List[EdgeModule]:
 
     provider = CentralDeviceProvider(
-        cmd=cmd, app_id=app_id, token=token, api_version=ApiVersion.ga_2022_05_31.value
+        cmd=cmd, app_id=app_id, token=token, api_version=ApiVersion.v1.value
     )
 
     return provider.list_device_modules(
@@ -535,7 +530,7 @@ def get_device_module(
 ) -> EdgeModule:
 
     provider = CentralDeviceProvider(
-        cmd=cmd, app_id=app_id, token=token, api_version=ApiVersion.ga_2022_05_31.value
+        cmd=cmd, app_id=app_id, token=token, api_version=ApiVersion.v1.value
     )
 
     modules = provider.list_device_modules(
@@ -610,7 +605,7 @@ def get_credentials(
     app_id: str,
     device_id,
     token=None,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=ApiVersion.v1.value,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> dict:
     provider = CentralDeviceProvider(
@@ -684,207 +679,3 @@ def get_downstream_rel_name(
                 rel_name = content.get("name")
 
     return rel_name
-
-
-def get_attestation(
-    cmd,
-    app_id: str,
-    device_id: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> dict:
-    provider = CentralDeviceProvider(
-        cmd=cmd, app_id=app_id, token=token, api_version=api_version
-    )
-    return provider.get_device_attestation(
-        device_id=device_id,
-        central_dns_suffix=central_dns_suffix,
-    )
-
-
-def delete_attestation(
-    cmd,
-    app_id: str,
-    device_id: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> dict:
-    provider = CentralDeviceProvider(
-        cmd=cmd, app_id=app_id, token=token, api_version=api_version
-    )
-
-    return provider.delete_device_attestation(device_id, central_dns_suffix=central_dns_suffix)
-
-
-def update_attestation(
-    cmd,
-    app_id: str,
-    device_id: str,
-    content: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> dict:
-    provider = CentralDeviceProvider(
-        cmd=cmd, app_id=app_id, token=token, api_version=api_version
-    )
-
-    payload = utility.process_json_arg(content, argument_name="content")
-
-    return provider.update_device_attestation(device_id, payload=payload, central_dns_suffix=central_dns_suffix)
-
-
-def create_attestation(
-    cmd,
-    app_id: str,
-    device_id: str,
-    content: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> dict:
-    provider = CentralDeviceProvider(
-        cmd=cmd, app_id=app_id, token=token, api_version=api_version
-    )
-
-    payload = utility.process_json_arg(content, argument_name="content")
-
-    return provider.create_device_attestation(device_id, payload=payload, central_dns_suffix=central_dns_suffix)
-
-
-def list_modules(
-    cmd,
-    app_id: str,
-    device_id,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> dict:
-    provider = CentralDeviceProvider(
-        cmd=cmd, app_id=app_id, token=token, api_version=api_version
-    )
-
-    return provider.list_modules(
-        device_id=device_id,
-        central_dns_suffix=central_dns_suffix,
-    )
-
-
-def list_components(
-    cmd,
-    app_id: str,
-    device_id,
-    module_name=None,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> dict:
-    provider = CentralDeviceProvider(
-        cmd=cmd, app_id=app_id, token=token, api_version=api_version
-    )
-
-    return provider.list_device_components(
-        device_id=device_id,
-        module_name=module_name,
-        central_dns_suffix=central_dns_suffix,
-    )
-
-
-def get_properties(
-    cmd,
-    app_id: str,
-    device_id: str,
-    component_name: Optional[str] = None,
-    module_name: Optional[str] = None,
-    token: Optional[str] = None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> dict:
-    provider = CentralDeviceProvider(
-        cmd=cmd, app_id=app_id, token=token, api_version=api_version
-    )
-
-    return provider.get_device_properties(
-        device_id=device_id,
-        component_name=component_name,
-        module_name=module_name,
-        central_dns_suffix=central_dns_suffix,
-    )
-
-
-def update_properties(
-    cmd,
-    app_id: str,
-    device_id,
-    content: str,
-    component_name: Optional[str] = None,
-    module_name: Optional[str] = None,
-    token: Optional[str] = None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> dict:
-    provider = CentralDeviceProvider(
-        cmd=cmd, app_id=app_id, token=token, api_version=api_version
-    )
-
-    payload = utility.process_json_arg(content, argument_name="content")
-
-    return provider.update_device_properties(
-        device_id=device_id,
-        payload=payload,
-        component_name=component_name,
-        module_name=module_name,
-        central_dns_suffix=central_dns_suffix,
-    )
-
-
-def replace_properties(
-    cmd,
-    app_id: str,
-    device_id,
-    content: str,
-    component_name: Optional[str] = None,
-    module_name: Optional[str] = None,
-    token: Optional[str] = None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> dict:
-    provider = CentralDeviceProvider(
-        cmd=cmd, app_id=app_id, token=token, api_version=api_version
-    )
-
-    payload = utility.process_json_arg(content, argument_name="content")
-
-    return provider.replace_device_properties(
-        device_id=device_id,
-        payload=payload,
-        component_name=component_name,
-        module_name=module_name,
-        central_dns_suffix=central_dns_suffix,
-    )
-
-
-def get_telemetry_value(
-    cmd,
-    app_id: str,
-    device_id,
-    telemetry_name,
-    component_name=None,
-    module_name=None,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> dict:
-    provider = CentralDeviceProvider(
-        cmd=cmd, app_id=app_id, token=token, api_version=api_version
-    )
-
-    return provider.get_telemetry_value(
-        device_id=device_id,
-        component_name=component_name,
-        module_name=module_name,
-        telemetry_name=telemetry_name,
-        central_dns_suffix=central_dns_suffix,
-    )

@@ -8,7 +8,6 @@ import json
 from time import sleep
 import pytest
 from azext_iot.digitaltwins.common import ProvisioningStateType
-from azext_iot.tests.helpers import create_storage_account
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests.settings import DynamoSettings
 from azure.cli.testsdk import LiveScenarioTest
@@ -24,7 +23,6 @@ MOCK_DEAD_LETTER_SECRET = "{}?sasToken".format(MOCK_DEAD_LETTER_ENDPOINT)
 REGION_RESOURCE_LIMIT = 9  # Actual value is 10 but this is to limit race condition
 REGION_LIST = ["westus2", "westcentralus", "eastus2", "eastus", "eastus2euap"]
 MAX_ADX_RETRIES = 5
-DEFAULT_CONTAINER = "test-adt-container"
 
 required_test_env_vars = ["azext_iot_testrg"]
 resource_test_env_vars = [
@@ -40,8 +38,6 @@ resource_test_env_vars = [
     "azext_dt_ep_eventgrid_topic",
     "azext_dt_ep_rg",
     "azext_dt_region",
-    "azext_iot_teststorageaccount",
-    "azext_iot_teststoragecontainer"
 ]
 
 settings = DynamoSettings(req_env_set=required_test_env_vars, opt_env_set=resource_test_env_vars)
@@ -61,9 +57,6 @@ EP_EVENTGRID_TOPIC = settings.env.azext_dt_ep_eventgrid_topic or ("test-egt-" + 
 ADX_CLUSTER = settings.env.azext_dt_adx_cluster or ("testadxc" + generate_generic_id()[:4])
 ADX_DATABASE = settings.env.azext_dt_adx_database or ("testadxd" + generate_generic_id()[:4])
 ADX_RG = settings.env.azext_dt_adx_rg or settings.env.azext_iot_testrg
-
-STORAGE_ACCOUNT = settings.env.azext_iot_teststorageaccount or "testadtstore" + generate_generic_id()[:4]
-STORAGE_CONTAINER = settings.env.azext_iot_teststoragecontainer or DEFAULT_CONTAINER
 
 
 def generate_resource_id():
@@ -88,8 +81,6 @@ class DTLiveScenarioTest(LiveScenarioTest):
         self._is_provider_registered()
         self._init_basic_env_vars()
         self.tracked_instances = []
-        if hasattr(self, 'storage_cstring'):
-            self._create_storage_account()
 
     def _is_provider_registered(self):
         result = self.cmd(
@@ -121,44 +112,6 @@ class DTLiveScenarioTest(LiveScenarioTest):
         self.rg_region = self.embedded_cli.invoke(
             "group show --name {}".format(self.rg)
         ).as_json()["location"]
-
-    def _create_storage_account(self):
-        """
-        Create a storage account and container if a storage account was not created yet.
-        Populate the following variables if needed:
-          - storage_account_name
-          - storage_container
-          - storage_cstring
-        """
-        self.storage_account_name = STORAGE_ACCOUNT
-        self.storage_container = STORAGE_CONTAINER
-
-        self.storage_cstring = create_storage_account(
-            cmd=self.cmd,
-            account_name=self.storage_account_name,
-            container_name=self.storage_container,
-            rg=self.rg,
-            resource_name="ADT_Test",
-            create_account=(not settings.env.azext_iot_teststorageaccount)
-        )
-
-    def _delete_storage_account(self):
-        """
-        Delete the storage account if it was created.
-        """
-        if not settings.env.azext_iot_teststorageaccount:
-            self.cmd(
-                "storage account delete -n {} -g {} -y".format(
-                    self.storage_account_name, self.rg
-                ),
-            )
-
-        elif not settings.env.azext_iot_teststoragecontainer:
-            self.cmd(
-                "storage container delete -n {} --connection-string '{}'".format(
-                    self.storage_account_name, self.storage_cstring
-                ),
-            )
 
     @property
     def current_user(self):
@@ -529,6 +482,3 @@ class DTLiveScenarioTest(LiveScenarioTest):
                 )
             except Exception:
                 logger.info("The DT instance {} has already been deleted.".format(instance))
-
-        if hasattr(self, "storage_cstring"):
-            self._delete_storage_account()
