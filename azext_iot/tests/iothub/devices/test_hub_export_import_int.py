@@ -455,6 +455,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
                     auth_type=auth_phase
                 )
             )
+            time.sleep(1)
             self.compare_hub_to_file()
 
         for auth_phase in DATAPLANE_AUTH_TYPES:
