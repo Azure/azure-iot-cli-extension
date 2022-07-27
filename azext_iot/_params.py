@@ -153,12 +153,6 @@ def load_arguments(self, _):
             help="Json payload to be passed to method. Must be file path or raw json.",
         )
         context.argument(
-            "timeout",
-            options_list=["--timeout", "--to"],
-            type=int,
-            help="Maximum number of seconds to wait for device method result.",
-        )
-        context.argument(
             "method_connect_timeout",
             options_list=["--method-connect-timeout", "--mct"],
             type=int,
@@ -300,6 +294,32 @@ def load_arguments(self, _):
             "auth_type_dataplane",
             options_list=["--auth-type"],
             arg_type=hub_auth_type_dataplane_param_type,
+        )
+        context.argument(
+            "filename",
+            options_list=["--filename", "-f"],
+            help="The path to the file where the state information will be stored."
+        )
+        context.argument(
+            "replace",
+            options_list=["--replace", "-r"],
+            help="If this flag is set, then the command will overwrite all configurations and devices in the destination hub."
+        )
+
+    with self.argument_context("iot hub invoke-device-method") as context:
+        context.argument(
+            "timeout",
+            options_list=["--timeout", "--to"],
+            type=int,
+            help="Maximum number of seconds to wait for the device method result.",
+        )
+
+    with self.argument_context("iot hub invoke-module-method") as context:
+        context.argument(
+            "timeout",
+            options_list=["--timeout", "--to"],
+            type=int,
+            help="Maximum number of seconds to wait for the module method result.",
         )
 
     with self.argument_context("iot hub connection-string") as context:
@@ -760,6 +780,48 @@ def load_arguments(self, _):
             options_list=["--top"],
             type=int,
             help="Maximum number of configurations to return. By default all configurations are returned.",
+        )
+
+    with self.argument_context("iot hub state migrate") as context:
+        context.argument(
+            "hub_name",
+            options_list=["--destination-hub", "--dh"],
+            help="Name of IoT Hub to which the origin hub will be copied."
+        )
+        context.argument(
+            "resource_group_name",
+            options_list=["--destination-resource-group", "--dg"],
+            help="Name of resource group of the IoT Hub to which the origin hub will be copied."
+        )
+        context.argument(
+            "login",
+            options_list=["--destination-hub-login", "--dl"],
+            validator=mode2_iot_login_handler,
+            help="This command supports an entity connection string with rights to perform action on the destination hub. "
+            'Use to avoid session login via "az login" for this IoT Hub instance. '
+            "If both an entity connection string and name are provided the connection string takes priority. "
+            "Required if --hub-name is not provided.",
+            arg_group="IoT Hub Identifier"
+        )
+        context.argument(
+            "orig_hub",
+            options_list=["--origin-hub", "--oh"],
+            help="Name of IoT Hub which will be copied."
+        )
+        context.argument(
+            "orig_resource_group_name",
+            options_list=["--origin-resource-group", "--og"],
+            help="Name of resource group of the IoT Hub which will be copied."
+        )
+        context.argument(
+            "orig_hub_login",
+            options_list=["--origin-hub-login", "--ol"],
+            validator=mode2_iot_login_handler,
+            help="This command supports an entity connection string with rights to perform action on the origin hub. "
+            'Use to avoid session login via "az login" for this IoT Hub instance. '
+            "If both an entity connection string and name are provided the connection string takes priority. "
+            "Required if --hub-name is not provided.",
+            arg_group="IoT Hub Identifier"
         )
 
     with self.argument_context("iot edge") as context:

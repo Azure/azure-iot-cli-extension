@@ -25,7 +25,7 @@
             "_justification": "Completely made up keys for unit tests."
         },
         {
-            "file": "azext_iot\\tests\\dps\\enrollment_group\\test_iot_dps_enrollment_group_int.py",
+            "file": "azext_iot\\tests\\dps\\__init__.py",
             "placeholder": "cT/EXZvsplPEpT//p98Pc6sKh8mY3kYgSxavHwMkl7w=",
             "_justification": "Ensure made up endorsement key evaluates to the expected device key."
         },

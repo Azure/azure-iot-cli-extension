@@ -19,6 +19,7 @@ from azext_iot.digitaltwins.common import (
     ADTEndpointAuthType,
     ADTPrivateConnectionStatusType,
     ADTPublicNetworkAccessType,
+    ADTModelCreateFailurePolicy
 )
 
 depfor_type = CLIArgumentType(
@@ -367,14 +368,31 @@ def load_digitaltwins_arguments(self, _):
         context.argument(
             "from_directory",
             options_list=["--from-directory", "--fd"],
-            help="The directory JSON model files will be parsed from.",
+            help="The directory JSON model files will be parsed from. "
+            "Please Note: Models are created atomically when directory contains 250 or lesser models, hence in case of an "
+            "error none of the models get created."
+            "Input model set is chunked & created in batches when directory has more than 250 models(API limit). "
+            "In case of an error processing a batch, the behavior is determined by the --failure-policy parameter. ",
             arg_group="Models Input",
         )
         context.argument(
             "models",
             options_list=["--models"],
-            help="Inline model JSON or file path to model JSON.",
+            help="Inline model JSON or file path to model JSON. "
+            "Please Note: Models are created atomically when model JSON contains 250 or lesser models, hence in case of an "
+            "error none of the models get created."
+            "Input model set is chunked & created in batches when model JSON has more than 250 models(API limit). "
+            "In case of an error processing a batch, the behavior is determined by the --failure-policy parameter. ",
             arg_group="Models Input",
+        )
+        context.argument(
+            "failure_policy",
+            options_list=["--failure-policy", "--fp"],
+            help="Indicates the failure policy when an error occurs while processing a models batch. "
+            "In the 'Rollback' mode all models created in previous batches are deleted one at a time. "
+            "When selected as 'None' the models created in previous batches are not deleted from DT instance.",
+            arg_group="Models Input",
+            arg_type=get_enum_type(ADTModelCreateFailurePolicy),
         )
         context.argument(
             "definition",
@@ -524,4 +542,59 @@ def load_digitaltwins_arguments(self, _):
             "yes",
             options_list=['--yes', '-y'],
             help='Do not prompt for confirmation when assigning required roles.',
+        )
+
+    with self.argument_context("dt job import") as context:
+        context.argument(
+            "job_id",
+            options_list=["--job-id", "-j"],
+            help="ID of bulk import job. A system generated ID is assigned when this parameter is ommitted during job creation.",
+            arg_group="Bulk Import Job",
+        )
+
+        context.argument(
+            "data_file_name",
+            options_list=["--data-file", "--df"],
+            help="Name of data file input to the bulk import job. The file must be in 'ndjson' format. Sample input data "
+            "file: https://github.com/Azure/azure-iot-cli-extension/tree/dev/docs/samples/adt-bulk-import-data-sample.ndjson",
+            arg_group="Bulk Import Job",
+        )
+
+        context.argument(
+            "input_blob_container_name",
+            options_list=["--input-blob-container", "--ibc"],
+            help="Name of Azure Storage blob container which contains the bulk import data file.",
+            arg_group="Bulk Import Job",
+        )
+
+        context.argument(
+            "input_storage_account_name",
+            options_list=["--input-storage-account", "--isa"],
+            help="Name of Azure Storage account containing blob container which stores the bulk import data file.",
+            arg_group="Bulk Import Job",
+        )
+
+        context.argument(
+            "output_file_name",
+            options_list=["--output-file", "--of"],
+            help="Name of the bulk import job's output file. This file will contain logs as well as error information. "
+            "The file gets created automatically once the job finishes. The file gets overwritten if it already exists. "
+            "If not provided the output file is created with the name: <job_id>_output.txt",
+            arg_group="Bulk Import Job",
+        )
+
+        context.argument(
+            "output_blob_container_name",
+            options_list=["--output-blob-container", "--obc"],
+            help="Name of Azure Storage blob container where the bulk import job's output file will be created. "
+            "If not provided, will use the input blob container.",
+            arg_group="Bulk Import Job",
+        )
+
+        context.argument(
+            "output_storage_account_name",
+            options_list=["--output-storage-account", "--osa"],
+            help="Name of Azure Storage account containing blob container where bulk import job's output file will be created. "
+            "If not provided, will use the input storage account.",
+            arg_group="Bulk Import Job",
         )

@@ -4,8 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from os.path import exists, basename
-from time import time, sleep
+from os.path import exists
 from knack.log import get_logger
 from enum import Enum, EnumMeta
 from azure.cli.core.azclierror import (
@@ -14,7 +13,6 @@ from azure.cli.core.azclierror import (
     ClientRequestError,
     FileOperationError,
     InvalidArgumentValueError,
-    MutuallyExclusiveArgumentError,
     RequiredArgumentMissingError,
     ResourceNotFoundError,
     ValidationError,
@@ -30,10 +28,8 @@ from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import (
     DeviceAuthType,
     SdkType,
-    ProtocolType,
     ConfigType,
     KeyType,
-    SettleType,
     RenewKeyType,
     IoTHubStateType,
     DeviceAuthApiType,
@@ -44,7 +40,6 @@ from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
     handle_service_exception,
     read_file_content,
-    validate_key_value_pairs,
     init_monitoring,
     process_json_arg,
     ensure_iothub_sdk_min_version,
@@ -77,6 +72,10 @@ def iot_query(
         login=login,
         auth_type=auth_type_dataplane,
     )
+    return _iot_query(target, query_command, top)
+
+
+def _iot_query(target, query_command, top=None):
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
@@ -100,6 +99,7 @@ def iot_device_show(
     login=None,
     auth_type_dataplane=None,
 ):
+
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         resource_name=hub_name,
@@ -133,22 +133,27 @@ def iot_device_list(
     login=None,
     auth_type_dataplane=None,
 ):
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        resource_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
+    return _iot_device_list(target, edge_enabled, top)
+
+
+def _iot_device_list(target, edge_enabled=False, top=1000):
+    top = _process_top(top)
     query = (
         "select * from devices where capabilities.iotEdge = true"
         if edge_enabled
         else "select * from devices"
     )
-    result = iot_query(
-        cmd=cmd,
-        query_command=query,
-        hub_name=hub_name,
-        top=top,
-        resource_group_name=resource_group_name,
-        login=login,
-        auth_type_dataplane=auth_type_dataplane,
-    )
+    result = _iot_query(target=target, query_command=query, top=top)
 
     if not result:
+        hub_name = target["entity"].split('.')[0]
         logger.info('No registered devices found on hub "%s".', hub_name)
     return result
 
@@ -179,6 +184,25 @@ def iot_device_create(
         login=login,
         auth_type=auth_type_dataplane,
     )
+    return _iot_device_create(target, device_id, edge_enabled, auth_method, primary_key, secondary_key, primary_thumbprint,
+                              secondary_thumbprint, status, status_reason, valid_days, output_dir, device_scope)
+
+
+def _iot_device_create(
+    target,
+    device_id,
+    edge_enabled=False,
+    auth_method=DeviceAuthType.shared_private_key.value,
+    primary_key=None,
+    secondary_key=None,
+    primary_thumbprint=None,
+    secondary_thumbprint=None,
+    status=EntityStatusType.enabled.value,
+    status_reason=None,
+    valid_days=None,
+    output_dir=None,
+    device_scope=None,
+):
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
@@ -458,6 +482,10 @@ def iot_device_delete(
         login=login,
         auth_type=auth_type_dataplane,
     )
+    return _iot_device_delete(target, device_id, etag)
+
+
+def _iot_device_delete(target, device_id, etag=None):
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
@@ -597,6 +625,15 @@ def iot_device_children_add(
         login=login,
         auth_type=auth_type_dataplane,
     )
+    return _iot_device_children_add(target, device_id, child_list, force)
+
+
+def _iot_device_children_add(
+    target,
+    device_id,
+    child_list,
+    force=False
+):
     devices = []
     edge_device = _iot_device_show(target, device_id)
     _validate_edge_device(edge_device)
@@ -634,9 +671,7 @@ def iot_device_children_remove(
     )
     devices = []
     if remove_all:
-        result = _iot_device_children_list(
-            cmd, device_id, hub_name, resource_group_name, login
-        )
+        result = _iot_device_children_list(target, device_id)
         if not result:
             raise ClientRequestError(
                 'No registered child devices found for "{}" edge device.'.format(
@@ -678,26 +713,6 @@ def iot_device_children_list(
     login=None,
     auth_type_dataplane=None,
 ):
-    result = _iot_device_children_list(
-        cmd=cmd,
-        device_id=device_id,
-        hub_name=hub_name,
-        resource_group_name=resource_group_name,
-        login=login,
-        auth_type_dataplane=auth_type_dataplane,
-    )
-
-    return [device["deviceId"] for device in result]
-
-
-def _iot_device_children_list(
-    cmd,
-    device_id,
-    hub_name=None,
-    resource_group_name=None,
-    login=None,
-    auth_type_dataplane=None,
-):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         resource_name=hub_name,
@@ -705,6 +720,12 @@ def _iot_device_children_list(
         login=login,
         auth_type=auth_type_dataplane,
     )
+    result = _iot_device_children_list(target, device_id)
+
+    return [device["deviceId"] for device in result]
+
+
+def _iot_device_children_list(target, device_id):
     device = _iot_device_show(target, device_id)
     _validate_edge_device(device)
     query = (
@@ -714,15 +735,7 @@ def _iot_device_children_list(
     )
 
     # TODO: Inefficient
-    return iot_query(
-        cmd=cmd,
-        query_command=query,
-        hub_name=hub_name,
-        top=None,
-        resource_group_name=resource_group_name,
-        login=login,
-        auth_type_dataplane=auth_type_dataplane,
-    )
+    return _iot_query(target, query)
 
 
 def _update_device_parent(target, device, is_edge, device_scope=None):
@@ -826,6 +839,20 @@ def iot_device_module_create(
         login=login,
         auth_type=auth_type_dataplane,
     )
+    return _iot_device_module_create(target, device_id, module_id, auth_method, primary_key, secondary_key, primary_thumbprint,
+                                     secondary_thumbprint)
+
+
+def _iot_device_module_create(
+    target,
+    device_id,
+    module_id,
+    auth_method=DeviceAuthType.shared_private_key.value,
+    primary_key=None,
+    secondary_key=None,
+    primary_thumbprint=None,
+    secondary_thumbprint=None
+):
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
@@ -997,6 +1024,10 @@ def iot_device_module_list(
         login=login,
         auth_type=auth_type_dataplane,
     )
+    return _iot_device_module_list(target, device_id, top)
+
+
+def _iot_device_module_list(target, device_id, top=1000):
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
@@ -1166,6 +1197,10 @@ def iot_device_module_twin_replace(
         login=login,
         auth_type=auth_type_dataplane,
     )
+    return _iot_device_module_twin_replace(target, device_id, module_id, target_json, etag)
+
+
+def _iot_device_module_twin_replace(target, device_id, module_id, target_json, etag=None):
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
@@ -1234,20 +1269,14 @@ def iot_edge_deployment_create(
 ):
     # Short-term fix for --no-validation
     config_type = ConfigType.layered if layered or no_validation else ConfigType.edge
-    return _iot_hub_configuration_create(
-        cmd=cmd,
-        config_id=config_id,
-        content=content,
-        hub_name=hub_name,
-        target_condition=target_condition,
-        priority=priority,
-        labels=labels,
-        metrics=metrics,
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        resource_name=hub_name,
         resource_group_name=resource_group_name,
         login=login,
-        config_type=config_type,
-        auth_type_dataplane=auth_type_dataplane,
+        auth_type=auth_type_dataplane,
     )
+    return _iot_hub_configuration_create(target, config_id, content, target_condition, priority, labels, metrics, config_type)
 
 
 def iot_hub_configuration_create(
@@ -1263,42 +1292,6 @@ def iot_hub_configuration_create(
     login=None,
     auth_type_dataplane=None,
 ):
-    return _iot_hub_configuration_create(
-        cmd=cmd,
-        config_id=config_id,
-        content=content,
-        hub_name=hub_name,
-        target_condition=target_condition,
-        priority=priority,
-        labels=labels,
-        metrics=metrics,
-        resource_group_name=resource_group_name,
-        login=login,
-        config_type=ConfigType.adm,
-        auth_type_dataplane=auth_type_dataplane,
-    )
-
-
-def _iot_hub_configuration_create(
-    cmd,
-    config_id,
-    content,
-    config_type,
-    hub_name=None,
-    target_condition="",
-    priority=0,
-    labels=None,
-    metrics=None,
-    resource_group_name=None,
-    login=None,
-    auth_type_dataplane=None,
-):
-    from azext_iot.sdk.iothub.service.models import (
-        Configuration,
-        ConfigurationContent,
-        ConfigurationMetrics,
-    )
-
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         resource_name=hub_name,
@@ -1306,6 +1299,25 @@ def _iot_hub_configuration_create(
         login=login,
         auth_type=auth_type_dataplane,
     )
+    return _iot_hub_configuration_create(target, config_id, content, target_condition, priority, labels, metrics, ConfigType.adm)
+
+
+def _iot_hub_configuration_create(
+    target,
+    config_id,
+    content,
+    target_condition,
+    priority=0,
+    labels=None,
+    metrics=None,
+    config_type=ConfigType.adm
+):
+    from azext_iot.sdk.iothub.service.models import (
+        Configuration,
+        ConfigurationContent,
+        ConfigurationMetrics,
+    )
+
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
@@ -1564,13 +1576,15 @@ def iot_hub_configuration_list(
     login=None,
     auth_type_dataplane=None,
 ):
-    result = _iot_hub_configuration_list(
-        cmd=cmd,
-        hub_name=hub_name,
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        resource_name=hub_name,
         resource_group_name=resource_group_name,
         login=login,
-        auth_type_dataplane=auth_type_dataplane,
+        auth_type=auth_type_dataplane,
     )
+    result = _iot_hub_configuration_list(target)
+
     filtered = [
         c
         for c in result
@@ -1590,21 +1604,6 @@ def iot_edge_deployment_list(
     login=None,
     auth_type_dataplane=None,
 ):
-    result = _iot_hub_configuration_list(
-        cmd,
-        hub_name=hub_name,
-        resource_group_name=resource_group_name,
-        login=login,
-        auth_type_dataplane=auth_type_dataplane,
-    )
-
-    filtered = [c for c in result if c["content"].get("modulesContent") is not None]
-    return filtered[:top]  # list[:None] == list[:len(list)]
-
-
-def _iot_hub_configuration_list(
-    cmd, hub_name=None, resource_group_name=None, login=None, auth_type_dataplane=None
-):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         resource_name=hub_name,
@@ -1612,12 +1611,20 @@ def _iot_hub_configuration_list(
         login=login,
         auth_type=auth_type_dataplane,
     )
+    result = _iot_hub_configuration_list(target)
+
+    filtered = [c for c in result if c["content"].get("modulesContent") is not None]
+    return filtered[:top]  # list[:None] == list[:len(list)]
+
+
+def _iot_hub_configuration_list(target):
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
     try:
         result = service_sdk.configuration.get_configurations(raw=True).response.json()
         if not result:
+            hub_name = target["entity"].split('.')[0]
             logger.info('No configurations found on hub "%s".', hub_name)
         return result
     except CloudError as e:
@@ -1640,6 +1647,10 @@ def iot_hub_configuration_delete(
         login=login,
         auth_type=auth_type_dataplane,
     )
+    return _iot_hub_configuration_delete(target, config_id, etag)
+
+
+def _iot_hub_configuration_delete(target, config_id, etag=None):
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
@@ -1838,6 +1849,10 @@ def iot_device_twin_replace(
         login=login,
         auth_type=auth_type_dataplane,
     )
+    return _iot_device_twin_replace(target, device_id, target_json, etag)
+
+
+def _iot_device_twin_replace(target, device_id, target_json, etag=None):
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
@@ -2225,497 +2240,6 @@ def iot_get_module_connection_string(
     return result
 
 
-# Messaging
-
-
-def iot_device_send_message(
-    cmd,
-    device_id,
-    hub_name=None,
-    data="Ping from Az CLI IoT Extension",
-    properties=None,
-    msg_count=1,
-    resource_group_name=None,
-    login=None
-):
-    from azext_iot.operations._mqtt import mqtt_client
-    discovery = IotHubDiscovery(cmd)
-    target = discovery.get_target(
-        resource_name=hub_name, resource_group_name=resource_group_name, login=login
-    )
-    if properties:
-        properties = validate_key_value_pairs(properties)
-    device = _iot_device_show(target, device_id)
-    device_connection_string = _build_device_or_module_connection_string(device, KeyType.primary.value)
-    device_auth_api_type = device.get("authentication", {}).get("type", "") if device else None
-    client_mqtt = mqtt_client(
-        target=target,
-        device_conn_string=device_connection_string,
-        device_id=device_id,
-        device_auth_api_type=device_auth_api_type
-    )
-    for _ in range(msg_count):
-        client_mqtt.send_d2c_message(message_text=data, properties=properties)
-    client_mqtt.shutdown()
-
-
-def iot_device_send_message_http(
-    cmd,
-    device_id,
-    data,
-    hub_name=None,
-    headers=None,
-    resource_group_name=None,
-    login=None,
-):
-    discovery = IotHubDiscovery(cmd)
-    target = discovery.get_target(
-        resource_name=hub_name, resource_group_name=resource_group_name, login=login
-    )
-    return _iot_device_send_message_http(target, device_id, data, headers)
-
-
-def _iot_device_send_message_http(target, device_id, data, headers=None):
-    resolver = SdkResolver(target=target, device_id=device_id)
-    device_sdk = resolver.get_sdk(SdkType.device_sdk)
-
-    try:
-        return device_sdk.device.send_device_event(
-            id=device_id, message=data, custom_headers=headers
-        )
-    except CloudError as e:
-        handle_service_exception(e)
-
-
-def iot_c2d_message_complete(
-    cmd, device_id, etag, hub_name=None, resource_group_name=None, login=None
-):
-    discovery = IotHubDiscovery(cmd)
-    target = discovery.get_target(
-        resource_name=hub_name, resource_group_name=resource_group_name, login=login
-    )
-    return _iot_c2d_message_complete(target, device_id, etag)
-
-
-def _iot_c2d_message_complete(target, device_id, etag):
-    resolver = SdkResolver(target=target, device_id=device_id)
-    device_sdk = resolver.get_sdk(SdkType.device_sdk)
-
-    try:
-        return device_sdk.device.complete_device_bound_notification(
-            id=device_id, etag=etag
-        )
-    except CloudError as e:
-        handle_service_exception(e)
-
-
-def iot_c2d_message_reject(
-    cmd, device_id, etag, hub_name=None, resource_group_name=None, login=None
-):
-    discovery = IotHubDiscovery(cmd)
-    target = discovery.get_target(
-        resource_name=hub_name, resource_group_name=resource_group_name, login=login
-    )
-    return _iot_c2d_message_reject(target, device_id, etag)
-
-
-def _iot_c2d_message_reject(target, device_id, etag):
-    resolver = SdkResolver(target=target, device_id=device_id)
-    device_sdk = resolver.get_sdk(SdkType.device_sdk)
-
-    try:
-        return device_sdk.device.complete_device_bound_notification(
-            id=device_id, etag=etag, reject=""
-        )
-    except CloudError as e:
-        handle_service_exception(e)
-
-
-def iot_c2d_message_abandon(
-    cmd, device_id, etag, hub_name=None, resource_group_name=None, login=None
-):
-    discovery = IotHubDiscovery(cmd)
-    target = discovery.get_target(
-        resource_name=hub_name, resource_group_name=resource_group_name, login=login
-    )
-    return _iot_c2d_message_abandon(target, device_id, etag)
-
-
-def _iot_c2d_message_abandon(target, device_id, etag):
-    resolver = SdkResolver(target=target, device_id=device_id)
-    device_sdk = resolver.get_sdk(SdkType.device_sdk)
-
-    try:
-        return device_sdk.device.abandon_device_bound_notification(
-            id=device_id, etag=etag
-        )
-    except CloudError as e:
-        handle_service_exception(e)
-
-
-def iot_c2d_message_receive(
-    cmd,
-    device_id,
-    hub_name=None,
-    lock_timeout=60,
-    resource_group_name=None,
-    login=None,
-    abandon=None,
-    complete=None,
-    reject=None,
-):
-    ack = None
-    ack_vals = [abandon, complete, reject]
-    if any(ack_vals):
-        if len(list(filter(lambda val: val, ack_vals))) > 1:
-            raise MutuallyExclusiveArgumentError(
-                "Only one c2d-message ack argument can be used [--complete, --abandon, --reject]"
-            )
-        if abandon:
-            ack = SettleType.abandon.value
-        elif complete:
-            ack = SettleType.complete.value
-        elif reject:
-            ack = SettleType.reject.value
-
-    discovery = IotHubDiscovery(cmd)
-    target = discovery.get_target(
-        resource_name=hub_name, resource_group_name=resource_group_name, login=login
-    )
-    return _iot_c2d_message_receive(target, device_id, lock_timeout, ack)
-
-
-def _iot_c2d_message_receive(target, device_id, lock_timeout=60, ack=None):
-    from azext_iot.constants import MESSAGING_HTTP_C2D_SYSTEM_PROPERTIES
-
-    resolver = SdkResolver(target=target, device_id=device_id)
-    device_sdk = resolver.get_sdk(SdkType.device_sdk)
-
-    request_headers = {}
-    if lock_timeout:
-        request_headers["IotHub-MessageLockTimeout"] = str(lock_timeout)
-
-    try:
-        result = device_sdk.device.receive_device_bound_notification(
-            id=device_id, custom_headers=request_headers, raw=True
-        ).response
-
-        if result and result.status_code == 200:
-            payload = {"properties": {}}
-
-            if "etag" in result.headers:
-                eTag = result.headers["etag"].strip('"')
-                payload["etag"] = eTag
-
-                if ack:
-                    ack_response = {}
-                    if ack == SettleType.abandon.value:
-                        logger.debug("__Abandoning message__")
-                        ack_response = (
-                            device_sdk.device.abandon_device_bound_notification(
-                                id=device_id, etag=eTag, raw=True
-                            )
-                        )
-                    elif ack == SettleType.reject.value:
-                        logger.debug("__Rejecting message__")
-                        ack_response = (
-                            device_sdk.device.complete_device_bound_notification(
-                                id=device_id, etag=eTag, reject="", raw=True
-                            )
-                        )
-                    else:
-                        logger.debug("__Completing message__")
-                        ack_response = (
-                            device_sdk.device.complete_device_bound_notification(
-                                id=device_id, etag=eTag, raw=True
-                            )
-                        )
-
-                    payload["ack"] = (
-                        ack
-                        if (ack_response and ack_response.response.status_code == 204)
-                        else None
-                    )
-
-            app_prop_prefix = "iothub-app-"
-            app_prop_keys = [
-                header
-                for header in result.headers
-                if header.lower().startswith(app_prop_prefix)
-            ]
-
-            app_props = {}
-            for key in app_prop_keys:
-                app_props[key[len(app_prop_prefix) :]] = result.headers[key]
-
-            if app_props:
-                payload["properties"]["app"] = app_props
-
-            sys_props = {}
-            for key in MESSAGING_HTTP_C2D_SYSTEM_PROPERTIES:
-                if key in result.headers:
-                    sys_props[key] = result.headers[key]
-
-            if sys_props:
-                payload["properties"]["system"] = sys_props
-
-            if result.content:
-                target_encoding = result.headers.get("ContentEncoding", "utf-8")
-                logger.info(f"Decoding message data encoded with: {target_encoding}")
-                payload["data"] = result.content.decode(target_encoding)
-
-            return payload
-        return
-    except CloudError as e:
-        handle_service_exception(e)
-
-
-def iot_c2d_message_send(
-    cmd,
-    device_id,
-    hub_name=None,
-    data="Ping from Az CLI IoT Extension",
-    message_id=None,
-    correlation_id=None,
-    user_id=None,
-    content_encoding="utf-8",
-    content_type=None,
-    expiry_time_utc=None,
-    properties=None,
-    ack=None,
-    wait_on_feedback=False,
-    yes=False,
-    repair=False,
-    resource_group_name=None,
-    login=None,
-    auth_type_dataplane=None,
-):
-    from azext_iot.common.deps import ensure_uamqp
-
-    if wait_on_feedback and not ack:
-        raise RequiredArgumentMissingError(
-            'To wait on device feedback, ack must be "full", "negative" or "positive"'
-        )
-
-    config = cmd.cli_ctx.config
-    ensure_uamqp(config, yes, repair)
-
-    discovery = IotHubDiscovery(cmd)
-    target = discovery.get_target(
-        resource_name=hub_name,
-        resource_group_name=resource_group_name,
-        login=login,
-        auth_type=auth_type_dataplane,
-    )
-
-    if properties:
-        properties = validate_key_value_pairs(properties)
-
-    if expiry_time_utc:
-        now_in_milli = int(time() * 1000)
-        user_msg_expiry = int(expiry_time_utc)
-        if user_msg_expiry < now_in_milli:
-            raise InvalidArgumentValueError("Message expiry time utc is in the past!")
-
-    from azext_iot.monitor import event
-
-    msg_id, errors = event.send_c2d_message(
-        target=target,
-        device_id=device_id,
-        data=data,
-        message_id=message_id,
-        correlation_id=correlation_id,
-        user_id=user_id,
-        content_encoding=content_encoding,
-        content_type=content_type,
-        expiry_time_utc=expiry_time_utc,
-        properties=properties,
-        ack=ack,
-    )
-    if errors:
-        raise CLIInternalError(
-            "C2D message error: {}, use --debug for more details.".format(errors)
-        )
-
-    if wait_on_feedback:
-        _iot_hub_monitor_feedback(target=target, device_id=device_id, wait_on_id=msg_id)
-
-
-def iot_simulate_device(
-    cmd,
-    device_id,
-    hub_name=None,
-    receive_settle="complete",
-    data="Ping from Az CLI IoT Extension",
-    msg_count=100,
-    msg_interval=3,
-    protocol_type="mqtt",
-    properties=None,
-    resource_group_name=None,
-    login=None,
-    method_response_code=None,
-    method_response_payload=None,
-    init_reported_properties=None
-):
-    import sys
-    import uuid
-    import datetime
-    import json
-    from azext_iot.operations._mqtt import mqtt_client
-    from threading import Event, Thread
-    from tqdm import tqdm
-    from azext_iot.constants import (
-        MIN_SIM_MSG_INTERVAL,
-        MIN_SIM_MSG_COUNT,
-        SIM_RECEIVE_SLEEP_SEC,
-    )
-
-    protocol_type = protocol_type.lower()
-    if protocol_type == ProtocolType.mqtt.name:
-        if receive_settle != "complete":
-            raise InvalidArgumentValueError('mqtt protocol only supports settle type of "complete"')
-
-    if msg_interval < MIN_SIM_MSG_INTERVAL:
-        raise InvalidArgumentValueError("msg interval must be at least {}".format(MIN_SIM_MSG_INTERVAL))
-
-    if msg_count < MIN_SIM_MSG_COUNT:
-        raise InvalidArgumentValueError("msg count must be at least {}".format(MIN_SIM_MSG_COUNT))
-
-    if protocol_type != ProtocolType.mqtt.name:
-        if method_response_code:
-            raise ArgumentUsageError("'method-response-code' not supported, {} doesn't allow direct methods."
-                                     .format(protocol_type))
-        if method_response_payload:
-            raise ArgumentUsageError("'method-response-payload' not supported, {} doesn't allow direct methods."
-                                     .format(protocol_type))
-        if init_reported_properties:
-            raise ArgumentUsageError("'init-reported-properties' not supported, {} doesn't allow setting twin props"
-                                     .format(protocol_type))
-
-    properties_to_send = _iot_simulate_get_default_properties(protocol_type)
-    user_properties = validate_key_value_pairs(properties) or {}
-    properties_to_send.update(user_properties)
-
-    discovery = IotHubDiscovery(cmd)
-    target = discovery.get_target(
-        resource_name=hub_name, resource_group_name=resource_group_name, login=login
-    )
-
-    if method_response_payload:
-        method_response_payload = process_json_arg(
-            method_response_payload, argument_name="method-response-payload"
-        )
-
-    if init_reported_properties:
-        init_reported_properties = process_json_arg(
-            init_reported_properties, argument_name="init-reported-properties"
-        )
-
-    class generator(object):
-        def __init__(self):
-            self.calls = 0
-
-        def generate(self, jsonify=True):
-            self.calls += 1
-            payload = {
-                "id": str(uuid.uuid4()),
-                "timestamp": str(datetime.datetime.utcnow()),
-                "data": str(data + " #{}".format(self.calls)),
-            }
-            return json.dumps(payload) if jsonify else payload
-
-    cancellation_token = Event()
-
-    def http_wrap(target, device_id, generator, msg_interval, msg_count):
-        for _ in tqdm(range(0, msg_count), desc='Sending and receiving events via https', ascii=' #'):
-            d = generator.generate(False)
-            _iot_device_send_message_http(target, device_id, d, headers=properties_to_send)
-            if cancellation_token.wait(msg_interval):
-                break
-    try:
-        device = _iot_device_show(target, device_id)
-        if protocol_type == ProtocolType.mqtt.name:
-            device_connection_string = _build_device_or_module_connection_string(device, KeyType.primary.value)
-            device_auth_api_type = device.get("authentication", {}).get("type", "") if device else None
-
-            client_mqtt = mqtt_client(
-                target=target,
-                device_conn_string=device_connection_string,
-                device_id=device_id,
-                device_auth_api_type=device_auth_api_type,
-                method_response_code=method_response_code,
-                method_response_payload=method_response_payload,
-                init_reported_properties=init_reported_properties
-            )
-            client_mqtt.execute(data=generator(), properties=properties_to_send, publish_delay=msg_interval, msg_count=msg_count)
-            client_mqtt.shutdown()
-        else:
-            op = Thread(target=http_wrap, args=(target, device_id, generator(), msg_interval, msg_count))
-            op.start()
-
-            while op.is_alive():
-                _handle_c2d_msg(target, device_id, receive_settle)
-                sleep(SIM_RECEIVE_SLEEP_SEC)
-
-    except KeyboardInterrupt:
-        sys.exit()
-    except Exception as x:
-        raise CLIInternalError(x)
-    finally:
-        if cancellation_token:
-            cancellation_token.set()
-
-
-def iot_c2d_message_purge(
-    cmd,
-    device_id,
-    hub_name=None,
-    resource_group_name=None,
-    login=None,
-):
-    discovery = IotHubDiscovery(cmd)
-    target = discovery.get_target(
-        resource_name=hub_name,
-        resource_group_name=resource_group_name,
-        login=login,
-    )
-    resolver = SdkResolver(target=target)
-    service_sdk = resolver.get_sdk(SdkType.service_sdk)
-
-    return service_sdk.cloud_to_device_messages.purge_cloud_to_device_message_queue(
-        device_id
-    )
-
-
-def _iot_simulate_get_default_properties(protocol):
-    default_properties = {}
-    is_mqtt = protocol == ProtocolType.mqtt.name
-
-    default_properties["$.ct" if is_mqtt else "content-type"] = "application/json"
-    default_properties["$.ce" if is_mqtt else "content-encoding"] = "utf-8"
-
-    return default_properties
-
-
-def _handle_c2d_msg(target, device_id, receive_settle, lock_timeout=60):
-    result = _iot_c2d_message_receive(target, device_id, lock_timeout)
-    if result:
-        print()
-        print("C2D Message Handler [Received C2D message]:")
-        printer.pprint(result)
-        if receive_settle == "reject":
-            print("C2D Message Handler [Rejecting message]")
-            _iot_c2d_message_reject(target, device_id, result["etag"])
-        elif receive_settle == "abandon":
-            print("C2D Message Handler [Abandoning message]")
-            _iot_c2d_message_abandon(target, device_id, result["etag"])
-        else:
-            print("C2D Message Handler [Completing message]")
-            _iot_c2d_message_complete(target, device_id, result["etag"])
-        return True
-    return False
-
-
 def iot_device_export(
     cmd,
     hub_name,
@@ -2879,59 +2403,6 @@ def iot_device_import(
         input_blob_container_uri=input_blob_container_uri,
         output_blob_container_uri=output_blob_container_uri,
     )
-
-
-def iot_device_upload_file(
-    cmd,
-    device_id,
-    file_path,
-    content_type,
-    hub_name=None,
-    resource_group_name=None,
-    login=None,
-):
-    from azext_iot.sdk.iothub.device.models import FileUploadCompletionStatus
-
-    discovery = IotHubDiscovery(cmd)
-    target = discovery.get_target(
-        resource_name=hub_name, resource_group_name=resource_group_name, login=login
-    )
-
-    resolver = SdkResolver(target=target, device_id=device_id)
-    device_sdk = resolver.get_sdk(SdkType.device_sdk)
-
-    if not exists(file_path):
-        raise FileOperationError('File path "{}" does not exist!'.format(file_path))
-
-    content = read_file_content(file_path)
-    file_name = basename(file_path)
-
-    try:
-        upload_meta = device_sdk.device.create_file_upload_sas_uri(
-            device_id=device_id, blob_name=file_name, raw=True
-        ).response.json()
-        storage_endpoint = "{}/{}/{}{}".format(
-            upload_meta["hostName"],
-            upload_meta["containerName"],
-            upload_meta["blobName"],
-            upload_meta["sasToken"],
-        )
-        completion_status = FileUploadCompletionStatus(
-            correlation_id=upload_meta["correlationId"], is_success=True
-        )
-        upload_response = device_sdk.device.upload_file_to_container(
-            storage_endpoint=storage_endpoint,
-            content=content,
-            content_type=content_type,
-        )
-        completion_status.status_code = upload_response.status_code
-        completion_status.status_reason = upload_response.reason
-
-        return device_sdk.device.update_file_upload_status(
-            device_id=device_id, file_upload_completion_status=completion_status
-        )
-    except CloudError as e:
-        handle_service_exception(e)
 
 
 def iot_hub_monitor_events(

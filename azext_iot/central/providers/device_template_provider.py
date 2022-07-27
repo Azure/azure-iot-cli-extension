@@ -13,6 +13,7 @@ from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.v1 import TemplateV1
 from azext_iot.central.models.v1_1_preview import TemplateV1_1_preview
+from azext_iot.central.models.ga_2022_05_31 import TemplateGa20220531
 from azext_iot.central.models.preview import TemplatePreview
 
 
@@ -40,7 +41,7 @@ class CentralDeviceTemplateProvider:
         self,
         device_template_id,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> Union[TemplateV1, TemplateV1_1_preview, TemplatePreview]:
+    ) -> Union[TemplateV1, TemplateV1_1_preview, TemplatePreview, TemplateGa20220531]:
         # get or add to cache
         device_template = self._device_templates.get(device_template_id)
         if not device_template:
@@ -67,7 +68,7 @@ class CentralDeviceTemplateProvider:
         self,
         compact=False,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> List[Union[TemplateV1, TemplateV1_1_preview, TemplatePreview]]:
+    ) -> List[Union[TemplateV1, TemplateV1_1_preview, TemplatePreview, TemplateGa20220531]]:
         templates = central_services.device_template.list_device_templates(
             cmd=self._cmd,
             app_id=self._app_id,

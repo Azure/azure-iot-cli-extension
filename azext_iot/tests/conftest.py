@@ -25,13 +25,17 @@ path_discovery_init = (
     "azext_iot.iothub.providers.discovery.IotHubDiscovery._initialize_client"
 )
 path_sas = "azext_iot._factory.SasTokenAuthentication"
-path_mqtt_device_client = (
+path_mqtt_device_client_cs = (
     "azure.iot.device.IoTHubDeviceClient.create_from_connection_string"
+)
+path_mqtt_device_client_x509 = (
+    "azure.iot.device.IoTHubDeviceClient.create_from_x509_certificate"
 )
 path_iot_hub_monitor_events_entrypoint = (
     "azext_iot.operations.hub._iot_hub_monitor_events"
 )
 path_iot_device_show = "azext_iot.operations.hub._iot_device_show"
+path_device_messaging_iot_device_show = "azext_iot.iothub.providers.device_messaging._iot_device_show"
 path_update_device_twin = "azext_iot.operations.hub._iot_device_twin_update"
 hub_entity = "myhub.azure-devices.net"
 path_iot_service_provisioning_factory = "azext_iot._factory.iot_service_provisioning_factory"
@@ -172,16 +176,22 @@ def serviceclient_generic_invalid_or_missing_etag(
 
 
 @pytest.fixture()
-def mqttclient(mocker, fixture_ghcs, fixture_sas):
-    client = mocker.patch(path_mqtt_device_client)
+def mqttclient_cs(mocker, fixture_ghcs, fixture_sas):
+    client = mocker.patch(path_mqtt_device_client_cs)
+    return client
+
+
+@pytest.fixture()
+def mqttclient_x509(mocker, fixture_ghcs, fixture_sas):
+    client = mocker.patch(path_mqtt_device_client_x509)
     return client
 
 
 @pytest.fixture()
 def mqttclient_generic_error(mocker, fixture_ghcs, fixture_sas):
-    mqtt_client = mocker.patch(path_mqtt_device_client)
-    mqtt_client().connect.side_effect = Exception("something happened")
-    return mqtt_client
+    MQTTProvider = mocker.patch(path_mqtt_device_client_cs)
+    MQTTProvider().connect.side_effect = Exception("something happened")
+    return MQTTProvider
 
 
 @pytest.fixture()
@@ -220,12 +230,12 @@ def fixture_iot_device_show_sas(mocker):
 
 
 @pytest.fixture()
-def fixture_self_signed_device_show_self_signed(mocker):
-    device = mocker.patch(path_iot_device_show)
+def fixture_device_messaging_iot_device_show_sas(mocker):
+    device = mocker.patch(path_device_messaging_iot_device_show)
     device.return_value = {
         "authentication": {
             "symmetricKey": {"primaryKey": "test_pk", "secondaryKey": "test_sk"},
-            "type": DeviceAuthApiType.selfSigned.value,
+            "type": DeviceAuthApiType.sas.value,
             "x509Thumbprint": {"primaryThumbprint": None, "secondaryThumbprint": None},
         },
         "capabilities": {"iotEdge": False},

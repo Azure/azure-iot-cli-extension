@@ -553,7 +553,7 @@ def load_digitaltwins_help():
         type: group
         short-summary: Manage and configure event routes.
         long-summary:
-            Note that an endpoint must first be configred before adding an event route.
+            Note that an endpoint must first be configured before adding an event route.
     """
 
     helps["dt route create"] = """
@@ -923,8 +923,9 @@ def load_digitaltwins_help():
 
     helps["dt model create"] = """
         type: command
-        short-summary: Uploads one or more models. When any error occurs, no models are uploaded.
-        long-summary: --models can be inline json or file path.
+        short-summary: Uploads one or more models.
+        long-summary: --models can be inline json or file path. Size of input model set (ontology) is
+                      constrained by max number of models which the DT instance can store (default is 10000 models).
 
         examples:
         - name: Bulk upload all .json or .dtdl model files from a target directory. Model processing is recursive.
@@ -996,4 +997,63 @@ def load_digitaltwins_help():
         - name: Delete all models.
           text: >
             az dt model delete-all -n {instance_or_hostname}
+    """
+
+    helps["dt job"] = """
+        type: group
+        short-summary: Manage and configure jobs for a digital twin instance.
+    """
+
+    helps["dt job import"] = """
+        type: group
+        short-summary: Manage and configure jobs for importing model, twin and relationships data to a digital twin instance.
+    """
+
+    helps["dt job import create"] = """
+        type: command
+        short-summary: Create and execute a data import job on a digital twin instance.
+        long-summary: The command requires an input import data file (in .ndjson format) to be present in the input blob container.
+                      Additionally, the DT instance being used must have 'Storage Blob Data Contributor' role set on input storage account.
+                      Once the job completes, an output file containing job's logs and errors will be created.
+
+        examples:
+        - name: Creates a job for importing data file stored in an Azure Storage Container. Import job's output file is created in the input file's blob container.
+          text: >
+            az dt job import create -n {instance_or_hostname} --data-file {data_file_name} --input-blob-container {input_blob_container_name}
+            --input-storage-account {input_storage_account_name} --output-file {output_file_name}
+        - name: Creates a job for importing data file stored in an azure storage container. Import job's output file is created in user-defined storage account and blob container.
+          text: >
+            az dt job import create -n {instance_or_hostname} --data-file {data_file_name} --input-blob-container {input_blob_container_name}
+            --input-storage-account {input_storage_account_name} --output-file {output_file_name} --output-blob-container {output_blob_container_name}
+            --output-storage-account {output_storage_account_name}
+    """
+
+    helps["dt job import show"] = """
+        type: command
+        short-summary: Show details of a data import job executed on a digital twins instance
+
+        examples:
+        - name: Show details of a data import job by job id.
+          text: >
+            az dt job import show -n {instance_or_hostname} -j {job_id}
+    """
+
+    helps["dt job import list"] = """
+        type: command
+        short-summary: List all data import jobs executed on a digital twins instance.
+
+        examples:
+        - name: List all data import jobs on a target digital twins instance.
+          text: >
+            az dt job import list -n {instance_or_hostname}
+    """
+
+    helps["dt job import delete"] = """
+        type: command
+        short-summary: Delete a data import job executed on a digital twins instance.
+
+        examples:
+        - name: Delete a data import job by job id.
+          text: >
+            az dt job import delete -n {instance_or_hostname} -j {job_id}
     """

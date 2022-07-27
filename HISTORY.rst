@@ -6,6 +6,84 @@ Release History
 unreleased
 +++++++++++++++
 
+
+0.16.1
++++++++++++++++
+
+* Fix issue preventing reference docgen.
+
+
+0.16.0
++++++++++++++++
+
+**Device Update**
+
+* The **in preview** `az iot device-update` command group is now always available.
+  No environment variable is needed for activation.
+
+  - The Device Update command group supports all `account` and `instance` related functionality against
+    control plane API version 2022-04-01-preview.
+
+**Digital Twin updates**
+
+* Updated `az dt model create` command to process input ontologies larger than 250 models in a single command run.
+  Size of input ontology is only constrained by the maximum number of models(default 10000) a DT instance can store.
+
+**IoT Central updates**
+
+* Add support for device groups CRUD.
+
+  - az iot central device-group
+
+    - az iot central device-group list
+    - az iot central device-group show
+    - az iot central device-group create
+    - az iot central device-group delete
+    - az iot central device-group update
+
+* Add support for device attestation CRUD.
+
+  - az iot central device attestation
+
+    - az iot central device attestation show
+    - az iot central device attestation create
+    - az iot central device attestation delete
+    - az iot central device attestation update
+
+* Add support for device/module properties/telemetry/command.
+
+  - az iot central device list-components
+  - az iot central device list-modules
+  - az iot central device telemetry
+
+    - az iot central device telemetry show
+
+  - az iot central device twin
+
+    - az iot central device twin show
+    - az iot central device twin update
+    - az iot central device twin replace
+
+* Add support for 2022-05-31 GA version.
+
+  - az iot central api-token
+  - az iot central device-template
+  - az iot central device-group
+  - az iot central device
+  - az iot central file-upload-config
+  - az iot central organization
+  - az iot central role
+  - az iot central user
+
+**IoT device updates**
+
+* `az iot device simulate` and `az iot device send-d2c-message` support a `--model-id` argument.
+  The model Id is used by a device to advertise the digital twin interface it implements.
+
+
+0.15.0
++++++++++++++++
+
 **General updates**
 
 * Dropped support for Python 3.6. The IoT extension is constrained to Python 3.7 or greater.
@@ -13,10 +91,33 @@ unreleased
 
 **Device Update**
 
-* Introducing the Azure Device Update for IoT Hub root command group `az iot device-update`.
+* Introducing the **in preview** Azure Device Update for IoT Hub root command group `az iot device-update`.
   To learn more about the service visit https://docs.microsoft.com/en-us/azure/iot-hub-device-update/.
+ 
+  - This command group is behind a feature flag environment variable. Set `IOT_CLI_ADU_ENABLED` to any value
+    to activate the command group.
+  - The Device Update command group supports all `account` and `instance` related functionality against
+    control plane API version 2022-04-01-preview.
 
-  - The Device Update command group supports all `account` and `instance` related functionality.
+**IoT device updates**
+
+* Added device registration commands, `az iot device registration create` to register a device to an individual
+  enrollment or an enrollment group. Currently, devices with symmetric key and x509 certificate authentication
+  are supported. Once registered, the device will show up in the linked IoT Hub and can be interacted with or
+  simulated using other `az iot device` commands.
+
+* Added support for simulating device identities that use x509 thumbprint or CA authentication, impacting the
+  following commands:
+    - `az iot device simulate`
+    - `az iot device send-d2c-message`
+
+**Digital Twin updates**
+
+* Added `az dt job import` command group, which will allow users to create and manage jobs for bulk importing
+  models, twins and relationships to a Digital Twins instance. The bulk import data must be stored as a blob in
+  a user owned storage account and container.
+
+* Data History commands, under the `az dt data-history` command group, are now GA.
 
 
 0.14.1
