@@ -2,6 +2,7 @@ import random
 import json
 import os
 import time
+from pathlib import Path
 from azext_iot.common.shared import DeviceAuthApiType
 
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
@@ -17,6 +18,7 @@ from azext_iot.tests.iothub import (
 )
 
 settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED, opt_env_set=ENV_SET_TEST_IOTHUB_OPTIONAL)
+CWD = os.path.dirname(os.path.abspath(__file__))
 
 
 class TestHubExportImport(IoTLiveScenarioTest):
@@ -45,8 +47,13 @@ class TestHubExportImport(IoTLiveScenarioTest):
         labels = {generate_generic_id() : generate_generic_id(), generate_generic_id() : generate_generic_id()}
         labels = json.dumps(labels)
 
-        metrics_path = os.path.dirname(__file__) + "\\..\\configurations\\test_config_generic_metrics.json"
-        content_path = os.path.dirname(__file__) + "\\..\\configurations\\test_adm_device_content.json"
+        metrics_path = os.path.join(Path(CWD), "..", "configurations", "test_config_generic_metrics.json")
+        content_path = os.path.join(Path(CWD), "..", "configurations", "test_adm_device_content.json")
+
+        print()
+        print(Path(CWD))
+        print(metrics_path)
+        print()
 
         self.kwargs["config_content"] = read_file_content(content_path)
         self.kwargs["labels"] = labels
@@ -61,7 +68,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
         )
 
         # make a regular edge deployment
-        deployment1_path = os.path.dirname(__file__) + "\\..\\configurations\\test_edge_deployment.json"
+        deployment1_path = os.path.join(Path(CWD), "..", "configurations", "test_edge_deployment.json")
         self.kwargs["edge_content1"] = read_file_content(deployment1_path)
         self.cmd(
             "iot edge deployment create -d deployment1 -l {} --content '{}' --labels '{}' --priority {} --metrics '{}' "
@@ -71,7 +78,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
         )
 
         # make a layered edge deployment
-        deployment2_path = os.path.dirname(__file__) + "\\..\\configurations\\test_edge_deployment_layered.json"
+        deployment2_path = os.path.join(Path(CWD), "..", "configurations", "test_edge_deployment_layered.json")
         self.kwargs["edge_content2"] = read_file_content(deployment2_path)
         self.cmd(
             "iot edge deployment create -d deployment2 -l {} --content '{}' --labels '{}' --priority {} --metrics '{}' "
@@ -455,6 +462,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
                     auth_type=auth_phase
                 )
             )
+            time.sleep(1)
             self.compare_hub_to_file()
 
         for auth_phase in DATAPLANE_AUTH_TYPES:
