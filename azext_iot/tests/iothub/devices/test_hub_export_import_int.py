@@ -1,4 +1,5 @@
 import random
+import pytest
 import json
 import os
 import time
@@ -47,8 +48,8 @@ class TestHubExportImport(IoTLiveScenarioTest):
         labels = {generate_generic_id() : generate_generic_id(), generate_generic_id() : generate_generic_id()}
         labels = json.dumps(labels)
 
-        metrics_path = os.path.abspath(os.path.join(Path(CWD), "..", "configurations", "test_config_generic_metrics.json"))
-        content_path = os.path.abspath(os.path.join(Path(CWD), "..", "configurations", "test_adm_device_content.json"))
+        metrics_path = os.path.join(Path(CWD), "..", "configurations", "test_config_generic_metrics.json")
+        content_path = os.path.join(Path(CWD), "..", "configurations", "test_adm_device_content.json")
 
         self.kwargs["config_content"] = read_file_content(content_path)
         self.kwargs["labels"] = labels
@@ -63,7 +64,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
         )
 
         # make a regular edge deployment
-        deployment1_path = os.path.abspath(os.path.join(Path(CWD), "..", "configurations", "test_edge_deployment.json"))
+        deployment1_path = os.path.join(Path(CWD), "..", "configurations", "test_edge_deployment.json")
         self.kwargs["edge_content1"] = read_file_content(deployment1_path)
         self.cmd(
             "iot edge deployment create -d deployment1 -l {} --content '{}' --labels '{}' --priority {} --metrics '{}' "
@@ -73,7 +74,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
         )
 
         # make a layered edge deployment
-        deployment2_path = os.path.abspath(os.path.join(Path(CWD), "..", "configurations", "test_edge_deployment_layered.json"))
+        deployment2_path = os.path.join(Path(CWD), "..", "configurations", "test_edge_deployment_layered.json")
         self.kwargs["edge_content2"] = read_file_content(deployment2_path)
         self.cmd(
             "iot edge deployment create -d deployment2 -l {} --content '{}' --labels '{}' --priority {} --metrics '{}' "
@@ -448,6 +449,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
         else:
             self.clean_up_hub(self.dest_hub_cstring)
 
+    @pytest.mark.skip(reason="no way of currently testing this")
     def test_export_import(self):
 
         for auth_phase in DATAPLANE_AUTH_TYPES:
@@ -471,6 +473,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
             time.sleep(1)  # gives the hub time to update before the checks
             self.compare_hub_to_file()
 
+    @pytest.mark.skip(reason="no way of currently testing this")
     def test_migrate(self):
 
         for auth_phase in DATAPLANE_AUTH_TYPES:
