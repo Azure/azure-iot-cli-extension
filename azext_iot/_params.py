@@ -800,13 +800,14 @@ def load_arguments(self, _):
             help="This command supports an entity connection string with rights to perform action on the destination hub. "
             'Use to avoid session login via "az login" for this IoT Hub instance. '
             "If both an entity connection string and name are provided the connection string takes priority. "
-            "Required if --hub-name is not provided.",
+            "Required if --destination-hub is not provided.",
             arg_group="IoT Hub Identifier"
         )
         context.argument(
             "orig_hub",
             options_list=["--origin-hub", "--oh"],
-            help="Name of IoT Hub which will be copied."
+            help="Name of IoT Hub which will be copied.",
+            arg_group="IoT Hub Identifier"
         )
         context.argument(
             "orig_resource_group_name",
@@ -820,7 +821,7 @@ def load_arguments(self, _):
             help="This command supports an entity connection string with rights to perform action on the origin hub. "
             'Use to avoid session login via "az login" for this IoT Hub instance. '
             "If both an entity connection string and name are provided the connection string takes priority. "
-            "Required if --hub-name is not provided.",
+            "Required if --origin-hub is not provided.",
             arg_group="IoT Hub Identifier"
         )
 
