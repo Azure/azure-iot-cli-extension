@@ -60,7 +60,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             self._create_storage_account()
 
         if not settings.env.azext_iot_testhub:
-            if hasattr(self, 'storage_cstring') and hasattr(self, 'storage_container'):
+            if hasattr(self, 'storage_container') and hasattr(self, 'storage_cstring'):
                 self.create_hub(self.entity_name, self.entity_rg, self.storage_container, self.storage_cstring)
             else:
                 self.create_hub(self.entity_name, self.entity_rg)

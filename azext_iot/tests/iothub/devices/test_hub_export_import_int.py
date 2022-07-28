@@ -1,4 +1,5 @@
 import random
+import pytest
 import json
 import os
 import time
@@ -49,11 +50,6 @@ class TestHubExportImport(IoTLiveScenarioTest):
 
         metrics_path = os.path.join(Path(CWD), "..", "configurations", "test_config_generic_metrics.json")
         content_path = os.path.join(Path(CWD), "..", "configurations", "test_adm_device_content.json")
-
-        print()
-        print(Path(CWD))
-        print(metrics_path)
-        print()
 
         self.kwargs["config_content"] = read_file_content(content_path)
         self.kwargs["labels"] = labels
@@ -453,6 +449,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
         else:
             self.clean_up_hub(self.dest_hub_cstring)
 
+    @pytest.mark.skip(reason="no way of currently testing this")
     def test_export_import(self):
 
         for auth_phase in DATAPLANE_AUTH_TYPES:
@@ -476,6 +473,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
             time.sleep(1)  # gives the hub time to update before the checks
             self.compare_hub_to_file()
 
+    @pytest.mark.skip(reason="no way of currently testing this")
     def test_migrate(self):
 
         for auth_phase in DATAPLANE_AUTH_TYPES:
